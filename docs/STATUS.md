@@ -18,7 +18,7 @@ The chosen direction is:
 - hardlink-first import strategy
 
 ## What is not implemented yet
-- downloader integration
+- `get_download_status`
 - `import_to_library`
 - media server refresh
 - watchlist workflow
@@ -26,33 +26,41 @@ The chosen direction is:
 
 ## What is implemented now
 - Telegram bot minimal runtime
-- basic config loading (`TELEGRAM_BOT_TOKEN`, `PROWLARR_BASE_URL`, `PROWLARR_API_KEY`)
+- basic config loading (`TELEGRAM_BOT_TOKEN`, `PROWLARR_BASE_URL`, `PROWLARR_API_KEY`, `TRANSMISSION_BASE_URL`)
 - Telegram text query triggers `search_media`
 - `search_media` calls Prowlarr and returns readable candidate list
 - quality fallback: infer quality/source from title when API quality fields are empty
-- minimal tests for config, search formatting, and bot handler
+- cache recent search candidates in memory (per chat, single-process)
+- numeric selection maps to cached candidate index
+- `add_to_downloader` integrated with Transmission RPC
+- bot reply now includes downloader task id/hash after successful add
+- minimal tests cover config, search formatting, selection mapping, add call behavior, and bot routing
 
 ## Latest verification (2026-04-01)
 - manual check: Telegram bot query confirmed candidate list reply
 - manual check: `dune` query now returns populated quality such as `1080p WEB-DL` / `1080p BluRay`
-- tests: `tests/test_config.py`, `tests/test_search_media.py`, `tests/test_telegram_bot.py` passed (10 passed)
+- manual check: Telegram flow passed (`dune` -> `5`) and bot replied task id/hash (`ID: 87`, `Hash: b305bf9427799bb31499c9efd4a362ec831e4bd6`)
+- tests: `tests/test_config.py`, `tests/test_search_media.py`, `tests/test_add_to_downloader.py`, `tests/test_telegram_bot.py` passed (19 passed)
 
 ## Current priority
 Build the next smallest path:
-1. select one candidate from current search result
-2. add selected candidate to one downloader
-3. let user query download status by task hash/id
+1. let user query downloader task status by id/hash
+2. keep status query result concise and readable in Telegram
+3. keep the current search + select + add flow unchanged
 
 ## Current risks
 - path design must stay compatible with Docker shared root
 - hardlinks require same filesystem
 - avoid introducing too many tools too early
 - avoid premature WeChat support
-- keep search result format stable enough for user selection mapping
+- cached selection is memory-only; restart will lose recent mapping
+- search result format must stay stable enough for index mapping
+- candidate source field differences (`downloadUrl` / `magnetUrl` / `guid`) may cause add failures
+- Transmission availability, session-id handshake, and network timeout may affect add latency
 - Prowlarr availability and API rate/timeout may affect reply latency
 
 ## Acceptance focus
 For now, success means:
-- search result can be selected deterministically
-- add-to-downloader path is testable for one downloader
+- downloader task can be queried by id/hash after add
+- status response is deterministic and testable
 - manual verification steps are clear

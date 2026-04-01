@@ -1,17 +1,17 @@
 # Next step
 
-Prerequisite completed: `search_media` minimal closed loop is already working (including quality fallback from title parsing).
+Prerequisite completed: `search_media` + index-based select + `add_to_downloader` (Transmission) closed loop is working and manually verified in Telegram.
 
 ## Goal
-Implement `add_to_downloader` for one downloader and bind it to selected candidate.
+Implement `get_download_status` using downloader task id/hash.
 
 ## Scope
 Only do:
-- define minimal select command format (index-based)
-- cache recent search candidates in memory (single-process)
-- integrate one downloader client (Transmission or qBittorrent, choose one)
-- add selected candidate to downloader
-- return task id/hash so follow-up status query can use it
+- define minimal status query command format (plain text, no extra channel feature)
+- add one downloader status query path for Transmission
+- accept task id/hash from user input and query downloader
+- return concise status fields in Telegram reply
+- add minimal tests for command parsing and status query behavior
 
 ## Do not do yet
 - database writes
@@ -22,12 +22,11 @@ Only do:
 - media server refresh
 
 ## Done when
-- user can select one search candidate in Telegram
-- selected item is added to one downloader successfully
-- bot replies with downloader task id/hash
-- minimal tests exist for select mapping and add call behavior
-- README includes config and manual verification steps for this flow
+- user can query one downloader task by id/hash in Telegram
+- bot replies with readable status summary
+- minimal tests exist for status command parsing and query call behavior
+- README includes manual verification steps for this flow
 
 ## After this step
 The next task will be:
-Implement `get_download_status` using downloader task id/hash.
+Implement completion handling for download -> import_to_library (hardlink-first).
