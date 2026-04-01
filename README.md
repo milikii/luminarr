@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Luminarr
 
 Luminarr 是一个面向自托管影视自动化场景的轻量自然语言 Agent。
@@ -160,3 +161,6 @@ python -m app.main
 - `docs/NEXT_STEP.md`
 
 每次开新线程前，让 Codex 先读取这三个文件再继续工作。
+=======
+# luminarr
+>>>>>>> origin/main
