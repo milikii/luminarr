@@ -1,32 +1,31 @@
 # Next step
 
-Prerequisite completed: `search_media` + index-based select + `add_to_downloader` (Transmission) closed loop is working and manually verified in Telegram.
+Prerequisite completed: `search_media` + index-based select + `add_to_downloader` + `get_download_status` is implemented for Transmission path.
 
 ## Goal
-Implement `get_download_status` using downloader task id/hash.
+Implement minimal completion handling: download done -> `import_to_library` (hardlink-first).
 
 ## Scope
 Only do:
-- define minimal status query command format (plain text, no extra channel feature)
-- add one downloader status query path for Transmission
-- accept task id/hash from user input and query downloader
-- return concise status fields in Telegram reply
-- add minimal tests for command parsing and status query behavior
+- define one minimal trigger path for completed task import
+- implement hardlink-first import logic for one media target path
+- return clear result when hardlink succeeds or cannot be used
+- keep path assumptions aligned with shared `/data` root
+- add minimal tests for import decision and path behavior
 
 ## Do not do yet
 - database writes
 - watchlist
 - WeChat
 - subtitle logic
-- import_to_library
 - media server refresh
 
 ## Done when
-- user can query one downloader task by id/hash in Telegram
-- bot replies with readable status summary
-- minimal tests exist for status command parsing and query call behavior
+- one completed download can be imported into library path
+- hardlink-first decision is deterministic and testable
+- minimal tests exist for import success and non-hardlinkable cases
 - README includes manual verification steps for this flow
 
 ## After this step
 The next task will be:
-Implement completion handling for download -> import_to_library (hardlink-first).
+Implement media server refresh after successful import.
