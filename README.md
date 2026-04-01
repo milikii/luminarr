@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Luminarr
 
 Luminarr 是一个面向自托管影视自动化场景的轻量自然语言 Agent。
@@ -131,13 +130,15 @@ pip install -r requirements.txt
 
 ```bash
 export TELEGRAM_BOT_TOKEN="你的 Bot Token"
+export PROWLARR_BASE_URL="http://你的-prowlarr:9696"
+export PROWLARR_API_KEY="你的 Prowlarr API Key"
 python -m app.main
 ```
 
 ### 5. 最小手工验收
 
-- 给 Bot 发送任意消息
-- 预期收到固定回复：`✅ 我收到了`
+- 给 Bot 发送搜索词，例如：`dune`
+- 预期收到候选列表文本，包含标题、年份、画质、大小、站点
 
 ## 开发节奏
 
@@ -161,6 +162,3 @@ python -m app.main
 - `docs/NEXT_STEP.md`
 
 每次开新线程前，让 Codex 先读取这三个文件再继续工作。
-=======
-# luminarr
->>>>>>> origin/main

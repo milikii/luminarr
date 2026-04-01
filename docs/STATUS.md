@@ -18,7 +18,6 @@ The chosen direction is:
 - hardlink-first import strategy
 
 ## What is not implemented yet
-- `search_media` workflow
 - downloader integration
 - `import_to_library`
 - media server refresh
@@ -27,29 +26,33 @@ The chosen direction is:
 
 ## What is implemented now
 - Telegram bot minimal runtime
-- basic config loading (`TELEGRAM_BOT_TOKEN`)
-- receives a message and replies with fixed text `✅ 我收到了`
-- minimal tests for config and message handler
+- basic config loading (`TELEGRAM_BOT_TOKEN`, `PROWLARR_BASE_URL`, `PROWLARR_API_KEY`)
+- Telegram text query triggers `search_media`
+- `search_media` calls Prowlarr and returns readable candidate list
+- quality fallback: infer quality/source from title when API quality fields are empty
+- minimal tests for config, search formatting, and bot handler
 
 ## Latest verification (2026-04-01)
-- manual check: Telegram bot reply confirmed with `✅ 我收到了`
-- tests: `tests/test_config.py` and `tests/test_telegram_bot.py` passed
+- manual check: Telegram bot query confirmed candidate list reply
+- manual check: `dune` query now returns populated quality such as `1080p WEB-DL` / `1080p BluRay`
+- tests: `tests/test_config.py`, `tests/test_search_media.py`, `tests/test_telegram_bot.py` passed (10 passed)
 
 ## Current priority
 Build the next smallest path:
-1. parse user query into `search_media`
-2. call Prowlarr search
-3. return readable candidate list to Telegram
+1. select one candidate from current search result
+2. add selected candidate to one downloader
+3. let user query download status by task hash/id
 
 ## Current risks
 - path design must stay compatible with Docker shared root
 - hardlinks require same filesystem
 - avoid introducing too many tools too early
 - avoid premature WeChat support
-- keep `search_media` output stable enough for next "select" step
+- keep search result format stable enough for user selection mapping
+- Prowlarr availability and API rate/timeout may affect reply latency
 
 ## Acceptance focus
 For now, success means:
-- Telegram minimal loop is stable and testable
-- `search_media` can return readable candidates for manual selection
+- search result can be selected deterministically
+- add-to-downloader path is testable for one downloader
 - manual verification steps are clear
