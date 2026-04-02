@@ -23,6 +23,8 @@ def test_load_settings_reads_token() -> None:
     assert settings.transmission_username == "tr-user"
     assert settings.transmission_password == "tr-pass"
     assert settings.library_target_dir == "/data/library/movies"
+    assert settings.emby_base_url == ""
+    assert settings.emby_api_key == ""
 
 
 def test_load_settings_reads_library_target_dir() -> None:
@@ -36,6 +38,21 @@ def test_load_settings_reads_library_target_dir() -> None:
         }
     )
     assert settings.library_target_dir == "/data/library/anime"
+
+
+def test_load_settings_reads_emby_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "EMBY_BASE_URL": "http://emby:8096/",
+            "EMBY_API_KEY": "emby-api-key",
+        }
+    )
+    assert settings.emby_base_url == "http://emby:8096"
+    assert settings.emby_api_key == "emby-api-key"
 
 
 def test_load_settings_requires_token() -> None:

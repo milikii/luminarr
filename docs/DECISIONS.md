@@ -311,6 +311,19 @@
 
 ---
 
+## D-021 refresh 闭环落地：import 成功后触发 Emby 刷新，并分离导入与刷新结果
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - 当前 refresh 路径固定为 Emby-only
+  - 仅在 import 成功后触发 `refresh_media_server`
+  - refresh 输出固定为可测试文本（成功/失败）
+  - refresh 失败不回滚 import 成功结果，回复中并列展示两段结果
+- **原因**：
+  先补齐主链最后一跳，保持改动小且不破坏现有 search/select/add/status/import 语义。
+
+---
+
 ## 附：更新规则
 
 每次要新增一条决策时，使用以下模板：

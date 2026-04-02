@@ -1,74 +1,65 @@
 # Current status
 
 ## Project position
-Luminarr is in early implementation.
-The chosen direction is:
-- self-built minimal runtime
-- Telegram as the only primary validation channel
-- WeChat postponed to later phase
-- Docker Compose deployment target
-- shared `/data` root path inside containers
+Luminarr is in early implementation, under the fixed v12 runtime profile:
+- Telegram private chat only
+- TMDB as metadata source (full flow not landed yet)
+- Prowlarr as search source
+- Transmission as only downloader
+- Emby as only media server
+- Docker Compose + shared `/data` root
+- movie-first narrow workflow
 
 ## What is already decided
-- narrow vertical scope: media automation only
-- Python + FastAPI + SQLite
-- Prowlarr for search
-- one downloader first (Transmission or qBittorrent)
-- Jellyfin / Emby refresh after import
-- hardlink-first import strategy
-
-## What is not implemented yet
-- media server refresh
-- watchlist workflow
-- subtitle workflow
+- narrow vertical scope: media automation harness only
+- parser-first, LLM-fallback
+- hardlink-first import
+- keep tool surface small and stable
+- finish refresh before persistence/approval/recovery
 
 ## What is implemented now
 - Telegram bot minimal runtime
-- basic config loading (`TELEGRAM_BOT_TOKEN`, `PROWLARR_BASE_URL`, `PROWLARR_API_KEY`, `TRANSMISSION_BASE_URL`)
+- config loading for Telegram / Prowlarr / Transmission
 - Telegram text query triggers `search_media`
-- `search_media` calls Prowlarr and returns readable candidate list
-- quality fallback: infer quality/source from title when API quality fields are empty
-- cache recent search candidates in memory (per chat, single-process)
-- numeric selection maps to cached candidate index
-- `add_to_downloader` integrated with Transmission RPC
-- bot reply now includes downloader task id/hash after successful add
-- `get_download_status` implemented via `status <id/hash>` / `状态 <id/hash>`
-- status reply includes task id/hash, status, progress, download speed, eta
-- `import_to_library` implemented via `import <id/hash>` / `导入 <id/hash>`
-- import flow checks completion first, then hardlink-imports into fixed library target path
-- import reply now returns deterministic success/failure reason
-- minimal tests cover config, search/add/status/import behavior, and bot routing
+- search result candidate cache (in-memory, per chat, single process)
+- numeric select -> `add_to_downloader` -> Transmission RPC
+- `status <id/hash>` / `状态 <id/hash>` query path
+- `import <id/hash>` / `导入 <id/hash>` hardlink import path
+- import returns deterministic success/failure text
+- minimal Emby client + `refresh_media_server`
+- refresh is triggered only after import success
+- refresh returns deterministic text:
+  - success: `媒体库刷新成功。`
+  - failure: `媒体库刷新失败：<reason>`
+- tests cover config, bot routing, search/import, and refresh success/failure
 
-## Latest verification (2026-04-01)
-- manual check: Telegram bot query confirmed candidate list reply
-- manual check: `dune` query now returns populated quality such as `1080p WEB-DL` / `1080p BluRay`
-- manual check: Telegram flow passed (`dune` -> `5`) and bot replied task id/hash (`ID: 87`, `Hash: b305bf9427799bb31499c9efd4a362ec831e4bd6`)
-- manual check: status/import command path not manually re-verified in this round
-- tests: `38 passed` (`.venv/bin/python -m pytest -q -s`)
+## What is not implemented yet
+- TMDB-first metadata resolution + Chinese poster-card display
+- fixed v12 search plan (English title + year, original title fallback)
+- candidate persistence (replace memory-only cache)
+- approval persistence and approval flow
+- durable job/event state in SQLite
+- lease/version recovery and retry path
+- watchlist workflow
+
+## Latest verification (2026-04-02)
+- tests: `34 passed` (`.venv/bin/python -m pytest -q -s`)
+- manual Telegram round for refresh path: not executed in this change
 
 ## Current priority
 Build the next smallest path:
-1. trigger media server refresh after successful import
-2. keep current Telegram query/add/status/import behaviors unchanged
-3. keep no-DB minimal runtime until this step is stable
+1. keep current search/select/add/status/import/refresh behavior stable
+2. add minimal persistence for completion-to-refresh chain
+3. postpone approval/recovery until persistence baseline is stable
 
 ## Current risks
-- path design must stay compatible with Docker shared root
-- hardlinks require same filesystem
-- avoid introducing too many tools too early
-- avoid premature WeChat support
-- cached selection is memory-only; restart will lose recent mapping
-- search result format must stay stable enough for index mapping
-- candidate source field differences (`downloadUrl` / `magnetUrl` / `guid`) may cause add failures
-- status command format must avoid collision with normal free-text search
-- import command format must avoid collision with normal free-text search
+- if `EMBY_BASE_URL` / `EMBY_API_KEY` is missing, import still succeeds but refresh will not run
+- candidate cache is memory-only; restart loses index mapping
 - Transmission `downloadDir + name` must map to container-visible paths
-- hardlink import currently has no copy fallback when cross-filesystem
-- Transmission availability, session-id handshake, and network timeout may affect add latency
-- Prowlarr availability and API rate/timeout may affect reply latency
+- hardlink import has no copy fallback for cross-filesystem case
+- current state is not recoverable across restart beyond Transmission's own persistence
 
-## Acceptance focus
-For now, success means:
-- refresh path runs deterministically after successful import
-- refresh failure path has explicit, testable error messages
-- manual verification steps are clear
+## Acceptance focus for next step
+- persistence path does not change current Telegram command behavior
+- persistence writes are deterministic and testable
+- refresh chain remains stable after persistence is introduced

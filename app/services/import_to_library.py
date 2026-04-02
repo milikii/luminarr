@@ -9,6 +9,7 @@ from pathlib import Path
 from app.clients.transmission import TransmissionImportSource
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
+RefreshMediaServerFunc = Callable[[], Awaitable[str]]
 
 IMPORT_QUERY_USAGE_TEXT = "导入格式：import <任务ID或Hash>"
 IMPORT_NOT_FOUND_TEXT = "未找到对应下载任务，请检查任务 ID/Hash。"
@@ -20,12 +21,19 @@ IMPORT_TARGET_EXISTS_TEXT = "目标已存在，已拒绝覆盖：{target_path}"
 IMPORT_PREPARE_TARGET_FAILED_TEXT = "创建目标目录失败：{target_path}"
 IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT = "硬链接失败：源和目标不在同一文件系统。"
 IMPORT_HARDLINK_FAILED_TEXT = "硬链接失败：{reason}"
+IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 
 
 class ImportToLibraryService:
-    def __init__(self, get_import_source_func: GetImportSourceFunc, library_target_dir: str) -> None:
+    def __init__(
+        self,
+        get_import_source_func: GetImportSourceFunc,
+        library_target_dir: str,
+        refresh_media_server_func: RefreshMediaServerFunc | None = None,
+    ) -> None:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
+        self._refresh_media_server_func = refresh_media_server_func
 
     async def import_by_task_ref(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
@@ -66,12 +74,21 @@ class ImportToLibraryService:
                 return IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
             return IMPORT_HARDLINK_FAILED_TEXT.format(reason=str(exc))
 
-        return (
+        import_success_text = (
             f"导入成功：{import_source.name}\n"
             f"任务 ID: {import_source.task_id}\n"
             f"任务 Hash: {import_source.task_hash}\n"
             f"目标路径: {target_path}"
         )
+
+        if self._refresh_media_server_func is None:
+            return import_success_text
+
+        try:
+            refresh_text = await self._refresh_media_server_func()
+        except Exception:
+            refresh_text = IMPORT_REFRESH_FAILED_TEXT
+        return f"{import_success_text}\n{refresh_text}"
 
 
 def parse_import_query(text: str) -> str | None:
