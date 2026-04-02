@@ -11,19 +11,21 @@ Prerequisite completed:
 - minimal import `approval_record` persistence + stale guard is landed
 - TMDB-first movie metadata baseline is landed (parser-first + deterministic fallback)
 - fixed v12 search-order baseline is landed (English + year -> original + year on miss)
+- Chinese poster-card text baseline is landed (card text + unchanged candidate list)
 
 ## Goal
-Land Chinese poster-card display baseline for movie query.
+Land explicit approval interaction baseline for import side effect.
 
 ## Scope
 Only do:
-- keep current parser-first normalization and fixed v12 search-order unchanged
-- keep current candidate mapping persistence and index-select behavior unchanged
-- add deterministic Chinese poster-card style text block for movie query reply
-- keep candidate list text block after card so numeric select keeps current usage
+- keep current search order, poster-card reply, and candidate mapping behavior unchanged
+- keep current Telegram command words for search/select/status/import unchanged
+- make `import <id/hash>` enter deterministic approval-pending response before side effect execution
+- add explicit confirm command for import execution (same task ref), then execute current import hardlink + refresh flow
+- persist approval interaction state using existing approval persistence baseline
 - keep current Telegram command words and routing unchanged
 - keep search/select/add/status/import/refresh behavior unchanged
-- add focused tests for card rendering determinism and no-regression of selection list format
+- add focused tests for approval-pending, confirm execution, and duplicate/stale guard behavior
 
 ## Explicit constraints
 - do not add new downloader/media server support
@@ -31,19 +33,21 @@ Only do:
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming in this step
-- do not introduce rich interactive Telegram UI components (inline keyboard / media group)
+- do not introduce interactive Telegram UI widgets (inline keyboard)
+- do not remove existing `import <id/hash>` command path
 
 ## Suggested implementation shape
-1. isolate movie card view-model assembly from raw search response
-2. prepend deterministic Chinese card text to current search reply
-3. keep existing list index lines unchanged for select compatibility
-4. add focused tests for card text and routing-no-regression
+1. split import path into `request approval` and `execute approved import` two explicit stages
+2. add deterministic text protocol for pending/confirmed/expired states
+3. keep existing import success/failure text body for confirmed execution
+4. add focused tests for approval flow and routing-no-regression
 5. add simple manual verification steps
 
 ## Done when
-- movie query reply includes deterministic Chinese poster-card baseline text
-- index-select input (`1`, `2`, ...) still works with no behavior change
+- `import <id/hash>` no longer executes side effect immediately; returns approval-pending deterministic text
+- explicit confirm command executes import + refresh deterministically
+- duplicate confirm / stale confirm is deterministically rejected
 - existing Telegram command behavior does not regress
 
 ## After this step
-Move to explicit approval interaction baseline for import side effect.
+Move to lease/version recovery baseline for restart-safe import workflow.

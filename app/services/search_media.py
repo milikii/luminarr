@@ -52,6 +52,7 @@ class SearchMediaService:
         parsed_query = parse_movie_query(cleaned_query)
         fallback_query = _build_query(parsed_query.title, parsed_query.year)
         raw_results: Sequence[Mapping[str, Any]] = ()
+        tmdb_movie: TmdbMovie | None = None
 
         if self._lookup_movie_func is not None:
             try:
@@ -82,7 +83,7 @@ class SearchMediaService:
                     pass
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
-        return format_candidates(cleaned_query, candidates)
+        return format_movie_query_reply(cleaned_query, parsed_query, tmdb_movie, candidates)
 
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
         if index < 1:
@@ -149,6 +150,49 @@ def format_candidates(query: str, candidates: Sequence[Candidate]) -> str:
     for i, item in enumerate(candidates, start=1):
         lines.append(f"{i}. {item.title} ({item.year})")
         lines.append(f"   画质: {item.quality} | 大小: {item.size} | 站点: {item.indexer}")
+    return "\n".join(lines)
+
+
+def format_movie_query_reply(
+    query: str,
+    parsed_query: ParsedMovieQuery,
+    tmdb_movie: TmdbMovie | None,
+    candidates: Sequence[Candidate],
+) -> str:
+    candidates_text = format_candidates(query, candidates)
+    if not candidates:
+        return candidates_text
+    card_text = format_movie_poster_card(parsed_query, tmdb_movie)
+    return f"{card_text}\n\n{candidates_text}"
+
+
+def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> str:
+    card_title = parsed_query.title or "-"
+    card_year = parsed_query.year.strip() or "-"
+    card_alias = "-"
+
+    if tmdb_movie is not None:
+        original_title = _normalize_spaces(tmdb_movie.original_title)
+        english_title = _normalize_spaces(tmdb_movie.title)
+        if original_title:
+            card_title = original_title
+        elif english_title:
+            card_title = english_title
+
+        resolved_year = tmdb_movie.year.strip()
+        if resolved_year:
+            card_year = resolved_year
+
+        if english_title and english_title != card_title:
+            card_alias = english_title
+
+    lines = [
+        "电影海报卡片",
+        f"片名: {card_title}",
+        f"年份: {card_year}",
+        f"别名: {card_alias}",
+        "海报: 暂未接入图片",
+    ]
     return "\n".join(lines)
 
 

@@ -39,11 +39,17 @@ async def _fake_search_empty(query: str) -> list[dict[str, object]]:
 def test_search_and_format_with_results() -> None:
     service = SearchMediaService(_fake_search_with_results)
     text = _run(service.search_and_format("dune"))
+    assert "电影海报卡片" in text
+    assert "片名: dune" in text
+    assert "年份: -" in text
+    assert "别名: -" in text
+    assert "海报: 暂未接入图片" in text
     assert "搜索结果：dune" in text
     assert "1. Dune: Part Two (2024)" in text
     assert "画质: 2160p | 大小: 8.0 GB | 站点: IndexerA" in text
     assert "2. Dune (2021) (2021)" in text
     assert "画质: 1080p | 大小: 2.0 GB | 站点: IndexerB" in text
+    assert text.index("电影海报卡片") < text.index("搜索结果：dune")
 
 
 def test_search_and_format_empty_query() -> None:
@@ -99,6 +105,10 @@ def test_search_and_format_uses_tmdb_first_when_available() -> None:
         lookup_movie_func=_fake_lookup_tmdb_movie,
     )
     text = _run(service.search_and_format("星际穿越 (2014)"))
+    assert "电影海报卡片" in text
+    assert "片名: Interstellar" in text
+    assert "年份: 2014" in text
+    assert "别名: -" in text
     assert "搜索结果：星际穿越 (2014)" in text
     assert "Interstellar 2014 1080p BluRay" in text
 
@@ -126,6 +136,10 @@ def test_search_and_format_tmdb_english_hit_stops_before_original() -> None:
     text = _run(service.search_and_format("星际穿越 (2014)"))
 
     assert seen_queries == ["Interstellar 2014"]
+    assert "电影海报卡片" in text
+    assert "片名: 星际穿越" in text
+    assert "年份: 2014" in text
+    assert "别名: Interstellar" in text
     assert "Interstellar 2014 1080p BluRay" in text
 
 

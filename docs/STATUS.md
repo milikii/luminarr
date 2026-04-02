@@ -4,6 +4,7 @@
 Luminarr is in early implementation, under the fixed v12 runtime profile:
 - Telegram private chat only
 - TMDB fixed v12 search-order baseline landed
+- Chinese poster-card text baseline landed for movie query reply
 - Prowlarr as search source
 - Transmission as only downloader
 - Emby as only media server
@@ -27,6 +28,8 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
   1) TMDB English title + year
   2) TMDB original title + year (only when step 1 misses)
   3) parser-first normalized original query (only when TMDB unavailable/no hit)
+- movie query reply prepends deterministic Chinese poster-card text block
+- candidate list text block keeps original numbering format for numeric select compatibility
 - search result candidate mapping persistence (SQLite, per chat + index)
 - in-memory candidate cache remains as fast path in-process
 - numeric select -> `add_to_downloader` -> Transmission RPC
@@ -45,7 +48,6 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - tests cover config, bot routing, search/import/refresh, and SQLite persistence baseline
 
 ## What is not implemented yet
-- Chinese poster-card display
 - explicit approval interaction flow
 - lease/version recovery and retry path
 - watchlist workflow
@@ -61,14 +63,15 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 ## Current priority
 Build the next smallest path:
 1. keep current search/select/add/status/import/refresh behavior stable
-2. land Chinese poster-card display baseline for movie query
-3. keep fixed v12 search-order behavior and tests stable
+2. land explicit approval interaction baseline for import side effect
+3. keep fixed search-order + poster-card reply behavior and tests stable
 
 ## Current risks
 - if `EMBY_BASE_URL` / `EMBY_API_KEY` is missing, import still succeeds but refresh will not run
 - if `TMDB_API_KEY` is missing, search path falls back to parser-first normalized Prowlarr direct search
 - TMDB first-hit strategy may still pick non-best metadata candidate for ambiguous titles
 - when TMDB lookup hits but both English/original searches return empty, path does not fall back to original normalized query by design
+- poster-card is text-only baseline (`海报: 暂未接入图片`), not real image/media rendering
 - candidate mapping keeps only latest search window per chat; older windows are overwritten
 - Transmission `downloadDir + name` must map to container-visible paths
 - hardlink import has no copy fallback for cross-filesystem case
@@ -76,7 +79,7 @@ Build the next smallest path:
 - job events are append-only traces, not yet a lease/version recovery protocol
 
 ## Acceptance focus for next step
-- movie query reply can render deterministic Chinese poster-card baseline
-- card rendering does not break current command words and routing
+- explicit approval interaction can persist and gate import side effect deterministically
+- approval flow does not break current command words and routing
 - existing command words and routing do not regress
 - search/select/add/status/import/refresh chain remains stable
