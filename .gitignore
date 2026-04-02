@@ -12,3 +12,4 @@ build/
 *.sqlite3
 *.db
 logs/
+tmp_tests/

@@ -34,6 +34,7 @@ Prerequisite completed:
   - deterministic physical failure detection (`413`, truncated-style errors)
   - same-turn one-time compact-and-retry
   - final user-safe fallback text instead of surfacing raw physical backend error
+  - manual fallback verification is passed (`retry_count=2`, safe fallback text)
 
 ## Goal
 

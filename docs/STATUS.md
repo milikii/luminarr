@@ -86,6 +86,7 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 ## Latest verification
 
 - tests: `109 passed` (`.venv/bin/python -m pytest -q`)
+- manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
