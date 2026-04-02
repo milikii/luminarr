@@ -20,6 +20,7 @@ class Settings:
     library_target_dir: str
     emby_base_url: str
     emby_api_key: str
+    sqlite_db_path: str
 
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
@@ -46,4 +47,5 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         library_target_dir=_read_optional(env, "LIBRARY_TARGET_DIR") or "/data/library/movies",
         emby_base_url=emby_base_url,
         emby_api_key=_read_optional(env, "EMBY_API_KEY"),
+        sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
     )

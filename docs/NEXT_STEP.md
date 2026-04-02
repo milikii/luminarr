@@ -6,14 +6,17 @@ Prerequisite completed:
 - `get_download_status` works
 - `import_to_library` works
 - `import done -> refresh_media_server (Emby only)` is landed
+- candidate mapping persistence is landed (SQLite)
+- minimal import -> refresh `job_event` persistence is landed
 
 ## Goal
-Stabilize completion-to-refresh chain with minimal persistence.
+Add minimal approval persistence and restart-safe recovery controls.
 
 ## Scope
 Only do:
-- persist candidate mapping needed by index selection
-- persist minimal job/event records for import -> refresh chain
+- persist minimal approval records for high-risk side effects (starting with import)
+- read approval state from SQLite on restart
+- add minimal stale-action guard using persisted job events + approval state
 - keep current command behavior unchanged:
   - search
   - select (index)
@@ -21,28 +24,27 @@ Only do:
   - status
   - import
   - refresh feedback
-- add minimal tests for persistence read/write and recovery-on-restart baseline
+- add minimal tests for approval read/write and restart baseline
 
 ## Explicit constraints
 - do not add new downloader/media server support
 - do not add watchlist automation
-- do not add approval engine yet
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming in this step
 
 ## Suggested implementation shape
-1. add minimal SQLite tables/repo for candidate + job_event
-2. write on key transition points only
-3. read persisted candidate mapping on select/import path
-4. keep in-memory fast path if safe, but persistence is source of truth after restart
+1. add one minimal approval table/repo in existing SQLite baseline
+2. write approval records only on key transition points
+3. read approval record + recent job_event on restart-sensitive path
+4. reject stale or duplicate actions with deterministic text
 5. add focused tests and simple manual verification steps
 
 ## Done when
-- restart does not break recent candidate index selection
-- import -> refresh chain has minimal persisted trace
-- persistence behavior is deterministic and testable
+- restart preserves minimal approval state
+- stale/duplicate side effects are blocked by deterministic guard
+- persistence + recovery behavior is deterministic and testable
 - existing Telegram command behavior does not regress
 
 ## After this step
-Move to minimal approval persistence and recovery controls.
+Move to TMDB-first metadata resolution baseline.

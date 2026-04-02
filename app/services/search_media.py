@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.db.candidate_repo import CandidateMappingRepo
+
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
@@ -21,9 +23,15 @@ class Candidate:
 
 
 class SearchMediaService:
-    def __init__(self, search_func: SearchFunc, limit: int = 5) -> None:
+    def __init__(
+        self,
+        search_func: SearchFunc,
+        limit: int = 5,
+        candidate_repo: CandidateMappingRepo | None = None,
+    ) -> None:
         self._search_func = search_func
         self._limit = max(1, limit)
+        self._candidate_repo = candidate_repo
         self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
 
     async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
@@ -35,6 +43,11 @@ class SearchMediaService:
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
+            if self._candidate_repo is not None:
+                try:
+                    self._candidate_repo.save_candidates(chat_id, selected_raw_results)
+                except Exception:
+                    pass
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
         return format_candidates(cleaned_query, candidates)
@@ -43,12 +56,19 @@ class SearchMediaService:
         if index < 1:
             return None
         candidates = self._recent_candidates_by_chat.get(chat_id)
-        if not candidates:
-            return None
         resolved_index = index - 1
-        if resolved_index >= len(candidates):
+        if candidates and resolved_index < len(candidates):
+            return candidates[resolved_index]
+
+        if self._candidate_repo is None:
             return None
-        return candidates[resolved_index]
+        try:
+            persisted_candidate = self._candidate_repo.get_candidate(chat_id, index)
+        except Exception:
+            return None
+        if persisted_candidate is None:
+            return None
+        return persisted_candidate
 
 
 def normalize_candidate(item: Mapping[str, Any]) -> Candidate:

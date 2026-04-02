@@ -25,6 +25,7 @@ def test_load_settings_reads_token() -> None:
     assert settings.library_target_dir == "/data/library/movies"
     assert settings.emby_base_url == ""
     assert settings.emby_api_key == ""
+    assert settings.sqlite_db_path == "/data/luminarr.db"
 
 
 def test_load_settings_reads_library_target_dir() -> None:
@@ -53,6 +54,19 @@ def test_load_settings_reads_emby_settings() -> None:
     )
     assert settings.emby_base_url == "http://emby:8096"
     assert settings.emby_api_key == "emby-api-key"
+
+
+def test_load_settings_reads_sqlite_path() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "SQLITE_DB_PATH": "/data/luminarr/state.db",
+        }
+    )
+    assert settings.sqlite_db_path == "/data/luminarr/state.db"
 
 
 def test_load_settings_requires_token() -> None:

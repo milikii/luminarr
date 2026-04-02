@@ -5,6 +5,9 @@ from app.clients.emby import EmbyClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.transmission import TransmissionClient
 from app.config import load_settings
+from app.db.candidate_repo import CandidateMappingRepo
+from app.db.job_event_repo import JobEventRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
@@ -14,11 +17,19 @@ from app.services.search_media import SearchMediaService
 
 def main() -> None:
     settings = load_settings()
+    database = SqliteDatabase(settings.sqlite_db_path)
+    database.initialize()
+    candidate_repo = CandidateMappingRepo(database)
+    job_event_repo = JobEventRepo(database)
+
     prowlarr_client = ProwlarrClient(
         base_url=settings.prowlarr_base_url,
         api_key=settings.prowlarr_api_key,
     )
-    search_service = SearchMediaService(prowlarr_client.search)
+    search_service = SearchMediaService(
+        search_func=prowlarr_client.search,
+        candidate_repo=candidate_repo,
+    )
     transmission_client = TransmissionClient(
         base_url=settings.transmission_base_url,
         username=settings.transmission_username,
@@ -38,6 +49,7 @@ def main() -> None:
         get_import_source_func=transmission_client.get_torrent_import_source,
         library_target_dir=settings.library_target_dir,
         refresh_media_server_func=refresh_media_server_func,
+        job_event_repo=job_event_repo,
     )
     application = build_application(
         settings.telegram_bot_token,

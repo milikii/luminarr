@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
+from app.db.job_event_repo import JobEventRepo
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
@@ -22,6 +23,7 @@ IMPORT_PREPARE_TARGET_FAILED_TEXT = "创建目标目录失败：{target_path}"
 IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT = "硬链接失败：源和目标不在同一文件系统。"
 IMPORT_HARDLINK_FAILED_TEXT = "硬链接失败：{reason}"
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
+IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
 
 
 class ImportToLibraryService:
@@ -30,10 +32,12 @@ class ImportToLibraryService:
         get_import_source_func: GetImportSourceFunc,
         library_target_dir: str,
         refresh_media_server_func: RefreshMediaServerFunc | None = None,
+        job_event_repo: JobEventRepo | None = None,
     ) -> None:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
         self._refresh_media_server_func = refresh_media_server_func
+        self._job_event_repo = job_event_repo
 
     async def import_by_task_ref(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
@@ -43,35 +47,94 @@ class ImportToLibraryService:
         try:
             import_source = await self._get_import_source_func(cleaned_ref)
         except Exception:
+            self._record_event(
+                task_ref=cleaned_ref,
+                event_type="import.query_failed",
+                message=IMPORT_QUERY_FAILED_TEXT,
+            )
             return IMPORT_QUERY_FAILED_TEXT
         if import_source is None:
+            self._record_event(
+                task_ref=cleaned_ref,
+                event_type="import.not_found",
+                message=IMPORT_NOT_FOUND_TEXT,
+            )
             return IMPORT_NOT_FOUND_TEXT
 
         progress = _clamp_progress(import_source.percent_done)
         if not _is_download_completed(import_source):
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.not_completed",
+                message=IMPORT_NOT_COMPLETED_TEXT.format(progress=progress),
+            )
             return IMPORT_NOT_COMPLETED_TEXT.format(progress=progress)
 
         source_path = Path(import_source.download_dir) / import_source.name
         if not source_path.exists():
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.source_missing",
+                message=IMPORT_SOURCE_MISSING_TEXT,
+            )
             return IMPORT_SOURCE_MISSING_TEXT
 
         target_root = self._library_target_dir
         try:
             target_root.mkdir(parents=True, exist_ok=True)
         except OSError:
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.prepare_target_failed",
+                message=IMPORT_PREPARE_TARGET_FAILED_TEXT.format(target_path=str(target_root)),
+            )
             return IMPORT_PREPARE_TARGET_FAILED_TEXT.format(target_path=str(target_root))
 
         target_path = target_root / source_path.name
         if target_path.exists():
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.target_exists",
+                message=IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path)),
+            )
             return IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
 
         try:
             _hardlink_import(source_path, target_path)
         except FileExistsError:
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.target_exists",
+                message=IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path)),
+            )
             return IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
         except OSError as exc:
             if exc.errno == errno.EXDEV:
+                self._record_event(
+                    task_ref=cleaned_ref,
+                    task_id=import_source.task_id,
+                    task_hash=import_source.task_hash,
+                    event_type="import.hardlink_cross_filesystem",
+                    message=IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
+                )
                 return IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.hardlink_failed",
+                message=IMPORT_HARDLINK_FAILED_TEXT.format(reason=str(exc)),
+            )
             return IMPORT_HARDLINK_FAILED_TEXT.format(reason=str(exc))
 
         import_success_text = (
@@ -79,6 +142,13 @@ class ImportToLibraryService:
             f"任务 ID: {import_source.task_id}\n"
             f"任务 Hash: {import_source.task_hash}\n"
             f"目标路径: {target_path}"
+        )
+        self._record_event(
+            task_ref=cleaned_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            event_type="import.succeeded",
+            message=str(target_path),
         )
 
         if self._refresh_media_server_func is None:
@@ -88,7 +158,53 @@ class ImportToLibraryService:
             refresh_text = await self._refresh_media_server_func()
         except Exception:
             refresh_text = IMPORT_REFRESH_FAILED_TEXT
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="refresh.failed",
+                message=refresh_text,
+            )
+            return f"{import_success_text}\n{refresh_text}"
+        if refresh_text == IMPORT_REFRESH_SUCCESS_TEXT:
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="refresh.succeeded",
+                message=refresh_text,
+            )
+        else:
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="refresh.failed",
+                message=refresh_text,
+            )
         return f"{import_success_text}\n{refresh_text}"
+
+    def _record_event(
+        self,
+        *,
+        task_ref: str,
+        event_type: str,
+        message: str,
+        task_id: str = "",
+        task_hash: str = "",
+    ) -> None:
+        if self._job_event_repo is None:
+            return
+        try:
+            self._job_event_repo.append_event(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                event_type=event_type,
+                message=message,
+            )
+        except Exception:
+            pass
 
 
 def parse_import_query(text: str) -> str | None:

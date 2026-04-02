@@ -19,31 +19,31 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 
 ## What is implemented now
 - Telegram bot minimal runtime
-- config loading for Telegram / Prowlarr / Transmission
+- config loading for Telegram / Prowlarr / Transmission / SQLite path
 - Telegram text query triggers `search_media`
-- search result candidate cache (in-memory, per chat, single process)
+- search result candidate mapping persistence (SQLite, per chat + index)
+- in-memory candidate cache remains as fast path in-process
 - numeric select -> `add_to_downloader` -> Transmission RPC
 - `status <id/hash>` / `状态 <id/hash>` query path
 - `import <id/hash>` / `导入 <id/hash>` hardlink import path
 - import returns deterministic success/failure text
 - minimal Emby client + `refresh_media_server`
 - refresh is triggered only after import success
+- minimal `job_event` persistence for import -> refresh key transitions
 - refresh returns deterministic text:
   - success: `媒体库刷新成功。`
   - failure: `媒体库刷新失败：<reason>`
-- tests cover config, bot routing, search/import, and refresh success/failure
+- tests cover config, bot routing, search/import/refresh, and SQLite persistence baseline
 
 ## What is not implemented yet
 - TMDB-first metadata resolution + Chinese poster-card display
 - fixed v12 search plan (English title + year, original title fallback)
-- candidate persistence (replace memory-only cache)
 - approval persistence and approval flow
-- durable job/event state in SQLite
 - lease/version recovery and retry path
 - watchlist workflow
 
 ## Latest verification (2026-04-02)
-- tests: `46 passed` (`.venv/bin/python -m pytest -q -s`)
+- tests: `51 passed` (`.venv/bin/python -m pytest -q -s`)
 - manual end-to-end verification in WSL test stack (Transmission + Emby) passed:
   - `status e93d696a3e980458765f8016ce39f61437cc9543` returned completed seeding state
   - `import e93d696a3e980458765f8016ce39f61437cc9543` returned deterministic import success text
@@ -53,17 +53,17 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 ## Current priority
 Build the next smallest path:
 1. keep current search/select/add/status/import/refresh behavior stable
-2. add minimal persistence for completion-to-refresh chain
-3. postpone approval/recovery until persistence baseline is stable
+2. add minimal approval persistence baseline
+3. add restart-safe recovery controls on top of persisted events
 
 ## Current risks
 - if `EMBY_BASE_URL` / `EMBY_API_KEY` is missing, import still succeeds but refresh will not run
-- candidate cache is memory-only; restart loses index mapping
+- candidate mapping keeps only latest search window per chat; older windows are overwritten
 - Transmission `downloadDir + name` must map to container-visible paths
 - hardlink import has no copy fallback for cross-filesystem case
-- current state is not recoverable across restart beyond Transmission's own persistence
+- job events are append-only traces, not yet a lease/version recovery protocol
 
 ## Acceptance focus for next step
-- persistence path does not change current Telegram command behavior
-- persistence writes are deterministic and testable
-- refresh chain remains stable after persistence is introduced
+- approval persistence does not change current Telegram command behavior
+- recovery controls remain deterministic and testable
+- restart path can reject stale actions safely
