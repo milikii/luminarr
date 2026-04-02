@@ -60,6 +60,9 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - deterministic Telegram watchlist command path (`watchlist` / `想看`)
   - manual add/list/remove/clear only
   - no downloader/import side effects from watchlist actions
+- pending downloader/import approvals now persist timeout truth (`approval_record.expires_at`)
+- `confirm <id/hash>` now deterministically rejects expired pending approvals for downloader/import
+- expired pending approvals are deterministically converged to cancelled truth in `approval_record + jobs`
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## What is adopted as a v15 rule, but not implemented yet
@@ -70,7 +73,6 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 
 ## What is not implemented yet
 
-- approval expiry / timeout policy
 - copy fallback approval for import
 - scheduler / retry baseline for pending tasks
 - real image/media poster rendering
@@ -80,7 +82,7 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 
 ## Latest verification
 
-- tests: `104 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `107 passed` (`.venv/bin/python -m pytest -q`)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -88,7 +90,7 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
-3. land approval expiry / timeout policy as the next smallest control-layer gap
+3. land reactive recovery baseline for LLM physical failures (`413`, truncated output, compact-and-retry)
 4. keep downloader/import approval behavior stable
 
 ## Current risks
@@ -104,14 +106,13 @@ Build the next smallest path:
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
-- approval pending still has no expiry / timeout policy
 - no reactive compact / same-turn retry for LLM physical failures yet
 - frustration/reset short-circuit does not yet cover a future clarification workflow
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
 
 ## Acceptance focus for the next step
 
-- land the smallest approval expiry / timeout policy baseline
+- land the smallest reactive recovery baseline for LLM physical failures
 - existing downloader/import approval and confirm routing behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping behavior remains stable

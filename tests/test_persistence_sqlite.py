@@ -233,6 +233,30 @@ def test_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     assert record.last_task_ref == "87"
 
 
+def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    lease_version = repo.request_import_approval(
+        task_id="87",
+        task_hash="hash-87",
+        task_ref="87",
+        timeout_seconds=-1,
+    )
+    assert lease_version == 1
+
+    record = repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert record is not None
+    assert record.expires_at
+    assert repo.is_import_pending_expired(
+        task_id="87",
+        task_hash="hash-87",
+        expected_lease_version=lease_version,
+    )
+
+
 def test_downloader_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

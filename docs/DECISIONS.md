@@ -312,6 +312,16 @@
 - **原因**：
   先补齐最小业务面闭环，同时保持副作用边界与执行卫生稳定。
 
+## D-030 pending approval timeout 基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - `approval_record` 增加 pending timeout 持久化真相：`expires_at`
+  - downloader/import 的 pending approval 在 `confirm <id/hash>` 时必须检查超时
+  - 过期 pending confirm 必须确定性拒绝，并收敛为 cancelled 真相（`approval_record + jobs`）
+- **原因**：
+  pending approval 若无限期有效会破坏控制层可预期性；timeout 是最小且必要的执行卫生补齐。
+
 ---
 
 ## 附：更新模板

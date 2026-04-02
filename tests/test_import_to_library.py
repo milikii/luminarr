@@ -9,10 +9,17 @@ from unittest.mock import AsyncMock
 
 import app.services.import_to_library as import_module
 from app.clients.transmission import TransmissionImportSource
-from app.db.approval_repo import APPROVAL_STATUS_APPROVED, APPROVAL_STATUS_PENDING, ApprovalRepo
+from app.db.approval_repo import (
+    APPROVAL_STATUS_APPROVED,
+    APPROVAL_STATUS_CANCELLED,
+    APPROVAL_STATUS_PENDING,
+    ApprovalRepo,
+)
+from app.db.job_repo import JOB_STATE_CANCELLED, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     CONFIRM_QUERY_USAGE_TEXT,
+    IMPORT_CONFIRM_EXPIRED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
     IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
@@ -348,6 +355,57 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     assert succeeded_record.status == APPROVAL_STATUS_APPROVED
     assert succeeded_record.lease_version == 1
     assert succeeded_record.executed_version == 1
+
+
+def test_confirm_import_by_task_ref_rejects_expired_pending(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+
+    pending_text = _run(service.import_by_task_ref("87", chat_id=1001, user_id=2001))
+    assert "导入待确认" in pending_text
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            UPDATE approval_record
+            SET expires_at = '2000-01-01 00:00:00'
+            WHERE action_type = 'import_to_library' AND task_id = '87' AND task_hash = 'hash-87'
+            """
+        )
+        connection.commit()
+
+    confirm_text = _run(service.confirm_import_by_task_ref("87", chat_id=1001, user_id=2001))
+    assert confirm_text == IMPORT_CONFIRM_EXPIRED_TEXT
+
+    record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert record is not None
+    assert record.status == APPROVAL_STATUS_CANCELLED
+
+    job = job_repo.get_import_job_for_chat_ref(chat_id=1001, task_ref="87")
+    assert job is not None
+    assert job.state == JOB_STATE_CANCELLED
 
 
 def test_import_by_task_ref_persists_pending_approval(tmp_path: Path) -> None:

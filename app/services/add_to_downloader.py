@@ -7,7 +7,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.clients.transmission import TransmissionTask
-from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRecord, ApprovalRepo
+from app.db.approval_repo import (
+    APPROVAL_STATUS_PENDING,
+    DEFAULT_PENDING_TIMEOUT_SECONDS,
+    ApprovalRecord,
+    ApprovalRepo,
+)
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.search_media import SearchMediaService
@@ -26,6 +31,7 @@ ADD_APPROVAL_PENDING_TEXT = (
 )
 ADD_CANCELLED_TEXT = "已取消当前下载确认。请重新发送序号。"
 ADD_CONFIRM_NOT_PENDING_TEXT = "没有待确认的下载请求，请先重新发送序号。"
+ADD_CONFIRM_EXPIRED_TEXT = "下载确认已超时，请重新发送序号。"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 JOB_LEASE_OWNER = "downloader_confirm"
 
@@ -146,6 +152,13 @@ class AddToDownloaderService:
                     task_hash=confirm_context.pending_add.task_hash,
                 )
                 return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
+            expired_text = self._handle_expired_pending_confirm(
+                task_ref=cleaned_ref,
+                context=confirm_context,
+                chat_id=chat_id,
+            )
+            if expired_text is not None:
+                return expired_text
 
         claimed_job = False
         claimed_job_id = ""
@@ -382,6 +395,7 @@ class AddToDownloaderService:
                 task_id=task_id,
                 task_hash=task_hash,
                 task_ref=task_ref,
+                timeout_seconds=DEFAULT_PENDING_TIMEOUT_SECONDS,
             )
             if requested_lease > 0:
                 lease_version = requested_lease
@@ -665,6 +679,65 @@ class AddToDownloaderService:
         if approval_record.executed_version < approval_record.lease_version:
             return None
         return ADD_CONFIRM_NOT_PENDING_TEXT
+
+    def _handle_expired_pending_confirm(
+        self,
+        *,
+        task_ref: str,
+        context: ConfirmExecutionContext,
+        chat_id: int | None,
+    ) -> str | None:
+        approval_record = context.approval_record
+        if approval_record is None:
+            return None
+        if not self._is_pending_approval_expired(
+            task_id=context.pending_add.task_id,
+            task_hash=context.pending_add.task_hash,
+            expected_lease_version=approval_record.lease_version,
+        ):
+            return None
+        self._cancel_pending_approval(
+            task_ref=task_ref,
+            task_id=context.pending_add.task_id,
+            task_hash=context.pending_add.task_hash,
+            expected_lease_version=approval_record.lease_version,
+        )
+        if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
+            try:
+                self._job_repo.cancel_pending_job(
+                    job_id=context.job.job_id,
+                    expected_version=context.job.version,
+                    workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+                )
+            except Exception:
+                pass
+        self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
+        self._record_event(
+            task_ref=task_ref,
+            task_id=context.pending_add.task_id,
+            task_hash=context.pending_add.task_hash,
+            event_type="downloader.approval_expired",
+            message=ADD_CONFIRM_EXPIRED_TEXT,
+        )
+        return ADD_CONFIRM_EXPIRED_TEXT
+
+    def _is_pending_approval_expired(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> bool:
+        if self._approval_repo is None:
+            return False
+        try:
+            return self._approval_repo.is_downloader_pending_expired(
+                task_id=task_id,
+                task_hash=task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+        except Exception:
+            return False
 
     def _record_event(
         self,

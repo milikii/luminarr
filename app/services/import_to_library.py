@@ -8,7 +8,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
-from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRecord, ApprovalRepo
+from app.db.approval_repo import (
+    APPROVAL_STATUS_PENDING,
+    DEFAULT_PENDING_TIMEOUT_SECONDS,
+    ApprovalRecord,
+    ApprovalRepo,
+)
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 
@@ -34,6 +39,7 @@ IMPORT_APPROVAL_PENDING_TEXT = (
 )
 IMPORT_CANCELLED_TEXT = "已取消当前导入确认。请重新发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_NOT_PENDING_TEXT = "没有待确认的导入请求，请先发送 import <任务ID或Hash>。"
+IMPORT_CONFIRM_EXPIRED_TEXT = "导入确认已超时，请重新发送 import <任务ID或Hash>。"
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
 JOB_LEASE_OWNER = "import_confirm"
@@ -170,6 +176,9 @@ class ImportToLibraryService:
                     message=rejection_text,
                 )
                 return rejection_text
+            expired_text = self._handle_expired_pending_confirm(task_ref=cleaned_ref, context=confirm_context)
+            if expired_text is not None:
+                return expired_text
             lease_owner = self._build_job_lease_owner(cleaned_ref)
             claimed_job = self._claim_pending_job(
                 job=confirm_context.job,
@@ -532,6 +541,7 @@ class ImportToLibraryService:
                 task_id=task_id,
                 task_hash=task_hash,
                 task_ref=task_ref,
+                timeout_seconds=DEFAULT_PENDING_TIMEOUT_SECONDS,
             )
             if requested_lease > 0:
                 lease_version = requested_lease
@@ -791,6 +801,62 @@ class ImportToLibraryService:
                 return target_path
             return None
         return None
+
+    def _handle_expired_pending_confirm(self, *, task_ref: str, context: ConfirmExecutionContext) -> str | None:
+        approval_record = context.approval_record
+        if approval_record is None:
+            return None
+        if not self._is_pending_approval_expired(
+            task_id=context.job.task_id,
+            task_hash=context.job.task_hash,
+            expected_lease_version=approval_record.lease_version,
+        ):
+            return None
+        if self._approval_repo is not None:
+            try:
+                self._approval_repo.cancel_import(
+                    task_id=context.job.task_id,
+                    task_hash=context.job.task_hash,
+                    task_ref=task_ref,
+                    expected_lease_version=approval_record.lease_version,
+                )
+            except Exception:
+                pass
+        if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
+            try:
+                self._job_repo.cancel_pending_job(
+                    job_id=context.job.job_id,
+                    expected_version=context.job.version,
+                    workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
+                )
+            except Exception:
+                pass
+        self._record_event(
+            task_ref=task_ref,
+            task_id=context.job.task_id,
+            task_hash=context.job.task_hash,
+            event_type="import.approval_expired",
+            message=IMPORT_CONFIRM_EXPIRED_TEXT,
+        )
+        return IMPORT_CONFIRM_EXPIRED_TEXT
+
+    def _is_pending_approval_expired(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> bool:
+        if self._approval_repo is None:
+            return False
+        try:
+            return self._approval_repo.is_import_pending_expired(
+                task_id=task_id,
+                task_hash=task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+        except Exception:
+            return False
 
     def _record_event(
         self,

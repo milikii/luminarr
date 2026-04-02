@@ -26,10 +26,14 @@ Prerequisite completed:
   - `watchlist_item` SQLite persistence
   - deterministic `watchlist` / `想看` add/list/remove/clear command path
   - no auto-download side effects
+- smallest approval expiry / timeout policy baseline is now landed:
+  - pending downloader/import approval persists timeout truth (`approval_record.expires_at`)
+  - `confirm <id/hash>` deterministically rejects expired pending approvals
+  - expired pending approvals converge to cancelled truth (`approval_record + jobs`)
 
 ## Goal
 
-Land the smallest **approval expiry / timeout policy** baseline for pending approvals.
+Land the smallest **reactive recovery baseline for LLM physical failures**.
 
 ## Scope
 
@@ -37,9 +41,9 @@ Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
 - keep the landed downloader/import approval flows, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
-- land a minimal persisted timeout truth for pending downloader/import approvals
-- define deterministic timeout handling on `confirm <id/hash>` for expired pending approvals
-- add focused tests for timeout persistence/routing/no-regression
+- land minimal same-turn reactive recovery for physical failures (`413`, truncated output)
+- recovery context must preserve only minimal execution truth (`system_base + project_rules + current_job_context`)
+- add focused tests for recovery routing/no-regression
 
 ## Explicit constraints
 
@@ -55,20 +59,20 @@ Only do:
 
 ## Suggested implementation shape
 
-1. land the minimum persisted timeout truth for pending approvals
-2. enforce deterministic expiry rejection for stale pending approvals
+1. detect LLM physical failure type deterministically
+2. apply aggressive context compact while preserving required execution truth
+3. retry once in the same turn and return user-safe text on final failure
 3. keep downloader/import success paths and text bodies stable
 4. add focused tests and manual verification steps
 
 ## Done when
 
-- pending approvals have deterministic expiry behavior with persisted truth
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
+- physical LLM failures are no longer directly surfaced as raw backend errors in the main user path
 
 ## After this step
 
 Re-evaluate the smallest next control-layer gap:
-- reactive recovery for LLM physical failures
 - clarification-stage frustration/reset coverage
