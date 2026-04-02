@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v16)
+# docs/DECISIONS.md (v17)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -346,6 +346,19 @@
   用最小改动补齐 D-024 在“澄清阶段”的最后缺口，同时不引入新协议和额外复杂性。
 - **验证**：
   已通过 targeted pytest 与手工脚本验收。
+
+## D-033 read-only concurrency-safe execution policy 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - 增加最小 runtime execution policy 声明：显式标记 `concurrency_safe`
+  - `search_media`、`get_download_status`、`watchlist list` 作为只读路径可并发
+  - `add_to_downloader`、`import_to_library`、`confirm`、`watchlist` 写操作与 reset/cancel 路径保持串行
+  - Telegram 现有命令词与成功/失败文案保持不变
+- **原因**：
+  以最小改动兑现 D-020，提升只读路径吞吐同时不破坏副作用安全边界。
+- **验证**：
+  已通过 `pytest` 全量回归与手工并发策略脚本验收。
 
 ---
 

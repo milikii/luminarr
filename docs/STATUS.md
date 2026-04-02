@@ -1,4 +1,4 @@
-# Current status (v16)
+# Current status (v17)
 
 ## Project position
 
@@ -71,11 +71,15 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - deterministic detection for `413` / truncated-style physical errors
   - same-turn one-time compact-and-retry
   - final user-safe text on repeated physical failure (instead of raw backend error)
+- smallest read-only concurrency-safe execution policy baseline is now landed:
+  - runtime policy truth is explicit (`ExecutionPolicy.concurrency_safe`)
+  - read-only actions (`search_media` / `get_download_status` / `watchlist list`) are marked concurrency-safe
+  - side-effect actions (`add/confirm import/confirm downloader/watchlist mutation/reset-cancel`) stay serialized via a shared execution gate
+  - Telegram routing behavior and existing reply texts remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## What is adopted as a v15 rule, but not implemented yet
 
-- concurrency-safe execution policy for read-only tools
 - isolated explore-agent / explore-subflow for ambiguous title resolution
 
 ## What is not implemented yet
@@ -89,6 +93,7 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 ## Latest verification
 
 - tests: `111 passed` (`.venv/bin/python -m pytest -q`)
+- manual verification: read-only concurrency-safe execution policy baseline passed (`tmp_tests/verify_execution_policy_baseline.py`)
 - manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
 - manual verification: clarification-stage frustration/reset baseline passed (`tmp_tests` script + targeted pytest)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
@@ -99,7 +104,7 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed clarification-stage frustration/reset behavior stable
-4. land read-only concurrency-safe execution policy with no side-effect path regression
+4. land isolated read-only explore-agent / explore-subflow baseline for ambiguous title resolution
 
 ## Current risks
 
@@ -116,10 +121,11 @@ Build the next smallest path:
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
 - clarification-stage pending truth is currently in-process memory only and is not restart-durable
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
+- ambiguous title resolution still lacks isolated read-only exploration path and relies on current direct search flow
 
 ## Acceptance focus for the next step
 
-- land the smallest read-only concurrency-safe execution policy baseline
+- land the smallest isolated read-only explore-agent / explore-subflow baseline
 - existing downloader/import approval and confirm routing behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable

@@ -1,4 +1,4 @@
-# Next step (v16)
+# Next step (v17)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -34,15 +34,19 @@ Prerequisite completed:
   - deterministic physical failure detection (`413`, truncated-style errors)
   - same-turn one-time compact-and-retry
   - final user-safe fallback text instead of surfacing raw physical backend error
-  - manual fallback verification is passed (`retry_count=2`, safe fallback text)
 - smallest clarification-stage frustration/reset coverage baseline is now landed:
   - no-result clarification pending truth is tracked per chat in-process
   - frustration phrases (`不对/停/重来/换一个/算了/取消`) deterministically short-circuit clarification reset
   - existing pending downloader/import cancel routing remains stable
+- smallest read-only concurrency-safe execution policy baseline is now landed:
+  - explicit runtime policy marks read-only actions as `concurrency_safe`
+  - read-only actions run without side-effect serialization lock
+  - side-effect actions remain serialized through the execution gate
+  - existing Telegram command behavior and success/failure text bodies remain unchanged
 
 ## Goal
 
-Land the smallest **read-only concurrency-safe execution policy baseline**.
+Land the smallest **isolated read-only explore-agent / explore-subflow baseline** for ambiguous title resolution.
 
 ## Scope
 
@@ -52,9 +56,10 @@ Only do:
 - keep the landed downloader/import approval flows, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
-- add the smallest execution policy that marks read-only paths concurrency-safe
-- ensure side-effect paths remain serialized and unchanged
-- add focused tests for concurrency-safe markers/routing and no-regression
+- keep the landed read-only concurrency-safe execution policy behavior stable
+- add the smallest isolated read-only exploration path for highly ambiguous title resolution
+- ensure exploration path is read-only only and never dispatches downloader/import side effects
+- add focused tests/manual verification for exploration routing and no-regression
 
 ## Explicit constraints
 
@@ -71,10 +76,10 @@ Only do:
 
 ## Suggested implementation shape
 
-1. identify current read-only tool paths and side-effect tool paths explicitly
-2. add the smallest concurrency-safe declaration/guard only for read-only paths
-3. keep side-effect serialization path and lease/approval protocol unchanged
-4. keep current physical-failure and frustration/reset behavior unchanged
+1. identify ambiguous-query trigger conditions in current read-only search path
+2. add the smallest isolated exploration helper/subflow with strict read-only boundary
+3. keep confirmed structured result write-back behavior deterministic
+4. keep side-effect serialization, lease/approval protocol, physical-failure, and reset/cancel behaviors unchanged
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -82,9 +87,8 @@ Only do:
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
-- read-only paths have explicit concurrency-safe policy without changing side-effect behavior
+- ambiguous-query exploration path is read-only isolated and cannot trigger side effects
 
 ## After this step
 
-Re-evaluate the smallest next control-layer gap:
-- isolated explore-agent / explore-subflow for ambiguous title resolution
+Re-evaluate the smallest next control-layer gap after ambiguous-query isolation baseline is stable.
