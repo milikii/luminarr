@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import errno
+import os
 from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -296,6 +297,57 @@ def test_confirm_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monke
     monkeypatch.setattr(import_module.os, "link", _raise_exdev)
     text = _run(service.confirm_import_by_task_ref("87"))
     assert text == IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
+
+
+def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path, monkeypatch) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    original_link = os.link
+
+    def _raise_exdev(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr(import_module.os, "link", _raise_exdev)
+    first_confirm = _run(service.confirm_import_by_task_ref("87"))
+    assert first_confirm == IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
+
+    failed_record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert failed_record is not None
+    assert failed_record.status == APPROVAL_STATUS_PENDING
+    assert failed_record.lease_version == 1
+    assert failed_record.executed_version == 0
+
+    monkeypatch.setattr(import_module.os, "link", original_link)
+    second_confirm = _run(service.confirm_import_by_task_ref("87"))
+    assert "导入成功" in second_confirm
+
+    succeeded_record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert succeeded_record is not None
+    assert succeeded_record.status == APPROVAL_STATUS_APPROVED
+    assert succeeded_record.lease_version == 1
+    assert succeeded_record.executed_version == 1
 
 
 def test_import_by_task_ref_persists_pending_approval(tmp_path: Path) -> None:

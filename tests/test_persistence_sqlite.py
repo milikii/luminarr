@@ -140,6 +140,8 @@ def test_approval_repo_persists_for_restart(tmp_path: Path) -> None:
     assert record is not None
     assert record.action_type == ACTION_IMPORT_TO_LIBRARY
     assert record.status == APPROVAL_STATUS_APPROVED
+    assert record.lease_version == 1
+    assert record.executed_version == 1
     assert record.last_task_ref == "87"
 
 
@@ -157,7 +159,112 @@ def test_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     assert record is not None
     assert record.action_type == ACTION_IMPORT_TO_LIBRARY
     assert record.status == APPROVAL_STATUS_PENDING
+    assert record.lease_version == 1
+    assert record.executed_version == 0
     assert record.last_task_ref == "87"
+
+
+def test_import_request_advances_lease_version(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+
+    first_reply = _run(service.import_by_task_ref("87"))
+    second_reply = _run(service.import_by_task_ref("87"))
+
+    assert "导入待确认" in first_reply
+    assert "导入待确认" in second_reply
+    record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert record is not None
+    assert record.status == APPROVAL_STATUS_PENDING
+    assert record.lease_version == 2
+    assert record.executed_version == 0
+
+
+def test_confirm_marks_executed_version(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    confirm_reply = _run(service.confirm_import_by_task_ref("87"))
+
+    assert "导入成功" in confirm_reply
+    record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert record is not None
+    assert record.status == APPROVAL_STATUS_APPROVED
+    assert record.lease_version == 1
+    assert record.executed_version == 1
+
+
+def test_approve_import_requires_current_lease_version(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    first_lease = repo.request_import_approval(task_id="87", task_hash="hash-87", task_ref="87")
+    second_lease = repo.request_import_approval(task_id="87", task_hash="hash-87", task_ref="87")
+
+    assert first_lease == 1
+    assert second_lease == 2
+    assert (
+        repo.approve_import(
+            task_id="87",
+            task_hash="hash-87",
+            task_ref="87",
+            expected_lease_version=first_lease,
+        )
+        is False
+    )
+    assert (
+        repo.approve_import(
+            task_id="87",
+            task_hash="hash-87",
+            task_ref="87",
+            expected_lease_version=second_lease,
+        )
+        is True
+    )
 
 
 def test_import_stale_guard_blocks_duplicate_after_restart(tmp_path: Path) -> None:

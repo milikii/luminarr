@@ -40,7 +40,11 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - refresh is triggered only after confirmed import success
 - minimal `job_event` persistence for import -> refresh key transitions
 - `approval_record` supports pending/approved state transitions for import approval flow
-- stale/duplicate confirm guard reads `approval_record + job_event` on restart-sensitive path
+- `approval_record` now keeps minimal lease/version markers (`lease_version`, `executed_version`)
+- `import <id/hash>` now advances lease snapshot deterministically when entering pending
+- `confirm <id/hash>` now uses lease snapshot CAS guard and only executes current version
+- failed confirm execution restores `pending` on the same lease version (no extra lease bump)
+- stale/duplicate confirm guard can reject replay deterministically by version after restart
 - stale/duplicate rejection keeps deterministic text style (`目标已存在，已拒绝覆盖：...`)
 - refresh returns deterministic text:
   - success: `媒体库刷新成功。`
@@ -48,17 +52,16 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - tests cover config, bot routing, search/import/refresh, approval flow, and SQLite persistence baseline
 
 ## What is not implemented yet
-- lease/version recovery and retry path
 - watchlist workflow
 
 ## Latest verification (2026-04-02)
-- tests: `78 passed` (`.venv/bin/python -m pytest -q -s`)
-- manual end-to-end verification for the new `import -> confirm -> import/refresh` interaction is not re-run yet in this iteration
+- tests: `82 passed` (`.venv/bin/python -m pytest -q -s`)
+- manual end-to-end verification for the new lease/version replay guard is not re-run yet in this iteration
 
 ## Current priority
 Build the next smallest path:
 1. keep current search/select/add/status/import/confirm/refresh behavior stable
-2. land lease/version recovery baseline for restart-safe confirmed import workflow
+2. land watchlist workflow baseline
 3. keep fixed search-order + poster-card reply behavior and tests stable
 
 ## Current risks
@@ -70,12 +73,9 @@ Build the next smallest path:
 - candidate mapping keeps only latest search window per chat; older windows are overwritten
 - Transmission `downloadDir + name` must map to container-visible paths
 - hardlink import has no copy fallback for cross-filesystem case
-- approval pending has no expiry/lease semantics yet
-- stale guard only covers tasks that already have both approved status and `import.succeeded` event
-- job events are append-only traces, not yet a lease/version recovery protocol
+- lease/version guard is SQLite-local only; no multi-process/global lock guarantee
+- approval pending still has no expiry/timeout policy
 
 ## Acceptance focus for next step
-- lease/version recovery can reject stale execution deterministically after restart
-- recovery flow does not break current command words and routing
-- existing command words and routing do not regress
-- search/select/add/status/import/confirm/refresh chain remains stable
+- watchlist baseline lands without changing existing command words/routing
+- existing search/select/add/status/import/confirm/refresh chain remains stable

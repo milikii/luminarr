@@ -449,6 +449,24 @@
 
 ---
 
+## D-030 最小 lease/version 防重放协议：import 推进 lease，confirm 仅执行当前 lease
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - `approval_record` 增加最小版本字段：`lease_version`、`executed_version`
+  - `import <id/hash>` 每次进入 pending 都会推进当前 lease 快照
+  - `confirm <id/hash>` 通过 lease 快照做 CAS，只有当前 lease 可以执行副作用
+  - 执行成功后写入 `executed_version`，重启后基于版本号确定性拒绝 stale replay
+  - 保持现有 Telegram 命令词和 import 成功/失败文本主体不变
+- **原因**：
+  用最小改动补齐“可恢复场景下的防重放”能力，避免重复执行导入副作用，同时不引入额外复杂组件。
+- **影响范围**：
+  - `approval_record` 持久化协议升级（含旧库兼容迁移）
+  - `import/confirm` 状态迁移从两态提升为“状态 + 版本”最小协议
+  - import 相关持久化与重启回归测试更新
+
+---
+
 ## 附：更新规则
 
 每次要新增一条决策时，使用以下模板：

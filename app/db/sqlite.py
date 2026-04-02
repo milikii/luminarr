@@ -21,6 +21,8 @@ SCHEMA_STATEMENTS = (
         task_id TEXT NOT NULL DEFAULT '',
         task_hash TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL,
+        lease_version INTEGER NOT NULL DEFAULT 0,
+        executed_version INTEGER NOT NULL DEFAULT 0,
         last_task_ref TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -59,6 +61,7 @@ class SqliteDatabase:
         with self.connect() as connection:
             for statement in SCHEMA_STATEMENTS:
                 connection.execute(statement)
+            _ensure_approval_record_columns(connection)
             connection.commit()
 
     @contextmanager
@@ -69,3 +72,16 @@ class SqliteDatabase:
             yield connection
         finally:
             connection.close()
+
+
+def _ensure_approval_record_columns(connection: sqlite3.Connection) -> None:
+    rows = connection.execute("PRAGMA table_info(approval_record)").fetchall()
+    existing_columns = {str(row["name"]) for row in rows}
+    if "lease_version" not in existing_columns:
+        connection.execute(
+            "ALTER TABLE approval_record ADD COLUMN lease_version INTEGER NOT NULL DEFAULT 0"
+        )
+    if "executed_version" not in existing_columns:
+        connection.execute(
+            "ALTER TABLE approval_record ADD COLUMN executed_version INTEGER NOT NULL DEFAULT 0"
+        )

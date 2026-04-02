@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
-from app.db.approval_repo import APPROVAL_STATUS_APPROVED, APPROVAL_STATUS_PENDING, ApprovalRepo
+from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRepo
 from app.db.job_event_repo import JobEventRepo
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
@@ -58,6 +58,7 @@ class ImportToLibraryService:
         self._job_event_repo = job_event_repo
         self._approval_repo = approval_repo
         self._pending_import_identities: set[tuple[str, str]] = set()
+        self._pending_import_lease_versions: dict[tuple[str, str], int] = {}
 
     async def import_by_task_ref(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
@@ -98,7 +99,25 @@ class ImportToLibraryService:
             return error_text
 
         import_source = prepared_import.import_source
-        if not self._has_pending_approval(task_id=import_source.task_id, task_hash=import_source.task_hash):
+        stale_text = self._find_version_stale_rejection_text(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+        )
+        if stale_text is not None:
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.stale_rejected",
+                message=stale_text,
+            )
+            return stale_text
+
+        expected_lease_version = self._resolve_pending_lease_version(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+        )
+        if expected_lease_version <= 0:
             self._record_event(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
@@ -108,11 +127,27 @@ class ImportToLibraryService:
             )
             return IMPORT_CONFIRM_NOT_PENDING_TEXT
 
-        self._record_import_approval(
+        approved = self._record_import_approval(
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
             task_hash=import_source.task_hash,
+            expected_lease_version=expected_lease_version,
         )
+        if not approved:
+            stale_text = self._find_version_stale_rejection_text(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+            )
+            rejection_text = stale_text or IMPORT_CONFIRM_NOT_PENDING_TEXT
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.stale_rejected",
+                message=rejection_text,
+            )
+            return rejection_text
+
         self._record_event(
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
@@ -122,11 +157,19 @@ class ImportToLibraryService:
         )
 
         reply, imported = await self._execute_import(cleaned_ref, prepared_import)
-        if not imported:
-            self._record_pending_approval(
+        if imported:
+            self._record_executed_lease_version(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
+                executed_lease_version=expected_lease_version,
+            )
+        else:
+            self._restore_pending_approval(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                expected_lease_version=expected_lease_version,
             )
         return reply
 
@@ -160,21 +203,6 @@ class ImportToLibraryService:
                 message=message,
             )
             return None, message
-
-        stale_target_path = self._find_stale_import_target_path(
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-        )
-        if stale_target_path is not None:
-            stale_text = IMPORT_TARGET_EXISTS_TEXT.format(target_path=stale_target_path)
-            self._record_event(
-                task_ref=task_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                event_type="import.stale_rejected",
-                message=stale_text,
-            )
-            return None, stale_text
 
         source_path = Path(import_source.download_dir) / import_source.name
         if not source_path.exists():
@@ -300,44 +328,145 @@ class ImportToLibraryService:
             )
         return f"{import_success_text}\n{refresh_text}", True
 
-    def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> None:
+    def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         identity = (task_id.strip(), task_hash.strip())
-        if identity[0] and identity[1]:
+        if not identity[0] or not identity[1]:
+            return 0
+
+        in_memory_next_lease = self._pending_import_lease_versions.get(identity, 0) + 1
+        lease_version = in_memory_next_lease
+
+        if self._approval_repo is None:
+            self._pending_import_lease_versions[identity] = lease_version
             self._pending_import_identities.add(identity)
+            return lease_version
+        try:
+            requested_lease = self._approval_repo.request_import_approval(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+            )
+            if requested_lease > 0:
+                lease_version = requested_lease
+        except Exception:
+            lease_version = in_memory_next_lease
+
+        self._pending_import_lease_versions[identity] = lease_version
+        self._pending_import_identities.add(identity)
+        return lease_version
+
+    def _record_import_approval(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> bool:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return False
+        if expected_lease_version <= 0:
+            return False
 
         if self._approval_repo is None:
-            return
-        try:
-            self._approval_repo.request_import_approval(task_id=task_id, task_hash=task_hash, task_ref=task_ref)
-        except Exception:
-            pass
-
-    def _record_import_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> None:
-        identity = (task_id.strip(), task_hash.strip())
-        if identity in self._pending_import_identities:
+            current_lease = self._pending_import_lease_versions.get(identity, 0)
+            if identity not in self._pending_import_identities or current_lease != expected_lease_version:
+                return False
             self._pending_import_identities.remove(identity)
+            return True
 
+        approved = False
+        try:
+            approved = self._approval_repo.approve_import(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+                expected_lease_version=expected_lease_version,
+            )
+        except Exception:
+            current_lease = self._pending_import_lease_versions.get(identity, 0)
+            approved = identity in self._pending_import_identities and current_lease == expected_lease_version
+
+        if approved and identity in self._pending_import_identities:
+            self._pending_import_identities.remove(identity)
+        return approved
+
+    def _restore_pending_approval(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> None:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return
+        if expected_lease_version <= 0:
+            return
+        self._pending_import_identities.add(identity)
+        self._pending_import_lease_versions[identity] = expected_lease_version
         if self._approval_repo is None:
             return
         try:
-            self._approval_repo.approve_import(task_id=task_id, task_hash=task_hash, task_ref=task_ref)
+            self._approval_repo.restore_import_pending(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+                expected_lease_version=expected_lease_version,
+            )
         except Exception:
-            pass
+            return
 
-    def _has_pending_approval(self, *, task_id: str, task_hash: str) -> bool:
+    def _record_executed_lease_version(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        executed_lease_version: int,
+    ) -> None:
+        _ = task_ref
         identity = (task_id.strip(), task_hash.strip())
+        if identity[0] and identity[1] and executed_lease_version > 0:
+            self._pending_import_lease_versions[identity] = executed_lease_version
         if self._approval_repo is None:
-            return identity in self._pending_import_identities
+            return
+        try:
+            self._approval_repo.mark_import_executed(
+                task_id=task_id,
+                task_hash=task_hash,
+                executed_lease_version=executed_lease_version,
+            )
+        except Exception:
+            return
+
+    def _resolve_pending_lease_version(self, *, task_id: str, task_hash: str) -> int:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return 0
+        if self._approval_repo is None:
+            if identity not in self._pending_import_identities:
+                return 0
+            return self._pending_import_lease_versions.get(identity, 1)
+
         try:
             approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
         except Exception:
-            return identity in self._pending_import_identities
+            if identity not in self._pending_import_identities:
+                return 0
+            return self._pending_import_lease_versions.get(identity, 1)
         if approval_record is None:
-            return identity in self._pending_import_identities
-        return approval_record.status == APPROVAL_STATUS_PENDING
+            if identity not in self._pending_import_identities:
+                return 0
+            return self._pending_import_lease_versions.get(identity, 1)
+        if approval_record.status != APPROVAL_STATUS_PENDING:
+            return 0
+        return max(0, approval_record.lease_version)
 
-    def _find_stale_import_target_path(self, *, task_id: str, task_hash: str) -> str | None:
-        if self._approval_repo is None or self._job_event_repo is None:
+    def _find_version_stale_rejection_text(self, *, task_id: str, task_hash: str) -> str | None:
+        if self._approval_repo is None:
             return None
         try:
             approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
@@ -345,9 +474,19 @@ class ImportToLibraryService:
             return None
         if approval_record is None:
             return None
-        if approval_record.status != APPROVAL_STATUS_APPROVED:
+        if approval_record.lease_version <= 0:
+            return None
+        if approval_record.executed_version < approval_record.lease_version:
             return None
 
+        stale_target_path = self._find_latest_import_target_path(task_id=task_id, task_hash=task_hash)
+        if stale_target_path:
+            return IMPORT_TARGET_EXISTS_TEXT.format(target_path=stale_target_path)
+        return IMPORT_CONFIRM_NOT_PENDING_TEXT
+
+    def _find_latest_import_target_path(self, *, task_id: str, task_hash: str) -> str | None:
+        if self._job_event_repo is None:
+            return None
         try:
             events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
         except Exception:
