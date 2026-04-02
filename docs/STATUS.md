@@ -18,7 +18,6 @@ The chosen direction is:
 - hardlink-first import strategy
 
 ## What is not implemented yet
-- `import_to_library`
 - media server refresh
 - watchlist workflow
 - subtitle workflow
@@ -35,20 +34,23 @@ The chosen direction is:
 - bot reply now includes downloader task id/hash after successful add
 - `get_download_status` implemented via `status <id/hash>` / `状态 <id/hash>`
 - status reply includes task id/hash, status, progress, download speed, eta
-- minimal tests cover config, search formatting, selection mapping, add call behavior, status behavior, and bot routing
+- `import_to_library` implemented via `import <id/hash>` / `导入 <id/hash>`
+- import flow checks completion first, then hardlink-imports into fixed library target path
+- import reply now returns deterministic success/failure reason
+- minimal tests cover config, search/add/status/import behavior, and bot routing
 
 ## Latest verification (2026-04-01)
 - manual check: Telegram bot query confirmed candidate list reply
 - manual check: `dune` query now returns populated quality such as `1080p WEB-DL` / `1080p BluRay`
 - manual check: Telegram flow passed (`dune` -> `5`) and bot replied task id/hash (`ID: 87`, `Hash: b305bf9427799bb31499c9efd4a362ec831e4bd6`)
-- manual check: status query path is not manually re-verified in this round
-- tests: `tests/test_config.py`, `tests/test_search_media.py`, `tests/test_add_to_downloader.py`, `tests/test_get_download_status.py`, `tests/test_telegram_bot.py` passed (28 passed)
+- manual check: status/import command path not manually re-verified in this round
+- tests: `38 passed` (`.venv/bin/python -m pytest -q -s`)
 
 ## Current priority
 Build the next smallest path:
-1. detect download completion for the selected downloader path
-2. implement minimal `import_to_library` with hardlink-first strategy
-3. keep current Telegram query/add/status behaviors unchanged
+1. trigger media server refresh after successful import
+2. keep current Telegram query/add/status/import behaviors unchanged
+3. keep no-DB minimal runtime until this step is stable
 
 ## Current risks
 - path design must stay compatible with Docker shared root
@@ -59,11 +61,14 @@ Build the next smallest path:
 - search result format must stay stable enough for index mapping
 - candidate source field differences (`downloadUrl` / `magnetUrl` / `guid`) may cause add failures
 - status command format must avoid collision with normal free-text search
+- import command format must avoid collision with normal free-text search
+- Transmission `downloadDir + name` must map to container-visible paths
+- hardlink import currently has no copy fallback when cross-filesystem
 - Transmission availability, session-id handshake, and network timeout may affect add latency
 - Prowlarr availability and API rate/timeout may affect reply latency
 
 ## Acceptance focus
 For now, success means:
-- completion-to-import path is deterministic and testable for one downloader
-- hardlink-first behavior and fallback/error message are explicit
+- refresh path runs deterministically after successful import
+- refresh failure path has explicit, testable error messages
 - manual verification steps are clear

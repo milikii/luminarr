@@ -221,6 +221,37 @@ Luminarr 设计默认遵循这条前提：
 - 下载目录和媒体库目录路径规划正确
 - Luminarr 容器能看到共享媒体根目录
 
+### 当前已实现的最小运行配置（到 import_to_library）
+
+必填环境变量：
+
+- `TELEGRAM_BOT_TOKEN`
+- `PROWLARR_BASE_URL`
+- `PROWLARR_API_KEY`
+- `TRANSMISSION_BASE_URL`（可用 `http://<host>:9091`，程序会自动补 `/transmission/rpc`）
+
+可选环境变量：
+
+- `TRANSMISSION_USERNAME`
+- `TRANSMISSION_PASSWORD`
+- `LIBRARY_TARGET_DIR`（默认 `/data/library/movies`）
+
+### 手工验收（搜索 -> 选择 -> 投递 -> 状态查询 -> 导入）
+
+1. 启动程序：`python -m app.main`
+2. 在 Telegram 给 bot 发送搜索词（例如 `dune`）
+3. 收到候选列表后，发送序号（例如 `1`）
+4. 期望回复包含：
+   - `任务 ID: ...`
+   - `任务 Hash: ...`
+5. 到 Transmission 确认任务已出现（新增或 duplicate 都会返回 id/hash）
+6. 发送状态查询命令，例如 `status 87` 或 `status b305bf9427799bb31499c9efd4a362ec831e4bd6`
+7. 期望回复包含状态摘要（任务 ID/Hash、状态、进度、下载速度、预计剩余）
+8. 当状态到完成后，发送导入命令，例如 `import 87`
+9. 期望回复包含：
+   - `导入成功：...` 或失败原因
+   - `目标路径: ...`
+
 ---
 
 ## 9. 当前开发节奏
