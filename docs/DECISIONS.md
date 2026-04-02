@@ -289,6 +289,19 @@
 - **原因**：
   先用最小真相源补齐执行卫生，不把当前仓库过早拉成完整 workflow 平台。
 
+## D-028 downloader 显式 approval 基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - numeric select 不再直接 dispatch 到 Transmission
+  - `add_to_downloader` 必须先进入 pending approval
+  - `confirm <id/hash>` 必须可基于持久化 workflow truth 确定性路由到 downloader 或 import approval wake
+  - downloader approval 也采用最小 lease/version 防重放
+  - `jobs` 扩展承接 downloader approval wake/replay 所需的最小 payload truth
+  - frustration/reset 在 pending approval 阶段也必须覆盖 downloader cancel
+- **原因**：
+  downloader dispatch 同样属于副作用路径，必须与 import approval 保持一致的执行边界和重放纪律。
+
 ---
 
 ## 附：更新模板

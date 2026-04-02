@@ -5,8 +5,12 @@ import re
 from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
+from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
-from app.services.add_to_downloader import AddToDownloaderService
+from app.services.add_to_downloader import (
+    ADD_CANCELLED_TEXT,
+    AddToDownloaderService,
+)
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
 from app.services.import_to_library import (
     IMPORT_CANCELLED_TEXT,
@@ -22,6 +26,7 @@ SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
 IMPORT_TO_LIBRARY_SERVICE_KEY = "import_to_library_service"
+JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 
 
@@ -46,10 +51,40 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     query = (message.text or "").strip()
     if _is_frustration_text(query):
+        if chat is not None:
+            job_repo = context.application.bot_data.get(JOB_REPO_KEY)
+            if isinstance(job_repo, JobRepo):
+                try:
+                    pending_job = job_repo.get_latest_pending_job(chat_id=chat.id)
+                except Exception:
+                    pending_job = None
+                if pending_job is not None:
+                    if pending_job.workflow_type == WORKFLOW_IMPORT_TO_LIBRARY:
+                        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+                        if isinstance(import_service, ImportToLibraryService):
+                            cancelled_text = import_service.cancel_pending_import(chat.id)
+                            if cancelled_text == IMPORT_CANCELLED_TEXT:
+                                await message.reply_text(cancelled_text)
+                                return
+                    if pending_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER:
+                        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+                        if isinstance(add_service, AddToDownloaderService):
+                            cancelled_text = add_service.cancel_pending_add(chat.id)
+                            if cancelled_text == ADD_CANCELLED_TEXT:
+                                await message.reply_text(cancelled_text)
+                                return
+
         import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
         if isinstance(import_service, ImportToLibraryService) and chat is not None:
             cancelled_text = import_service.cancel_pending_import(chat.id)
             if cancelled_text == IMPORT_CANCELLED_TEXT:
+                await message.reply_text(cancelled_text)
+                return
+
+        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if isinstance(add_service, AddToDownloaderService) and chat is not None:
+            cancelled_text = add_service.cancel_pending_add(chat.id)
+            if cancelled_text == ADD_CANCELLED_TEXT:
                 await message.reply_text(cancelled_text)
                 return
 
@@ -85,6 +120,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     confirm_ref = parse_confirm_query(query)
     if confirm_ref is not None:
+        if chat is not None and confirm_ref:
+            job_repo = context.application.bot_data.get(JOB_REPO_KEY)
+            if isinstance(job_repo, JobRepo):
+                try:
+                    matched_job = job_repo.get_job_for_chat_ref(chat_id=chat.id, task_ref=confirm_ref)
+                except Exception:
+                    matched_job = None
+                if matched_job is not None and matched_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER:
+                    add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+                    if not isinstance(add_service, AddToDownloaderService):
+                        await message.reply_text(SERVICE_NOT_READY_TEXT)
+                        return
+                    reply = await add_service.confirm_add_by_task_ref(
+                        confirm_ref,
+                        chat_id=chat.id,
+                        user_id=user.id if user is not None else None,
+                    )
+                    await message.reply_text(reply)
+                    return
+                if matched_job is not None and matched_job.workflow_type == WORKFLOW_IMPORT_TO_LIBRARY:
+                    import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+                    if not isinstance(import_service, ImportToLibraryService):
+                        await message.reply_text(SERVICE_NOT_READY_TEXT)
+                        return
+                    reply = await import_service.confirm_import_by_task_ref(
+                        confirm_ref,
+                        chat_id=chat.id,
+                        user_id=user.id if user is not None else None,
+                    )
+                    await message.reply_text(reply)
+                    return
+
+        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if (
+            isinstance(add_service, AddToDownloaderService)
+            and chat is not None
+            and add_service.has_pending_add(chat.id, confirm_ref)
+        ):
+            reply = await add_service.confirm_add_by_task_ref(
+                confirm_ref,
+                chat_id=chat.id,
+                user_id=user.id if user is not None else None,
+            )
+            await message.reply_text(reply)
+            return
+
         import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
         if not isinstance(import_service, ImportToLibraryService):
             await message.reply_text(SERVICE_NOT_READY_TEXT)
@@ -106,7 +187,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if chat is None:
             await message.reply_text(SERVICE_NOT_READY_TEXT)
             return
-        reply = await add_service.add_by_selection(chat.id, query)
+        reply = await add_service.add_by_selection(
+            chat.id,
+            query,
+            user_id=user.id if user is not None else None,
+        )
         await message.reply_text(reply)
         return
 
@@ -127,6 +212,7 @@ def build_application(
     get_download_status_service: GetDownloadStatusService,
     import_to_library_service: ImportToLibraryService,
     telegram_update_repo: TelegramUpdateRepo | None = None,
+    job_repo: JobRepo | None = None,
 ) -> Application:
     application = Application.builder().token(token).build()
     application.bot_data[SEARCH_SERVICE_KEY] = search_service
@@ -135,6 +221,8 @@ def build_application(
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
     if telegram_update_repo is not None:
         application.bot_data[TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
+    if job_repo is not None:
+        application.bot_data[JOB_REPO_KEY] = job_repo
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     return application
 

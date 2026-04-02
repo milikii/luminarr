@@ -50,6 +50,9 @@ def main() -> None:
     add_to_downloader_service = AddToDownloaderService(
         search_service=search_service,
         add_torrent_func=transmission_client.add_torrent,
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+        job_event_repo=job_event_repo,
     )
     get_download_status_service = GetDownloadStatusService(transmission_client.get_torrent_status)
     refresh_media_server_func = None
@@ -72,6 +75,7 @@ def main() -> None:
         get_download_status_service,
         import_to_library_service,
         telegram_update_repo=telegram_update_repo,
+        job_repo=job_repo,
     )
     application.run_polling(drop_pending_updates=True)
 

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from app.db.sqlite import SqliteDatabase
 
+ACTION_ADD_TO_DOWNLOADER = "add_to_downloader"
 ACTION_IMPORT_TO_LIBRARY = "import_to_library"
 APPROVAL_STATUS_CANCELLED = "cancelled"
 APPROVAL_STATUS_PENDING = "pending"
@@ -36,6 +37,171 @@ class ApprovalRepo:
         task_ref: str,
         status: str = APPROVAL_STATUS_APPROVED,
     ) -> None:
+        self._upsert_approval(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            status=status,
+        )
+
+    def request_import_approval(self, *, task_id: str, task_hash: str, task_ref: str) -> int:
+        return self._request_approval(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+        )
+
+    def approve_import(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        return self._approve(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+        )
+
+    def restore_import_pending(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        return self._restore_pending(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+        )
+
+    def cancel_import(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        return self._cancel(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+        )
+
+    def mark_import_executed(self, *, task_id: str, task_hash: str, executed_lease_version: int) -> None:
+        self._mark_executed(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+            executed_lease_version=executed_lease_version,
+        )
+
+    def get_import_approval(self, *, task_id: str, task_hash: str) -> ApprovalRecord | None:
+        return self._get_approval(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id=task_id,
+            task_hash=task_hash,
+        )
+
+    def request_downloader_approval(self, *, task_id: str, task_hash: str, task_ref: str) -> int:
+        return self._request_approval(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+        )
+
+    def approve_downloader(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        return self._approve(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+        )
+
+    def restore_downloader_pending(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        return self._restore_pending(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+        )
+
+    def cancel_downloader(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        return self._cancel(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+        )
+
+    def mark_downloader_executed(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        executed_lease_version: int,
+    ) -> None:
+        self._mark_executed(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            task_id=task_id,
+            task_hash=task_hash,
+            executed_lease_version=executed_lease_version,
+        )
+
+    def get_downloader_approval(self, *, task_id: str, task_hash: str) -> ApprovalRecord | None:
+        return self._get_approval(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            task_id=task_id,
+            task_hash=task_hash,
+        )
+
+    def _upsert_approval(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        status: str,
+    ) -> None:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
@@ -43,6 +209,7 @@ class ApprovalRepo:
         cleaned_status = status.strip()
         if not cleaned_status:
             return
+
         initial_lease_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
         initial_executed_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
         with self._database.connect() as connection:
@@ -74,7 +241,7 @@ class ApprovalRepo:
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
-                    ACTION_IMPORT_TO_LIBRARY,
+                    action_type,
                     cleaned_task_id,
                     cleaned_task_hash,
                     cleaned_status,
@@ -85,7 +252,14 @@ class ApprovalRepo:
             )
             connection.commit()
 
-    def request_import_approval(self, *, task_id: str, task_hash: str, task_ref: str) -> int:
+    def _request_approval(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+    ) -> int:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
@@ -113,7 +287,7 @@ class ApprovalRepo:
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (
-                    ACTION_IMPORT_TO_LIBRARY,
+                    action_type,
                     cleaned_task_id,
                     cleaned_task_hash,
                     APPROVAL_STATUS_PENDING,
@@ -127,16 +301,17 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (ACTION_IMPORT_TO_LIBRARY, cleaned_task_id, cleaned_task_hash),
+                (action_type, cleaned_task_id, cleaned_task_hash),
             ).fetchone()
             connection.commit()
         if row is None:
             return 0
         return int(row["lease_version"])
 
-    def approve_import(
+    def _approve(
         self,
         *,
+        action_type: str,
         task_id: str,
         task_hash: str,
         task_ref: str,
@@ -144,9 +319,7 @@ class ApprovalRepo:
     ) -> bool:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            return False
-        if expected_lease_version <= 0:
+        if not cleaned_task_id or not cleaned_task_hash or expected_lease_version <= 0:
             return False
 
         with self._database.connect() as connection:
@@ -167,7 +340,7 @@ class ApprovalRepo:
                 (
                     APPROVAL_STATUS_APPROVED,
                     task_ref.strip(),
-                    ACTION_IMPORT_TO_LIBRARY,
+                    action_type,
                     cleaned_task_id,
                     cleaned_task_hash,
                     APPROVAL_STATUS_PENDING,
@@ -178,9 +351,10 @@ class ApprovalRepo:
             connection.commit()
         return cursor.rowcount == 1
 
-    def restore_import_pending(
+    def _restore_pending(
         self,
         *,
+        action_type: str,
         task_id: str,
         task_hash: str,
         task_ref: str,
@@ -188,9 +362,7 @@ class ApprovalRepo:
     ) -> bool:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            return False
-        if expected_lease_version <= 0:
+        if not cleaned_task_id or not cleaned_task_hash or expected_lease_version <= 0:
             return False
 
         with self._database.connect() as connection:
@@ -210,7 +382,7 @@ class ApprovalRepo:
                 (
                     APPROVAL_STATUS_PENDING,
                     task_ref.strip(),
-                    ACTION_IMPORT_TO_LIBRARY,
+                    action_type,
                     cleaned_task_id,
                     cleaned_task_hash,
                     expected_lease_version,
@@ -220,9 +392,10 @@ class ApprovalRepo:
             connection.commit()
         return cursor.rowcount == 1
 
-    def cancel_import(
+    def _cancel(
         self,
         *,
+        action_type: str,
         task_id: str,
         task_hash: str,
         task_ref: str,
@@ -230,9 +403,7 @@ class ApprovalRepo:
     ) -> bool:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            return False
-        if expected_lease_version <= 0:
+        if not cleaned_task_id or not cleaned_task_hash or expected_lease_version <= 0:
             return False
 
         with self._database.connect() as connection:
@@ -253,7 +424,7 @@ class ApprovalRepo:
                 (
                     APPROVAL_STATUS_CANCELLED,
                     task_ref.strip(),
-                    ACTION_IMPORT_TO_LIBRARY,
+                    action_type,
                     cleaned_task_id,
                     cleaned_task_hash,
                     APPROVAL_STATUS_PENDING,
@@ -264,13 +435,19 @@ class ApprovalRepo:
             connection.commit()
         return cursor.rowcount == 1
 
-    def mark_import_executed(self, *, task_id: str, task_hash: str, executed_lease_version: int) -> None:
+    def _mark_executed(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+        executed_lease_version: int,
+    ) -> None:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
+        if not cleaned_task_id or not cleaned_task_hash or executed_lease_version <= 0:
             return
-        if executed_lease_version <= 0:
-            return
+
         with self._database.connect() as connection:
             connection.execute(
                 """
@@ -286,14 +463,20 @@ class ApprovalRepo:
                 (
                     executed_lease_version,
                     executed_lease_version,
-                    ACTION_IMPORT_TO_LIBRARY,
+                    action_type,
                     cleaned_task_id,
                     cleaned_task_hash,
                 ),
             )
             connection.commit()
 
-    def get_import_approval(self, *, task_id: str, task_hash: str) -> ApprovalRecord | None:
+    def _get_approval(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+    ) -> ApprovalRecord | None:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
@@ -315,7 +498,7 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (ACTION_IMPORT_TO_LIBRARY, cleaned_task_id, cleaned_task_hash),
+                (action_type, cleaned_task_id, cleaned_task_hash),
             ).fetchone()
         if row is None:
             return None

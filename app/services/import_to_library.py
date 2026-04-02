@@ -10,7 +10,7 @@ from pathlib import Path
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRecord, ApprovalRepo
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo
+from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
@@ -347,6 +347,7 @@ class ImportToLibraryService:
         if not self._job_repo.cancel_pending_job(
             job_id=pending_job.job_id,
             expected_version=pending_job.version,
+            workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
         ):
             return None
 
@@ -684,6 +685,7 @@ class ImportToLibraryService:
                 job_id=job.job_id,
                 expected_version=job.version,
                 lease_owner=lease_owner,
+                workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
         except Exception:
             return False
@@ -702,6 +704,7 @@ class ImportToLibraryService:
                 job_id=job_id,
                 expected_version=expected_version,
                 lease_owner=lease_owner,
+                workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
         except Exception:
             return
@@ -720,6 +723,7 @@ class ImportToLibraryService:
                 job_id=job_id,
                 expected_version=expected_version,
                 lease_owner=lease_owner,
+                workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
         except Exception:
             return

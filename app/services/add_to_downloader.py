@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from app.clients.transmission import TransmissionTask
+from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRecord, ApprovalRepo
+from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.search_media import SearchMediaService
 
 AddTorrentFunc = Callable[[str], Awaitable[TransmissionTask]]
@@ -14,6 +19,15 @@ SELECT_NOT_FOUND_TEXT = "没有可用的候选结果，请先发一条搜索请�
 SELECT_OUT_OF_RANGE_TEXT = "序号超出范围，请按搜索结果里的序号重试。"
 CANDIDATE_SOURCE_MISSING_TEXT = "该候选缺少可下载链接，请换一个序号。"
 ADD_FAILED_TEXT = "下载投递失败，请稍后重试。"
+ADD_APPROVAL_PENDING_TEXT = (
+    "下载待确认：{title}\n"
+    "选择序号: {task_ref}\n"
+    "请发送 confirm {task_ref} 执行下载。"
+)
+ADD_CANCELLED_TEXT = "已取消当前下载确认。请重新发送序号。"
+ADD_CONFIRM_NOT_PENDING_TEXT = "没有待确认的下载请求，请先重新发送序号。"
+CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
+JOB_LEASE_OWNER = "downloader_confirm"
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,12 +37,48 @@ class AddResult:
     title: str
 
 
+@dataclass(frozen=True, slots=True)
+class PendingAddContext:
+    task_ref: str
+    task_id: str
+    task_hash: str
+    title: str
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmExecutionContext:
+    job: JobRecord
+    approval_record: ApprovalRecord | None
+    pending_add: PendingAddContext
+
+
 class AddToDownloaderService:
-    def __init__(self, search_service: SearchMediaService, add_torrent_func: AddTorrentFunc) -> None:
+    def __init__(
+        self,
+        search_service: SearchMediaService,
+        add_torrent_func: AddTorrentFunc,
+        approval_repo: ApprovalRepo | None = None,
+        job_repo: JobRepo | None = None,
+        job_event_repo: JobEventRepo | None = None,
+    ) -> None:
         self._search_service = search_service
         self._add_torrent_func = add_torrent_func
+        self._approval_repo = approval_repo
+        self._job_repo = job_repo
+        self._job_event_repo = job_event_repo
+        self._pending_add_identities: set[tuple[str, str]] = set()
+        self._pending_add_lease_versions: dict[tuple[str, str], int] = {}
+        self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
+        self._latest_pending_task_ref_by_chat: dict[int, str] = {}
 
-    async def add_by_selection(self, chat_id: int, selection_text: str) -> str:
+    async def add_by_selection(
+        self,
+        chat_id: int,
+        selection_text: str,
+        *,
+        user_id: int | None = None,
+    ) -> str:
         index = _parse_selection_index(selection_text)
         if index is None:
             return SELECT_USAGE_TEXT
@@ -43,18 +93,600 @@ class AddToDownloaderService:
         if not source:
             return CANDIDATE_SOURCE_MISSING_TEXT
 
+        task_ref = str(index)
+        title = str(candidate.get("title", "")).strip() or "(no title)"
+        pending_add = _build_pending_add_context(task_ref=task_ref, title=title, source=source)
+
+        self._record_pending_approval(
+            task_ref=task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+        )
+        self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
+        self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add)
+        self._record_event(
+            task_ref=task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            event_type="downloader.approval_pending",
+            message=title,
+        )
+        return ADD_APPROVAL_PENDING_TEXT.format(title=title, task_ref=task_ref)
+
+    async def confirm_add_by_task_ref(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
+        _ = user_id
+        cleaned_ref = task_ref.strip()
+        if not cleaned_ref:
+            return CONFIRM_QUERY_USAGE_TEXT
+
+        confirm_context = self._rebuild_confirm_context(task_ref=cleaned_ref, chat_id=chat_id)
+        if confirm_context is None:
+            in_memory_pending = self._get_in_memory_pending(chat_id=chat_id, task_ref=cleaned_ref)
+            if in_memory_pending is None:
+                return ADD_CONFIRM_NOT_PENDING_TEXT
+        else:
+            if confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
+                stale_text = self._find_version_stale_rejection_text(
+                    task_id=confirm_context.pending_add.task_id,
+                    task_hash=confirm_context.pending_add.task_hash,
+                )
+                return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
+            if (
+                confirm_context.approval_record is None
+                or confirm_context.approval_record.status != APPROVAL_STATUS_PENDING
+            ):
+                stale_text = self._find_version_stale_rejection_text(
+                    task_id=confirm_context.pending_add.task_id,
+                    task_hash=confirm_context.pending_add.task_hash,
+                )
+                return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
+
+        claimed_job = False
+        claimed_job_id = ""
+        claimed_job_version = 0
+        lease_owner = ""
+        pending_add = confirm_context.pending_add if confirm_context is not None else in_memory_pending
+        assert pending_add is not None
+
+        if confirm_context is not None:
+            lease_owner = self._build_job_lease_owner(cleaned_ref)
+            claimed_job = self._claim_pending_job(job=confirm_context.job, lease_owner=lease_owner)
+            if not claimed_job:
+                stale_text = self._find_version_stale_rejection_text(
+                    task_id=pending_add.task_id,
+                    task_hash=pending_add.task_hash,
+                )
+                return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
+            claimed_job_id = confirm_context.job.job_id
+            claimed_job_version = confirm_context.job.version
+
+        stale_text = self._find_version_stale_rejection_text(
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+        )
+        if stale_text is not None:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            return stale_text
+
+        expected_lease_version = 0
+        if confirm_context is not None and confirm_context.approval_record is not None:
+            expected_lease_version = max(0, confirm_context.approval_record.lease_version)
+        if expected_lease_version <= 0:
+            expected_lease_version = self._resolve_pending_lease_version(
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+            )
+        if expected_lease_version <= 0:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            return ADD_CONFIRM_NOT_PENDING_TEXT
+
+        approved = self._record_downloader_approval(
+            task_ref=cleaned_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            expected_lease_version=expected_lease_version,
+        )
+        if not approved:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            stale_text = self._find_version_stale_rejection_text(
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+            )
+            return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
+
+        self._record_event(
+            task_ref=cleaned_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            event_type="downloader.approval_confirmed",
+            message=pending_add.title,
+        )
+
         try:
-            task = await self._add_torrent_func(source)
+            task = await self._add_torrent_func(pending_add.source)
         except Exception:
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                event_type="downloader.dispatch_failed",
+                message=ADD_FAILED_TEXT,
+            )
+            self._restore_pending_approval(
+                task_ref=cleaned_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
             return ADD_FAILED_TEXT
 
-        title = str(candidate.get("title", "")).strip() or "(no title)"
-        result = AddResult(task_id=task.task_id, task_hash=task.task_hash, title=title)
-        return (
+        result = AddResult(task_id=task.task_id, task_hash=task.task_hash, title=pending_add.title)
+        reply = (
             f"已添加下载：{result.title}\n"
             f"任务 ID: {result.task_id}\n"
             f"任务 Hash: {result.task_hash}"
         )
+        self._record_event(
+            task_ref=cleaned_ref,
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            event_type="downloader.succeeded",
+            message=result.title,
+        )
+        self._record_executed_lease_version(
+            task_ref=cleaned_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            executed_lease_version=expected_lease_version,
+        )
+        if claimed_job:
+            self._mark_completed_job(
+                job_id=claimed_job_id,
+                expected_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+        self._clear_pending_context(chat_id=chat_id, task_ref=cleaned_ref)
+        return reply
+
+    def has_pending_add(self, chat_id: int, task_ref: str) -> bool:
+        cleaned_ref = task_ref.strip()
+        if chat_id <= 0 or not cleaned_ref:
+            return False
+        if self._job_repo is not None:
+            try:
+                job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=cleaned_ref)
+            except Exception:
+                job = None
+            if job is not None and job.state == JOB_STATE_PENDING_APPROVAL:
+                return True
+        return (chat_id, cleaned_ref) in self._pending_add_contexts_by_chat_ref
+
+    def cancel_pending_add(self, chat_id: int) -> str | None:
+        if chat_id <= 0:
+            return None
+
+        pending_job: JobRecord | None = None
+        if self._job_repo is not None:
+            try:
+                pending_job = self._job_repo.get_latest_pending_downloader_job(chat_id=chat_id)
+            except Exception:
+                pending_job = None
+
+        if pending_job is None:
+            task_ref = self._latest_pending_task_ref_by_chat.get(chat_id, "").strip()
+            if not task_ref:
+                return None
+            pending_add = self._pending_add_contexts_by_chat_ref.get((chat_id, task_ref))
+            if pending_add is None:
+                return None
+            expected_lease_version = self._resolve_pending_lease_version(
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+            )
+            if expected_lease_version <= 0:
+                return None
+            approval_cancelled = self._cancel_pending_approval(
+                task_ref=task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            if not approval_cancelled:
+                return None
+            self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
+            self._record_event(
+                task_ref=task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                event_type="downloader.cancelled",
+                message=ADD_CANCELLED_TEXT,
+            )
+            return ADD_CANCELLED_TEXT
+
+        pending_add = _pending_add_from_json(pending_job.payload_json)
+        if pending_add is None:
+            return None
+
+        expected_lease_version = self._resolve_pending_lease_version(
+            task_id=pending_job.task_id,
+            task_hash=pending_job.task_hash,
+        )
+        if expected_lease_version <= 0:
+            return None
+
+        approval_cancelled = self._cancel_pending_approval(
+            task_ref=pending_job.task_ref,
+            task_id=pending_job.task_id,
+            task_hash=pending_job.task_hash,
+            expected_lease_version=expected_lease_version,
+        )
+        if not approval_cancelled:
+            return None
+        if not self._job_repo.cancel_pending_job(
+            job_id=pending_job.job_id,
+            expected_version=pending_job.version,
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        ):
+            return None
+        self._clear_pending_context(chat_id=chat_id, task_ref=pending_job.task_ref)
+        self._record_event(
+            task_ref=pending_job.task_ref,
+            task_id=pending_job.task_id,
+            task_hash=pending_job.task_hash,
+            event_type="downloader.cancelled",
+            message=ADD_CANCELLED_TEXT,
+        )
+        return ADD_CANCELLED_TEXT
+
+    def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return 0
+
+        in_memory_next_lease = self._pending_add_lease_versions.get(identity, 0) + 1
+        lease_version = in_memory_next_lease
+
+        if self._approval_repo is None:
+            self._pending_add_lease_versions[identity] = lease_version
+            self._pending_add_identities.add(identity)
+            return lease_version
+        try:
+            requested_lease = self._approval_repo.request_downloader_approval(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+            )
+            if requested_lease > 0:
+                lease_version = requested_lease
+        except Exception:
+            lease_version = in_memory_next_lease
+
+        self._pending_add_lease_versions[identity] = lease_version
+        self._pending_add_identities.add(identity)
+        return lease_version
+
+    def _record_downloader_approval(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> bool:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1] or expected_lease_version <= 0:
+            return False
+
+        if self._approval_repo is None:
+            current_lease = self._pending_add_lease_versions.get(identity, 0)
+            if identity not in self._pending_add_identities or current_lease != expected_lease_version:
+                return False
+            self._pending_add_identities.remove(identity)
+            return True
+
+        approved = False
+        try:
+            approved = self._approval_repo.approve_downloader(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+                expected_lease_version=expected_lease_version,
+            )
+        except Exception:
+            current_lease = self._pending_add_lease_versions.get(identity, 0)
+            approved = identity in self._pending_add_identities and current_lease == expected_lease_version
+
+        if approved and identity in self._pending_add_identities:
+            self._pending_add_identities.remove(identity)
+        return approved
+
+    def _restore_pending_approval(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> None:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1] or expected_lease_version <= 0:
+            return
+        self._pending_add_identities.add(identity)
+        self._pending_add_lease_versions[identity] = expected_lease_version
+        if self._approval_repo is None:
+            return
+        try:
+            self._approval_repo.restore_downloader_pending(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+                expected_lease_version=expected_lease_version,
+            )
+        except Exception:
+            return
+
+    def _cancel_pending_approval(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        expected_lease_version: int,
+    ) -> bool:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1] or expected_lease_version <= 0:
+            return False
+
+        self._pending_add_identities.discard(identity)
+        if self._approval_repo is None:
+            return True
+        try:
+            return self._approval_repo.cancel_downloader(
+                task_id=task_id,
+                task_hash=task_hash,
+                task_ref=task_ref,
+                expected_lease_version=expected_lease_version,
+            )
+        except Exception:
+            return False
+
+    def _record_executed_lease_version(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        executed_lease_version: int,
+    ) -> None:
+        _ = task_ref
+        identity = (task_id.strip(), task_hash.strip())
+        if identity[0] and identity[1] and executed_lease_version > 0:
+            self._pending_add_lease_versions[identity] = executed_lease_version
+        if self._approval_repo is None:
+            return
+        try:
+            self._approval_repo.mark_downloader_executed(
+                task_id=task_id,
+                task_hash=task_hash,
+                executed_lease_version=executed_lease_version,
+            )
+        except Exception:
+            return
+
+    def _record_pending_context(self, *, chat_id: int, pending_add: PendingAddContext) -> None:
+        if chat_id <= 0:
+            return
+        key = (chat_id, pending_add.task_ref)
+        self._pending_add_contexts_by_chat_ref[key] = pending_add
+        self._latest_pending_task_ref_by_chat[chat_id] = pending_add.task_ref
+
+    def _record_pending_job(
+        self,
+        *,
+        chat_id: int,
+        user_id: int | None,
+        pending_add: PendingAddContext,
+    ) -> None:
+        if self._job_repo is None:
+            return
+        try:
+            self._job_repo.upsert_downloader_job_pending(
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=pending_add.task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                payload_json=_pending_add_to_json(pending_add),
+            )
+        except Exception:
+            return
+
+    def _rebuild_confirm_context(
+        self,
+        *,
+        task_ref: str,
+        chat_id: int | None,
+    ) -> ConfirmExecutionContext | None:
+        if self._job_repo is None or chat_id is None or chat_id <= 0:
+            return None
+        try:
+            job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
+        except Exception:
+            return None
+        if job is None:
+            return None
+
+        pending_add = _pending_add_from_json(job.payload_json)
+        if pending_add is None:
+            return None
+
+        approval_record: ApprovalRecord | None = None
+        if self._approval_repo is not None:
+            try:
+                approval_record = self._approval_repo.get_downloader_approval(
+                    task_id=job.task_id,
+                    task_hash=job.task_hash,
+                )
+            except Exception:
+                approval_record = None
+        return ConfirmExecutionContext(job=job, approval_record=approval_record, pending_add=pending_add)
+
+    def _get_in_memory_pending(self, *, chat_id: int | None, task_ref: str) -> PendingAddContext | None:
+        if chat_id is None or chat_id <= 0:
+            return None
+        return self._pending_add_contexts_by_chat_ref.get((chat_id, task_ref))
+
+    def _clear_pending_context(self, *, chat_id: int | None, task_ref: str) -> None:
+        if chat_id is None or chat_id <= 0:
+            return
+        key = (chat_id, task_ref)
+        self._pending_add_contexts_by_chat_ref.pop(key, None)
+        if self._latest_pending_task_ref_by_chat.get(chat_id) == task_ref:
+            self._latest_pending_task_ref_by_chat.pop(chat_id, None)
+
+    def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool:
+        if self._job_repo is None:
+            return False
+        try:
+            return self._job_repo.claim_lease(
+                job_id=job.job_id,
+                expected_version=job.version,
+                lease_owner=lease_owner,
+                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+            )
+        except Exception:
+            return False
+
+    def _restore_pending_job(
+        self,
+        *,
+        job_id: str,
+        expected_version: int,
+        lease_owner: str,
+    ) -> None:
+        if self._job_repo is None:
+            return
+        try:
+            self._job_repo.release_lease_to_pending(
+                job_id=job_id,
+                expected_version=expected_version,
+                lease_owner=lease_owner,
+                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+            )
+        except Exception:
+            return
+
+    def _mark_completed_job(
+        self,
+        *,
+        job_id: str,
+        expected_version: int,
+        lease_owner: str,
+    ) -> None:
+        if self._job_repo is None:
+            return
+        try:
+            self._job_repo.mark_completed(
+                job_id=job_id,
+                expected_version=expected_version,
+                lease_owner=lease_owner,
+                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+            )
+        except Exception:
+            return
+
+    def _build_job_lease_owner(self, task_ref: str) -> str:
+        cleaned_ref = task_ref.strip()
+        if not cleaned_ref:
+            return JOB_LEASE_OWNER
+        return f"{JOB_LEASE_OWNER}:{cleaned_ref}"
+
+    def _resolve_pending_lease_version(self, *, task_id: str, task_hash: str) -> int:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return 0
+        if self._approval_repo is None:
+            if identity not in self._pending_add_identities:
+                return 0
+            return self._pending_add_lease_versions.get(identity, 1)
+
+        try:
+            approval_record = self._approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
+        except Exception:
+            if identity not in self._pending_add_identities:
+                return 0
+            return self._pending_add_lease_versions.get(identity, 1)
+        if approval_record is None:
+            if identity not in self._pending_add_identities:
+                return 0
+            return self._pending_add_lease_versions.get(identity, 1)
+        if approval_record.status != APPROVAL_STATUS_PENDING:
+            return 0
+        return max(0, approval_record.lease_version)
+
+    def _find_version_stale_rejection_text(self, *, task_id: str, task_hash: str) -> str | None:
+        if self._approval_repo is None:
+            return None
+        try:
+            approval_record = self._approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
+        except Exception:
+            return None
+        if approval_record is None:
+            return None
+        if approval_record.lease_version <= 0:
+            return None
+        if approval_record.executed_version < approval_record.lease_version:
+            return None
+        return ADD_CONFIRM_NOT_PENDING_TEXT
+
+    def _record_event(
+        self,
+        *,
+        task_ref: str,
+        event_type: str,
+        message: str,
+        task_id: str = "",
+        task_hash: str = "",
+    ) -> None:
+        if self._job_event_repo is None:
+            return
+        try:
+            self._job_event_repo.append_event(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                event_type=event_type,
+                message=message,
+            )
+        except Exception:
+            return
 
 
 def _parse_selection_index(text: str) -> int | None:
@@ -76,3 +708,55 @@ def _resolve_source(candidate: Mapping[str, Any]) -> str:
         if text:
             return text
     return ""
+
+
+def _build_pending_add_context(*, task_ref: str, title: str, source: str) -> PendingAddContext:
+    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    return PendingAddContext(
+        task_ref=task_ref,
+        task_id=f"selection:{task_ref}",
+        task_hash=f"candidate:{digest}",
+        title=title,
+        source=source,
+    )
+
+
+def _pending_add_to_json(pending_add: PendingAddContext) -> str:
+    return json.dumps(
+        {
+            "task_ref": pending_add.task_ref,
+            "task_id": pending_add.task_id,
+            "task_hash": pending_add.task_hash,
+            "title": pending_add.title,
+            "source": pending_add.source,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+
+
+def _pending_add_from_json(payload_json: str) -> PendingAddContext | None:
+    cleaned_payload = payload_json.strip()
+    if not cleaned_payload:
+        return None
+    try:
+        payload = json.loads(cleaned_payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    task_ref = str(payload.get("task_ref", "")).strip()
+    task_id = str(payload.get("task_id", "")).strip()
+    task_hash = str(payload.get("task_hash", "")).strip()
+    title = str(payload.get("title", "")).strip()
+    source = str(payload.get("source", "")).strip()
+    if not task_ref or not task_id or not task_hash or not title or not source:
+        return None
+    return PendingAddContext(
+        task_ref=task_ref,
+        task_id=task_id,
+        task_hash=task_hash,
+        title=title,
+        source=source,
+    )

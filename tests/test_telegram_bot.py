@@ -12,6 +12,7 @@ from app.bot.telegram_bot import (
     FRUSTRATION_RESET_TEXT,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
+    JOB_REPO_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_UPDATE_REPO_KEY,
@@ -23,7 +24,7 @@ from app.db.approval_repo import ApprovalRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
-from app.services.add_to_downloader import AddToDownloaderService
+from app.services.add_to_downloader import ADD_CANCELLED_TEXT, AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -116,8 +117,8 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     asyncio.run(handle_message(update, context))
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "任务 ID: 11" in sent_text
-    assert "任务 Hash: h11" in sent_text
+    assert "下载待确认" in sent_text
+    assert "confirm 1" in sent_text
 
 
 def test_handle_message_digit_replies_service_not_ready() -> None:
@@ -342,6 +343,86 @@ def test_handle_message_confirm_replies_service_not_ready() -> None:
     reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
 
 
+def test_handle_message_confirm_routes_to_add_service_when_downloader_pending(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+
+    update, reply_text = _build_update("confirm 1")
+    search_service = SearchMediaService(_fake_search)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=SimpleNamespace(task_id="11", task_hash="h11")),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    _run(add_service.add_by_selection(1001, "1", user_id=2001))
+
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    import_service.confirm_import_by_task_ref = AsyncMock(return_value="不应走到这里")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                JOB_REPO_KEY: job_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "任务 ID: 11" in sent_text
+    assert "任务 Hash: h11" in sent_text
+    import_service.confirm_import_by_task_ref.assert_not_called()
+
+
+def test_handle_message_confirm_routes_stale_downloader_confirm_to_add_service(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+
+    search_service = SearchMediaService(_fake_search)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=SimpleNamespace(task_id="11", task_hash="h11")),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    _run(add_service.add_by_selection(1001, "1", user_id=2001))
+    _run(add_service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+
+    update, reply_text = _build_update("confirm 1")
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    import_service.confirm_import_by_task_ref = AsyncMock(return_value="不应走到这里")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                JOB_REPO_KEY: job_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with("没有待确认的下载请求，请先重新发送序号。")
+    import_service.confirm_import_by_task_ref.assert_not_called()
+
+
 def test_handle_message_deduplicates_update(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
@@ -441,16 +522,64 @@ def test_handle_message_frustration_cancels_pending_import(tmp_path: Path) -> No
     reply_text.assert_awaited_once_with(IMPORT_CANCELLED_TEXT)
 
 
+def test_handle_message_frustration_cancels_pending_downloader(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+
+    search_service = SearchMediaService(_fake_search)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(
+        search_service,
+        AsyncMock(return_value=SimpleNamespace(task_id="11", task_hash="h11")),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    _run(add_service.add_by_selection(1001, "1", user_id=2001))
+
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+
+    update, reply_text = _build_update("取消", update_id=78)
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                JOB_REPO_KEY: job_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(ADD_CANCELLED_TEXT)
+
+
 def test_build_application_registers_services() -> None:
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
     status_service = GetDownloadStatusService(AsyncMock())
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
-    application = build_application("token", search_service, add_service, status_service, import_service)
+    database = SqliteDatabase(":memory:")
+    database.initialize()
+    job_repo = JobRepo(database)
+    application = build_application(
+        "token",
+        search_service,
+        add_service,
+        status_service,
+        import_service,
+        job_repo=job_repo,
+    )
     assert application.bot_data[SEARCH_SERVICE_KEY] is search_service
     assert application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] is add_service
     assert application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] is status_service
     assert application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] is import_service
+    assert application.bot_data[JOB_REPO_KEY] is job_repo
 
 
 def _run(coroutine: Awaitable[str]) -> str:

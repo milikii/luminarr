@@ -3,7 +3,7 @@
 Luminarr 是一个**面向自托管影视自动化场景的轻量自然语言 Harness**。
 它不是通用 AI 助手，也不是大而全媒体平台，而是把：
 
-**搜索 -> 选择 -> 提交下载 -> 查询状态 -> 导入 -> 刷新**
+**搜索 -> 选择 -> 审批 -> 提交下载 -> 查询状态 -> 导入 -> 刷新**
 
 这条链路，放进一个**可控、可测、可恢复、可审计**的运行时里。
 
@@ -45,12 +45,13 @@ Luminarr 是一个**面向自托管影视自动化场景的轻量自然语言 Ha
   3. parser-normalized original query（仅 TMDB 不可用或无命中时）
 - 中文海报卡片文本基线
 - 候选映射持久化（SQLite）
+- `add_to_downloader` 显式审批
 - Transmission 投递
 - `status <id/hash>` 查询
 - `import <id/hash>` 进入 pending
-- `confirm <id/hash>` 执行 hardlink import + Emby refresh
+- `confirm <id/hash>` 路由到 downloader/import 的待确认副作用
 - `approval_record` 最小 pending/approved 协议
-- import confirm 的最小 lease/version 防重放
+- downloader/import confirm 的最小 lease/version 防重放
 - `job_event` 最小事件轨迹
 
 ---
@@ -69,14 +70,13 @@ v15 采纳的是**工程原则升级**，不是“下一步一次做完 5 个大
 
 ### 尚未实现、但不再忽视
 - `telegram_updates` 已落地为 Telegram message de-dup 真相源
-- `jobs.version + lease_owner + lease_until` 已落地为 import wake/replay 最小真相
+- `jobs.version + lease_owner + lease_until` 已落地为 import wake/replay + downloader approval wake/replay 最小真相
 - `confirm <id/hash>` 的 approval-wake context rebuild 已落地
-- frustration/reset short-circuit 已落地到选择 reset + pending import cancel
-- `add_to_downloader` 的 pre-dispatch approval
+- frustration/reset short-circuit 已落地到选择 reset + pending downloader/import cancel
 - approval expiry / timeout policy
 - 真正的 concurrency-safe executor
 - reactive recovery implementation
-- watchlist baseline（已不再是最近一步）
+- watchlist baseline（重新回到下一步）
 
 ---
 
@@ -121,8 +121,9 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 ## 6. 审批与上下文重建
 
 当前已经落地：
+- 选择序号不会立即投递下载，而是先进入 pending approval
 - `import <id/hash>` 只进入 pending
-- `confirm <id/hash>` 才执行导入副作用
+- `confirm <id/hash>` 才执行 downloader/import 副作用
 
 v15 新要求：
 - 审批唤醒后，执行阶段不得直接复用旧对话长历史
@@ -146,15 +147,15 @@ v15 新要求：
 
 ## 8. 下一步正确优先级
 
-v15 下，**watchlist 不再是最近一步**。
-最近一步应该回到执行卫生和控制层：
+v15 下，执行卫生和控制层已补到 downloader approval。
+下一步应回到 **watchlist baseline**：
 
 1. `telegram_updates` 去重真相源
 2. `jobs` 表最小执行所有权协议
 3. approval-wake context rebuild
 4. frustration detector / deterministic reset
-5. 这些已落地后，再做 `add_to_downloader` 的显式审批
-6. 最后才轮到 watchlist baseline
+5. `add_to_downloader` 的显式审批
+6. 现在回到 watchlist baseline
 
 ---
 

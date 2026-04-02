@@ -65,6 +65,7 @@ SCHEMA_STATEMENTS = (
         task_ref TEXT NOT NULL DEFAULT '',
         task_id TEXT NOT NULL DEFAULT '',
         task_hash TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '',
         version INTEGER NOT NULL DEFAULT 1,
         lease_owner TEXT NOT NULL DEFAULT '',
         lease_until TEXT NOT NULL DEFAULT '',
@@ -92,6 +93,7 @@ class SqliteDatabase:
             for statement in SCHEMA_STATEMENTS:
                 connection.execute(statement)
             _ensure_approval_record_columns(connection)
+            _ensure_jobs_columns(connection)
             connection.commit()
 
     @contextmanager
@@ -115,3 +117,10 @@ def _ensure_approval_record_columns(connection: sqlite3.Connection) -> None:
         connection.execute(
             "ALTER TABLE approval_record ADD COLUMN executed_version INTEGER NOT NULL DEFAULT 0"
         )
+
+
+def _ensure_jobs_columns(connection: sqlite3.Connection) -> None:
+    rows = connection.execute("PRAGMA table_info(jobs)").fetchall()
+    existing_columns = {str(row["name"]) for row in rows}
+    if "payload_json" not in existing_columns:
+        connection.execute("ALTER TABLE jobs ADD COLUMN payload_json TEXT NOT NULL DEFAULT ''")

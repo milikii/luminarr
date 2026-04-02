@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionImportSource, TransmissionTask
 from app.db.approval_repo import (
+    ACTION_ADD_TO_DOWNLOADER,
     ACTION_IMPORT_TO_LIBRARY,
     APPROVAL_STATUS_APPROVED,
     APPROVAL_STATUS_CANCELLED,
@@ -15,10 +16,14 @@ from app.db.approval_repo import (
 )
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_COMPLETED, JobRepo
+from app.db.job_repo import JOB_STATE_COMPLETED, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
-from app.services.add_to_downloader import AddToDownloaderService
+from app.services.add_to_downloader import (
+    ADD_CANCELLED_TEXT,
+    ADD_CONFIRM_NOT_PENDING_TEXT,
+    AddToDownloaderService,
+)
 from app.services.import_to_library import (
     IMPORT_CANCELLED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
@@ -46,9 +51,12 @@ def test_candidate_mapping_persists_for_restart(tmp_path: Path) -> None:
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
     add_service = AddToDownloaderService(search_service=search_service_after_restart, add_torrent_func=add_torrent)
 
-    reply = _run(add_service.add_by_selection(1001, "1"))
-    assert "任务 ID: 42" in reply
-    assert "任务 Hash: hash-42" in reply
+    pending_reply = _run(add_service.add_by_selection(1001, "1"))
+    assert "下载待确认" in pending_reply
+
+    confirm_reply = _run(add_service.confirm_add_by_task_ref("1", chat_id=1001))
+    assert "任务 ID: 42" in confirm_reply
+    assert "任务 Hash: hash-42" in confirm_reply
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
 
 
@@ -107,6 +115,7 @@ def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None
         job_id=second_job.job_id,
         expected_version=second_job.version,
         lease_owner="test-owner",
+        workflow_type=second_job.workflow_type,
     )
 
     restarted_repo = JobRepo(SqliteDatabase(str(db_path)))
@@ -222,6 +231,128 @@ def test_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     assert record.lease_version == 1
     assert record.executed_version == 0
     assert record.last_task_ref == "87"
+
+
+def test_downloader_pending_approval_persists_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    search_before_restart = SearchMediaService(
+        search_func=_fake_search_with_download_url,
+        candidate_repo=CandidateMappingRepo(database),
+    )
+    _run(search_before_restart.search_and_format("dune", chat_id=1001))
+
+    before_restart_service = AddToDownloaderService(
+        search_service=search_before_restart,
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+    )
+    pending_reply = _run(before_restart_service.add_by_selection(1001, "1", user_id=2001))
+    assert "下载待确认" in pending_reply
+
+    after_restart_service = AddToDownloaderService(
+        search_service=SearchMediaService(_unexpected_search_call),
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        approval_repo=ApprovalRepo(SqliteDatabase(str(db_path))),
+        job_repo=JobRepo(SqliteDatabase(str(db_path))),
+    )
+    confirm_reply = _run(after_restart_service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+
+    assert "任务 ID: 42" in confirm_reply
+    assert "任务 Hash: hash-42" in confirm_reply
+
+    restarted_job = JobRepo(SqliteDatabase(str(db_path))).get_downloader_job_for_chat_ref(
+        chat_id=1001,
+        task_ref="1",
+    )
+    assert restarted_job is not None
+    assert restarted_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER
+    assert restarted_job.state == JOB_STATE_COMPLETED
+    assert restarted_job.payload_json
+
+    approval_record = ApprovalRepo(SqliteDatabase(str(db_path))).get_downloader_approval(
+        task_id="selection:1",
+        task_hash=restarted_job.task_hash,
+    )
+    assert approval_record is not None
+    assert approval_record.action_type == ACTION_ADD_TO_DOWNLOADER
+    assert approval_record.status == APPROVAL_STATUS_APPROVED
+    assert approval_record.executed_version == approval_record.lease_version
+
+
+def test_downloader_confirm_stale_guard_blocks_duplicate_after_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    search_service = SearchMediaService(
+        search_func=_fake_search_with_download_url,
+        candidate_repo=CandidateMappingRepo(database),
+    )
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    first_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+    )
+    _run(first_service.add_by_selection(1001, "1", user_id=2001))
+    first_confirm = _run(first_service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+    assert "任务 ID: 42" in first_confirm
+
+    restarted_service = AddToDownloaderService(
+        search_service=SearchMediaService(_unexpected_search_call),
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        approval_repo=ApprovalRepo(SqliteDatabase(str(db_path))),
+        job_repo=JobRepo(SqliteDatabase(str(db_path))),
+    )
+    stale_reply = _run(restarted_service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+
+    assert stale_reply == ADD_CONFIRM_NOT_PENDING_TEXT
+
+
+def test_cancel_pending_downloader_updates_persisted_truth(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    search_service = SearchMediaService(
+        search_func=_fake_search_with_download_url,
+        candidate_repo=CandidateMappingRepo(database),
+    )
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+
+    pending_reply = _run(service.add_by_selection(1001, "1", user_id=2001))
+    assert "下载待确认" in pending_reply
+
+    pending_job = job_repo.get_downloader_job_for_chat_ref(chat_id=1001, task_ref="1")
+    assert pending_job is not None
+
+    cancelled_reply = service.cancel_pending_add(1001)
+    assert cancelled_reply == ADD_CANCELLED_TEXT
+
+    record = approval_repo.get_downloader_approval(
+        task_id=pending_job.task_id,
+        task_hash=pending_job.task_hash,
+    )
+    assert record is not None
+    assert record.status == APPROVAL_STATUS_CANCELLED
+
+    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+    assert confirm_reply == ADD_CONFIRM_NOT_PENDING_TEXT
 
 
 def test_import_request_advances_lease_version(tmp_path: Path) -> None:
