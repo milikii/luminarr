@@ -100,7 +100,6 @@
 - **日期**：2026-04-01
 - **结论**：
   项目的长期记忆依赖：
-  - `Luminarr_v15_execution_guide_reviewed.md`
   - `docs/DECISIONS.md`
   - `docs/NEXT_STEP.md`
   - `docs/STATUS.md`
@@ -262,12 +261,11 @@
 - **日期**：2026-04-02
 - **结论**：
   文档冲突时按以下顺序解释：
-  1. execution guide
-  2. `docs/DECISIONS.md`
-  3. `docs/NEXT_STEP.md`
-  4. `docs/STATUS.md`
-  5. `README.md`
-  6. `AGENTS.md`
+  1. `docs/DECISIONS.md`
+  2. `docs/NEXT_STEP.md`
+  3. `docs/STATUS.md`
+  4. `README.md`
+  5. `AGENTS.md`
 - **原因**：
   防止 Codex 被互相冲突的文档带偏。
 

@@ -199,11 +199,10 @@ v15 下，执行卫生和控制层已补到 downloader approval。
 
 开始任何新任务前，先读：
 
-1. `Luminarr_v15_execution_guide_reviewed.md`
-2. `docs/DECISIONS.md`
-3. `docs/NEXT_STEP.md`
-4. `docs/STATUS.md`
-5. `AGENTS.md`
+1. `docs/DECISIONS.md`
+2. `docs/NEXT_STEP.md`
+3. `docs/STATUS.md`
+4. `AGENTS.md`
 
 ---
 

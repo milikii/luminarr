@@ -6,12 +6,11 @@ This file is the operating contract for AI coding agents working in this reposit
 
 When files disagree, follow this order:
 
-1. `Luminarr_v15_execution_guide_reviewed.md`
-2. `docs/DECISIONS.md`
-3. `docs/NEXT_STEP.md`
-4. `docs/STATUS.md`
-5. `README.md`
-6. `AGENTS.md`
+1. `docs/DECISIONS.md`
+2. `docs/NEXT_STEP.md`
+3. `docs/STATUS.md`
+4. `README.md`
+5. `AGENTS.md`
 
 Do not invent a third interpretation. If two files conflict, update the lower-priority file.
 
