@@ -23,6 +23,7 @@ from app.services.search_media import SearchMediaService
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
+LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
@@ -216,7 +217,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     chat_id = chat.id if chat is not None else None
-    reply = await search_service.search_and_format(query, chat_id=chat_id)
+    reply = await _search_with_reactive_recovery(
+        search_service=search_service,
+        query=query,
+        chat_id=chat_id,
+    )
     await message.reply_text(reply)
 
 
@@ -249,3 +254,54 @@ def _is_frustration_text(text: str) -> bool:
     if not cleaned_text:
         return False
     return cleaned_text in {"不对", "停", "重来", "换一个", "算了", "取消"}
+
+
+async def _search_with_reactive_recovery(
+    *,
+    search_service: SearchMediaService,
+    query: str,
+    chat_id: int | None,
+) -> str:
+    try:
+        return await search_service.search_and_format(query, chat_id=chat_id)
+    except Exception as error:
+        if not _is_llm_physical_failure(error):
+            raise
+
+    recovery_context = _build_recovery_context(query=query, chat_id=chat_id)
+    compact_query = recovery_context["current_job_context"]
+    try:
+        return await search_service.search_and_format(compact_query, chat_id=chat_id)
+    except Exception as error:
+        if _is_llm_physical_failure(error):
+            return LLM_PHYSICAL_FAILURE_SAFE_TEXT
+        raise
+
+
+def _build_recovery_context(*, query: str, chat_id: int | None) -> dict[str, str]:
+    compact_query = re.sub(r"\s+", " ", query.strip())
+    if len(compact_query) > 160:
+        compact_query = compact_query[:160]
+    return {
+        "system_base": "telegram_private_chat",
+        "project_rules": "parser_first_llm_fallback",
+        "current_job_context": compact_query if compact_query else f"chat:{chat_id or 0}",
+    }
+
+
+def _is_llm_physical_failure(error: Exception) -> bool:
+    status_code = getattr(error, "status_code", None)
+    if status_code == 413:
+        return True
+
+    message = str(error).lower()
+    patterns = (
+        "413",
+        "payload too large",
+        "max_output_tokens",
+        "maximum context length",
+        "context length exceeded",
+        "response was truncated",
+        "truncated",
+    )
+    return any(pattern in message for pattern in patterns)

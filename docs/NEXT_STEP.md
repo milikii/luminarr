@@ -30,10 +30,14 @@ Prerequisite completed:
   - pending downloader/import approval persists timeout truth (`approval_record.expires_at`)
   - `confirm <id/hash>` deterministically rejects expired pending approvals
   - expired pending approvals converge to cancelled truth (`approval_record + jobs`)
+- smallest reactive recovery baseline for LLM physical failures is now landed:
+  - deterministic physical failure detection (`413`, truncated-style errors)
+  - same-turn one-time compact-and-retry
+  - final user-safe fallback text instead of surfacing raw physical backend error
 
 ## Goal
 
-Land the smallest **reactive recovery baseline for LLM physical failures**.
+Land the smallest **clarification-stage frustration/reset coverage baseline**.
 
 ## Scope
 
@@ -41,9 +45,9 @@ Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
 - keep the landed downloader/import approval flows, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
-- land minimal same-turn reactive recovery for physical failures (`413`, truncated output)
-- recovery context must preserve only minimal execution truth (`system_base + project_rules + current_job_context`)
-- add focused tests for recovery routing/no-regression
+- keep the landed physical-failure reactive recovery behavior stable
+- add clarification-stage parser-level frustration detection and deterministic reset/cancel routing
+- add focused tests for clarification-stage coverage and no-regression
 
 ## Explicit constraints
 
@@ -59,20 +63,20 @@ Only do:
 
 ## Suggested implementation shape
 
-1. detect LLM physical failure type deterministically
-2. apply aggressive context compact while preserving required execution truth
-3. retry once in the same turn and return user-safe text on final failure
+1. detect clarification-stage frustration phrase deterministically at parser level
+2. when clarification-stage frustration phrase is detected, short-circuit to deterministic reset/cancel path
 3. keep downloader/import success paths and text bodies stable
-4. add focused tests and manual verification steps
+4. keep current physical-failure reactive recovery behavior unchanged
+5. add focused tests and manual verification steps
 
 ## Done when
 
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
-- physical LLM failures are no longer directly surfaced as raw backend errors in the main user path
+- clarification-stage frustration phrases no longer trigger extra LLM turns and route deterministically
 
 ## After this step
 
 Re-evaluate the smallest next control-layer gap:
-- clarification-stage frustration/reset coverage
+- concurrency-safe execution policy for read-only tools
