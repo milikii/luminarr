@@ -43,8 +43,12 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - watchlist workflow
 
 ## Latest verification (2026-04-02)
-- tests: `34 passed` (`.venv/bin/python -m pytest -q -s`)
-- manual Telegram round for refresh path: not executed in this change
+- tests: `46 passed` (`.venv/bin/python -m pytest -q -s`)
+- manual end-to-end verification in WSL test stack (Transmission + Emby) passed:
+  - `status e93d696a3e980458765f8016ce39f61437cc9543` returned completed seeding state
+  - `import e93d696a3e980458765f8016ce39f61437cc9543` returned deterministic import success text
+  - import reply included `媒体库刷新成功。`
+  - Emby UI confirmed item visible after refresh
 
 ## Current priority
 Build the next smallest path:

@@ -29,6 +29,7 @@ Only do:
 - do not add approval engine yet
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
+- do not add library filename normalization/renaming in this step
 
 ## Suggested implementation shape
 1. add minimal SQLite tables/repo for candidate + job_event
