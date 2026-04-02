@@ -1,31 +1,48 @@
 # Next step
 
-Prerequisite completed: `search_media` + index-based select + `add_to_downloader` + `get_download_status` + `import_to_library` is implemented for Transmission path.
+Prerequisite completed:
+- `search_media` + index-based select works
+- `add_to_downloader` works for Transmission
+- `get_download_status` works
+- `import_to_library` works
+- `import done -> refresh_media_server (Emby only)` is landed
 
 ## Goal
-Implement minimal media refresh handling: import done -> `refresh_media_server`.
+Stabilize completion-to-refresh chain with minimal persistence.
 
 ## Scope
 Only do:
-- define one minimal refresh trigger path after successful import
-- implement one media server refresh path (Jellyfin or Emby, pick one first)
-- return clear result when refresh succeeds or fails
-- keep existing Telegram query/add/status/import paths unchanged
-- add minimal tests for refresh success/failure behavior
+- persist candidate mapping needed by index selection
+- persist minimal job/event records for import -> refresh chain
+- keep current command behavior unchanged:
+  - search
+  - select (index)
+  - add
+  - status
+  - import
+  - refresh feedback
+- add minimal tests for persistence read/write and recovery-on-restart baseline
 
-## Do not do yet
-- database writes
-- watchlist
-- WeChat
-- subtitle logic
-- multi-media-server abstraction
+## Explicit constraints
+- do not add new downloader/media server support
+- do not add watchlist automation
+- do not add approval engine yet
+- do not add large directory refactor
+- do not introduce PostgreSQL / Redis / MQ
+- do not add library filename normalization/renaming in this step
+
+## Suggested implementation shape
+1. add minimal SQLite tables/repo for candidate + job_event
+2. write on key transition points only
+3. read persisted candidate mapping on select/import path
+4. keep in-memory fast path if safe, but persistence is source of truth after restart
+5. add focused tests and simple manual verification steps
 
 ## Done when
-- one imported item can trigger a media library refresh
-- refresh response is deterministic and testable
-- minimal tests exist for refresh success and failure
-- README includes manual verification steps for this flow
+- restart does not break recent candidate index selection
+- import -> refresh chain has minimal persisted trace
+- persistence behavior is deterministic and testable
+- existing Telegram command behavior does not regress
 
 ## After this step
-The next task will be:
-Stabilize completion-to-refresh chain with minimal persistence.
+Move to minimal approval persistence and recovery controls.

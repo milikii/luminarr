@@ -24,15 +24,31 @@ class SearchMediaService:
     def __init__(self, search_func: SearchFunc, limit: int = 5) -> None:
         self._search_func = search_func
         self._limit = max(1, limit)
+        self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
 
-    async def search_and_format(self, query: str) -> str:
+    async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
         cleaned_query = query.strip()
         if not cleaned_query:
             return EMPTY_QUERY_TEXT
 
         raw_results = await self._search_func(cleaned_query)
-        candidates = [normalize_candidate(item) for item in raw_results[: self._limit]]
+        selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
+        if chat_id is not None:
+            self._recent_candidates_by_chat[chat_id] = selected_raw_results
+
+        candidates = [normalize_candidate(item) for item in selected_raw_results]
         return format_candidates(cleaned_query, candidates)
+
+    def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
+        if index < 1:
+            return None
+        candidates = self._recent_candidates_by_chat.get(chat_id)
+        if not candidates:
+            return None
+        resolved_index = index - 1
+        if resolved_index >= len(candidates):
+            return None
+        return candidates[resolved_index]
 
 
 def normalize_candidate(item: Mapping[str, Any]) -> Candidate:
@@ -145,3 +161,7 @@ def _guess_quality_from_title(title: str) -> str:
     if resolution == "-":
         return source
     return f"{resolution} {source}"
+
+
+def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {str(key): value for key, value in item.items()}

@@ -12,6 +12,7 @@ from app.services.import_to_library import (
     IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
+    IMPORT_REFRESH_FAILED_TEXT,
     IMPORT_SOURCE_MISSING_TEXT,
     ImportToLibraryService,
     parse_import_query,
@@ -55,6 +56,90 @@ def test_import_by_task_ref_success_for_file(tmp_path: Path) -> None:
     assert source_file.stat().st_ino == target_file.stat().st_ino
 
 
+def test_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    refresh = AsyncMock(return_value="媒体库刷新成功。")
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        refresh_media_server_func=refresh,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+    assert "导入成功" in text
+    assert "媒体库刷新成功。" in text
+    refresh.assert_awaited_once()
+
+
+def test_import_by_task_ref_success_with_refresh_failure_text(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    refresh = AsyncMock(return_value="媒体库刷新失败：connection timeout")
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        refresh_media_server_func=refresh,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+    assert "导入成功" in text
+    assert "媒体库刷新失败：connection timeout" in text
+    refresh.assert_awaited_once()
+
+
+def test_import_by_task_ref_success_with_refresh_exception(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    refresh = AsyncMock(side_effect=RuntimeError("boom"))
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        refresh_media_server_func=refresh,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+    assert "导入成功" in text
+    assert IMPORT_REFRESH_FAILED_TEXT in text
+    refresh.assert_awaited_once()
+
+
 def test_import_by_task_ref_not_found() -> None:
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
     text = _run(service.import_by_task_ref("missing"))
@@ -73,6 +158,26 @@ def test_import_by_task_ref_not_completed(tmp_path: Path) -> None:
     service = ImportToLibraryService(AsyncMock(return_value=import_source), str(tmp_path / "library"))
     text = _run(service.import_by_task_ref("87"))
     assert text == IMPORT_NOT_COMPLETED_TEXT.format(progress=42.0)
+
+
+def test_import_by_task_ref_not_completed_does_not_refresh(tmp_path: Path) -> None:
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune.2021.mkv",
+        download_dir=str(tmp_path / "downloads"),
+        is_finished=False,
+        percent_done=0.42,
+    )
+    refresh = AsyncMock(return_value="媒体库刷新成功。")
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        refresh_media_server_func=refresh,
+    )
+    text = _run(service.import_by_task_ref("87"))
+    assert text == IMPORT_NOT_COMPLETED_TEXT.format(progress=42.0)
+    refresh.assert_not_called()
 
 
 def test_import_by_task_ref_source_missing(tmp_path: Path) -> None:
