@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from app.db.sqlite import SqliteDatabase
 
 ACTION_IMPORT_TO_LIBRARY = "import_to_library"
+APPROVAL_STATUS_PENDING = "pending"
 APPROVAL_STATUS_APPROVED = "approved"
 
 
@@ -24,10 +25,20 @@ class ApprovalRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
 
-    def upsert_import_approval(self, *, task_id: str, task_hash: str, task_ref: str) -> None:
+    def upsert_import_approval(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        status: str = APPROVAL_STATUS_APPROVED,
+    ) -> None:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
+            return
+        cleaned_status = status.strip()
+        if not cleaned_status:
             return
         with self._database.connect() as connection:
             connection.execute(
@@ -51,11 +62,27 @@ class ApprovalRepo:
                     ACTION_IMPORT_TO_LIBRARY,
                     cleaned_task_id,
                     cleaned_task_hash,
-                    APPROVAL_STATUS_APPROVED,
+                    cleaned_status,
                     task_ref.strip(),
                 ),
             )
             connection.commit()
+
+    def request_import_approval(self, *, task_id: str, task_hash: str, task_ref: str) -> None:
+        self.upsert_import_approval(
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            status=APPROVAL_STATUS_PENDING,
+        )
+
+    def approve_import(self, *, task_id: str, task_hash: str, task_ref: str) -> None:
+        self.upsert_import_approval(
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            status=APPROVAL_STATUS_APPROVED,
+        )
 
     def get_import_approval(self, *, task_id: str, task_hash: str) -> ApprovalRecord | None:
         cleaned_task_id = task_id.strip()

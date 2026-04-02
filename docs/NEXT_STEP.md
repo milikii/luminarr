@@ -4,7 +4,7 @@ Prerequisite completed:
 - `search_media` + index-based select works
 - `add_to_downloader` works for Transmission
 - `get_download_status` works
-- `import_to_library` works
+- `import_to_library` hardlink flow works
 - `import done -> refresh_media_server (Emby only)` is landed
 - candidate mapping persistence is landed (SQLite)
 - minimal import -> refresh `job_event` persistence is landed
@@ -12,20 +12,22 @@ Prerequisite completed:
 - TMDB-first movie metadata baseline is landed (parser-first + deterministic fallback)
 - fixed v12 search-order baseline is landed (English + year -> original + year on miss)
 - Chinese poster-card text baseline is landed (card text + unchanged candidate list)
+- explicit import approval interaction baseline is landed:
+  - `import <id/hash>` enters pending and does not execute side effect
+  - `confirm <id/hash>` executes import + refresh
+  - duplicate/stale confirm is deterministically rejected
 
 ## Goal
-Land explicit approval interaction baseline for import side effect.
+Land lease/version recovery baseline for restart-safe confirmed import workflow.
 
 ## Scope
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
-- keep current Telegram command words for search/select/status/import unchanged
-- make `import <id/hash>` enter deterministic approval-pending response before side effect execution
-- add explicit confirm command for import execution (same task ref), then execute current import hardlink + refresh flow
-- persist approval interaction state using existing approval persistence baseline
-- keep current Telegram command words and routing unchanged
-- keep search/select/add/status/import/refresh behavior unchanged
-- add focused tests for approval-pending, confirm execution, and duplicate/stale guard behavior
+- keep current Telegram command words for search/select/status/import/confirm unchanged
+- introduce minimal lease/version markers for import confirm execution
+- on restart-sensitive path, reject stale execution by lease/version deterministically
+- keep current import success/failure text body unchanged for confirmed execution
+- add focused tests for lease/version stale rejection and restart recovery behavior
 
 ## Explicit constraints
 - do not add new downloader/media server support
@@ -34,20 +36,20 @@ Only do:
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming in this step
 - do not introduce interactive Telegram UI widgets (inline keyboard)
-- do not remove existing `import <id/hash>` command path
+- do not remove existing `import <id/hash>` and `confirm <id/hash>` command paths
 
 ## Suggested implementation shape
-1. split import path into `request approval` and `execute approved import` two explicit stages
-2. add deterministic text protocol for pending/confirmed/expired states
-3. keep existing import success/failure text body for confirmed execution
-4. add focused tests for approval flow and routing-no-regression
+1. add minimal lease/version fields and deterministic transition rules in existing persistence baseline
+2. bind confirm execution to current lease/version snapshot
+3. reject stale lease/version attempts with deterministic text
+4. add focused tests for restart + stale rejection + routing-no-regression
 5. add simple manual verification steps
 
 ## Done when
-- `import <id/hash>` no longer executes side effect immediately; returns approval-pending deterministic text
-- explicit confirm command executes import + refresh deterministically
-- duplicate confirm / stale confirm is deterministically rejected
+- confirmed import execution is guarded by lease/version snapshot
+- stale lease/version execution is deterministically rejected after restart
+- duplicate side effect execution is prevented under restart-sensitive path
 - existing Telegram command behavior does not regress
 
 ## After this step
-Move to lease/version recovery baseline for restart-safe import workflow.
+Move to watchlist workflow baseline.

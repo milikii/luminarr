@@ -8,15 +8,18 @@ from unittest.mock import AsyncMock
 
 import app.services.import_to_library as import_module
 from app.clients.transmission import TransmissionImportSource
-from app.db.approval_repo import APPROVAL_STATUS_APPROVED, ApprovalRepo
+from app.db.approval_repo import APPROVAL_STATUS_APPROVED, APPROVAL_STATUS_PENDING, ApprovalRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
+    CONFIRM_QUERY_USAGE_TEXT,
+    IMPORT_CONFIRM_NOT_PENDING_TEXT,
     IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
     IMPORT_REFRESH_FAILED_TEXT,
     IMPORT_SOURCE_MISSING_TEXT,
     ImportToLibraryService,
+    parse_confirm_query,
     parse_import_query,
 )
 
@@ -33,7 +36,19 @@ def test_parse_import_query_rejects_non_import_text() -> None:
     assert parse_import_query("dune") is None
 
 
-def test_import_by_task_ref_success_for_file(tmp_path: Path) -> None:
+def test_parse_confirm_query_supports_confirm_prefix() -> None:
+    assert parse_confirm_query("confirm 87") == "87"
+    assert parse_confirm_query("CONFIRM abc123") == "abc123"
+    assert parse_confirm_query("确认 b305bf") == "b305bf"
+    assert parse_confirm_query("confirm") == ""
+
+
+def test_parse_confirm_query_rejects_non_confirm_text() -> None:
+    assert parse_confirm_query("import 87") is None
+    assert parse_confirm_query("dune") is None
+
+
+def test_import_by_task_ref_returns_pending_for_file(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -51,6 +66,33 @@ def test_import_by_task_ref_success_for_file(tmp_path: Path) -> None:
     service = ImportToLibraryService(AsyncMock(return_value=import_source), str(target_dir))
 
     text = _run(service.import_by_task_ref("87"))
+    assert "导入待确认" in text
+    assert "请发送 confirm 87" in text
+    assert text.startswith("导入待确认：")
+    assert not (target_dir / source_file.name).exists()
+
+
+def test_confirm_import_by_task_ref_executes_after_pending(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(AsyncMock(return_value=import_source), str(target_dir))
+
+    pending_text = _run(service.import_by_task_ref("87"))
+    assert "导入待确认" in pending_text
+
+    text = _run(service.confirm_import_by_task_ref("87"))
     target_file = target_dir / source_file.name
     assert "导入成功" in text
     assert str(target_file) in text
@@ -58,7 +100,33 @@ def test_import_by_task_ref_success_for_file(tmp_path: Path) -> None:
     assert source_file.stat().st_ino == target_file.stat().st_ino
 
 
-def test_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:
+def test_confirm_import_by_task_ref_requires_pending(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(AsyncMock(return_value=import_source), str(tmp_path / "library"))
+
+    text = _run(service.confirm_import_by_task_ref("87"))
+    assert text == IMPORT_CONFIRM_NOT_PENDING_TEXT
+
+
+def test_confirm_import_by_task_ref_usage_when_empty() -> None:
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    text = _run(service.confirm_import_by_task_ref("  "))
+    assert text == CONFIRM_QUERY_USAGE_TEXT
+
+
+def test_confirm_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -80,13 +148,15 @@ def test_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None
         refresh_media_server_func=refresh,
     )
 
-    text = _run(service.import_by_task_ref("87"))
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
     assert "导入成功" in text
     assert "媒体库刷新成功。" in text
     refresh.assert_awaited_once()
 
 
-def test_import_by_task_ref_success_with_refresh_failure_text(tmp_path: Path) -> None:
+def test_confirm_import_by_task_ref_success_with_refresh_failure_text(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -108,13 +178,15 @@ def test_import_by_task_ref_success_with_refresh_failure_text(tmp_path: Path) ->
         refresh_media_server_func=refresh,
     )
 
-    text = _run(service.import_by_task_ref("87"))
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
     assert "导入成功" in text
     assert "媒体库刷新失败：connection timeout" in text
     refresh.assert_awaited_once()
 
 
-def test_import_by_task_ref_success_with_refresh_exception(tmp_path: Path) -> None:
+def test_confirm_import_by_task_ref_success_with_refresh_exception(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -136,7 +208,9 @@ def test_import_by_task_ref_success_with_refresh_exception(tmp_path: Path) -> No
         refresh_media_server_func=refresh,
     )
 
-    text = _run(service.import_by_task_ref("87"))
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
     assert "导入成功" in text
     assert IMPORT_REFRESH_FAILED_TEXT in text
     refresh.assert_awaited_once()
@@ -162,7 +236,7 @@ def test_import_by_task_ref_not_completed(tmp_path: Path) -> None:
     assert text == IMPORT_NOT_COMPLETED_TEXT.format(progress=42.0)
 
 
-def test_import_by_task_ref_not_completed_does_not_refresh(tmp_path: Path) -> None:
+def test_confirm_import_by_task_ref_not_completed_does_not_refresh(tmp_path: Path) -> None:
     import_source = TransmissionImportSource(
         task_id="87",
         task_hash="hash-87",
@@ -177,7 +251,8 @@ def test_import_by_task_ref_not_completed_does_not_refresh(tmp_path: Path) -> No
         str(tmp_path / "library"),
         refresh_media_server_func=refresh,
     )
-    text = _run(service.import_by_task_ref("87"))
+
+    text = _run(service.confirm_import_by_task_ref("87"))
     assert text == IMPORT_NOT_COMPLETED_TEXT.format(progress=42.0)
     refresh.assert_not_called()
 
@@ -198,7 +273,7 @@ def test_import_by_task_ref_source_missing(tmp_path: Path) -> None:
     assert text == IMPORT_SOURCE_MISSING_TEXT
 
 
-def test_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monkeypatch) -> None:
+def test_confirm_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monkeypatch) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -217,12 +292,13 @@ def test_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monkeypatch) 
     def _raise_exdev(src: str | Path, dst: str | Path) -> None:
         raise OSError(errno.EXDEV, "Invalid cross-device link")
 
+    _run(service.import_by_task_ref("87"))
     monkeypatch.setattr(import_module.os, "link", _raise_exdev)
-    text = _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
     assert text == IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
 
 
-def test_import_by_task_ref_success_persists_approval(tmp_path: Path) -> None:
+def test_import_by_task_ref_persists_pending_approval(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -247,12 +323,45 @@ def test_import_by_task_ref_success_persists_approval(tmp_path: Path) -> None:
     )
 
     text = _run(service.import_by_task_ref("87"))
+    assert "导入待确认" in text
+
+    record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert record is not None
+    assert record.status == APPROVAL_STATUS_PENDING
+    assert record.last_task_ref == "87"
+
+
+def test_confirm_import_by_task_ref_promotes_pending_to_approved(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        approval_repo=approval_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in text
 
     record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
     assert record is not None
     assert record.status == APPROVAL_STATUS_APPROVED
-    assert record.last_task_ref == "87"
 
 
 def _run(coroutine: Awaitable[str]) -> str:

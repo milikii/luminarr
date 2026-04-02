@@ -5,7 +5,11 @@ from telegram.ext import Application, ContextTypes, MessageHandler, filters
 
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
-from app.services.import_to_library import ImportToLibraryService, parse_import_query
+from app.services.import_to_library import (
+    ImportToLibraryService,
+    parse_confirm_query,
+    parse_import_query,
+)
 from app.services.search_media import SearchMediaService
 
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
@@ -38,6 +42,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await message.reply_text(SERVICE_NOT_READY_TEXT)
             return
         reply = await import_service.import_by_task_ref(import_ref)
+        await message.reply_text(reply)
+        return
+
+    confirm_ref = parse_confirm_query(query)
+    if confirm_ref is not None:
+        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if not isinstance(import_service, ImportToLibraryService):
+            await message.reply_text(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await import_service.confirm_import_by_task_ref(confirm_ref)
         await message.reply_text(reply)
         return
 

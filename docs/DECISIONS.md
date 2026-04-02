@@ -432,6 +432,23 @@
 
 ---
 
+## D-029 import 显式 approval 交互基线：import 仅挂起，confirm 才执行副作用
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - `import <id/hash>` 只进入 `pending`，返回确定性待确认文本，不执行导入副作用
+  - 新增 `confirm <id/hash>`（含中文同义词）触发现有 `hardlink import + refresh` 执行路径
+  - approval 持久化改为 `pending/approved` 两态，并继续沿用现有 `approval_record` 表
+  - 重复/过期 confirm 在重启敏感路径下保持确定性拒绝文本（`目标已存在，已拒绝覆盖：...`）
+- **原因**：
+  在不引入复杂交互控件和额外依赖的前提下，把 import 副作用改成显式确认，减少误操作并为后续 recovery 协议铺底。
+- **影响范围**：
+  - `import_to_library` 交互语义从“立即执行”变为“两阶段执行”
+  - Telegram 路由新增 `confirm` 命令分支
+  - import 相关测试与持久化测试基线更新
+
+---
+
 ## 附：更新规则
 
 每次要新增一条决策时，使用以下模板：

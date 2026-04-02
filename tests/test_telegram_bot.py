@@ -205,7 +205,52 @@ def test_handle_message_import_routes_to_import_service() -> None:
     add_service = AddToDownloaderService(search_service, AsyncMock())
     status_service = GetDownloadStatusService(AsyncMock())
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
-    import_service.import_by_task_ref = AsyncMock(return_value="导入成功")
+    import_service.import_by_task_ref = AsyncMock(return_value="导入待确认")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once_with("导入待确认")
+
+
+def test_handle_message_import_replies_service_not_ready() -> None:
+    reply_text = AsyncMock()
+    message = SimpleNamespace(text="import 87", reply_text=reply_text)
+    update = SimpleNamespace(effective_message=message, effective_chat=SimpleNamespace(id=1001))
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+
+
+def test_handle_message_confirm_routes_to_import_service() -> None:
+    reply_text = AsyncMock()
+    message = SimpleNamespace(text="confirm 87", reply_text=reply_text)
+    update = SimpleNamespace(effective_message=message, effective_chat=SimpleNamespace(id=1001))
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    import_service.confirm_import_by_task_ref = AsyncMock(return_value="导入成功")
     context = SimpleNamespace(
         application=SimpleNamespace(
             bot_data={
@@ -221,9 +266,33 @@ def test_handle_message_import_routes_to_import_service() -> None:
     reply_text.assert_awaited_once_with("导入成功")
 
 
-def test_handle_message_import_replies_service_not_ready() -> None:
+def test_handle_message_confirm_without_ref_returns_usage() -> None:
     reply_text = AsyncMock()
-    message = SimpleNamespace(text="import 87", reply_text=reply_text)
+    message = SimpleNamespace(text="confirm", reply_text=reply_text)
+    update = SimpleNamespace(effective_message=message, effective_chat=SimpleNamespace(id=1001))
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    import_service.confirm_import_by_task_ref = AsyncMock(return_value="确认格式：confirm <任务ID或Hash>")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once_with("确认格式：confirm <任务ID或Hash>")
+
+
+def test_handle_message_confirm_replies_service_not_ready() -> None:
+    reply_text = AsyncMock()
+    message = SimpleNamespace(text="confirm 87", reply_text=reply_text)
     update = SimpleNamespace(effective_message=message, effective_chat=SimpleNamespace(id=1001))
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
