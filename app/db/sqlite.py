@@ -16,6 +16,20 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS approval_record (
+        action_type TEXT NOT NULL,
+        task_id TEXT NOT NULL DEFAULT '',
+        task_hash TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL,
+        last_task_ref TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (action_type, task_id, task_hash)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_approval_record_task_id ON approval_record(task_id)",
+    "CREATE INDEX IF NOT EXISTS idx_approval_record_task_hash ON approval_record(task_hash)",
+    """
     CREATE TABLE IF NOT EXISTS job_event (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_ref TEXT NOT NULL,

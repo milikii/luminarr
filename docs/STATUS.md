@@ -30,6 +30,9 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - minimal Emby client + `refresh_media_server`
 - refresh is triggered only after import success
 - minimal `job_event` persistence for import -> refresh key transitions
+- minimal `approval_record` persistence baseline for import side effect
+- import stale/duplicate guard reads `approval_record + job_event` on restart-sensitive path
+- stale/duplicate rejection keeps deterministic text style (`目标已存在，已拒绝覆盖：...`)
 - refresh returns deterministic text:
   - success: `媒体库刷新成功。`
   - failure: `媒体库刷新失败：<reason>`
@@ -38,12 +41,12 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 ## What is not implemented yet
 - TMDB-first metadata resolution + Chinese poster-card display
 - fixed v12 search plan (English title + year, original title fallback)
-- approval persistence and approval flow
+- explicit approval interaction flow
 - lease/version recovery and retry path
 - watchlist workflow
 
 ## Latest verification (2026-04-02)
-- tests: `51 passed` (`.venv/bin/python -m pytest -q -s`)
+- tests: `55 passed` (`.venv/bin/python -m pytest -q -s`)
 - manual end-to-end verification in WSL test stack (Transmission + Emby) passed:
   - `status e93d696a3e980458765f8016ce39f61437cc9543` returned completed seeding state
   - `import e93d696a3e980458765f8016ce39f61437cc9543` returned deterministic import success text
@@ -53,17 +56,18 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 ## Current priority
 Build the next smallest path:
 1. keep current search/select/add/status/import/refresh behavior stable
-2. add minimal approval persistence baseline
-3. add restart-safe recovery controls on top of persisted events
+2. land TMDB-first metadata resolution baseline
+3. keep parser-first and deterministic fallback behavior
 
 ## Current risks
 - if `EMBY_BASE_URL` / `EMBY_API_KEY` is missing, import still succeeds but refresh will not run
 - candidate mapping keeps only latest search window per chat; older windows are overwritten
 - Transmission `downloadDir + name` must map to container-visible paths
 - hardlink import has no copy fallback for cross-filesystem case
+- stale guard only covers tasks that already have both `approval_record` and `import.succeeded` event
 - job events are append-only traces, not yet a lease/version recovery protocol
 
 ## Acceptance focus for next step
-- approval persistence does not change current Telegram command behavior
-- recovery controls remain deterministic and testable
-- restart path can reject stale actions safely
+- TMDB metadata path stays minimal and testable
+- existing command words and routing do not regress
+- search/select/add/status/import/refresh chain remains stable

@@ -366,6 +366,23 @@
 
 ---
 
+## D-025 最小 approval 持久化基线：import 关键点写入 + 重启可读 stale guard
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - 增加 `approval_record` 表，按 `action_type + task_id + task_hash` 持久化最小 approval 状态
+  - import 在执行硬链接前写入 approval 记录（不改变现有命令语义）
+  - import 在重启敏感路径读取 `approval_record + job_event`，拦截已执行任务的重复导入
+  - 重复导入拦截保持确定性文本风格：`目标已存在，已拒绝覆盖：...`
+- **原因**：
+  先用最小改动补齐“可持久化的副作用许可 + 重启后可判重”的基础能力，为后续完整 approval flow 和 recovery 协议铺底。
+- **影响范围**：
+  - `import` 路径新增最小 approval 读写
+  - 同一任务跨重启重复导入可被确定性拦截
+  - Telegram 命令词与主链路行为保持不变
+
+---
+
 ## 附：更新规则
 
 每次要新增一条决策时，使用以下模板：

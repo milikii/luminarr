@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
+from app.db.approval_repo import APPROVAL_STATUS_APPROVED, ApprovalRepo
 from app.db.job_event_repo import JobEventRepo
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
@@ -33,11 +34,13 @@ class ImportToLibraryService:
         library_target_dir: str,
         refresh_media_server_func: RefreshMediaServerFunc | None = None,
         job_event_repo: JobEventRepo | None = None,
+        approval_repo: ApprovalRepo | None = None,
     ) -> None:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
         self._refresh_media_server_func = refresh_media_server_func
         self._job_event_repo = job_event_repo
+        self._approval_repo = approval_repo
 
     async def import_by_task_ref(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
@@ -71,6 +74,21 @@ class ImportToLibraryService:
                 message=IMPORT_NOT_COMPLETED_TEXT.format(progress=progress),
             )
             return IMPORT_NOT_COMPLETED_TEXT.format(progress=progress)
+
+        stale_target_path = self._find_stale_import_target_path(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+        )
+        if stale_target_path is not None:
+            stale_text = IMPORT_TARGET_EXISTS_TEXT.format(target_path=stale_target_path)
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.stale_rejected",
+                message=stale_text,
+            )
+            return stale_text
 
         source_path = Path(import_source.download_dir) / import_source.name
         if not source_path.exists():
@@ -106,6 +124,12 @@ class ImportToLibraryService:
                 message=IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path)),
             )
             return IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
+
+        self._record_import_approval(
+            task_ref=cleaned_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+        )
 
         try:
             _hardlink_import(source_path, target_path)
@@ -183,6 +207,39 @@ class ImportToLibraryService:
                 message=refresh_text,
             )
         return f"{import_success_text}\n{refresh_text}"
+
+    def _record_import_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> None:
+        if self._approval_repo is None:
+            return
+        try:
+            self._approval_repo.upsert_import_approval(task_id=task_id, task_hash=task_hash, task_ref=task_ref)
+        except Exception:
+            pass
+
+    def _find_stale_import_target_path(self, *, task_id: str, task_hash: str) -> str | None:
+        if self._approval_repo is None or self._job_event_repo is None:
+            return None
+        try:
+            approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
+        except Exception:
+            return None
+        if approval_record is None:
+            return None
+        if approval_record.status != APPROVAL_STATUS_APPROVED:
+            return None
+
+        try:
+            events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
+        except Exception:
+            return None
+        for event in reversed(events):
+            if event.event_type != "import.succeeded":
+                continue
+            target_path = event.message.strip()
+            if target_path:
+                return target_path
+            return None
+        return None
 
     def _record_event(
         self,

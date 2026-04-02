@@ -8,23 +8,19 @@ Prerequisite completed:
 - `import done -> refresh_media_server (Emby only)` is landed
 - candidate mapping persistence is landed (SQLite)
 - minimal import -> refresh `job_event` persistence is landed
+- minimal import `approval_record` persistence + stale guard is landed
 
 ## Goal
-Add minimal approval persistence and restart-safe recovery controls.
+Add TMDB-first metadata resolution baseline for movie query.
 
 ## Scope
 Only do:
-- persist minimal approval records for high-risk side effects (starting with import)
-- read approval state from SQLite on restart
-- add minimal stale-action guard using persisted job events + approval state
-- keep current command behavior unchanged:
-  - search
-  - select (index)
-  - add
-  - status
-  - import
-  - refresh feedback
-- add minimal tests for approval read/write and restart baseline
+- add minimal TMDB client wiring for movie lookup
+- add parser-first query normalization (title + optional year)
+- add deterministic fallback when TMDB lookup fails or returns empty
+- keep current Telegram command words and routing unchanged
+- keep search/select/add/status/import/refresh behavior unchanged
+- add focused tests for TMDB lookup success/fallback path
 
 ## Explicit constraints
 - do not add new downloader/media server support
@@ -32,19 +28,19 @@ Only do:
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming in this step
+- do not redesign reply format into rich card UI in this step
 
 ## Suggested implementation shape
-1. add one minimal approval table/repo in existing SQLite baseline
-2. write approval records only on key transition points
-3. read approval record + recent job_event on restart-sensitive path
-4. reject stale or duplicate actions with deterministic text
+1. add one minimal TMDB client wrapper (search movie)
+2. normalize query to title/year and call TMDB first
+3. fallback to existing search path when TMDB is unavailable or no hit
+4. keep response deterministic and parser-first
 5. add focused tests and simple manual verification steps
 
 ## Done when
-- restart preserves minimal approval state
-- stale/duplicate side effects are blocked by deterministic guard
-- persistence + recovery behavior is deterministic and testable
+- TMDB lookup path is testable and deterministic
+- empty/failure fallback path is deterministic
 - existing Telegram command behavior does not regress
 
 ## After this step
-Move to TMDB-first metadata resolution baseline.
+Move to fixed v12 search plan baseline (English title + year, original title fallback).

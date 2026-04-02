@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock
 
 import app.services.import_to_library as import_module
 from app.clients.transmission import TransmissionImportSource
+from app.db.approval_repo import APPROVAL_STATUS_APPROVED, ApprovalRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
@@ -218,6 +220,39 @@ def test_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(import_module.os, "link", _raise_exdev)
     text = _run(service.import_by_task_ref("87"))
     assert text == IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
+
+
+def test_import_by_task_ref_success_persists_approval(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+    assert "导入成功" in text
+
+    record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
+    assert record is not None
+    assert record.status == APPROVAL_STATUS_APPROVED
+    assert record.last_task_ref == "87"
 
 
 def _run(coroutine: Awaitable[str]) -> str:

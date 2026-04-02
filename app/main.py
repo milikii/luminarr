@@ -5,6 +5,7 @@ from app.clients.emby import EmbyClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.transmission import TransmissionClient
 from app.config import load_settings
+from app.db.approval_repo import ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -21,6 +22,7 @@ def main() -> None:
     database.initialize()
     candidate_repo = CandidateMappingRepo(database)
     job_event_repo = JobEventRepo(database)
+    approval_repo = ApprovalRepo(database)
 
     prowlarr_client = ProwlarrClient(
         base_url=settings.prowlarr_base_url,
@@ -50,6 +52,7 @@ def main() -> None:
         library_target_dir=settings.library_target_dir,
         refresh_media_server_func=refresh_media_server_func,
         job_event_repo=job_event_repo,
+        approval_repo=approval_repo,
     )
     application = build_application(
         settings.telegram_bot_token,

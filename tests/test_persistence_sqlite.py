@@ -6,11 +6,12 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionImportSource, TransmissionTask
+from app.db.approval_repo import ACTION_IMPORT_TO_LIBRARY, APPROVAL_STATUS_APPROVED, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
-from app.services.import_to_library import ImportToLibraryService
+from app.services.import_to_library import IMPORT_TARGET_EXISTS_TEXT, ImportToLibraryService
 from app.services.search_media import SearchMediaService
 
 
@@ -110,6 +111,94 @@ def test_import_not_completed_persists_event(tmp_path: Path) -> None:
     events = event_repo.list_events_for_task_ref("87")
     assert len(events) == 1
     assert events[0].event_type == "import.not_completed"
+
+
+def test_approval_repo_persists_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_repo = ApprovalRepo(database)
+    before_restart_repo.upsert_import_approval(task_id="87", task_hash="hash-87", task_ref="87")
+
+    after_restart_repo = ApprovalRepo(SqliteDatabase(str(db_path)))
+    record = after_restart_repo.get_import_approval(task_id="87", task_hash="hash-87")
+
+    assert record is not None
+    assert record.action_type == ACTION_IMPORT_TO_LIBRARY
+    assert record.status == APPROVAL_STATUS_APPROVED
+    assert record.last_task_ref == "87"
+
+
+def test_import_stale_guard_blocks_duplicate_after_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    approval_repo = ApprovalRepo(database)
+
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    first_service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        job_event_repo=event_repo,
+        approval_repo=approval_repo,
+    )
+    first_reply = _run(first_service.import_by_task_ref("87"))
+    assert "导入成功" in first_reply
+
+    imported_target = target_dir / source_file.name
+    assert imported_target.exists()
+    imported_target.unlink()
+    assert not imported_target.exists()
+
+    restarted_service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        job_event_repo=JobEventRepo(SqliteDatabase(str(db_path))),
+        approval_repo=ApprovalRepo(SqliteDatabase(str(db_path))),
+    )
+    stale_reply = _run(restarted_service.import_by_task_ref("hash-87"))
+
+    assert stale_reply == IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(imported_target))
+    assert not imported_target.exists()
+
+
+def test_job_event_repo_can_query_by_task_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message="/data/library/movies/Dune.2021.mkv",
+    )
+    repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="refresh.succeeded",
+        message="媒体库刷新成功。",
+    )
+
+    events = repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert [event.event_type for event in events] == ["import.succeeded", "refresh.succeeded"]
 
 
 async def _fake_search_with_download_url(query: str) -> list[dict[str, object]]:

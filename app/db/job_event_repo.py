@@ -58,6 +58,34 @@ class JobEventRepo:
             ).fetchall()
         return [_to_job_event(row) for row in rows]
 
+    def list_events_for_task_identity(self, *, task_id: str, task_hash: str) -> list[JobEvent]:
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        if not cleaned_task_id and not cleaned_task_hash:
+            return []
+
+        statement = """
+            SELECT id, task_ref, task_id, task_hash, event_type, message, created_at
+            FROM job_event
+            WHERE {condition}
+            ORDER BY id ASC
+        """
+        params: tuple[str, ...]
+        condition: str
+        if cleaned_task_id and cleaned_task_hash:
+            condition = "(task_id = ? OR task_hash = ?)"
+            params = (cleaned_task_id, cleaned_task_hash)
+        elif cleaned_task_id:
+            condition = "task_id = ?"
+            params = (cleaned_task_id,)
+        else:
+            condition = "task_hash = ?"
+            params = (cleaned_task_hash,)
+
+        with self._database.connect() as connection:
+            rows = connection.execute(statement.format(condition=condition), params).fetchall()
+        return [_to_job_event(row) for row in rows]
+
 
 def _to_job_event(row: Mapping[str, object]) -> JobEvent:
     return JobEvent(
