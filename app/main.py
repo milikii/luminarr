@@ -9,7 +9,9 @@ from app.config import load_settings
 from app.db.approval_repo import ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
+from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
@@ -23,7 +25,9 @@ def main() -> None:
     database.initialize()
     candidate_repo = CandidateMappingRepo(database)
     job_event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
+    telegram_update_repo = TelegramUpdateRepo(database)
 
     prowlarr_client = ProwlarrClient(
         base_url=settings.prowlarr_base_url,
@@ -59,6 +63,7 @@ def main() -> None:
         refresh_media_server_func=refresh_media_server_func,
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,
+        job_repo=job_repo,
     )
     application = build_application(
         settings.telegram_bot_token,
@@ -66,6 +71,7 @@ def main() -> None:
         add_to_downloader_service,
         get_download_status_service,
         import_to_library_service,
+        telegram_update_repo=telegram_update_repo,
     )
     application.run_polling(drop_pending_updates=True)
 

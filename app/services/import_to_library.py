@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
-from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRepo
+from app.db.approval_repo import APPROVAL_STATUS_PENDING, ApprovalRecord, ApprovalRepo
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
@@ -31,9 +32,11 @@ IMPORT_APPROVAL_PENDING_TEXT = (
     "任务 Hash: {task_hash}\n"
     "请发送 confirm {task_ref} 执行导入。"
 )
+IMPORT_CANCELLED_TEXT = "已取消当前导入确认。请重新发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_NOT_PENDING_TEXT = "没有待确认的导入请求，请先发送 import <任务ID或Hash>。"
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
+JOB_LEASE_OWNER = "import_confirm"
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +44,20 @@ class PreparedImport:
     import_source: TransmissionImportSource
     source_path: Path
     target_path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmExecutionContext:
+    job: JobRecord
+    approval_record: ApprovalRecord | None
+
+    @property
+    def lookup_task_ref(self) -> str:
+        if self.job.task_hash:
+            return self.job.task_hash
+        if self.job.task_id:
+            return self.job.task_id
+        return self.job.task_ref
 
 
 class ImportToLibraryService:
@@ -51,16 +68,24 @@ class ImportToLibraryService:
         refresh_media_server_func: RefreshMediaServerFunc | None = None,
         job_event_repo: JobEventRepo | None = None,
         approval_repo: ApprovalRepo | None = None,
+        job_repo: JobRepo | None = None,
     ) -> None:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
         self._refresh_media_server_func = refresh_media_server_func
         self._job_event_repo = job_event_repo
         self._approval_repo = approval_repo
+        self._job_repo = job_repo
         self._pending_import_identities: set[tuple[str, str]] = set()
         self._pending_import_lease_versions: dict[tuple[str, str], int] = {}
 
-    async def import_by_task_ref(self, task_ref: str) -> str:
+    async def import_by_task_ref(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
         cleaned_ref = task_ref.strip()
         if not cleaned_ref:
             return IMPORT_QUERY_USAGE_TEXT
@@ -71,6 +96,13 @@ class ImportToLibraryService:
 
         import_source = prepared_import.import_source
         self._record_pending_approval(
+            task_ref=cleaned_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+        )
+        self._record_pending_job(
+            chat_id=chat_id,
+            user_id=user_id,
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
             task_hash=import_source.task_hash,
@@ -89,13 +121,86 @@ class ImportToLibraryService:
             task_ref=cleaned_ref,
         )
 
-    async def confirm_import_by_task_ref(self, task_ref: str) -> str:
+    async def confirm_import_by_task_ref(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
+        _ = user_id
         cleaned_ref = task_ref.strip()
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
-        prepared_import, error_text = await self._prepare_import(cleaned_ref)
+        confirm_context = self._rebuild_confirm_context(task_ref=cleaned_ref, chat_id=chat_id)
+        if confirm_context is not None and confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
+            stale_text = self._find_version_stale_rejection_text(
+                task_id=confirm_context.job.task_id,
+                task_hash=confirm_context.job.task_hash,
+            )
+            rejection_text = stale_text or IMPORT_CONFIRM_NOT_PENDING_TEXT
+            self._record_event(
+                task_ref=cleaned_ref,
+                task_id=confirm_context.job.task_id,
+                task_hash=confirm_context.job.task_hash,
+                event_type="import.confirm_not_pending",
+                message=rejection_text,
+            )
+            return rejection_text
+
+        claimed_job = False
+        claimed_job_version = 0
+        claimed_job_id = ""
+        lease_owner = ""
+        prepared_task_ref = cleaned_ref
+        if confirm_context is not None:
+            approval_record = confirm_context.approval_record
+            if approval_record is None or approval_record.status != APPROVAL_STATUS_PENDING:
+                stale_text = self._find_version_stale_rejection_text(
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                )
+                rejection_text = stale_text or IMPORT_CONFIRM_NOT_PENDING_TEXT
+                self._record_event(
+                    task_ref=cleaned_ref,
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                    event_type="import.confirm_not_pending",
+                    message=rejection_text,
+                )
+                return rejection_text
+            lease_owner = self._build_job_lease_owner(cleaned_ref)
+            claimed_job = self._claim_pending_job(
+                job=confirm_context.job,
+                lease_owner=lease_owner,
+            )
+            if not claimed_job:
+                stale_text = self._find_version_stale_rejection_text(
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                )
+                rejection_text = stale_text or IMPORT_CONFIRM_NOT_PENDING_TEXT
+                self._record_event(
+                    task_ref=cleaned_ref,
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                    event_type="import.confirm_not_pending",
+                    message=rejection_text,
+                )
+                return rejection_text
+            claimed_job_id = confirm_context.job.job_id
+            claimed_job_version = confirm_context.job.version
+            prepared_task_ref = confirm_context.lookup_task_ref
+
+        prepared_import, error_text = await self._prepare_import(prepared_task_ref)
         if prepared_import is None:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
             return error_text
 
         import_source = prepared_import.import_source
@@ -111,12 +216,22 @@ class ImportToLibraryService:
                 event_type="import.stale_rejected",
                 message=stale_text,
             )
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
             return stale_text
 
-        expected_lease_version = self._resolve_pending_lease_version(
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-        )
+        expected_lease_version = 0
+        if confirm_context is not None and confirm_context.approval_record is not None:
+            expected_lease_version = max(0, confirm_context.approval_record.lease_version)
+        if expected_lease_version <= 0:
+            expected_lease_version = self._resolve_pending_lease_version(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+            )
         if expected_lease_version <= 0:
             self._record_event(
                 task_ref=cleaned_ref,
@@ -125,6 +240,12 @@ class ImportToLibraryService:
                 event_type="import.confirm_not_pending",
                 message=IMPORT_CONFIRM_NOT_PENDING_TEXT,
             )
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
             return IMPORT_CONFIRM_NOT_PENDING_TEXT
 
         approved = self._record_import_approval(
@@ -146,6 +267,12 @@ class ImportToLibraryService:
                 event_type="import.stale_rejected",
                 message=rejection_text,
             )
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
             return rejection_text
 
         self._record_event(
@@ -164,6 +291,12 @@ class ImportToLibraryService:
                 task_hash=import_source.task_hash,
                 executed_lease_version=expected_lease_version,
             )
+            if claimed_job:
+                self._mark_completed_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
         else:
             self._restore_pending_approval(
                 task_ref=cleaned_ref,
@@ -171,7 +304,60 @@ class ImportToLibraryService:
                 task_hash=import_source.task_hash,
                 expected_lease_version=expected_lease_version,
             )
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
         return reply
+
+    def cancel_pending_import(self, chat_id: int) -> str | None:
+        if chat_id <= 0:
+            return None
+        if self._job_repo is None:
+            return None
+
+        pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
+        if pending_job is None:
+            return None
+
+        expected_lease_version = self._resolve_pending_lease_version(
+            task_id=pending_job.task_id,
+            task_hash=pending_job.task_hash,
+        )
+        if expected_lease_version <= 0:
+            return None
+
+        approval_cancelled = True
+        if self._approval_repo is not None:
+            try:
+                approval_cancelled = self._approval_repo.cancel_import(
+                    task_id=pending_job.task_id,
+                    task_hash=pending_job.task_hash,
+                    task_ref=pending_job.task_ref,
+                    expected_lease_version=expected_lease_version,
+                )
+            except Exception:
+                approval_cancelled = False
+
+        if not approval_cancelled:
+            return None
+
+        if not self._job_repo.cancel_pending_job(
+            job_id=pending_job.job_id,
+            expected_version=pending_job.version,
+        ):
+            return None
+
+        self._record_event(
+            task_ref=pending_job.task_ref,
+            task_id=pending_job.task_id,
+            task_hash=pending_job.task_hash,
+            event_type="import.cancelled",
+            message=IMPORT_CANCELLED_TEXT,
+        )
+        return IMPORT_CANCELLED_TEXT
 
     async def _prepare_import(self, task_ref: str) -> tuple[PreparedImport | None, str]:
         try:
@@ -441,6 +627,108 @@ class ImportToLibraryService:
             )
         except Exception:
             return
+
+    def _record_pending_job(
+        self,
+        *,
+        chat_id: int | None,
+        user_id: int | None,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+    ) -> None:
+        if self._job_repo is None:
+            return
+        try:
+            self._job_repo.upsert_import_job_pending(
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+            )
+        except Exception:
+            return
+
+    def _rebuild_confirm_context(
+        self,
+        *,
+        task_ref: str,
+        chat_id: int | None,
+    ) -> ConfirmExecutionContext | None:
+        if self._job_repo is None or chat_id is None or chat_id <= 0:
+            return None
+        try:
+            job = self._job_repo.get_import_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
+        except Exception:
+            return None
+        if job is None:
+            return None
+
+        approval_record: ApprovalRecord | None = None
+        if self._approval_repo is not None:
+            try:
+                approval_record = self._approval_repo.get_import_approval(
+                    task_id=job.task_id,
+                    task_hash=job.task_hash,
+                )
+            except Exception:
+                approval_record = None
+        return ConfirmExecutionContext(job=job, approval_record=approval_record)
+
+    def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool:
+        if self._job_repo is None:
+            return False
+        try:
+            return self._job_repo.claim_lease(
+                job_id=job.job_id,
+                expected_version=job.version,
+                lease_owner=lease_owner,
+            )
+        except Exception:
+            return False
+
+    def _restore_pending_job(
+        self,
+        *,
+        job_id: str,
+        expected_version: int,
+        lease_owner: str,
+    ) -> None:
+        if self._job_repo is None:
+            return
+        try:
+            self._job_repo.release_lease_to_pending(
+                job_id=job_id,
+                expected_version=expected_version,
+                lease_owner=lease_owner,
+            )
+        except Exception:
+            return
+
+    def _mark_completed_job(
+        self,
+        *,
+        job_id: str,
+        expected_version: int,
+        lease_owner: str,
+    ) -> None:
+        if self._job_repo is None:
+            return
+        try:
+            self._job_repo.mark_completed(
+                job_id=job_id,
+                expected_version=expected_version,
+                lease_owner=lease_owner,
+            )
+        except Exception:
+            return
+
+    def _build_job_lease_owner(self, task_ref: str) -> str:
+        cleaned_ref = task_ref.strip()
+        if not cleaned_ref:
+            return JOB_LEASE_OWNER
+        return f"{JOB_LEASE_OWNER}:{cleaned_ref}"
 
     def _resolve_pending_lease_version(self, *, task_id: str, task_hash: str) -> int:
         identity = (task_id.strip(), task_hash.strip())

@@ -1,85 +1,107 @@
-# Luminarr
+# Luminarr (v15)
 
-Luminarr 是一个**面向自托管影视 / 动漫自动化场景的轻量自然语言 Agent**。
+Luminarr 是一个**面向自托管影视自动化场景的轻量自然语言 Harness**。
+它不是通用 AI 助手，也不是大而全媒体平台，而是把：
 
-它的目标不是替代所有现有媒体工具，而是把“**搜索 -> 下载 -> 入库 -> 刷新媒体库 -> 状态查询 -> 追更**”这条链路串起来，让用户主要通过 **Telegram** 与系统交互，并在后续支持 **微信辅助入口**。
+**搜索 -> 选择 -> 提交下载 -> 查询状态 -> 导入 -> 刷新**
 
-> 当前项目路线：**自建极简底座**、**Telegram 主验收渠道**、**Docker Compose 部署**、**统一 `/data` 路径设计**、**先主链路后扩展字幕/刮削/Skills**。
+这条链路，放进一个**可控、可测、可恢复、可审计**的运行时里。
 
 ---
 
-## 1. 项目定位
+## 1. 当前固定运行画像
 
-### 一句话
+当前主线写死为：
 
-**Luminarr = 一个专注影视自动化的小垂直自然语言 Agent。**
+- **Telegram 私聊**：唯一用户入口
+- **TMDB**：唯一元数据源
+- **Prowlarr**：唯一搜索聚合器
+- **Transmission**：唯一下载器
+- **Emby**：唯一媒体服务器
+- **SQLite**：唯一数据库
+- **Docker Compose**：唯一部署方式
+- **单实例 / 单进程 / 单机**
+- **电影优先**
 
-用户通过聊天完成：
-- 搜索资源
-- 投递下载
-- 查看下载状态
-- 下载完成后入库
-- 刷新 Jellyfin / Emby
-- 管理追更
-
-### 不追求的方向
-
-Luminarr **不是**：
+当前不是：
 - 通用 AI 助手
-- 多领域工具平台
-- OpenClaw 替代品
-- 一开始就覆盖所有下载器 / 所有媒体服务器 / 所有聊天平台的大而全系统
-- 以 Web UI 为核心的传统媒体管理面板
-
-### 当前边界
-
-当前阶段只专注：
-- 影视 / 动漫资源自动化
-- 自然语言交互
-- 工具调用可控、可测试、可恢复
-- 适合 NAS / VPS / Docker 场景
+- 通用 Agent 平台
+- Sonarr / Radarr 替代品
+- qBittorrent / Jellyfin 双线并行项目
+- 自动 watchlist 下载系统
 
 ---
 
-## 2. 适合谁
+## 2. 当前已落地能力
 
-Luminarr 适合这类用户：
-- 有 NAS / VPS / Docker / Linux 基础操作经验
-- 不一定会写代码，但能执行命令、配置服务、查看日志
-- 希望少折腾前端，多通过聊天完成操作
-- 个人或小范围自用（1-3 人）
+目前仓库已经落地的主链能力包括：
 
----
-
-## 3. 当前架构原则
-
-### 用户看到的是自然语言
-
-例如：
-- 帮我找《星际穿越》4K，优先蓝光原盘
-- 把昨天卡住的任务重试一下
-- 这部番下周有新集吗
-
-### 系统内部是结构化执行
-
-系统内部不会让模型直接“自由发挥”，而是固定走：
-1. 理解用户意图
-2. 提取结构化参数
-3. 选择少量已定义工具
-4. 推进明确工作流
-5. 对高风险动作要求确认
-6. 将关键状态持久化到 SQLite
-
-### 主渠道与辅助渠道
-
-- **Telegram**：主渠道、主验收渠道
-- **微信**：后续辅助渠道，不进入 v1 主线验收
+- Telegram 最小运行时
+- `search_media`
+- TMDB-first 电影元数据基线
+- 固定搜索顺序：
+  1. English title + year
+  2. original title + year
+  3. parser-normalized original query（仅 TMDB 不可用或无命中时）
+- 中文海报卡片文本基线
+- 候选映射持久化（SQLite）
+- Transmission 投递
+- `status <id/hash>` 查询
+- `import <id/hash>` 进入 pending
+- `confirm <id/hash>` 执行 hardlink import + Emby refresh
+- `approval_record` 最小 pending/approved 协议
+- import confirm 的最小 lease/version 防重放
+- `job_event` 最小事件轨迹
 
 ---
 
-## 4. 当前 v1 核心能力
+## 3. v15 这次调整了什么
 
-v1 只围绕这 6 个核心工具展开：
+这版文档吸收了新的 review 意见，但不会把系统直接拉向“大而全”。
+v15 采纳的是**工程原则升级**，不是“下一步一次做完 5 个大特性”。
+
+### 已采纳为制度规则
+- 只读工具允许进入**安全并发调度**；有副作用工具必须串行
+- 对 LLM 的 413 / 截断等**物理异常**，后续要走响应式恢复，而不是把错误暴露给用户
+- 模糊搜索允许使用**只读探索代理 / 探索子流程**，但不得污染主状态机
+- 任务从审批挂起恢复时，必须做**精确上下文重建**
+- 在 Telegram 交互层加入**低成本挫败感探测与短路重置**
+
+### 尚未实现、但不再忽视
+- `telegram_updates` 已落地为 Telegram message de-dup 真相源
+- `jobs.version + lease_owner + lease_until` 已落地为 import wake/replay 最小真相
+- `confirm <id/hash>` 的 approval-wake context rebuild 已落地
+- frustration/reset short-circuit 已落地到选择 reset + pending import cancel
+- `add_to_downloader` 的 pre-dispatch approval
+- approval expiry / timeout policy
+- 真正的 concurrency-safe executor
+- reactive recovery implementation
+- watchlist baseline（已不再是最近一步）
+
+---
+
+## 4. 当前最重要的工程立场
+
+Luminarr 当前不追求“像一个更通用的 agent”，而追求：
+
+1. **副作用动作有清晰边界**
+2. **执行所有权有真相来源**
+3. **失败可以阶段恢复**
+4. **模型异常对用户尽量透明**
+5. **不该用 AI 的地方就不要用 AI**
+
+因此：
+- parser-first，LLM-fallback
+- 模型不负责幂等
+- 模型不负责审批校验
+- 模型不负责执行结果真相
+- 模型不负责 lease/version
+
+---
+
+## 5. 工具与调度原则
+
+当前核心工具仍然只保留 6 个：
 
 - `search_media`
 - `add_to_downloader`
@@ -88,255 +110,102 @@ v1 只围绕这 6 个核心工具展开：
 - `refresh_media_server`
 - `manage_watchlist`
 
-说明：
-- `add_to_downloader` 统一处理搜索结果、magnet、torrent 文件三类输入
-- 不在 v1 中把同类能力拆成大量细碎工具
+### 调度纪律
+- `search_media`、`get_download_status`：只读，可并发
+- `add_to_downloader`、`import_to_library`、`refresh_media_server`：有副作用，串行
+- 同一 job 的副作用路径必须持有执行所有权
+- `manage_watchlist` 先按串行实现，后续如仅做提醒查询再放宽
 
 ---
 
-## 5. 部署范围说明（重要）
+## 6. 审批与上下文重建
 
-## Luminarr 的 Docker 部署 **只包含 Luminarr 自己**
+当前已经落地：
+- `import <id/hash>` 只进入 pending
+- `confirm <id/hash>` 才执行导入副作用
 
-本项目当前的 Docker / Docker Compose 部署，指的是：
-
-- 部署 **Luminarr 服务本体**
-- 挂载配置目录、数据库目录、日志目录、媒体公共根目录
-- 通过配置连接**已经存在的外部服务**
-
-### 当前 **不内置、不打包、不代管** 的程序
-
-以下程序默认视为**外部依赖**，由用户自行部署、维护和配置：
-
-- **Prowlarr**：资源搜索 / 索引聚合
-- **Transmission** 或 **qBittorrent**：下载器（v1 先支持其中一个）
-- **Jellyfin** 或 **Emby**：媒体服务器
-- **TMDB / Bangumi**：元数据来源
-
-也就是说：
-
-**Luminarr 不负责替你一键部署整套媒体生态。**
-它只负责作为“媒体自动化编排层”和“聊天入口层”，连接并调度这些已有组件。
+v15 新要求：
+- 审批唤醒后，执行阶段不得直接复用旧对话长历史
+- 必须从持久化状态重建一个极小执行上下文
+- 后续 `add_to_downloader` 也要遵循同样模式
 
 ---
 
-## 6. 运行 Luminarr 之前，你需要准备什么
+## 7. 当前不该做什么
 
-在运行 Luminarr 之前，建议你已经具备以下外部服务：
-
-### 必需
-
-1. **一个聊天入口**
-   - Telegram Bot Token（v1 必需）
-
-2. **一个搜索聚合器**
-   - Prowlarr
-
-3. **一个下载器**
-   - Transmission **或** qBittorrent（二选一）
-
-4. **一个媒体服务器**
-   - Jellyfin **或** Emby（二选一）
-
-5. **媒体目录规划**
-   - 下载目录
-   - 媒体库目录
-   - 二者位于同一文件系统
-
-### 推荐
-
-6. **元数据来源配置**
-   - TMDB API Key
-   - Bangumi（后续用于动漫增强）
-
-7. **稳定的 Docker / NAS 路径规划**
-   - 宿主机媒体根目录，例如 `/srv/media`
-   - Luminarr 配置 / 数据目录，例如 `/srv/luminarr`
+不要把下一步发散到这些方向：
+- watchlist 自动下载
+- 多下载器并行支持
+- 多媒体服务器并行支持
+- Webhook / Web UI / 群聊
+- 一次性引入 Redis / MQ / PostgreSQL
+- 复杂命名模板 / 解压 / 清理策略
+- 通用多 Agent 平台化
 
 ---
 
-## 7. 路径与硬链接要求（非常重要）
+## 8. 下一步正确优先级
 
-Luminarr 设计默认遵循这条前提：
+v15 下，**watchlist 不再是最近一步**。
+最近一步应该回到执行卫生和控制层：
 
-- 下载目录和媒体库目录必须位于**同一文件系统**
-- 相关容器内部尽量看到**统一公共根路径**，例如 `/data`
+1. `telegram_updates` 去重真相源
+2. `jobs` 表最小执行所有权协议
+3. approval-wake context rebuild
+4. frustration detector / deterministic reset
+5. 这些已落地后，再做 `add_to_downloader` 的显式审批
+6. 最后才轮到 watchlist baseline
 
-推荐宿主机结构：
+---
+
+## 9. 部署前提
+
+推荐宿主机目录：
 
 ```text
 /srv/media/
 ├── downloads/
 │   ├── tr/
-│   ├── qb/
 │   ├── incomplete/
 │   └── watch/
 └── library/
-    ├── movies/
-    ├── shows/
-    └── anime/
+    └── movies/
 
 /srv/luminarr/
 ├── config/
 ├── data/
 ├── logs/
-└── cache/
+├── cache/
+└── backups/
 ```
 
-推荐容器内视图：
+容器内统一视图：
 
 ```text
 /data/downloads/tr
-/data/downloads/qb
 /data/library/movies
-/data/library/shows
-/data/library/anime
 ```
 
-### 为什么必须这样
-
-因为：
-- 硬链接不能跨文件系统
-- 路径设计混乱会让后续入库、刷新、清理都变复杂
-- 统一 `/data` 视图最适合长期维护和排错
-
----
-
-## 8. 最小部署思路
-
-### 你要部署的只有：
-- Luminarr 容器
-
-### 你要在配置里填写的通常包括：
-- Telegram Bot Token
-- 模型 API 地址 / Key
-- Prowlarr 地址与 API Key
-- 下载器地址与认证信息
-- Jellyfin / Emby 地址与 API Key
-- 媒体根路径映射
-- SQLite 数据库路径
-
-### 你需要自己保证：
-- 外部服务已经能正常访问
-- 下载目录和媒体库目录路径规划正确
-- Luminarr 容器能看到共享媒体根目录
-
-### 当前已实现的最小运行配置（到 import_to_library）
-
-必填环境变量：
-
-- `TELEGRAM_BOT_TOKEN`
-- `PROWLARR_BASE_URL`
-- `PROWLARR_API_KEY`
-- `TRANSMISSION_BASE_URL`（可用 `http://<host>:9091`，程序会自动补 `/transmission/rpc`）
-
-可选环境变量：
-
-- `TRANSMISSION_USERNAME`
-- `TRANSMISSION_PASSWORD`
-- `LIBRARY_TARGET_DIR`（默认 `/data/library/movies`）
-
-### 手工验收（搜索 -> 选择 -> 投递 -> 状态查询 -> 导入）
-
-1. 启动程序：`python -m app.main`
-2. 在 Telegram 给 bot 发送搜索词（例如 `dune`）
-3. 收到候选列表后，发送序号（例如 `1`）
-4. 期望回复包含：
-   - `任务 ID: ...`
-   - `任务 Hash: ...`
-5. 到 Transmission 确认任务已出现（新增或 duplicate 都会返回 id/hash）
-6. 发送状态查询命令，例如 `status 87` 或 `status b305bf9427799bb31499c9efd4a362ec831e4bd6`
-7. 期望回复包含状态摘要（任务 ID/Hash、状态、进度、下载速度、预计剩余）
-8. 当状态到完成后，发送导入命令，例如 `import 87`
-9. 期望回复包含：
-   - `导入成功：...` 或失败原因
-   - `目标路径: ...`
+约束：
+- 下载目录和库目录必须位于同一文件系统
+- 硬链接优先
+- 硬链接失败默认不自动 copy
+- copy fallback 必须审批
 
 ---
 
-## 9. 当前开发节奏
+## 10. 文档入口
 
-### Phase 0
-先搭好：
-- README
-- AGENTS.md
-- docs/STATUS.md
-- docs/NEXT_STEP.md
-- 基础项目骨架
+开始任何新任务前，先读：
 
-### Phase 1
-只做最小可用闭环：
-- Telegram 收消息
-- 自然语言触发搜索
-- 选择候选
-- 投递到下载器
-- 查看状态
-
-### Phase 2
-再做：
-- 下载完成检测
-- 硬链接入库
-- 刷新 Jellyfin / Emby
-
-### Phase 3
-再做：
-- watchlist / 追更
-
-### Phase 4
-再做：
-- 字幕处理
-- 更强刮削能力
-- 微信辅助渠道
-- Skills 化扩展
+1. `Luminarr_v15_execution_guide_reviewed.md`
+2. `docs/DECISIONS.md`
+3. `docs/NEXT_STEP.md`
+4. `docs/STATUS.md`
+5. `AGENTS.md`
 
 ---
 
-## 10. 开发环境
+## 11. 一句话总结
 
-当前默认开发环境：
-- Windows
-- Codex Desktop
-- Ubuntu WSL
-- 项目仓库放在 WSL 内
-
-建议：
-- 代码始终在 WSL 的 Linux 文件系统里维护
-- 通过 Git 与 GitHub 同步
-- 用 Codex 负责计划、改代码、跑测试、更新状态文件
-- 由人来做最终验收、commit、push
-
----
-
-## 11. 当前状态文件
-
-为了防止线程腐化、上下文丢失，项目长期维护以下文件：
-
-- `AGENTS.md`：长期规则
-- `docs/STATUS.md`：当前状态
-- `docs/NEXT_STEP.md`：下一步唯一任务
-- `docs/DECISIONS.md`：已拍板的架构与产品决策
-
-新线程开始时，Codex 必须先读取这些文件，再继续当前任务。
-
----
-
-## 12. 后续扩展方向
-
-以下方向已经被保留为后续扩展，但不进入 v1 核心范围：
-
-- 微信辅助接入
-- Bangumi 动漫增强
-- Subtitle 处理
-- Metadata repair
-- Library hygiene
-- Skills 化本地扩展
-
----
-
-## 13. 一句话总结
-
-**Luminarr 当前不是“一键部署整套媒体栈”的项目，而是一个部署在你现有媒体生态之上的轻量自然语言编排层。**
-
-它只负责把：
-**搜索 -> 下载 -> 入库 -> 刷新 -> 查询 -> 追更**
-这条链路通过聊天方式整合起来。
+**Luminarr v15 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；它保留 TMDB-first 搜索、import-confirm、最小 lease/version 防重放等已落地能力，同时把“安全并发、响应式恢复、审批唤醒重建、挫败感短路”正式提升为下一阶段工程纪律。**

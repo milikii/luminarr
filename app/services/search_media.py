@@ -103,6 +103,29 @@ class SearchMediaService:
             return None
         return persisted_candidate
 
+    def has_cached_candidates(self, chat_id: int) -> bool:
+        if chat_id <= 0:
+            return False
+        if self.get_cached_candidate(chat_id, 1) is not None:
+            return True
+        return False
+
+    def clear_cached_candidates(self, chat_id: int) -> bool:
+        if chat_id <= 0:
+            return False
+
+        cleared = False
+        if chat_id in self._recent_candidates_by_chat:
+            self._recent_candidates_by_chat.pop(chat_id, None)
+            cleared = True
+
+        if self._candidate_repo is None:
+            return cleared
+        try:
+            return self._candidate_repo.clear_candidates(chat_id) or cleared
+        except Exception:
+            return cleared
+
 
 def parse_movie_query(query: str) -> ParsedMovieQuery:
     cleaned_query = _normalize_spaces(query)

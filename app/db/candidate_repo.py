@@ -29,6 +29,12 @@ class CandidateMappingRepo:
                 )
             connection.commit()
 
+    def clear_candidates(self, chat_id: int) -> bool:
+        with self._database.connect() as connection:
+            cursor = connection.execute("DELETE FROM candidate_mapping WHERE chat_id = ?", (chat_id,))
+            connection.commit()
+        return cursor.rowcount > 0
+
     def get_candidate(self, chat_id: int, selection_index: int) -> Mapping[str, Any] | None:
         if selection_index < 1:
             return None

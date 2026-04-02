@@ -1,77 +1,142 @@
-# Luminarr AGENTS.md
+# Luminarr AGENTS.md (v15)
+
+This file is the operating contract for AI coding agents working in this repository.
+
+## Document priority
+
+When files disagree, follow this order:
+
+1. `Luminarr_v15_execution_guide_reviewed.md`
+2. `docs/DECISIONS.md`
+3. `docs/NEXT_STEP.md`
+4. `docs/STATUS.md`
+5. `README.md`
+6. `AGENTS.md`
+
+Do not invent a third interpretation. If two files conflict, update the lower-priority file.
 
 ## Project goal
-Luminarr is a narrow vertical media automation agent.
+
+Luminarr is a narrow vertical media automation harness for 2–4 self-hosted users.
+
+Current fixed runtime profile:
+- Telegram private chat only
+- TMDB only
+- Prowlarr only
+- Transmission only
+- Emby only
+- SQLite only
+- Docker Compose only
+- single instance / single process / single host
+- movie-first workflow
 
 Core responsibilities:
-- search media
-- add to downloader
-- check task status
-- import to library using hardlinks when possible
-- refresh media server
-- manage watchlist
-
-## Product constraints
-- Telegram is the primary channel.
-- WeChat is later-phase only.
-- Keep the runtime minimal and explicit.
-- Do not introduce heavy agent frameworks unless explicitly asked.
-- Keep Docker Compose as the deployment target.
-- Assume a shared `/data` root inside containers.
-- Never assume hardlinks work across filesystems.
-- Keep natural language UX, but execute actions via structured tools and workflows.
+- `search_media`
+- `add_to_downloader`
+- `get_download_status`
+- `import_to_library`
+- `refresh_media_server`
+- `manage_watchlist` (reserved, not current priority)
 
 ## Scope discipline
+
 Do not expand into:
-- general office automation
-- generic knowledge assistant behavior
-- multi-purpose agent platform features
-- broad plugin marketplace design in v1
+- generic AI assistant behavior
+- office automation
+- generic agent platform features
+- plugin marketplace / MCP platformization
+- qBittorrent / Jellyfin / Sonarr / Radarr in the current mainline
+- auto-download watchlist in the current mainline
+
+## Current priority
+
+The next development priority is **execution hygiene**, not watchlist:
+1. durable Telegram message/callback de-dup
+2. durable execution ownership (`jobs.version`, `lease_owner`, `lease_until`)
+3. approval-wake context rebuild
+4. low-cost frustration/reset short-circuit
+5. only after the above, consider watchlist baseline
+
+## Runtime rules
+
+### Model usage
+- Parser-first, LLM-fallback.
+- Never use the model for idempotency checks.
+- Never use the model for lease ownership.
+- Never use the model for execution-result truth.
+- Never use the model for approval re-validation.
+- Background recovery and scheduler ticks must not depend on LLM calls.
+
+### Concurrency
+- Read-only tools may be marked concurrency-safe.
+- Stateful tools must remain serialized through workflow ownership.
+- Same-job side effects must never run concurrently.
+- If no lease is held, the side-effect path must exit.
+
+### Approval wake
+When a suspended task is resumed by `confirm`, rebuild execution context from persisted truth:
+- `system_base`
+- `project_rules`
+- current `job_context`
+- minimal `approval_context`
+Do not reuse the old free-form conversation transcript as execution memory.
+
+### Ambiguous search
+For highly ambiguous title resolution, an isolated read-only exploration helper is allowed.
+It may:
+- query TMDB / Prowlarr
+- help generate clarification text
+It may not:
+- mutate main workflow state
+- write side-effect approvals
+- dispatch downloads
+Only the final confirmed structured result may be written back to the main workflow.
+
+### Frustration detector
+Use low-cost parser rules for phrases such as:
+- 不对
+- 停
+- 重来
+- 换一个
+- 算了
+- 取消
+When triggered in clarification / selection / pending-approval stages, prefer deterministic reset/cancel flows over more LLM turns.
 
 ## Engineering conventions
-- Use Python 3.12 style.
-- Prefer small files and explicit functions.
-- Keep functions focused and readable.
+
+- Python 3.12 style.
+- Prefer small explicit functions.
 - Prefer minimal dependencies.
+- Prefer deterministic text protocols over fancy UI.
 - Add tests for every non-trivial change.
-- Keep changes scoped to the requested task.
-- Update README or docs when behavior changes.
+- Keep diffs narrow.
+- Do not refactor unrelated modules.
+- Update docs whenever behavior or rules change.
 
-## Architecture assumptions
-- app/bot: channel entry and routing
-- app/agent: planner, schemas, tool registry, workflow orchestration
-- app/clients: external API clients
-- app/services: business logic
-- app/db: persistence
-- app/jobs: scheduler jobs
-- tests: automated tests
+## High-risk paths
 
-## Primary workflow priority
-Always prioritize the main chain:
-1. search
-2. select
-3. add to downloader
-4. monitor status
-5. import to library
-6. refresh media server
+Do not casually modify these without updating docs and calling out the risk:
+- persistence schema / migrations
+- approval protocol
+- lease/version protocol
+- recovery scripts
+- docker-compose deployment files
+- restore / backup scripts
+- secrets or token wiring
 
 ## Definition of done
+
 A task is done only when:
 1. code is complete
 2. tests pass
-3. manual acceptance steps are provided
+3. manual verification steps are written
 4. relevant docs are updated
 5. no obvious regression remains
+6. document priority is still internally consistent
 
 ## Useful commands
+
 - run app: `python -m app.main`
 - run tests: `pytest -q`
 - format: `python -m black .`
 - lint: `python -m ruff check .`
-
-## Codex operating rules
-- Always start with a plan for non-trivial tasks.
-- Prefer minimal diffs.
-- Do not refactor unrelated modules.
-- If repeating the same mistake, perform a short retrospective and update this file.
-- Before finishing, run tests and review the diff.

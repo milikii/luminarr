@@ -1,475 +1,297 @@
-# docs/DECISIONS.md
+# docs/DECISIONS.md (v15)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
-> 使用方式：每次有重要架构、产品、部署、流程上的决定，都追加一条。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
+> 备注：当旧决策与新决策冲突时，以编号更大的条目为准。
 
 ---
 
-## D-001 项目定位：只做垂直媒体自动化 Agent
+## D-001 项目定位：只做垂直媒体自动化 Harness
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  Luminarr 只专注影视 / 动漫自动化这一条链路：
+  Luminarr 只专注这一条链路：
   搜索 -> 下载 -> 入库 -> 刷新媒体库 -> 状态查询 -> 追更。
 - **不做**：
   - 通用 AI 助手
   - 通用办公自动化
   - 多领域工具平台
-  - 一开始就做成“大而全”的 OpenClaw 替代品
+  - 一开始就做成大而全平台
 - **原因**：
-  项目发起者更适合做一个边界清晰、可逐步推进、可长期维护的小垂直系统。
+  保持边界清晰、可逐步推进、可长期维护。
 
----
-
-## D-002 交互方式：用户自然语言，内部结构化工具调用
+## D-002 交互方式：用户自然语言，内部结构化执行
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
   用户侧保持自然语言体验；
   系统内部必须转换为结构化意图、工具调用和工作流推进。
 - **原则**：
-  - 自然语言 != 模型直接自由发挥
-  - 模型只负责理解、提参、选工具、组织回复
-  - 副作用操作必须由系统显式执行
-- **原因**：
-  这样更可控、可测、可恢复，也更适合后续长期维护。
+  - 自然语言 != 模型自由发挥
+  - 模型只负责理解、补充、组织回复
+  - 副作用动作必须由系统显式执行
 
----
-
-## D-003 底座路线：自建极简 runtime，不直接依赖 nanobot
+## D-003 底座路线：自建极简 runtime
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  v1 采用自建极简底座，不直接把 nanobot 当运行时底座。
-- **保留**：
-  nanobot 仅作为架构参考来源：
-  - channel 抽象思路
-  - session 隔离思路
-  - 轻量 agent 骨架思路
+  v1 采用自建极简底座，不直接依赖通用 agent runtime。
 - **原因**：
-  - 项目范围很窄，自建 runtime 足够
-  - 减少对外部快速演进框架的绑定
-  - 更利于长期维护和开源
+  项目范围窄，自建足够且更易长期维护。
 
----
-
-## D-004 渠道策略：Telegram 主验收，微信后置
+## D-004 渠道策略：Telegram 主线，微信后置
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  - **Telegram** 是 v1 唯一主验收渠道
-  - **微信** 是后续辅助渠道，不进入 v1 主线验收
-- **说明**：
-  微信会保留为后续真实使用入口，但不作为第一阶段开发依赖。
-- **原因**：
-  Telegram Bot API 更成熟、调试更方便、资料更多，适合作为基线渠道。
+  Telegram 是当前唯一主验收渠道；微信保留为后续辅助入口。
 
----
-
-## D-005 企业微信不进入当前路线
+## D-005 当前主线固定组件
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  当前阶段不接企业微信，不为企业微信做专门适配。
-- **原因**：
-  与“个人 / 家庭 / 小范围自部署”的核心场景不匹配，会分散开发精力。
+  当前主线固定为：
+  - Telegram
+  - TMDB
+  - Prowlarr
+  - Transmission
+  - Emby
+  - SQLite
+  - Docker Compose
+- **补充**：
+  qBittorrent、Jellyfin 不进入当前主线文档与最近开发顺序。
 
----
-
-## D-006 v1 工具集收敛为 6 个
+## D-006 工具面固定为 6 个核心工具
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  v1 只保留以下 6 个核心工具：
+  只保留：
   - `search_media`
   - `add_to_downloader`
   - `get_download_status`
   - `import_to_library`
   - `refresh_media_server`
   - `manage_watchlist`
-- **补充**：
-  `add_to_downloader` 统一处理：
-  - 搜索结果投递
-  - magnet 投递
-  - torrent 文件投递
-- **原因**：
-  工具越少，Planner 越稳定；更适合小步推进和明确测试。
 
----
-
-## D-007 下载器策略：v1 只先支持一个下载器
+## D-007 路径设计：统一公共根 `/data`
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  v1 只先支持一个下载器，不同时实现 qBittorrent 和 Transmission。
-- **优先建议**：
-  若当前已有 Transmission 环境，则先做 Transmission。
+  相关容器内部统一使用 `/data` 视图。
 - **原因**：
-  避免同阶段处理两套 API 细节，降低复杂度。
+  便于硬链接、调试和长期维护。
 
----
-
-## D-008 媒体服务器策略：先做“入库后刷新”，不做复杂刮削控制
+## D-008 硬链接原则：同一文件系统、默认不自动 copy
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  v1 / Phase 2 只实现：
-  - 下载完成后入库
-  - 触发 Jellyfin / Emby 刷新
-- **暂不做**：
-  - 复杂单文件级精细刮削流程
-  - 高级元数据修复流程
-- **原因**：
-  先跑通主链路，比一开始追求高级刮削更重要。
+  - 硬链接优先
+  - 不跨文件系统假设
+  - copy fallback 不作为默认路径
+  - copy fallback 必须审批
 
----
-
-## D-009 字幕翻译后置到后续阶段
+## D-009 数据库策略：SQLite 继续作为唯一主线数据库
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  字幕提取 / 翻译不进入 v1。
-- **进入时机**：
-  在主链路稳定后，作为后续扩展能力或 Skill。
-- **原因**：
-  字幕处理会明显增加复杂度，不应阻塞“搜索 -> 下载 -> 入库 -> 刷新”主链路。
+  v1 继续使用 SQLite，保持单实例写入。
 
----
-
-## D-010 部署方式：Docker Compose 是唯一主部署形态
+## D-010 项目记忆：靠仓库文件，不靠聊天线程
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  项目默认部署方式为 Docker Compose。
-- **不优先支持**：
-  - 手工裸跑生产环境
-  - systemd 原生部署优先路线
-- **原因**：
-  项目面向 NAS / VPS 自部署场景，Docker Compose 最符合目标用户习惯。
-
----
-
-## D-011 路径设计：统一公共根路径 `/data`
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  相关容器内部统一使用公共根路径 `/data`。
-- **建议结构**：
-  - `/data/downloads/tr`
-  - `/data/downloads/qb`
-  - `/data/library/movies`
-  - `/data/library/shows`
-  - `/data/library/anime`
-- **禁止**：
-  不再采用彼此割裂的路径视图，例如：
-  - 某容器用 `/downloads`
-  - 某容器用 `/movies`
-  - 某容器用 `/media`
-- **原因**：
-  统一路径视图更利于硬链接、日志理解、调试和后续扩展。
-
----
-
-## D-012 硬链接原则：依赖同一文件系统，不做跨文件系统假设
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  硬链接只在：
-  - 源目录和目标目录位于同一文件系统
-  - 且路径布局满足统一公共根时
-  才视为可用方案。
-- **降级策略**：
-  如果硬链接失败，可后续支持复制，但复制不是优先路径。
-- **原因**：
-  这是 Docker/NAS 媒体自动化场景里最关键的底层前提，必须在项目设计里写死。
-
----
-
-## D-013 状态持久化：SQLite 为 v1 唯一数据库
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  v1 继续使用 SQLite。
-- **保存内容**：
-  - 下载任务
-  - task events
-  - library records
-  - watchlist
-  - sessions
-  - history
-  - push logs
-- **原因**：
-  单机自部署、零运维、易备份，足够覆盖当前需求。
-
----
-
-## D-014 工作方式：先代码最小闭环，再补架构文档
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  不在 Phase 0 一开始写大量架构文档。
-- **Phase 0 只做**：
-  - README
-  - AGENTS.md
-  - docs/STATUS.md
-  - docs/NEXT_STEP.md
-  - 基础项目骨架
-- **原因**：
-  先有可运行闭环，再让文档反映真实系统，避免文档先于代码腐化。
-
----
-
-## D-015 开发节奏：从第一天就保留自然语言壳
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  不先做一套纯命令式 bot 再重构成 Agent。
-- **做法**：
-  从 v1 开始就保留：
-  自然语言输入 -> Planner -> 工具调用
-  只是初期工具很少、能力很窄。
-- **原因**：
-  避免重复建设和后续推翻重做。
-
----
-
-## D-016 主开发流程：一次只做一个小目标
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  每次任务都必须满足：
-  - 只有一个小目标
-  - 先计划
-  - 明确 Done when
-  - 改动可测试
-  - 任务结束更新状态文件
-- **原因**：
-  这是最适合当前作者背景的推进方式，也最适合 Codex 协作。
-
----
-
-## D-017 项目记忆持久化：靠仓库文件，不靠聊天线程
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  项目的长期记忆放在仓库文件里，而不是依赖聊天线程。
-- **核心文件**：
-  - `AGENTS.md`
-  - `README.md`
-  - `docs/STATUS.md`
-  - `docs/NEXT_STEP.md`
+  项目的长期记忆依赖：
+  - `Luminarr_v15_execution_guide_reviewed.md`
   - `docs/DECISIONS.md`
-- **原因**：
-  防止线程腐化，保证新线程可以稳定续接进度。
+  - `docs/NEXT_STEP.md`
+  - `docs/STATUS.md`
+  - `README.md`
+  - `AGENTS.md`
 
----
-
-## D-018 Git 工作流：每个小目标独立分支
+## D-011 当前开发方式：一次只做一个小目标
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  每次任务使用独立分支开发，验收通过后再合并。
-- **基本流程**：
-  - `git checkout -b feat/...`
-  - 开发 / 测试
-  - 人工验收
-  - `git commit`
-  - `git push`
-  - 合并回 `main`
-- **原因**：
-  这样更容易回滚，更适合和 Codex 一步步协作。
+  每次任务必须是小范围、可测试、可回滚、可写清 Done when 的目标。
 
----
-
-## D-019 开发环境：Windows + Codex Desktop + Ubuntu WSL
+## D-012 当前开发环境
 - **状态**：已决定
 - **日期**：2026-04-01
 - **结论**：
-  开发环境固定为：
-  - Windows 主系统
-  - Codex 桌面版
-  - Ubuntu WSL
-  - 项目仓库放在 WSL 内
-- **原因**：
-  这是当前作者已经具备的稳定环境，最适合继续推进。
+  Windows + Codex Desktop + Ubuntu WSL，仓库放在 WSL 内。
 
----
-
-## D-020 后续扩展方向：Skills 化，但 v1 不做技能市场
-- **状态**：已决定
-- **日期**：2026-04-01
-- **结论**：
-  后续会支持本地 Skills 化扩展，但 v1 不做技能市场或远程安装系统。
-- **优先候选 Skills**：
-  - Anime
-  - Subtitle
-  - Metadata repair
-  - Library hygiene
-- **原因**：
-  先保证核心主链路稳定，再做可插拔能力层。
-
----
-
-## D-021 refresh 闭环落地：import 成功后触发 Emby 刷新，并分离导入与刷新结果
+## D-013 refresh 闭环：import 成功后触发 Emby refresh
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
   - 当前 refresh 路径固定为 Emby-only
-  - 仅在 import 成功后触发 `refresh_media_server`
-  - refresh 输出固定为可测试文本（成功/失败）
-  - refresh 失败不回滚 import 成功结果，回复中并列展示两段结果
-- **原因**：
-  先补齐主链最后一跳，保持改动小且不破坏现有 search/select/add/status/import 语义。
+  - 仅在 import 成功后触发
+  - refresh 失败不回滚 import 成功
 
----
-
-## D-022 本地联调基线：WSL 使用独立测试栈（Transmission + Emby），仅用于测试
+## D-014 本地联调基线：WSL 独立 Transmission + Emby 测试栈
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - 在 WSL 使用独立 `docker-compose.test.yml` 启动 Transmission 和 Emby
-  - 测试栈挂载固定为统一 `/data` 视图
-  - Transmission 下载目录固定为 `/data/downloads/tr`
-  - 该栈仅用于本地开发联调，不替代 NAS 正式环境
-- **原因**：
-  保证 WSL 下可重复验证 import/refresh 路径，并避免影响 NAS 在用服务。
+  WSL 中使用独立测试栈做 import/refresh 联调，不替代 NAS 正式环境。
 
----
-
-## D-023 命名规范化策略：当前阶段不做入库重命名，后置到持久化之后
+## D-015 当前不做入库重命名
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - 当前阶段保持 `import_to_library` 只做硬链接导入与刷新
-  - 不在当前阶段引入入库重命名/规范化命名
-  - 重命名单独作为后续小任务，在持久化与 TMDB metadata 基线后再做
-- **原因**：
-  避免在主链刚跑通时引入命名规则副作用，先确保链路稳定和可恢复。
+  当前阶段 `import_to_library` 只做硬链接导入与刷新，不引入命名规范化。
 
----
-
-## D-024 最小 SQLite 持久化基线：候选映射 + import/refresh 事件
+## D-016 最小持久化基线：候选映射 + job_event
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - 增加 `candidate_mapping` 表，按 `chat_id + index` 持久化最近一次搜索候选
-  - 增加 `job_event` 表，记录 import -> refresh 关键事件轨迹
-  - 选择序号时优先走内存缓存，缓存缺失则回读 SQLite
-  - 现阶段只做最小事件追踪，不引入复杂状态机
-- **原因**：
-  先解决“重启后候选丢失”和“import/refresh 无持久轨迹”两个最小痛点，并保持主链语义不变。
-- **影响范围**：
-  - `search -> select` 路径可跨重启继续使用最近候选序号
-  - `import -> refresh` 有最小可追踪事件
-  - 为后续 approval/recovery 提供基础数据面
+  - 搜索候选映射持久化到 SQLite
+  - `job_event` 记录 import -> refresh 关键事件
+  - 选择序号时优先走内存，缓存缺失再回读 SQLite
 
----
-
-## D-025 最小 approval 持久化基线：import 关键点写入 + 重启可读 stale guard
+## D-017 TMDB-first 搜索基线
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - 增加 `approval_record` 表，按 `action_type + task_id + task_hash` 持久化最小 approval 状态
-  - import 在执行硬链接前写入 approval 记录（不改变现有命令语义）
-  - import 在重启敏感路径读取 `approval_record + job_event`，拦截已执行任务的重复导入
-  - 重复导入拦截保持确定性文本风格：`目标已存在，已拒绝覆盖：...`
-- **原因**：
-  先用最小改动补齐“可持久化的副作用许可 + 重启后可判重”的基础能力，为后续完整 approval flow 和 recovery 协议铺底。
-- **影响范围**：
-  - `import` 路径新增最小 approval 读写
-  - 同一任务跨重启重复导入可被确定性拦截
-  - Telegram 命令词与主链路行为保持不变
+  - parser-first 规范化
+  - TMDB 可用时先做 movie lookup
+  - 搜索顺序固定为：
+    1. English title + year
+    2. original title + year
+    3. normalized original query（仅 TMDB 不可用或无命中时）
+  - 中文海报卡片文本前置，候选编号格式保持不变
 
----
-
-## D-026 TMDB-first 元数据解析基线：parser-first 规范化 + 确定性回退
+## D-018 import 显式 approval 交互
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - search 路径新增 parser-first 规范化（`title + optional year`）
-  - 在 `TMDB_API_KEY` 可用时，先进行 TMDB movie lookup，再用 TMDB 结果构造搜索词
-  - TMDB lookup 失败或空结果时，确定性回退到 parser-first 规范化后的原查询
-  - 不改 Telegram 命令词与路由，不改 add/status/import/refresh 语义
-- **原因**：
-  先把 TMDB 接入落到最小可测基线，保证搜索链路增强同时不引入复杂状态和新依赖面。
-- **影响范围**：
-  - `search_media` 查询组装与调用顺序
-  - `config` 新增可选 TMDB 配置项（默认兼容未配置）
-  - 新增 TMDB client 与对应测试
+  - `import <id/hash>` 只进入 pending
+  - `confirm <id/hash>` 才执行导入副作用
+  - `approval_record` 维持 pending/approved 最小协议
+  - 重复/过期 confirm 必须确定性拒绝
 
----
-
-## D-027 固定 v12 搜索顺序：English 命中优先，original 仅在 miss 时回退
+## D-019 import confirm 最小 lease/version 防重放协议
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - TMDB lookup 命中后，按固定顺序执行：
-    1) `TMDB English title + year`
-    2) 仅当 1) 无候选时，执行 `TMDB original title + year`
-  - TMDB 不可用或无命中时，才回退到 parser-first 规范化原查询
-  - 保持 Telegram 指令词、回复格式、以及 select/add/status/import/refresh 语义不变
-- **原因**：
-  用最小改动把搜索行为固定成可测试、可复现的顺序，避免后续 fallback 漂移。
-- **影响范围**：
-  - `search_media` 查询组装与执行顺序
-  - 搜索相关测试用例（顺序与回退判定）
+  - `approval_record` 增加 `lease_version`、`executed_version`
+  - `import` 进入 pending 时推进当前 lease
+  - `confirm` 只允许执行当前 lease
+  - stale replay 在重启后必须被确定性拒绝
 
----
-
-## D-028 电影查询中文海报卡片文本基线：卡片前置，候选列表格式不变
+## D-020 并发调度哲学：只读可并发，副作用串行
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - 电影查询回复前置确定性中文海报卡片文本块（文本基线）
-  - 保留原候选列表文本块与编号格式，确保数字选择语义不变
-  - 当前海报字段为文本占位（`海报: 暂未接入图片`），不引入媒体渲染
+  - 工具契约必须显式声明 `concurrency_safe`
+  - 只读 / 纯查询工具允许安全并发
+  - 有副作用工具必须串行进入 workflow 主线
+  - 同一 job 的副作用路径不得并发
 - **原因**：
-  先落地可测试、低风险的展示基线，同时不影响现有 select/add 主链路。
-- **影响范围**：
-  - `search_media` 回复拼装顺序
-  - 搜索相关测试断言（卡片文本与列表不回归）
+  提升响应速度，但不牺牲副作用安全边界。
 
----
-
-## D-029 import 显式 approval 交互基线：import 仅挂起，confirm 才执行副作用
+## D-021 LLM 物理异常恢复：采用响应式恢复，而非把底层崩溃暴露给用户
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - `import <id/hash>` 只进入 `pending`，返回确定性待确认文本，不执行导入副作用
-  - 新增 `confirm <id/hash>`（含中文同义词）触发现有 `hardlink import + refresh` 执行路径
-  - approval 持久化改为 `pending/approved` 两态，并继续沿用现有 `approval_record` 表
-  - 重复/过期 confirm 在重启敏感路径下保持确定性拒绝文本（`目标已存在，已拒绝覆盖：...`）
+  对 `413 Payload Too Large`、`max_output_tokens` 截断等物理异常，系统后续应支持：
+  - 激进上下文折叠
+  - 保留 `system_base + project_rules + current_job_context`
+  - 同轮次透明重试
+- **说明**：
+  这是已采纳方向，当前尚未实现。
 - **原因**：
-  在不引入复杂交互控件和额外依赖的前提下，把 import 副作用改成显式确认，减少误操作并为后续 recovery 协议铺底。
-- **影响范围**：
-  - `import_to_library` 交互语义从“立即执行”变为“两阶段执行”
-  - Telegram 路由新增 `confirm` 命令分支
-  - import 相关测试与持久化测试基线更新
+  模型物理异常不应直接污染用户体验。
 
----
-
-## D-030 最小 lease/version 防重放协议：import 推进 lease，confirm 仅执行当前 lease
+## D-022 模糊查询隔离：允许只读 Explore Agent / Explore Subflow
 - **状态**：已决定
 - **日期**：2026-04-02
 - **结论**：
-  - `approval_record` 增加最小版本字段：`lease_version`、`executed_version`
-  - `import <id/hash>` 每次进入 pending 都会推进当前 lease 快照
-  - `confirm <id/hash>` 通过 lease 快照做 CAS，只有当前 lease 可以执行副作用
-  - 执行成功后写入 `executed_version`，重启后基于版本号确定性拒绝 stale replay
-  - 保持现有 Telegram 命令词和 import 成功/失败文本主体不变
+  对于高歧义查询，可使用只读探索子流程来做：
+  - TMDB/Prowlarr 对比
+  - 多轮澄清文案
+  - 海报比对
+- **边界**：
+  不得写主 workflow 状态，不得执行副作用。
+  只有最终确认的结构化结果可写回主状态机。
+- **说明**：
+  这是已采纳方向，当前尚未实现。
+
+## D-023 审批唤醒后的上下文重建
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  当任务从 pending approval 被 `confirm` 唤醒时，执行阶段必须：
+  - 清空冗余历史
+  - 从持久化状态重建微型执行上下文
+  - 不依赖旧的自由对话历史作为执行内存
 - **原因**：
-  用最小改动补齐“可恢复场景下的防重放”能力，避免重复执行导入副作用，同时不引入额外复杂组件。
-- **影响范围**：
-  - `approval_record` 持久化协议升级（含旧库兼容迁移）
-  - `import/confirm` 状态迁移从两态提升为“状态 + 版本”最小协议
-  - import 相关持久化与重启回归测试更新
+  降低执行阶段出错概率，并减少历史污染。
+
+## D-024 低成本挫败感短路
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  在 Parser 层增加低成本规则检测：
+  - 不对
+  - 停
+  - 重来
+  - 换一个
+  - 算了
+  - 取消
+- **行为**：
+  在澄清 / 选择 / pending-approval 阶段触发时，优先走 deterministic reset/cancel，而不是继续消耗 LLM 回合。
+- **原因**：
+  优秀的 harness 必须知道什么时候“放弃使用 AI”。
+
+## D-025 路线重排：watchlist 不再是最近一步
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  当前最近一步不再是 watchlist。
+  正确顺序调整为：
+  1. durable Telegram de-dup
+  2. durable `jobs.version + lease_owner + lease_until`
+  3. approval-wake context rebuild
+  4. frustration/reset short-circuit
+  5. explicit pre-dispatch approval for `add_to_downloader`
+  6. 之后再回到 watchlist baseline
+- **原因**：
+  先补控制层，再做新业务面。
+
+## D-026 文档优先级规则
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  文档冲突时按以下顺序解释：
+  1. execution guide
+  2. `docs/DECISIONS.md`
+  3. `docs/NEXT_STEP.md`
+  4. `docs/STATUS.md`
+  5. `README.md`
+  6. `AGENTS.md`
+- **原因**：
+  防止 Codex 被互相冲突的文档带偏。
+
+## D-027 execution hygiene baseline 的最小落地形状
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  当前 execution hygiene baseline 按最小可用形状落地为：
+  - `telegram_updates` 作为 Telegram message de-dup 的持久化真相源
+  - `jobs` 先只承接 import approval wake/replay 所需的最小真相：
+    - `version`
+    - `lease_owner`
+    - `lease_until`
+    - `chat_id/user_id/task_ref/task_id/task_hash/state`
+  - `confirm <id/hash>` 优先从持久化 `job + approval_record` 重建微型执行上下文
+  - frustration/reset 当前只覆盖：
+    - 选择窗口 reset
+    - pending import approval cancel
+- **原因**：
+  先用最小真相源补齐执行卫生，不把当前仓库过早拉成完整 workflow 平台。
 
 ---
 
-## 附：更新规则
-
-每次要新增一条决策时，使用以下模板：
+## 附：更新模板
 
 ### D-XXX 标题
 - **状态**：已决定 / 已废弃 / 已替换

@@ -45,6 +45,36 @@ SCHEMA_STATEMENTS = (
     "CREATE INDEX IF NOT EXISTS idx_job_event_task_ref ON job_event(task_ref)",
     "CREATE INDEX IF NOT EXISTS idx_job_event_task_id ON job_event(task_id)",
     "CREATE INDEX IF NOT EXISTS idx_job_event_task_hash ON job_event(task_hash)",
+    """
+    CREATE TABLE IF NOT EXISTS telegram_updates (
+        update_key TEXT PRIMARY KEY,
+        source_type TEXT NOT NULL,
+        source_id TEXT NOT NULL,
+        chat_id INTEGER NOT NULL DEFAULT 0,
+        user_id INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS jobs (
+        job_id TEXT PRIMARY KEY,
+        chat_id INTEGER NOT NULL DEFAULT 0,
+        user_id INTEGER NOT NULL DEFAULT 0,
+        workflow_type TEXT NOT NULL,
+        state TEXT NOT NULL,
+        task_ref TEXT NOT NULL DEFAULT '',
+        task_id TEXT NOT NULL DEFAULT '',
+        task_hash TEXT NOT NULL DEFAULT '',
+        version INTEGER NOT NULL DEFAULT 1,
+        lease_owner TEXT NOT NULL DEFAULT '',
+        lease_until TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_jobs_chat_workflow ON jobs(chat_id, workflow_type)",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_task_ref ON jobs(task_ref)",
+    "CREATE INDEX IF NOT EXISTS idx_jobs_task_identity ON jobs(task_id, task_hash)",
 )
 
 

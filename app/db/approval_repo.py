@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from app.db.sqlite import SqliteDatabase
 
 ACTION_IMPORT_TO_LIBRARY = "import_to_library"
+APPROVAL_STATUS_CANCELLED = "cancelled"
 APPROVAL_STATUS_PENDING = "pending"
 APPROVAL_STATUS_APPROVED = "approved"
 
@@ -212,6 +213,50 @@ class ApprovalRepo:
                     ACTION_IMPORT_TO_LIBRARY,
                     cleaned_task_id,
                     cleaned_task_hash,
+                    expected_lease_version,
+                    expected_lease_version,
+                ),
+            )
+            connection.commit()
+        return cursor.rowcount == 1
+
+    def cancel_import(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+    ) -> bool:
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        if not cleaned_task_id or not cleaned_task_hash:
+            return False
+        if expected_lease_version <= 0:
+            return False
+
+        with self._database.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE approval_record
+                SET
+                    status = ?,
+                    last_task_ref = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE action_type = ?
+                  AND task_id = ?
+                  AND task_hash = ?
+                  AND status = ?
+                  AND lease_version = ?
+                  AND executed_version < ?
+                """,
+                (
+                    APPROVAL_STATUS_CANCELLED,
+                    task_ref.strip(),
+                    ACTION_IMPORT_TO_LIBRARY,
+                    cleaned_task_id,
+                    cleaned_task_hash,
+                    APPROVAL_STATUS_PENDING,
                     expected_lease_version,
                     expected_lease_version,
                 ),
