@@ -3,7 +3,7 @@
 ## Project position
 Luminarr is in early implementation, under the fixed v12 runtime profile:
 - Telegram private chat only
-- TMDB movie lookup baseline landed (parser-first + deterministic fallback)
+- TMDB fixed v12 search-order baseline landed
 - Prowlarr as search source
 - Transmission as only downloader
 - Emby as only media server
@@ -23,7 +23,10 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - Telegram text query triggers `search_media`
 - parser-first query normalization (`title + optional year`) in search path
 - minimal TMDB movie lookup client wiring
-- TMDB-first query resolution for search path, with deterministic fallback to normalized Prowlarr direct search
+- deterministic v12 search order in search path:
+  1) TMDB English title + year
+  2) TMDB original title + year (only when step 1 misses)
+  3) parser-first normalized original query (only when TMDB unavailable/no hit)
 - search result candidate mapping persistence (SQLite, per chat + index)
 - in-memory candidate cache remains as fast path in-process
 - numeric select -> `add_to_downloader` -> Transmission RPC
@@ -42,14 +45,13 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - tests cover config, bot routing, search/import/refresh, and SQLite persistence baseline
 
 ## What is not implemented yet
-- fixed v12 search plan (English title + year, original title fallback)
 - Chinese poster-card display
 - explicit approval interaction flow
 - lease/version recovery and retry path
 - watchlist workflow
 
 ## Latest verification (2026-04-02)
-- tests: `65 passed` (`.venv/bin/python -m pytest -q -s`)
+- tests: `68 passed` (`.venv/bin/python -m pytest -q -s`)
 - manual end-to-end verification in WSL test stack (Transmission + Emby) passed:
   - `status e93d696a3e980458765f8016ce39f61437cc9543` returned completed seeding state
   - `import e93d696a3e980458765f8016ce39f61437cc9543` returned deterministic import success text
@@ -59,13 +61,14 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 ## Current priority
 Build the next smallest path:
 1. keep current search/select/add/status/import/refresh behavior stable
-2. land fixed v12 search plan baseline (English title + year)
-3. add deterministic original-title fallback after English-title search miss
+2. land Chinese poster-card display baseline for movie query
+3. keep fixed v12 search-order behavior and tests stable
 
 ## Current risks
 - if `EMBY_BASE_URL` / `EMBY_API_KEY` is missing, import still succeeds but refresh will not run
 - if `TMDB_API_KEY` is missing, search path falls back to parser-first normalized Prowlarr direct search
 - TMDB first-hit strategy may still pick non-best metadata candidate for ambiguous titles
+- when TMDB lookup hits but both English/original searches return empty, path does not fall back to original normalized query by design
 - candidate mapping keeps only latest search window per chat; older windows are overwritten
 - Transmission `downloadDir + name` must map to container-visible paths
 - hardlink import has no copy fallback for cross-filesystem case
@@ -73,7 +76,7 @@ Build the next smallest path:
 - job events are append-only traces, not yet a lease/version recovery protocol
 
 ## Acceptance focus for next step
-- fixed v12 search plan remains parser-first and deterministic
-- original-title fallback only runs on explicit English-title miss path
+- movie query reply can render deterministic Chinese poster-card baseline
+- card rendering does not break current command words and routing
 - existing command words and routing do not regress
 - search/select/add/status/import/refresh chain remains stable

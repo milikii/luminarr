@@ -10,23 +10,20 @@ Prerequisite completed:
 - minimal import -> refresh `job_event` persistence is landed
 - minimal import `approval_record` persistence + stale guard is landed
 - TMDB-first movie metadata baseline is landed (parser-first + deterministic fallback)
+- fixed v12 search-order baseline is landed (English + year -> original + year on miss)
 
 ## Goal
-Land fixed v12 search plan baseline:
-- use TMDB English title + year as primary search query
-- fallback to TMDB original title (+ year) only when primary search misses
+Land Chinese poster-card display baseline for movie query.
 
 ## Scope
 Only do:
-- keep current parser-first normalization (`title + optional year`)
-- keep TMDB-first lookup baseline already landed
-- build deterministic search order:
-  1) TMDB English title + year
-  2) TMDB original title + year (only if step 1 no candidates)
-  3) parser-first normalized original query (if TMDB unavailable/no hit)
+- keep current parser-first normalization and fixed v12 search-order unchanged
+- keep current candidate mapping persistence and index-select behavior unchanged
+- add deterministic Chinese poster-card style text block for movie query reply
+- keep candidate list text block after card so numeric select keeps current usage
 - keep current Telegram command words and routing unchanged
 - keep search/select/add/status/import/refresh behavior unchanged
-- add focused tests for search-order and fallback determinism
+- add focused tests for card rendering determinism and no-regression of selection list format
 
 ## Explicit constraints
 - do not add new downloader/media server support
@@ -34,20 +31,19 @@ Only do:
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming in this step
-- do not redesign reply format into rich card UI in this step
+- do not introduce rich interactive Telegram UI components (inline keyboard / media group)
 
 ## Suggested implementation shape
-1. split search query assembly into deterministic ordered candidates
-2. execute ordered search with first-non-empty strategy
-3. keep reply format and command routing unchanged
-4. add focused tests for ordered fallback behavior
+1. isolate movie card view-model assembly from raw search response
+2. prepend deterministic Chinese card text to current search reply
+3. keep existing list index lines unchanged for select compatibility
+4. add focused tests for card text and routing-no-regression
 5. add simple manual verification steps
 
 ## Done when
-- ordered search path is deterministic and testable
-- English-title miss triggers original-title fallback deterministically
-- TMDB unavailable path still deterministically falls back
+- movie query reply includes deterministic Chinese poster-card baseline text
+- index-select input (`1`, `2`, ...) still works with no behavior change
 - existing Telegram command behavior does not regress
 
 ## After this step
-Move to Chinese poster-card display baseline for movie query.
+Move to explicit approval interaction baseline for import side effect.

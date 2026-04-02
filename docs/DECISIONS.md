@@ -400,6 +400,23 @@
 
 ---
 
+## D-027 固定 v12 搜索顺序：English 命中优先，original 仅在 miss 时回退
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - TMDB lookup 命中后，按固定顺序执行：
+    1) `TMDB English title + year`
+    2) 仅当 1) 无候选时，执行 `TMDB original title + year`
+  - TMDB 不可用或无命中时，才回退到 parser-first 规范化原查询
+  - 保持 Telegram 指令词、回复格式、以及 select/add/status/import/refresh 语义不变
+- **原因**：
+  用最小改动把搜索行为固定成可测试、可复现的顺序，避免后续 fallback 漂移。
+- **影响范围**：
+  - `search_media` 查询组装与执行顺序
+  - 搜索相关测试用例（顺序与回退判定）
+
+---
+
 ## 附：更新规则
 
 每次要新增一条决策时，使用以下模板：

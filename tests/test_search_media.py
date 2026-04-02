@@ -103,6 +103,77 @@ def test_search_and_format_uses_tmdb_first_when_available() -> None:
     assert "Interstellar 2014 1080p BluRay" in text
 
 
+def test_search_and_format_tmdb_english_hit_stops_before_original() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Interstellar 2014":
+            return [
+                {
+                    "title": "Interstellar 2014 1080p BluRay",
+                    "year": 2014,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerA",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="星际穿越", year="2014")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("星际穿越 (2014)"))
+
+    assert seen_queries == ["Interstellar 2014"]
+    assert "Interstellar 2014 1080p BluRay" in text
+
+
+def test_search_and_format_fallbacks_to_tmdb_original_when_english_miss() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Interstellar 2014":
+            return []
+        if query == "星际穿越 2014":
+            return [
+                {
+                    "title": "星际穿越 2014 1080p BluRay",
+                    "year": 2014,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerB",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="星际穿越", year="2014")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("星际穿越 (2014)"))
+
+    assert seen_queries == ["Interstellar 2014", "星际穿越 2014"]
+    assert "星际穿越 2014 1080p BluRay" in text
+
+
+def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="Interstellar", year="2014")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("星际穿越 (2014)"))
+
+    assert seen_queries == ["Interstellar 2014"]
+    assert text == NO_RESULT_TEXT_TEMPLATE.format(query="星际穿越 (2014)")
+
+
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_empty() -> None:
     seen_query: dict[str, str] = {}
 

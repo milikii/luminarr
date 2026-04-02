@@ -50,7 +50,9 @@ class SearchMediaService:
             return EMPTY_QUERY_TEXT
 
         parsed_query = parse_movie_query(cleaned_query)
-        search_query = _build_query(parsed_query.title, parsed_query.year)
+        fallback_query = _build_query(parsed_query.title, parsed_query.year)
+        raw_results: Sequence[Mapping[str, Any]] = ()
+
         if self._lookup_movie_func is not None:
             try:
                 tmdb_movie = await self._lookup_movie_func(parsed_query.title, parsed_query.year)
@@ -58,9 +60,18 @@ class SearchMediaService:
                 tmdb_movie = None
             if tmdb_movie is not None:
                 resolved_year = tmdb_movie.year or parsed_query.year
-                search_query = _build_query(tmdb_movie.title, resolved_year)
+                ordered_queries = _unique_queries(
+                    [
+                        _build_query(tmdb_movie.title, resolved_year),
+                        _build_query(tmdb_movie.original_title, resolved_year),
+                    ]
+                )
+                raw_results = await _search_first_non_empty(self._search_func, ordered_queries)
+            else:
+                raw_results = await self._search_func(fallback_query)
+        else:
+            raw_results = await self._search_func(fallback_query)
 
-        raw_results = await self._search_func(search_query)
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
@@ -243,3 +254,23 @@ def _build_query(title: str, year: str) -> str:
     if not cleaned_year:
         return cleaned_title
     return f"{cleaned_title} {cleaned_year}"
+
+
+async def _search_first_non_empty(search_func: SearchFunc, ordered_queries: Sequence[str]) -> Sequence[Mapping[str, Any]]:
+    for query in ordered_queries:
+        raw_results = await search_func(query)
+        if raw_results:
+            return raw_results
+    return ()
+
+
+def _unique_queries(candidates: Sequence[str]) -> list[str]:
+    ordered_queries: list[str] = []
+    for query in candidates:
+        cleaned_query = query.strip()
+        if not cleaned_query:
+            continue
+        if cleaned_query in ordered_queries:
+            continue
+        ordered_queries.append(cleaned_query)
+    return ordered_queries
