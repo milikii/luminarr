@@ -3,7 +3,7 @@
 ## Project position
 Luminarr is in early implementation, under the fixed v12 runtime profile:
 - Telegram private chat only
-- TMDB as metadata source (full flow not landed yet)
+- TMDB movie lookup baseline landed (parser-first + deterministic fallback)
 - Prowlarr as search source
 - Transmission as only downloader
 - Emby as only media server
@@ -19,8 +19,11 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 
 ## What is implemented now
 - Telegram bot minimal runtime
-- config loading for Telegram / Prowlarr / Transmission / SQLite path
+- config loading for Telegram / Prowlarr / TMDB / Transmission / SQLite path
 - Telegram text query triggers `search_media`
+- parser-first query normalization (`title + optional year`) in search path
+- minimal TMDB movie lookup client wiring
+- TMDB-first query resolution for search path, with deterministic fallback to normalized Prowlarr direct search
 - search result candidate mapping persistence (SQLite, per chat + index)
 - in-memory candidate cache remains as fast path in-process
 - numeric select -> `add_to_downloader` -> Transmission RPC
@@ -39,14 +42,14 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 - tests cover config, bot routing, search/import/refresh, and SQLite persistence baseline
 
 ## What is not implemented yet
-- TMDB-first metadata resolution + Chinese poster-card display
 - fixed v12 search plan (English title + year, original title fallback)
+- Chinese poster-card display
 - explicit approval interaction flow
 - lease/version recovery and retry path
 - watchlist workflow
 
 ## Latest verification (2026-04-02)
-- tests: `55 passed` (`.venv/bin/python -m pytest -q -s`)
+- tests: `65 passed` (`.venv/bin/python -m pytest -q -s`)
 - manual end-to-end verification in WSL test stack (Transmission + Emby) passed:
   - `status e93d696a3e980458765f8016ce39f61437cc9543` returned completed seeding state
   - `import e93d696a3e980458765f8016ce39f61437cc9543` returned deterministic import success text
@@ -56,11 +59,13 @@ Luminarr is in early implementation, under the fixed v12 runtime profile:
 ## Current priority
 Build the next smallest path:
 1. keep current search/select/add/status/import/refresh behavior stable
-2. land TMDB-first metadata resolution baseline
-3. keep parser-first and deterministic fallback behavior
+2. land fixed v12 search plan baseline (English title + year)
+3. add deterministic original-title fallback after English-title search miss
 
 ## Current risks
 - if `EMBY_BASE_URL` / `EMBY_API_KEY` is missing, import still succeeds but refresh will not run
+- if `TMDB_API_KEY` is missing, search path falls back to parser-first normalized Prowlarr direct search
+- TMDB first-hit strategy may still pick non-best metadata candidate for ambiguous titles
 - candidate mapping keeps only latest search window per chat; older windows are overwritten
 - Transmission `downloadDir + name` must map to container-visible paths
 - hardlink import has no copy fallback for cross-filesystem case
@@ -68,6 +73,7 @@ Build the next smallest path:
 - job events are append-only traces, not yet a lease/version recovery protocol
 
 ## Acceptance focus for next step
-- TMDB metadata path stays minimal and testable
+- fixed v12 search plan remains parser-first and deterministic
+- original-title fallback only runs on explicit English-title miss path
 - existing command words and routing do not regress
 - search/select/add/status/import/refresh chain remains stable

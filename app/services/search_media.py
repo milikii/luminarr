@@ -5,9 +5,11 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
+LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
@@ -22,16 +24,24 @@ class Candidate:
     indexer: str
 
 
+@dataclass(frozen=True, slots=True)
+class ParsedMovieQuery:
+    title: str
+    year: str
+
+
 class SearchMediaService:
     def __init__(
         self,
         search_func: SearchFunc,
         limit: int = 5,
         candidate_repo: CandidateMappingRepo | None = None,
+        lookup_movie_func: LookupMovieFunc | None = None,
     ) -> None:
         self._search_func = search_func
         self._limit = max(1, limit)
         self._candidate_repo = candidate_repo
+        self._lookup_movie_func = lookup_movie_func
         self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
 
     async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
@@ -39,7 +49,18 @@ class SearchMediaService:
         if not cleaned_query:
             return EMPTY_QUERY_TEXT
 
-        raw_results = await self._search_func(cleaned_query)
+        parsed_query = parse_movie_query(cleaned_query)
+        search_query = _build_query(parsed_query.title, parsed_query.year)
+        if self._lookup_movie_func is not None:
+            try:
+                tmdb_movie = await self._lookup_movie_func(parsed_query.title, parsed_query.year)
+            except Exception:
+                tmdb_movie = None
+            if tmdb_movie is not None:
+                resolved_year = tmdb_movie.year or parsed_query.year
+                search_query = _build_query(tmdb_movie.title, resolved_year)
+
+        raw_results = await self._search_func(search_query)
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
@@ -69,6 +90,31 @@ class SearchMediaService:
         if persisted_candidate is None:
             return None
         return persisted_candidate
+
+
+def parse_movie_query(query: str) -> ParsedMovieQuery:
+    cleaned_query = _normalize_spaces(query)
+    if not cleaned_query:
+        return ParsedMovieQuery(title="", year="")
+
+    matched_parentheses = re.match(
+        r"^(?P<title>.+?)\s*[\(（](?P<year>(?:19|20)\d{2})[\)）]\s*$",
+        cleaned_query,
+    )
+    if matched_parentheses is not None:
+        title = _normalize_spaces(matched_parentheses.group("title"))
+        year = matched_parentheses.group("year")
+        if title:
+            return ParsedMovieQuery(title=title, year=year)
+
+    matched_suffix = re.match(r"^(?P<title>.+?)\s+(?P<year>(?:19|20)\d{2})\s*$", cleaned_query)
+    if matched_suffix is not None:
+        title = _normalize_spaces(matched_suffix.group("title"))
+        year = matched_suffix.group("year")
+        if title:
+            return ParsedMovieQuery(title=title, year=year)
+
+    return ParsedMovieQuery(title=cleaned_query, year="")
 
 
 def normalize_candidate(item: Mapping[str, Any]) -> Candidate:
@@ -185,3 +231,15 @@ def _guess_quality_from_title(title: str) -> str:
 
 def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in item.items()}
+
+
+def _normalize_spaces(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _build_query(title: str, year: str) -> str:
+    cleaned_title = _normalize_spaces(title)
+    cleaned_year = year.strip()
+    if not cleaned_year:
+        return cleaned_title
+    return f"{cleaned_title} {cleaned_year}"

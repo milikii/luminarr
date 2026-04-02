@@ -19,6 +19,8 @@ def test_load_settings_reads_token() -> None:
     assert settings.telegram_bot_token == "token-value"
     assert settings.prowlarr_base_url == "http://prowlarr:9696"
     assert settings.prowlarr_api_key == "api-key"
+    assert settings.tmdb_base_url == "https://api.themoviedb.org"
+    assert settings.tmdb_api_key == ""
     assert settings.transmission_base_url == "http://transmission:9091"
     assert settings.transmission_username == "tr-user"
     assert settings.transmission_password == "tr-pass"
@@ -54,6 +56,21 @@ def test_load_settings_reads_emby_settings() -> None:
     )
     assert settings.emby_base_url == "http://emby:8096"
     assert settings.emby_api_key == "emby-api-key"
+
+
+def test_load_settings_reads_tmdb_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TMDB_BASE_URL": "https://tmdb.example/",
+            "TMDB_API_KEY": "tmdb-api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+        }
+    )
+    assert settings.tmdb_base_url == "https://tmdb.example"
+    assert settings.tmdb_api_key == "tmdb-api-key"
 
 
 def test_load_settings_reads_sqlite_path() -> None:

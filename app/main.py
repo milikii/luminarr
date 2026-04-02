@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
 from app.clients.prowlarr import ProwlarrClient
+from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient
 from app.config import load_settings
 from app.db.approval_repo import ApprovalRepo
@@ -28,9 +29,14 @@ def main() -> None:
         base_url=settings.prowlarr_base_url,
         api_key=settings.prowlarr_api_key,
     )
+    tmdb_lookup_movie_func = None
+    if settings.tmdb_api_key:
+        tmdb_client = TmdbClient(api_key=settings.tmdb_api_key, base_url=settings.tmdb_base_url)
+        tmdb_lookup_movie_func = tmdb_client.search_movie
     search_service = SearchMediaService(
         search_func=prowlarr_client.search,
         candidate_repo=candidate_repo,
+        lookup_movie_func=tmdb_lookup_movie_func,
     )
     transmission_client = TransmissionClient(
         base_url=settings.transmission_base_url,

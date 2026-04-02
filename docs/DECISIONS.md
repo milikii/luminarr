@@ -383,6 +383,23 @@
 
 ---
 
+## D-026 TMDB-first 元数据解析基线：parser-first 规范化 + 确定性回退
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - search 路径新增 parser-first 规范化（`title + optional year`）
+  - 在 `TMDB_API_KEY` 可用时，先进行 TMDB movie lookup，再用 TMDB 结果构造搜索词
+  - TMDB lookup 失败或空结果时，确定性回退到 parser-first 规范化后的原查询
+  - 不改 Telegram 命令词与路由，不改 add/status/import/refresh 语义
+- **原因**：
+  先把 TMDB 接入落到最小可测基线，保证搜索链路增强同时不引入复杂状态和新依赖面。
+- **影响范围**：
+  - `search_media` 查询组装与调用顺序
+  - `config` 新增可选 TMDB 配置项（默认兼容未配置）
+  - 新增 TMDB client 与对应测试
+
+---
+
 ## 附：更新规则
 
 每次要新增一条决策时，使用以下模板：

@@ -9,18 +9,24 @@ Prerequisite completed:
 - candidate mapping persistence is landed (SQLite)
 - minimal import -> refresh `job_event` persistence is landed
 - minimal import `approval_record` persistence + stale guard is landed
+- TMDB-first movie metadata baseline is landed (parser-first + deterministic fallback)
 
 ## Goal
-Add TMDB-first metadata resolution baseline for movie query.
+Land fixed v12 search plan baseline:
+- use TMDB English title + year as primary search query
+- fallback to TMDB original title (+ year) only when primary search misses
 
 ## Scope
 Only do:
-- add minimal TMDB client wiring for movie lookup
-- add parser-first query normalization (title + optional year)
-- add deterministic fallback when TMDB lookup fails or returns empty
+- keep current parser-first normalization (`title + optional year`)
+- keep TMDB-first lookup baseline already landed
+- build deterministic search order:
+  1) TMDB English title + year
+  2) TMDB original title + year (only if step 1 no candidates)
+  3) parser-first normalized original query (if TMDB unavailable/no hit)
 - keep current Telegram command words and routing unchanged
 - keep search/select/add/status/import/refresh behavior unchanged
-- add focused tests for TMDB lookup success/fallback path
+- add focused tests for search-order and fallback determinism
 
 ## Explicit constraints
 - do not add new downloader/media server support
@@ -31,16 +37,17 @@ Only do:
 - do not redesign reply format into rich card UI in this step
 
 ## Suggested implementation shape
-1. add one minimal TMDB client wrapper (search movie)
-2. normalize query to title/year and call TMDB first
-3. fallback to existing search path when TMDB is unavailable or no hit
-4. keep response deterministic and parser-first
-5. add focused tests and simple manual verification steps
+1. split search query assembly into deterministic ordered candidates
+2. execute ordered search with first-non-empty strategy
+3. keep reply format and command routing unchanged
+4. add focused tests for ordered fallback behavior
+5. add simple manual verification steps
 
 ## Done when
-- TMDB lookup path is testable and deterministic
-- empty/failure fallback path is deterministic
+- ordered search path is deterministic and testable
+- English-title miss triggers original-title fallback deterministically
+- TMDB unavailable path still deterministically falls back
 - existing Telegram command behavior does not regress
 
 ## After this step
-Move to fixed v12 search plan baseline (English title + year, original title fallback).
+Move to Chinese poster-card display baseline for movie query.
