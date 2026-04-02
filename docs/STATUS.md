@@ -1,4 +1,4 @@
-# Current status (v15)
+# Current status (v16)
 
 ## Project position
 
@@ -55,6 +55,10 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - cached selection window reset
   - pending import approval cancel
   - pending downloader approval cancel
+- clarification-stage frustration/reset short-circuit is now landed:
+  - when search enters no-result clarification pending, frustration phrases (`不对/停/重来/换一个/算了/取消`) deterministically short-circuit to reset/cancel
+  - clarification reset is handled before candidate-window reset in frustration routing
+  - downloader/import approval cancel and existing command routing remain unchanged
 - smallest persisted manual `manage_watchlist` baseline is landed:
   - `watchlist_item` persisted truth (SQLite, chat-scoped)
   - deterministic Telegram watchlist command path (`watchlist` / `想看`)
@@ -81,12 +85,12 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 - real image/media poster rendering
 - multi-process/global locking semantics
 - Telegram callback workflow routing still does not exist, although `telegram_updates` is callback-ready at schema/repo level
-- frustration/reset short-circuit currently covers selection + pending-approval paths only; no clarification-stage workflow exists yet
 
 ## Latest verification
 
-- tests: `109 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `111 passed` (`.venv/bin/python -m pytest -q`)
 - manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
+- manual verification: clarification-stage frustration/reset baseline passed (`tmp_tests` script + targeted pytest)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -94,8 +98,8 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
-3. extend frustration/reset short-circuit into a future clarification-stage workflow
-4. keep downloader/import approval behavior and current recovery behavior stable
+3. keep landed clarification-stage frustration/reset behavior stable
+4. land read-only concurrency-safe execution policy with no side-effect path regression
 
 ## Current risks
 
@@ -110,12 +114,12 @@ Build the next smallest path:
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
-- frustration/reset short-circuit does not yet cover a future clarification workflow
+- clarification-stage pending truth is currently in-process memory only and is not restart-durable
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
 
 ## Acceptance focus for the next step
 
-- land the smallest clarification-stage frustration/reset coverage baseline
+- land the smallest read-only concurrency-safe execution policy baseline
 - existing downloader/import approval and confirm routing behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
-- current search-order + poster-card + candidate mapping behavior remains stable
+- current search-order + poster-card + candidate mapping + clarification reset behavior remains stable

@@ -1,4 +1,4 @@
-# Next step (v15)
+# Next step (v16)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -35,10 +35,14 @@ Prerequisite completed:
   - same-turn one-time compact-and-retry
   - final user-safe fallback text instead of surfacing raw physical backend error
   - manual fallback verification is passed (`retry_count=2`, safe fallback text)
+- smallest clarification-stage frustration/reset coverage baseline is now landed:
+  - no-result clarification pending truth is tracked per chat in-process
+  - frustration phrases (`不对/停/重来/换一个/算了/取消`) deterministically short-circuit clarification reset
+  - existing pending downloader/import cancel routing remains stable
 
 ## Goal
 
-Land the smallest **clarification-stage frustration/reset coverage baseline**.
+Land the smallest **read-only concurrency-safe execution policy baseline**.
 
 ## Scope
 
@@ -46,9 +50,11 @@ Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
 - keep the landed downloader/import approval flows, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
-- add clarification-stage parser-level frustration detection and deterministic reset/cancel routing
-- add focused tests for clarification-stage coverage and no-regression
+- add the smallest execution policy that marks read-only paths concurrency-safe
+- ensure side-effect paths remain serialized and unchanged
+- add focused tests for concurrency-safe markers/routing and no-regression
 
 ## Explicit constraints
 
@@ -60,14 +66,15 @@ Only do:
 - do not remove existing `import <id/hash>` / `confirm <id/hash>` / `watchlist ...` command paths
 - do not change current downloader/import success/failure text bodies
 - do not regress the landed execution-hygiene baseline
+- do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
 
 ## Suggested implementation shape
 
-1. detect clarification-stage frustration phrase deterministically at parser level
-2. when clarification-stage frustration phrase is detected, short-circuit to deterministic reset/cancel path
-3. keep downloader/import success paths and text bodies stable
-4. keep current physical-failure reactive recovery behavior unchanged
+1. identify current read-only tool paths and side-effect tool paths explicitly
+2. add the smallest concurrency-safe declaration/guard only for read-only paths
+3. keep side-effect serialization path and lease/approval protocol unchanged
+4. keep current physical-failure and frustration/reset behavior unchanged
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -75,9 +82,9 @@ Only do:
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
-- clarification-stage frustration phrases no longer trigger extra LLM turns and route deterministically
+- read-only paths have explicit concurrency-safe policy without changing side-effect behavior
 
 ## After this step
 
 Re-evaluate the smallest next control-layer gap:
-- concurrency-safe execution policy for read-only tools
+- isolated explore-agent / explore-subflow for ambiguous title resolution

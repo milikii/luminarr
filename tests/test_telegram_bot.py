@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    CLARIFICATION_RESET_TEXT,
     FRUSTRATION_RESET_TEXT,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
@@ -45,6 +46,10 @@ async def _fake_search(query: str) -> list[dict[str, object]]:
             "downloadUrl": "https://example.com/sample.torrent",
         }
     ]
+
+
+async def _fake_search_empty(_: str) -> list[dict[str, object]]:
+    return []
 
 
 def _build_update(
@@ -579,6 +584,55 @@ def test_handle_message_frustration_clears_candidates() -> None:
 
     reply_text.assert_awaited_once_with(FRUSTRATION_RESET_TEXT)
     assert search_service.get_cached_candidate(1001, 1) is None
+
+
+def test_handle_message_frustration_resets_pending_clarification() -> None:
+    update, reply_text = _build_update("重来")
+    search_service = SearchMediaService(_fake_search_empty)
+    _run(search_service.search_and_format("unknown", chat_id=1001))
+    assert search_service.is_clarification_pending(1001)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(CLARIFICATION_RESET_TEXT)
+    assert not search_service.is_clarification_pending(1001)
+
+
+def test_handle_message_frustration_without_state_still_routes_to_search() -> None:
+    update, reply_text = _build_update("算了")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "搜索结果：算了" in sent_text
 
 
 def test_handle_message_frustration_cancels_pending_import(tmp_path: Path) -> None:

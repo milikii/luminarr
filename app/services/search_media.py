@@ -43,6 +43,7 @@ class SearchMediaService:
         self._candidate_repo = candidate_repo
         self._lookup_movie_func = lookup_movie_func
         self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
+        self._clarification_pending_by_chat: dict[int, str] = {}
 
     async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
         cleaned_query = query.strip()
@@ -76,6 +77,10 @@ class SearchMediaService:
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
+            if selected_raw_results:
+                self._clarification_pending_by_chat.pop(chat_id, None)
+            else:
+                self._clarification_pending_by_chat[chat_id] = cleaned_query
             if self._candidate_repo is not None:
                 try:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
@@ -118,6 +123,7 @@ class SearchMediaService:
         if chat_id in self._recent_candidates_by_chat:
             self._recent_candidates_by_chat.pop(chat_id, None)
             cleared = True
+        self._clarification_pending_by_chat.pop(chat_id, None)
 
         if self._candidate_repo is None:
             return cleared
@@ -125,6 +131,19 @@ class SearchMediaService:
             return self._candidate_repo.clear_candidates(chat_id) or cleared
         except Exception:
             return cleared
+
+    def is_clarification_pending(self, chat_id: int) -> bool:
+        if chat_id <= 0:
+            return False
+        return chat_id in self._clarification_pending_by_chat
+
+    def clear_clarification_pending(self, chat_id: int) -> bool:
+        if chat_id <= 0:
+            return False
+        if chat_id in self._clarification_pending_by_chat:
+            self._clarification_pending_by_chat.pop(chat_id, None)
+            return True
+        return False
 
 
 def parse_movie_query(query: str) -> ParsedMovieQuery:
