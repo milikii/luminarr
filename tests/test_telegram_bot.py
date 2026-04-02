@@ -13,6 +13,7 @@ from app.bot.telegram_bot import (
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     JOB_REPO_KEY,
+    MANAGE_WATCHLIST_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_UPDATE_REPO_KEY,
@@ -24,9 +25,11 @@ from app.db.approval_repo import ApprovalRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.db.watchlist_repo import WatchlistRepo
 from app.services.add_to_downloader import ADD_CANCELLED_TEXT, AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
+from app.services.manage_watchlist import ManageWatchlistService
 from app.services.search_media import SearchMediaService
 
 
@@ -260,6 +263,53 @@ def test_handle_message_import_replies_service_not_ready() -> None:
                 SEARCH_SERVICE_KEY: search_service,
                 ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
                 GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+
+
+def test_handle_message_watchlist_routes_to_watchlist_service(tmp_path: Path) -> None:
+    update, reply_text = _build_update("watchlist add dune 2021")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    watchlist_service = ManageWatchlistService(WatchlistRepo(_make_database(tmp_path)))
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                MANAGE_WATCHLIST_SERVICE_KEY: watchlist_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "已加入想看" in sent_text
+    assert "dune" in sent_text
+
+
+def test_handle_message_watchlist_replies_service_not_ready() -> None:
+    update, reply_text = _build_update("watchlist list")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
             }
         )
     )
@@ -564,6 +614,9 @@ def test_build_application_registers_services() -> None:
     add_service = AddToDownloaderService(search_service, AsyncMock())
     status_service = GetDownloadStatusService(AsyncMock())
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    watchlist_db = SqliteDatabase(":memory:")
+    watchlist_db.initialize()
+    watchlist_service = ManageWatchlistService(WatchlistRepo(watchlist_db))
     database = SqliteDatabase(":memory:")
     database.initialize()
     job_repo = JobRepo(database)
@@ -573,14 +626,22 @@ def test_build_application_registers_services() -> None:
         add_service,
         status_service,
         import_service,
+        watchlist_service,
         job_repo=job_repo,
     )
     assert application.bot_data[SEARCH_SERVICE_KEY] is search_service
     assert application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] is add_service
     assert application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] is status_service
     assert application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] is import_service
+    assert application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] is watchlist_service
     assert application.bot_data[JOB_REPO_KEY] is job_repo
 
 
 def _run(coroutine: Awaitable[str]) -> str:
     return asyncio.run(coroutine)
+
+
+def _make_database(tmp_path: Path) -> SqliteDatabase:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    return database

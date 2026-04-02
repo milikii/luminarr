@@ -12,9 +12,11 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.db.watchlist_repo import WatchlistRepo
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
+from app.services.manage_watchlist import ManageWatchlistService
 from app.services.refresh_media_server import RefreshMediaServerService
 from app.services.search_media import SearchMediaService
 
@@ -28,6 +30,7 @@ def main() -> None:
     job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
     telegram_update_repo = TelegramUpdateRepo(database)
+    watchlist_repo = WatchlistRepo(database)
 
     prowlarr_client = ProwlarrClient(
         base_url=settings.prowlarr_base_url,
@@ -68,12 +71,14 @@ def main() -> None:
         approval_repo=approval_repo,
         job_repo=job_repo,
     )
+    manage_watchlist_service = ManageWatchlistService(watchlist_repo)
     application = build_application(
         settings.telegram_bot_token,
         search_service,
         add_to_downloader_service,
         get_download_status_service,
         import_to_library_service,
+        manage_watchlist_service,
         telegram_update_repo=telegram_update_repo,
         job_repo=job_repo,
     )

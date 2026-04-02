@@ -302,6 +302,18 @@
 - **原因**：
   downloader dispatch 同样属于副作用路径，必须与 import approval 保持一致的执行边界和重放纪律。
 
+## D-029 watchlist 最小手动基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-02
+- **结论**：
+  - `manage_watchlist` 在当前阶段以最小手动基线落地：
+    - SQLite 持久化真相（`watchlist_item`）
+    - Telegram `watchlist` / `想看` 的 add/list/remove/clear
+  - watchlist 在当前主线不得触发 downloader/import side effects
+  - watchlist 不引入 auto-download，不引入 scheduler
+- **原因**：
+  先补齐最小业务面闭环，同时保持副作用边界与执行卫生稳定。
+
 ---
 
 ## 附：更新模板

@@ -5,6 +5,7 @@ from app.db.candidate_repo import CandidateMappingRepo
 from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.db.watchlist_repo import WatchlistItem, WatchlistRepo
 
 __all__ = [
     "CandidateMappingRepo",
@@ -14,4 +15,6 @@ __all__ = [
     "JobRepo",
     "SqliteDatabase",
     "TelegramUpdateRepo",
+    "WatchlistItem",
+    "WatchlistRepo",
 ]

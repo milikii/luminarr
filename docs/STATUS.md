@@ -55,6 +55,11 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - cached selection window reset
   - pending import approval cancel
   - pending downloader approval cancel
+- smallest persisted manual `manage_watchlist` baseline is landed:
+  - `watchlist_item` persisted truth (SQLite, chat-scoped)
+  - deterministic Telegram watchlist command path (`watchlist` / `想看`)
+  - manual add/list/remove/clear only
+  - no downloader/import side effects from watchlist actions
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## What is adopted as a v15 rule, but not implemented yet
@@ -67,7 +72,6 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 
 - approval expiry / timeout policy
 - copy fallback approval for import
-- watchlist workflow
 - scheduler / retry baseline for pending tasks
 - real image/media poster rendering
 - multi-process/global locking semantics
@@ -76,16 +80,16 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 
 ## Latest verification
 
-- tests: `97 passed` (`.venv/bin/python -m pytest -q`)
-- manual end-to-end verification for the execution-hygiene baseline was **not** re-run in the latest iteration
+- tests: `104 passed` (`.venv/bin/python -m pytest -q`)
+- manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
 
 Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
-2. return to watchlist baseline as the next smallest business feature
-3. keep downloader/import approval behavior stable
-4. keep search-order + poster-card behavior stable
+2. keep manual watchlist baseline behavior stable
+3. land approval expiry / timeout policy as the next smallest control-layer gap
+4. keep downloader/import approval behavior stable
 
 ## Current risks
 
@@ -103,10 +107,11 @@ Build the next smallest path:
 - approval pending still has no expiry / timeout policy
 - no reactive compact / same-turn retry for LLM physical failures yet
 - frustration/reset short-circuit does not yet cover a future clarification workflow
+- watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
 
 ## Acceptance focus for the next step
 
-- land the smallest persisted watchlist baseline without auto-download side effects
+- land the smallest approval expiry / timeout policy baseline
 - existing downloader/import approval and confirm routing behavior does not regress
-- existing `search/select/status/import/confirm/refresh` behavior does not regress
+- existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping behavior remains stable

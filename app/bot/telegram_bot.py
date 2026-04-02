@@ -18,6 +18,7 @@ from app.services.import_to_library import (
     parse_confirm_query,
     parse_import_query,
 )
+from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
 from app.services.search_media import SearchMediaService
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
@@ -26,6 +27,7 @@ SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
 IMPORT_TO_LIBRARY_SERVICE_KEY = "import_to_library_service"
+MANAGE_WATCHLIST_SERVICE_KEY = "manage_watchlist_service"
 JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 
@@ -101,6 +103,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await message.reply_text(SERVICE_NOT_READY_TEXT)
             return
         reply = await status_service.get_status_text(task_ref)
+        await message.reply_text(reply)
+        return
+
+    watchlist_command = parse_watchlist_query(query)
+    if watchlist_command is not None:
+        watchlist_service = context.application.bot_data.get(MANAGE_WATCHLIST_SERVICE_KEY)
+        if not isinstance(watchlist_service, ManageWatchlistService):
+            await message.reply_text(SERVICE_NOT_READY_TEXT)
+            return
+        reply = watchlist_service.handle(
+            watchlist_command,
+            chat_id=chat.id if chat is not None else None,
+        )
         await message.reply_text(reply)
         return
 
@@ -211,6 +226,7 @@ def build_application(
     add_to_downloader_service: AddToDownloaderService,
     get_download_status_service: GetDownloadStatusService,
     import_to_library_service: ImportToLibraryService,
+    manage_watchlist_service: ManageWatchlistService,
     telegram_update_repo: TelegramUpdateRepo | None = None,
     job_repo: JobRepo | None = None,
 ) -> Application:
@@ -219,6 +235,7 @@ def build_application(
     application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
     application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
+    application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
     if telegram_update_repo is not None:
         application.bot_data[TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
     if job_repo is not None:
