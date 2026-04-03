@@ -11,7 +11,10 @@ from telegram.ext import CallbackQueryHandler
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
-    BT_DIRECT_INTENT_TEXT,
+    BT_CLASSIFICATION_CANCELLED_TEXT,
+    BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
+    BT_CLASSIFICATION_PROMPT_TEXT,
+    BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE,
     CLARIFICATION_SELECTION_BLOCKED_TEXT,
     CLARIFICATION_RESET_TEXT,
     FRUSTRATION_RESET_TEXT,
@@ -144,7 +147,7 @@ def test_handle_message_magnet_routes_to_bt_direct_split() -> None:
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_awaited_once_with(BT_DIRECT_INTENT_TEXT)
+    reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -168,7 +171,88 @@ def test_handle_message_explicit_bt_text_routes_to_bt_direct_split() -> None:
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_awaited_once_with(BT_DIRECT_INTENT_TEXT)
+    reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_classification_reply_when_pending() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text = _build_update("movie", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(follow_up_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(
+        BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label="电影", kind="movie")
+    )
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_classification_cancel_when_pending() -> None:
+    update, first_reply_text = _build_update("下载这个 BT")
+    cancel_update, second_reply_text = _build_update("取消", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(cancel_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_CANCELLED_TEXT)
+
+
+def test_handle_message_bt_classification_pending_returns_reminder_for_plain_text() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text = _build_update("沙丘", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(follow_up_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -317,7 +401,37 @@ def test_handle_callback_query_magnet_routes_to_bt_direct_split() -> None:
     asyncio.run(handle_callback_query(update, context))
 
     answer.assert_awaited_once()
-    reply_text.assert_awaited_once_with(BT_DIRECT_INTENT_TEXT)
+    reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+
+
+def test_handle_callback_query_bt_classification_reply_when_pending() -> None:
+    update, first_reply_text, first_answer = _build_callback_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text, second_answer = _build_callback_update("raw_bt", callback_query_id="cb-2")
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+    asyncio.run(handle_callback_query(follow_up_update, context))
+
+    first_answer.assert_awaited_once()
+    second_answer.assert_awaited_once()
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(
+        BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label="其他 BT 资源", kind="raw_bt")
+    )
     search_service.search_and_format.assert_not_awaited()
 
 

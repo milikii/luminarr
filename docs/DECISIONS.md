@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v27)
+# docs/DECISIONS.md (v28)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -670,6 +670,32 @@
   - 当前 next smallest path 前进到 BT classification follow-up baseline
 - **原因**：
   先把“正常观影需求”和“直接 BT 下载需求”在入口层硬分开，后面再补 BT 分类和后半段时，代码边界才不会继续混在一起。
+- **验证**：
+  已通过 focused pytest（`tests/test_telegram_bot.py`）与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-053 BT classification follow-up 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 在已落地的 BT-direct parser/routing 入口之后，系统现在已补上最小 deterministic 分类 follow-up
+  - 当用户发送原始 `magnet:?` 或明确 `下载这个 BT / 下载这个磁力` 一类文本时，Telegram text/callback 路径必须先进入分类询问：
+    - `movie`
+    - `series`
+    - `anime`
+    - `raw_bt`
+  - 当当前 chat 处于 BT 分类 pending 时：
+    - 合法分类回复必须返回确定性的分类结果文本
+    - 普通非分类文本不得落回普通电影搜索路径，而是返回固定提醒文本
+    - `不对/停/重来/换一个/算了/取消` 一类短路词可直接取消当前 BT 分类 pending
+  - 该步严格保持 follow-up-only：
+    - 不创建新的持久化 BT workflow 协议
+    - 不发起 downloader side effects
+    - 不做 TMDB association follow-up
+    - 不做 `raw_bt` 目录选择
+    - 不引入 downloader-role binding
+  - 当前 next smallest path 前进到 movie / series / anime BT TMDB association follow-up baseline
+- **原因**：
+  先把“直接 BT 下载需求已经识别出来之后，系统下一句该问什么”补成确定性路径，避免入口层又退回到占位提示或误入普通搜片主干；同时继续保持最小边界，不把这一步扩成完整 BT workflow。
 - **验证**：
   已通过 focused pytest（`tests/test_telegram_bot.py`）与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 

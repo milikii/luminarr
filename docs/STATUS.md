@@ -1,4 +1,4 @@
-# Current status (v28)
+# Current status (v29)
 
 ## Project position
 
@@ -141,8 +141,14 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - existing Telegram command words and approval / ownership / replay boundaries remain unchanged
 - smallest PT / BT parser-level intent split baseline is now landed:
   - Telegram text/callback routing now deterministically splits normal movie-search demand and direct BT / magnet demand at the existing parser/entry layer
-  - raw `magnet:?` links and explicit `下载这个 BT / 下载这个磁力` style text now return a deterministic BT-direct routing reply instead of falling into the normal movie search path
-  - current step remains parser/routing-only; it does not dispatch downloader side effects, does not add BT classification follow-up, and does not introduce downloader-role binding
+  - raw `magnet:?` links and explicit `下载这个 BT / 下载这个磁力` style text now return a deterministic BT-direct routing prompt instead of falling into the normal movie search path
+  - current step remains parser/routing-only; it does not dispatch downloader side effects and does not introduce downloader-role binding
+  - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
+- smallest BT classification follow-up baseline is now landed:
+  - after BT-direct routing, Telegram text/callback path now deterministically asks the user to classify the request as `movie` / `series` / `anime` / `raw_bt`
+  - while BT classification is pending, valid classification replies deterministically return classification-result text; plain non-classification text returns a reminder instead of falling into the normal movie search path
+  - frustration/cancel phrases now clear the current BT classification pending state without affecting downloader/import approval flows
+  - current step remains follow-up-only: it does not persist a new BT workflow truth, does not dispatch downloader side effects, does not do TMDB association, and does not do raw BT destination selection
   - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
@@ -171,8 +177,9 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- BT classification follow-up:
+- movie / series / anime BT TMDB association follow-up:
   - movie / series / anime magnets should do TMDB association first, then reuse naming / metadata scrape / poster / subtitle / refresh after download completes
+- `raw_bt` destination-directory follow-up:
   - `raw_bt` should skip TMDB; the system should present preconfigured destination-directory options during dispatch inquiry, persist the user's choice, and move files into that selected directory only
 - downloader-role binding (`pt_downloader` / `bt_downloader`) with multiple downloader instances:
   - later protocol set is Transmission + qBittorrent
@@ -205,8 +212,9 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - manual verification: clarification-stage frustration/reset baseline passed (`tmp_tests` script + targeted pytest)
 - manual verification: ambiguous read-only exploration baseline passed (temporary `tmp_tests` script + targeted pytest)
 - manual verification: restart-durable clarification pending truth baseline passed (temporary `tmp_tests/verify_clarification_persistence.py`, script cleaned after run)
-- focused tests: `35 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
+- focused tests: `39 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
 - manual verification: PT / BT parser-level intent split baseline passed (temporary `tmp_tests/verify_pt_bt_parser_split_baseline.py`, script cleaned after run)
+- manual verification: BT classification follow-up baseline passed (temporary `tmp_tests/verify_bt_classification_followup.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -215,8 +223,8 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep landed watchlist media-kind behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. keep landed resource auto-selection rules + filename normalization / rename + metadata scraping + subtitle auto-translation baselines stable
-5. land the smallest BT classification follow-up baseline without introducing downloader-role binding or scheduler/platformization
+4. keep landed BT classification follow-up baseline stable
+5. land the smallest movie / series / anime BT TMDB association follow-up baseline without introducing `raw_bt` destination selection, downloader-role binding, or scheduler/platformization
 
 ## Current risks
 
@@ -242,16 +250,18 @@ Build the next smallest path:
 - watchlist kind is currently user-declared (`movie` / `series` / `anime`); no automatic kind inference or fuzzy correction is introduced in this baseline
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
 - current BT-direct intent split baseline is intentionally narrow; only raw magnet links and a small set of explicit “下载这个 BT / 磁力” phrases are recognized
-- direct BT / magnet demand currently stops at deterministic routing text; BT classification, TMDB follow-up, destination selection, and dispatch are not landed yet
+- BT classification follow-up currently keeps only the smallest in-memory chat-scoped pending state; process restart will clear that pending classification by design in this baseline
+- direct BT / magnet demand now reaches deterministic classification follow-up, but TMDB follow-up, destination selection, and dispatch are not landed yet
 
 ## Acceptance focus for the next step
 
-- land the smallest BT classification follow-up baseline without changing existing text-command behavior
+- land the smallest movie / series / anime BT TMDB association follow-up baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
 - keep the landed metadata scraping (`TMDB + Fanart.tv`) baseline stable
 - keep the landed subtitle auto-translation baseline stable
+- keep the landed BT classification follow-up baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
@@ -262,3 +272,4 @@ Build the next smallest path:
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable
 - current ambiguous read-only exploration + numeric-select blocking behavior remains stable
 - landed PT / BT parser-level intent split baseline remains deterministic and does not bypass existing side-effect boundaries
+- landed BT classification follow-up remains deterministic and does not bypass existing side-effect boundaries

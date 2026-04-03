@@ -1,4 +1,4 @@
-# Next step (v28)
+# Next step (v29)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -106,13 +106,19 @@ Prerequisite completed:
   - focused tests + manual verification passed
 - smallest PT / BT parser-level intent split baseline is now landed:
   - existing Telegram parser / routing entry now deterministically splits normal movie-search demand and direct BT / magnet demand
-  - raw `magnet:?` links and explicit `下载这个 BT / 下载这个磁力` style text now return a deterministic BT-direct routing reply
+  - raw `magnet:?` links and explicit `下载这个 BT / 下载这个磁力` style text now return a deterministic BT-direct routing prompt
   - current step stays parser/routing-only and does not dispatch new downloader side effects
+  - focused tests + manual verification passed
+- smallest BT classification follow-up baseline is now landed:
+  - after BT-direct routing, Telegram text/callback path now deterministically asks the user to classify the request as `movie` / `series` / `anime` / `raw_bt`
+  - valid classification replies now return deterministic classification-result text; plain non-classification text returns a reminder instead of falling into the normal movie search path
+  - frustration/cancel phrases clear the current BT classification pending state without affecting downloader/import approval flows
+  - current step remains follow-up-only and does not add TMDB association, downloader dispatch, raw BT directory selection, downloader-role binding, or a new persisted BT workflow protocol
   - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **BT classification follow-up baseline**.
+Land the smallest **movie / series / anime BT TMDB association follow-up baseline**.
 
 ## Scope
 
@@ -125,13 +131,16 @@ Only do:
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
 - keep the landed PT / BT parser-level intent split baseline unchanged
-- add only the smallest deterministic BT classification follow-up after BT-direct routing:
+- keep the landed BT classification follow-up baseline unchanged
+- add only the smallest deterministic TMDB association follow-up for BT requests already classified as:
   - `movie`
   - `series`
   - `anime`
-  - `raw_bt`
-- keep this step focused on classification follow-up only; do not yet add downloader-role binding, qBittorrent, TMDB association follow-up, BT dispatch, or raw BT directory selection
-- add focused tests/manual verification for BT classification follow-up and no-regression
+- when TMDB can map the classified BT request, make that association visible in deterministic text/result handling without dispatching downloader side effects in this step
+- when TMDB cannot reliably map the classified BT request, return deterministic clarification text and keep the flow side-effect free
+- keep `raw_bt` out of scope for this step; do not yet add raw BT destination-directory selection
+- keep this step focused on TMDB association follow-up only; do not yet add downloader-role binding, qBittorrent, BT dispatch, or raw BT directory selection
+- add focused tests/manual verification for BT TMDB association follow-up and no-regression
 
 ## Explicit constraints
 
@@ -147,14 +156,16 @@ Only do:
 - do not introduce qBittorrent or multiple downloader instances in this step
 - do not introduce a generic tracking platform or user-configurable rule engine in this step
 - do not bypass the landed parser-level PT / BT split with ad-hoc late-stage branching
+- do not pull `raw_bt` into TMDB association in this step
 
 ## Suggested implementation shape
 
-1. reuse the landed BT-direct routing entry and add the smallest deterministic classification follow-up for direct BT / magnet demand
+1. reuse the landed BT-direct routing + classification follow-up and add the smallest deterministic TMDB association step for `movie / series / anime`
 2. keep normal movie/search/watchlist/status/import/confirm command behavior fully backward compatible
-3. make the classification visible in deterministic routing/result text without dispatching new downloader side effects in this step
-4. keep current manual status/watchlist/import paths fully backward compatible
-5. add focused tests and manual verification steps for BT classification follow-up and no-regression
+3. make the TMDB association result visible in deterministic text/result handling without dispatching new downloader side effects in this step
+4. keep `raw_bt` on the existing classification-only path for now
+5. keep current manual status/watchlist/import paths fully backward compatible
+6. add focused tests and manual verification steps for BT TMDB association follow-up and no-regression
 
 ## Done when
 
@@ -166,16 +177,16 @@ Only do:
 - landed watchlist media-kind behavior remains deterministic, persistence-backed, and side-effect free
 - landed downloader completion truth, post-download auto import, resource auto-selection, filename normalization, metadata scraping, and subtitle auto-translation baselines remain stable
 - landed PT / BT parser-level split baseline remains deterministic and does not bypass existing side-effect boundaries
-- BT-direct classification follow-up is deterministic and does not dispatch downloader side effects in this step
+- landed BT classification follow-up remains deterministic and does not dispatch downloader side effects in this step
+- BT `movie / series / anime` TMDB association follow-up is deterministic and remains side-effect free in this step
+- `raw_bt` remains on the existing classification-only path and does not accidentally enter TMDB association in this step
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After BT classification follow-up baseline is stable, advance in this order (still one small goal at a time):
+After BT `movie / series / anime` TMDB association follow-up baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
-   - movie / series / anime BT TMDB association follow-up:
-     - movie / series / anime magnets do TMDB association first, then reuse naming / metadata / poster / subtitle / refresh after download completes
    - `raw_bt` destination-directory follow-up:
      - `raw_bt` presents preconfigured destination-directory options during dispatch inquiry, persists the user's choice, and transfers files into that selected directory only
    - downloader-role binding (`pt_downloader` / `bt_downloader`; multiple downloader instances allowed, qBittorrent protocol later)

@@ -40,10 +40,19 @@ from app.services.search_media import SearchMediaService
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
 CLARIFICATION_SELECTION_BLOCKED_TEXT = "当前处于片名澄清中，请先补充片名或年份后再搜索。"
-BT_DIRECT_INTENT_TEXT = (
+BT_CLASSIFICATION_PROMPT_TEXT = (
     "已识别为直接 BT/磁力下载需求。\n"
-    "当前只完成 PT / BT 入口分流基线，暂未接入 BT 主干后半段。\n"
-    "请暂时继续使用正常片名搜索；后续步骤会再补 BT 分类与投递。"
+    "请回复以下分类之一：movie / series / anime / raw_bt\n"
+    "对应含义：电影 / 剧集 / 动漫 / 其他 BT 资源"
+)
+BT_CLASSIFICATION_CANCELLED_TEXT = "已取消当前 BT 分类，请重新发送磁力或 BT 指令。"
+BT_CLASSIFICATION_PENDING_REMINDER_TEXT = (
+    "当前正在等待 BT 分类。\n"
+    "请回复：movie / series / anime / raw_bt"
+)
+BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE = (
+    "已记录本次 BT 分类：{label}（{kind}）。\n"
+    "当前这一步只完成分类 follow-up，暂不执行 TMDB 关联、下载投递或目录选择。"
 )
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
@@ -55,7 +64,33 @@ MANAGE_WATCHLIST_SERVICE_KEY = "manage_watchlist_service"
 JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
+BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
 T = TypeVar("T")
+
+BT_CLASSIFICATION_ALIASES = {
+    "movie": "movie",
+    "film": "movie",
+    "电影": "movie",
+    "series": "series",
+    "tv": "series",
+    "show": "series",
+    "电视剧": "series",
+    "剧集": "series",
+    "anime": "anime",
+    "动漫": "anime",
+    "动画": "anime",
+    "raw_bt": "raw_bt",
+    "rawbt": "raw_bt",
+    "raw": "raw_bt",
+    "其他bt资源": "raw_bt",
+    "其他bt": "raw_bt",
+}
+BT_CLASSIFICATION_LABELS = {
+    "movie": "电影",
+    "series": "剧集",
+    "anime": "动漫",
+    "raw_bt": "其他 BT 资源",
+}
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -277,6 +312,61 @@ def _record_callback_update(
     )
 
 
+def _resolve_bt_classification_pending_by_chat(context: ContextTypes.DEFAULT_TYPE) -> dict[int, str]:
+    pending_by_chat = context.application.bot_data.get(BT_CLASSIFICATION_PENDING_BY_CHAT_KEY)
+    if isinstance(pending_by_chat, dict):
+        return pending_by_chat
+    resolved_pending_by_chat: dict[int, str] = {}
+    context.application.bot_data[BT_CLASSIFICATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
+    return resolved_pending_by_chat
+
+
+def _set_bt_classification_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    query: str,
+) -> None:
+    if chat_id is None or chat_id <= 0:
+        return
+    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
+    pending_by_chat[chat_id] = query.strip()
+
+
+def _is_bt_classification_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> bool:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
+    return chat_id in pending_by_chat
+
+
+def _clear_bt_classification_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> bool:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
+    return pending_by_chat.pop(chat_id, None) is not None
+
+
+def _parse_bt_classification_choice(text: str) -> str | None:
+    normalized_text = re.sub(r"\s+", "", text.strip()).lower()
+    if not normalized_text:
+        return None
+    return BT_CLASSIFICATION_ALIASES.get(normalized_text)
+
+
+def _format_bt_classification_result(media_kind: str) -> str:
+    label = BT_CLASSIFICATION_LABELS.get(media_kind, BT_CLASSIFICATION_LABELS["raw_bt"])
+    return BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label=label, kind=media_kind)
+
+
 async def _handle_query_text(
     *,
     query: str,
@@ -357,9 +447,23 @@ async def _handle_query_text(
             ):
                 await reply_func(FRUSTRATION_RESET_TEXT)
                 return
+        if _clear_bt_classification_pending(context=context, chat_id=chat_id):
+            await reply_func(BT_CLASSIFICATION_CANCELLED_TEXT)
+            return
 
     if _is_bt_direct_intent(query):
-        await reply_func(BT_DIRECT_INTENT_TEXT)
+        _set_bt_classification_pending(
+            context=context,
+            chat_id=chat_id,
+            query=query,
+        )
+        await reply_func(BT_CLASSIFICATION_PROMPT_TEXT)
+        return
+
+    bt_classification = _parse_bt_classification_choice(query)
+    if bt_classification is not None and _is_bt_classification_pending(context=context, chat_id=chat_id):
+        _clear_bt_classification_pending(context=context, chat_id=chat_id)
+        await reply_func(_format_bt_classification_result(bt_classification))
         return
 
     task_ref = parse_status_query(query)
@@ -513,6 +617,10 @@ async def _handle_query_text(
     search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
     if not isinstance(search_service, SearchMediaService):
         await reply_func(SERVICE_NOT_READY_TEXT)
+        return
+
+    if _is_bt_classification_pending(context=context, chat_id=chat_id):
+        await reply_func(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
         return
 
     reply = await execution_gate.run(
