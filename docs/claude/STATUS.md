@@ -1,4 +1,4 @@
-# Current status (v19)
+# Current status (v18)
 
 ## Project position
 
@@ -80,12 +80,47 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - in search read-path, highly ambiguous no-year queries deterministically return clarification text with read-only options
   - ambiguous clarification path does not persist candidate mapping and does not dispatch downloader/import side effects
   - during clarification pending, numeric select is deterministically blocked to avoid side-effect misrouting
-- smallest restart-durable clarification pending truth baseline is now landed:
-  - clarification pending truth is persisted in SQLite (`clarification_state`, chat-scoped)
-  - search no-result / ambiguous clarification set + success/reset clear now synchronizes in-memory fast path and persisted truth
-  - numeric-select blocking and frustration clarification reset remain deterministic after process restart
-  - existing Telegram command words and existing downloader/import success-failure text bodies remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
+
+## Local integration test stack (WSL Docker)
+
+The following services run in WSL Docker for local integration testing:
+
+| Service | Role | Default endpoint |
+|---|---|---|
+| Transmission | downloader test instance | `http://localhost:9091` (RPC path `/transmission/rpc`) |
+| Emby | media server test instance | `http://localhost:8096` |
+
+Path layout inside WSL (must be same filesystem for hardlink):
+```
+/srv/luminarr-test/
+├── downloads/tr/       ← Transmission download dir (mapped into container)
+└── library/movies/     ← Emby library dir (mapped into container)
+```
+
+Container-internal view (matches app config):
+```
+/data/downloads/tr      ← Transmission sees this
+/data/library/movies    ← Emby sees this
+```
+
+When to use the local test stack:
+- any task touching `import_to_library` (hardlink execution)
+- any task touching `refresh_media_server` (Emby API call)
+- any task touching `add_to_downloader` end-to-end (Transmission RPC)
+- do NOT rely on mocks for these paths; the local stack is the verification baseline
+
+Verify test stack is up before running integration scripts:
+```bash
+curl -s http://localhost:9091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
+curl -s http://localhost:8096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"
+```
+
+Actual credentials and volume paths are in `docs/TEST_ENV.md`.
+
+## WeChat channel adapter
+
+WeChat接入已完成架构决策（D-035），当前**不排入开发计划**。待主线控制层稳定后再启动。
 
 ## What is adopted as a v15 rule, but not implemented yet
 
@@ -93,20 +128,41 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 
 ## What is not implemented yet
 
-- copy fallback approval for import
+**控制层（近期）：**
+- copy fallback approval for import（跨文件系统场景）
 - scheduler / retry baseline for pending tasks
-- real image/media poster rendering
+- real image/media poster rendering（当前为文字卡片）
 - multi-process/global locking semantics
-- Telegram callback workflow routing still does not exist, although `telegram_updates` is callback-ready at schema/repo level
+- Telegram callback workflow routing（`telegram_updates` schema 已就绪）
+
+**阶段 B：自动化闭环（D-037 / D-041 / D-042）：**
+- 下载完成后自动入库（D-037，取消手动 import confirm）
+- 文件规范化重命名（D-042，按 Emby/Jellyfin/Plex 规格）
+- TMDB + Fanart.tv 刮削（D-042，.nfo + 图片）
+- 字幕自动翻译（D-041，ffmpeg 提取 + AI 翻译 → .zh.srt）
+- 资源选择规则化（D-038 前置，分辨率/字幕/做种数自动选优）
+
+**阶段 C：追更与多内容类型（D-038 / D-039）：**
+- 剧集 / 动漫追更（D-038，watchlist 驱动，scheduler 轮询，全链路通知）
+- qBittorrent 接入（D-039，BT 专用下载器，PT/BT 路由分离）
+
+**阶段 D：渠道扩展（D-040）：**
+- 飞书 Bot（优先，官方 Webhook）
+- 企业微信 Bot（官方 Webhook）
+- 个人微信（D-035，iLink 长轮询）
+
+**阶段 E：运维自动化（D-043）：**
+- 下载器资源与库文件关联监控（D-043）
+- 库文件删除 → 自动清理下载器任务（BT 即时，PT 按做种策略）
+- 孤儿任务定期收敛清理（D-043）
 
 ## Latest verification
 
-- tests: `117 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `113 passed` (`.venv/bin/python -m pytest -q`)
 - manual verification: read-only concurrency-safe execution policy baseline passed (`tmp_tests/verify_execution_policy_baseline.py`)
 - manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
 - manual verification: clarification-stage frustration/reset baseline passed (`tmp_tests` script + targeted pytest)
 - manual verification: ambiguous read-only exploration baseline passed (temporary `tmp_tests` script + targeted pytest)
-- manual verification: restart-durable clarification pending truth baseline passed (temporary `tmp_tests/verify_clarification_persistence.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -115,7 +171,7 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. land the smallest Telegram callback workflow routing baseline
+4. land the smallest restart-durable clarification pending truth baseline
 
 ## Current risks
 
@@ -130,13 +186,13 @@ Build the next smallest path:
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
+- clarification-stage pending truth is currently in-process memory only and is not restart-durable
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
-- Telegram callback workflow routing is still missing in the current bot runtime
 
 ## Acceptance focus for the next step
 
-- land the smallest Telegram callback workflow routing baseline without changing existing text-command behavior
+- land the smallest restart-durable clarification pending truth baseline
 - existing downloader/import approval and confirm routing behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable

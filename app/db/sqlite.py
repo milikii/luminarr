@@ -69,6 +69,13 @@ SCHEMA_STATEMENTS = (
     """,
     "CREATE INDEX IF NOT EXISTS idx_watchlist_item_chat_id ON watchlist_item(chat_id)",
     """
+    CREATE TABLE IF NOT EXISTS clarification_state (
+        chat_id INTEGER PRIMARY KEY,
+        query TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS jobs (
         job_id TEXT PRIMARY KEY,
         chat_id INTEGER NOT NULL DEFAULT 0,

@@ -7,6 +7,7 @@ from typing import Any
 
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
+from app.db.clarification_repo import ClarificationRepo
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
@@ -53,11 +54,13 @@ class SearchMediaService:
         search_func: SearchFunc,
         limit: int = 5,
         candidate_repo: CandidateMappingRepo | None = None,
+        clarification_repo: ClarificationRepo | None = None,
         lookup_movie_func: LookupMovieFunc | None = None,
     ) -> None:
         self._search_func = search_func
         self._limit = max(1, limit)
         self._candidate_repo = candidate_repo
+        self._clarification_repo = clarification_repo
         self._lookup_movie_func = lookup_movie_func
         self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
         self._clarification_pending_by_chat: dict[int, str] = {}
@@ -98,16 +101,16 @@ class SearchMediaService:
         )
         if ambiguous_text is not None:
             if chat_id is not None:
-                self._clarification_pending_by_chat[chat_id] = cleaned_query
+                self._set_clarification_pending(chat_id=chat_id, query=cleaned_query)
             return ambiguous_text
 
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
             if selected_raw_results:
-                self._clarification_pending_by_chat.pop(chat_id, None)
+                self._clear_clarification_pending(chat_id=chat_id)
             else:
-                self._clarification_pending_by_chat[chat_id] = cleaned_query
+                self._set_clarification_pending(chat_id=chat_id, query=cleaned_query)
             if self._candidate_repo is not None:
                 try:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
@@ -150,7 +153,7 @@ class SearchMediaService:
         if chat_id in self._recent_candidates_by_chat:
             self._recent_candidates_by_chat.pop(chat_id, None)
             cleared = True
-        self._clarification_pending_by_chat.pop(chat_id, None)
+        cleared = self._clear_clarification_pending(chat_id=chat_id) or cleared
 
         if self._candidate_repo is None:
             return cleared
@@ -162,15 +165,49 @@ class SearchMediaService:
     def is_clarification_pending(self, chat_id: int) -> bool:
         if chat_id <= 0:
             return False
-        return chat_id in self._clarification_pending_by_chat
+        if chat_id in self._clarification_pending_by_chat:
+            return True
+        pending_query = self._load_persisted_clarification_query(chat_id=chat_id)
+        if pending_query is None:
+            return False
+        self._clarification_pending_by_chat[chat_id] = pending_query
+        return True
 
     def clear_clarification_pending(self, chat_id: int) -> bool:
         if chat_id <= 0:
             return False
+        return self._clear_clarification_pending(chat_id=chat_id)
+
+    def _set_clarification_pending(self, *, chat_id: int, query: str) -> None:
+        if chat_id <= 0:
+            return
+        self._clarification_pending_by_chat[chat_id] = query
+        if self._clarification_repo is None:
+            return
+        try:
+            self._clarification_repo.upsert_pending(chat_id=chat_id, query=query)
+        except Exception:
+            pass
+
+    def _clear_clarification_pending(self, *, chat_id: int) -> bool:
+        cleared = False
         if chat_id in self._clarification_pending_by_chat:
             self._clarification_pending_by_chat.pop(chat_id, None)
-            return True
-        return False
+            cleared = True
+        if self._clarification_repo is None:
+            return cleared
+        try:
+            return self._clarification_repo.clear_pending(chat_id=chat_id) or cleared
+        except Exception:
+            return cleared
+
+    def _load_persisted_clarification_query(self, *, chat_id: int) -> str | None:
+        if self._clarification_repo is None:
+            return None
+        try:
+            return self._clarification_repo.get_pending_query(chat_id=chat_id)
+        except Exception:
+            return None
 
 
 def parse_movie_query(query: str) -> ParsedMovieQuery:

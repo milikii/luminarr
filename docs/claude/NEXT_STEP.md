@@ -1,4 +1,4 @@
-# Next step (v19)
+# Next step (v18)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -47,15 +47,10 @@ Prerequisite completed:
   - highly ambiguous no-year queries return deterministic clarification text with read-only options
   - clarification-path does not persist candidate mapping and does not trigger downloader/import side effects
   - numeric select is blocked while clarification is pending
-- smallest restart-durable clarification pending truth baseline is now landed:
-  - chat-scoped clarification truth is persisted in SQLite (`clarification_state`)
-  - search no-result/ambiguous set + success/reset clear synchronizes in-memory fast path and persisted truth
-  - clarification pending numeric-select blocking remains deterministic after process restart
-  - existing Telegram command words and existing downloader/import success-failure text bodies remain unchanged
 
 ## Goal
 
-Land the smallest **Telegram callback workflow routing baseline**.
+Land the smallest **restart-durable clarification pending truth baseline**.
 
 ## Scope
 
@@ -67,10 +62,9 @@ Only do:
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- add minimal callback route handling in Telegram runtime without changing existing text-command path
-- use existing `telegram_updates` callback de-dup truth path and keep callback handling deterministic
-- keep callback path side-effect boundary identical to existing text command routing
-- add focused tests/manual verification for callback routing baseline and no-regression
+- persist minimal clarification-pending truth so it can survive process restart
+- restore/clear clarification-pending truth deterministically with existing reset/cancel routing
+- add focused tests/manual verification for clarification durability and no-regression
 
 ## Explicit constraints
 
@@ -84,14 +78,14 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
-- do not introduce Telegram inline keyboard as a requirement for this step
+- do not broaden clarification persistence into a generic workflow-state platform
 
 ## Suggested implementation shape
 
-1. add the smallest callback update entry handling in Telegram runtime and route to existing workflow dispatcher
-2. reuse existing parser/service execution path as much as possible (no duplicate business logic)
-3. preserve current side-effect serialization and approval/lease protocol boundaries
-4. keep existing text message path fully backward compatible
+1. add a smallest persisted clarification truth shape (chat-scoped, no extra side-effect protocols)
+2. wire search/no-result clarification set + clear to persisted truth with in-memory fast path preserved
+3. keep numeric-select blocking and frustration reset behavior deterministic after restart
+4. keep side-effect serialization, lease/approval protocol, physical-failure behavior unchanged
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -99,9 +93,32 @@ Only do:
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
-- callback update routing works with deterministic de-dup and does not bypass approval boundaries
+- clarification pending state survives restart with deterministic reset behavior
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-Re-evaluate the smallest remaining control-layer gap after callback routing baseline is stable.
+完成 clarification durability 后，按以下顺序推进（每次只做一个小目标）：
+
+**近期控制层收尾：**
+- copy fallback approval（跨文件系统 import 场景）
+- scheduler 最小基线（pending task 重试 + 追更轮询前置）
+
+**阶段 B 入口（D-037，优先级最高的下一大步）：**
+- 下载完成自动触发入库（移除手动 import confirm）
+- 文件规范化重命名（D-042）
+- TMDB + Fanart.tv 刮削（D-042）
+- 字幕自动翻译（D-041）
+
+以上阶段 B 完成后，再依次推进：阶段 C（追更 D-038 + qBittorrent D-039）→ 阶段 D（渠道扩展 D-040）→ 阶段 E（运维自动化 D-043）。
+
+详见 `README.md` 路线图。
+
+## Integration test reminder
+
+涉及 `import_to_library`、`refresh_media_server`、`add_to_downloader` 端到端的任务，必须用 WSL Docker 本地测试栈验证，不得用 mock。见 `docs/TEST_ENV.md`。
+
+```bash
+curl -s http://localhost:9091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
+curl -s http://localhost:8096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"
+```

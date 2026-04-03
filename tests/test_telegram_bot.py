@@ -25,6 +25,7 @@ from app.bot.telegram_bot import (
 )
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalRepo
+from app.db.clarification_repo import ClarificationRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
@@ -213,6 +214,40 @@ def test_handle_message_digit_blocked_when_clarification_pending() -> None:
     _run(search_service.search_and_format("unknown", chat_id=1001))
     assert search_service.is_clarification_pending(1001)
 
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once_with(CLARIFICATION_SELECTION_BLOCKED_TEXT)
+
+
+def test_handle_message_digit_blocked_when_clarification_pending_after_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_service = SearchMediaService(
+        _fake_search_empty,
+        clarification_repo=ClarificationRepo(database),
+    )
+    _run(before_restart_service.search_and_format("unknown", chat_id=1001))
+
+    update, reply_text = _build_update("1")
+    search_service = SearchMediaService(
+        _fake_search,
+        clarification_repo=ClarificationRepo(SqliteDatabase(str(db_path))),
+    )
     add_service = AddToDownloaderService(search_service, AsyncMock())
     status_service = GetDownloadStatusService(AsyncMock())
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")

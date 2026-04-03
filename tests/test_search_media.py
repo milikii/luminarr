@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
+from pathlib import Path
 
 from app.clients.tmdb import TmdbMovie
+from app.db.clarification_repo import ClarificationRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.search_media import (
     EMPTY_QUERY_TEXT,
     NO_RESULT_TEXT_TEMPLATE,
@@ -81,6 +84,48 @@ def test_search_and_format_returns_clarification_for_ambiguous_query() -> None:
     assert "- Dune (1984) 1080p BluRay (1984)" in text
     assert service.is_clarification_pending(1001)
     assert service.get_cached_candidate(1001, 1) is None
+
+
+def test_clarification_pending_persists_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_service = SearchMediaService(
+        _fake_search_ambiguous,
+        clarification_repo=ClarificationRepo(database),
+    )
+    _run(before_restart_service.search_and_format("Dune", chat_id=1001))
+
+    after_restart_service = SearchMediaService(
+        _fake_search_with_results,
+        clarification_repo=ClarificationRepo(SqliteDatabase(str(db_path))),
+    )
+    assert after_restart_service.is_clarification_pending(1001)
+    assert after_restart_service.clear_clarification_pending(1001)
+    assert not after_restart_service.is_clarification_pending(1001)
+
+
+def test_search_success_clears_persisted_clarification_pending(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    repo = ClarificationRepo(database)
+
+    pending_service = SearchMediaService(_fake_search_empty, clarification_repo=repo)
+    _run(pending_service.search_and_format("unknown", chat_id=1001))
+
+    clear_service = SearchMediaService(
+        _fake_search_with_results,
+        clarification_repo=ClarificationRepo(SqliteDatabase(str(db_path))),
+    )
+    _run(clear_service.search_and_format("dune", chat_id=1001))
+
+    verify_service = SearchMediaService(
+        _fake_search_with_results,
+        clarification_repo=ClarificationRepo(SqliteDatabase(str(db_path))),
+    )
+    assert not verify_service.is_clarification_pending(1001)
 
 
 async def _fake_search_quality_from_title(query: str) -> list[dict[str, object]]:

@@ -8,6 +8,7 @@ from app.clients.transmission import TransmissionClient
 from app.config import load_settings
 from app.db.approval_repo import ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
+from app.db.clarification_repo import ClarificationRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -31,6 +32,7 @@ def main() -> None:
     approval_repo = ApprovalRepo(database)
     telegram_update_repo = TelegramUpdateRepo(database)
     watchlist_repo = WatchlistRepo(database)
+    clarification_repo = ClarificationRepo(database)
 
     prowlarr_client = ProwlarrClient(
         base_url=settings.prowlarr_base_url,
@@ -43,6 +45,7 @@ def main() -> None:
     search_service = SearchMediaService(
         search_func=prowlarr_client.search,
         candidate_repo=candidate_repo,
+        clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
     )
     transmission_client = TransmissionClient(

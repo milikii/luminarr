@@ -13,6 +13,7 @@ services:
       - TRANSMISSION_INCOMPLETE_DIR=/data/downloads/incomplete
       - TRANSMISSION_WATCH_DIR_ENABLED=true
       - TRANSMISSION_WATCH_DIR=/data/downloads/watch
+      - TRANSMISSION_WEB_HOME=/config/webui/trguing-zh
     volumes:
       - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission:/config
       - /data:/data

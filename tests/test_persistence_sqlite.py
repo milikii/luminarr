@@ -15,6 +15,7 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.candidate_repo import CandidateMappingRepo
+from app.db.clarification_repo import ClarificationRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_COMPLETED, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.db.sqlite import SqliteDatabase
@@ -84,6 +85,22 @@ def test_telegram_update_repo_rejects_duplicate_message_after_restart(tmp_path: 
 
     after_restart_repo = TelegramUpdateRepo(SqliteDatabase(str(db_path)))
     assert after_restart_repo.record_message_update(update_id=1001, chat_id=2001, user_id=3001) is False
+
+
+def test_clarification_repo_persists_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_repo = ClarificationRepo(database)
+    before_restart_repo.upsert_pending(chat_id=1001, query="Dune")
+
+    after_restart_repo = ClarificationRepo(SqliteDatabase(str(db_path)))
+    assert after_restart_repo.get_pending_query(chat_id=1001) == "Dune"
+    assert after_restart_repo.clear_pending(chat_id=1001) is True
+
+    verify_repo = ClarificationRepo(SqliteDatabase(str(db_path)))
+    assert verify_repo.get_pending_query(chat_id=1001) is None
 
 
 def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None:
