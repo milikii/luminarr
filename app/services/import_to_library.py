@@ -512,7 +512,16 @@ class ImportToLibraryService:
             )
             return None, message
 
-        target_path = target_root / source_path.name
+        naming_truth = self._resolve_normalized_naming_truth(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            fallback_name=import_source.name,
+        )
+        normalized_target_name = _build_normalized_target_name(
+            source_path=source_path,
+            naming_truth=naming_truth,
+        )
+        target_path = target_root / normalized_target_name
         if target_path.exists():
             message = IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
             self._record_event(
@@ -525,6 +534,28 @@ class ImportToLibraryService:
             return None, message
 
         return PreparedImport(import_source=import_source, source_path=source_path, target_path=target_path), ""
+
+    def _resolve_normalized_naming_truth(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        fallback_name: str,
+    ) -> str:
+        fallback = fallback_name.strip()
+        if self._job_event_repo is None:
+            return fallback
+        try:
+            events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
+        except Exception:
+            return fallback
+        for event in reversed(events):
+            if event.event_type != "downloader.succeeded":
+                continue
+            title = event.message.strip()
+            if title:
+                return title
+        return fallback
 
     async def _execute_import(
         self,
@@ -1129,3 +1160,80 @@ def _is_copy_fallback_pending_payload(payload_json: str) -> bool:
     if not isinstance(payload, dict):
         return False
     return str(payload.get("mode", "")).strip() == IMPORT_EXECUTION_MODE_COPY
+
+
+def _build_normalized_target_name(*, source_path: Path, naming_truth: str) -> str:
+    if source_path.is_file():
+        source_base_name = source_path.stem
+        suffix = source_path.suffix
+    else:
+        source_base_name = source_path.name
+        suffix = ""
+
+    raw_truth = naming_truth.strip() or source_base_name
+    if suffix and raw_truth.lower().endswith(suffix.lower()):
+        raw_truth = raw_truth[: -len(suffix)]
+
+    normalized_truth = _normalize_name_tokens(raw_truth)
+    normalized_source = _normalize_name_tokens(source_base_name)
+    year = _extract_movie_year(normalized_truth) or _extract_movie_year(normalized_source)
+
+    title_base = normalized_truth or normalized_source
+    if year:
+        title_base = _trim_title_before_year(title_base, year)
+    if not title_base:
+        title_base = normalized_source or source_base_name.strip()
+
+    if year:
+        final_base = f"{title_base} ({year})"
+    else:
+        final_base = title_base
+
+    sanitized_base = _sanitize_target_component(final_base)
+    if not sanitized_base:
+        sanitized_base = _sanitize_target_component(normalized_source or source_base_name.strip())
+    if not sanitized_base:
+        sanitized_base = "unknown"
+
+    if suffix:
+        return f"{sanitized_base}{suffix}"
+    return sanitized_base
+
+
+def _normalize_name_tokens(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"[._]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
+
+
+def _extract_movie_year(value: str) -> str:
+    matched = re.search(r"(?<!\d)((?:19|20)\d{2})(?!\d)", value)
+    if matched is None:
+        return ""
+    return matched.group(1)
+
+
+def _trim_title_before_year(value: str, year: str) -> str:
+    if not value or not year:
+        return value.strip()
+    matched = re.search(rf"(?<!\d){re.escape(year)}(?!\d)", value)
+    if matched is None:
+        return value.strip()
+    prefix = value[: matched.start()].strip()
+    if prefix:
+        return prefix
+    without_year = re.sub(rf"(?<!\d){re.escape(year)}(?!\d)", " ", value)
+    return without_year.strip()
+
+
+def _sanitize_target_component(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"[<>:\"/\\|?*\x00-\x1f]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" .-_")
+    cleaned = re.sub(r"[\(\[\{]+$", "", cleaned).strip(" .-_")
+    return cleaned

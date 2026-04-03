@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v21)
+# docs/DECISIONS.md (v22)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -475,6 +475,20 @@
   - 当前 next smallest path 前进到 filename normalization / rename baseline
 - **原因**：
   先用最小确定性规则补齐自动化闭环第二步，优先过滤明显低质量资源，同时不把仓库提前扩成完整资源评分平台。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-043 filename normalization / rename 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - confirmed import 在现有导入路径上已接入最小 deterministic 文件名规范化
+  - 目标命名优先使用已持久化的 downloader 成功标题真相（`downloader.succeeded`），缺失时回退到 Transmission 导入源名称
+  - 命名规则在 hardlink 与 copy-fallback 二次 `confirm` 路径保持一致
+  - 既有 Telegram 命令词、approval 边界、`jobs` 所有权、lease/version、防重放协议保持不变
+  - 当前 next smallest path 前进到 metadata scraping (`TMDB + Fanart.tv`) baseline
+- **原因**：
+  先用最小改动补齐入库后命名规范化缺口，同时保持既有副作用安全边界和控制层协议稳定。
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 

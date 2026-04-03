@@ -15,6 +15,7 @@ from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
     ApprovalRepo,
 )
+from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
@@ -101,7 +102,7 @@ def test_confirm_import_by_task_ref_executes_after_pending(tmp_path: Path) -> No
     assert "导入待确认" in pending_text
 
     text = _run(service.confirm_import_by_task_ref("87"))
-    target_file = target_dir / source_file.name
+    target_file = target_dir / "Dune (2021).mkv"
     assert "导入成功" in text
     assert str(target_file) in text
     assert target_file.exists()
@@ -351,7 +352,7 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     second_confirm = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in second_confirm
     assert "导入方式: 复制" in second_confirm
-    target_file = tmp_path / "library" / source_file.name
+    target_file = tmp_path / "library" / "Dune (2021).mkv"
     assert target_file.exists()
     assert source_file.stat().st_ino != target_file.stat().st_ino
 
@@ -477,6 +478,76 @@ def test_confirm_import_by_task_ref_promotes_pending_to_approved(tmp_path: Path)
     record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
     assert record is not None
     assert record.status == APPROVAL_STATUS_APPROVED
+
+
+def test_confirm_import_prefers_downloader_title_for_normalized_name(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.Part.Two.2024.1080p.WEB-DL.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="1",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="downloader.succeeded",
+        message="Dune: Part Two 2024",
+    )
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    target_file = target_dir / "Dune Part Two (2024).mkv"
+    assert target_file.exists()
+    assert str(target_file) in text
+
+
+def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_dir = download_dir / "Dune.Part.Two.2024.1080p.WEB-DL"
+    source_dir.mkdir(parents=True)
+    (source_dir / "movie.mkv").write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_dir.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+    )
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    target_path = target_dir / "Dune Part Two (2024)"
+    assert target_path.is_dir()
+    assert (target_path / "movie.mkv").exists()
+    assert str(target_path) in text
 
 
 def _run(coroutine: Awaitable[str]) -> str:

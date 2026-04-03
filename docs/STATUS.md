@@ -1,4 +1,4 @@
-# Current status (v21)
+# Current status (v22)
 
 ## Project position
 
@@ -116,6 +116,11 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - skipped resources can still be manually imported via `import <id/hash>`
   - existing Telegram command words remain unchanged; `status <id/hash>` may now append either import approval-pending text or rule-skip text when completion is first observed
   - no rename, scrape, or subtitle behavior is introduced in this step
+- smallest filename normalization / rename baseline is now landed:
+  - confirmed import path now deterministically computes normalized target naming; when year is available the target follows `Title (Year)` style
+  - normalized naming prefers persisted downloader title truth (`downloader.succeeded`) when available, then falls back to Transmission import source name
+  - hardlink import and copy-fallback second-confirm import share the same normalized target naming rule
+  - existing Telegram command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -140,7 +145,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - multi-process/global locking semantics
 
 **Stage B automation closure (documented roadmap, not current step):**
-- filename normalization / renaming
 - metadata scraping (`TMDB + Fanart.tv`)
 - subtitle auto-translation
 
@@ -158,11 +162,12 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `132 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `134 passed` (`.venv/bin/python -m pytest -q`)
 - manual verification: resource auto-selection rules baseline passed (temporary `tmp_tests/verify_resource_auto_selection_baseline.py`, script cleaned after run)
 - manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
 - manual verification: completion-monitor / scheduler prerequisite baseline passed (temporary `tmp_tests/verify_download_monitor_prerequisite.py`, script cleaned after run)
 - manual verification: copy fallback approval baseline passed (temporary `tmp_tests/verify_import_copy_fallback_approval.py`, script cleaned after run)
+- manual verification: filename normalization / rename baseline passed (temporary `tmp_tests/verify_filename_normalization_baseline.py`, script cleaned after run)
 - manual verification: Telegram callback workflow routing baseline passed (temporary `tmp_tests/verify_callback_routing.py`, script cleaned after run)
 - manual verification: read-only concurrency-safe execution policy baseline passed (`tmp_tests/verify_execution_policy_baseline.py`)
 - manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
@@ -177,8 +182,8 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. keep landed resource auto-selection rules baseline stable
-5. land the smallest filename normalization / renaming baseline
+4. keep landed resource auto-selection rules + filename normalization / rename baselines stable
+5. land the smallest metadata scraping baseline (`TMDB + Fanart.tv`) without introducing subtitle logic
 
 ## Current risks
 
@@ -192,6 +197,7 @@ Build the next smallest path:
 - copy fallback duplicates data and depends on sufficient free disk space
 - downloader completion truth and auto-import progression currently advance when runtime observes status; standalone background polling is still not landed
 - resource auto-selection baseline currently blocks only explicit low-quality source markers in the download name; broader quality ranking is not landed
+- filename normalization baseline currently uses smallest deterministic cleanup + year extraction; noisy release names may still produce imperfect titles
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
@@ -200,8 +206,9 @@ Build the next smallest path:
 
 ## Acceptance focus for the next step
 
-- land the smallest filename normalization / renaming baseline without changing existing text-command behavior
+- land the smallest metadata scraping baseline (`TMDB + Fanart.tv`) without changing existing text-command behavior
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
+- keep the landed filename normalization / rename baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress

@@ -663,7 +663,7 @@ def test_import_stale_guard_blocks_duplicate_after_restart(tmp_path: Path) -> No
     first_confirm = _run(first_service.confirm_import_by_task_ref("87"))
     assert "导入成功" in first_confirm
 
-    imported_target = target_dir / source_file.name
+    imported_target = target_dir / "Dune (2021).mkv"
     assert imported_target.exists()
     imported_target.unlink()
     assert not imported_target.exists()
@@ -795,7 +795,7 @@ def test_copy_fallback_pending_survives_restart_and_second_confirm_copies(tmp_pa
         after_restart_service.confirm_import_by_task_ref("87", chat_id=1001, user_id=2001)
     )
 
-    target_file = target_dir / source_file.name
+    target_file = target_dir / "Dune (2021).mkv"
     assert "导入成功" in second_confirm
     assert "导入方式: 复制" in second_confirm
     assert target_file.exists()

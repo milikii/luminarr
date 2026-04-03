@@ -1,4 +1,4 @@
-# Next step (v21)
+# Next step (v22)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -82,25 +82,29 @@ Prerequisite completed:
   - skipped auto progression appends `auto_import.skipped_by_rule` into `job_event` and does not repeat on later `status <id/hash>`
   - skipped resources still keep the existing manual `import <id/hash>` path
   - focused tests + manual verification passed
+- smallest filename normalization / rename baseline is now landed:
+  - confirmed import now produces deterministic normalized target naming on the existing import path
+  - naming prefers persisted downloader title truth when available and keeps copy-fallback approval boundary unchanged
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **filename normalization / rename** baseline.
+Land the smallest **metadata scraping (`TMDB + Fanart.tv`) baseline**.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, filename normalization / rename, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- reuse the existing confirmed import path as the only rename entrypoint
-- add only the smallest deterministic filename normalization / rename rule set; do not broaden into metadata scrape / subtitle logic
+- reuse the existing confirmed import success path as the only metadata scrape entrypoint
+- add only the smallest deterministic metadata scraping baseline (`TMDB + Fanart.tv`); do not broaden into subtitle logic
 - preserve the landed import safety boundary, including copy-fallback approval for cross-filesystem import
-- add focused tests/manual verification for filename normalization / rename and no-regression
+- add focused tests/manual verification for metadata scrape and no-regression
 
 ## Explicit constraints
 
@@ -108,21 +112,21 @@ Only do:
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
 - do not add a broad generic scheduler platform in this step
-- do not start metadata scrape / subtitle logic in this step
+- do not start subtitle logic in this step
 - do not remove existing `status <id/hash>` / `watchlist ...` command paths
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
 - do not start stage B/C/D/E roadmap items in this step
-- do not introduce a custom naming DSL or user-configurable rename template system in this step
+- do not introduce a generic metadata pipeline platform or user-configurable scrape template system in this step
 
 ## Suggested implementation shape
 
-1. use the existing confirmed import path as the only place that applies normalized movie naming
-2. derive the normalized target name from already-known deterministic movie truth when available, without depending on free-form chat history
-3. keep rename logic compatible with the existing approval / ownership / copy-fallback rules
+1. use the existing confirmed import success path as the only place that triggers metadata scraping
+2. derive scrape input from deterministic persisted movie truth (task identity + known title/year/path), without depending on free-form chat history
+3. keep metadata scrape trigger compatible with the existing approval / ownership / copy-fallback rules
 4. keep current manual status/watchlist/import paths fully backward compatible
-5. add focused tests and manual verification steps
+5. add focused tests and manual verification steps for scrape success/failure paths
 
 ## Done when
 
@@ -131,17 +135,16 @@ Only do:
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
 - cross-filesystem import copy-fallback approval remains stable
-- landed downloader completion truth, post-download auto import, and resource auto-selection baselines remain stable
-- confirmed import can deterministically produce the smallest normalized movie target naming without depending on chat transcript memory
+- landed downloader completion truth, post-download auto import, resource auto-selection, and filename normalization baselines remain stable
+- confirmed import success can deterministically trigger the smallest metadata scraping baseline without depending on chat transcript memory
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
-- metadata scrape / subtitle logic is not introduced in this step
+- subtitle logic is not introduced in this step
 
 ## After this step
 
-After filename normalization / rename is stable, advance in this order (still one small goal at a time):
+After metadata scraping baseline is stable, advance in this order (still one small goal at a time):
 
 1. enter stage B automation closure:
-   - metadata scrape
    - subtitle auto-translation
 2. after movie automation is stable, enter stage C:
    - series / anime watchlist-driven tracking
