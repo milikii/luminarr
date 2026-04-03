@@ -1,4 +1,4 @@
-# Current status (v27)
+# Current status (v28)
 
 ## Project position
 
@@ -139,6 +139,11 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - subtitle translation defaults to professional model translation (`gpt-5.4`, OpenAI-compatible `chat/completions`) for SubRip (`.srt`) and writes `*.zh.srt`
   - missing subtitle API key / model errors are explicitly recorded (`subtitle.failed`) and do not roll back confirmed import success
   - existing Telegram command words and approval / ownership / replay boundaries remain unchanged
+- smallest PT / BT parser-level intent split baseline is now landed:
+  - Telegram text/callback routing now deterministically splits normal movie-search demand and direct BT / magnet demand at the existing parser/entry layer
+  - raw `magnet:?` links and explicit `下载这个 BT / 下载这个磁力` style text now return a deterministic BT-direct routing reply instead of falling into the normal movie search path
+  - current step remains parser/routing-only; it does not dispatch downloader side effects, does not add BT classification follow-up, and does not introduce downloader-role binding
+  - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -166,7 +171,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- PT/BT parser-level intent split for “正常观影需求” vs direct BT / magnet demand
 - BT classification follow-up:
   - movie / series / anime magnets should do TMDB association first, then reuse naming / metadata scrape / poster / subtitle / refresh after download completes
   - `raw_bt` should skip TMDB; the system should present preconfigured destination-directory options during dispatch inquiry, persist the user's choice, and move files into that selected directory only
@@ -201,6 +205,8 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - manual verification: clarification-stage frustration/reset baseline passed (`tmp_tests` script + targeted pytest)
 - manual verification: ambiguous read-only exploration baseline passed (temporary `tmp_tests` script + targeted pytest)
 - manual verification: restart-durable clarification pending truth baseline passed (temporary `tmp_tests/verify_clarification_persistence.py`, script cleaned after run)
+- focused tests: `35 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
+- manual verification: PT / BT parser-level intent split baseline passed (temporary `tmp_tests/verify_pt_bt_parser_split_baseline.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -210,7 +216,7 @@ Build the next smallest path:
 2. keep landed watchlist media-kind behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
 4. keep landed resource auto-selection rules + filename normalization / rename + metadata scraping + subtitle auto-translation baselines stable
-5. land the smallest PT / BT parser-level intent split baseline without introducing downloader-role binding or scheduler/platformization
+5. land the smallest BT classification follow-up baseline without introducing downloader-role binding or scheduler/platformization
 
 ## Current risks
 
@@ -235,10 +241,12 @@ Build the next smallest path:
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
 - watchlist kind is currently user-declared (`movie` / `series` / `anime`); no automatic kind inference or fuzzy correction is introduced in this baseline
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
+- current BT-direct intent split baseline is intentionally narrow; only raw magnet links and a small set of explicit “下载这个 BT / 磁力” phrases are recognized
+- direct BT / magnet demand currently stops at deterministic routing text; BT classification, TMDB follow-up, destination selection, and dispatch are not landed yet
 
 ## Acceptance focus for the next step
 
-- land the smallest PT / BT parser-level intent split baseline without changing existing text-command behavior
+- land the smallest BT classification follow-up baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
@@ -253,3 +261,4 @@ Build the next smallest path:
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable
 - current ambiguous read-only exploration + numeric-select blocking behavior remains stable
+- landed PT / BT parser-level intent split baseline remains deterministic and does not bypass existing side-effect boundaries

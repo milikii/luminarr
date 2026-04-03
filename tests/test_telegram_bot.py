@@ -11,6 +11,7 @@ from telegram.ext import CallbackQueryHandler
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    BT_DIRECT_INTENT_TEXT,
     CLARIFICATION_SELECTION_BLOCKED_TEXT,
     CLARIFICATION_RESET_TEXT,
     FRUSTRATION_RESET_TEXT,
@@ -121,6 +122,54 @@ def test_handle_message_replies_search_result() -> None:
     sent_text = reply_text.await_args.args[0]
     assert "搜索结果：dune" in sent_text
     assert "title-dune" in sent_text
+
+
+def test_handle_message_magnet_routes_to_bt_direct_split() -> None:
+    update, reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(BT_DIRECT_INTENT_TEXT)
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_explicit_bt_text_routes_to_bt_direct_split() -> None:
+    update, reply_text = _build_update("下载这个 BT")
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(BT_DIRECT_INTENT_TEXT)
+    search_service.search_and_format.assert_not_awaited()
 
 
 def test_handle_message_replies_service_not_ready() -> None:
@@ -245,6 +294,31 @@ def test_handle_callback_query_digit_routes_to_add_service() -> None:
     sent_text = reply_text.await_args.args[0]
     assert "下载待确认" in sent_text
     assert "confirm 1" in sent_text
+
+
+def test_handle_callback_query_magnet_routes_to_bt_direct_split() -> None:
+    update, reply_text, answer = _build_callback_update("magnet:?xt=urn:btih:abcdef1234567890")
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    reply_text.assert_awaited_once_with(BT_DIRECT_INTENT_TEXT)
+    search_service.search_and_format.assert_not_awaited()
 
 
 def test_handle_callback_query_digit_uses_callback_context_when_effective_context_missing() -> None:

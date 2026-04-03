@@ -651,6 +651,28 @@
 - **验证**：
   已通过 focused pytest（watchlist 相关）与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
+## D-052 PT / BT parser-level intent split 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 现有 Telegram parser / routing 入口现在已按最小可用形状接入 PT / BT 分流
+  - 正常观影需求继续走现有 PT 主干：搜索 / 选择 / 下载审批 / 状态 / 导入 / refresh / watchlist
+  - 直接 BT / 磁力需求在入口层被确定性拦出，不再误入普通电影搜索路径
+  - 当前最小识别范围只包括：
+    - 原始 `magnet:?` 链接
+    - 明确 `下载这个 BT / 下载这个磁力` 一类文本
+  - 当前这一步严格保持 parser/routing-only：
+    - 不创建新持久化协议
+    - 不发起 downloader side effects
+    - 不接入 BT 分类后半段
+    - 不引入 downloader-role binding
+  - 现有 `search/select/status/import/confirm/watchlist` 命令词、approval 边界、`jobs` 所有权、lease/version、防重放、callback 路由保持不变
+  - 当前 next smallest path 前进到 BT classification follow-up baseline
+- **原因**：
+  先把“正常观影需求”和“直接 BT 下载需求”在入口层硬分开，后面再补 BT 分类和后半段时，代码边界才不会继续混在一起。
+- **验证**：
+  已通过 focused pytest（`tests/test_telegram_bot.py`）与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
 ---
 
 ## 附：更新模板

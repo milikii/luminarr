@@ -1,4 +1,4 @@
-# Next step (v27)
+# Next step (v28)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -104,10 +104,15 @@ Prerequisite completed:
   - `watchlist add <movie|series|anime> <片名 [年份]>` is now supported as the smallest explicit kind input
   - manual `watchlist add/list/remove/clear` remains chat-scoped and side-effect free
   - focused tests + manual verification passed
+- smallest PT / BT parser-level intent split baseline is now landed:
+  - existing Telegram parser / routing entry now deterministically splits normal movie-search demand and direct BT / magnet demand
+  - raw `magnet:?` links and explicit `下载这个 BT / 下载这个磁力` style text now return a deterministic BT-direct routing reply
+  - current step stays parser/routing-only and does not dispatch new downloader side effects
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **PT / BT parser-level intent split baseline**.
+Land the smallest **BT classification follow-up baseline**.
 
 ## Scope
 
@@ -119,11 +124,14 @@ Only do:
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- add only the smallest deterministic parser-level split between:
-  - 正常观影需求（继续走 PT 主干）
-  - 直接 BT / 磁力下载需求（进入后续 BT 主干）
-- keep this step parser/routing-only; do not yet add downloader-role binding, BT 分类问询后半段, TMDB follow-up, or raw BT directory selection
-- add focused tests/manual verification for parser/routing split and no-regression
+- keep the landed PT / BT parser-level intent split baseline unchanged
+- add only the smallest deterministic BT classification follow-up after BT-direct routing:
+  - `movie`
+  - `series`
+  - `anime`
+  - `raw_bt`
+- keep this step focused on classification follow-up only; do not yet add downloader-role binding, qBittorrent, TMDB association follow-up, BT dispatch, or raw BT directory selection
+- add focused tests/manual verification for BT classification follow-up and no-regression
 
 ## Explicit constraints
 
@@ -136,19 +144,17 @@ Only do:
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
 - do not introduce downloader-role binding in this step
-- do not introduce BT classification follow-up in this step
 - do not introduce qBittorrent or multiple downloader instances in this step
 - do not introduce a generic tracking platform or user-configurable rule engine in this step
+- do not bypass the landed parser-level PT / BT split with ad-hoc late-stage branching
 
 ## Suggested implementation shape
 
-1. reuse the existing parser / Telegram routing entry and add the smallest deterministic BT-direct intent detection for:
-   - raw magnet links
-   - explicit “下载这个 BT / 下载这个磁力” style text
+1. reuse the landed BT-direct routing entry and add the smallest deterministic classification follow-up for direct BT / magnet demand
 2. keep normal movie/search/watchlist/status/import/confirm command behavior fully backward compatible
-3. make the split visible in deterministic routing/result text without dispatching new downloader side effects in this step
+3. make the classification visible in deterministic routing/result text without dispatching new downloader side effects in this step
 4. keep current manual status/watchlist/import paths fully backward compatible
-5. add focused tests and manual verification steps for PT/BT parser split and no-regression
+5. add focused tests and manual verification steps for BT classification follow-up and no-regression
 
 ## Done when
 
@@ -159,16 +165,18 @@ Only do:
 - cross-filesystem import copy-fallback approval remains stable
 - landed watchlist media-kind behavior remains deterministic, persistence-backed, and side-effect free
 - landed downloader completion truth, post-download auto import, resource auto-selection, filename normalization, metadata scraping, and subtitle auto-translation baselines remain stable
-- PT / BT parser-level split baseline is deterministic and does not bypass existing side-effect boundaries
+- landed PT / BT parser-level split baseline remains deterministic and does not bypass existing side-effect boundaries
+- BT-direct classification follow-up is deterministic and does not dispatch downloader side effects in this step
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After PT / BT parser-level intent split baseline is stable, advance in this order (still one small goal at a time):
+After BT classification follow-up baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
-   - BT classification follow-up:
+   - movie / series / anime BT TMDB association follow-up:
      - movie / series / anime magnets do TMDB association first, then reuse naming / metadata / poster / subtitle / refresh after download completes
+   - `raw_bt` destination-directory follow-up:
      - `raw_bt` presents preconfigured destination-directory options during dispatch inquiry, persists the user's choice, and transfers files into that selected directory only
    - downloader-role binding (`pt_downloader` / `bt_downloader`; multiple downloader instances allowed, qBittorrent protocol later)
    - only after the above is stable, evaluate BT subscription / continuous-download as another separate small goal

@@ -1,4 +1,4 @@
-# Luminarr (v27)
+# Luminarr (v28)
 
 Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harness**。
 
@@ -73,14 +73,14 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 ## 3. 当前最近一步
 
-当前 next step 不是下载器角色绑定，也不是 BT 后半段投递，而是：
+当前 next step 不是下载器角色绑定，也不是 BT 直接投递，而是：
 
-- **PT / BT parser-level intent split baseline**
+- **BT classification follow-up baseline**
 
 这一小步的目标是：
 
-- 在 parser / 路由层，先把“正常观影需求”和“直接 BT / 磁力下载需求”分开
-- 当前这一步不引入下载器角色绑定，不引入 qBittorrent，不引入 BT 分类后半段
+- 在已落地的 PT / BT 入口分流之后，给直接 BT / 磁力需求补最小分类 follow-up
+- 当前这一步不引入下载器角色绑定，不引入 qBittorrent，不引入 BT 真实投递后半段
 - 当前这一步不直接改变现有 downloader / import 副作用链
 - 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
@@ -216,4 +216,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 10. 一句话总结
 
-**Luminarr v27 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经补到 completion-monitor、post-download auto import、rename、metadata scraping、subtitle auto-translation，以及 `watchlist` 的 `movie / series / anime` 最小分类真相，当前最近一步前进到 PT/BT parser-level 分流。**
+**Luminarr v28 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经补到 completion-monitor、post-download auto import、rename、metadata scraping、subtitle auto-translation、`watchlist` 的 `movie / series / anime` 最小分类真相，以及 PT/BT parser-level 入口分流；当前最近一步前进到 BT classification follow-up。**

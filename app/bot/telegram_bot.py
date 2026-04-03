@@ -40,6 +40,11 @@ from app.services.search_media import SearchMediaService
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
 CLARIFICATION_SELECTION_BLOCKED_TEXT = "当前处于片名澄清中，请先补充片名或年份后再搜索。"
+BT_DIRECT_INTENT_TEXT = (
+    "已识别为直接 BT/磁力下载需求。\n"
+    "当前只完成 PT / BT 入口分流基线，暂未接入 BT 主干后半段。\n"
+    "请暂时继续使用正常片名搜索；后续步骤会再补 BT 分类与投递。"
+)
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -217,6 +222,25 @@ def _is_frustration_text(text: str) -> bool:
     return cleaned_text in {"不对", "停", "重来", "换一个", "算了", "取消"}
 
 
+def _is_bt_direct_intent(text: str) -> bool:
+    stripped_text = text.strip()
+    if not stripped_text:
+        return False
+    lowered_text = stripped_text.lower()
+    if lowered_text.startswith("magnet:?"):
+        return True
+
+    normalized_text = re.sub(r"\s+", "", stripped_text).lower()
+    return normalized_text in {
+        "下载这个bt",
+        "下载这个bt种子",
+        "下载这个磁力",
+        "下载此bt",
+        "下载此bt种子",
+        "下载此磁力",
+    }
+
+
 def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
     if not isinstance(update_repo, TelegramUpdateRepo):
@@ -333,6 +357,10 @@ async def _handle_query_text(
             ):
                 await reply_func(FRUSTRATION_RESET_TEXT)
                 return
+
+    if _is_bt_direct_intent(query):
+        await reply_func(BT_DIRECT_INTENT_TEXT)
+        return
 
     task_ref = parse_status_query(query)
     if task_ref is not None:
