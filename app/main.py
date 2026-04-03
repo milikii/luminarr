@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
+from app.clients.fanart import FanartClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient
@@ -19,9 +20,14 @@ from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.manage_watchlist import ManageWatchlistService
+from app.services.metadata_scraper import MetadataScraperService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService
 from app.services.search_media import SearchMediaService
+
+
+async def _skip_fanart_images(_: str):
+    return None
 
 
 def main() -> None:
@@ -42,9 +48,19 @@ def main() -> None:
         api_key=settings.prowlarr_api_key,
     )
     tmdb_lookup_movie_func = None
+    scrape_metadata_func = None
     if settings.tmdb_api_key:
         tmdb_client = TmdbClient(api_key=settings.tmdb_api_key, base_url=settings.tmdb_base_url)
         tmdb_lookup_movie_func = tmdb_client.search_movie
+        get_movie_images_func = _skip_fanart_images
+        if settings.fanart_api_key:
+            fanart_client = FanartClient(api_key=settings.fanart_api_key, base_url=settings.fanart_base_url)
+            get_movie_images_func = fanart_client.get_movie_images
+        metadata_scraper_service = MetadataScraperService(
+            lookup_movie_func=tmdb_client.search_movie,
+            get_movie_images_func=get_movie_images_func,
+        )
+        scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(
         search_func=prowlarr_client.search,
         candidate_repo=candidate_repo,
@@ -73,6 +89,7 @@ def main() -> None:
         get_import_source_func=transmission_client.get_torrent_import_source,
         library_target_dir=settings.library_target_dir,
         refresh_media_server_func=refresh_media_server_func,
+        scrape_metadata_func=scrape_metadata_func,
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,
         job_repo=job_repo,

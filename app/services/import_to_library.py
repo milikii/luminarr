@@ -18,9 +18,11 @@ from app.db.approval_repo import (
 )
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
+MetadataScrapeFunc = Callable[[MetadataScrapeInput], Awaitable[MetadataScrapeResult]]
 
 IMPORT_QUERY_USAGE_TEXT = "导入格式：import <任务ID或Hash>"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
@@ -88,6 +90,7 @@ class ImportToLibraryService:
         get_import_source_func: GetImportSourceFunc,
         library_target_dir: str,
         refresh_media_server_func: RefreshMediaServerFunc | None = None,
+        scrape_metadata_func: MetadataScrapeFunc | None = None,
         job_event_repo: JobEventRepo | None = None,
         approval_repo: ApprovalRepo | None = None,
         job_repo: JobRepo | None = None,
@@ -95,6 +98,7 @@ class ImportToLibraryService:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
         self._refresh_media_server_func = refresh_media_server_func
+        self._scrape_metadata_func = scrape_metadata_func
         self._job_event_repo = job_event_repo
         self._approval_repo = approval_repo
         self._job_repo = job_repo
@@ -631,6 +635,11 @@ class ImportToLibraryService:
             event_type="import.succeeded",
             message=str(target_path),
         )
+        await self._try_scrape_metadata(
+            task_ref=task_ref,
+            import_source=import_source,
+            target_path=target_path,
+        )
 
         if self._refresh_media_server_func is None:
             return ImportExecutionResult(reply=import_success_text, imported=True)
@@ -665,6 +674,71 @@ class ImportToLibraryService:
                 message=refresh_text,
             )
         return ImportExecutionResult(reply=f"{import_success_text}\n{refresh_text}", imported=True)
+
+    async def _try_scrape_metadata(
+        self,
+        *,
+        task_ref: str,
+        import_source: TransmissionImportSource,
+        target_path: Path,
+    ) -> None:
+        if self._scrape_metadata_func is None:
+            return
+
+        title, year = self._resolve_metadata_title_year(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            target_path=target_path,
+        )
+        scrape_input = MetadataScrapeInput(
+            task_ref=task_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            title=title,
+            year=year,
+            target_path=str(target_path),
+        )
+        try:
+            result = await self._scrape_metadata_func(scrape_input)
+        except Exception as exc:
+            message = f"metadata 刮削执行异常：{exc}"
+            self._record_event(
+                task_ref=task_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="metadata.failed",
+                message=message,
+            )
+            print(f"\033[31m[元数据刮削失败]\033[0m {message}", flush=True)
+            print(
+                "\033[33m[处理建议]\033[0m 检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
+                flush=True,
+            )
+            return
+
+        event_type = "metadata.succeeded" if result.success else "metadata.failed"
+        self._record_event(
+            task_ref=task_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            event_type=event_type,
+            message=result.message,
+        )
+
+    def _resolve_metadata_title_year(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
+        fallback_title, fallback_year = _extract_title_year_for_scrape(target_path)
+        naming_truth = self._resolve_normalized_naming_truth(
+            task_id=task_id,
+            task_hash=task_hash,
+            fallback_name="",
+        )
+        if not naming_truth:
+            return fallback_title, fallback_year
+
+        title_from_truth, year_from_truth = _extract_title_year_from_text(naming_truth)
+        title = title_from_truth or fallback_title
+        year = year_from_truth or fallback_year
+        return title, year
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         identity = (task_id.strip(), task_hash.strip())
@@ -1160,6 +1234,34 @@ def _is_copy_fallback_pending_payload(payload_json: str) -> bool:
     if not isinstance(payload, dict):
         return False
     return str(payload.get("mode", "")).strip() == IMPORT_EXECUTION_MODE_COPY
+
+
+def _extract_title_year_for_scrape(target_path: Path) -> tuple[str, str]:
+    if target_path.is_file():
+        base_name = target_path.stem
+    else:
+        base_name = target_path.name
+    normalized = _normalize_name_tokens(base_name)
+    year = _extract_movie_year(normalized)
+    if year:
+        title = _trim_title_before_year(normalized, year)
+    else:
+        title = normalized
+    title = _sanitize_target_component(title)
+    if not title:
+        title = _sanitize_target_component(base_name)
+    return title, year
+
+
+def _extract_title_year_from_text(value: str) -> tuple[str, str]:
+    normalized = _normalize_name_tokens(value)
+    year = _extract_movie_year(normalized)
+    if year:
+        title = _trim_title_before_year(normalized, year)
+    else:
+        title = normalized
+    title = title.strip()
+    return title, year
 
 
 def _build_normalized_target_name(*, source_path: Path, naming_truth: str) -> str:

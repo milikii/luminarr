@@ -13,6 +13,7 @@ class TmdbMovie:
     title: str
     original_title: str
     year: str
+    tmdb_id: str = ""
 
 
 class TmdbClient:
@@ -66,6 +67,7 @@ class TmdbClient:
 
 
 def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
+    movie_id = _safe_id(item.get("id"))
     title = _safe_text(item.get("title"))
     original_title = _safe_text(item.get("original_title"))
     resolved_title = title or original_title
@@ -74,10 +76,19 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
 
     release_date = _safe_text(item.get("release_date"))
     year = _extract_year(release_date)
-    return TmdbMovie(title=resolved_title, original_title=original_title, year=year)
+    return TmdbMovie(tmdb_id=movie_id, title=resolved_title, original_title=original_title, year=year)
 
 
 def _safe_text(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    return text
+
+
+def _safe_id(value: Any) -> str:
     if value is None:
         return ""
     text = str(value).strip()

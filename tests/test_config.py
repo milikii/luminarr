@@ -21,6 +21,8 @@ def test_load_settings_reads_token() -> None:
     assert settings.prowlarr_api_key == "api-key"
     assert settings.tmdb_base_url == "https://api.themoviedb.org"
     assert settings.tmdb_api_key == ""
+    assert settings.fanart_base_url == "https://webservice.fanart.tv/v3"
+    assert settings.fanart_api_key == ""
     assert settings.transmission_base_url == "http://transmission:9091"
     assert settings.transmission_username == "tr-user"
     assert settings.transmission_password == "tr-pass"
@@ -71,6 +73,21 @@ def test_load_settings_reads_tmdb_settings() -> None:
     )
     assert settings.tmdb_base_url == "https://tmdb.example"
     assert settings.tmdb_api_key == "tmdb-api-key"
+
+
+def test_load_settings_reads_fanart_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "FANART_BASE_URL": "https://fanart.example/",
+            "FANART_API_KEY": "fanart-api-key",
+        }
+    )
+    assert settings.fanart_base_url == "https://fanart.example"
+    assert settings.fanart_api_key == "fanart-api-key"
 
 
 def test_load_settings_reads_sqlite_path() -> None:

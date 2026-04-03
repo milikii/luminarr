@@ -32,6 +32,7 @@ def test_search_movie_returns_first_valid_result() -> None:
                 "results": [
                     {"title": "", "original_title": "", "release_date": "2024-01-01"},
                     {
+                        "id": 157336,
                         "title": "Interstellar",
                         "original_title": "Interstellar",
                         "release_date": "2014-11-05",
@@ -52,6 +53,7 @@ def test_search_movie_returns_first_valid_result() -> None:
     assert result.title == "Interstellar"
     assert result.original_title == "Interstellar"
     assert result.year == "2014"
+    assert result.tmdb_id == "157336"
 
 
 def test_search_movie_without_valid_result_returns_none() -> None:
