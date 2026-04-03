@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v16)
+# Luminarr AGENTS.md (v17)
 
 This file is the operating contract for AI coding agents working in this repository. 
 
@@ -11,6 +11,52 @@ This file is the operating contract for AI coding agents working in this reposit
 1. **No Jargon / No Black Boxes:** Explain architecture using real-world analogies (e.g., "file read/write", "network ports", "data flow"). Do not use terms like "polymorphism" or "dependency injection". Tell me clearly *who is sending what data to whom*.
 2. **Architecture Guide:** Whenever creating or modifying a file, explain its role in the system in 1-2 plain Chinese sentences before writing code.
 3. **Defensive Programming:** Code must not fail silently. Include explicit error handling. If an operation fails, you MUST print detailed, colored Chinese error logs to the terminal telling me exactly what broke and how to fix it.
+
+---
+
+## Development environment
+
+- **Host OS:** Windows
+- **Dev shell:** WSL (Ubuntu), all work happens inside WSL
+- **Interaction mode:** Codex CLI in WSL terminal, pure CLI, no GUI
+- **Repository location:** inside WSL filesystem (not `/mnt/c/...`)
+
+---
+
+## Local integration test stack (WSL Docker)
+
+This repository has a formal local integration baseline for real downloader/import/refresh verification.
+
+### Services
+
+| Service | Role | WSL-accessible endpoint |
+|---|---|---|
+| Transmission | downloader test instance | `http://localhost:9091` (RPC: `/transmission/rpc`) |
+| Emby | media server test instance | `http://localhost:8096` |
+
+### Source of truth
+
+Read `docs/TEST_ENV.md` before writing or running any integration script that touches:
+- `add_to_downloader`
+- `import_to_library`
+- `refresh_media_server`
+- related SQLite schema / persistence behavior for these paths
+
+### When it is mandatory
+
+Use the local stack, not mocks, for any task that depends on:
+- hardlink execution
+- Transmission RPC dispatch
+- Emby refresh API behavior
+
+### Health check before integration scripts
+
+```bash
+curl -s http://localhost:9091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
+curl -s http://localhost:8096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"
+```
+
+If either service is down, do not proceed with integration verification.
 
 ---
 
@@ -60,7 +106,7 @@ Core responsibilities:
 - `get_download_status`
 - `import_to_library`
 - `refresh_media_server`
-- `manage_watchlist` (reserved, not current priority)
+- `manage_watchlist` (manual baseline landed; auto-download remains deferred)
 
 ## Scope discipline
 
@@ -72,14 +118,28 @@ Do not expand into:
 - qBittorrent / Jellyfin / Sonarr / Radarr in the current mainline
 - auto-download watchlist in the current mainline
 
+The following are valid roadmap items, but remain out of scope until `docs/NEXT_STEP.md` explicitly promotes them:
+- post-download auto import
+- filename normalization + metadata scraping
+- subtitle auto-translation
+- series / anime tracking scheduler
+- BT/PT split downloader routing
+- Feishu / WeCom / personal WeChat adapters
+- downloader/library asset cleanup automation
+
 ## Current priority
 
-The next development priority is **execution hygiene**, not watchlist:
-1. durable Telegram message/callback de-dup
-2. durable execution ownership (`jobs.version`, `lease_owner`, `lease_until`)
+The current next smallest path is **Telegram callback workflow routing baseline**.
+
+Keep these already-landed baselines stable while doing it:
+1. Telegram message de-dup via `telegram_updates`
+2. execution ownership via `jobs.version`, `lease_owner`, `lease_until`
 3. approval-wake context rebuild
-4. low-cost frustration/reset short-circuit
-5. only after the above, consider watchlist baseline
+4. frustration/reset short-circuit
+5. downloader/import approval timeout
+6. read-only concurrency-safe execution policy
+7. ambiguous clarification isolation + restart-durable clarification truth
+8. manual watchlist baseline
 
 ## Runtime rules
 

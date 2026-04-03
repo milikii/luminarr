@@ -1,4 +1,4 @@
-# Current status (v19)
+# Current status (v20)
 
 ## Project position
 
@@ -87,17 +87,48 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - existing Telegram command words and existing downloader/import success-failure text bodies remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
+## Local integration test stack (WSL Docker)
+
+The formal local integration baseline is:
+- Transmission test instance: `http://localhost:9091`
+- Emby test instance: `http://localhost:8096`
+- host-side hardlink paths:
+  - `/srv/luminarr-test/downloads/tr`
+  - `/srv/luminarr-test/library/movies`
+
+Use this stack for real downloader/import/refresh verification. The detailed path, health-check, and config placeholder truth now lives in `docs/TEST_ENV.md`.
+
 ## What is adopted as a v15 rule, but not implemented yet
 
 - none
 
 ## What is not implemented yet
 
-- copy fallback approval for import
-- scheduler / retry baseline for pending tasks
+**Near-term control-layer and current-mainline gaps:**
+- Telegram callback workflow routing still does not exist, although `telegram_updates` is callback-ready at schema/repo level
+- copy fallback approval for import (cross-filesystem hardlink failure path)
+- smallest scheduler / retry / completion-monitor prerequisite for later automation is not landed yet
 - real image/media poster rendering
 - multi-process/global locking semantics
-- Telegram callback workflow routing still does not exist, although `telegram_updates` is callback-ready at schema/repo level
+
+**Stage B automation closure (documented roadmap, not current step):**
+- post-download auto import (replace the manual import confirm path only after control-layer prerequisites are stable)
+- resource auto-selection rules
+- filename normalization / renaming
+- metadata scraping (`TMDB + Fanart.tv`)
+- subtitle auto-translation
+
+**Stage C expansion (documented roadmap, not current step):**
+- series / anime watchlist-driven tracking
+- BT/PT split downloader routing with `qBittorrent` as later BT downloader
+
+**Stage D channel expansion (documented roadmap, not current step):**
+- Feishu adapter
+- WeCom adapter
+- personal WeChat adapter
+
+**Stage E operations cleanup (documented roadmap, not current step):**
+- downloader/library asset correlation and cleanup
 
 ## Latest verification
 

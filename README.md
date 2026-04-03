@@ -1,19 +1,24 @@
-# Luminarr (v15)
+# Luminarr (v20)
 
-Luminarr 是一个**面向自托管影视自动化场景的轻量自然语言 Harness**。
-它不是通用 AI 助手，也不是大而全媒体平台，而是把：
+Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harness**。
 
-**搜索 -> 选择 -> 审批 -> 提交下载 -> 查询状态 -> 导入 -> 刷新**
+当前已实现主线仍然是：
 
-这条链路，放进一个**可控、可测、可恢复、可审计**的运行时里。
+**搜索 -> 选择 -> 下载审批 -> 投递下载 -> 查询状态 -> 导入审批 -> 硬链接入库 -> Emby 刷新**
+
+更长的完整自动化链路：
+
+**意图 -> 元数据 -> 搜索 -> 用户确认 -> 下载 -> 自动入库 -> 规范化命名 -> 刮削 -> 字幕 -> 刷新 -> 追更 -> 通知 -> 清理**
+
+是后续阶段路线，不是当前已经落地的事实。
 
 ---
 
 ## 1. 当前固定运行画像
 
-当前主线写死为：
+当前主线固定为：
 
-- **Telegram 私聊**：唯一用户入口
+- **Telegram 私聊**：唯一当前入口
 - **TMDB**：唯一元数据源
 - **Prowlarr**：唯一搜索聚合器
 - **Transmission**：唯一下载器
@@ -23,22 +28,15 @@ Luminarr 是一个**面向自托管影视自动化场景的轻量自然语言 Ha
 - **单实例 / 单进程 / 单机**
 - **电影优先**
 
-当前不是：
-- 通用 AI 助手
-- 通用 Agent 平台
-- Sonarr / Radarr 替代品
-- qBittorrent / Jellyfin 双线并行项目
-- 自动 watchlist 下载系统
-
 ---
 
-## 2. 当前已落地能力
+## 2. 当前主线已落地能力
 
 目前仓库已经落地的主链能力包括：
 
 - Telegram 最小运行时
 - `search_media`
-- TMDB-first 电影元数据基线
+- TMDB-first 电影元数据搜索
 - 固定搜索顺序：
   1. English title + year
   2. original title + year
@@ -46,41 +44,99 @@ Luminarr 是一个**面向自托管影视自动化场景的轻量自然语言 Ha
 - 中文海报卡片文本基线
 - 候选映射持久化（SQLite）
 - `add_to_downloader` 显式审批
-- Transmission 投递
 - `status <id/hash>` 查询
 - `import <id/hash>` 进入 pending
 - `confirm <id/hash>` 路由到 downloader/import 的待确认副作用
-- `approval_record` 最小 pending/approved 协议
 - downloader/import confirm 的最小 lease/version 防重放
-- `job_event` 最小事件轨迹
+- `telegram_updates` 去重真相源
+- `jobs.version + lease_owner + lease_until` 最小执行所有权
+- approval-wake context rebuild
+- frustration/reset short-circuit
+- approval expiry / timeout baseline
+- LLM 物理异常响应式恢复最小基线
+- read-only concurrency-safe execution policy baseline
+- ambiguous-title 只读澄清隔离
+- clarification pending restart-durable baseline
+- 手动 `watchlist` 基线（add/list/remove/clear）
+- 硬链接导入 + Emby refresh
 
 ---
 
-## 3. v15 这次调整了什么
+## 3. 当前最近一步
 
-这版文档吸收了新的 review 意见，但不会把系统直接拉向“大而全”。
-v15 采纳的是**工程原则升级**，不是“下一步一次做完 5 个大特性”。
+当前 next step 不是 watchlist，也不是自动化大升级，而是：
 
-### 已采纳为制度规则
-- 只读工具允许进入**安全并发调度**；有副作用工具必须串行
-- 对 LLM 的 413 / 截断等**物理异常**，后续要走响应式恢复，而不是把错误暴露给用户
-- 模糊搜索允许使用**只读探索代理 / 探索子流程**，但不得污染主状态机
-- 任务从审批挂起恢复时，必须做**精确上下文重建**
-- 在 Telegram 交互层加入**低成本挫败感探测与短路重置**
+- **Telegram callback workflow routing baseline**
 
-### 尚未实现、但不再忽视
-- `telegram_updates` 已落地为 Telegram message de-dup 真相源
-- `jobs.version + lease_owner + lease_until` 已落地为 import wake/replay + downloader approval wake/replay 最小真相
-- `confirm <id/hash>` 的 approval-wake context rebuild 已落地
-- frustration/reset short-circuit 已落地到选择 reset + pending downloader/import cancel
-- approval expiry / timeout policy
-- 真正的 concurrency-safe executor
-- reactive recovery implementation
-- watchlist baseline（重新回到下一步）
+这一小步的目标是：
+
+- 不改现有文本命令路径
+- 不绕过现有 downloader/import approval 边界
+- 复用已有 `telegram_updates` 去重真相
+- 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
 ---
 
-## 4. 当前最重要的工程立场
+## 4. 当前之后的阶段化路线
+
+下面这些是**后续路线**，不是当前一步要同时开工的内容。推进顺序固定为“每次只做一个小目标”。
+
+### 阶段 A：控制层收尾
+
+- Telegram callback workflow routing baseline
+- copy fallback approval（跨文件系统 import 场景）
+- 最小 completion-monitor / scheduler 前置能力
+
+### 阶段 B：自动化闭环
+
+- 下载完成后自动入库
+- 资源自动选优规则
+- 文件规范化重命名
+- 元数据刮削（TMDB + Fanart.tv）
+- 字幕自动翻译
+
+### 阶段 C：追更与多内容类型
+
+- 剧集 / 动漫 watchlist 驱动追更
+- BT/PT 分离下载器路由
+- `qBittorrent` 作为后续 BT 下载器
+
+### 阶段 D：渠道扩展
+
+- 飞书
+- 企业微信
+- 个人微信
+
+### 阶段 E：运维自动化
+
+- 下载器资源与库文件关联监控
+- 孤儿任务与清理策略
+
+---
+
+## 5. 当前不该做什么
+
+### 不是当前主线
+
+- 自动 watchlist 下载
+- 多下载器并行支持
+- 多媒体服务器并行支持
+- 多渠道并行接入
+- 通用 scheduler 平台化
+
+### 明确不做
+
+- 通用 AI 助手
+- 通用 Agent 平台
+- Web UI / 桌面端
+- Telegram / 微信群聊
+- 一次性引入 Redis / MQ / PostgreSQL
+- 多机分布式部署
+- 解压压缩包流程
+
+---
+
+## 6. 工程立场
 
 Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
@@ -91,6 +147,7 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 5. **不该用 AI 的地方就不要用 AI**
 
 因此：
+
 - parser-first，LLM-fallback
 - 模型不负责幂等
 - 模型不负责审批校验
@@ -99,113 +156,29 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ---
 
-## 5. 工具与调度原则
+## 7. 本地集成测试栈
 
-当前核心工具仍然只保留 6 个：
+涉及 `add_to_downloader`、`import_to_library`、`refresh_media_server` 的真实联调，使用 WSL Docker 本地测试栈：
 
-- `search_media`
-- `add_to_downloader`
-- `get_download_status`
-- `import_to_library`
-- `refresh_media_server`
-- `manage_watchlist`
+- Transmission：`http://localhost:9091`
+- Emby：`http://localhost:8096`
 
-### 调度纪律
-- `search_media`、`get_download_status`：只读，可并发
-- `add_to_downloader`、`import_to_library`、`refresh_media_server`：有副作用，串行
-- 同一 job 的副作用路径必须持有执行所有权
-- `manage_watchlist` 先按串行实现，后续如仅做提醒查询再放宽
+详细路径、健康检查、配置占位见 `docs/TEST_ENV.md`。
 
 ---
 
-## 6. 审批与上下文重建
-
-当前已经落地：
-- 选择序号不会立即投递下载，而是先进入 pending approval
-- `import <id/hash>` 只进入 pending
-- `confirm <id/hash>` 才执行 downloader/import 副作用
-
-v15 新要求：
-- 审批唤醒后，执行阶段不得直接复用旧对话长历史
-- 必须从持久化状态重建一个极小执行上下文
-- 后续 `add_to_downloader` 也要遵循同样模式
-
----
-
-## 7. 当前不该做什么
-
-不要把下一步发散到这些方向：
-- watchlist 自动下载
-- 多下载器并行支持
-- 多媒体服务器并行支持
-- Webhook / Web UI / 群聊
-- 一次性引入 Redis / MQ / PostgreSQL
-- 复杂命名模板 / 解压 / 清理策略
-- 通用多 Agent 平台化
-
----
-
-## 8. 下一步正确优先级
-
-v15 下，执行卫生和控制层已补到 downloader approval。
-下一步应回到 **watchlist baseline**：
-
-1. `telegram_updates` 去重真相源
-2. `jobs` 表最小执行所有权协议
-3. approval-wake context rebuild
-4. frustration detector / deterministic reset
-5. `add_to_downloader` 的显式审批
-6. 现在回到 watchlist baseline
-
----
-
-## 9. 部署前提
-
-推荐宿主机目录：
-
-```text
-/srv/media/
-├── downloads/
-│   ├── tr/
-│   ├── incomplete/
-│   └── watch/
-└── library/
-    └── movies/
-
-/srv/luminarr/
-├── config/
-├── data/
-├── logs/
-├── cache/
-└── backups/
-```
-
-容器内统一视图：
-
-```text
-/data/downloads/tr
-/data/library/movies
-```
-
-约束：
-- 下载目录和库目录必须位于同一文件系统
-- 硬链接优先
-- 硬链接失败默认不自动 copy
-- copy fallback 必须审批
-
----
-
-## 10. 文档入口
+## 8. 文档入口
 
 开始任何新任务前，先读：
 
 1. `docs/DECISIONS.md`
 2. `docs/NEXT_STEP.md`
 3. `docs/STATUS.md`
-4. `AGENTS.md`
+4. `README.md`
+5. `AGENTS.md`
 
 ---
 
-## 11. 一句话总结
+## 9. 一句话总结
 
-**Luminarr v15 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；它保留 TMDB-first 搜索、import-confirm、最小 lease/version 防重放等已落地能力，同时把“安全并发、响应式恢复、审批唤醒重建、挫败感短路”正式提升为下一阶段工程纪律。**
+**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，下一步先收掉 callback 路由，再按阶段进入自动化闭环。**

@@ -1,8 +1,8 @@
 # docs/TEST_ENV.md — 本地集成测试栈配置
 
-> 这份文件是 WSL Docker 本地测试栈的唯一配置真相源。
-> Codex 在执行涉及 import / refresh / downloader 的集成任务前，必须先读这份文件。
-> 不要把真实凭据提交到 Git。此文件应加入 `.gitignore`。
+> 这份文件是 WSL Docker 本地测试栈的正式说明入口。
+> 它记录端点、路径、健康检查和配置占位；不要把真实凭据提交到 Git。
+> 真实用户名、密码、API Key、Library ID 应保存在本地 `.env` 或本地配置覆盖中。
 
 ---
 
@@ -10,7 +10,7 @@
 
 Docker Compose 文件：
 
-```
+```text
 /srv/luminarr-test/docker-compose.yml
 ```
 
@@ -34,8 +34,8 @@ cd /srv/luminarr-test && docker compose down
 |---|---|
 | WSL 访问地址 | `http://localhost:9091` |
 | RPC 路径 | `/transmission/rpc` |
-| 用户名 | `admin`（按实际填写） |
-| 密码 | `（按实际填写）` |
+| 用户名 | `admin`（按本地实际填写） |
+| 密码 | `（按本地实际填写）` |
 | 下载目录（宿主机） | `/srv/luminarr-test/downloads/tr` |
 | 下载目录（容器内） | `/data/downloads/tr` |
 | incomplete 目录（宿主机） | `/srv/luminarr-test/downloads/incomplete` |
@@ -53,10 +53,10 @@ curl -s http://localhost:9091/transmission/rpc | grep -q "X-Transmission-Session
 | 项目 | 值 |
 |---|---|
 | WSL 访问地址 | `http://localhost:8096` |
-| API Key | `（按实际填写，在 Emby 管理后台生成）` |
+| API Key | `（按本地实际填写，在 Emby 管理后台生成）` |
 | 库路径（宿主机） | `/srv/luminarr-test/library/movies` |
 | 库路径（容器内） | `/data/library/movies` |
-| Library ID | `（按实际填写，首次启动后在 Emby 后台查看）` |
+| Library ID | `（按本地实际填写，首次启动后在 Emby 后台查看）` |
 
 健康检查：
 
@@ -70,8 +70,8 @@ curl -s http://localhost:8096/System/Info/Public | grep -q "ServerName" && echo 
 
 下载目录和库目录**必须在同一 WSL 文件系统**上：
 
-```
-/srv/luminarr-test/downloads/tr      ← 必须与下面在同一挂载点
+```text
+/srv/luminarr-test/downloads/tr
 /srv/luminarr-test/library/movies
 ```
 
@@ -81,23 +81,23 @@ curl -s http://localhost:8096/System/Info/Public | grep -q "ServerName" && echo 
 stat -c "%d" /srv/luminarr-test/downloads/tr && stat -c "%d" /srv/luminarr-test/library/movies
 ```
 
-两个数字相同 → 同一文件系统 → 硬链接可用。
+两个数字相同，才表示硬链接可用。
 
 ---
 
-## 对应的 app 配置（.env 或 config）
+## 对应的 app 配置（.env 或本地 config）
 
 ```env
 # Transmission
 TRANSMISSION_HOST=http://localhost:9091
 TRANSMISSION_USER=admin
-TRANSMISSION_PASS=（按实际填写）
+TRANSMISSION_PASS=（按本地实际填写）
 TRANSMISSION_DOWNLOAD_DIR=/data/downloads/tr
 
 # Emby
 EMBY_BASE_URL=http://localhost:8096
-EMBY_API_KEY=（按实际填写）
-EMBY_LIBRARY_ID=（按实际填写）
+EMBY_API_KEY=（按本地实际填写）
+EMBY_LIBRARY_ID=（按本地实际填写）
 
 # 本地库路径（宿主机视角，供 import hardlink 使用）
 LIBRARY_MOVIES_PATH=/srv/luminarr-test/library/movies
@@ -107,7 +107,7 @@ LIBRARY_MOVIES_PATH=/srv/luminarr-test/library/movies
 
 ## Codex 使用规范
 
-1. 执行涉及 `import_to_library` / `refresh_media_server` / `add_to_downloader` 端到端的 `tmp_tests/` 脚本前，必须先做健康检查。
-2. 如果健康检查失败，不要继续执行，告知用户先启动测试栈。
-3. 测试完成后，Transmission 中的测试种子和 Emby 中的测试媒体条目可手动清理，不需要自动清理。
-4. 不要把测试栈的凭据硬编码进仓库代码，始终从 config / `.env` 读取。
+1. 执行涉及 `import_to_library` / `refresh_media_server` / `add_to_downloader` 的端到端验证前，必须先做健康检查。
+2. 如果健康检查失败，不要继续执行，先让用户启动测试栈。
+3. 不要把测试栈真实凭据硬编码进仓库代码，始终从本地 config / `.env` 读取。
+4. 测试完成后，Transmission 中的测试任务和 Emby 中的测试媒体条目可以手动清理，不要求仓库代码自动清理。

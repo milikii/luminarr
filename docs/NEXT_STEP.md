@@ -1,4 +1,4 @@
-# Next step (v19)
+# Next step (v20)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -84,7 +84,7 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
-- do not introduce Telegram inline keyboard as a requirement for this step
+- do not start stage B/C/D/E roadmap items in this step
 
 ## Suggested implementation shape
 
@@ -104,4 +104,22 @@ Only do:
 
 ## After this step
 
-Re-evaluate the smallest remaining control-layer gap after callback routing baseline is stable.
+After callback routing baseline is stable, advance in this order (still one small goal at a time):
+
+1. close the remaining import hardlink safety gap:
+   - copy fallback approval for cross-filesystem import
+2. land the smallest completion-monitor / scheduler prerequisite needed by later automation:
+   - keep it narrow; do not broaden into a generic workflow platform
+3. only then enter stage B automation closure:
+   - post-download auto import
+   - resource auto-selection rules
+   - filename normalization / rename
+   - metadata scrape
+   - subtitle auto-translation
+4. after movie automation is stable, enter stage C:
+   - series / anime watchlist-driven tracking
+   - BT/PT split downloader routing (`qBittorrent` later)
+5. after workflow core is stable, enter stage D:
+   - Feishu / WeCom / personal WeChat parallel channel adapters
+6. after the above is stable, enter stage E:
+   - downloader/library asset correlation and cleanup
