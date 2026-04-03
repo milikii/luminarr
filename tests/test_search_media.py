@@ -36,6 +36,15 @@ async def _fake_search_empty(query: str) -> list[dict[str, object]]:
     return []
 
 
+async def _fake_search_ambiguous(query: str) -> list[dict[str, object]]:
+    assert query == "Dune"
+    return [
+        {"title": "Dune (1984) 1080p BluRay", "year": 1984, "size": 2 * 1024 * 1024 * 1024},
+        {"title": "Dune (2000) 1080p WEB-DL", "year": 2000, "size": 3 * 1024 * 1024 * 1024},
+        {"title": "Dune (2021) 2160p WEB-DL", "year": 2021, "size": 9 * 1024 * 1024 * 1024},
+    ]
+
+
 def test_search_and_format_with_results() -> None:
     service = SearchMediaService(_fake_search_with_results)
     text = _run(service.search_and_format("dune"))
@@ -62,6 +71,16 @@ def test_search_and_format_no_result() -> None:
     service = SearchMediaService(_fake_search_empty)
     text = _run(service.search_and_format("unknown"))
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
+
+
+def test_search_and_format_returns_clarification_for_ambiguous_query() -> None:
+    service = SearchMediaService(_fake_search_ambiguous)
+    text = _run(service.search_and_format("Dune", chat_id=1001))
+    assert "片名可能有多个版本：Dune" in text
+    assert "只读探索参考：" in text
+    assert "- Dune (1984) 1080p BluRay (1984)" in text
+    assert service.is_clarification_pending(1001)
+    assert service.get_cached_candidate(1001, 1) is None
 
 
 async def _fake_search_quality_from_title(query: str) -> list[dict[str, object]]:

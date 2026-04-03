@@ -1,4 +1,4 @@
-# Next step (v17)
+# Next step (v18)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -43,10 +43,14 @@ Prerequisite completed:
   - read-only actions run without side-effect serialization lock
   - side-effect actions remain serialized through the execution gate
   - existing Telegram command behavior and success/failure text bodies remain unchanged
+- smallest isolated read-only exploration baseline for ambiguous title resolution is now landed:
+  - highly ambiguous no-year queries return deterministic clarification text with read-only options
+  - clarification-path does not persist candidate mapping and does not trigger downloader/import side effects
+  - numeric select is blocked while clarification is pending
 
 ## Goal
 
-Land the smallest **isolated read-only explore-agent / explore-subflow baseline** for ambiguous title resolution.
+Land the smallest **restart-durable clarification pending truth baseline**.
 
 ## Scope
 
@@ -57,9 +61,10 @@ Only do:
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
-- add the smallest isolated read-only exploration path for highly ambiguous title resolution
-- ensure exploration path is read-only only and never dispatches downloader/import side effects
-- add focused tests/manual verification for exploration routing and no-regression
+- keep the landed ambiguous read-only exploration behavior unchanged
+- persist minimal clarification-pending truth so it can survive process restart
+- restore/clear clarification-pending truth deterministically with existing reset/cancel routing
+- add focused tests/manual verification for clarification durability and no-regression
 
 ## Explicit constraints
 
@@ -73,13 +78,14 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
+- do not broaden clarification persistence into a generic workflow-state platform
 
 ## Suggested implementation shape
 
-1. identify ambiguous-query trigger conditions in current read-only search path
-2. add the smallest isolated exploration helper/subflow with strict read-only boundary
-3. keep confirmed structured result write-back behavior deterministic
-4. keep side-effect serialization, lease/approval protocol, physical-failure, and reset/cancel behaviors unchanged
+1. add a smallest persisted clarification truth shape (chat-scoped, no extra side-effect protocols)
+2. wire search/no-result clarification set + clear to persisted truth with in-memory fast path preserved
+3. keep numeric-select blocking and frustration reset behavior deterministic after restart
+4. keep side-effect serialization, lease/approval protocol, physical-failure behavior unchanged
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -87,8 +93,9 @@ Only do:
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
-- ambiguous-query exploration path is read-only isolated and cannot trigger side effects
+- clarification pending state survives restart with deterministic reset behavior
+- ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-Re-evaluate the smallest next control-layer gap after ambiguous-query isolation baseline is stable.
+Re-evaluate the smallest remaining control-layer gap after clarification durability is stable.

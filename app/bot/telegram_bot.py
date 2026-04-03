@@ -39,6 +39,7 @@ from app.services.search_media import SearchMediaService
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
+CLARIFICATION_SELECTION_BLOCKED_TEXT = "当前处于片名澄清中，请先补充片名或年份后再搜索。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -265,6 +266,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
 
     if query.isdigit():
+        search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
+        if (
+            isinstance(search_service, SearchMediaService)
+            and chat is not None
+            and search_service.is_clarification_pending(chat.id)
+        ):
+            await message.reply_text(CLARIFICATION_SELECTION_BLOCKED_TEXT)
+            return
+
         add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
         if not isinstance(add_service, AddToDownloaderService):
             await message.reply_text(SERVICE_NOT_READY_TEXT)

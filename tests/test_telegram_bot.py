@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    CLARIFICATION_SELECTION_BLOCKED_TEXT,
     CLARIFICATION_RESET_TEXT,
     FRUSTRATION_RESET_TEXT,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
@@ -204,6 +205,30 @@ def test_handle_message_digit_replies_service_not_ready() -> None:
 
     asyncio.run(handle_message(update, context))
     reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+
+
+def test_handle_message_digit_blocked_when_clarification_pending() -> None:
+    update, reply_text = _build_update("1")
+    search_service = SearchMediaService(_fake_search_empty)
+    _run(search_service.search_and_format("unknown", chat_id=1001))
+    assert search_service.is_clarification_pending(1001)
+
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once_with(CLARIFICATION_SELECTION_BLOCKED_TEXT)
 
 
 def test_handle_message_status_routes_to_status_service() -> None:
