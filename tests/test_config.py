@@ -126,6 +126,23 @@ def test_load_settings_reads_subtitle_translation_settings() -> None:
     assert settings.subtitle_translation_timeout_seconds == 45.0
 
 
+def test_load_settings_reads_raw_bt_destinations() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "RAW_BT_DESTINATIONS": "downloads|下载目录|/data/raw/downloads;archive|归档目录|/data/raw/archive",
+        }
+    )
+    assert len(settings.raw_bt_destination_options) == 2
+    assert settings.raw_bt_destination_options[0].key == "downloads"
+    assert settings.raw_bt_destination_options[0].label == "下载目录"
+    assert settings.raw_bt_destination_options[0].target_dir == "/data/raw/downloads"
+    assert settings.raw_bt_destination_options[1].key == "archive"
+
+
 def test_load_settings_rejects_invalid_subtitle_timeout() -> None:
     with pytest.raises(ConfigError):
         load_settings(

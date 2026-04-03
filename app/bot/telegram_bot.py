@@ -8,6 +8,7 @@ from typing import TypeVar
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
+from app.config import RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
@@ -86,6 +87,32 @@ BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE = (
     "当前这一步只展示关联结果，暂不执行下载投递。"
 )
 BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT = "TMDB 关联服务未就绪，请稍后重试。"
+RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE = (
+    "已记录本次 BT 分类：其他 BT 资源（raw_bt）。\n"
+    "请选择预设目标目录：\n"
+    "{options}\n"
+    "请回复目录编号或目录键，例如：1 或 downloads\n"
+    "当前这一步只记录目录 follow-up，不会执行下载投递。"
+)
+RAW_BT_DESTINATION_PENDING_REMINDER_TEMPLATE = (
+    "当前正在等待 raw_bt 目标目录。\n"
+    "请回复目录编号或目录键，例如：{example}"
+)
+RAW_BT_DESTINATION_SELECTED_TEMPLATE = (
+    "已记录 raw_bt 目标目录。\n"
+    "目录键: {key}\n"
+    "目录说明: {label}\n"
+    "目标路径: {target_dir}\n"
+    "当前这一步只展示目录结果，暂不执行下载投递。"
+)
+RAW_BT_DESTINATION_CANCELLED_TEXT = "已取消当前 raw_bt 目录选择，请重新发送磁力或 BT 指令。"
+RAW_BT_DESTINATION_INVALID_TEMPLATE = (
+    "未识别到有效的 raw_bt 目录选项：{query}\n"
+    "请回复目录编号或目录键，例如：{example}\n"
+    "可选目录：\n"
+    "{options}"
+)
+RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT = "raw_bt 目录选择未就绪，请先配置预设目标目录后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -100,6 +127,8 @@ BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
 BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
 BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY = "bt_tmdb_movie_candidates_lookup_func"
 BT_TMDB_TV_CANDIDATES_LOOKUP_KEY = "bt_tmdb_tv_candidates_lookup_func"
+RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY = "raw_bt_destination_pending_by_chat"
+RAW_BT_DESTINATION_OPTIONS_KEY = "raw_bt_destination_options"
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 
@@ -137,6 +166,11 @@ BT_TMDB_ASSOCIATION_EXAMPLES = {
 @dataclass(frozen=True, slots=True)
 class BtTmdbAssociationPending:
     media_kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class RawBtDestinationPending:
+    options: tuple[RawBtDestinationOption, ...]
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -207,6 +241,7 @@ def build_application(
     execution_gate: ExecutionGate | None = None,
     bt_tmdb_movie_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
     bt_tmdb_tv_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
+    raw_bt_destination_options: tuple[RawBtDestinationOption, ...] = (),
 ) -> Application:
     application = Application.builder().token(token).build()
     application.bot_data[SEARCH_SERVICE_KEY] = search_service
@@ -219,6 +254,7 @@ def build_application(
         application.bot_data[BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
     if bt_tmdb_tv_candidates_lookup_func is not None:
         application.bot_data[BT_TMDB_TV_CANDIDATES_LOOKUP_KEY] = bt_tmdb_tv_candidates_lookup_func
+    application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY] = raw_bt_destination_options
     if telegram_update_repo is not None:
         application.bot_data[TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
     if job_repo is not None:
@@ -432,6 +468,17 @@ def _resolve_bt_tmdb_association_pending_by_chat(
     return resolved_pending_by_chat
 
 
+def _resolve_raw_bt_destination_pending_by_chat(
+    context: ContextTypes.DEFAULT_TYPE,
+) -> dict[int, RawBtDestinationPending]:
+    pending_by_chat = context.application.bot_data.get(RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY)
+    if isinstance(pending_by_chat, dict):
+        return pending_by_chat
+    resolved_pending_by_chat: dict[int, RawBtDestinationPending] = {}
+    context.application.bot_data[RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
+    return resolved_pending_by_chat
+
+
 def _set_bt_tmdb_association_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
@@ -466,6 +513,43 @@ def _clear_bt_tmdb_association_pending(
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
+    return pending_by_chat.pop(chat_id, None) is not None
+
+
+def _set_raw_bt_destination_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    options: tuple[RawBtDestinationOption, ...],
+) -> None:
+    if chat_id is None or chat_id <= 0:
+        return
+    pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
+    pending_by_chat[chat_id] = RawBtDestinationPending(options=options)
+
+
+def _get_raw_bt_destination_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> RawBtDestinationPending | None:
+    if chat_id is None or chat_id <= 0:
+        return None
+    pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
+    pending = pending_by_chat.get(chat_id)
+    if not isinstance(pending, RawBtDestinationPending):
+        return None
+    return pending
+
+
+def _clear_raw_bt_destination_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> bool:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
     return pending_by_chat.pop(chat_id, None) is not None
 
 
@@ -529,6 +613,90 @@ def _format_bt_tmdb_association_success(media_kind: str, match: TmdbMovie) -> st
         year=year,
         tmdb_id=tmdb_id,
     )
+
+
+def _resolve_raw_bt_destination_options(
+    context: ContextTypes.DEFAULT_TYPE,
+) -> tuple[RawBtDestinationOption, ...]:
+    options = context.application.bot_data.get(RAW_BT_DESTINATION_OPTIONS_KEY)
+    if not isinstance(options, tuple):
+        return ()
+    resolved_options: list[RawBtDestinationOption] = []
+    for option in options:
+        if isinstance(option, RawBtDestinationOption):
+            resolved_options.append(option)
+    return tuple(resolved_options)
+
+
+def _format_raw_bt_destination_options(options: tuple[RawBtDestinationOption, ...]) -> str:
+    lines: list[str] = []
+    for index, option in enumerate(options, start=1):
+        lines.append(f"{index}. {option.label} [{option.key}] -> {option.target_dir}")
+    return "\n".join(lines) if lines else "- 暂无可用目录。"
+
+
+def _format_raw_bt_destination_prompt(options: tuple[RawBtDestinationOption, ...]) -> str:
+    return RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE.format(
+        options=_format_raw_bt_destination_options(options),
+    )
+
+
+def _resolve_raw_bt_destination_example(options: tuple[RawBtDestinationOption, ...]) -> str:
+    if not options:
+        return "downloads"
+    first_option = options[0]
+    return first_option.key or "1"
+
+
+def _format_raw_bt_destination_selected(option: RawBtDestinationOption) -> str:
+    return RAW_BT_DESTINATION_SELECTED_TEMPLATE.format(
+        key=option.key,
+        label=option.label,
+        target_dir=option.target_dir,
+    )
+
+
+def _parse_raw_bt_destination_choice(
+    query: str,
+    options: tuple[RawBtDestinationOption, ...],
+) -> RawBtDestinationOption | None:
+    normalized_text = query.strip().lower()
+    if not normalized_text:
+        return None
+    if normalized_text.isdigit():
+        index = int(normalized_text)
+        if 1 <= index <= len(options):
+            return options[index - 1]
+    for option in options:
+        if normalized_text == option.key.lower():
+            return option
+    return None
+
+
+def _format_raw_bt_destination_invalid(
+    query: str,
+    options: tuple[RawBtDestinationOption, ...],
+) -> str:
+    return RAW_BT_DESTINATION_INVALID_TEMPLATE.format(
+        query=query.strip(),
+        example=_resolve_raw_bt_destination_example(options),
+        options=_format_raw_bt_destination_options(options),
+    )
+
+
+async def _handle_raw_bt_destination_query(
+    *,
+    query: str,
+    pending: RawBtDestinationPending,
+    chat_id: int | None,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> str:
+    selected_option = _parse_raw_bt_destination_choice(query, pending.options)
+    if selected_option is None:
+        return _format_raw_bt_destination_invalid(query, pending.options)
+
+    _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    return _format_raw_bt_destination_selected(selected_option)
 
 
 def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
@@ -653,6 +821,9 @@ async def _handle_query_text(
             ):
                 await reply_func(FRUSTRATION_RESET_TEXT)
                 return
+        if _clear_raw_bt_destination_pending(context=context, chat_id=chat_id):
+            await reply_func(RAW_BT_DESTINATION_CANCELLED_TEXT)
+            return
         if _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id):
             await reply_func(BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
             return
@@ -661,6 +832,7 @@ async def _handle_query_text(
             return
 
     if _is_bt_direct_intent(query):
+        _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         _set_bt_classification_pending(
             context=context,
@@ -673,9 +845,19 @@ async def _handle_query_text(
     bt_classification = _parse_bt_classification_choice(query)
     if bt_classification is not None and _is_bt_classification_pending(context=context, chat_id=chat_id):
         _pop_bt_classification_pending(context=context, chat_id=chat_id)
+        _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         if bt_classification == "raw_bt":
-            await reply_func(_format_bt_classification_result(bt_classification))
+            raw_bt_destination_options = _resolve_raw_bt_destination_options(context)
+            if not raw_bt_destination_options:
+                await reply_func(RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT)
+                return
+            _set_raw_bt_destination_pending(
+                context=context,
+                chat_id=chat_id,
+                options=raw_bt_destination_options,
+            )
+            await reply_func(_format_raw_bt_destination_prompt(raw_bt_destination_options))
             return
         _set_bt_tmdb_association_pending(
             context=context,
@@ -809,6 +991,17 @@ async def _handle_query_text(
         reply = await _handle_bt_tmdb_association_query(
             query=query,
             pending=bt_tmdb_pending,
+            chat_id=chat_id,
+            context=context,
+        )
+        await reply_func(reply)
+        return
+
+    raw_bt_destination_pending = _get_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    if raw_bt_destination_pending is not None:
+        reply = await _handle_raw_bt_destination_query(
+            query=query,
+            pending=raw_bt_destination_pending,
             chat_id=chat_id,
             context=context,
         )

@@ -1,4 +1,4 @@
-# Next step (v30)
+# Next step (v31)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -122,10 +122,17 @@ Prerequisite completed:
   - when TMDB returns no reliable candidate or multiple plausible candidates, Telegram text/callback path now returns deterministic clarification text and stays side-effect free
   - `raw_bt` remains on the existing classification-only path and does not enter TMDB association in this step
   - focused tests + manual verification passed
+- smallest `raw_bt` destination-directory follow-up baseline is now landed:
+  - after BT classification, `raw_bt` now deterministically enters destination-directory follow-up instead of stopping at classification-result text
+  - destination options come from configured raw-BT directories and are shown in deterministic text/result handling
+  - valid replies now accept directory index or directory key and return deterministic selected-directory text while staying side-effect free
+  - invalid destination replies now return deterministic reminder text with the available options and stay side-effect free
+  - missing raw-BT destination configuration now returns explicit not-ready text instead of silently falling through to other routes
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **`raw_bt` destination-directory follow-up baseline**.
+Land the smallest **downloader-role binding baseline**.
 
 ## Scope
 
@@ -140,11 +147,13 @@ Only do:
 - keep the landed PT / BT parser-level intent split baseline unchanged
 - keep the landed BT classification follow-up baseline unchanged
 - keep the landed BT `movie / series / anime` TMDB association follow-up baseline unchanged
-- add only the smallest deterministic destination-directory follow-up for BT requests already classified as `raw_bt`
-- when the current BT request is `raw_bt`, make the preconfigured destination-directory options visible in deterministic text/result handling without dispatching downloader side effects in this step
-- when the user gives an invalid or unclear raw-BT destination reply, return deterministic reminder/clarification text and keep the flow side-effect free
-- keep this step focused on destination-directory follow-up only; do not yet add downloader-role binding, qBittorrent, BT dispatch, or persistent raw-BT transfer execution
-- add focused tests/manual verification for raw-BT destination-directory follow-up and no-regression
+- keep the landed `raw_bt` destination-directory follow-up baseline unchanged
+- add only the smallest deterministic downloader-role binding truth for:
+  - `pt_downloader`
+  - `bt_downloader`
+- allow configuration to bind PT and BT roles to downloader instance names without dispatching new downloader side effects in this step
+- keep this step focused on role-binding truth only; do not yet add qBittorrent protocol wiring, BT dispatch execution, or persistent raw-BT transfer execution
+- add focused tests/manual verification for downloader-role binding baseline and no-regression
 
 ## Explicit constraints
 
@@ -156,20 +165,20 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
-- do not introduce downloader-role binding in this step
-- do not introduce qBittorrent or multiple downloader instances in this step
+- do not introduce qBittorrent request dispatch in this step
 - do not introduce a generic tracking platform or user-configurable rule engine in this step
 - do not bypass the landed parser-level PT / BT split with ad-hoc late-stage branching
 - do not regress the landed BT `movie / series / anime` TMDB association follow-up baseline
+- do not regress the landed `raw_bt` destination-directory follow-up baseline
 
 ## Suggested implementation shape
 
-1. reuse the landed BT-direct routing + classification follow-up and add the smallest deterministic destination-directory follow-up for `raw_bt`
+1. add the smallest configuration truth for downloader instances and bind `pt_downloader` / `bt_downloader` to instance names
 2. keep normal movie/search/watchlist/status/import/confirm command behavior fully backward compatible
-3. make the raw-BT destination-directory options and chosen result visible in deterministic text/result handling without dispatching new downloader side effects in this step
-4. keep `movie / series / anime` on the existing TMDB association path for now
+3. keep this step side-effect free for BT dispatch and raw-BT transfer execution
+4. keep current PT and BT follow-up routing unchanged; this step only prepares the later dispatch truth
 5. keep current manual status/watchlist/import paths fully backward compatible
-6. add focused tests and manual verification steps for raw-BT destination-directory follow-up and no-regression
+6. add focused tests and manual verification steps for downloader-role binding baseline and no-regression
 
 ## Done when
 
@@ -183,15 +192,16 @@ Only do:
 - landed PT / BT parser-level split baseline remains deterministic and does not bypass existing side-effect boundaries
 - landed BT classification follow-up remains deterministic and does not dispatch downloader side effects in this step
 - landed BT `movie / series / anime` TMDB association follow-up remains deterministic and side-effect free in this step
-- `raw_bt` destination-directory follow-up is deterministic and remains side-effect free in this step
+- landed `raw_bt` destination-directory follow-up remains deterministic and side-effect free in this step
+- downloader-role binding truth is deterministic and remains side-effect free in this step
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After `raw_bt` destination-directory follow-up baseline is stable, advance in this order (still one small goal at a time):
+After downloader-role binding baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
-   - downloader-role binding (`pt_downloader` / `bt_downloader`; multiple downloader instances allowed, qBittorrent protocol later)
+   - BT dispatch / transfer execution on top of the landed PT/BT split, TMDB association follow-up, raw-BT destination follow-up, and downloader-role binding truth
    - only after the above is stable, evaluate BT subscription / continuous-download as another separate small goal
 2. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters

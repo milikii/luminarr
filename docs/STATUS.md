@@ -1,4 +1,4 @@
-# Current status (v30)
+# Current status (v31)
 
 ## Project position
 
@@ -157,6 +157,13 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - when TMDB returns no reliable candidate or multiple plausible candidates, Telegram text/callback path now returns deterministic clarification text and stays side-effect free
   - `raw_bt` remains on the existing classification-only path and does not enter TMDB association in this baseline
   - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
+- smallest `raw_bt` destination-directory follow-up baseline is now landed:
+  - after BT classification, `raw_bt` now deterministically enters destination-directory follow-up instead of stopping at classification-result text
+  - destination options come from configured pre-set raw-BT directories and are shown in deterministic text/result handling
+  - valid replies now accept either directory index or directory key and return deterministic selected-directory text (`key / label / target_dir`) while staying side-effect free
+  - invalid raw-BT directory replies now return deterministic reminder text with the available options and stay side-effect free
+  - missing raw-BT destination configuration now returns explicit not-ready text instead of silently falling through to other routes
+  - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -184,8 +191,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- `raw_bt` destination-directory follow-up:
-  - `raw_bt` should skip TMDB; the system should present preconfigured destination-directory options during dispatch inquiry, persist the user's choice, and move files into that selected directory only
 - downloader-role binding (`pt_downloader` / `bt_downloader`) with multiple downloader instances:
   - later protocol set is Transmission + qBittorrent
   - multiple Transmission / qBittorrent instances are allowed
@@ -201,9 +206,10 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `169 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `175 passed` (`.venv/bin/python -m pytest -q`)
 - focused tests: `10 passed, 29 deselected` (`.venv/bin/python -m pytest -q tests/test_manage_watchlist.py tests/test_telegram_bot.py -k watchlist`)
 - focused tests: `49 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_tmdb_client.py`)
+- focused tests: `62 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_config.py`)
 - manual verification: series / anime watchlist-driven tracking baseline passed (temporary `tmp_tests/verify_watchlist_media_kind_baseline.py`, script cleaned after run)
 - manual verification: resource auto-selection rules baseline passed (temporary `tmp_tests/verify_resource_auto_selection_baseline.py`, script cleaned after run)
 - manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
@@ -222,6 +228,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - manual verification: PT / BT parser-level intent split baseline passed (temporary `tmp_tests/verify_pt_bt_parser_split_baseline.py`, script cleaned after run)
 - manual verification: BT classification follow-up baseline passed (temporary `tmp_tests/verify_bt_classification_followup.py`, script cleaned after run)
 - manual verification: BT `movie / series / anime` TMDB association follow-up baseline passed (temporary `tmp_tests/verify_bt_tmdb_association_followup.py`, script cleaned after run)
+- manual verification: `raw_bt` destination-directory follow-up baseline passed (temporary `tmp_tests/verify_raw_bt_destination_followup.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -232,7 +239,8 @@ Build the next smallest path:
 3. keep landed ambiguous read-only exploration behavior stable
 4. keep landed BT classification follow-up baseline stable
 5. keep landed BT `movie / series / anime` TMDB association follow-up baseline stable
-6. land the smallest `raw_bt` destination-directory follow-up baseline without introducing downloader-role binding, BT dispatch side effects, or scheduler/platformization
+6. keep landed `raw_bt` destination-directory follow-up baseline stable
+7. land the smallest downloader-role binding baseline without introducing BT dispatch side effects, qBittorrent wiring, or scheduler/platformization
 
 ## Current risks
 
@@ -258,14 +266,15 @@ Build the next smallest path:
 - watchlist kind is currently user-declared (`movie` / `series` / `anime`); no automatic kind inference or fuzzy correction is introduced in this baseline
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
 - current BT-direct intent split baseline is intentionally narrow; only raw magnet links and a small set of explicit “下载这个 BT / 磁力” phrases are recognized
-- BT classification follow-up and BT TMDB association follow-up currently keep only the smallest in-memory chat-scoped pending state; process restart will clear that pending state by design in this baseline
+- BT classification follow-up, BT TMDB association follow-up, and raw-BT destination follow-up currently keep only the smallest in-memory chat-scoped pending state; process restart will clear that pending state by design in this baseline
 - BT `series` / `anime` TMDB association currently uses TMDB TV search only; anime movie-style entries may still require the user to retry with a clearer title/year
 - BT `movie / series / anime` TMDB association is currently result-text only; persisted BT workflow truth, downloader dispatch, and later media-chain reuse are not landed yet
-- `raw_bt` destination selection and later dispatch path are not landed yet
+- `raw_bt` destination follow-up is currently result-text only; persisted raw-BT workflow truth and later dispatch/transfer execution are not landed yet
+- downloader-role binding is not landed yet, so PT / BT still cannot bind to separate configured downloader instances
 
 ## Acceptance focus for the next step
 
-- land the smallest `raw_bt` destination-directory follow-up baseline without changing existing text-command behavior
+- land the smallest downloader-role binding baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
@@ -273,6 +282,7 @@ Build the next smallest path:
 - keep the landed subtitle auto-translation baseline stable
 - keep the landed BT classification follow-up baseline stable
 - keep the landed BT `movie / series / anime` TMDB association follow-up baseline stable
+- keep the landed `raw_bt` destination-directory follow-up baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
@@ -285,3 +295,4 @@ Build the next smallest path:
 - landed PT / BT parser-level intent split baseline remains deterministic and does not bypass existing side-effect boundaries
 - landed BT classification follow-up remains deterministic and does not bypass existing side-effect boundaries
 - landed BT `movie / series / anime` TMDB association follow-up remains deterministic and side-effect free
+- landed `raw_bt` destination-directory follow-up remains deterministic and side-effect free

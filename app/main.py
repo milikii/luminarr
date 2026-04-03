@@ -128,6 +128,7 @@ def main() -> None:
         job_repo=job_repo,
         bt_tmdb_movie_candidates_lookup_func=tmdb_client.search_movie_candidates if settings.tmdb_api_key else None,
         bt_tmdb_tv_candidates_lookup_func=tmdb_client.search_tv_candidates if settings.tmdb_api_key else None,
+        raw_bt_destination_options=settings.raw_bt_destination_options,
     )
     application.run_polling(drop_pending_updates=True)
 

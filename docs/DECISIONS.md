@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v29)
+# docs/DECISIONS.md (v30)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -729,6 +729,32 @@
   先把“媒体型 BT 在分类后到底关联到哪部影视作品”补成确定性路径，再继续往 `raw_bt` 目录选择和更后面的下载器角色绑定推进，能避免不同 BT 子路径在入口阶段再次混在一起。
 - **验证**：
   已通过 focused pytest（`tests/test_telegram_bot.py tests/test_tmdb_client.py`）、全量 pytest 与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-055 `raw_bt` destination-directory follow-up 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 在已落地的 BT classification follow-up 之后，`raw_bt` 现在已补上最小 deterministic destination-directory follow-up
+  - 当用户在 BT 分类阶段选择 `raw_bt` 时，系统不会直接结束在分类结果文本，也不会进入下载执行，而是继续展示预设目标目录选项
+  - 目录选项当前最小落地为配置驱动：
+    - 来自预设 raw-BT destination options
+    - Telegram text/callback 路径向用户展示目录编号、目录键与目标路径
+  - 当用户回复合法目录编号或目录键时，系统必须返回确定性的目录选择结果文本，至少展示：
+    - 目录键
+    - 目录说明
+    - 目标路径
+  - 当用户回复无效目录选项时，系统必须返回确定性的提醒文本和可选目录列表
+  - 当 raw-BT 目录配置缺失时，系统必须返回显式 not-ready 文本，不得静默落回普通搜索或其他 BT 子路径
+  - 当前这一步严格保持 follow-up-only：
+    - 不持久化新的 raw-BT workflow truth
+    - 不发起 downloader side effects
+    - 不执行 BT dispatch / transfer
+    - 不引入 downloader-role binding
+  - 当前 next smallest path 前进到 downloader-role binding baseline
+- **原因**：
+  先把“原始 BT 资源应该落到哪个预设目录”补成确定性路径，再继续进入 downloader-role binding，能避免后续 BT dispatch 阶段继续建立在模糊目标目录之上。
+- **验证**：
+  已通过 focused pytest（`tests/test_telegram_bot.py tests/test_config.py`）、全量 pytest 与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
 ---
 

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 from telegram.ext import CallbackQueryHandler
 
+from app.config import RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
@@ -16,6 +17,9 @@ from app.bot.telegram_bot import (
     BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
     BT_CLASSIFICATION_PROMPT_TEXT,
     BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE,
+    RAW_BT_DESTINATION_CANCELLED_TEXT,
+    RAW_BT_DESTINATION_OPTIONS_KEY,
+    RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
     BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
     BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
     BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
@@ -224,6 +228,18 @@ def test_handle_message_bt_raw_classification_reply_when_pending() -> None:
                 ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
                 GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
                 IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: (
+                    RawBtDestinationOption(
+                        key="downloads",
+                        label="下载目录",
+                        target_dir="/data/raw/downloads",
+                    ),
+                    RawBtDestinationOption(
+                        key="archive",
+                        label="归档目录",
+                        target_dir="/data/raw/archive",
+                    ),
+                ),
             }
         )
     )
@@ -232,9 +248,37 @@ def test_handle_message_bt_raw_classification_reply_when_pending() -> None:
     asyncio.run(handle_message(follow_up_update, context))
 
     first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
-    second_reply_text.assert_awaited_once_with(
-        BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label="其他 BT 资源", kind="raw_bt")
+    second_sent_text = second_reply_text.await_args.args[0]
+    assert "已记录本次 BT 分类：其他 BT 资源（raw_bt）。" in second_sent_text
+    assert "请选择预设目标目录：" in second_sent_text
+    assert "1. 下载目录 [downloads] -> /data/raw/downloads" in second_sent_text
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_raw_classification_replies_service_not_ready_without_destinations() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text = _build_update("raw_bt", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
     )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(follow_up_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -472,6 +516,112 @@ def test_handle_message_bt_tmdb_association_cancel_when_pending() -> None:
     third_reply_text.assert_awaited_once_with(BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
 
 
+def test_handle_message_raw_bt_destination_selection_succeeds() -> None:
+    update, first_reply_text = _build_update("下载这个 BT")
+    classify_update, second_reply_text = _build_update("raw_bt", update_id=2)
+    select_update, third_reply_text = _build_update("2", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    options = (
+        RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/data/raw/downloads"),
+        RawBtDestinationOption(key="archive", label="归档目录", target_dir="/data/raw/archive"),
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: options,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(select_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
+    selected_text = third_reply_text.await_args.args[0]
+    assert "已记录 raw_bt 目标目录。" in selected_text
+    assert "目录键: archive" in selected_text
+    assert "目标路径: /data/raw/archive" in selected_text
+
+
+def test_handle_message_raw_bt_destination_invalid_text_returns_reminder() -> None:
+    update, first_reply_text = _build_update("下载这个 BT")
+    classify_update, second_reply_text = _build_update("raw_bt", update_id=2)
+    invalid_update, third_reply_text = _build_update("随便放", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    options = (
+        RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/data/raw/downloads"),
+        RawBtDestinationOption(key="archive", label="归档目录", target_dir="/data/raw/archive"),
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: options,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(invalid_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
+    invalid_text = third_reply_text.await_args.args[0]
+    assert "未识别到有效的 raw_bt 目录选项：随便放" in invalid_text
+    assert "1. 下载目录 [downloads] -> /data/raw/downloads" in invalid_text
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_raw_bt_destination_cancel_when_pending() -> None:
+    update, first_reply_text = _build_update("下载这个 BT")
+    classify_update, second_reply_text = _build_update("raw_bt", update_id=2)
+    cancel_update, third_reply_text = _build_update("取消", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    options = (
+        RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/data/raw/downloads"),
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: options,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(cancel_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
+    third_reply_text.assert_awaited_once_with(RAW_BT_DESTINATION_CANCELLED_TEXT)
+
+
 def test_handle_message_replies_service_not_ready() -> None:
     reply_text = AsyncMock()
     message = SimpleNamespace(text="dune", reply_text=reply_text)
@@ -635,6 +785,13 @@ def test_handle_callback_query_bt_classification_reply_when_pending() -> None:
                 ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
                 GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
                 IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: (
+                    RawBtDestinationOption(
+                        key="downloads",
+                        label="下载目录",
+                        target_dir="/data/raw/downloads",
+                    ),
+                ),
             }
         )
     )
@@ -645,10 +802,57 @@ def test_handle_callback_query_bt_classification_reply_when_pending() -> None:
     first_answer.assert_awaited_once()
     second_answer.assert_awaited_once()
     first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
-    second_reply_text.assert_awaited_once_with(
-        BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label="其他 BT 资源", kind="raw_bt")
-    )
+    second_sent_text = second_reply_text.await_args.args[0]
+    assert "已记录本次 BT 分类：其他 BT 资源（raw_bt）。" in second_sent_text
+    assert "请选择预设目标目录：" in second_sent_text
+    assert "1. 下载目录 [downloads] -> /data/raw/downloads" in second_sent_text
     search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_callback_query_raw_bt_destination_selection_succeeds() -> None:
+    update, first_reply_text, first_answer = _build_callback_update("magnet:?xt=urn:btih:abcdef1234567890")
+    classify_update, second_reply_text, second_answer = _build_callback_update("raw_bt", callback_query_id="cb-2")
+    select_update, third_reply_text, third_answer = _build_callback_update("downloads", callback_query_id="cb-3")
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: (
+                    RawBtDestinationOption(
+                        key="downloads",
+                        label="下载目录",
+                        target_dir="/data/raw/downloads",
+                    ),
+                    RawBtDestinationOption(
+                        key="archive",
+                        label="归档目录",
+                        target_dir="/data/raw/archive",
+                    ),
+                ),
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+    asyncio.run(handle_callback_query(classify_update, context))
+    asyncio.run(handle_callback_query(select_update, context))
+
+    first_answer.assert_awaited_once()
+    second_answer.assert_awaited_once()
+    third_answer.assert_awaited_once()
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
+    selected_text = third_reply_text.await_args.args[0]
+    assert "已记录 raw_bt 目标目录。" in selected_text
+    assert "目录键: downloads" in selected_text
 
 
 def test_handle_callback_query_digit_uses_callback_context_when_effective_context_missing() -> None:
