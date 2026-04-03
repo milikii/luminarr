@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v23)
+# docs/DECISIONS.md (v24)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -504,6 +504,21 @@
   - 当前 next smallest path 前进到 subtitle auto-translation baseline
 - **原因**：
   先用最小改动补齐“导入后 metadata 侧车文件”这一自动化闭环缺口，同时保持现有副作用安全边界和控制层协议稳定。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-045 subtitle auto-translation 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - confirmed import success 现在在现有导入成功路径上确定性触发 subtitle auto-translation
+  - 仅处理 SubRip (`.srt`) 字幕；输出 `*.zh.srt`，并保持原始序号与时间轴结构
+  - 默认翻译路径改为专业模型逐行翻译（OpenAI-compatible `chat/completions`），默认模型 `gpt-5.4`
+  - 缺少 `SUBTITLE_TRANSLATION_API_KEY` 或模型调用失败时，必须显式记录 `subtitle.failed` 并打印可读错误/建议；失败不回滚 confirmed import success
+  - 既有 Telegram 命令词、approval 边界、`jobs` 所有权、lease/version、防重放协议保持不变
+  - 当前 next smallest path 前进到 series / anime watchlist-driven tracking baseline
+- **原因**：
+  先用最小改动补齐“导入后字幕自动翻译”闭环缺口，并把默认路径提升到专业翻译模型，避免低质量规则替换误导用户。
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 

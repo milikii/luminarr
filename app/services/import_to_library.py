@@ -19,10 +19,12 @@ from app.db.approval_repo import (
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
+from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 
 GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
 MetadataScrapeFunc = Callable[[MetadataScrapeInput], Awaitable[MetadataScrapeResult]]
+SubtitleTranslateFunc = Callable[[SubtitleTranslateInput], SubtitleTranslateResult]
 
 IMPORT_QUERY_USAGE_TEXT = "导入格式：import <任务ID或Hash>"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
@@ -91,6 +93,7 @@ class ImportToLibraryService:
         library_target_dir: str,
         refresh_media_server_func: RefreshMediaServerFunc | None = None,
         scrape_metadata_func: MetadataScrapeFunc | None = None,
+        translate_subtitle_func: SubtitleTranslateFunc | None = None,
         job_event_repo: JobEventRepo | None = None,
         approval_repo: ApprovalRepo | None = None,
         job_repo: JobRepo | None = None,
@@ -99,6 +102,7 @@ class ImportToLibraryService:
         self._library_target_dir = Path(library_target_dir).expanduser()
         self._refresh_media_server_func = refresh_media_server_func
         self._scrape_metadata_func = scrape_metadata_func
+        self._translate_subtitle_func = translate_subtitle_func
         self._job_event_repo = job_event_repo
         self._approval_repo = approval_repo
         self._job_repo = job_repo
@@ -635,10 +639,16 @@ class ImportToLibraryService:
             event_type="import.succeeded",
             message=str(target_path),
         )
-        await self._try_scrape_metadata(
+        metadata_result = await self._try_scrape_metadata(
             task_ref=task_ref,
             import_source=import_source,
             target_path=target_path,
+        )
+        self._try_translate_subtitle(
+            task_ref=task_ref,
+            import_source=import_source,
+            target_path=target_path,
+            metadata_result=metadata_result,
         )
 
         if self._refresh_media_server_func is None:
@@ -681,9 +691,9 @@ class ImportToLibraryService:
         task_ref: str,
         import_source: TransmissionImportSource,
         target_path: Path,
-    ) -> None:
+    ) -> MetadataScrapeResult | None:
         if self._scrape_metadata_func is None:
-            return
+            return None
 
         title, year = self._resolve_metadata_title_year(
             task_id=import_source.task_id,
@@ -714,7 +724,7 @@ class ImportToLibraryService:
                 "\033[33m[处理建议]\033[0m 检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
                 flush=True,
             )
-            return
+            return None
 
         event_type = "metadata.succeeded" if result.success else "metadata.failed"
         self._record_event(
@@ -724,6 +734,67 @@ class ImportToLibraryService:
             event_type=event_type,
             message=result.message,
         )
+        return result
+
+    def _try_translate_subtitle(
+        self,
+        *,
+        task_ref: str,
+        import_source: TransmissionImportSource,
+        target_path: Path,
+        metadata_result: MetadataScrapeResult | None,
+    ) -> None:
+        if self._translate_subtitle_func is None:
+            return
+        metadata_path = ""
+        if metadata_result is not None and metadata_result.metadata_path.strip():
+            metadata_path = metadata_result.metadata_path.strip()
+        else:
+            metadata_path = str(_resolve_metadata_sidecar_path(target_path))
+        translate_input = SubtitleTranslateInput(
+            task_ref=task_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            target_path=str(target_path),
+            metadata_path=metadata_path,
+        )
+        try:
+            result = self._translate_subtitle_func(translate_input)
+        except Exception as exc:
+            message = f"subtitle 翻译执行异常：{exc}"
+            self._record_event(
+                task_ref=task_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="subtitle.failed",
+                message=message,
+            )
+            print(f"\033[31m[字幕翻译失败]\033[0m {message}", flush=True)
+            print(
+                "\033[33m[处理建议]\033[0m 检查字幕文件编码和目录写权限，再重试 confirm 导入。",
+                flush=True,
+            )
+            return
+
+        if result.skipped:
+            event_type = "subtitle.skipped"
+        elif result.success:
+            event_type = "subtitle.succeeded"
+        else:
+            event_type = "subtitle.failed"
+        self._record_event(
+            task_ref=task_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            event_type=event_type,
+            message=result.message,
+        )
+        if event_type == "subtitle.failed":
+            print(f"\033[31m[字幕翻译失败]\033[0m {result.message}", flush=True)
+            print(
+                "\033[33m[处理建议]\033[0m 检查字幕文件内容、编码和目录写权限，再重试 confirm 导入。",
+                flush=True,
+            )
 
     def _resolve_metadata_title_year(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
         fallback_title, fallback_year = _extract_title_year_for_scrape(target_path)
@@ -1262,6 +1333,12 @@ def _extract_title_year_from_text(value: str) -> tuple[str, str]:
         title = normalized
     title = title.strip()
     return title, year
+
+
+def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
+    if target_path.is_dir():
+        return target_path / ".luminarr.metadata.json"
+    return target_path.with_suffix(".metadata.json")
 
 
 def _build_normalized_target_name(*, source_path: Path, naming_truth: str) -> str:

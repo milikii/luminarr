@@ -1,4 +1,4 @@
-# Current status (v23)
+# Current status (v24)
 
 ## Project position
 
@@ -127,6 +127,11 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - when `TMDB_API_KEY` exists but `FANART_API_KEY` is missing, metadata sidecar still writes TMDB truth with empty fanart image fields
   - metadata scrape failure is explicitly recorded (`metadata.failed`) and does not roll back confirmed import success
   - existing Telegram command words and approval / ownership / replay boundaries remain unchanged
+- smallest subtitle auto-translation baseline is now landed:
+  - confirmed import success path now deterministically triggers subtitle auto-translation on the existing import chain
+  - subtitle translation defaults to professional model translation (`gpt-5.4`, OpenAI-compatible `chat/completions`) for SubRip (`.srt`) and writes `*.zh.srt`
+  - missing subtitle API key / model errors are explicitly recorded (`subtitle.failed`) and do not roll back confirmed import success
+  - existing Telegram command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -151,7 +156,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - multi-process/global locking semantics
 
 **Stage B automation closure (documented roadmap, not current step):**
-- subtitle auto-translation
+- none
 
 **Stage C expansion (documented roadmap, not current step):**
 - series / anime watchlist-driven tracking
@@ -167,13 +172,14 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `144 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `152 passed` (`.venv/bin/python -m pytest -q`)
 - manual verification: resource auto-selection rules baseline passed (temporary `tmp_tests/verify_resource_auto_selection_baseline.py`, script cleaned after run)
 - manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
 - manual verification: completion-monitor / scheduler prerequisite baseline passed (temporary `tmp_tests/verify_download_monitor_prerequisite.py`, script cleaned after run)
 - manual verification: copy fallback approval baseline passed (temporary `tmp_tests/verify_import_copy_fallback_approval.py`, script cleaned after run)
 - manual verification: filename normalization / rename baseline passed (temporary `tmp_tests/verify_filename_normalization_baseline.py`, script cleaned after run)
 - manual verification: metadata scraping (`TMDB + Fanart.tv`) baseline passed (temporary `tmp_tests/verify_metadata_scraping_baseline.py`, script cleaned after run)
+- manual verification: subtitle auto-translation baseline passed (temporary `tmp_tests/verify_subtitle_auto_translation_baseline.py` and `tmp_tests/verify_subtitle_professional_translation_live.py`, scripts cleaned after run)
 - manual verification: Telegram callback workflow routing baseline passed (temporary `tmp_tests/verify_callback_routing.py`, script cleaned after run)
 - manual verification: read-only concurrency-safe execution policy baseline passed (`tmp_tests/verify_execution_policy_baseline.py`)
 - manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
@@ -188,8 +194,8 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. keep landed resource auto-selection rules + filename normalization / rename + metadata scraping baselines stable
-5. land the smallest subtitle auto-translation baseline without introducing generic subtitle platformization
+4. keep landed resource auto-selection rules + filename normalization / rename + metadata scraping + subtitle auto-translation baselines stable
+5. land the smallest series / anime watchlist-driven tracking baseline without introducing generic scheduler/downloader platformization
 
 ## Current risks
 
@@ -206,6 +212,8 @@ Build the next smallest path:
 - filename normalization baseline currently uses smallest deterministic cleanup + year extraction; noisy release names may still produce imperfect titles
 - metadata scraping baseline is best-effort; TMDB/Fanart/query/write failures are recorded but do not block confirmed import success
 - when `FANART_API_KEY` is missing, metadata sidecar keeps empty fanart image URLs by design
+- subtitle auto-translation baseline is best-effort; missing `SUBTITLE_TRANSLATION_API_KEY` or model/network failure is recorded and does not block confirmed import success
+- subtitle auto-translation currently only targets SubRip (`.srt`) files; non-`.srt` subtitle formats are not processed in this baseline
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
@@ -214,10 +222,11 @@ Build the next smallest path:
 
 ## Acceptance focus for the next step
 
-- land the smallest subtitle auto-translation baseline without changing existing text-command behavior
+- land the smallest series / anime watchlist-driven tracking baseline without changing existing text-command behavior
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
 - keep the landed metadata scraping (`TMDB + Fanart.tv`) baseline stable
+- keep the landed subtitle auto-translation baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress

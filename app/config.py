@@ -24,6 +24,10 @@ class Settings:
     library_target_dir: str
     emby_base_url: str
     emby_api_key: str
+    subtitle_translation_api_key: str
+    subtitle_translation_base_url: str
+    subtitle_translation_model: str
+    subtitle_translation_timeout_seconds: float
     sqlite_db_path: str
 
 
@@ -43,6 +47,14 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     emby_base_url = _read_optional(env, "EMBY_BASE_URL").rstrip("/")
     tmdb_base_url = _read_optional(env, "TMDB_BASE_URL").rstrip("/")
     fanart_base_url = _read_optional(env, "FANART_BASE_URL").rstrip("/")
+    subtitle_translation_base_url = _read_optional(env, "SUBTITLE_TRANSLATION_BASE_URL").rstrip("/")
+    subtitle_translation_timeout_raw = _read_optional(env, "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS")
+    subtitle_translation_timeout_seconds = 60.0
+    if subtitle_translation_timeout_raw:
+        try:
+            subtitle_translation_timeout_seconds = float(subtitle_translation_timeout_raw)
+        except ValueError:
+            raise ConfigError("SUBTITLE_TRANSLATION_TIMEOUT_SECONDS must be a number")
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
         prowlarr_base_url=_read_required(env, "PROWLARR_BASE_URL").rstrip("/"),
@@ -57,5 +69,9 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         library_target_dir=_read_optional(env, "LIBRARY_TARGET_DIR") or "/data/library/movies",
         emby_base_url=emby_base_url,
         emby_api_key=_read_optional(env, "EMBY_API_KEY"),
+        subtitle_translation_api_key=_read_optional(env, "SUBTITLE_TRANSLATION_API_KEY"),
+        subtitle_translation_base_url=subtitle_translation_base_url or "https://api.openai.com/v1",
+        subtitle_translation_model=_read_optional(env, "SUBTITLE_TRANSLATION_MODEL") or "gpt-5.4",
+        subtitle_translation_timeout_seconds=subtitle_translation_timeout_seconds,
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
     )

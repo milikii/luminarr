@@ -1,4 +1,4 @@
-# Next step (v23)
+# Next step (v24)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -92,25 +92,29 @@ Prerequisite completed:
   - with TMDB enabled and Fanart missing, metadata sidecar still writes TMDB truth with empty fanart fields
   - metadata scrape failures are explicitly recorded and do not break confirmed import success
   - focused tests + manual verification passed
+- smallest subtitle auto-translation baseline is now landed:
+  - confirmed import success now deterministically triggers subtitle auto-translation on the existing import success path
+  - subtitle translation defaults to professional model translation (`gpt-5.4`, OpenAI-compatible `chat/completions`) for SubRip (`.srt`) and writes `*.zh.srt`
+  - missing subtitle API key / model errors are explicitly recorded and do not break confirmed import success
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **subtitle auto-translation baseline**.
+Land the smallest **series / anime watchlist-driven tracking baseline**.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, filename normalization / rename, metadata scraping (`TMDB + Fanart.tv`), completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, filename normalization / rename, metadata scraping (`TMDB + Fanart.tv`), subtitle auto-translation, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- reuse the existing confirmed import success path as the only subtitle auto-translation trigger entrypoint
-- add only the smallest deterministic subtitle auto-translation baseline; do not broaden into generic subtitle platformization
-- preserve the landed import safety boundary, including copy-fallback approval for cross-filesystem import
-- add focused tests/manual verification for subtitle translation success/failure and no-regression
+- add only the smallest deterministic series/anime watchlist-driven tracking baseline without introducing downloader routing/scheduler platformization
+- keep watchlist changes chat-scoped and persistence-first (SQLite truth), without bypassing existing approval/ownership boundaries
+- add focused tests/manual verification for series/anime watchlist tracking paths and no-regression
 
 ## Explicit constraints
 
@@ -122,16 +126,16 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
-- do not start stage B/C/D/E roadmap items in this step
-- do not introduce a generic subtitle pipeline platform or user-configurable subtitle template system in this step
+- do not introduce BT/PT split downloader routing in this step
+- do not introduce a generic series tracking platform or user-configurable tracking rule engine in this step
 
 ## Suggested implementation shape
 
-1. use the existing confirmed import success path as the only place that triggers subtitle auto-translation
-2. derive subtitle task input from deterministic persisted import truth (task identity + target path + metadata sidecar), without depending on free-form chat history
-3. keep subtitle trigger compatible with the existing approval / ownership / copy-fallback rules
+1. reuse existing `watchlist_item` persistence and extend minimal schema/protocol shape for media kind (`movie/series/anime`) without broad refactor
+2. keep command interaction deterministic and backward compatible for existing movie watchlist commands
+3. ensure series/anime watchlist tracking path does not trigger downloader/import side effects in this step
 4. keep current manual status/watchlist/import paths fully backward compatible
-5. add focused tests and manual verification steps for subtitle success/failure paths
+5. add focused tests and manual verification steps for series/anime tracking add/list/remove flows
 
 ## Done when
 
@@ -140,16 +144,15 @@ Only do:
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
 - cross-filesystem import copy-fallback approval remains stable
-- landed downloader completion truth, post-download auto import, resource auto-selection, filename normalization, and metadata scraping baselines remain stable
-- confirmed import success can deterministically trigger the smallest subtitle auto-translation baseline without depending on chat transcript memory
+- landed downloader completion truth, post-download auto import, resource auto-selection, filename normalization, metadata scraping, and subtitle auto-translation baselines remain stable
+- series/anime watchlist-driven tracking baseline is deterministic, persistence-backed, and does not bypass existing side-effect boundaries
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After subtitle auto-translation baseline is stable, advance in this order (still one small goal at a time):
+After series/anime watchlist-driven tracking baseline is stable, advance in this order (still one small goal at a time):
 
-1. after movie automation closure is stable, enter stage C:
-   - series / anime watchlist-driven tracking
+1. keep stage C order:
    - BT/PT split downloader routing (`qBittorrent` later)
 2. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters

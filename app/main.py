@@ -24,6 +24,7 @@ from app.services.metadata_scraper import MetadataScraperService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService
 from app.services.search_media import SearchMediaService
+from app.services.subtitle_translator import SubtitleTranslatorService
 
 
 async def _skip_fanart_images(_: str):
@@ -90,6 +91,12 @@ def main() -> None:
         library_target_dir=settings.library_target_dir,
         refresh_media_server_func=refresh_media_server_func,
         scrape_metadata_func=scrape_metadata_func,
+        translate_subtitle_func=SubtitleTranslatorService(
+            api_key=settings.subtitle_translation_api_key,
+            base_url=settings.subtitle_translation_base_url,
+            model=settings.subtitle_translation_model,
+            timeout_seconds=settings.subtitle_translation_timeout_seconds,
+        ).translate_for_import,
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,
         job_repo=job_repo,
