@@ -1,4 +1,4 @@
-# Next step (v20)
+# Next step (v21)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -76,45 +76,51 @@ Prerequisite completed:
   - cross-filesystem copy-fallback approval remains unchanged on the later confirmed import path
   - existing Telegram command words remain unchanged; `status <id/hash>` may append import approval-pending text when completion is first observed
   - focused tests + manual verification passed
+- smallest resource auto-selection rules baseline is now landed:
+  - observed completed download truth now passes through the smallest deterministic resource rule set before auto-progressing into import approval-pending
+  - explicit low-quality source markers (`CAM` / `HDCAM` / `TS` / `HDTS` / `TC` / `SCR` / `WORKPRINT`) deterministically skip auto progression
+  - skipped auto progression appends `auto_import.skipped_by_rule` into `job_event` and does not repeat on later `status <id/hash>`
+  - skipped resources still keep the existing manual `import <id/hash>` path
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **resource auto-selection rules** baseline.
+Land the smallest **filename normalization / rename** baseline.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, post-download auto import, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- reuse the landed downloader completion truth and post-download auto import progression as the only trigger/input source
-- add only the smallest deterministic resource auto-selection rule set; do not broaden into rename / scrape / subtitle logic
+- reuse the existing confirmed import path as the only rename entrypoint
+- add only the smallest deterministic filename normalization / rename rule set; do not broaden into metadata scrape / subtitle logic
 - preserve the landed import safety boundary, including copy-fallback approval for cross-filesystem import
-- add focused tests/manual verification for resource auto-selection and no-regression
+- add focused tests/manual verification for filename normalization / rename and no-regression
 
 ## Explicit constraints
 
 - do not add new downloader/media server support
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
-- do not add library filename normalization/renaming
 - do not add a broad generic scheduler platform in this step
-- do not start rename / metadata scrape / subtitle logic in this step
+- do not start metadata scrape / subtitle logic in this step
 - do not remove existing `status <id/hash>` / `watchlist ...` command paths
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
 - do not start stage B/C/D/E roadmap items in this step
+- do not introduce a custom naming DSL or user-configurable rename template system in this step
 
 ## Suggested implementation shape
 
-1. use landed downloader completion truth and post-download auto import progression as the only automation input
-2. add the smallest deterministic rule set that decides whether the completed resource should progress or be skipped
-3. keep this rule set independent from LLM calls and compatible with existing ownership / approval rules
+1. use the existing confirmed import path as the only place that applies normalized movie naming
+2. derive the normalized target name from already-known deterministic movie truth when available, without depending on free-form chat history
+3. keep rename logic compatible with the existing approval / ownership / copy-fallback rules
 4. keep current manual status/watchlist/import paths fully backward compatible
 5. add focused tests and manual verification steps
 
@@ -125,16 +131,16 @@ Only do:
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
 - cross-filesystem import copy-fallback approval remains stable
-- downloader completion truth can deterministically drive the smallest resource auto-selection progression without depending on chat transcript memory
-- landed post-download auto import baseline remains stable
+- landed downloader completion truth, post-download auto import, and resource auto-selection baselines remain stable
+- confirmed import can deterministically produce the smallest normalized movie target naming without depending on chat transcript memory
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
+- metadata scrape / subtitle logic is not introduced in this step
 
 ## After this step
 
-After resource auto-selection rules are stable, advance in this order (still one small goal at a time):
+After filename normalization / rename is stable, advance in this order (still one small goal at a time):
 
 1. enter stage B automation closure:
-   - filename normalization / rename
    - metadata scrape
    - subtitle auto-translation
 2. after movie automation is stable, enter stage C:

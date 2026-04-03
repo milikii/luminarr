@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v20)
+# docs/DECISIONS.md (v21)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -461,6 +461,20 @@
   - 当前 next smallest path 前进到 resource auto-selection rules
 - **原因**：
   先补齐自动化闭环第一步，同时坚持“自动推进只到待确认，不直接做副作用执行”的最小实现原则，避免控制层边界退化。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-042 resource auto-selection rules 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - 已观察到完成的下载在自动推进到 `import` approval-pending 之前，必须先经过最小 deterministic resource auto-selection 规则
+  - 当前最小规则只拦截明确低质量来源标记：`CAM` / `HDCAM` / `TS` / `HDTS` / `TC` / `SCR` / `WORKPRINT`
+  - 命中规则时，系统不得自动推进到 `import` approval-pending；应返回确定性 skip 文本，并保留手动 `import <id/hash>` 路径
+  - skip truth 继续复用现有 `job_event`，记录为 `auto_import.skipped_by_rule`，避免后续 `status` 重复自动推进或重复 skip 提示
+  - 当前 next smallest path 前进到 filename normalization / rename baseline
+- **原因**：
+  先用最小确定性规则补齐自动化闭环第二步，优先过滤明显低质量资源，同时不把仓库提前扩成完整资源评分平台。
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 

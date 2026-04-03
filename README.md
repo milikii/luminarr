@@ -1,4 +1,4 @@
-# Luminarr (v20)
+# Luminarr (v21)
 
 Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harness**。
 
@@ -61,6 +61,7 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 - cross-filesystem import copy fallback approval baseline
 - completion-monitor / scheduler prerequisite baseline
 - post-download auto import baseline
+- resource auto-selection rules baseline
 - 手动 `watchlist` 基线（add/list/remove/clear）
 - 硬链接导入 + Emby refresh
 
@@ -70,12 +71,12 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 当前 next step 不是 watchlist，也不是自动化大升级，而是：
 
-- **resource auto-selection rules baseline**
+- **filename normalization / rename baseline**
 
 这一小步的目标是：
 
-- 复用已落地的 completion-monitor 与 auto import 真相推进自动化闭环第二步
-- 不引入通用 scheduler 平台化
+- 在现有 confirmed import 路径上最小化落地规范化命名
+- 不引入 metadata scrape / subtitle / scheduler 平台化
 - 保持现有 import 安全边界和 copy-fallback 审批不退化
 - 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
@@ -88,7 +89,6 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 ### 阶段 B：自动化闭环
 
 - 下载完成后自动入库
-- 资源自动选优规则
 - 文件规范化重命名
 - 元数据刮削（TMDB + Fanart.tv）
 - 字幕自动翻译
@@ -179,4 +179,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 9. 一句话总结
 
-**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，post-download auto import baseline 也已落地，下一步进入 resource auto-selection rules baseline。**
+**Luminarr v21 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新、post-download auto import 与 resource auto-selection 补到了较稳定状态，下一步进入 filename normalization / rename baseline。**

@@ -16,7 +16,10 @@ from app.services.get_download_status import (
     GetDownloadStatusService,
     parse_status_query,
 )
-from app.services.post_download_auto_import import PostDownloadAutoImportService
+from app.services.post_download_auto_import import (
+    AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+    PostDownloadAutoImportService,
+)
 
 
 def test_parse_status_query_supports_status_prefix() -> None:
@@ -224,6 +227,170 @@ def test_get_status_text_does_not_repeat_auto_import_when_import_activity_exists
     assert "状态: 做种中" in text
     assert "导入待确认" not in text
     auto_import.assert_not_awaited()
+
+
+def test_get_status_text_skips_low_quality_resource_auto_import_and_records_event(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 CAM",
+        chat_id=1001,
+        user_id=2001,
+    )
+    event_repo = JobEventRepo(database)
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        auto_import_func=auto_import,
+    )
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 2024 CAM",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert "资源自动规则已跳过自动导入：Dune 2024 CAM" in text
+    assert "命中低质量来源标记 CAM" in text
+    assert "import hash-87" in text
+    auto_import.assert_not_awaited()
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert [event.event_type for event in events] == [
+        "downloader.completed_observed",
+        AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+    ]
+
+
+def test_get_status_text_does_not_repeat_rule_skip_when_skip_event_exists(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 CAM",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 2024 CAM",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type=AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+        message="CAM",
+    )
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        auto_import_func=auto_import,
+    )
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 2024 CAM",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert "资源自动规则已跳过自动导入" not in text
+    auto_import.assert_not_awaited()
+
+
+def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 1080p WEB-DL",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.register_download(
+        task_id="88",
+        task_hash="hash-88",
+        name="Dune 2024 CAM",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 2024 1080p WEB-DL",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="88",
+            task_hash="hash-88",
+            name="Dune 2024 CAM",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    auto_import = AsyncMock(return_value="导入待确认：Dune 2024 1080p WEB-DL")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=JobEventRepo(database),
+        auto_import_func=auto_import,
+    )
+
+    result = asyncio.run(auto_import_service.run_once())
+
+    assert result.scanned == 2
+    assert result.progressed == 1
+    assert len(result.replies) == 2
+    auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
 
 
 def _run(coroutine: Awaitable[str]) -> str:
