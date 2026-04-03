@@ -19,6 +19,7 @@ from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.manage_watchlist import ManageWatchlistService
+from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService
 from app.services.search_media import SearchMediaService
 
@@ -63,11 +64,6 @@ def main() -> None:
         job_event_repo=job_event_repo,
         download_monitor_repo=download_monitor_repo,
     )
-    get_download_status_service = GetDownloadStatusService(
-        transmission_client.get_torrent_status,
-        download_monitor_repo=download_monitor_repo,
-        job_event_repo=job_event_repo,
-    )
     refresh_media_server_func = None
     if settings.emby_base_url and settings.emby_api_key:
         emby_client = EmbyClient(base_url=settings.emby_base_url, api_key=settings.emby_api_key)
@@ -80,6 +76,21 @@ def main() -> None:
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,
         job_repo=job_repo,
+    )
+    post_download_auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=download_monitor_repo,
+        job_event_repo=job_event_repo,
+        auto_import_func=lambda task_ref, chat_id, user_id: import_to_library_service.import_by_task_ref(
+            task_ref,
+            chat_id=chat_id,
+            user_id=user_id,
+        ),
+    )
+    get_download_status_service = GetDownloadStatusService(
+        transmission_client.get_torrent_status,
+        download_monitor_repo=download_monitor_repo,
+        job_event_repo=job_event_repo,
+        post_download_auto_import_service=post_download_auto_import_service,
     )
     manage_watchlist_service = ManageWatchlistService(watchlist_repo)
     application = build_application(

@@ -101,6 +101,8 @@ SCHEMA_STATEMENTS = (
         task_id TEXT NOT NULL,
         task_hash TEXT NOT NULL,
         name TEXT NOT NULL DEFAULT '',
+        chat_id INTEGER NOT NULL DEFAULT 0,
+        user_id INTEGER NOT NULL DEFAULT 0,
         status_code INTEGER NOT NULL DEFAULT 0,
         percent_done REAL NOT NULL DEFAULT 0,
         is_complete INTEGER NOT NULL DEFAULT 0,
@@ -130,6 +132,7 @@ class SqliteDatabase:
                 connection.execute(statement)
             _ensure_approval_record_columns(connection)
             _ensure_jobs_columns(connection)
+            _ensure_download_monitor_columns(connection)
             connection.commit()
 
     @contextmanager
@@ -162,3 +165,12 @@ def _ensure_jobs_columns(connection: sqlite3.Connection) -> None:
     existing_columns = {str(row["name"]) for row in rows}
     if "payload_json" not in existing_columns:
         connection.execute("ALTER TABLE jobs ADD COLUMN payload_json TEXT NOT NULL DEFAULT ''")
+
+
+def _ensure_download_monitor_columns(connection: sqlite3.Connection) -> None:
+    rows = connection.execute("PRAGMA table_info(download_monitor)").fetchall()
+    existing_columns = {str(row["name"]) for row in rows}
+    if "chat_id" not in existing_columns:
+        connection.execute("ALTER TABLE download_monitor ADD COLUMN chat_id INTEGER NOT NULL DEFAULT 0")
+    if "user_id" not in existing_columns:
+        connection.execute("ALTER TABLE download_monitor ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")

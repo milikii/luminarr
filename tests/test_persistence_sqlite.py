@@ -36,6 +36,7 @@ from app.services.import_to_library import (
     IMPORT_TARGET_EXISTS_TEXT,
     ImportToLibraryService,
 )
+from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.search_media import SearchMediaService
 
 
@@ -124,6 +125,86 @@ def test_download_monitor_truth_persists_for_restart_and_completion_observation(
         task_hash="hash-42",
     )
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
+
+
+def test_completed_download_truth_after_restart_can_progress_to_import_pending(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    before_restart_monitor = DownloadMonitorRepo(database)
+    before_restart_monitor.register_download(
+        task_id="42",
+        task_hash="hash-42",
+        name=source_file.name,
+        chat_id=1001,
+        user_id=2001,
+    )
+    before_restart_monitor.record_status(
+        TransmissionTaskStatus(
+            task_id="42",
+            task_hash="hash-42",
+            name=source_file.name,
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+
+    import_source = TransmissionImportSource(
+        task_id="42",
+        task_hash="hash-42",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    after_restart_database = SqliteDatabase(str(db_path))
+    import_service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=ApprovalRepo(after_restart_database),
+        job_repo=JobRepo(after_restart_database),
+    )
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=DownloadMonitorRepo(after_restart_database),
+        job_event_repo=JobEventRepo(after_restart_database),
+        auto_import_func=lambda task_ref, chat_id, user_id: import_service.import_by_task_ref(
+            task_ref,
+            chat_id=chat_id,
+            user_id=user_id,
+        ),
+    )
+    status_service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="42",
+                task_hash="hash-42",
+                name=source_file.name,
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=DownloadMonitorRepo(after_restart_database),
+        job_event_repo=JobEventRepo(after_restart_database),
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    status_reply = _run(status_service.get_status_text("42"))
+
+    assert "状态: 做种中" in status_reply
+    assert "导入待确认" in status_reply
+    pending_job = JobRepo(SqliteDatabase(str(db_path))).get_import_job_for_chat_ref(chat_id=1001, task_ref="hash-42")
+    assert pending_job is not None
+    assert pending_job.state == JOB_STATE_PENDING_APPROVAL
 
 
 def test_telegram_update_repo_rejects_duplicate_message_after_restart(tmp_path: Path) -> None:

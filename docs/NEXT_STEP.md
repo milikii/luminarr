@@ -70,25 +70,31 @@ Prerequisite completed:
   - first observed completion deterministically appends `downloader.completed_observed` into `job_event`
   - pending-completion truth survives restart through SQLite
   - focused tests + manual verification passed
+- smallest post-download auto import baseline is now landed:
+  - observed completed download truth can auto-progress into the existing import approval-pending path
+  - auto-progress reuses existing `import_to_library` / approval / `jobs` truth and still requires explicit `confirm <id/hash>` before import side effects
+  - cross-filesystem copy-fallback approval remains unchanged on the later confirmed import path
+  - existing Telegram command words remain unchanged; `status <id/hash>` may append import approval-pending text when completion is first observed
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **post-download auto import** baseline.
+Land the smallest **resource auto-selection rules** baseline.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, post-download auto import, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- reuse the landed downloader completion truth as the only trigger source for auto-import
-- keep this step narrow; do not broaden into generic scheduler/platform work or resource auto-selection rules
+- reuse the landed downloader completion truth and post-download auto import progression as the only trigger/input source
+- add only the smallest deterministic resource auto-selection rule set; do not broaden into rename / scrape / subtitle logic
 - preserve the landed import safety boundary, including copy-fallback approval for cross-filesystem import
-- add focused tests/manual verification for post-download auto import and no-regression
+- add focused tests/manual verification for resource auto-selection and no-regression
 
 ## Explicit constraints
 
@@ -97,7 +103,7 @@ Only do:
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming
 - do not add a broad generic scheduler platform in this step
-- do not start resource auto-selection / rename / metadata scrape / subtitle logic in this step
+- do not start rename / metadata scrape / subtitle logic in this step
 - do not remove existing `status <id/hash>` / `watchlist ...` command paths
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
@@ -106,10 +112,10 @@ Only do:
 
 ## Suggested implementation shape
 
-1. use landed downloader completion truth (`download_monitor` / `job_event`) as the only automation trigger input
-2. add the smallest serialized path that turns observed completed download truth into auto-import progression
-3. keep this progression independent from LLM calls and compatible with existing ownership / approval rules
-4. keep current manual status/watchlist paths fully backward compatible
+1. use landed downloader completion truth and post-download auto import progression as the only automation input
+2. add the smallest deterministic rule set that decides whether the completed resource should progress or be skipped
+3. keep this rule set independent from LLM calls and compatible with existing ownership / approval rules
+4. keep current manual status/watchlist/import paths fully backward compatible
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -119,15 +125,15 @@ Only do:
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
 - cross-filesystem import copy-fallback approval remains stable
-- downloader completion truth can deterministically drive the smallest auto-import progression without depending on chat transcript memory
+- downloader completion truth can deterministically drive the smallest resource auto-selection progression without depending on chat transcript memory
+- landed post-download auto import baseline remains stable
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After post-download auto import is stable, advance in this order (still one small goal at a time):
+After resource auto-selection rules are stable, advance in this order (still one small goal at a time):
 
 1. enter stage B automation closure:
-   - resource auto-selection rules
    - filename normalization / rename
    - metadata scrape
    - subtitle auto-translation

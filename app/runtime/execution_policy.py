@@ -20,7 +20,6 @@ ACTION_RESET_CANDIDATES = "reset_candidates"
 READ_ONLY_ACTIONS = frozenset(
     {
         ACTION_SEARCH_MEDIA,
-        ACTION_GET_DOWNLOAD_STATUS,
         ACTION_WATCHLIST_LIST,
     }
 )
@@ -55,4 +54,3 @@ class ExecutionGate:
 
         async with self._side_effect_lock:
             return await operation()
-

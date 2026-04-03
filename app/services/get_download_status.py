@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
+from app.services.post_download_auto_import import PostDownloadAutoImportService
 
 GetStatusFunc = Callable[[str], Awaitable[TransmissionTaskStatus | None]]
 
@@ -30,10 +31,12 @@ class GetDownloadStatusService:
         get_status_func: GetStatusFunc,
         download_monitor_repo: DownloadMonitorRepo | None = None,
         job_event_repo: JobEventRepo | None = None,
+        post_download_auto_import_service: PostDownloadAutoImportService | None = None,
     ) -> None:
         self._get_status_func = get_status_func
         self._download_monitor_repo = download_monitor_repo
         self._job_event_repo = job_event_repo
+        self._post_download_auto_import_service = post_download_auto_import_service
 
     async def get_status_text(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
@@ -46,28 +49,36 @@ class GetDownloadStatusService:
             return STATUS_QUERY_FAILED_TEXT
         if task_status is None:
             return STATUS_NOT_FOUND_TEXT
-        self._record_status_observation(task_ref=cleaned_ref, task_status=task_status)
-        return format_task_status(task_status)
+        auto_import_text = await self._record_status_observation(task_ref=cleaned_ref, task_status=task_status)
+        status_text = format_task_status(task_status)
+        if not auto_import_text:
+            return status_text
+        return f"{status_text}\n\n{auto_import_text}"
 
-    def _record_status_observation(self, *, task_ref: str, task_status: TransmissionTaskStatus) -> None:
+    async def _record_status_observation(self, *, task_ref: str, task_status: TransmissionTaskStatus) -> str | None:
         if self._download_monitor_repo is None:
-            return
+            return None
         try:
             update = self._download_monitor_repo.record_status(task_status)
         except Exception:
-            return
-        if not update.newly_completed or self._job_event_repo is None:
-            return
+            return None
+        if update.newly_completed and self._job_event_repo is not None:
+            try:
+                self._job_event_repo.append_event(
+                    task_ref=task_ref,
+                    task_id=task_status.task_id,
+                    task_hash=task_status.task_hash,
+                    event_type="downloader.completed_observed",
+                    message=task_status.name,
+                )
+            except Exception:
+                pass
+        if self._post_download_auto_import_service is None:
+            return None
         try:
-            self._job_event_repo.append_event(
-                task_ref=task_ref,
-                task_id=task_status.task_id,
-                task_hash=task_status.task_hash,
-                event_type="downloader.completed_observed",
-                message=task_status.name,
-            )
+            return await self._post_download_auto_import_service.run_for_record(update.record)
         except Exception:
-            return
+            return None
 
 
 def parse_status_query(text: str) -> str | None:

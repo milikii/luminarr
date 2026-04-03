@@ -129,7 +129,7 @@ The following are valid roadmap items, but remain out of scope until `docs/NEXT_
 
 ## Current priority
 
-The current next smallest path is **the smallest post-download auto import baseline**.
+The current next smallest path is **the smallest resource auto-selection rules baseline**.
 
 Keep these already-landed baselines stable while doing it:
 1. Telegram message de-dup via `telegram_updates`
@@ -143,6 +143,7 @@ Keep these already-landed baselines stable while doing it:
 9. Telegram callback workflow routing baseline
 10. cross-filesystem import copy fallback approval baseline
 11. completion-monitor / scheduler prerequisite baseline
+12. post-download auto import baseline
 
 ## Runtime rules
 

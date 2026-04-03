@@ -103,6 +103,12 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - first observed completion deterministically appends `downloader.completed_observed` into `job_event`
   - pending-completion truth survives restart via SQLite and no longer depends on chat transcript memory
   - no background scheduler loop or auto-import side effect is introduced in this step
+- smallest post-download auto import baseline is now landed:
+  - observed completed download truth can now auto-progress into the existing import approval-pending path
+  - auto-progress reuses existing `import_to_library` / approval / `jobs` truth and still requires explicit `confirm <id/hash>` before import side effects
+  - cross-filesystem copy-fallback approval remains unchanged on the later confirmed import path
+  - existing Telegram command words remain unchanged; `status <id/hash>` may now append import approval-pending text when completion is first observed
+  - no generic scheduler platform, resource auto-selection, rename, scrape, or subtitle behavior is introduced in this step
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -127,7 +133,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - multi-process/global locking semantics
 
 **Stage B automation closure (documented roadmap, not current step):**
-- post-download auto import (replace the manual import confirm path only after control-layer prerequisites are stable)
 - resource auto-selection rules
 - filename normalization / renaming
 - metadata scraping (`TMDB + Fanart.tv`)
@@ -147,7 +152,8 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `125 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `129 passed` (`.venv/bin/python -m pytest -q`)
+- manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
 - manual verification: completion-monitor / scheduler prerequisite baseline passed (temporary `tmp_tests/verify_download_monitor_prerequisite.py`, script cleaned after run)
 - manual verification: copy fallback approval baseline passed (temporary `tmp_tests/verify_import_copy_fallback_approval.py`, script cleaned after run)
 - manual verification: Telegram callback workflow routing baseline passed (temporary `tmp_tests/verify_callback_routing.py`, script cleaned after run)
@@ -164,7 +170,7 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. land the smallest post-download auto import baseline
+4. land the smallest resource auto-selection rules baseline
 
 ## Current risks
 
@@ -176,7 +182,7 @@ Build the next smallest path:
 - candidate mapping keeps only the latest search window per chat
 - Transmission `downloadDir + name` must map to container-visible paths
 - copy fallback duplicates data and depends on sufficient free disk space
-- downloader completion truth currently advances when runtime observes status; background polling itself is not landed yet
+- downloader completion truth and auto-import progression currently advance when runtime observes status; standalone background polling is still not landed
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
@@ -185,12 +191,13 @@ Build the next smallest path:
 
 ## Acceptance focus for the next step
 
-- land the smallest post-download auto import baseline without changing existing text-command behavior
-- reuse the landed completion-monitor truth instead of depending on chat transcript memory
+- land the smallest resource auto-selection rules baseline without changing existing text-command behavior
+- reuse the landed completion-monitor truth and post-download auto import baseline instead of depending on chat transcript memory
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
 - landed completion-monitor / scheduler prerequisite behavior does not regress
+- landed post-download auto import behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable
 - current ambiguous read-only exploration + numeric-select blocking behavior remains stable

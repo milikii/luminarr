@@ -451,6 +451,19 @@
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
+## D-041 post-download auto import 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - 当前阶段允许“已观察到完成的下载”自动推进到现有 `import` approval-pending 路径
+  - 自动推进必须继续复用现有 `import_to_library` / approval / `jobs` 真相，不能绕过 `confirm <id/hash>` 执行真实导入副作用
+  - 自动推进不得破坏 cross-filesystem copy-fallback approval 规则；后续真实导入仍按原有安全边界执行
+  - 当前 next smallest path 前进到 resource auto-selection rules
+- **原因**：
+  先补齐自动化闭环第一步，同时坚持“自动推进只到待确认，不直接做副作用执行”的最小实现原则，避免控制层边界退化。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
 ---
 
 ## 附：更新模板

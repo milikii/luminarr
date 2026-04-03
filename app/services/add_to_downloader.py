@@ -129,7 +129,6 @@ class AddToDownloaderService:
         chat_id: int | None = None,
         user_id: int | None = None,
     ) -> str:
-        _ = user_id
         cleaned_ref = task_ref.strip()
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
@@ -276,7 +275,13 @@ class AddToDownloaderService:
             event_type="downloader.succeeded",
             message=result.title,
         )
-        self._register_download_monitor(task_id=result.task_id, task_hash=result.task_hash, title=result.title)
+        self._register_download_monitor(
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            title=result.title,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
         self._record_executed_lease_version(
             task_ref=cleaned_ref,
             task_id=pending_add.task_id,
@@ -765,7 +770,15 @@ class AddToDownloaderService:
         except Exception:
             return
 
-    def _register_download_monitor(self, *, task_id: str, task_hash: str, title: str) -> None:
+    def _register_download_monitor(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        title: str,
+        chat_id: int | None,
+        user_id: int | None,
+    ) -> None:
         if self._download_monitor_repo is None:
             return
         try:
@@ -773,6 +786,8 @@ class AddToDownloaderService:
                 task_id=task_id,
                 task_hash=task_hash,
                 name=title,
+                chat_id=chat_id,
+                user_id=user_id,
             )
         except Exception:
             return

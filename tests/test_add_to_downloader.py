@@ -196,12 +196,14 @@ def test_confirm_add_by_task_ref_registers_download_monitor_truth(tmp_path) -> N
     )
 
     _run(service.add_by_selection(1001, "1"))
-    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
 
     assert "任务 ID: 42" in confirm_reply
     record = monitor_repo.get_record(task_id="42", task_hash="abc123")
     assert record is not None
     assert record.name == "Dune: Part Two"
+    assert record.chat_id == 1001
+    assert record.user_id == 2001
     assert record.is_complete is False
     pending_records = monitor_repo.list_pending_completion()
     assert len(pending_records) == 1

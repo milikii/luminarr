@@ -16,6 +16,7 @@ from app.services.get_download_status import (
     GetDownloadStatusService,
     parse_status_query,
 )
+from app.services.post_download_auto_import import PostDownloadAutoImportService
 
 
 def test_parse_status_query_supports_status_prefix() -> None:
@@ -121,6 +122,108 @@ def test_get_status_text_updates_download_monitor_truth_and_completion_event(tmp
     assert monitor_repo.list_pending_completion() == []
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
+
+
+def test_get_status_text_progresses_completed_download_to_auto_import_pending(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 1984",
+        chat_id=1001,
+        user_id=2001,
+    )
+    event_repo = JobEventRepo(database)
+    auto_import = AsyncMock(return_value="导入待确认：Dune 1984\n请发送 confirm hash-87 执行导入。")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        auto_import_func=auto_import,
+    )
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert "导入待确认：Dune 1984" in text
+    auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
+
+
+def test_get_status_text_does_not_repeat_auto_import_when_import_activity_exists(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 1984",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 1984",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.approval_pending",
+        message="already pending",
+    )
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        auto_import_func=auto_import,
+    )
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert "导入待确认" not in text
+    auto_import.assert_not_awaited()
 
 
 def _run(coroutine: Awaitable[str]) -> str:

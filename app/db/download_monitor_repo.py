@@ -12,6 +12,8 @@ class DownloadMonitorRecord:
     task_id: str
     task_hash: str
     name: str
+    chat_id: int
+    user_id: int
     status_code: int
     percent_done: float
     is_complete: bool
@@ -31,7 +33,15 @@ class DownloadMonitorRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
 
-    def register_download(self, *, task_id: str, task_hash: str, name: str) -> None:
+    def register_download(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        name: str,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+    ) -> None:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
@@ -44,6 +54,8 @@ class DownloadMonitorRepo:
                     task_id,
                     task_hash,
                     name,
+                    chat_id,
+                    user_id,
                     status_code,
                     percent_done,
                     is_complete,
@@ -51,13 +63,27 @@ class DownloadMonitorRepo:
                     last_observed_at,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, 0, 0, 0, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, ?, 0, 0, 0, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT(task_id, task_hash)
                 DO UPDATE SET
                     name = excluded.name,
+                    chat_id = CASE
+                        WHEN excluded.chat_id > 0 THEN excluded.chat_id
+                        ELSE download_monitor.chat_id
+                    END,
+                    user_id = CASE
+                        WHEN excluded.user_id > 0 THEN excluded.user_id
+                        ELSE download_monitor.user_id
+                    END,
                     updated_at = CURRENT_TIMESTAMP
                 """,
-                (cleaned_task_id, cleaned_task_hash, name.strip()),
+                (
+                    cleaned_task_id,
+                    cleaned_task_hash,
+                    name.strip(),
+                    int(chat_id or 0),
+                    int(user_id or 0),
+                ),
             )
             connection.commit()
 
@@ -75,6 +101,8 @@ class DownloadMonitorRepo:
                     task_id,
                     task_hash,
                     name,
+                    chat_id,
+                    user_id,
                     status_code,
                     percent_done,
                     is_complete,
@@ -99,6 +127,8 @@ class DownloadMonitorRepo:
                     task_id,
                     task_hash,
                     name,
+                    chat_id,
+                    user_id,
                     status_code,
                     percent_done,
                     is_complete,
@@ -107,7 +137,7 @@ class DownloadMonitorRepo:
                     created_at,
                     updated_at
                 ) VALUES (
-                    ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE '' END, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    ?, ?, ?, 0, 0, ?, ?, ?, CASE WHEN ? THEN CURRENT_TIMESTAMP ELSE '' END, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
                 )
                 ON CONFLICT(task_id, task_hash)
                 DO UPDATE SET
@@ -142,6 +172,8 @@ class DownloadMonitorRepo:
                     task_id,
                     task_hash,
                     name,
+                    chat_id,
+                    user_id,
                     status_code,
                     percent_done,
                     is_complete,
@@ -177,6 +209,8 @@ class DownloadMonitorRepo:
                     task_id,
                     task_hash,
                     name,
+                    chat_id,
+                    user_id,
                     status_code,
                     percent_done,
                     is_complete,
@@ -202,6 +236,8 @@ class DownloadMonitorRepo:
                     task_id,
                     task_hash,
                     name,
+                    chat_id,
+                    user_id,
                     status_code,
                     percent_done,
                     is_complete,
@@ -213,6 +249,32 @@ class DownloadMonitorRepo:
                 WHERE is_complete = 0
                 ORDER BY created_at ASC, updated_at ASC
                 """
+            ).fetchall()
+        return [_to_download_monitor_record(row) for row in rows]
+
+    def list_completed_for_auto_import(self, *, limit: int = 20) -> list[DownloadMonitorRecord]:
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    task_id,
+                    task_hash,
+                    name,
+                    chat_id,
+                    user_id,
+                    status_code,
+                    percent_done,
+                    is_complete,
+                    completion_observed_at,
+                    last_observed_at,
+                    created_at,
+                    updated_at
+                FROM download_monitor
+                WHERE is_complete = 1 AND chat_id > 0
+                ORDER BY completion_observed_at ASC, updated_at ASC
+                LIMIT ?
+                """,
+                (max(1, limit),),
             ).fetchall()
         return [_to_download_monitor_record(row) for row in rows]
 
@@ -228,6 +290,8 @@ def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRec
         task_id=str(row["task_id"]),
         task_hash=str(row["task_hash"]),
         name=str(row["name"]),
+        chat_id=int(row["chat_id"]),
+        user_id=int(row["user_id"]),
         status_code=int(row["status_code"]),
         percent_done=float(row["percent_done"]),
         is_complete=bool(int(row["is_complete"])),
