@@ -85,16 +85,22 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - search no-result / ambiguous clarification set + success/reset clear now synchronizes in-memory fast path and persisted truth
   - numeric-select blocking and frustration clarification reset remain deterministic after process restart
   - existing Telegram command words and existing downloader/import success-failure text bodies remain unchanged
+- smallest Telegram callback workflow routing baseline is now landed:
+  - Telegram runtime now accepts callback updates and routes them through the existing workflow dispatcher
+  - callback update de-dup reuses persisted `telegram_updates` callback truth (`callback_query_id`)
+  - callback digit/select, `confirm`, and read-only query paths keep the same approval / execution boundary as the existing text path
+  - callback path can rebuild chat/user/message context from either `effective_*` fields or callback-owned message context
+  - existing Telegram command words and existing downloader/import success-failure text bodies remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
 
 The formal local integration baseline is:
-- Transmission test instance: `http://localhost:9091`
-- Emby test instance: `http://localhost:8096`
+- Transmission test instance: `http://127.0.0.1:19091`
+- Emby test instance: `http://127.0.0.1:18096`
 - host-side hardlink paths:
-  - `/srv/luminarr-test/downloads/tr`
-  - `/srv/luminarr-test/library/movies`
+  - `/data/downloads/tr`
+  - `/data/library/movies`
 
 Use this stack for real downloader/import/refresh verification. The detailed path, health-check, and config placeholder truth now lives in `docs/TEST_ENV.md`.
 
@@ -105,7 +111,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 ## What is not implemented yet
 
 **Near-term control-layer and current-mainline gaps:**
-- Telegram callback workflow routing still does not exist, although `telegram_updates` is callback-ready at schema/repo level
 - copy fallback approval for import (cross-filesystem hardlink failure path)
 - smallest scheduler / retry / completion-monitor prerequisite for later automation is not landed yet
 - real image/media poster rendering
@@ -132,7 +137,8 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `117 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `121 passed` (`.venv/bin/python -m pytest -q`)
+- manual verification: Telegram callback workflow routing baseline passed (temporary `tmp_tests/verify_callback_routing.py`, script cleaned after run)
 - manual verification: read-only concurrency-safe execution policy baseline passed (`tmp_tests/verify_execution_policy_baseline.py`)
 - manual verification: reactive recovery fallback path passed (`retry_count=2` + safe fallback text)
 - manual verification: clarification-stage frustration/reset baseline passed (`tmp_tests` script + targeted pytest)
@@ -146,7 +152,7 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. land the smallest Telegram callback workflow routing baseline
+4. land the smallest copy fallback approval for import (cross-filesystem hardlink failure path)
 
 ## Current risks
 
@@ -163,12 +169,13 @@ Build the next smallest path:
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
-- Telegram callback workflow routing is still missing in the current bot runtime
 
 ## Acceptance focus for the next step
 
-- land the smallest Telegram callback workflow routing baseline without changing existing text-command behavior
+- land the smallest copy fallback approval for cross-filesystem import without changing existing text-command behavior
+- hardlink import remains the default path and must not silently downgrade to copy
 - existing downloader/import approval and confirm routing behavior does not regress
+- landed Telegram callback workflow routing behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable
 - current ambiguous read-only exploration + numeric-select blocking behavior remains stable

@@ -31,8 +31,8 @@ This repository has a formal local integration baseline for real downloader/impo
 
 | Service | Role | WSL-accessible endpoint |
 |---|---|---|
-| Transmission | downloader test instance | `http://localhost:9091` (RPC: `/transmission/rpc`) |
-| Emby | media server test instance | `http://localhost:8096` |
+| Transmission | downloader test instance | `http://127.0.0.1:19091` (RPC: `/transmission/rpc`) |
+| Emby | media server test instance | `http://127.0.0.1:18096` |
 
 ### Source of truth
 
@@ -52,8 +52,8 @@ Use the local stack, not mocks, for any task that depends on:
 ### Health check before integration scripts
 
 ```bash
-curl -s http://localhost:9091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
-curl -s http://localhost:8096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"
+curl -s http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
+curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"
 ```
 
 If either service is down, do not proceed with integration verification.
@@ -129,7 +129,7 @@ The following are valid roadmap items, but remain out of scope until `docs/NEXT_
 
 ## Current priority
 
-The current next smallest path is **Telegram callback workflow routing baseline**.
+The current next smallest path is **copy fallback approval for import (cross-filesystem hardlink failure path)**.
 
 Keep these already-landed baselines stable while doing it:
 1. Telegram message de-dup via `telegram_updates`
@@ -140,6 +140,7 @@ Keep these already-landed baselines stable while doing it:
 6. read-only concurrency-safe execution policy
 7. ambiguous clarification isolation + restart-durable clarification truth
 8. manual watchlist baseline
+9. Telegram callback workflow routing baseline
 
 ## Runtime rules
 

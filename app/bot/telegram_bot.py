@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 from telegram import Update
-from telegram.ext import Application, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
@@ -58,257 +58,55 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if message is None:
         return
 
-    chat = getattr(update, "effective_chat", None)
-    user = getattr(update, "effective_user", None)
-    update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
-    if isinstance(update_repo, TelegramUpdateRepo):
-        update_id = getattr(update, "update_id", 0)
-        if isinstance(update_id, int):
-            accepted = update_repo.record_message_update(
-                update_id=update_id,
-                chat_id=chat.id if chat is not None else None,
-                user_id=user.id if user is not None else None,
-            )
-            if not accepted:
-                return
-
-    query = (message.text or "").strip()
-    execution_gate = _resolve_execution_gate(context)
-    if _is_frustration_text(query):
-        if chat is not None:
-            job_repo = context.application.bot_data.get(JOB_REPO_KEY)
-            if isinstance(job_repo, JobRepo):
-                try:
-                    pending_job = job_repo.get_latest_pending_job(chat_id=chat.id)
-                except Exception:
-                    pending_job = None
-                if pending_job is not None:
-                    if pending_job.workflow_type == WORKFLOW_IMPORT_TO_LIBRARY:
-                        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
-                        if isinstance(import_service, ImportToLibraryService):
-                            cancelled_text = await _run_sync_with_policy(
-                                execution_gate,
-                                ACTION_CANCEL_PENDING_APPROVAL,
-                                lambda: import_service.cancel_pending_import(chat.id),
-                            )
-                            if cancelled_text == IMPORT_CANCELLED_TEXT:
-                                await message.reply_text(cancelled_text)
-                                return
-                    if pending_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER:
-                        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
-                        if isinstance(add_service, AddToDownloaderService):
-                            cancelled_text = await _run_sync_with_policy(
-                                execution_gate,
-                                ACTION_CANCEL_PENDING_APPROVAL,
-                                lambda: add_service.cancel_pending_add(chat.id),
-                            )
-                            if cancelled_text == ADD_CANCELLED_TEXT:
-                                await message.reply_text(cancelled_text)
-                                return
-
-        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
-        if isinstance(import_service, ImportToLibraryService) and chat is not None:
-            cancelled_text = await _run_sync_with_policy(
-                execution_gate,
-                ACTION_CANCEL_PENDING_APPROVAL,
-                lambda: import_service.cancel_pending_import(chat.id),
-            )
-            if cancelled_text == IMPORT_CANCELLED_TEXT:
-                await message.reply_text(cancelled_text)
-                return
-
-        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
-        if isinstance(add_service, AddToDownloaderService) and chat is not None:
-            cancelled_text = await _run_sync_with_policy(
-                execution_gate,
-                ACTION_CANCEL_PENDING_APPROVAL,
-                lambda: add_service.cancel_pending_add(chat.id),
-            )
-            if cancelled_text == ADD_CANCELLED_TEXT:
-                await message.reply_text(cancelled_text)
-                return
-
-        search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
-        if isinstance(search_service, SearchMediaService) and chat is not None:
-            if search_service.is_clarification_pending(chat.id):
-                await _run_sync_with_policy(
-                    execution_gate,
-                    ACTION_RESET_CLARIFICATION,
-                    lambda: search_service.clear_clarification_pending(chat.id),
-                )
-                await message.reply_text(CLARIFICATION_RESET_TEXT)
-                return
-            if await _run_sync_with_policy(
-                execution_gate,
-                ACTION_RESET_CANDIDATES,
-                lambda: search_service.clear_cached_candidates(chat.id),
-            ):
-                await message.reply_text(FRUSTRATION_RESET_TEXT)
-                return
-
-    task_ref = parse_status_query(query)
-    if task_ref is not None:
-        status_service = context.application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
-        if not isinstance(status_service, GetDownloadStatusService):
-            await message.reply_text(SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            ACTION_GET_DOWNLOAD_STATUS,
-            lambda: status_service.get_status_text(task_ref),
-        )
-        await message.reply_text(reply)
+    chat_id = _resolve_chat_id(update)
+    user_id = _resolve_user_id(update)
+    if not _record_message_update(update=update, context=context):
         return
 
-    watchlist_command = parse_watchlist_query(query)
-    if watchlist_command is not None:
-        watchlist_service = context.application.bot_data.get(MANAGE_WATCHLIST_SERVICE_KEY)
-        if not isinstance(watchlist_service, ManageWatchlistService):
-            await message.reply_text(SERVICE_NOT_READY_TEXT)
-            return
-        reply = await _run_sync_with_policy(
-            execution_gate,
-            _watchlist_policy_action(watchlist_command.action),
-            lambda: watchlist_service.handle(
-                watchlist_command,
-                chat_id=chat.id if chat is not None else None,
-            ),
-        )
-        await message.reply_text(reply)
-        return
-
-    import_ref = parse_import_query(query)
-    if import_ref is not None:
-        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
-        if not isinstance(import_service, ImportToLibraryService):
-            await message.reply_text(SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            ACTION_IMPORT_TO_LIBRARY,
-            lambda: import_service.import_by_task_ref(
-                import_ref,
-                chat_id=chat.id if chat is not None else None,
-                user_id=user.id if user is not None else None,
-            ),
-        )
-        await message.reply_text(reply)
-        return
-
-    confirm_ref = parse_confirm_query(query)
-    if confirm_ref is not None:
-        if chat is not None and confirm_ref:
-            job_repo = context.application.bot_data.get(JOB_REPO_KEY)
-            if isinstance(job_repo, JobRepo):
-                try:
-                    matched_job = job_repo.get_job_for_chat_ref(chat_id=chat.id, task_ref=confirm_ref)
-                except Exception:
-                    matched_job = None
-                if matched_job is not None and matched_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER:
-                    add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
-                    if not isinstance(add_service, AddToDownloaderService):
-                        await message.reply_text(SERVICE_NOT_READY_TEXT)
-                        return
-                    reply = await execution_gate.run(
-                        ACTION_CONFIRM_ADD_TO_DOWNLOADER,
-                        lambda: add_service.confirm_add_by_task_ref(
-                            confirm_ref,
-                            chat_id=chat.id,
-                            user_id=user.id if user is not None else None,
-                        ),
-                    )
-                    await message.reply_text(reply)
-                    return
-                if matched_job is not None and matched_job.workflow_type == WORKFLOW_IMPORT_TO_LIBRARY:
-                    import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
-                    if not isinstance(import_service, ImportToLibraryService):
-                        await message.reply_text(SERVICE_NOT_READY_TEXT)
-                        return
-                    reply = await execution_gate.run(
-                        ACTION_CONFIRM_IMPORT_TO_LIBRARY,
-                        lambda: import_service.confirm_import_by_task_ref(
-                            confirm_ref,
-                            chat_id=chat.id,
-                            user_id=user.id if user is not None else None,
-                        ),
-                    )
-                    await message.reply_text(reply)
-                    return
-
-        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
-        if (
-            isinstance(add_service, AddToDownloaderService)
-            and chat is not None
-            and add_service.has_pending_add(chat.id, confirm_ref)
-        ):
-            reply = await execution_gate.run(
-                ACTION_CONFIRM_ADD_TO_DOWNLOADER,
-                lambda: add_service.confirm_add_by_task_ref(
-                    confirm_ref,
-                    chat_id=chat.id,
-                    user_id=user.id if user is not None else None,
-                ),
-            )
-            await message.reply_text(reply)
-            return
-
-        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
-        if not isinstance(import_service, ImportToLibraryService):
-            await message.reply_text(SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            ACTION_CONFIRM_IMPORT_TO_LIBRARY,
-            lambda: import_service.confirm_import_by_task_ref(
-                confirm_ref,
-                chat_id=chat.id if chat is not None else None,
-                user_id=user.id if user is not None else None,
-            ),
-        )
-        await message.reply_text(reply)
-        return
-
-    if query.isdigit():
-        search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
-        if (
-            isinstance(search_service, SearchMediaService)
-            and chat is not None
-            and search_service.is_clarification_pending(chat.id)
-        ):
-            await message.reply_text(CLARIFICATION_SELECTION_BLOCKED_TEXT)
-            return
-
-        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
-        if not isinstance(add_service, AddToDownloaderService):
-            await message.reply_text(SERVICE_NOT_READY_TEXT)
-            return
-
-        if chat is None:
-            await message.reply_text(SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            ACTION_ADD_TO_DOWNLOADER,
-            lambda: add_service.add_by_selection(
-                chat.id,
-                query,
-                user_id=user.id if user is not None else None,
-            ),
-        )
-        await message.reply_text(reply)
-        return
-
-    search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
-    if not isinstance(search_service, SearchMediaService):
-        await message.reply_text(SERVICE_NOT_READY_TEXT)
-        return
-
-    chat_id = chat.id if chat is not None else None
-    reply = await execution_gate.run(
-        ACTION_SEARCH_MEDIA,
-        lambda: _search_with_reactive_recovery(
-            search_service=search_service,
-            query=query,
-            chat_id=chat_id,
-        ),
+    await _handle_query_text(
+        query=(message.text or "").strip(),
+        reply_func=message.reply_text,
+        chat_id=chat_id,
+        user_id=user_id,
+        context=context,
     )
-    await message.reply_text(reply)
+
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    callback_query = getattr(update, "callback_query", None)
+    if callback_query is None:
+        return
+
+    chat_id = _resolve_chat_id(update, callback_query=callback_query)
+    user_id = _resolve_user_id(update, callback_query=callback_query)
+    callback_query_id = str(getattr(callback_query, "id", "") or "").strip()
+    if not _record_callback_update(
+        callback_query_id=callback_query_id,
+        chat_id=chat_id,
+        user_id=user_id,
+        context=context,
+    ):
+        return
+
+    answer_func = getattr(callback_query, "answer", None)
+    if callable(answer_func):
+        await answer_func()
+
+    message = _resolve_callback_message(update, callback_query)
+    if message is None:
+        return
+
+    query = str(getattr(callback_query, "data", "") or "").strip()
+    if not query:
+        return
+
+    await _handle_query_text(
+        query=query,
+        reply_func=message.reply_text,
+        chat_id=chat_id,
+        user_id=user_id,
+        context=context,
+    )
 
 
 def build_application(
@@ -334,6 +132,7 @@ def build_application(
     if job_repo is not None:
         application.bot_data[JOB_REPO_KEY] = job_repo
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(handle_callback_query))
     return application
 
 
@@ -363,11 +162,340 @@ def _watchlist_policy_action(action: str) -> str:
     return ACTION_WATCHLIST_MUTATION
 
 
+def _resolve_chat_id(
+    update: Update,
+    *,
+    callback_query: object | None = None,
+) -> int | None:
+    chat = getattr(update, "effective_chat", None)
+    chat_id = getattr(chat, "id", None)
+    if isinstance(chat_id, int):
+        return chat_id
+
+    if callback_query is None:
+        return None
+
+    message = getattr(callback_query, "message", None)
+    callback_chat = getattr(message, "chat", None)
+    callback_chat_id = getattr(callback_chat, "id", None)
+    if isinstance(callback_chat_id, int):
+        return callback_chat_id
+    return None
+
+
+def _resolve_user_id(
+    update: Update,
+    *,
+    callback_query: object | None = None,
+) -> int | None:
+    user = getattr(update, "effective_user", None)
+    user_id = getattr(user, "id", None)
+    if isinstance(user_id, int):
+        return user_id
+
+    if callback_query is None:
+        return None
+
+    callback_user = getattr(callback_query, "from_user", None)
+    callback_user_id = getattr(callback_user, "id", None)
+    if isinstance(callback_user_id, int):
+        return callback_user_id
+    return None
+
+
+def _resolve_callback_message(update: Update, callback_query: object) -> object | None:
+    message = getattr(update, "effective_message", None)
+    if message is not None:
+        return message
+    return getattr(callback_query, "message", None)
+
+
 def _is_frustration_text(text: str) -> bool:
     cleaned_text = re.sub(r"\s+", "", text.strip())
     if not cleaned_text:
         return False
     return cleaned_text in {"不对", "停", "重来", "换一个", "算了", "取消"}
+
+
+def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
+    if not isinstance(update_repo, TelegramUpdateRepo):
+        return True
+
+    update_id = getattr(update, "update_id", 0)
+    if not isinstance(update_id, int):
+        return True
+
+    chat = getattr(update, "effective_chat", None)
+    user = getattr(update, "effective_user", None)
+    return update_repo.record_message_update(
+        update_id=update_id,
+        chat_id=chat.id if chat is not None else None,
+        user_id=user.id if user is not None else None,
+    )
+
+
+def _record_callback_update(
+    *,
+    callback_query_id: str,
+    chat_id: int | None,
+    user_id: int | None,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> bool:
+    update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
+    if not isinstance(update_repo, TelegramUpdateRepo):
+        return True
+
+    return update_repo.record_callback_update(
+        callback_query_id=callback_query_id,
+        chat_id=chat_id,
+        user_id=user_id,
+    )
+
+
+async def _handle_query_text(
+    *,
+    query: str,
+    reply_func: Callable[[str], Awaitable[object]],
+    chat_id: int | None,
+    user_id: int | None,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
+    execution_gate = _resolve_execution_gate(context)
+    if _is_frustration_text(query):
+        if chat_id is not None:
+            job_repo = context.application.bot_data.get(JOB_REPO_KEY)
+            if isinstance(job_repo, JobRepo):
+                try:
+                    pending_job = job_repo.get_latest_pending_job(chat_id=chat_id)
+                except Exception:
+                    pending_job = None
+                if pending_job is not None:
+                    if pending_job.workflow_type == WORKFLOW_IMPORT_TO_LIBRARY:
+                        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+                        if isinstance(import_service, ImportToLibraryService):
+                            cancelled_text = await _run_sync_with_policy(
+                                execution_gate,
+                                ACTION_CANCEL_PENDING_APPROVAL,
+                                lambda: import_service.cancel_pending_import(chat_id),
+                            )
+                            if cancelled_text == IMPORT_CANCELLED_TEXT:
+                                await reply_func(cancelled_text)
+                                return
+                    if pending_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER:
+                        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+                        if isinstance(add_service, AddToDownloaderService):
+                            cancelled_text = await _run_sync_with_policy(
+                                execution_gate,
+                                ACTION_CANCEL_PENDING_APPROVAL,
+                                lambda: add_service.cancel_pending_add(chat_id),
+                            )
+                            if cancelled_text == ADD_CANCELLED_TEXT:
+                                await reply_func(cancelled_text)
+                                return
+
+        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if isinstance(import_service, ImportToLibraryService) and chat_id is not None:
+            cancelled_text = await _run_sync_with_policy(
+                execution_gate,
+                ACTION_CANCEL_PENDING_APPROVAL,
+                lambda: import_service.cancel_pending_import(chat_id),
+            )
+            if cancelled_text == IMPORT_CANCELLED_TEXT:
+                await reply_func(cancelled_text)
+                return
+
+        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if isinstance(add_service, AddToDownloaderService) and chat_id is not None:
+            cancelled_text = await _run_sync_with_policy(
+                execution_gate,
+                ACTION_CANCEL_PENDING_APPROVAL,
+                lambda: add_service.cancel_pending_add(chat_id),
+            )
+            if cancelled_text == ADD_CANCELLED_TEXT:
+                await reply_func(cancelled_text)
+                return
+
+        search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
+        if isinstance(search_service, SearchMediaService) and chat_id is not None:
+            if search_service.is_clarification_pending(chat_id):
+                await _run_sync_with_policy(
+                    execution_gate,
+                    ACTION_RESET_CLARIFICATION,
+                    lambda: search_service.clear_clarification_pending(chat_id),
+                )
+                await reply_func(CLARIFICATION_RESET_TEXT)
+                return
+            if await _run_sync_with_policy(
+                execution_gate,
+                ACTION_RESET_CANDIDATES,
+                lambda: search_service.clear_cached_candidates(chat_id),
+            ):
+                await reply_func(FRUSTRATION_RESET_TEXT)
+                return
+
+    task_ref = parse_status_query(query)
+    if task_ref is not None:
+        status_service = context.application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
+        if not isinstance(status_service, GetDownloadStatusService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            ACTION_GET_DOWNLOAD_STATUS,
+            lambda: status_service.get_status_text(task_ref),
+        )
+        await reply_func(reply)
+        return
+
+    watchlist_command = parse_watchlist_query(query)
+    if watchlist_command is not None:
+        watchlist_service = context.application.bot_data.get(MANAGE_WATCHLIST_SERVICE_KEY)
+        if not isinstance(watchlist_service, ManageWatchlistService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await _run_sync_with_policy(
+            execution_gate,
+            _watchlist_policy_action(watchlist_command.action),
+            lambda: watchlist_service.handle(
+                watchlist_command,
+                chat_id=chat_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    import_ref = parse_import_query(query)
+    if import_ref is not None:
+        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if not isinstance(import_service, ImportToLibraryService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            ACTION_IMPORT_TO_LIBRARY,
+            lambda: import_service.import_by_task_ref(
+                import_ref,
+                chat_id=chat_id,
+                user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    confirm_ref = parse_confirm_query(query)
+    if confirm_ref is not None:
+        if chat_id is not None and confirm_ref:
+            job_repo = context.application.bot_data.get(JOB_REPO_KEY)
+            if isinstance(job_repo, JobRepo):
+                try:
+                    matched_job = job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=confirm_ref)
+                except Exception:
+                    matched_job = None
+                if matched_job is not None and matched_job.workflow_type == WORKFLOW_ADD_TO_DOWNLOADER:
+                    add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+                    if not isinstance(add_service, AddToDownloaderService):
+                        await reply_func(SERVICE_NOT_READY_TEXT)
+                        return
+                    reply = await execution_gate.run(
+                        ACTION_CONFIRM_ADD_TO_DOWNLOADER,
+                        lambda: add_service.confirm_add_by_task_ref(
+                            confirm_ref,
+                            chat_id=chat_id,
+                            user_id=user_id,
+                        ),
+                    )
+                    await reply_func(reply)
+                    return
+                if matched_job is not None and matched_job.workflow_type == WORKFLOW_IMPORT_TO_LIBRARY:
+                    import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+                    if not isinstance(import_service, ImportToLibraryService):
+                        await reply_func(SERVICE_NOT_READY_TEXT)
+                        return
+                    reply = await execution_gate.run(
+                        ACTION_CONFIRM_IMPORT_TO_LIBRARY,
+                        lambda: import_service.confirm_import_by_task_ref(
+                            confirm_ref,
+                            chat_id=chat_id,
+                            user_id=user_id,
+                        ),
+                    )
+                    await reply_func(reply)
+                    return
+
+        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if (
+            isinstance(add_service, AddToDownloaderService)
+            and chat_id is not None
+            and add_service.has_pending_add(chat_id, confirm_ref)
+        ):
+            reply = await execution_gate.run(
+                ACTION_CONFIRM_ADD_TO_DOWNLOADER,
+                lambda: add_service.confirm_add_by_task_ref(
+                    confirm_ref,
+                    chat_id=chat_id,
+                    user_id=user_id,
+                ),
+            )
+            await reply_func(reply)
+            return
+
+        import_service = context.application.bot_data.get(IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if not isinstance(import_service, ImportToLibraryService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            ACTION_CONFIRM_IMPORT_TO_LIBRARY,
+            lambda: import_service.confirm_import_by_task_ref(
+                confirm_ref,
+                chat_id=chat_id,
+                user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    if query.isdigit():
+        search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
+        if (
+            isinstance(search_service, SearchMediaService)
+            and chat_id is not None
+            and search_service.is_clarification_pending(chat_id)
+        ):
+            await reply_func(CLARIFICATION_SELECTION_BLOCKED_TEXT)
+            return
+
+        add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if not isinstance(add_service, AddToDownloaderService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+
+        if chat_id is None:
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            ACTION_ADD_TO_DOWNLOADER,
+            lambda: add_service.add_by_selection(
+                chat_id,
+                query,
+                user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
+    if not isinstance(search_service, SearchMediaService):
+        await reply_func(SERVICE_NOT_READY_TEXT)
+        return
+
+    reply = await execution_gate.run(
+        ACTION_SEARCH_MEDIA,
+        lambda: _search_with_reactive_recovery(
+            search_service=search_service,
+            query=query,
+            chat_id=chat_id,
+        ),
+    )
+    await reply_func(reply)
 
 
 async def _search_with_reactive_recovery(

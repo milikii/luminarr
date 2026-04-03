@@ -409,6 +409,20 @@
 - **原因**：
   需要吸收新文档里的长期方向，但不能让未来路线伪装成当前事实，避免开发顺序被大路线打乱。
 
+## D-038 Telegram callback workflow routing 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - Telegram runtime 现在接受 callback update，并统一路由到现有文本命令共用的 workflow dispatcher
+  - callback 去重继续复用持久化 `telegram_updates` 真相，按 `callback_query_id` 确定性去重
+  - callback 路径不得绕过既有 downloader/import approval 边界、`jobs` 所有权、lease/version、防重放和 execution gate
+  - callback 路径允许从 `effective_*` 或 callback 自带 message/user 上下文恢复 chat/user/message 信息；既有命令词与成功/失败文案保持不变
+  - 当前 next smallest path 前进到 cross-filesystem import 的 copy fallback approval
+- **原因**：
+  先用最小改动补齐 Telegram 控制层最后一个明显缺口，并继续坚持“不复制业务逻辑、不放松副作用边界”的实现方式。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
 ---
 
 ## 附：更新模板

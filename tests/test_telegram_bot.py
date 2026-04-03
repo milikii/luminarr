@@ -6,6 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from telegram.ext import CallbackQueryHandler
+
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -21,6 +23,7 @@ from app.bot.telegram_bot import (
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_UPDATE_REPO_KEY,
     build_application,
+    handle_callback_query,
     handle_message,
 )
 from app.clients.transmission import TransmissionImportSource
@@ -70,6 +73,33 @@ def _build_update(
         effective_user=SimpleNamespace(id=user_id),
     )
     return update, reply_text
+
+
+def _build_callback_update(
+    data: str,
+    *,
+    chat_id: int = 1001,
+    user_id: int = 2001,
+    callback_query_id: str = "cb-1",
+    include_effective_context: bool = True,
+) -> tuple[SimpleNamespace, AsyncMock, AsyncMock]:
+    reply_text = AsyncMock()
+    answer = AsyncMock()
+    message = SimpleNamespace(text="origin", reply_text=reply_text, chat=SimpleNamespace(id=chat_id))
+    callback_query = SimpleNamespace(
+        id=callback_query_id,
+        data=data,
+        message=message,
+        answer=answer,
+        from_user=SimpleNamespace(id=user_id),
+    )
+    update = SimpleNamespace(
+        callback_query=callback_query,
+        effective_message=message if include_effective_context else None,
+        effective_chat=SimpleNamespace(id=chat_id) if include_effective_context else None,
+        effective_user=SimpleNamespace(id=user_id) if include_effective_context else None,
+    )
+    return update, reply_text, answer
 
 
 def test_handle_message_replies_search_result() -> None:
@@ -181,6 +211,66 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     )
 
     asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "下载待确认" in sent_text
+    assert "confirm 1" in sent_text
+
+
+def test_handle_callback_query_digit_routes_to_add_service() -> None:
+    update, reply_text, answer = _build_callback_update("1")
+    search_service = SearchMediaService(_fake_search)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=SimpleNamespace(task_id="11", task_hash="h11")),
+    )
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "下载待确认" in sent_text
+    assert "confirm 1" in sent_text
+
+
+def test_handle_callback_query_digit_uses_callback_context_when_effective_context_missing() -> None:
+    update, reply_text, answer = _build_callback_update("1", include_effective_context=False)
+    search_service = SearchMediaService(_fake_search)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=SimpleNamespace(task_id="11", task_hash="h11")),
+    )
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
     assert "下载待确认" in sent_text
@@ -555,6 +645,48 @@ def test_handle_message_confirm_routes_to_add_service_when_downloader_pending(tm
     import_service.confirm_import_by_task_ref.assert_not_called()
 
 
+def test_handle_callback_query_confirm_routes_to_add_service_when_downloader_pending(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+
+    search_service = SearchMediaService(_fake_search)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(return_value=SimpleNamespace(task_id="11", task_hash="h11")),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    _run(add_service.add_by_selection(1001, "1", user_id=2001))
+
+    update, reply_text, answer = _build_callback_update("confirm 1")
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    import_service.confirm_import_by_task_ref = AsyncMock(return_value="不应走到这里")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                JOB_REPO_KEY: job_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "任务 ID: 11" in sent_text
+    assert "任务 Hash: h11" in sent_text
+    import_service.confirm_import_by_task_ref.assert_not_called()
+
+
 def test_handle_message_confirm_routes_stale_downloader_confirm_to_add_service(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
@@ -619,6 +751,35 @@ def test_handle_message_deduplicates_update(tmp_path: Path) -> None:
     asyncio.run(handle_message(update, context))
     asyncio.run(handle_message(update, context))
 
+    reply_text.assert_awaited_once()
+
+
+def test_handle_callback_query_deduplicates_update(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    update_repo = TelegramUpdateRepo(database)
+
+    update, reply_text, answer = _build_callback_update("dune", callback_query_id="cb-9001")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                TELEGRAM_UPDATE_REPO_KEY: update_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_awaited_once()
     reply_text.assert_awaited_once()
 
 
@@ -805,6 +966,11 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] is import_service
     assert application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] is watchlist_service
     assert application.bot_data[JOB_REPO_KEY] is job_repo
+    assert any(
+        isinstance(handler, CallbackQueryHandler)
+        for handlers in application.handlers.values()
+        for handler in handlers
+    )
 
 
 def _run(coroutine: Awaitable[str]) -> str:

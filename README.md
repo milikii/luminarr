@@ -57,6 +57,7 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 - read-only concurrency-safe execution policy baseline
 - ambiguous-title 只读澄清隔离
 - clarification pending restart-durable baseline
+- Telegram callback workflow routing baseline
 - 手动 `watchlist` 基线（add/list/remove/clear）
 - 硬链接导入 + Emby refresh
 
@@ -66,13 +67,13 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 当前 next step 不是 watchlist，也不是自动化大升级，而是：
 
-- **Telegram callback workflow routing baseline**
+- **copy fallback approval（跨文件系统 import 场景）**
 
 这一小步的目标是：
 
-- 不改现有文本命令路径
-- 不绕过现有 downloader/import approval 边界
-- 复用已有 `telegram_updates` 去重真相
+- 保持硬链接仍然是默认入库路径
+- 跨文件系统时不能静默 copy，必须显式审批
+- 复用已有 approval / confirm / `jobs` 真相
 - 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
 ---
@@ -83,7 +84,6 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 ### 阶段 A：控制层收尾
 
-- Telegram callback workflow routing baseline
 - copy fallback approval（跨文件系统 import 场景）
 - 最小 completion-monitor / scheduler 前置能力
 
@@ -160,8 +160,8 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 涉及 `add_to_downloader`、`import_to_library`、`refresh_media_server` 的真实联调，使用 WSL Docker 本地测试栈：
 
-- Transmission：`http://localhost:9091`
-- Emby：`http://localhost:8096`
+- Transmission：`http://127.0.0.1:19091`
+- Emby：`http://127.0.0.1:18096`
 
 详细路径、健康检查、配置占位见 `docs/TEST_ENV.md`。
 
@@ -181,4 +181,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 9. 一句话总结
 
-**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，下一步先收掉 callback 路由，再按阶段进入自动化闭环。**
+**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，callback 路由已落地，下一步补 cross-filesystem import 的 copy fallback approval。**

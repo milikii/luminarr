@@ -52,35 +52,43 @@ Prerequisite completed:
   - search no-result/ambiguous set + success/reset clear synchronizes in-memory fast path and persisted truth
   - clarification pending numeric-select blocking remains deterministic after process restart
   - existing Telegram command words and existing downloader/import success-failure text bodies remain unchanged
+- smallest Telegram callback workflow routing baseline is now landed:
+  - Telegram runtime accepts callback updates and routes them into the existing workflow dispatcher
+  - callback update de-dup reuses persisted `telegram_updates` callback truth
+  - callback path keeps the same side-effect boundary as the existing text-command routing
+  - callback path can recover chat/user/message context from either `effective_*` fields or callback-owned context
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **Telegram callback workflow routing baseline**.
+Land the smallest **copy fallback approval for import** baseline.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep hardlink import as the default path
+- when confirmed import hits cross-filesystem hardlink failure, do not silently copy
+- add the smallest explicit copy-fallback approval interaction for that cross-filesystem case only
+- keep the landed downloader/import approval flows, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- add minimal callback route handling in Telegram runtime without changing existing text-command path
-- use existing `telegram_updates` callback de-dup truth path and keep callback handling deterministic
-- keep callback path side-effect boundary identical to existing text command routing
-- add focused tests/manual verification for callback routing baseline and no-regression
+- reuse the existing approval / confirm / jobs truth as much as possible
+- add focused tests/manual verification for copy-fallback approval and no-regression
 
 ## Explicit constraints
 
 - do not add new downloader/media server support
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
+- do not make copy the default import path
+- do not auto-execute copy without approval
 - do not add library filename normalization/renaming
-- do not introduce Telegram inline keyboard as a requirement for this step
 - do not remove existing `import <id/hash>` / `confirm <id/hash>` / `watchlist ...` command paths
-- do not change current downloader/import success/failure text bodies
+- do not change current hardlink success-path text bodies
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
@@ -88,10 +96,10 @@ Only do:
 
 ## Suggested implementation shape
 
-1. add the smallest callback update entry handling in Telegram runtime and route to existing workflow dispatcher
-2. reuse existing parser/service execution path as much as possible (no duplicate business logic)
-3. preserve current side-effect serialization and approval/lease protocol boundaries
-4. keep existing text message path fully backward compatible
+1. detect cross-filesystem hardlink failure inside the existing import confirm path
+2. convert that failure into the smallest explicit copy-fallback approval state instead of silently copying
+3. reuse existing approval / confirm / job truth as much as possible (no duplicate workflow stack)
+4. keep hardlink success path, refresh behavior, and current command routing backward compatible
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -99,27 +107,27 @@ Only do:
 - existing downloader/import approval flows do not regress
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
-- callback update routing works with deterministic de-dup and does not bypass approval boundaries
+- callback update routing remains stable with deterministic de-dup and no approval bypass
+- cross-filesystem import never auto-copies without explicit approval
+- approved copy fallback can be deterministically confirmed through the existing command path
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After callback routing baseline is stable, advance in this order (still one small goal at a time):
+After copy fallback approval is stable, advance in this order (still one small goal at a time):
 
-1. close the remaining import hardlink safety gap:
-   - copy fallback approval for cross-filesystem import
-2. land the smallest completion-monitor / scheduler prerequisite needed by later automation:
+1. land the smallest completion-monitor / scheduler prerequisite needed by later automation:
    - keep it narrow; do not broaden into a generic workflow platform
-3. only then enter stage B automation closure:
+2. only then enter stage B automation closure:
    - post-download auto import
    - resource auto-selection rules
    - filename normalization / rename
    - metadata scrape
    - subtitle auto-translation
-4. after movie automation is stable, enter stage C:
+3. after movie automation is stable, enter stage C:
    - series / anime watchlist-driven tracking
    - BT/PT split downloader routing (`qBittorrent` later)
-5. after workflow core is stable, enter stage D:
+4. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters
-6. after the above is stable, enter stage E:
+5. after the above is stable, enter stage E:
    - downloader/library asset correlation and cleanup
