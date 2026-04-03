@@ -9,6 +9,7 @@ from app.config import load_settings
 from app.db.approval_repo import ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -30,6 +31,7 @@ def main() -> None:
     job_event_repo = JobEventRepo(database)
     job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
+    download_monitor_repo = DownloadMonitorRepo(database)
     telegram_update_repo = TelegramUpdateRepo(database)
     watchlist_repo = WatchlistRepo(database)
     clarification_repo = ClarificationRepo(database)
@@ -59,8 +61,13 @@ def main() -> None:
         approval_repo=approval_repo,
         job_repo=job_repo,
         job_event_repo=job_event_repo,
+        download_monitor_repo=download_monitor_repo,
     )
-    get_download_status_service = GetDownloadStatusService(transmission_client.get_torrent_status)
+    get_download_status_service = GetDownloadStatusService(
+        transmission_client.get_torrent_status,
+        download_monitor_repo=download_monitor_repo,
+        job_event_repo=job_event_repo,
+    )
     refresh_media_server_func = None
     if settings.emby_base_url and settings.emby_api_key:
         emby_client = EmbyClient(base_url=settings.emby_base_url, api_key=settings.emby_api_key)

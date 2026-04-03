@@ -97,6 +97,12 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - second `confirm <id/hash>` executes explicit copy import through the existing approval / confirm / `jobs` truth path
   - copy-fallback pending survives restart through persisted `jobs.payload_json` truth
   - existing Telegram command words and existing hardlink success-path text bodies remain unchanged
+- smallest completion-monitor / scheduler prerequisite is now landed:
+  - downloader dispatch success now persists completion-monitor truth in SQLite (`download_monitor`)
+  - `status <id/hash>` updates observed download progress/completion truth without introducing new command words
+  - first observed completion deterministically appends `downloader.completed_observed` into `job_event`
+  - pending-completion truth survives restart via SQLite and no longer depends on chat transcript memory
+  - no background scheduler loop or auto-import side effect is introduced in this step
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -117,7 +123,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 ## What is not implemented yet
 
 **Near-term control-layer and current-mainline gaps:**
-- smallest scheduler / retry / completion-monitor prerequisite for later automation is not landed yet
 - real image/media poster rendering
 - multi-process/global locking semantics
 
@@ -142,7 +147,8 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `122 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `125 passed` (`.venv/bin/python -m pytest -q`)
+- manual verification: completion-monitor / scheduler prerequisite baseline passed (temporary `tmp_tests/verify_download_monitor_prerequisite.py`, script cleaned after run)
 - manual verification: copy fallback approval baseline passed (temporary `tmp_tests/verify_import_copy_fallback_approval.py`, script cleaned after run)
 - manual verification: Telegram callback workflow routing baseline passed (temporary `tmp_tests/verify_callback_routing.py`, script cleaned after run)
 - manual verification: read-only concurrency-safe execution policy baseline passed (`tmp_tests/verify_execution_policy_baseline.py`)
@@ -158,7 +164,7 @@ Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
 2. keep manual watchlist baseline behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
-4. land the smallest completion-monitor / scheduler prerequisite needed by later automation
+4. land the smallest post-download auto import baseline
 
 ## Current risks
 
@@ -170,6 +176,7 @@ Build the next smallest path:
 - candidate mapping keeps only the latest search window per chat
 - Transmission `downloadDir + name` must map to container-visible paths
 - copy fallback duplicates data and depends on sufficient free disk space
+- downloader completion truth currently advances when runtime observes status; background polling itself is not landed yet
 - `jobs` ownership protocol is currently wired into import approval wake and downloader dispatch approval wake, not the full workflow chain
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
@@ -178,11 +185,12 @@ Build the next smallest path:
 
 ## Acceptance focus for the next step
 
-- land the smallest completion-monitor / scheduler prerequisite without changing existing text-command behavior
-- keep the scheduler prerequisite narrow; do not broaden into a generic workflow platform
+- land the smallest post-download auto import baseline without changing existing text-command behavior
+- reuse the landed completion-monitor truth instead of depending on chat transcript memory
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
+- landed completion-monitor / scheduler prerequisite behavior does not regress
 - existing `search/select/status/import/confirm/refresh/watchlist` behavior does not regress
 - current search-order + poster-card + candidate mapping + clarification reset behavior remains stable
 - current ambiguous read-only exploration + numeric-select blocking behavior remains stable

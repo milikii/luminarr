@@ -13,6 +13,7 @@ from app.db.approval_repo import (
     ApprovalRecord,
     ApprovalRepo,
 )
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.search_media import SearchMediaService
@@ -67,12 +68,14 @@ class AddToDownloaderService:
         approval_repo: ApprovalRepo | None = None,
         job_repo: JobRepo | None = None,
         job_event_repo: JobEventRepo | None = None,
+        download_monitor_repo: DownloadMonitorRepo | None = None,
     ) -> None:
         self._search_service = search_service
         self._add_torrent_func = add_torrent_func
         self._approval_repo = approval_repo
         self._job_repo = job_repo
         self._job_event_repo = job_event_repo
+        self._download_monitor_repo = download_monitor_repo
         self._pending_add_identities: set[tuple[str, str]] = set()
         self._pending_add_lease_versions: dict[tuple[str, str], int] = {}
         self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
@@ -273,6 +276,7 @@ class AddToDownloaderService:
             event_type="downloader.succeeded",
             message=result.title,
         )
+        self._register_download_monitor(task_id=result.task_id, task_hash=result.task_hash, title=result.title)
         self._record_executed_lease_version(
             task_ref=cleaned_ref,
             task_id=pending_add.task_id,
@@ -757,6 +761,18 @@ class AddToDownloaderService:
                 task_hash=task_hash,
                 event_type=event_type,
                 message=message,
+            )
+        except Exception:
+            return
+
+    def _register_download_monitor(self, *, task_id: str, task_hash: str, title: str) -> None:
+        if self._download_monitor_repo is None:
+            return
+        try:
+            self._download_monitor_repo.register_download(
+                task_id=task_id,
+                task_hash=task_hash,
+                name=title,
             )
         except Exception:
             return

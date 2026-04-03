@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
@@ -175,6 +176,36 @@ def test_confirm_add_by_task_ref_rejects_expired_pending(tmp_path) -> None:
     )
     assert record is not None
     assert record.status == APPROVAL_STATUS_CANCELLED
+
+
+def test_confirm_add_by_task_ref_registers_download_monitor_truth(tmp_path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    search_service = SearchMediaService(
+        _fake_search_with_download_url,
+        candidate_repo=CandidateMappingRepo(database),
+    )
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    monitor_repo = DownloadMonitorRepo(database)
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=add_torrent,
+        download_monitor_repo=monitor_repo,
+    )
+
+    _run(service.add_by_selection(1001, "1"))
+    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert "任务 ID: 42" in confirm_reply
+    record = monitor_repo.get_record(task_id="42", task_hash="abc123")
+    assert record is not None
+    assert record.name == "Dune: Part Two"
+    assert record.is_complete is False
+    pending_records = monitor_repo.list_pending_completion()
+    assert len(pending_records) == 1
+    assert pending_records[0].task_hash == "abc123"
 
 
 def _run(coroutine: Awaitable[str]) -> str:

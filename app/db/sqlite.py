@@ -96,6 +96,22 @@ SCHEMA_STATEMENTS = (
     "CREATE INDEX IF NOT EXISTS idx_jobs_chat_workflow ON jobs(chat_id, workflow_type)",
     "CREATE INDEX IF NOT EXISTS idx_jobs_task_ref ON jobs(task_ref)",
     "CREATE INDEX IF NOT EXISTS idx_jobs_task_identity ON jobs(task_id, task_hash)",
+    """
+    CREATE TABLE IF NOT EXISTS download_monitor (
+        task_id TEXT NOT NULL,
+        task_hash TEXT NOT NULL,
+        name TEXT NOT NULL DEFAULT '',
+        status_code INTEGER NOT NULL DEFAULT 0,
+        percent_done REAL NOT NULL DEFAULT 0,
+        is_complete INTEGER NOT NULL DEFAULT 0,
+        completion_observed_at TEXT NOT NULL DEFAULT '',
+        last_observed_at TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (task_id, task_hash)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_download_monitor_complete ON download_monitor(is_complete, updated_at)",
 )
 
 

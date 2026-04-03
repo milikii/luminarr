@@ -64,24 +64,31 @@ Prerequisite completed:
   - second `confirm <id/hash>` executes copy import through the existing approval / confirm / `jobs` truth path
   - copy-fallback pending survives restart through persisted `jobs.payload_json`
   - focused tests + manual verification passed
+- smallest completion-monitor / scheduler prerequisite is now landed:
+  - downloader dispatch success persists completion-monitor truth in SQLite (`download_monitor`)
+  - `status <id/hash>` updates observed download progress/completion truth without changing command words
+  - first observed completion deterministically appends `downloader.completed_observed` into `job_event`
+  - pending-completion truth survives restart through SQLite
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **completion-monitor / scheduler prerequisite** baseline.
+Land the smallest **post-download auto import** baseline.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- add only the smallest runtime truth needed by later automation completion detection / recovery
-- do not make this step responsible for generic scheduling, auto-import business policy, or broad workflow orchestration
-- add focused tests/manual verification for the scheduler prerequisite and no-regression
+- reuse the landed downloader completion truth as the only trigger source for auto-import
+- keep this step narrow; do not broaden into generic scheduler/platform work or resource auto-selection rules
+- preserve the landed import safety boundary, including copy-fallback approval for cross-filesystem import
+- add focused tests/manual verification for post-download auto import and no-regression
 
 ## Explicit constraints
 
@@ -89,9 +96,9 @@ Only do:
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
 - do not add library filename normalization/renaming
-- do not remove existing `import <id/hash>` / `confirm <id/hash>` / `watchlist ...` command paths
 - do not add a broad generic scheduler platform in this step
-- do not start post-download auto import business behavior in this step
+- do not start resource auto-selection / rename / metadata scrape / subtitle logic in this step
+- do not remove existing `status <id/hash>` / `watchlist ...` command paths
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
@@ -99,10 +106,10 @@ Only do:
 
 ## Suggested implementation shape
 
-1. define the smallest persisted/runtime truth needed to observe downloader completion or resume later automation safely
-2. keep this truth independent from LLM calls and compatible with existing ownership / approval rules
-3. reuse existing persistence / event / jobs structures as much as possible (no duplicate workflow stack)
-4. keep current manual import / confirm / refresh path fully backward compatible
+1. use landed downloader completion truth (`download_monitor` / `job_event`) as the only automation trigger input
+2. add the smallest serialized path that turns observed completed download truth into auto-import progression
+3. keep this progression independent from LLM calls and compatible with existing ownership / approval rules
+4. keep current manual status/watchlist paths fully backward compatible
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -112,15 +119,14 @@ Only do:
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
 - cross-filesystem import copy-fallback approval remains stable
-- the new completion-monitor / scheduler prerequisite is durable enough to support later automation without depending on chat transcript memory
+- downloader completion truth can deterministically drive the smallest auto-import progression without depending on chat transcript memory
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After the scheduler prerequisite is stable, advance in this order (still one small goal at a time):
+After post-download auto import is stable, advance in this order (still one small goal at a time):
 
 1. enter stage B automation closure:
-   - post-download auto import
    - resource auto-selection rules
    - filename normalization / rename
    - metadata scrape

@@ -437,6 +437,20 @@
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
+## D-040 completion-monitor / scheduler prerequisite 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - 当前阶段不引入通用 scheduler 平台，只先补最小 completion-monitor 真相
+  - downloader dispatch 成功后，系统必须把真实下载任务登记到持久化 completion-monitor 账本（`download_monitor`）
+  - `status <id/hash>` 在成功拿到真实下载状态时，必须同步更新该账本中的 observed truth
+  - 第一次观察到下载完成时，系统必须追加确定性的完成事件（`downloader.completed_observed`），供后续自动化闭环复用
+  - 当前 next smallest path 前进到 post-download auto import baseline
+- **原因**：
+  先补齐自动化闭环前最后一个“可持久化、可恢复、与聊天历史解耦”的运行时真相层，同时避免过早把仓库扩成通用 scheduler 平台。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
 ---
 
 ## 附：更新模板

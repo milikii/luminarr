@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import app.services.import_to_library as import_module
-from app.clients.transmission import TransmissionImportSource, TransmissionTask
+from app.clients.transmission import TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
 from app.db.approval_repo import (
     ACTION_ADD_TO_DOWNLOADER,
     ACTION_IMPORT_TO_LIBRARY,
@@ -18,6 +18,7 @@ from app.db.approval_repo import (
 )
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_COMPLETED, JOB_STATE_PENDING_APPROVAL, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.db.sqlite import SqliteDatabase
@@ -27,6 +28,7 @@ from app.services.add_to_downloader import (
     ADD_CONFIRM_NOT_PENDING_TEXT,
     AddToDownloaderService,
 )
+from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import (
     IMPORT_COPY_APPROVAL_PENDING_TEXT,
     IMPORT_CANCELLED_TEXT,
@@ -76,6 +78,52 @@ def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:
     assert [event.event_type for event in events] == ["import.succeeded", "refresh.succeeded"]
     assert events[0].message.endswith("demo.mkv")
     assert events[1].message == "媒体库刷新成功。"
+
+
+def test_download_monitor_truth_persists_for_restart_and_completion_observation(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_repo = DownloadMonitorRepo(database)
+    before_restart_repo.register_download(task_id="42", task_hash="hash-42", name="Dune: Part Two")
+
+    after_restart_repo = DownloadMonitorRepo(SqliteDatabase(str(db_path)))
+    pending_records = after_restart_repo.list_pending_completion()
+    assert len(pending_records) == 1
+    assert pending_records[0].task_id == "42"
+    assert pending_records[0].is_complete is False
+
+    status_service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="42",
+                task_hash="hash-42",
+                name="Dune: Part Two",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=after_restart_repo,
+        job_event_repo=JobEventRepo(SqliteDatabase(str(db_path))),
+    )
+    status_reply = _run(status_service.get_status_text("42"))
+    assert "状态: 做种中" in status_reply
+
+    final_repo = DownloadMonitorRepo(SqliteDatabase(str(db_path)))
+    final_record = final_repo.get_record(task_id="42", task_hash="hash-42")
+    assert final_record is not None
+    assert final_record.is_complete is True
+    assert final_record.completion_observed_at
+    assert final_repo.list_pending_completion() == []
+
+    events = JobEventRepo(SqliteDatabase(str(db_path))).list_events_for_task_identity(
+        task_id="42",
+        task_hash="hash-42",
+    )
+    assert [event.event_type for event in events] == ["downloader.completed_observed"]
 
 
 def test_telegram_update_repo_rejects_duplicate_message_after_restart(tmp_path: Path) -> None:

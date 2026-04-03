@@ -59,6 +59,7 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 - clarification pending restart-durable baseline
 - Telegram callback workflow routing baseline
 - cross-filesystem import copy fallback approval baseline
+- completion-monitor / scheduler prerequisite baseline
 - 手动 `watchlist` 基线（add/list/remove/clear）
 - 硬链接导入 + Emby refresh
 
@@ -68,13 +69,13 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 当前 next step 不是 watchlist，也不是自动化大升级，而是：
 
-- **最小 completion-monitor / scheduler 前置能力**
+- **post-download auto import baseline**
 
 这一小步的目标是：
 
-- 给后续自动化闭环准备最小运行时真相
+- 复用已落地的 completion-monitor 真相驱动自动化闭环第一步
 - 不引入通用 scheduler 平台化
-- 复用已有持久化与执行所有权边界
+- 保持现有 import 安全边界和 copy-fallback 审批不退化
 - 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
 ---
@@ -82,10 +83,6 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 ## 4. 当前之后的阶段化路线
 
 下面这些是**后续路线**，不是当前一步要同时开工的内容。推进顺序固定为“每次只做一个小目标”。
-
-### 阶段 A：控制层收尾
-
-- 最小 completion-monitor / scheduler 前置能力
 
 ### 阶段 B：自动化闭环
 
@@ -181,4 +178,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 9. 一句话总结
 
-**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，callback 路由与 cross-filesystem copy fallback approval 已落地，下一步补最小 completion-monitor / scheduler 前置能力。**
+**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，completion-monitor 前置真相也已落地，下一步进入 post-download auto import baseline。**

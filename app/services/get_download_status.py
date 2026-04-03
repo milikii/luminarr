@@ -4,6 +4,8 @@ import re
 from collections.abc import Awaitable, Callable
 
 from app.clients.transmission import TransmissionTaskStatus
+from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.job_event_repo import JobEventRepo
 
 GetStatusFunc = Callable[[str], Awaitable[TransmissionTaskStatus | None]]
 
@@ -23,8 +25,15 @@ _STATUS_CODE_LABELS = {
 
 
 class GetDownloadStatusService:
-    def __init__(self, get_status_func: GetStatusFunc) -> None:
+    def __init__(
+        self,
+        get_status_func: GetStatusFunc,
+        download_monitor_repo: DownloadMonitorRepo | None = None,
+        job_event_repo: JobEventRepo | None = None,
+    ) -> None:
         self._get_status_func = get_status_func
+        self._download_monitor_repo = download_monitor_repo
+        self._job_event_repo = job_event_repo
 
     async def get_status_text(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
@@ -37,7 +46,28 @@ class GetDownloadStatusService:
             return STATUS_QUERY_FAILED_TEXT
         if task_status is None:
             return STATUS_NOT_FOUND_TEXT
+        self._record_status_observation(task_ref=cleaned_ref, task_status=task_status)
         return format_task_status(task_status)
+
+    def _record_status_observation(self, *, task_ref: str, task_status: TransmissionTaskStatus) -> None:
+        if self._download_monitor_repo is None:
+            return
+        try:
+            update = self._download_monitor_repo.record_status(task_status)
+        except Exception:
+            return
+        if not update.newly_completed or self._job_event_repo is None:
+            return
+        try:
+            self._job_event_repo.append_event(
+                task_ref=task_ref,
+                task_id=task_status.task_id,
+                task_hash=task_status.task_hash,
+                event_type="downloader.completed_observed",
+                message=task_status.name,
+            )
+        except Exception:
+            return
 
 
 def parse_status_query(text: str) -> str | None:

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionTaskStatus
+from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.job_event_repo import JobEventRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.get_download_status import (
     STATUS_NOT_FOUND_TEXT,
     STATUS_QUERY_FAILED_TEXT,
@@ -65,6 +69,58 @@ def test_get_status_text_handles_empty_ref() -> None:
     service = GetDownloadStatusService(AsyncMock())
     text = _run(service.get_status_text("   "))
     assert text == STATUS_QUERY_USAGE_TEXT
+
+
+def test_get_status_text_updates_download_monitor_truth_and_completion_event(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    event_repo = JobEventRepo(database)
+
+    service = GetDownloadStatusService(
+        AsyncMock(
+            side_effect=[
+                TransmissionTaskStatus(
+                    task_id="87",
+                    task_hash="hash-87",
+                    name="Dune 1984",
+                    status_code=4,
+                    percent_done=0.5,
+                    rate_download=1024,
+                    eta_seconds=30,
+                ),
+                TransmissionTaskStatus(
+                    task_id="87",
+                    task_hash="hash-87",
+                    name="Dune 1984",
+                    status_code=6,
+                    percent_done=1.0,
+                    rate_download=0,
+                    eta_seconds=-1,
+                ),
+            ]
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+    )
+
+    first_text = _run(service.get_status_text("87"))
+    assert "状态: 下载中" in first_text
+    first_record = monitor_repo.get_record(task_id="87", task_hash="hash-87")
+    assert first_record is not None
+    assert first_record.is_complete is False
+    assert len(monitor_repo.list_pending_completion()) == 1
+    assert event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87") == []
+
+    second_text = _run(service.get_status_text("87"))
+    assert "状态: 做种中" in second_text
+    second_record = monitor_repo.get_record(task_id="87", task_hash="hash-87")
+    assert second_record is not None
+    assert second_record.is_complete is True
+    assert second_record.completion_observed_at
+    assert monitor_repo.list_pending_completion() == []
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert [event.event_type for event in events] == ["downloader.completed_observed"]
 
 
 def _run(coroutine: Awaitable[str]) -> str:
