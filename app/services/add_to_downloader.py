@@ -18,7 +18,7 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.search_media import SearchMediaService
 
-AddTorrentFunc = Callable[[str], Awaitable[TransmissionTask]]
+AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 
 SELECT_USAGE_TEXT = "请输入要选择的序号，例如：1"
 SELECT_NOT_FOUND_TEXT = "没有可用的候选结果，请先发一条搜索请求。"
@@ -34,6 +34,7 @@ ADD_CANCELLED_TEXT = "已取消当前下载确认。请重新发送序号。"
 ADD_CONFIRM_NOT_PENDING_TEXT = "没有待确认的下载请求，请先重新发送序号。"
 ADD_CONFIRM_EXPIRED_TEXT = "下载确认已超时，请重新发送序号。"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
+BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
 
 
@@ -51,6 +52,10 @@ class PendingAddContext:
     task_hash: str
     title: str
     source: str
+    downloader_name: str = ""
+    downloader_type: str = "transmission"
+    download_dir: str = ""
+    auto_import_enabled: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +92,9 @@ class AddToDownloaderService:
         selection_text: str,
         *,
         user_id: int | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
     ) -> str:
         index = _parse_selection_index(selection_text)
         if index is None:
@@ -104,7 +112,14 @@ class AddToDownloaderService:
 
         task_ref = str(index)
         title = str(candidate.get("title", "")).strip() or "(no title)"
-        pending_add = _build_pending_add_context(task_ref=task_ref, title=title, source=source)
+        pending_add = _build_pending_add_context(
+            task_ref=task_ref,
+            title=title,
+            source=source,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+        )
 
         self._record_pending_approval(
             task_ref=task_ref,
@@ -121,6 +136,48 @@ class AddToDownloaderService:
             message=title,
         )
         return ADD_APPROVAL_PENDING_TEXT.format(title=title, task_ref=task_ref)
+
+    async def add_bt_source(
+        self,
+        *,
+        chat_id: int,
+        source: str,
+        title: str,
+        user_id: int | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> str:
+        cleaned_source = source.strip()
+        if not cleaned_source.lower().startswith("magnet:?"):
+            return BT_SOURCE_UNSUPPORTED_TEXT
+
+        cleaned_title = title.strip() or "(no title)"
+        pending_add = _build_pending_add_context(
+            task_ref=_build_bt_task_ref(cleaned_source),
+            title=cleaned_title,
+            source=cleaned_source,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
+        )
+        self._record_pending_approval(
+            task_ref=pending_add.task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+        )
+        self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
+        self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add)
+        self._record_event(
+            task_ref=pending_add.task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            event_type="downloader.approval_pending",
+            message=cleaned_title,
+        )
+        return ADD_APPROVAL_PENDING_TEXT.format(title=cleaned_title, task_ref=pending_add.task_ref)
 
     async def confirm_add_by_task_ref(
         self,
@@ -239,8 +296,9 @@ class AddToDownloaderService:
         )
 
         try:
-            task = await self._add_torrent_func(pending_add.source)
-        except Exception:
+            task = await self._invoke_add_torrent(pending_add)
+        except Exception as error:
+            self._log_dispatch_error(pending_add=pending_add, error=error)
             self._record_event(
                 task_ref=cleaned_ref,
                 task_id=pending_add.task_id,
@@ -275,13 +333,14 @@ class AddToDownloaderService:
             event_type="downloader.succeeded",
             message=result.title,
         )
-        self._register_download_monitor(
-            task_id=result.task_id,
-            task_hash=result.task_hash,
-            title=result.title,
-            chat_id=chat_id,
-            user_id=user_id,
-        )
+        if pending_add.auto_import_enabled:
+            self._register_download_monitor(
+                task_id=result.task_id,
+                task_hash=result.task_hash,
+                title=result.title,
+                chat_id=chat_id,
+                user_id=user_id,
+            )
         self._record_executed_lease_version(
             task_ref=cleaned_ref,
             task_id=pending_add.task_id,
@@ -289,10 +348,16 @@ class AddToDownloaderService:
             executed_lease_version=expected_lease_version,
         )
         if claimed_job:
+            completed_context = _to_completed_pending_add_context(
+                pending_add,
+                actual_task_id=result.task_id,
+                actual_task_hash=result.task_hash,
+            )
             self._mark_completed_job(
                 job_id=claimed_job_id,
                 expected_version=claimed_job_version,
                 lease_owner=lease_owner,
+                completed_add=completed_context,
             )
         self._clear_pending_context(chat_id=chat_id, task_ref=cleaned_ref)
         return reply
@@ -632,15 +697,18 @@ class AddToDownloaderService:
         job_id: str,
         expected_version: int,
         lease_owner: str,
+        completed_add: PendingAddContext,
     ) -> None:
         if self._job_repo is None:
             return
         try:
-            self._job_repo.mark_completed(
+            self._job_repo.mark_downloader_completed(
                 job_id=job_id,
                 expected_version=expected_version,
                 lease_owner=lease_owner,
-                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+                task_id=completed_add.task_id,
+                task_hash=completed_add.task_hash,
+                payload_json=_pending_add_to_json(completed_add),
             )
         except Exception:
             return
@@ -792,6 +860,24 @@ class AddToDownloaderService:
         except Exception:
             return
 
+    async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
+        if pending_add.downloader_name.strip() or pending_add.download_dir.strip():
+            return await self._add_torrent_func(
+                pending_add.source,
+                pending_add.downloader_name,
+                pending_add.download_dir,
+            )
+        return await self._add_torrent_func(pending_add.source)
+
+    def _log_dispatch_error(self, *, pending_add: PendingAddContext, error: Exception) -> None:
+        print(
+            "\033[31m[下载投递失败]\033[0m "
+            f"标题={pending_add.title} 下载器={pending_add.downloader_name or 'legacy-transmission'} "
+            f"类型={pending_add.downloader_type or 'transmission'} 目标目录={pending_add.download_dir or '-'} "
+            f"原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查下载器地址、认证信息、目标目录和磁力链接后重试。"
+        )
+
 
 def _parse_selection_index(text: str) -> int | None:
     cleaned = text.strip()
@@ -814,7 +900,16 @@ def _resolve_source(candidate: Mapping[str, Any]) -> str:
     return ""
 
 
-def _build_pending_add_context(*, task_ref: str, title: str, source: str) -> PendingAddContext:
+def _build_pending_add_context(
+    *,
+    task_ref: str,
+    title: str,
+    source: str,
+    downloader_name: str = "",
+    downloader_type: str = "transmission",
+    download_dir: str = "",
+    auto_import_enabled: bool = True,
+) -> PendingAddContext:
     digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
     return PendingAddContext(
         task_ref=task_ref,
@@ -822,7 +917,35 @@ def _build_pending_add_context(*, task_ref: str, title: str, source: str) -> Pen
         task_hash=f"candidate:{digest}",
         title=title,
         source=source,
+        downloader_name=downloader_name.strip(),
+        downloader_type=downloader_type.strip() or "transmission",
+        download_dir=download_dir.strip(),
+        auto_import_enabled=bool(auto_import_enabled),
     )
+
+
+def _to_completed_pending_add_context(
+    pending_add: PendingAddContext,
+    *,
+    actual_task_id: str,
+    actual_task_hash: str,
+) -> PendingAddContext:
+    return PendingAddContext(
+        task_ref=pending_add.task_ref,
+        task_id=actual_task_id.strip(),
+        task_hash=actual_task_hash.strip(),
+        title=pending_add.title,
+        source=pending_add.source,
+        downloader_name=pending_add.downloader_name,
+        downloader_type=pending_add.downloader_type,
+        download_dir=pending_add.download_dir,
+        auto_import_enabled=pending_add.auto_import_enabled,
+    )
+
+
+def _build_bt_task_ref(source: str) -> str:
+    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    return f"bt-{digest[:8]}"
 
 
 def _pending_add_to_json(pending_add: PendingAddContext) -> str:
@@ -833,6 +956,10 @@ def _pending_add_to_json(pending_add: PendingAddContext) -> str:
             "task_hash": pending_add.task_hash,
             "title": pending_add.title,
             "source": pending_add.source,
+            "downloader_name": pending_add.downloader_name,
+            "downloader_type": pending_add.downloader_type,
+            "download_dir": pending_add.download_dir,
+            "auto_import_enabled": pending_add.auto_import_enabled,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -855,6 +982,10 @@ def _pending_add_from_json(payload_json: str) -> PendingAddContext | None:
     task_hash = str(payload.get("task_hash", "")).strip()
     title = str(payload.get("title", "")).strip()
     source = str(payload.get("source", "")).strip()
+    downloader_name = str(payload.get("downloader_name", "")).strip()
+    downloader_type = str(payload.get("downloader_type", "")).strip() or "transmission"
+    download_dir = str(payload.get("download_dir", "")).strip()
+    auto_import_enabled = payload.get("auto_import_enabled", True)
     if not task_ref or not task_id or not task_hash or not title or not source:
         return None
     return PendingAddContext(
@@ -863,4 +994,8 @@ def _pending_add_from_json(payload_json: str) -> PendingAddContext | None:
         task_hash=task_hash,
         title=title,
         source=source,
+        downloader_name=downloader_name,
+        downloader_type=downloader_type,
+        download_dir=download_dir,
+        auto_import_enabled=bool(auto_import_enabled),
     )

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import json
+
 from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
 from app.clients.fanart import FanartClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.tmdb import TmdbClient
-from app.clients.transmission import TransmissionClient
-from app.config import load_settings
+from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
+from app.config import DownloaderInstanceConfig, load_settings
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.candidate_repo import CandidateMappingRepo
@@ -30,6 +32,56 @@ from app.services.subtitle_translator import SubtitleTranslatorService
 
 async def _skip_fanart_images(_: str):
     return None
+
+
+def _build_transmission_clients_by_name(
+    instances: tuple[DownloaderInstanceConfig, ...],
+) -> dict[str, TransmissionClient]:
+    clients: dict[str, TransmissionClient] = {}
+    for instance in instances:
+        if instance.downloader_type != "transmission":
+            continue
+        clients[instance.name] = TransmissionClient(
+            base_url=instance.base_url,
+            username=instance.username,
+            password=instance.password,
+        )
+    return clients
+
+
+def _resolve_downloader_payload_value(payload_json: str, key: str) -> str:
+    cleaned_payload = payload_json.strip()
+    if not cleaned_payload:
+        return ""
+    try:
+        payload = json.loads(cleaned_payload)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    return str(payload.get(key, "")).strip()
+
+
+def _resolve_transmission_client_for_task(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    legacy_client: TransmissionClient,
+    transmission_clients_by_name: dict[str, TransmissionClient],
+) -> TransmissionClient:
+    if chat_id is None or chat_id <= 0:
+        return legacy_client
+    try:
+        downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
+    except Exception:
+        return legacy_client
+    if downloader_job is None:
+        return legacy_client
+    downloader_name = _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
+    if not downloader_name:
+        return legacy_client
+    return transmission_clients_by_name.get(downloader_name, legacy_client)
 
 
 def main() -> None:
@@ -75,9 +127,41 @@ def main() -> None:
         username=settings.transmission_username,
         password=settings.transmission_password,
     )
+    transmission_clients_by_name = _build_transmission_clients_by_name(settings.downloader_instances)
+
+    async def add_torrent_with_routing(source: str, downloader_name: str = "", download_dir: str = "") -> TransmissionTask:
+        client = transmission_client
+        cleaned_name = downloader_name.strip()
+        if cleaned_name:
+            client = transmission_clients_by_name.get(cleaned_name, transmission_client)
+        return await client.add_torrent(source, download_dir=download_dir)
+
+    async def get_torrent_status_with_routing(task_ref: str, chat_id: int | None = None) -> TransmissionTaskStatus | None:
+        client = _resolve_transmission_client_for_task(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            job_repo=job_repo,
+            legacy_client=transmission_client,
+            transmission_clients_by_name=transmission_clients_by_name,
+        )
+        return await client.get_torrent_status(task_ref)
+
+    async def get_torrent_import_source_with_routing(
+        task_ref: str,
+        chat_id: int | None = None,
+    ) -> TransmissionImportSource | None:
+        client = _resolve_transmission_client_for_task(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            job_repo=job_repo,
+            legacy_client=transmission_client,
+            transmission_clients_by_name=transmission_clients_by_name,
+        )
+        return await client.get_torrent_import_source(task_ref)
+
     add_to_downloader_service = AddToDownloaderService(
         search_service=search_service,
-        add_torrent_func=transmission_client.add_torrent,
+        add_torrent_func=add_torrent_with_routing,
         approval_repo=approval_repo,
         job_repo=job_repo,
         job_event_repo=job_event_repo,
@@ -89,7 +173,7 @@ def main() -> None:
         refresh_service = RefreshMediaServerService(emby_client.refresh_library)
         refresh_media_server_func = refresh_service.refresh_text
     import_to_library_service = ImportToLibraryService(
-        get_import_source_func=transmission_client.get_torrent_import_source,
+        get_import_source_func=get_torrent_import_source_with_routing,
         library_target_dir=settings.library_target_dir,
         refresh_media_server_func=refresh_media_server_func,
         scrape_metadata_func=scrape_metadata_func,
@@ -113,7 +197,7 @@ def main() -> None:
         ),
     )
     get_download_status_service = GetDownloadStatusService(
-        transmission_client.get_torrent_status,
+        get_torrent_status_with_routing,
         download_monitor_repo=download_monitor_repo,
         job_event_repo=job_event_repo,
         post_download_auto_import_service=post_download_auto_import_service,

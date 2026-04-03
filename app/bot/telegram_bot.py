@@ -35,6 +35,7 @@ from app.runtime.execution_policy import (
 )
 from app.services.add_to_downloader import (
     ADD_CANCELLED_TEXT,
+    BT_SOURCE_UNSUPPORTED_TEXT,
     AddToDownloaderService,
 )
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
@@ -90,8 +91,7 @@ BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE = (
     "标题: {title}\n"
     "原始标题: {original_title}\n"
     "年份: {year}\n"
-    "TMDB ID: {tmdb_id}\n"
-    "当前这一步只展示关联结果，暂不执行下载投递。"
+    "TMDB ID: {tmdb_id}"
 )
 BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT = "TMDB 关联服务未就绪，请稍后重试。"
 RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE = (
@@ -109,8 +109,7 @@ RAW_BT_DESTINATION_SELECTED_TEMPLATE = (
     "已记录 raw_bt 目标目录。\n"
     "目录键: {key}\n"
     "目录说明: {label}\n"
-    "目标路径: {target_dir}\n"
-    "当前这一步只展示目录结果，暂不执行下载投递。"
+    "目标路径: {target_dir}"
 )
 RAW_BT_DESTINATION_CANCELLED_TEXT = "已取消当前 raw_bt 目录选择，请重新发送磁力或 BT 指令。"
 RAW_BT_DESTINATION_INVALID_TEMPLATE = (
@@ -120,6 +119,11 @@ RAW_BT_DESTINATION_INVALID_TEMPLATE = (
     "{options}"
 )
 RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT = "raw_bt 目录选择未就绪，请先配置预设目标目录后重试。"
+DOWNLOADER_EXECUTION_NOT_READY_TEMPLATE = (
+    "下载器角色 {role} 当前绑定到 {downloader_type} 实例 {name}，"
+    "但本次版本还未接入 {downloader_type} 真执行。请先把 {role_env} 指向 Transmission 实例后重试。"
+)
+DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE = "下载器角色 {role} 绑定的实例不存在：{name}。请检查配置后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -176,11 +180,20 @@ BT_TMDB_ASSOCIATION_EXAMPLES = {
 @dataclass(frozen=True, slots=True)
 class BtTmdbAssociationPending:
     media_kind: str
+    source: str
 
 
 @dataclass(frozen=True, slots=True)
 class RawBtDestinationPending:
     options: tuple[RawBtDestinationOption, ...]
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedDownloaderExecution:
+    name: str
+    downloader_type: str
+    download_dir: str
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -564,18 +577,19 @@ def _set_bt_tmdb_association_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
     media_kind: str,
+    source: str,
 ) -> None:
     if chat_id is None or chat_id <= 0:
         return
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
-    pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind)
+    pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind, source=source.strip())
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return
     pending_repo.upsert_pending(
         chat_id=chat_id,
         stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-        payload_json=_serialize_bt_pending_payload({"media_kind": media_kind}),
+        payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
     )
 
 
@@ -598,9 +612,10 @@ def _get_bt_tmdb_association_pending(
         return None
     payload = _deserialize_bt_pending_payload(pending_state.payload_json)
     media_kind = str(payload.get("media_kind", "")).strip()
+    source = str(payload.get("source", "")).strip()
     if not media_kind:
         return None
-    resolved_pending = BtTmdbAssociationPending(media_kind=media_kind)
+    resolved_pending = BtTmdbAssociationPending(media_kind=media_kind, source=source)
     pending_by_chat[chat_id] = resolved_pending
     return resolved_pending
 
@@ -627,11 +642,12 @@ def _set_raw_bt_destination_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
     options: tuple[RawBtDestinationOption, ...],
+    source: str,
 ) -> None:
     if chat_id is None or chat_id <= 0:
         return
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
-    pending_by_chat[chat_id] = RawBtDestinationPending(options=options)
+    pending_by_chat[chat_id] = RawBtDestinationPending(options=options, source=source.strip())
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return
@@ -647,7 +663,8 @@ def _set_raw_bt_destination_pending(
                         "target_dir": option.target_dir,
                     }
                     for option in options
-                ]
+                ],
+                "source": source.strip(),
             }
         ),
     )
@@ -672,6 +689,7 @@ def _get_raw_bt_destination_pending(
         return None
     payload = _deserialize_bt_pending_payload(pending_state.payload_json)
     raw_options = payload.get("options")
+    source = str(payload.get("source", "")).strip()
     if not isinstance(raw_options, list):
         return None
     options: list[RawBtDestinationOption] = []
@@ -686,7 +704,7 @@ def _get_raw_bt_destination_pending(
         options.append(RawBtDestinationOption(key=key, label=label, target_dir=target_dir))
     if not options:
         return None
-    resolved_pending = RawBtDestinationPending(options=tuple(options))
+    resolved_pending = RawBtDestinationPending(options=tuple(options), source=source)
     pending_by_chat[chat_id] = resolved_pending
     return resolved_pending
 
@@ -770,6 +788,14 @@ def _format_bt_tmdb_association_success(media_kind: str, match: TmdbMovie) -> st
     )
 
 
+def _format_bt_dispatch_title(match: TmdbMovie) -> str:
+    title = match.title or match.original_title or "(no title)"
+    year = match.year.strip()
+    if not year:
+        return title
+    return f"{title} ({year})"
+
+
 def _resolve_raw_bt_destination_options(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> tuple[RawBtDestinationOption, ...]:
@@ -781,6 +807,58 @@ def _resolve_raw_bt_destination_options(
         if isinstance(option, RawBtDestinationOption):
             resolved_options.append(option)
     return tuple(resolved_options)
+
+
+def _resolve_downloader_instances(
+    context: ContextTypes.DEFAULT_TYPE,
+) -> dict[str, DownloaderInstanceConfig]:
+    raw_instances = context.application.bot_data.get(DOWNLOADER_INSTANCES_KEY)
+    if not isinstance(raw_instances, tuple):
+        return {}
+    resolved_instances: dict[str, DownloaderInstanceConfig] = {}
+    for instance in raw_instances:
+        if isinstance(instance, DownloaderInstanceConfig):
+            resolved_instances[instance.name] = instance
+    return resolved_instances
+
+
+def _resolve_bound_downloader_execution(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    role: str,
+) -> tuple[ResolvedDownloaderExecution | None, str | None]:
+    role_binding = context.application.bot_data.get(DOWNLOADER_ROLE_BINDING_KEY)
+    if not isinstance(role_binding, DownloaderRoleBinding):
+        return None, None
+
+    role_name = "PT" if role == "pt" else "BT"
+    role_env = "PT_DOWNLOADER" if role == "pt" else "BT_DOWNLOADER"
+    downloader_name = role_binding.pt_downloader if role == "pt" else role_binding.bt_downloader
+    cleaned_name = downloader_name.strip()
+    if not cleaned_name:
+        return None, None
+
+    instances_by_name = _resolve_downloader_instances(context)
+    instance = instances_by_name.get(cleaned_name)
+    if instance is None:
+        return None, DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE.format(role=role_name, name=cleaned_name)
+
+    if instance.downloader_type != "transmission":
+        return None, DOWNLOADER_EXECUTION_NOT_READY_TEMPLATE.format(
+            role=role_name,
+            downloader_type=instance.downloader_type,
+            name=instance.name,
+            role_env=role_env,
+        )
+
+    return (
+        ResolvedDownloaderExecution(
+            name=instance.name,
+            downloader_type=instance.downloader_type,
+            download_dir=instance.download_dir,
+        ),
+        None,
+    )
 
 
 def _format_raw_bt_destination_options(options: tuple[RawBtDestinationOption, ...]) -> str:
@@ -844,14 +922,35 @@ async def _handle_raw_bt_destination_query(
     query: str,
     pending: RawBtDestinationPending,
     chat_id: int | None,
+    user_id: int | None,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> str:
+    if chat_id is None:
+        return SERVICE_NOT_READY_TEXT
     selected_option = _parse_raw_bt_destination_choice(query, pending.options)
     if selected_option is None:
         return _format_raw_bt_destination_invalid(query, pending.options)
 
     _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
-    return _format_raw_bt_destination_selected(selected_option)
+    add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+    if not isinstance(add_service, AddToDownloaderService):
+        return SERVICE_NOT_READY_TEXT
+    downloader_execution, resolution_error = _resolve_bound_downloader_execution(context=context, role="bt")
+    if resolution_error is not None:
+        return resolution_error
+    pending_text = await add_service.add_bt_source(
+        chat_id=chat_id,
+        user_id=user_id,
+        source=pending.source,
+        title=f"raw_bt -> {selected_option.label}",
+        downloader_name=downloader_execution.name if downloader_execution is not None else "",
+        downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+        download_dir=selected_option.target_dir,
+        auto_import_enabled=False,
+    )
+    if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
+        return pending_text
+    return f"{_format_raw_bt_destination_selected(selected_option)}\n\n{pending_text}"
 
 
 def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
@@ -866,8 +965,11 @@ async def _handle_bt_tmdb_association_query(
     query: str,
     pending: BtTmdbAssociationPending,
     chat_id: int | None,
+    user_id: int | None,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> str:
+    if chat_id is None:
+        return SERVICE_NOT_READY_TEXT
     parsed_query = parse_movie_query(query)
     if not parsed_query.title:
         return _format_bt_tmdb_association_pending_reminder(pending.media_kind)
@@ -893,7 +995,25 @@ async def _handle_bt_tmdb_association_query(
         )
 
     _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
-    return _format_bt_tmdb_association_success(pending.media_kind, matches[0])
+    add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
+    if not isinstance(add_service, AddToDownloaderService):
+        return SERVICE_NOT_READY_TEXT
+    downloader_execution, resolution_error = _resolve_bound_downloader_execution(context=context, role="bt")
+    if resolution_error is not None:
+        return resolution_error
+    pending_text = await add_service.add_bt_source(
+        chat_id=chat_id,
+        user_id=user_id,
+        source=pending.source,
+        title=_format_bt_dispatch_title(matches[0]),
+        downloader_name=downloader_execution.name if downloader_execution is not None else "",
+        downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+        download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
+        auto_import_enabled=True,
+    )
+    if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
+        return pending_text
+    return f"{_format_bt_tmdb_association_success(pending.media_kind, matches[0])}\n\n{pending_text}"
 
 
 async def _handle_query_text(
@@ -999,7 +1119,7 @@ async def _handle_query_text(
 
     bt_classification = _parse_bt_classification_choice(query)
     if bt_classification is not None and _is_bt_classification_pending(context=context, chat_id=chat_id):
-        _pop_bt_classification_pending(context=context, chat_id=chat_id)
+        bt_source = _pop_bt_classification_pending(context=context, chat_id=chat_id) or ""
         _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         if bt_classification == "raw_bt":
@@ -1011,6 +1131,7 @@ async def _handle_query_text(
                 context=context,
                 chat_id=chat_id,
                 options=raw_bt_destination_options,
+                source=bt_source,
             )
             await reply_func(_format_raw_bt_destination_prompt(raw_bt_destination_options))
             return
@@ -1018,6 +1139,7 @@ async def _handle_query_text(
             context=context,
             chat_id=chat_id,
             media_kind=bt_classification,
+            source=bt_source,
         )
         await reply_func(_format_bt_tmdb_association_prompt(bt_classification))
         return
@@ -1030,7 +1152,7 @@ async def _handle_query_text(
             return
         reply = await execution_gate.run(
             ACTION_GET_DOWNLOAD_STATUS,
-            lambda: status_service.get_status_text(task_ref),
+            lambda: status_service.get_status_text(task_ref, chat_id=chat_id),
         )
         await reply_func(reply)
         return
@@ -1147,6 +1269,7 @@ async def _handle_query_text(
             query=query,
             pending=bt_tmdb_pending,
             chat_id=chat_id,
+            user_id=user_id,
             context=context,
         )
         await reply_func(reply)
@@ -1158,6 +1281,7 @@ async def _handle_query_text(
             query=query,
             pending=raw_bt_destination_pending,
             chat_id=chat_id,
+            user_id=user_id,
             context=context,
         )
         await reply_func(reply)
@@ -1181,12 +1305,19 @@ async def _handle_query_text(
         if chat_id is None:
             await reply_func(SERVICE_NOT_READY_TEXT)
             return
+        downloader_execution, resolution_error = _resolve_bound_downloader_execution(context=context, role="pt")
+        if resolution_error is not None:
+            await reply_func(resolution_error)
+            return
         reply = await execution_gate.run(
             ACTION_ADD_TO_DOWNLOADER,
             lambda: add_service.add_by_selection(
                 chat_id,
                 query,
                 user_id=user_id,
+                downloader_name=downloader_execution.name if downloader_execution is not None else "",
+                downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+                download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
             ),
         )
         await reply_func(reply)

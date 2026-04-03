@@ -54,8 +54,12 @@ class TransmissionClient:
         self._session_id = ""
         self._auth = (username, password) if username else None
 
-    async def add_torrent(self, source: str) -> TransmissionTask:
-        payload = await self._rpc("torrent-add", {"filename": source})
+    async def add_torrent(self, source: str, download_dir: str = "") -> TransmissionTask:
+        arguments: dict[str, Any] = {"filename": source}
+        cleaned_download_dir = download_dir.strip()
+        if cleaned_download_dir:
+            arguments["download-dir"] = cleaned_download_dir
+        payload = await self._rpc("torrent-add", arguments)
         arguments = payload.get("arguments")
         if not isinstance(arguments, dict):
             raise TransmissionError("missing arguments in response")

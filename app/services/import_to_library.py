@@ -21,7 +21,7 @@ from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORK
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 
-GetImportSourceFunc = Callable[[str], Awaitable[TransmissionImportSource | None]]
+GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
 MetadataScrapeFunc = Callable[[MetadataScrapeInput], Awaitable[MetadataScrapeResult]]
 SubtitleTranslateFunc = Callable[[SubtitleTranslateInput], SubtitleTranslateResult]
@@ -48,6 +48,7 @@ IMPORT_APPROVAL_PENDING_TEXT = (
     "任务 Hash: {task_hash}\n"
     "请发送 confirm {task_ref} 执行导入。"
 )
+IMPORT_RAW_BT_UNSUPPORTED_TEXT = "当前任务属于 raw_bt 资源，不走媒体入库链。请直接到已选目标目录中使用文件。"
 IMPORT_CANCELLED_TEXT = "已取消当前导入确认。请重新发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_NOT_PENDING_TEXT = "没有待确认的导入请求，请先发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_EXPIRED_TEXT = "导入确认已超时，请重新发送 import <任务ID或Hash>。"
@@ -121,7 +122,10 @@ class ImportToLibraryService:
         if not cleaned_ref:
             return IMPORT_QUERY_USAGE_TEXT
 
-        prepared_import, error_text = await self._prepare_import(cleaned_ref)
+        if self._is_raw_bt_task(chat_id=chat_id, task_ref=cleaned_ref):
+            return IMPORT_RAW_BT_UNSUPPORTED_TEXT
+
+        prepared_import, error_text = await self._prepare_import(cleaned_ref, chat_id=chat_id)
         if prepared_import is None:
             return error_text
 
@@ -228,7 +232,7 @@ class ImportToLibraryService:
             claimed_job_version = confirm_context.job.version
             prepared_task_ref = confirm_context.lookup_task_ref
 
-        prepared_import, error_text = await self._prepare_import(prepared_task_ref)
+        prepared_import, error_text = await self._prepare_import(prepared_task_ref, chat_id=chat_id)
         if prepared_import is None:
             if claimed_job:
                 self._restore_pending_job(
@@ -464,9 +468,17 @@ class ImportToLibraryService:
         )
         return IMPORT_CANCELLED_TEXT
 
-    async def _prepare_import(self, task_ref: str) -> tuple[PreparedImport | None, str]:
+    async def _prepare_import(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+    ) -> tuple[PreparedImport | None, str]:
         try:
-            import_source = await self._get_import_source_func(task_ref)
+            if chat_id is not None:
+                import_source = await self._get_import_source_func(task_ref, chat_id)
+            else:
+                import_source = await self._get_import_source_func(task_ref)
         except Exception:
             self._record_event(
                 task_ref=task_ref,
@@ -542,6 +554,26 @@ class ImportToLibraryService:
             return None, message
 
         return PreparedImport(import_source=import_source, source_path=source_path, target_path=target_path), ""
+
+    def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool:
+        if self._job_repo is None or chat_id is None or chat_id <= 0:
+            return False
+        try:
+            downloader_job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
+        except Exception:
+            return False
+        if downloader_job is None:
+            return False
+        cleaned_payload = downloader_job.payload_json.strip()
+        if not cleaned_payload:
+            return False
+        try:
+            payload = json.loads(cleaned_payload)
+        except json.JSONDecodeError:
+            return False
+        if not isinstance(payload, dict):
+            return False
+        return payload.get("auto_import_enabled") is False
 
     def _resolve_normalized_naming_truth(
         self,

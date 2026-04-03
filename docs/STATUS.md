@@ -1,4 +1,4 @@
-# Current status (v32)
+# Current status (v33)
 
 ## Project position
 
@@ -170,6 +170,15 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - role binding currently binds PT / BT to configured downloader instance names without changing existing downloader side effects in this baseline
   - BT classification / TMDB association / raw-BT destination pending truth is now persisted in SQLite (`bt_pending_state`) and no longer disappears after process restart
   - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
+- smallest BT dispatch / transfer execution baseline is now landed:
+  - PT numeric select now deterministically enters the existing downloader approval flow with the configured `pt_downloader` Transmission instance truth
+  - BT `movie / series / anime` now deterministically continue from TMDB association success into the existing downloader approval flow with the configured `bt_downloader` Transmission instance truth
+  - `raw_bt` now deterministically continues from destination-directory selection into the existing downloader approval flow, and confirmed dispatch passes the selected target directory to Transmission `download-dir`
+  - downloader completed truth now updates `jobs` with the real downloader task identity (`task_id / task_hash`) after confirmed dispatch, so later `status <id/hash>` / `import <id/hash>` can route through the persisted downloader truth
+  - `status <id/hash>` and media import-source lookup now deterministically route through the persisted downloader instance truth instead of assuming a single legacy Transmission client
+  - `raw_bt` confirmed dispatch does not register post-download auto-import truth, and manual `import <id/hash>` now deterministically rejects `raw_bt` tasks with explicit text instead of entering the media import chain
+  - qBittorrent request execution remains a later step; when `pt_downloader` / `bt_downloader` points to a qBittorrent instance, Telegram now returns explicit not-ready text instead of silently misrouting to Transmission
+  - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -197,11 +206,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- BT dispatch / transfer execution on top of landed role binding truth:
-  - PT tasks should later dispatch through `pt_downloader`
-  - BT tasks should later dispatch through `bt_downloader`
-  - `raw_bt` should later reuse the selected destination-directory truth during transfer execution
-  - qBittorrent protocol execution remains a later step, not current fact
+- qBittorrent protocol execution and broader multi-instance downloader support on top of the landed BT dispatch / transfer execution baseline
 
 **Stage D channel expansion (documented roadmap, not current step):**
 - Feishu adapter
@@ -238,6 +243,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - manual verification: BT `movie / series / anime` TMDB association follow-up baseline passed (temporary `tmp_tests/verify_bt_tmdb_association_followup.py`, script cleaned after run)
 - manual verification: `raw_bt` destination-directory follow-up baseline passed (temporary `tmp_tests/verify_raw_bt_destination_followup.py`, script cleaned after run)
 - manual verification: downloader-role binding baseline passed (temporary `tmp_tests/verify_downloader_role_binding_baseline.py`, script cleaned after run)
+- manual verification: BT dispatch / transfer execution baseline passed (temporary `tmp_tests/verify_bt_dispatch_execution_baseline.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -250,7 +256,8 @@ Build the next smallest path:
 5. keep landed BT `movie / series / anime` TMDB association follow-up baseline stable
 6. keep landed `raw_bt` destination-directory follow-up baseline stable
 7. keep landed downloader-role binding baseline stable
-8. land the smallest BT dispatch / transfer execution baseline without introducing qBittorrent request dispatch or scheduler/platformization
+8. keep landed BT dispatch / transfer execution baseline stable
+9. land qBittorrent protocol execution and broader multi-instance downloader support on top of the landed role-binding truth, without introducing scheduler/platformization
 
 ## Current risks
 

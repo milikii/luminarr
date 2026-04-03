@@ -280,6 +280,61 @@ class JobRepo:
             bump_version=True,
         )
 
+    def mark_downloader_completed(
+        self,
+        *,
+        job_id: str,
+        expected_version: int,
+        lease_owner: str,
+        task_id: str,
+        task_hash: str,
+        payload_json: str,
+    ) -> bool:
+        cleaned_job_id = job_id.strip()
+        cleaned_owner = lease_owner.strip()
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        if (
+            not cleaned_job_id
+            or not cleaned_owner
+            or not cleaned_task_id
+            or not cleaned_task_hash
+            or expected_version <= 0
+        ):
+            return False
+
+        with self._database.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE jobs
+                SET
+                    state = ?,
+                    task_id = ?,
+                    task_hash = ?,
+                    payload_json = ?,
+                    version = version + 1,
+                    lease_owner = '',
+                    lease_until = '',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE job_id = ?
+                  AND version = ?
+                  AND workflow_type = ?
+                  AND lease_owner = ?
+                """,
+                (
+                    JOB_STATE_COMPLETED,
+                    cleaned_task_id,
+                    cleaned_task_hash,
+                    payload_json.strip(),
+                    cleaned_job_id,
+                    expected_version,
+                    WORKFLOW_ADD_TO_DOWNLOADER,
+                    cleaned_owner,
+                ),
+            )
+            connection.commit()
+        return cursor.rowcount == 1
+
     def cancel_pending_job(self, *, job_id: str, expected_version: int, workflow_type: str) -> bool:
         cleaned_job_id = job_id.strip()
         cleaned_workflow = workflow_type.strip()

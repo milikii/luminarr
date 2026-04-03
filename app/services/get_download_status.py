@@ -8,7 +8,7 @@ from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 
-GetStatusFunc = Callable[[str], Awaitable[TransmissionTaskStatus | None]]
+GetStatusFunc = Callable[..., Awaitable[TransmissionTaskStatus | None]]
 
 STATUS_QUERY_USAGE_TEXT = "状态查询格式：status <任务ID或Hash>"
 STATUS_NOT_FOUND_TEXT = "未找到对应下载任务，请检查任务 ID/Hash。"
@@ -38,13 +38,16 @@ class GetDownloadStatusService:
         self._job_event_repo = job_event_repo
         self._post_download_auto_import_service = post_download_auto_import_service
 
-    async def get_status_text(self, task_ref: str) -> str:
+    async def get_status_text(self, task_ref: str, *, chat_id: int | None = None) -> str:
         cleaned_ref = task_ref.strip()
         if not cleaned_ref:
             return STATUS_QUERY_USAGE_TEXT
 
         try:
-            task_status = await self._get_status_func(cleaned_ref)
+            if chat_id is not None:
+                task_status = await self._get_status_func(cleaned_ref, chat_id)
+            else:
+                task_status = await self._get_status_func(cleaned_ref)
         except Exception:
             return STATUS_QUERY_FAILED_TEXT
         if task_status is None:

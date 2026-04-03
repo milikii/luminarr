@@ -785,6 +785,25 @@
 - **验证**：
   已通过 focused pytest（`tests/test_config.py tests/test_persistence_sqlite.py tests/test_telegram_bot.py`）、全量 pytest 与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
+## D-057 BT dispatch / transfer execution 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - PT 现有数字选择 -> downloader approval -> `confirm` 执行链，现在开始消费已落地的 `pt_downloader` 角色绑定真相
+  - BT `movie / series / anime` 在 TMDB 关联成功后，现已确定性进入现有 downloader approval -> `confirm` 执行链，并通过 `bt_downloader` 角色绑定解析到具体下载器实例
+  - `raw_bt` 在目标目录选择成功后，现已确定性进入现有 downloader approval -> `confirm` 执行链；confirmed dispatch 时必须把用户刚才选择的目标目录传给下载器
+  - 当前最小执行协议下，BT 真实请求仍只接入 Transmission；当角色绑定指向 qBittorrent 实例时，系统必须返回显式 not-ready 文本，不得静默落回 Transmission
+  - downloader confirmed dispatch 成功后，`jobs` 必须更新为真实 downloader task identity（`task_id / task_hash`），供后续 `status <id/hash>` / `import <id/hash>` / import-source 查询按持久化真相路由到正确实例
+  - `status <id/hash>` 与媒体 import-source 查询现在必须按已持久化 downloader truth 路由，而不是默认假设单一 legacy Transmission client
+  - `raw_bt` 当前不进入媒体后半段：
+    - 不登记 post-download auto import truth
+    - 手动 `import <id/hash>` 必须确定性拒绝并返回显式提示
+  - 当前 next smallest path 前进到 qBittorrent protocol execution and broader multi-instance downloader support
+- **原因**：
+  先把已落地的 BT 前半段真相、raw-BT 目录真相和 downloader role-binding 真相真正接到可执行路径上，同时继续维持 approval 边界、导入边界和“raw_bt 不误入媒体链”的最小清晰形状；qBittorrent 真协议留到下一步单独补，避免这一步同时改两层复杂度。
+- **验证**：
+  已通过 `py_compile`、临时 `tmp_tests/verify_bt_dispatch_execution_baseline.py` 手工脚本验收（脚本已按规范清理）。
+
 ---
 
 ## 附：更新模板
