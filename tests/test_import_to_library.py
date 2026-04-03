@@ -19,9 +19,9 @@ from app.db.job_repo import JOB_STATE_CANCELLED, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     CONFIRM_QUERY_USAGE_TEXT,
+    IMPORT_COPY_APPROVAL_PENDING_TEXT,
     IMPORT_CONFIRM_EXPIRED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
-    IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
     IMPORT_REFRESH_FAILED_TEXT,
@@ -303,7 +303,7 @@ def test_confirm_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monke
     _run(service.import_by_task_ref("87"))
     monkeypatch.setattr(import_module.os, "link", _raise_exdev)
     text = _run(service.confirm_import_by_task_ref("87"))
-    assert text == IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
+    assert text == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
 
 
 def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path, monkeypatch) -> None:
@@ -331,14 +331,12 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     )
 
     _run(service.import_by_task_ref("87"))
-    original_link = os.link
-
     def _raise_exdev(src: str | Path, dst: str | Path) -> None:
         raise OSError(errno.EXDEV, "Invalid cross-device link")
 
     monkeypatch.setattr(import_module.os, "link", _raise_exdev)
     first_confirm = _run(service.confirm_import_by_task_ref("87"))
-    assert first_confirm == IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT
+    assert first_confirm == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
 
     failed_record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
     assert failed_record is not None
@@ -346,9 +344,16 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     assert failed_record.lease_version == 1
     assert failed_record.executed_version == 0
 
-    monkeypatch.setattr(import_module.os, "link", original_link)
+    def _unexpected_hardlink(src: str | Path, dst: str | Path) -> None:
+        raise AssertionError("copy confirm should not call os.link again")
+
+    monkeypatch.setattr(import_module.os, "link", _unexpected_hardlink)
     second_confirm = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in second_confirm
+    assert "导入方式: 复制" in second_confirm
+    target_file = tmp_path / "library" / source_file.name
+    assert target_file.exists()
+    assert source_file.stat().st_ino != target_file.stat().st_ino
 
     succeeded_record = approval_repo.get_import_approval(task_id="87", task_hash="hash-87")
     assert succeeded_record is not None

@@ -58,6 +58,7 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 - ambiguous-title 只读澄清隔离
 - clarification pending restart-durable baseline
 - Telegram callback workflow routing baseline
+- cross-filesystem import copy fallback approval baseline
 - 手动 `watchlist` 基线（add/list/remove/clear）
 - 硬链接导入 + Emby refresh
 
@@ -67,13 +68,13 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 当前 next step 不是 watchlist，也不是自动化大升级，而是：
 
-- **copy fallback approval（跨文件系统 import 场景）**
+- **最小 completion-monitor / scheduler 前置能力**
 
 这一小步的目标是：
 
-- 保持硬链接仍然是默认入库路径
-- 跨文件系统时不能静默 copy，必须显式审批
-- 复用已有 approval / confirm / `jobs` 真相
+- 给后续自动化闭环准备最小运行时真相
+- 不引入通用 scheduler 平台化
+- 复用已有持久化与执行所有权边界
 - 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
 ---
@@ -84,7 +85,6 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 ### 阶段 A：控制层收尾
 
-- copy fallback approval（跨文件系统 import 场景）
 - 最小 completion-monitor / scheduler 前置能力
 
 ### 阶段 B：自动化闭环
@@ -181,4 +181,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 9. 一句话总结
 
-**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，callback 路由已落地，下一步补 cross-filesystem import 的 copy fallback approval。**
+**Luminarr v20 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经把搜索、审批、下载、导入、刷新和执行卫生补到了较稳定状态，callback 路由与 cross-filesystem copy fallback approval 已落地，下一步补最小 completion-monitor / scheduler 前置能力。**

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import errno
+import json
 import os
 import re
+import shutil
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +33,11 @@ IMPORT_TARGET_EXISTS_TEXT = "目标已存在，已拒绝覆盖：{target_path}"
 IMPORT_PREPARE_TARGET_FAILED_TEXT = "创建目标目录失败：{target_path}"
 IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT = "硬链接失败：源和目标不在同一文件系统。"
 IMPORT_HARDLINK_FAILED_TEXT = "硬链接失败：{reason}"
+IMPORT_COPY_APPROVAL_PENDING_TEXT = (
+    "硬链接失败：源和目标不在同一文件系统。\n"
+    "如需改用复制导入（会额外占用磁盘空间），请再次发送 confirm {task_ref}。"
+)
+IMPORT_COPY_FAILED_TEXT = "复制导入失败：{reason}"
 IMPORT_APPROVAL_PENDING_TEXT = (
     "导入待确认：{name}\n"
     "任务 ID: {task_id}\n"
@@ -43,6 +50,8 @@ IMPORT_CONFIRM_EXPIRED_TEXT = "导入确认已超时，请重新发送 import <�
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
 JOB_LEASE_OWNER = "import_confirm"
+IMPORT_EXECUTION_MODE_COPY = "copy"
+IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +75,13 @@ class ConfirmExecutionContext:
         return self.job.task_ref
 
 
+@dataclass(frozen=True, slots=True)
+class ImportExecutionResult:
+    reply: str
+    imported: bool
+    pending_copy_approval: bool = False
+
+
 class ImportToLibraryService:
     def __init__(
         self,
@@ -84,6 +100,7 @@ class ImportToLibraryService:
         self._job_repo = job_repo
         self._pending_import_identities: set[tuple[str, str]] = set()
         self._pending_import_lease_versions: dict[tuple[str, str], int] = {}
+        self._pending_copy_fallback_identities: set[tuple[str, str]] = set()
 
     async def import_by_task_ref(
         self,
@@ -112,6 +129,7 @@ class ImportToLibraryService:
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
             task_hash=import_source.task_hash,
+            payload_json="",
         )
         self._record_event(
             task_ref=cleaned_ref,
@@ -292,13 +310,26 @@ class ImportToLibraryService:
             message=cleaned_ref,
         )
 
-        reply, imported = await self._execute_import(cleaned_ref, prepared_import)
-        if imported:
+        execution_mode = self._resolve_execution_mode(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            confirm_context=confirm_context,
+        )
+        execution = await self._execute_import(
+            cleaned_ref,
+            prepared_import,
+            execution_mode=execution_mode,
+        )
+        if execution.imported:
             self._record_executed_lease_version(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
                 executed_lease_version=expected_lease_version,
+            )
+            self._clear_pending_copy_fallback(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
             )
             if claimed_job:
                 self._mark_completed_job(
@@ -306,6 +337,32 @@ class ImportToLibraryService:
                     expected_version=claimed_job_version,
                     lease_owner=lease_owner,
                 )
+        elif execution.pending_copy_approval:
+            self._record_copy_fallback_pending(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+            )
+            self._restore_pending_approval(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            if confirm_context is not None:
+                persisted = self._record_pending_job(
+                    chat_id=confirm_context.job.chat_id,
+                    user_id=confirm_context.job.user_id,
+                    task_ref=confirm_context.job.task_ref or cleaned_ref,
+                    task_id=import_source.task_id,
+                    task_hash=import_source.task_hash,
+                    payload_json=_copy_fallback_pending_to_json(),
+                )
+                if not persisted and claimed_job:
+                    self._restore_pending_job(
+                        job_id=claimed_job_id,
+                        expected_version=claimed_job_version,
+                        lease_owner=lease_owner,
+                    )
         else:
             self._restore_pending_approval(
                 task_ref=cleaned_ref,
@@ -313,13 +370,39 @@ class ImportToLibraryService:
                 task_hash=import_source.task_hash,
                 expected_lease_version=expected_lease_version,
             )
-            if claimed_job:
-                self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
+            if execution_mode == IMPORT_EXECUTION_MODE_COPY:
+                self._record_copy_fallback_pending(
+                    task_id=import_source.task_id,
+                    task_hash=import_source.task_hash,
                 )
-        return reply
+            else:
+                self._clear_pending_copy_fallback(
+                    task_id=import_source.task_id,
+                    task_hash=import_source.task_hash,
+                )
+            if claimed_job:
+                if execution_mode == IMPORT_EXECUTION_MODE_COPY:
+                    persisted = self._record_pending_job(
+                        chat_id=confirm_context.job.chat_id if confirm_context is not None else chat_id,
+                        user_id=confirm_context.job.user_id if confirm_context is not None else user_id,
+                        task_ref=confirm_context.job.task_ref if confirm_context is not None else cleaned_ref,
+                        task_id=import_source.task_id,
+                        task_hash=import_source.task_hash,
+                        payload_json=_copy_fallback_pending_to_json(),
+                    )
+                    if not persisted:
+                        self._restore_pending_job(
+                            job_id=claimed_job_id,
+                            expected_version=claimed_job_version,
+                            lease_owner=lease_owner,
+                        )
+                else:
+                    self._restore_pending_job(
+                        job_id=claimed_job_id,
+                        expected_version=claimed_job_version,
+                        lease_owner=lease_owner,
+                    )
+        return execution.reply
 
     def cancel_pending_import(self, chat_id: int) -> str | None:
         if chat_id <= 0:
@@ -359,6 +442,10 @@ class ImportToLibraryService:
             workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
         ):
             return None
+        self._clear_pending_copy_fallback(
+            task_id=pending_job.task_id,
+            task_hash=pending_job.task_hash,
+        )
 
         self._record_event(
             task_ref=pending_job.task_ref,
@@ -439,13 +526,22 @@ class ImportToLibraryService:
 
         return PreparedImport(import_source=import_source, source_path=source_path, target_path=target_path), ""
 
-    async def _execute_import(self, task_ref: str, prepared_import: PreparedImport) -> tuple[str, bool]:
+    async def _execute_import(
+        self,
+        task_ref: str,
+        prepared_import: PreparedImport,
+        *,
+        execution_mode: str,
+    ) -> ImportExecutionResult:
         import_source = prepared_import.import_source
         source_path = prepared_import.source_path
         target_path = prepared_import.target_path
 
         try:
-            _hardlink_import(source_path, target_path)
+            if execution_mode == IMPORT_EXECUTION_MODE_COPY:
+                _copy_import(source_path, target_path)
+            else:
+                _hardlink_import(source_path, target_path)
         except FileExistsError:
             message = IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
             self._record_event(
@@ -455,26 +551,39 @@ class ImportToLibraryService:
                 event_type="import.target_exists",
                 message=message,
             )
-            return message, False
+            return ImportExecutionResult(reply=message, imported=False)
         except OSError as exc:
-            if exc.errno == errno.EXDEV:
+            if execution_mode != IMPORT_EXECUTION_MODE_COPY and exc.errno == errno.EXDEV:
+                prompt_text = IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref=task_ref)
                 self._record_event(
                     task_ref=task_ref,
                     task_id=import_source.task_id,
                     task_hash=import_source.task_hash,
-                    event_type="import.hardlink_cross_filesystem",
-                    message=IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT,
+                    event_type="import.copy_fallback_pending",
+                    message=prompt_text,
                 )
-                return IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT, False
-            message = IMPORT_HARDLINK_FAILED_TEXT.format(reason=str(exc))
+                return ImportExecutionResult(
+                    reply=prompt_text,
+                    imported=False,
+                    pending_copy_approval=True,
+                )
+            message = (
+                IMPORT_COPY_FAILED_TEXT.format(reason=str(exc))
+                if execution_mode == IMPORT_EXECUTION_MODE_COPY
+                else IMPORT_HARDLINK_FAILED_TEXT.format(reason=str(exc))
+            )
             self._record_event(
                 task_ref=task_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
-                event_type="import.hardlink_failed",
+                event_type=(
+                    "import.copy_failed"
+                    if execution_mode == IMPORT_EXECUTION_MODE_COPY
+                    else "import.hardlink_failed"
+                ),
                 message=message,
             )
-            return message, False
+            return ImportExecutionResult(reply=message, imported=False)
 
         import_success_text = (
             f"导入成功：{import_source.name}\n"
@@ -482,6 +591,8 @@ class ImportToLibraryService:
             f"任务 Hash: {import_source.task_hash}\n"
             f"目标路径: {target_path}"
         )
+        if execution_mode == IMPORT_EXECUTION_MODE_COPY:
+            import_success_text = f"{import_success_text}\n导入方式: 复制"
         self._record_event(
             task_ref=task_ref,
             task_id=import_source.task_id,
@@ -491,7 +602,7 @@ class ImportToLibraryService:
         )
 
         if self._refresh_media_server_func is None:
-            return import_success_text, True
+            return ImportExecutionResult(reply=import_success_text, imported=True)
 
         try:
             refresh_text = await self._refresh_media_server_func()
@@ -504,7 +615,7 @@ class ImportToLibraryService:
                 event_type="refresh.failed",
                 message=refresh_text,
             )
-            return f"{import_success_text}\n{refresh_text}", True
+            return ImportExecutionResult(reply=f"{import_success_text}\n{refresh_text}", imported=True)
 
         if refresh_text == IMPORT_REFRESH_SUCCESS_TEXT:
             self._record_event(
@@ -522,12 +633,13 @@ class ImportToLibraryService:
                 event_type="refresh.failed",
                 message=refresh_text,
             )
-        return f"{import_success_text}\n{refresh_text}", True
+        return ImportExecutionResult(reply=f"{import_success_text}\n{refresh_text}", imported=True)
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
             return 0
+        self._pending_copy_fallback_identities.discard(identity)
 
         in_memory_next_lease = self._pending_import_lease_versions.get(identity, 0) + 1
         lease_version = in_memory_next_lease
@@ -647,9 +759,10 @@ class ImportToLibraryService:
         task_ref: str,
         task_id: str,
         task_hash: str,
-    ) -> None:
+        payload_json: str = "",
+    ) -> bool:
         if self._job_repo is None:
-            return
+            return False
         try:
             self._job_repo.upsert_import_job_pending(
                 chat_id=chat_id,
@@ -657,9 +770,39 @@ class ImportToLibraryService:
                 task_ref=task_ref,
                 task_id=task_id,
                 task_hash=task_hash,
+                payload_json=payload_json,
             )
         except Exception:
+            return False
+        return True
+
+    def _resolve_execution_mode(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        confirm_context: ConfirmExecutionContext | None,
+    ) -> str:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return IMPORT_EXECUTION_MODE_HARDLINK
+        if confirm_context is not None and _is_copy_fallback_pending_payload(confirm_context.job.payload_json):
+            return IMPORT_EXECUTION_MODE_COPY
+        if identity in self._pending_copy_fallback_identities:
+            return IMPORT_EXECUTION_MODE_COPY
+        return IMPORT_EXECUTION_MODE_HARDLINK
+
+    def _record_copy_fallback_pending(self, *, task_id: str, task_hash: str) -> None:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
             return
+        self._pending_copy_fallback_identities.add(identity)
+
+    def _clear_pending_copy_fallback(self, *, task_id: str, task_hash: str) -> None:
+        identity = (task_id.strip(), task_hash.strip())
+        if not identity[0] or not identity[1]:
+            return
+        self._pending_copy_fallback_identities.discard(identity)
 
     def _rebuild_confirm_context(
         self,
@@ -831,6 +974,10 @@ class ImportToLibraryService:
                 )
             except Exception:
                 pass
+        self._clear_pending_copy_fallback(
+            task_id=context.job.task_id,
+            task_hash=context.job.task_hash,
+        )
         self._record_event(
             task_ref=task_ref,
             task_id=context.job.task_id,
@@ -922,6 +1069,26 @@ def _hardlink_import(source_path: Path, target_path: Path) -> None:
     raise OSError(errno.EINVAL, IMPORT_SOURCE_TYPE_UNSUPPORTED_TEXT)
 
 
+def _copy_import(source_path: Path, target_path: Path) -> None:
+    if source_path.is_file():
+        if target_path.exists():
+            raise FileExistsError(str(target_path))
+        try:
+            shutil.copy2(source_path, target_path)
+        except Exception:
+            _cleanup_partial_target(target_path)
+            raise
+        return
+    if source_path.is_dir():
+        try:
+            shutil.copytree(source_path, target_path, copy_function=shutil.copy2)
+        except Exception:
+            _cleanup_partial_target(target_path)
+            raise
+        return
+    raise OSError(errno.EINVAL, IMPORT_SOURCE_TYPE_UNSUPPORTED_TEXT)
+
+
 def _hardlink_directory(source_dir: Path, target_dir: Path) -> None:
     target_dir.mkdir(parents=True, exist_ok=False)
     for current_dir, _, file_names in os.walk(source_dir):
@@ -935,3 +1102,30 @@ def _hardlink_directory(source_dir: Path, target_dir: Path) -> None:
             if dst_file.exists():
                 raise FileExistsError(str(dst_file))
             os.link(src_file, dst_file)
+
+
+def _cleanup_partial_target(target_path: Path) -> None:
+    try:
+        if target_path.is_dir():
+            shutil.rmtree(target_path)
+        elif target_path.exists() or target_path.is_symlink():
+            target_path.unlink()
+    except OSError:
+        return
+
+
+def _copy_fallback_pending_to_json() -> str:
+    return json.dumps({"mode": IMPORT_EXECUTION_MODE_COPY}, ensure_ascii=False)
+
+
+def _is_copy_fallback_pending_payload(payload_json: str) -> bool:
+    cleaned_payload = payload_json.strip()
+    if not cleaned_payload:
+        return False
+    try:
+        payload = json.loads(cleaned_payload)
+    except json.JSONDecodeError:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    return str(payload.get("mode", "")).strip() == IMPORT_EXECUTION_MODE_COPY

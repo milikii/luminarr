@@ -58,37 +58,40 @@ Prerequisite completed:
   - callback path keeps the same side-effect boundary as the existing text-command routing
   - callback path can recover chat/user/message context from either `effective_*` fields or callback-owned context
   - focused tests + manual verification passed
+- smallest copy fallback approval for cross-filesystem import is now landed:
+  - hardlink remains the default confirmed import path
+  - cross-filesystem hardlink failure now deterministically enters explicit copy-fallback pending instead of silently copying
+  - second `confirm <id/hash>` executes copy import through the existing approval / confirm / `jobs` truth path
+  - copy-fallback pending survives restart through persisted `jobs.payload_json`
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **copy fallback approval for import** baseline.
+Land the smallest **completion-monitor / scheduler prerequisite** baseline.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep hardlink import as the default path
-- when confirmed import hits cross-filesystem hardlink failure, do not silently copy
-- add the smallest explicit copy-fallback approval interaction for that cross-filesystem case only
-- keep the landed downloader/import approval flows, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- reuse the existing approval / confirm / jobs truth as much as possible
-- add focused tests/manual verification for copy-fallback approval and no-regression
+- add only the smallest runtime truth needed by later automation completion detection / recovery
+- do not make this step responsible for generic scheduling, auto-import business policy, or broad workflow orchestration
+- add focused tests/manual verification for the scheduler prerequisite and no-regression
 
 ## Explicit constraints
 
 - do not add new downloader/media server support
 - do not add large directory refactor
 - do not introduce PostgreSQL / Redis / MQ
-- do not make copy the default import path
-- do not auto-execute copy without approval
 - do not add library filename normalization/renaming
 - do not remove existing `import <id/hash>` / `confirm <id/hash>` / `watchlist ...` command paths
-- do not change current hardlink success-path text bodies
+- do not add a broad generic scheduler platform in this step
+- do not start post-download auto import business behavior in this step
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
@@ -96,10 +99,10 @@ Only do:
 
 ## Suggested implementation shape
 
-1. detect cross-filesystem hardlink failure inside the existing import confirm path
-2. convert that failure into the smallest explicit copy-fallback approval state instead of silently copying
-3. reuse existing approval / confirm / job truth as much as possible (no duplicate workflow stack)
-4. keep hardlink success path, refresh behavior, and current command routing backward compatible
+1. define the smallest persisted/runtime truth needed to observe downloader completion or resume later automation safely
+2. keep this truth independent from LLM calls and compatible with existing ownership / approval rules
+3. reuse existing persistence / event / jobs structures as much as possible (no duplicate workflow stack)
+4. keep current manual import / confirm / refresh path fully backward compatible
 5. add focused tests and manual verification steps
 
 ## Done when
@@ -108,26 +111,24 @@ Only do:
 - existing Telegram command behavior does not regress
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
-- cross-filesystem import never auto-copies without explicit approval
-- approved copy fallback can be deterministically confirmed through the existing command path
+- cross-filesystem import copy-fallback approval remains stable
+- the new completion-monitor / scheduler prerequisite is durable enough to support later automation without depending on chat transcript memory
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After copy fallback approval is stable, advance in this order (still one small goal at a time):
+After the scheduler prerequisite is stable, advance in this order (still one small goal at a time):
 
-1. land the smallest completion-monitor / scheduler prerequisite needed by later automation:
-   - keep it narrow; do not broaden into a generic workflow platform
-2. only then enter stage B automation closure:
+1. enter stage B automation closure:
    - post-download auto import
    - resource auto-selection rules
    - filename normalization / rename
    - metadata scrape
    - subtitle auto-translation
-3. after movie automation is stable, enter stage C:
+2. after movie automation is stable, enter stage C:
    - series / anime watchlist-driven tracking
    - BT/PT split downloader routing (`qBittorrent` later)
-4. after workflow core is stable, enter stage D:
+3. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters
-5. after the above is stable, enter stage E:
+4. after the above is stable, enter stage E:
    - downloader/library asset correlation and cleanup

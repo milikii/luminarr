@@ -423,6 +423,20 @@
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
+## D-039 cross-filesystem import 的 copy fallback approval 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-03
+- **结论**：
+  - confirmed import 仍然默认先走硬链接，copy 不是默认路径
+  - 当硬链接因 cross-filesystem 失败时，系统必须进入显式 copy-fallback pending，而不是静默自动 copy
+  - 用户再次发送 `confirm <id/hash>` 后，才允许执行 copy 导入
+  - copy-fallback pending 继续复用现有 approval / confirm / `jobs` 真相，并通过最小持久化上下文在重启后保持成立
+  - 当前 next smallest path 前进到 completion-monitor / scheduler prerequisite
+- **原因**：
+  先补齐 import 链路最后一个明显的文件系统安全缺口，同时继续坚持“默认硬链接、不静默降级、不另起第二套工作流”的最小实现原则。
+- **验证**：
+  已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
 ---
 
 ## 附：更新模板

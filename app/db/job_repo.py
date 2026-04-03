@@ -44,6 +44,7 @@ class JobRepo:
         task_ref: str,
         task_id: str,
         task_hash: str,
+        payload_json: str = "",
     ) -> JobRecord | None:
         return self._upsert_job_pending(
             workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
@@ -52,7 +53,7 @@ class JobRepo:
             task_ref=task_ref,
             task_id=task_id,
             task_hash=task_hash,
-            payload_json="",
+            payload_json=payload_json,
         )
 
     def upsert_downloader_job_pending(

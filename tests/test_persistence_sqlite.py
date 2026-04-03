@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
+import errno
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import app.services.import_to_library as import_module
 from app.clients.transmission import TransmissionImportSource, TransmissionTask
 from app.db.approval_repo import (
     ACTION_ADD_TO_DOWNLOADER,
@@ -17,7 +19,7 @@ from app.db.approval_repo import (
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_COMPLETED, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.db.job_repo import JOB_STATE_COMPLETED, JOB_STATE_PENDING_APPROVAL, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.services.add_to_downloader import (
@@ -26,6 +28,7 @@ from app.services.add_to_downloader import (
     AddToDownloaderService,
 )
 from app.services.import_to_library import (
+    IMPORT_COPY_APPROVAL_PENDING_TEXT,
     IMPORT_CANCELLED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
     IMPORT_TARGET_EXISTS_TEXT,
@@ -600,6 +603,74 @@ def test_confirm_rebuilds_context_from_persisted_job_after_restart(tmp_path: Pat
     )
     assert restarted_job is not None
     assert restarted_job.state == JOB_STATE_COMPLETED
+
+
+def test_copy_fallback_pending_survives_restart_and_second_confirm_copies(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    job_repo = JobRepo(database)
+
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+
+    before_restart_service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    pending_reply = _run(before_restart_service.import_by_task_ref("87", chat_id=1001, user_id=2001))
+    assert "导入待确认" in pending_reply
+
+    def _raise_exdev(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr(import_module.os, "link", _raise_exdev)
+    first_confirm = _run(
+        before_restart_service.confirm_import_by_task_ref("87", chat_id=1001, user_id=2001)
+    )
+    assert first_confirm == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
+
+    restarted_job = JobRepo(SqliteDatabase(str(db_path))).get_import_job_for_chat_ref(
+        chat_id=1001,
+        task_ref="87",
+    )
+    assert restarted_job is not None
+    assert restarted_job.state == JOB_STATE_PENDING_APPROVAL
+    assert '"mode": "copy"' in restarted_job.payload_json
+
+    def _unexpected_hardlink(src: str | Path, dst: str | Path) -> None:
+        raise AssertionError("copy confirm after restart should not call os.link")
+
+    monkeypatch.setattr(import_module.os, "link", _unexpected_hardlink)
+    after_restart_service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        approval_repo=ApprovalRepo(SqliteDatabase(str(db_path))),
+        job_repo=JobRepo(SqliteDatabase(str(db_path))),
+    )
+    second_confirm = _run(
+        after_restart_service.confirm_import_by_task_ref("87", chat_id=1001, user_id=2001)
+    )
+
+    target_file = target_dir / source_file.name
+    assert "导入成功" in second_confirm
+    assert "导入方式: 复制" in second_confirm
+    assert target_file.exists()
+    assert source_file.stat().st_ino != target_file.stat().st_ino
 
 
 def test_cancel_pending_import_updates_persisted_truth(tmp_path: Path) -> None:
