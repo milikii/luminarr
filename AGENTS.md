@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v18)
+# Luminarr AGENTS.md (v19)
 
 This file is the operating contract for AI coding agents working in this repository. 
 
@@ -93,7 +93,7 @@ Current fixed runtime profile:
 - Telegram private chat only
 - TMDB only
 - Prowlarr only
-- Transmission only
+- Transmission + qBittorrent only
 - Emby only
 - SQLite only
 - Docker Compose only
@@ -115,21 +115,17 @@ Do not expand into:
 - office automation
 - generic agent platform features
 - plugin marketplace / MCP platformization
-- qBittorrent / Jellyfin / Sonarr / Radarr in the current mainline
+- Jellyfin / Sonarr / Radarr in the current mainline
 - auto-download watchlist in the current mainline
 
 The following are valid roadmap items, but remain out of scope until `docs/NEXT_STEP.md` explicitly promotes them:
-- filename normalization / rename
-- metadata scraping
-- subtitle auto-translation
-- series / anime tracking scheduler
-- BT/PT split downloader routing
+- BT subscription / continuous-download
 - Feishu / WeCom / personal WeChat adapters
 - downloader/library asset cleanup automation
 
 ## Current priority
 
-The current next smallest path is **the smallest filename normalization / rename baseline**.
+The current next smallest path is **the smallest BT subscription / continuous-download baseline**.
 
 Keep these already-landed baselines stable while doing it:
 1. Telegram message de-dup via `telegram_updates`
@@ -145,6 +141,9 @@ Keep these already-landed baselines stable while doing it:
 11. completion-monitor / scheduler prerequisite baseline
 12. post-download auto import baseline
 13. resource auto-selection rules baseline
+14. downloader-role binding baseline
+15. BT dispatch / transfer execution baseline
+16. qBittorrent protocol execution and broader multi-instance downloader support baseline
 
 ## Runtime rules
 

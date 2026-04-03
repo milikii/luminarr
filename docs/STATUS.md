@@ -1,4 +1,4 @@
-# Current status (v33)
+# Current status (v34)
 
 ## Project position
 
@@ -6,7 +6,7 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
 - Telegram private chat only
 - TMDB only
 - Prowlarr only
-- Transmission only
+- Transmission + qBittorrent only
 - Emby only
 - SQLite only
 - Docker Compose only
@@ -177,8 +177,21 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - downloader completed truth now updates `jobs` with the real downloader task identity (`task_id / task_hash`) after confirmed dispatch, so later `status <id/hash>` / `import <id/hash>` can route through the persisted downloader truth
   - `status <id/hash>` and media import-source lookup now deterministically route through the persisted downloader instance truth instead of assuming a single legacy Transmission client
   - `raw_bt` confirmed dispatch does not register post-download auto-import truth, and manual `import <id/hash>` now deterministically rejects `raw_bt` tasks with explicit text instead of entering the media import chain
-  - qBittorrent request execution remains a later step; when `pt_downloader` / `bt_downloader` points to a qBittorrent instance, Telegram now returns explicit not-ready text instead of silently misrouting to Transmission
+  - this baseline originally stopped at Transmission-only execution; qBittorrent request execution is now supplied by the later qBittorrent protocol baseline below
   - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
+- smallest qBittorrent protocol execution and broader multi-instance downloader support baseline is now landed:
+  - downloader execution now routes by configured downloader type instead of assuming Transmission after role resolution
+  - qBittorrent now supports the smallest real execution path:
+    - add torrent / magnet
+    - get status
+    - get import source
+  - qBittorrent-bound PT tasks can now complete the existing downloader approval -> `confirm` -> status -> import-source chain without silently falling back to Transmission
+  - qBittorrent-bound `raw_bt` tasks now keep using the user-selected destination directory truth during dispatch
+  - BT follow-up text protocol and existing approval / ownership / replay boundaries remain unchanged; when the user only sends “下载这个 BT” without a real `magnet:?`, Telegram now deterministically asks for the actual magnet link instead of surfacing internal execution wording
+  - current qBittorrent protocol baseline stays minimal:
+    - add/status/import-source only
+    - no qB categories/tags/rule engine
+    - no scheduler/platformization
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -206,7 +219,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- qBittorrent protocol execution and broader multi-instance downloader support on top of the landed BT dispatch / transfer execution baseline
+- BT subscription / continuous-download on top of the landed qBittorrent + broader multi-instance downloader support baseline
 
 **Stage D channel expansion (documented roadmap, not current step):**
 - Feishu adapter
@@ -244,6 +257,9 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - manual verification: `raw_bt` destination-directory follow-up baseline passed (temporary `tmp_tests/verify_raw_bt_destination_followup.py`, script cleaned after run)
 - manual verification: downloader-role binding baseline passed (temporary `tmp_tests/verify_downloader_role_binding_baseline.py`, script cleaned after run)
 - manual verification: BT dispatch / transfer execution baseline passed (temporary `tmp_tests/verify_bt_dispatch_execution_baseline.py`, script cleaned after run)
+- focused tests: `41 passed` (`.venv/bin/python -m pytest -q tests/test_qbittorrent_client.py tests/test_add_to_downloader.py tests/test_get_download_status.py tests/test_config.py`)
+- focused tests: `80 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_import_to_library.py`)
+- manual verification: qBittorrent protocol execution and broader multi-instance downloader support baseline passed (temporary `tmp_tests/verify_qbittorrent_protocol_baseline.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -257,7 +273,8 @@ Build the next smallest path:
 6. keep landed `raw_bt` destination-directory follow-up baseline stable
 7. keep landed downloader-role binding baseline stable
 8. keep landed BT dispatch / transfer execution baseline stable
-9. land qBittorrent protocol execution and broader multi-instance downloader support on top of the landed role-binding truth, without introducing scheduler/platformization
+9. keep landed qBittorrent protocol execution and broader multi-instance downloader support baseline stable
+10. land the smallest BT subscription / continuous-download baseline without introducing generic scheduler/platformization
 
 ## Current risks
 
@@ -285,14 +302,13 @@ Build the next smallest path:
 - current BT-direct intent split baseline is intentionally narrow; only raw magnet links and a small set of explicit “下载这个 BT / 磁力” phrases are recognized
 - BT classification follow-up, BT TMDB association follow-up, and raw-BT destination follow-up now persist restart-durable pending truth in SQLite, but they still use only the smallest stage + payload protocol instead of a full BT workflow state machine
 - BT `series` / `anime` TMDB association currently uses TMDB TV search only; anime movie-style entries may still require the user to retry with a clearer title/year
-- BT `movie / series / anime` TMDB association is currently result-text only; persisted BT workflow truth, downloader dispatch, and later media-chain reuse are not landed yet
-- `raw_bt` destination follow-up is currently result-text only; persisted raw-BT workflow truth and later dispatch/transfer execution are not landed yet
-- downloader-role binding truth is landed, but existing dispatch paths still do not consume `pt_downloader` / `bt_downloader`
-- multiple downloader instance truth is configuration-only in this baseline; qBittorrent request execution is not landed yet
+- qBittorrent protocol baseline currently covers add/status/import-source only; categories/tags/rule engine and more advanced qB features are not landed in this step
+- qBittorrent add currently resolves task identity by parsed magnet hash or list-diff fallback after add; unusual duplicate URL-torrent scenarios may still be less deterministic than magnet adds
+- when the user only sends “下载这个 BT” without an actual `magnet:?`, BT follow-up now returns explicit “请补实际磁力” text; this is intentional smallest-boundary behavior, not a generic BT parsing engine
 
 ## Acceptance focus for the next step
 
-- land the smallest BT dispatch / transfer execution baseline without changing existing text-command behavior
+- land the smallest BT subscription / continuous-download baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
@@ -302,6 +318,8 @@ Build the next smallest path:
 - keep the landed BT `movie / series / anime` TMDB association follow-up baseline stable
 - keep the landed `raw_bt` destination-directory follow-up baseline stable
 - keep the landed downloader-role binding baseline stable
+- keep the landed BT dispatch / transfer execution baseline stable
+- keep the landed qBittorrent protocol execution and broader multi-instance downloader support baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
@@ -316,3 +334,5 @@ Build the next smallest path:
 - landed BT `movie / series / anime` TMDB association follow-up remains deterministic and side-effect free
 - landed `raw_bt` destination-directory follow-up remains deterministic and side-effect free
 - landed downloader-role binding truth remains deterministic and side-effect free
+- landed BT dispatch / transfer execution path remains deterministic and does not bypass existing side-effect boundaries
+- landed qBittorrent-bound PT / BT execution path remains deterministic and does not silently fall back to Transmission

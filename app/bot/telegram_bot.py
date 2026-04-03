@@ -119,11 +119,8 @@ RAW_BT_DESTINATION_INVALID_TEMPLATE = (
     "{options}"
 )
 RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT = "raw_bt 目录选择未就绪，请先配置预设目标目录后重试。"
-DOWNLOADER_EXECUTION_NOT_READY_TEMPLATE = (
-    "下载器角色 {role} 当前绑定到 {downloader_type} 实例 {name}，"
-    "但本次版本还未接入 {downloader_type} 真执行。请先把 {role_env} 指向 Transmission 实例后重试。"
-)
 DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE = "下载器角色 {role} 绑定的实例不存在：{name}。请检查配置后重试。"
+BT_SOURCE_REQUIRED_TEXT = "当前还缺少实际的磁力链接，请直接发送 magnet:? 链接后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -796,6 +793,10 @@ def _format_bt_dispatch_title(match: TmdbMovie) -> str:
     return f"{title} ({year})"
 
 
+def _can_dispatch_bt_source(source: str) -> bool:
+    return source.strip().lower().startswith("magnet:?")
+
+
 def _resolve_raw_bt_destination_options(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> tuple[RawBtDestinationOption, ...]:
@@ -832,7 +833,6 @@ def _resolve_bound_downloader_execution(
         return None, None
 
     role_name = "PT" if role == "pt" else "BT"
-    role_env = "PT_DOWNLOADER" if role == "pt" else "BT_DOWNLOADER"
     downloader_name = role_binding.pt_downloader if role == "pt" else role_binding.bt_downloader
     cleaned_name = downloader_name.strip()
     if not cleaned_name:
@@ -842,14 +842,6 @@ def _resolve_bound_downloader_execution(
     instance = instances_by_name.get(cleaned_name)
     if instance is None:
         return None, DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE.format(role=role_name, name=cleaned_name)
-
-    if instance.downloader_type != "transmission":
-        return None, DOWNLOADER_EXECUTION_NOT_READY_TEMPLATE.format(
-            role=role_name,
-            downloader_type=instance.downloader_type,
-            name=instance.name,
-            role_env=role_env,
-        )
 
     return (
         ResolvedDownloaderExecution(
@@ -932,6 +924,9 @@ async def _handle_raw_bt_destination_query(
         return _format_raw_bt_destination_invalid(query, pending.options)
 
     _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    selected_text = _format_raw_bt_destination_selected(selected_option)
+    if not _can_dispatch_bt_source(pending.source):
+        return f"{selected_text}\n\n{BT_SOURCE_REQUIRED_TEXT}"
     add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
     if not isinstance(add_service, AddToDownloaderService):
         return SERVICE_NOT_READY_TEXT
@@ -950,7 +945,7 @@ async def _handle_raw_bt_destination_query(
     )
     if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
         return pending_text
-    return f"{_format_raw_bt_destination_selected(selected_option)}\n\n{pending_text}"
+    return f"{selected_text}\n\n{pending_text}"
 
 
 def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
@@ -995,6 +990,9 @@ async def _handle_bt_tmdb_association_query(
         )
 
     _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    association_text = _format_bt_tmdb_association_success(pending.media_kind, matches[0])
+    if not _can_dispatch_bt_source(pending.source):
+        return f"{association_text}\n\n{BT_SOURCE_REQUIRED_TEXT}"
     add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
     if not isinstance(add_service, AddToDownloaderService):
         return SERVICE_NOT_READY_TEXT
@@ -1013,7 +1011,7 @@ async def _handle_bt_tmdb_association_query(
     )
     if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
         return pending_text
-    return f"{_format_bt_tmdb_association_success(pending.media_kind, matches[0])}\n\n{pending_text}"
+    return f"{association_text}\n\n{pending_text}"
 
 
 async def _handle_query_text(

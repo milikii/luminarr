@@ -6,6 +6,7 @@ from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
 from app.clients.fanart import FanartClient
 from app.clients.prowlarr import ProwlarrClient
+from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
 from app.config import DownloaderInstanceConfig, load_settings
@@ -34,6 +35,12 @@ async def _skip_fanart_images(_: str):
     return None
 
 
+def _build_downloader_instances_by_name(
+    instances: tuple[DownloaderInstanceConfig, ...],
+) -> dict[str, DownloaderInstanceConfig]:
+    return {instance.name: instance for instance in instances}
+
+
 def _build_transmission_clients_by_name(
     instances: tuple[DownloaderInstanceConfig, ...],
 ) -> dict[str, TransmissionClient]:
@@ -42,6 +49,21 @@ def _build_transmission_clients_by_name(
         if instance.downloader_type != "transmission":
             continue
         clients[instance.name] = TransmissionClient(
+            base_url=instance.base_url,
+            username=instance.username,
+            password=instance.password,
+        )
+    return clients
+
+
+def _build_qbittorrent_clients_by_name(
+    instances: tuple[DownloaderInstanceConfig, ...],
+) -> dict[str, QbittorrentClient]:
+    clients: dict[str, QbittorrentClient] = {}
+    for instance in instances:
+        if instance.downloader_type != "qbittorrent":
+            continue
+        clients[instance.name] = QbittorrentClient(
             base_url=instance.base_url,
             username=instance.username,
             password=instance.password,
@@ -62,26 +84,21 @@ def _resolve_downloader_payload_value(payload_json: str, key: str) -> str:
     return str(payload.get(key, "")).strip()
 
 
-def _resolve_transmission_client_for_task(
+def _resolve_downloader_name_for_task(
     *,
     task_ref: str,
     chat_id: int | None,
     job_repo: JobRepo,
-    legacy_client: TransmissionClient,
-    transmission_clients_by_name: dict[str, TransmissionClient],
-) -> TransmissionClient:
+) -> str:
     if chat_id is None or chat_id <= 0:
-        return legacy_client
+        return ""
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
     except Exception:
-        return legacy_client
+        return ""
     if downloader_job is None:
-        return legacy_client
-    downloader_name = _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
-    if not downloader_name:
-        return legacy_client
-    return transmission_clients_by_name.get(downloader_name, legacy_client)
+        return ""
+    return _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
 
 
 def main() -> None:
@@ -127,36 +144,46 @@ def main() -> None:
         username=settings.transmission_username,
         password=settings.transmission_password,
     )
+    downloader_instances_by_name = _build_downloader_instances_by_name(settings.downloader_instances)
     transmission_clients_by_name = _build_transmission_clients_by_name(settings.downloader_instances)
+    qbittorrent_clients_by_name = _build_qbittorrent_clients_by_name(settings.downloader_instances)
+
+    def resolve_downloader_client_by_name(
+        downloader_name: str,
+    ) -> TransmissionClient | QbittorrentClient:
+        cleaned_name = downloader_name.strip()
+        if not cleaned_name:
+            return transmission_client
+        instance = downloader_instances_by_name.get(cleaned_name)
+        if instance is None:
+            return transmission_client
+        if instance.downloader_type == "qbittorrent":
+            return qbittorrent_clients_by_name.get(cleaned_name, transmission_client)
+        return transmission_clients_by_name.get(cleaned_name, transmission_client)
 
     async def add_torrent_with_routing(source: str, downloader_name: str = "", download_dir: str = "") -> TransmissionTask:
-        client = transmission_client
-        cleaned_name = downloader_name.strip()
-        if cleaned_name:
-            client = transmission_clients_by_name.get(cleaned_name, transmission_client)
+        client = resolve_downloader_client_by_name(downloader_name)
         return await client.add_torrent(source, download_dir=download_dir)
 
     async def get_torrent_status_with_routing(task_ref: str, chat_id: int | None = None) -> TransmissionTaskStatus | None:
-        client = _resolve_transmission_client_for_task(
+        downloader_name = _resolve_downloader_name_for_task(
             task_ref=task_ref,
             chat_id=chat_id,
             job_repo=job_repo,
-            legacy_client=transmission_client,
-            transmission_clients_by_name=transmission_clients_by_name,
         )
+        client = resolve_downloader_client_by_name(downloader_name)
         return await client.get_torrent_status(task_ref)
 
     async def get_torrent_import_source_with_routing(
         task_ref: str,
         chat_id: int | None = None,
     ) -> TransmissionImportSource | None:
-        client = _resolve_transmission_client_for_task(
+        downloader_name = _resolve_downloader_name_for_task(
             task_ref=task_ref,
             chat_id=chat_id,
             job_repo=job_repo,
-            legacy_client=transmission_client,
-            transmission_clients_by_name=transmission_clients_by_name,
         )
+        client = resolve_downloader_client_by_name(downloader_name)
         return await client.get_torrent_import_source(task_ref)
 
     add_to_downloader_service = AddToDownloaderService(

@@ -1,10 +1,18 @@
-# Luminarr (v28)
+# Luminarr (v29)
 
 Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harness**。
 
 当前已实现主线已经补到：
 
 **搜索 -> 选择 -> 下载审批 -> 投递下载 -> 查询状态 / 完成观察 -> 导入审批 -> 硬链接入库 -> 规范化命名 / metadata scrape / subtitle auto-translation / Emby 刷新**
+
+并且当前已经补上：
+
+- **PT / BT 入口分流**
+- **BT 分类 / TMDB 关联 / raw_bt 目标目录 follow-up**
+- **下载器实例 + 角色绑定**
+- **BT dispatch / transfer execution**
+- **qBittorrent protocol execution + broader multi-instance downloader support**
 
 更长的完整自动化链路：
 
@@ -21,11 +29,11 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 - **Telegram 私聊**：唯一当前入口
 - **TMDB**：唯一元数据源
 - **Prowlarr**：唯一搜索聚合器
-- **Transmission**：当前唯一已实现下载器客户端
+- **Transmission + qBittorrent**：当前已实现下载器协议
 - **Emby**：唯一媒体服务器
 - **SQLite**：唯一数据库
 - **Docker Compose**：唯一部署方式
-- **单实例 / 单进程 / 单机**
+- **单应用实例 / 单进程 / 单机**
 - **电影优先**
 
 ---
@@ -67,21 +75,24 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 - subtitle auto-translation baseline
 - 手动 `watchlist` 基线（add/list/remove/clear）
 - `watchlist` 的 `movie / series / anime` 最小分类持久化
+- downloader role binding baseline
+- BT dispatch / transfer execution baseline
+- qBittorrent protocol execution + broader multi-instance downloader support baseline
 - 硬链接导入 + Emby refresh
 
 ---
 
 ## 3. 当前最近一步
 
-当前 next step 不是下载器角色绑定，也不是 BT 直接投递，而是：
+当前 next step 不是 BT execution wiring，也不是 qB 协议接入，而是：
 
-- **BT classification follow-up baseline**
+- **BT subscription / continuous-download baseline**
 
 这一小步的目标是：
 
-- 在已落地的 PT / BT 入口分流之后，给直接 BT / 磁力需求补最小分类 follow-up
-- 当前这一步不引入下载器角色绑定，不引入 qBittorrent，不引入 BT 真实投递后半段
-- 当前这一步不直接改变现有 downloader / import 副作用链
+- 在已落地的 BT execution + qB protocol 基线上，补最小 BT 连续下载 / 订阅能力
+- 当前这一步不引入通用 scheduler 平台，不把仓库扩成规则引擎
+- 当前这一步要继续保持现有 downloader / import 审批边界和媒体后半段稳定
 - 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
 
 ---
@@ -113,8 +124,8 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
   - 支持多个实例：你可以有多个 TR、多个 QB
   - `pt_downloader` / `bt_downloader` 只绑定到实例名，不写死软件类型
   - PT 和 BT 可以共用同一个实例，也可以分别走不同实例
-- `qBittorrent` 作为后续要接入的协议，而不是当前已落地事实
-- 只有上述分流稳定后，才评估 BT subscription / continuous-download 这类下一小步
+- `qBittorrent` 真协议已经落地到最小执行形态：add / status / import-source
+- 只有上述执行链稳定后，才继续评估 BT subscription / continuous-download 这类下一小步
 
 ### 阶段 D：渠道扩展
 
@@ -134,8 +145,6 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 ### 不是当前主线
 
 - 自动 watchlist 下载
-- BT/PT 分流
-- 多下载器角色绑定
 - 多媒体服务器并行支持
 - 多渠道并行接入
 - 通用 scheduler 平台化
@@ -216,4 +225,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 10. 一句话总结
 
-**Luminarr v28 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经补到 completion-monitor、post-download auto import、rename、metadata scraping、subtitle auto-translation、`watchlist` 的 `movie / series / anime` 最小分类真相，以及 PT/BT parser-level 入口分流；当前最近一步前进到 BT classification follow-up。**
+**Luminarr v29 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经补到 completion-monitor、post-download auto import、rename、metadata scraping、subtitle auto-translation、PT/BT 分流、BT execution wiring、downloader role binding，以及 qBittorrent 真协议的最小执行形态；当前最近一步前进到 BT subscription / continuous-download。**

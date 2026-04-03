@@ -1,4 +1,4 @@
-# Next step (v33)
+# Next step (v34)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -142,11 +142,21 @@ Prerequisite completed:
   - downloader completed truth now updates `jobs` to the real downloader task identity so later `status <id/hash>` / `import <id/hash>` can route through the persisted downloader truth
   - `status <id/hash>` / media import-source lookup now route through the persisted downloader instance truth instead of assuming one legacy Transmission client
   - `raw_bt` confirmed dispatch does not register auto-import truth, and manual `import <id/hash>` now deterministically rejects `raw_bt` tasks
-  - qBittorrent request execution remains unimplemented in this step; focused manual verification passed
+  - this baseline originally stopped at Transmission-only execution; qBittorrent request execution is now supplied by the later qBittorrent protocol baseline below
+- smallest qBittorrent protocol execution and broader multi-instance downloader support baseline is now landed:
+  - downloader execution now resolves by configured downloader type instead of assuming Transmission after role binding resolution
+  - qBittorrent now supports the smallest real protocol execution path:
+    - add torrent / magnet
+    - get status
+    - get import source
+  - qBittorrent-bound PT / BT tasks can now execute through the existing downloader approval / confirm / status / import-source chain without silently falling back to Transmission
+  - qBittorrent-bound `raw_bt` tasks continue using the selected destination directory truth during dispatch
+  - BT follow-up text protocol and approval boundary remain unchanged; when the user has not sent a real `magnet:?`, Telegram now deterministically asks for the actual magnet link instead of surfacing internal execution wording
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **qBittorrent protocol execution and broader multi-instance downloader support baseline**.
+Land the smallest **BT subscription / continuous-download baseline**.
 
 ## Scope
 
@@ -164,13 +174,11 @@ Only do:
 - keep the landed `raw_bt` destination-directory follow-up baseline unchanged
 - keep the landed downloader-role binding baseline unchanged
 - keep the landed BT dispatch / transfer execution baseline unchanged
-- add the smallest real qBittorrent request execution path on top of the already-landed downloader instance / role-binding truth
-- broaden downloader execution from “legacy single Transmission + routed Transmission instances” to “Transmission + qBittorrent instances”, but keep the role model unchanged
-- PT dispatch should continue resolving the target instance through `pt_downloader`
-- BT dispatch / transfer execution should continue resolving the target instance through `bt_downloader`
-- keep `raw_bt` using the already-selected destination directory truth during BT dispatch
-- keep this step focused on downloader protocol execution only; do not broaden into scheduler/platformization, BT subscription, or rule-engine work
-- add focused tests/manual verification for qBittorrent protocol execution and no-regression
+- keep the landed qBittorrent protocol execution and broader multi-instance downloader support baseline unchanged
+- add only the smallest BT subscription / continuous-download truth and execution path on top of the already-landed BT execution chain
+- keep this step tightly bounded to BT continuous-download only; do not broaden into generic scheduler/platformization, rule-engine work, or downloader cleanup
+- preserve existing downloader/import approval boundaries, existing media post-processing boundaries, and existing `raw_bt` non-media behavior
+- add focused tests/manual verification for BT subscription / continuous-download baseline and no-regression
 
 ## Explicit constraints
 
@@ -189,15 +197,16 @@ Only do:
 - do not regress the landed `raw_bt` destination-directory follow-up baseline
 - do not regress the landed downloader-role binding baseline
 - do not regress the landed BT dispatch / transfer execution baseline
+- do not regress the landed qBittorrent protocol execution and broader multi-instance downloader support baseline
 
 ## Suggested implementation shape
 
-1. keep the current downloader routing truth shape (`downloader_instances` + `pt_downloader` / `bt_downloader`) unchanged
-2. add the smallest qBittorrent client wrapper with explicit add/status/import-source reads only
-3. route PT / BT execution by configured downloader type instead of assuming Transmission after role resolution
-4. keep current Telegram routing, approval boundary, and BT follow-up text protocol unchanged outside the minimal protocol execution wiring needed in this step
+1. keep the current downloader routing truth shape and current Transmission/qBittorrent execution paths unchanged
+2. add the smallest persisted BT subscription / continuous-download truth needed to survive restart
+3. keep continuous-download execution strictly bounded to the already-landed BT execution chain; do not invent a generic scheduler platform
+4. preserve existing `confirm` boundaries and `raw_bt` non-media branch while wiring the smallest repeated BT dispatch behavior needed in this step
 5. keep current manual status/watchlist/import paths fully backward compatible
-6. add focused tests and manual verification steps for qBittorrent protocol execution and no-regression
+6. add focused tests and manual verification steps for BT subscription / continuous-download baseline and no-regression
 
 ## Done when
 
@@ -214,15 +223,16 @@ Only do:
 - landed `raw_bt` destination-directory follow-up remains deterministic and side-effect free in this step
 - landed downloader-role binding truth remains deterministic and side-effect free in this step
 - landed BT dispatch / transfer execution path remains deterministic and does not bypass the landed safety boundaries
-- qBittorrent-bound PT / BT tasks can execute add/status/import-source against the configured qBittorrent instance without silently falling back to Transmission
+- landed qBittorrent protocol execution path remains deterministic and does not silently fall back to Transmission
+- the smallest BT subscription / continuous-download behavior is persisted, restart-durable, and does not require widening the repository into a generic scheduler platform
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After qBittorrent protocol execution and broader multi-instance downloader support are stable, advance in this order (still one small goal at a time):
+After BT subscription / continuous-download baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
-   - evaluate BT subscription / continuous-download as another separate small goal
+   - evaluate the next BT-stage automation gap, still one small goal at a time
 2. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters
 3. after the above is stable, enter stage E:

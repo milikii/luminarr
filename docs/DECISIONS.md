@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v31)
+# docs/DECISIONS.md (v32)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -803,6 +803,29 @@
   先把已落地的 BT 前半段真相、raw-BT 目录真相和 downloader role-binding 真相真正接到可执行路径上，同时继续维持 approval 边界、导入边界和“raw_bt 不误入媒体链”的最小清晰形状；qBittorrent 真协议留到下一步单独补，避免这一步同时改两层复杂度。
 - **验证**：
   已通过 `py_compile`、临时 `tmp_tests/verify_bt_dispatch_execution_baseline.py` 手工脚本验收（脚本已按规范清理）。
+
+## D-058 qBittorrent protocol execution 与 broader multi-instance downloader support 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 当前下载器执行路径不再默认假设“角色绑定后一定走 Transmission”；系统现在必须按 downloader instance truth 中的 `type` 做协议级路由
+  - qBittorrent 现在已补上最小真实协议执行能力：
+    - add torrent / magnet
+    - get status
+    - get import source
+  - 已落地的 `pt_downloader` / `bt_downloader` 角色绑定模型保持不变；PT / BT 仍然只绑定到实例名，不写死软件类型
+  - qBittorrent-bound PT / BT 任务现在可以走通现有 downloader approval -> `confirm` -> status -> import-source 链路，不得静默落回 Transmission
+  - qBittorrent-bound `raw_bt` 任务继续复用已选目标目录 truth，dispatch 时仍要把目标目录传给下载器
+  - 当前 qBittorrent 协议基线严格保持最小形状：
+    - 只补 add/status/import-source
+    - 不补 categories/tags/rule engine
+    - 不把仓库扩成通用多下载器平台
+  - 现有 BT follow-up 文本协议与 approval 边界保持不变；当用户只发送“下载这个 BT”但未提供实际 `magnet:?` 时，系统必须显式要求补真实磁力，而不是抛内部执行样式的错误
+  - 当前 next smallest path 前进到 BT subscription / continuous-download baseline
+- **原因**：
+  先把已落地的多实例 + 角色绑定真相真正扩展到 qBittorrent 真协议执行，同时继续保持最小边界，不把这一步顺手扩大成调度平台、规则系统或更大范围的下载器抽象层重构。
+- **验证**：
+  已通过 focused pytest（`tests/test_qbittorrent_client.py tests/test_add_to_downloader.py tests/test_get_download_status.py tests/test_config.py`、`tests/test_telegram_bot.py tests/test_import_to_library.py`）与临时 `tmp_tests/verify_qbittorrent_protocol_baseline.py` 手工脚本验收（脚本已按规范清理）。
 
 ---
 

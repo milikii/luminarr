@@ -555,6 +555,7 @@ def test_handle_message_raw_bt_destination_selection_succeeds() -> None:
     assert "已记录 raw_bt 目标目录。" in selected_text
     assert "目录键: archive" in selected_text
     assert "目标路径: /data/raw/archive" in selected_text
+    assert "当前还缺少实际的磁力链接" in selected_text
 
 
 def test_handle_message_raw_bt_destination_invalid_text_returns_reminder() -> None:
@@ -775,6 +776,7 @@ def test_handle_message_raw_bt_destination_pending_survives_restart(tmp_path: Pa
     selected_text = after_restart_reply.await_args.args[0]
     assert "已记录 raw_bt 目标目录。" in selected_text
     assert "目录键: downloads" in selected_text
+    assert "当前还缺少实际的磁力链接" in selected_text
 
 
 def test_handle_message_replies_service_not_ready() -> None:
