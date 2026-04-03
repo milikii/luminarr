@@ -10,13 +10,35 @@ WATCHLIST_USAGE_TEXT = (
     "想看命令格式：\n"
     "watchlist list\n"
     "watchlist add <片名 [年份]>\n"
+    "watchlist add <movie|series|anime> <片名 [年份]>\n"
     "watchlist remove <条目ID>\n"
     "watchlist clear"
 )
 WATCHLIST_EMPTY_TEXT = "想看清单为空。"
-WATCHLIST_ADD_USAGE_TEXT = "添加格式：watchlist add <片名 [年份]>"
+WATCHLIST_ADD_USAGE_TEXT = (
+    "添加格式：watchlist add <片名 [年份]>\n"
+    "或：watchlist add <movie|series|anime> <片名 [年份]>"
+)
 WATCHLIST_REMOVE_USAGE_TEXT = "删除格式：watchlist remove <条目ID>"
 WATCHLIST_CLEAR_EMPTY_TEXT = "想看清单本来就是空的。"
+MEDIA_KIND_ALIASES = {
+    "movie": "movie",
+    "film": "movie",
+    "电影": "movie",
+    "series": "series",
+    "tv": "series",
+    "show": "series",
+    "电视剧": "series",
+    "剧集": "series",
+    "anime": "anime",
+    "动漫": "anime",
+    "动画": "anime",
+}
+MEDIA_KIND_LABELS = {
+    "movie": "电影",
+    "series": "剧集",
+    "anime": "动漫",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +73,9 @@ class ManageWatchlistService:
         lines = ["想看清单："]
         for index, item in enumerate(items, start=1):
             year_text = item.year if item.year else "-"
-            lines.append(f"{index}. [{item.item_id}] {item.title} ({year_text})")
+            lines.append(
+                f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {_media_kind_label(item.media_kind)}"
+            )
         return "\n".join(lines)
 
     def _add_text(self, *, chat_id: int, raw_title: str) -> str:
@@ -59,20 +83,27 @@ class ManageWatchlistService:
         if not cleaned_title:
             return WATCHLIST_ADD_USAGE_TEXT
 
-        parsed = parse_movie_query(cleaned_title)
+        media_kind, parsed_title = _parse_media_kind_prefix(cleaned_title)
+        parsed = parse_movie_query(parsed_title)
         title = parsed.title.strip()
         year = parsed.year.strip()
         if not title:
             return WATCHLIST_ADD_USAGE_TEXT
 
-        created = self._watchlist_repo.add_item(chat_id=chat_id, title=title, year=year)
+        created = self._watchlist_repo.add_item(
+            chat_id=chat_id,
+            title=title,
+            year=year,
+            media_kind=media_kind,
+        )
         if created is None:
             return WATCHLIST_ADD_USAGE_TEXT
         item, is_created = created
         year_text = item.year if item.year else "-"
+        kind_text = _media_kind_label(item.media_kind)
         if is_created:
-            return f"已加入想看：{item.title} ({year_text})\n条目ID: {item.item_id}"
-        return f"想看已存在：{item.title} ({year_text})\n条目ID: {item.item_id}"
+            return f"已加入想看：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
+        return f"想看已存在：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
 
     def _remove_text(self, *, chat_id: int, item_ref: str) -> str:
         cleaned_ref = item_ref.strip()
@@ -124,3 +155,25 @@ def parse_watchlist_query(text: str) -> WatchlistCommand | None:
         return WatchlistCommand(action="remove", arg=(matched_remove.group(1) or "").strip())
 
     return WatchlistCommand(action="add", arg=tail)
+
+
+def _parse_media_kind_prefix(raw_title: str) -> tuple[str, str]:
+    cleaned_title = raw_title.strip()
+    if not cleaned_title:
+        return "movie", ""
+
+    head, separator, tail = cleaned_title.partition(" ")
+    direct_media_kind = MEDIA_KIND_ALIASES.get(head.strip().lower())
+    if not separator:
+        if direct_media_kind is not None:
+            return direct_media_kind, ""
+        return "movie", cleaned_title
+
+    if direct_media_kind is None:
+        return "movie", cleaned_title
+    return direct_media_kind, tail.strip()
+
+
+def _media_kind_label(media_kind: str) -> str:
+    cleaned_kind = media_kind.strip().lower()
+    return MEDIA_KIND_LABELS.get(cleaned_kind, MEDIA_KIND_LABELS["movie"])

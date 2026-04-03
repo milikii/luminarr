@@ -1,4 +1,4 @@
-# Current status (v24)
+# Current status (v27)
 
 ## Project position
 
@@ -63,6 +63,13 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - `watchlist_item` persisted truth (SQLite, chat-scoped)
   - deterministic Telegram watchlist command path (`watchlist` / `想看`)
   - manual add/list/remove/clear only
+  - no downloader/import side effects from watchlist actions
+- smallest series / anime watchlist-driven tracking baseline is now landed:
+  - `watchlist_item` persisted truth now includes `media_kind` (`movie` / `series` / `anime`)
+  - legacy watchlist rows deterministically migrate to default `movie` truth during SQLite initialization
+  - `watchlist add <片名 [年份]>` remains backward compatible and defaults to `movie`
+  - `watchlist add <movie|series|anime> <片名 [年份]>` now provides the smallest explicit content-kind input
+  - `watchlist list` now displays kind text, and same title/year can coexist across different kinds
   - no downloader/import side effects from watchlist actions
 - pending downloader/import approvals now persist timeout truth (`approval_record.expires_at`)
 - `confirm <id/hash>` now deterministically rejects expired pending approvals for downloader/import
@@ -159,8 +166,14 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- series / anime watchlist-driven tracking
-- BT/PT split downloader routing with `qBittorrent` as later BT downloader
+- PT/BT parser-level intent split for “正常观影需求” vs direct BT / magnet demand
+- BT classification follow-up:
+  - movie / series / anime magnets should do TMDB association first, then reuse naming / metadata scrape / poster / subtitle / refresh after download completes
+  - `raw_bt` should skip TMDB; the system should present preconfigured destination-directory options during dispatch inquiry, persist the user's choice, and move files into that selected directory only
+- downloader-role binding (`pt_downloader` / `bt_downloader`) with multiple downloader instances:
+  - later protocol set is Transmission + qBittorrent
+  - multiple Transmission / qBittorrent instances are allowed
+  - PT and BT roles may bind to the same instance or different instances
 
 **Stage D channel expansion (documented roadmap, not current step):**
 - Feishu adapter
@@ -173,6 +186,8 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 ## Latest verification
 
 - tests: `152 passed` (`.venv/bin/python -m pytest -q`)
+- focused tests: `10 passed, 29 deselected` (`.venv/bin/python -m pytest -q tests/test_manage_watchlist.py tests/test_telegram_bot.py -k watchlist`)
+- manual verification: series / anime watchlist-driven tracking baseline passed (temporary `tmp_tests/verify_watchlist_media_kind_baseline.py`, script cleaned after run)
 - manual verification: resource auto-selection rules baseline passed (temporary `tmp_tests/verify_resource_auto_selection_baseline.py`, script cleaned after run)
 - manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
 - manual verification: completion-monitor / scheduler prerequisite baseline passed (temporary `tmp_tests/verify_download_monitor_prerequisite.py`, script cleaned after run)
@@ -192,10 +207,10 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 Build the next smallest path:
 1. keep current `search/select/add/status/import/confirm/refresh` behavior stable
-2. keep manual watchlist baseline behavior stable
+2. keep landed watchlist media-kind behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
 4. keep landed resource auto-selection rules + filename normalization / rename + metadata scraping + subtitle auto-translation baselines stable
-5. land the smallest series / anime watchlist-driven tracking baseline without introducing generic scheduler/downloader platformization
+5. land the smallest PT / BT parser-level intent split baseline without introducing downloader-role binding or scheduler/platformization
 
 ## Current risks
 
@@ -218,11 +233,13 @@ Build the next smallest path:
 - same-task concurrent import approvals across different private chats still effectively share one task-identity truth path
 - same-selection downloader approvals are currently scoped by persisted candidate source identity plus chat-scoped ref routing
 - watchlist remove currently uses persisted item ID only, not natural-language fuzzy deletion
+- watchlist kind is currently user-declared (`movie` / `series` / `anime`); no automatic kind inference or fuzzy correction is introduced in this baseline
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
 
 ## Acceptance focus for the next step
 
-- land the smallest series / anime watchlist-driven tracking baseline without changing existing text-command behavior
+- land the smallest PT / BT parser-level intent split baseline without changing existing text-command behavior
+- keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
 - keep the landed metadata scraping (`TMDB + Fanart.tv`) baseline stable

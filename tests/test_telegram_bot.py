@@ -508,6 +508,33 @@ def test_handle_message_watchlist_routes_to_watchlist_service(tmp_path: Path) ->
     assert "dune" in sent_text
 
 
+def test_handle_message_watchlist_series_routes_to_watchlist_service(tmp_path: Path) -> None:
+    update, reply_text = _build_update("watchlist add series 三体 2023")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    watchlist_service = ManageWatchlistService(WatchlistRepo(_make_database(tmp_path)))
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                MANAGE_WATCHLIST_SERVICE_KEY: watchlist_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "已加入想看" in sent_text
+    assert "三体" in sent_text
+    assert "类型: 剧集" in sent_text
+
+
 def test_handle_message_watchlist_replies_service_not_ready() -> None:
     update, reply_text = _build_update("watchlist list")
     search_service = SearchMediaService(_fake_search)

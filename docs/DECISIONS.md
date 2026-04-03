@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v24)
+# docs/DECISIONS.md (v27)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -521,6 +521,135 @@
   先用最小改动补齐“导入后字幕自动翻译”闭环缺口，并把默认路径提升到专业翻译模型，避免低质量规则替换误导用户。
 - **验证**：
   已通过 targeted pytest、全量 pytest、临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-046 对 OpenHarness 的借鉴边界：只吸收机制，不改项目定位
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - OpenHarness 只作为“通用 agent harness 怎么搭”的外部参考，不改变 Luminarr 的垂直媒体自动化定位
+  - 当前明确可借鉴的机制只有：
+    - 后台任务生命周期（例如 created -> running -> completed/failed/cancelled），供后续 scheduler / tracking 真相层参考
+    - `PreToolUse / PostToolUse` 一类统一 hook 点，供后续 audit log / 通知 / 恢复逻辑复用
+    - path-level 权限规则，供后续硬链接 / copy / 刮削图片 / 字幕写回这类文件动作做显式 allow/deny
+    - 多 agent / coordinator 思路，仅作为更后面的 scheduler 协调参考
+  - 当前明确不引入：
+    - 通用 40+ 工具平台
+    - React TUI
+    - plugin / skill / MCP 平台化
+    - 为了“更像通用 harness”而重写现有垂直工作流
+- **原因**：
+  Luminarr 解决的是“影视自动化流水线稳定跑通”问题，不是“做一个通用 agent 底座”。只吸收能提升边界清晰度和可恢复性的机制，避免仓库被带成另一个方向。
+
+## D-047 阶段 C 的 PT / BT 主干必须在 parser 层先分叉
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 后续进入 BT/PT 分流时，分叉点必须在 parser / 意图识别层，而不是到了下载后半段再临时判断
+  - **PT 主干**只承接正常观影需求，例如：
+    - `我想看 X`
+    - `追更 X`
+    - `watchlist` / `想看`
+  - PT 主干继续走现有观影链路：TMDB -> Prowlarr PT 源 -> 资源选择 -> PT 下载器角色 -> 导入 / 规范化命名 / 刮削 / 字幕 / Emby
+  - **BT 主干**只承接直接 BT 下载需求，例如：
+    - 用户直接发 `magnet:?xt=...`
+    - 用户明确说“下载这个 BT / 下载这个磁力”
+  - 当系统收到磁力或明确 BT 下载指令时，必须先补一次最小分类询问：电影 / 电视剧 / 动漫 / 其他 BT 资源
+  - BT 主干与 PT 主干从入口开始天然隔离，不共享“正常观影需求”的搜索与自动化判断
+  - 该决策只定义后续阶段 C 的边界；不改变当前主线仍然是 Transmission-only、movie-first 的事实
+- **原因**：
+  PT 是本项目电影/剧集/动漫观影需求的主渠道；直接 BT/磁力是另一类下载需求。先在入口分流，后面代码才不会把两类目标搅在一起。
+
+## D-048 多下载器采用“角色绑定”，不把 PT / BT 写死到某个软件
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 后续多下载器支持采用“下载器实例 + 角色绑定”模型：
+    - 配置中先定义具体下载器实例
+    - 再把 `pt_downloader`、`bt_downloader` 这两个角色绑定到具体实例
+  - `pt_downloader` 与 `bt_downloader` 可以绑到同一个实例，也可以绑到不同实例
+  - 代码层只认“PT 角色 / BT 角色”，不硬编码“PT 一定是 Transmission”或“BT 一定是 qBittorrent”
+  - 当前已实现客户端仍然只有 Transmission；`qBittorrent` 仍是后续 BT 阶段的候选客户端，不是当前主线事实
+  - 后续 BT 主干默认只做“下载 -> 转移/放置文件”这条最小链路，不自动进入 PT 主干里的 metadata scrape / subtitle auto-translation
+- **原因**：
+  这样后续加新下载器时，不需要重写整条业务链；同时也能保住“BT 资源天然隔离”的边界，不把 PT 自动化链硬套到 BT 资源上。
+
+## D-049 BT 分类后的后半段：媒体型 BT 走 TMDB/刮削/字幕，原始 BT 走规则化转移
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 当用户发送磁力或明确要求直接下载 BT 资源时，系统先进入 BT 主干，再补一次最小分类询问：
+    - 电影
+    - 电视剧
+    - 动漫
+    - 其他 BT 资源
+  - 当用户选择电影 / 电视剧 / 动漫时，该任务属于“媒体型 BT”：
+    - 系统必须尝试做 TMDB 关联，并把 `media_kind` 与 `tmdb_id` 记入持久化真相
+    - 如果 TMDB 返回多个合理候选，必须继续让用户确认
+    - 如果 TMDB 无法可靠关联，必须显式提示用户补标题或改选“其他 BT 资源”，不得静默跳过
+    - 下载完成后，继续复用现有媒体后半段链路：规范化命名、metadata scrape、海报/图片侧车、subtitle auto-translation、媒体库 refresh
+  - 当用户选择“其他 BT 资源”时，该任务属于“原始 BT”：
+    - 不做 TMDB 关联
+    - 不做 metadata scrape / 海报 / subtitle auto-translation / 媒体库 refresh
+    - 系统只提供预先配置好的目标目录选项（例如 A 目录 / B 目录），并在投递问询阶段交由用户选择
+    - 任务真相中必须持久化记住用户选择的目标目录别名
+    - 下载完成后只做文件转移 / 放置到该已选目录
+    - 不做文件内容级自动分类，不依赖 AI 临时猜测目录
+  - D-048 中“BT 主干默认不进入 metadata / subtitle 链”的旧表述，仅继续适用于“其他 BT 资源”，不再适用于电影 / 电视剧 / 动漫类 BT
+- **原因**：
+  电影、剧集、动漫类磁力本质上还是媒体资源，应该尽量复用已经落地的入库后半段；只有真正的原始 BT 文件才保持纯转移路径。
+
+## D-050 下载器实例模型：支持多个 Transmission / qBittorrent 实例，PT/BT 只绑定角色
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 系统后续支持两类下载器协议：
+    - Transmission
+    - qBittorrent
+  - 配置层先声明“下载器实例列表”，每个实例至少要有：
+    - 实例名
+    - 类型（Transmission / qBittorrent）
+    - 地址 / 认证信息
+    - 该实例对应的下载目录真相
+  - 同一种类型允许存在多个实例，例如多个 Transmission、多个 qBittorrent
+  - `pt_downloader` 与 `bt_downloader` 只绑定到“实例名”，不直接绑定到某个软件类型
+  - `pt_downloader` 与 `bt_downloader` 可以：
+    - 指向同一个实例
+    - 指向不同实例
+    - 指向同类型的不同实例
+    - 指向不同类型的实例
+  - 任务真相中后续必须持久化记录：
+    - 当前任务属于 PT 还是 BT
+    - 当前任务属于 movie / series / anime / raw_bt 哪一类
+    - 当前任务实际投递到了哪个下载器实例
+    - 该实例属于哪种协议
+  - 当前已经实现的客户端仍然只有 Transmission；qBittorrent 只是后续要接入的协议，不是当前已落地事实
+- **原因**：
+  下载器是外部依赖，真实环境里经常会有多个实例。先把“实例”和“角色”分开，后面加新实例、新协议或改路由时，业务链才不会被迫重写。
+
+## D-051 series / anime watchlist-driven tracking 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - `watchlist_item` 持久化真相已最小扩展为：
+    - `title`
+    - `year`
+    - `media_kind`（`movie` / `series` / `anime`）
+  - 旧 SQLite `watchlist_item` 数据在初始化升级时，必须确定性补成 `media_kind='movie'`
+  - 现有手动 `watchlist` 命令保持成立，并补充最小显式分类写法：
+    - `watchlist add <片名 [年份]>` 继续默认按 `movie`
+    - `watchlist add <movie|series|anime> <片名 [年份]>`
+  - `watchlist list` 现在必须显式展示条目类型，便于用户按 `movie / series / anime` 区分同名条目
+  - 同一 chat 下，同标题同年份但不同 `media_kind` 的 watchlist 条目允许并存
+  - 该步仍然严格保持手动基线：
+    - 不触发 downloader side effects
+    - 不触发 import side effects
+    - 不引入 scheduler
+    - 不引入 tracking rule engine
+  - 当前 next smallest path 前进到 PT / BT parser-level intent split baseline
+- **原因**：
+  先把“想看条目到底是电影、剧集还是动漫”记成持久化真相，再进入后续 PT/BT 分流与更深的内容类型工作，避免后面流程继续建立在模糊条目上。
+- **验证**：
+  已通过 focused pytest（watchlist 相关）与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
 ---
 

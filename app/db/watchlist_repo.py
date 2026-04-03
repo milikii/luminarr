@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 from app.db.sqlite import SqliteDatabase
 
+VALID_MEDIA_KINDS = frozenset({"movie", "series", "anime"})
+
 
 @dataclass(frozen=True, slots=True)
 class WatchlistItem:
@@ -12,6 +14,7 @@ class WatchlistItem:
     chat_id: int
     title: str
     year: str
+    media_kind: str
     created_at: str
     updated_at: str
 
@@ -20,13 +23,26 @@ class WatchlistRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
 
-    def add_item(self, *, chat_id: int, title: str, year: str) -> tuple[WatchlistItem, bool] | None:
+    def add_item(
+        self,
+        *,
+        chat_id: int,
+        title: str,
+        year: str,
+        media_kind: str,
+    ) -> tuple[WatchlistItem, bool] | None:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
+        cleaned_media_kind = _normalize_media_kind(media_kind)
         if chat_id <= 0 or not cleaned_title:
             return None
 
-        existing = self.get_item_by_identity(chat_id=chat_id, title=cleaned_title, year=cleaned_year)
+        existing = self.get_item_by_identity(
+            chat_id=chat_id,
+            title=cleaned_title,
+            year=cleaned_year,
+            media_kind=cleaned_media_kind,
+        )
         if existing is not None:
             return existing, False
 
@@ -37,11 +53,12 @@ class WatchlistRepo:
                     chat_id,
                     title,
                     year,
+                    media_kind,
                     created_at,
                     updated_at
-                ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
-                (chat_id, cleaned_title, cleaned_year),
+                (chat_id, cleaned_title, cleaned_year, cleaned_media_kind),
             )
             connection.commit()
             item_id = int(cursor.lastrowid)
@@ -62,6 +79,7 @@ class WatchlistRepo:
                     chat_id,
                     title,
                     year,
+                    media_kind,
                     created_at,
                     updated_at
                 FROM watchlist_item
@@ -102,6 +120,7 @@ class WatchlistRepo:
                     chat_id,
                     title,
                     year,
+                    media_kind,
                     created_at,
                     updated_at
                 FROM watchlist_item
@@ -114,9 +133,17 @@ class WatchlistRepo:
             return None
         return _to_watchlist_item(row)
 
-    def get_item_by_identity(self, *, chat_id: int, title: str, year: str) -> WatchlistItem | None:
+    def get_item_by_identity(
+        self,
+        *,
+        chat_id: int,
+        title: str,
+        year: str,
+        media_kind: str,
+    ) -> WatchlistItem | None:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
+        cleaned_media_kind = _normalize_media_kind(media_kind)
         if chat_id <= 0 or not cleaned_title:
             return None
         with self._database.connect() as connection:
@@ -127,13 +154,14 @@ class WatchlistRepo:
                     chat_id,
                     title,
                     year,
+                    media_kind,
                     created_at,
                     updated_at
                 FROM watchlist_item
-                WHERE chat_id = ? AND title = ? AND year = ?
+                WHERE chat_id = ? AND title = ? AND year = ? AND media_kind = ?
                 LIMIT 1
                 """,
-                (chat_id, cleaned_title, cleaned_year),
+                (chat_id, cleaned_title, cleaned_year, cleaned_media_kind),
             ).fetchone()
         if row is None:
             return None
@@ -146,6 +174,14 @@ def _to_watchlist_item(row: Mapping[str, object]) -> WatchlistItem:
         chat_id=int(row["chat_id"]),
         title=str(row["title"]),
         year=str(row["year"]),
+        media_kind=_normalize_media_kind(str(row["media_kind"])),
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
     )
+
+
+def _normalize_media_kind(media_kind: str) -> str:
+    cleaned_media_kind = media_kind.strip().lower()
+    if cleaned_media_kind in VALID_MEDIA_KINDS:
+        return cleaned_media_kind
+    return "movie"

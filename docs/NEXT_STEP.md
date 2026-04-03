@@ -1,4 +1,4 @@
-# Next step (v24)
+# Next step (v27)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -97,24 +97,33 @@ Prerequisite completed:
   - subtitle translation defaults to professional model translation (`gpt-5.4`, OpenAI-compatible `chat/completions`) for SubRip (`.srt`) and writes `*.zh.srt`
   - missing subtitle API key / model errors are explicitly recorded and do not break confirmed import success
   - focused tests + manual verification passed
+- smallest series / anime watchlist-driven tracking baseline is now landed:
+  - `watchlist_item` persistence now carries `media_kind` (`movie` / `series` / `anime`)
+  - old watchlist rows are deterministically migrated to default `movie`
+  - `watchlist add <片名 [年份]>` remains backward compatible and defaults to `movie`
+  - `watchlist add <movie|series|anime> <片名 [年份]>` is now supported as the smallest explicit kind input
+  - manual `watchlist add/list/remove/clear` remains chat-scoped and side-effect free
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **series / anime watchlist-driven tracking baseline**.
+Land the smallest **PT / BT parser-level intent split baseline**.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
 - keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
-- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, filename normalization / rename, metadata scraping (`TMDB + Fanart.tv`), subtitle auto-translation, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and manual watchlist behavior unchanged
+- keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, filename normalization / rename, metadata scraping (`TMDB + Fanart.tv`), subtitle auto-translation, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and watchlist media-kind behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
 - keep the landed read-only concurrency-safe execution policy behavior stable
 - keep the landed ambiguous read-only exploration behavior unchanged
-- add only the smallest deterministic series/anime watchlist-driven tracking baseline without introducing downloader routing/scheduler platformization
-- keep watchlist changes chat-scoped and persistence-first (SQLite truth), without bypassing existing approval/ownership boundaries
-- add focused tests/manual verification for series/anime watchlist tracking paths and no-regression
+- add only the smallest deterministic parser-level split between:
+  - 正常观影需求（继续走 PT 主干）
+  - 直接 BT / 磁力下载需求（进入后续 BT 主干）
+- keep this step parser/routing-only; do not yet add downloader-role binding, BT 分类问询后半段, TMDB follow-up, or raw BT directory selection
+- add focused tests/manual verification for parser/routing split and no-regression
 
 ## Explicit constraints
 
@@ -126,16 +135,20 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
-- do not introduce BT/PT split downloader routing in this step
-- do not introduce a generic series tracking platform or user-configurable tracking rule engine in this step
+- do not introduce downloader-role binding in this step
+- do not introduce BT classification follow-up in this step
+- do not introduce qBittorrent or multiple downloader instances in this step
+- do not introduce a generic tracking platform or user-configurable rule engine in this step
 
 ## Suggested implementation shape
 
-1. reuse existing `watchlist_item` persistence and extend minimal schema/protocol shape for media kind (`movie/series/anime`) without broad refactor
-2. keep command interaction deterministic and backward compatible for existing movie watchlist commands
-3. ensure series/anime watchlist tracking path does not trigger downloader/import side effects in this step
+1. reuse the existing parser / Telegram routing entry and add the smallest deterministic BT-direct intent detection for:
+   - raw magnet links
+   - explicit “下载这个 BT / 下载这个磁力” style text
+2. keep normal movie/search/watchlist/status/import/confirm command behavior fully backward compatible
+3. make the split visible in deterministic routing/result text without dispatching new downloader side effects in this step
 4. keep current manual status/watchlist/import paths fully backward compatible
-5. add focused tests and manual verification steps for series/anime tracking add/list/remove flows
+5. add focused tests and manual verification steps for PT/BT parser split and no-regression
 
 ## Done when
 
@@ -144,16 +157,21 @@ Only do:
 - current search/select/add/status/import/confirm/watchlist/refresh chain remains stable
 - callback update routing remains stable with deterministic de-dup and no approval bypass
 - cross-filesystem import copy-fallback approval remains stable
+- landed watchlist media-kind behavior remains deterministic, persistence-backed, and side-effect free
 - landed downloader completion truth, post-download auto import, resource auto-selection, filename normalization, metadata scraping, and subtitle auto-translation baselines remain stable
-- series/anime watchlist-driven tracking baseline is deterministic, persistence-backed, and does not bypass existing side-effect boundaries
+- PT / BT parser-level split baseline is deterministic and does not bypass existing side-effect boundaries
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After series/anime watchlist-driven tracking baseline is stable, advance in this order (still one small goal at a time):
+After PT / BT parser-level intent split baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
-   - BT/PT split downloader routing (`qBittorrent` later)
+   - BT classification follow-up:
+     - movie / series / anime magnets do TMDB association first, then reuse naming / metadata / poster / subtitle / refresh after download completes
+     - `raw_bt` presents preconfigured destination-directory options during dispatch inquiry, persists the user's choice, and transfers files into that selected directory only
+   - downloader-role binding (`pt_downloader` / `bt_downloader`; multiple downloader instances allowed, qBittorrent protocol later)
+   - only after the above is stable, evaluate BT subscription / continuous-download as another separate small goal
 2. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters
 3. after the above is stable, enter stage E:

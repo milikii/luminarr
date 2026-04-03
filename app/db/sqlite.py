@@ -62,9 +62,10 @@ SCHEMA_STATEMENTS = (
         chat_id INTEGER NOT NULL,
         title TEXT NOT NULL,
         year TEXT NOT NULL DEFAULT '',
+        media_kind TEXT NOT NULL DEFAULT 'movie',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(chat_id, title, year)
+        UNIQUE(chat_id, title, year, media_kind)
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_watchlist_item_chat_id ON watchlist_item(chat_id)",
@@ -133,6 +134,7 @@ class SqliteDatabase:
             _ensure_approval_record_columns(connection)
             _ensure_jobs_columns(connection)
             _ensure_download_monitor_columns(connection)
+            _ensure_watchlist_item_columns(connection)
             connection.commit()
 
     @contextmanager
@@ -174,3 +176,50 @@ def _ensure_download_monitor_columns(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE download_monitor ADD COLUMN chat_id INTEGER NOT NULL DEFAULT 0")
     if "user_id" not in existing_columns:
         connection.execute("ALTER TABLE download_monitor ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
+
+
+def _ensure_watchlist_item_columns(connection: sqlite3.Connection) -> None:
+    rows = connection.execute("PRAGMA table_info(watchlist_item)").fetchall()
+    existing_columns = {str(row["name"]) for row in rows}
+    if "media_kind" in existing_columns:
+        return
+
+    connection.execute(
+        """
+        CREATE TABLE watchlist_item_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            year TEXT NOT NULL DEFAULT '',
+            media_kind TEXT NOT NULL DEFAULT 'movie',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(chat_id, title, year, media_kind)
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO watchlist_item_new (
+            id,
+            chat_id,
+            title,
+            year,
+            media_kind,
+            created_at,
+            updated_at
+        )
+        SELECT
+            id,
+            chat_id,
+            title,
+            year,
+            'movie',
+            created_at,
+            updated_at
+        FROM watchlist_item
+        """
+    )
+    connection.execute("DROP TABLE watchlist_item")
+    connection.execute("ALTER TABLE watchlist_item_new RENAME TO watchlist_item")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_item_chat_id ON watchlist_item(chat_id)")
