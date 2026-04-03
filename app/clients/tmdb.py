@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,6 +14,7 @@ class TmdbMovie:
     original_title: str
     year: str
     tmdb_id: str = ""
+    media_type: str = "movie"
 
 
 class TmdbClient:
@@ -28,9 +29,62 @@ class TmdbClient:
         self._timeout_seconds = timeout_seconds
 
     async def search_movie(self, title: str, year: str = "") -> TmdbMovie | None:
+        results = await self.search_movie_candidates(title, year=year, limit=1)
+        if not results:
+            return None
+        return results[0]
+
+    async def search_movie_candidates(
+        self,
+        title: str,
+        year: str = "",
+        *,
+        limit: int = 3,
+    ) -> list[TmdbMovie]:
+        return await self._search_candidates(
+            path="/3/search/movie",
+            title=title,
+            year=year,
+            year_param_name="year",
+            result_builder=_to_tmdb_movie,
+            limit=limit,
+        )
+
+    async def search_tv(self, title: str, year: str = "") -> TmdbMovie | None:
+        results = await self.search_tv_candidates(title, year=year, limit=1)
+        if not results:
+            return None
+        return results[0]
+
+    async def search_tv_candidates(
+        self,
+        title: str,
+        year: str = "",
+        *,
+        limit: int = 3,
+    ) -> list[TmdbMovie]:
+        return await self._search_candidates(
+            path="/3/search/tv",
+            title=title,
+            year=year,
+            year_param_name="first_air_date_year",
+            result_builder=_to_tmdb_tv,
+            limit=limit,
+        )
+
+    async def _search_candidates(
+        self,
+        *,
+        path: str,
+        title: str,
+        year: str,
+        year_param_name: str,
+        result_builder: Callable[[Mapping[str, Any]], TmdbMovie | None],
+        limit: int,
+    ) -> list[TmdbMovie]:
         cleaned_title = title.strip()
         if not cleaned_title:
-            return None
+            return []
 
         params: dict[str, str] = {
             "api_key": self._api_key,
@@ -39,24 +93,34 @@ class TmdbClient:
         }
         cleaned_year = year.strip()
         if cleaned_year:
-            params["year"] = cleaned_year
+            params[year_param_name] = cleaned_year
 
-        response = await self._get("/3/search/movie", params=params)
+        response = await self._get(path, params=params)
         data = response.json()
         if not isinstance(data, Mapping):
-            return None
+            return []
 
         raw_results = data.get("results")
         if not isinstance(raw_results, list):
-            return None
+            return []
 
+        resolved_results: list[TmdbMovie] = []
+        seen_ids: set[str] = set()
         for item in raw_results:
             if not isinstance(item, Mapping):
                 continue
-            movie = _to_tmdb_movie(item)
-            if movie is not None:
-                return movie
-        return None
+            media = result_builder(item)
+            if media is None:
+                continue
+            media_id = media.tmdb_id
+            if media_id and media_id in seen_ids:
+                continue
+            if media_id:
+                seen_ids.add(media_id)
+            resolved_results.append(media)
+            if len(resolved_results) >= max(1, limit):
+                break
+        return resolved_results
 
     async def _get(self, path: str, params: Mapping[str, str]) -> httpx.Response:
         url = f"{self._base_url}{path}"
@@ -76,7 +140,32 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
 
     release_date = _safe_text(item.get("release_date"))
     year = _extract_year(release_date)
-    return TmdbMovie(tmdb_id=movie_id, title=resolved_title, original_title=original_title, year=year)
+    return TmdbMovie(
+        tmdb_id=movie_id,
+        title=resolved_title,
+        original_title=original_title,
+        year=year,
+        media_type="movie",
+    )
+
+
+def _to_tmdb_tv(item: Mapping[str, Any]) -> TmdbMovie | None:
+    series_id = _safe_id(item.get("id"))
+    title = _safe_text(item.get("name"))
+    original_title = _safe_text(item.get("original_name"))
+    resolved_title = title or original_title
+    if not resolved_title:
+        return None
+
+    first_air_date = _safe_text(item.get("first_air_date"))
+    year = _extract_year(first_air_date)
+    return TmdbMovie(
+        tmdb_id=series_id,
+        title=resolved_title,
+        original_title=original_title,
+        year=year,
+        media_type="tv",
+    )
 
 
 def _safe_text(value: Any) -> str:

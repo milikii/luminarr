@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 from telegram.ext import CallbackQueryHandler
 
+from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -15,6 +16,10 @@ from app.bot.telegram_bot import (
     BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
     BT_CLASSIFICATION_PROMPT_TEXT,
     BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE,
+    BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
+    BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
+    BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
+    BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
     CLARIFICATION_SELECTION_BLOCKED_TEXT,
     CLARIFICATION_RESET_TEXT,
     FRUSTRATION_RESET_TEXT,
@@ -198,8 +203,37 @@ def test_handle_message_bt_classification_reply_when_pending() -> None:
     asyncio.run(handle_message(follow_up_update, context))
 
     first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    second_sent_text = second_reply_text.await_args.args[0]
+    assert "已记录本次 BT 分类：电影（movie）。" in second_sent_text
+    assert "请继续发送片名，可带年份" in second_sent_text
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_raw_classification_reply_when_pending() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text = _build_update("raw_bt", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(follow_up_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
     second_reply_text.assert_awaited_once_with(
-        BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label="电影", kind="movie")
+        BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label="其他 BT 资源", kind="raw_bt")
     )
     search_service.search_and_format.assert_not_awaited()
 
@@ -254,6 +288,188 @@ def test_handle_message_bt_classification_pending_returns_reminder_for_plain_tex
     first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
     second_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
     search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_tmdb_association_succeeds_for_movie() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    classify_update, second_reply_text = _build_update("movie", update_id=2)
+    title_update, third_reply_text = _build_update("Dune 2021", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+
+    async def fake_movie_lookup(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == "2021"
+        return [TmdbMovie(title="Dune", original_title="Dune", year="2021", tmdb_id="438631")]
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY: fake_movie_lookup,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(title_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
+    success_text = third_reply_text.await_args.args[0]
+    assert "BT 电影 TMDB 关联成功。" in success_text
+    assert "标题: Dune" in success_text
+    assert "TMDB ID: 438631" in success_text
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_tmdb_association_returns_ambiguous_text_without_year() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    classify_update, second_reply_text = _build_update("series", update_id=2)
+    title_update, third_reply_text = _build_update("三体", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+
+    async def fake_tv_lookup(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "三体"
+        assert year == ""
+        return [
+            TmdbMovie(title="三体", original_title="Three-Body", year="2023", tmdb_id="1001", media_type="tv"),
+            TmdbMovie(title="三体", original_title="Three Body", year="2024", tmdb_id="1002", media_type="tv"),
+        ]
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                BT_TMDB_TV_CANDIDATES_LOOKUP_KEY: fake_tv_lookup,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(title_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
+    ambiguous_text = third_reply_text.await_args.args[0]
+    assert "TMDB 关联存在多个候选：三体" in ambiguous_text
+    assert "1. 三体 (2023) [TMDB ID: 1001]" in ambiguous_text
+    assert "2. 三体 (2024) [TMDB ID: 1002]" in ambiguous_text
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_tmdb_association_allows_status_command_while_pending() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    classify_update, second_reply_text = _build_update("movie", update_id=2)
+    status_update, third_reply_text = _build_update("status 87", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="b305bf",
+                name="Dune 1984",
+                status_code=4,
+                percent_done=0.5,
+                rate_download=1024,
+                eta_seconds=30,
+            )
+        )
+    )
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(status_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
+    assert "任务 ID: 87" in third_reply_text.await_args.args[0]
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_tmdb_association_replies_service_not_ready_when_lookup_missing() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    classify_update, second_reply_text = _build_update("anime", update_id=2)
+    title_update, third_reply_text = _build_update("葬送的芙莉莲 2023", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(title_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
+    third_reply_text.assert_awaited_once_with(BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT)
+
+
+def test_handle_message_bt_tmdb_association_cancel_when_pending() -> None:
+    update, first_reply_text = _build_update("下载这个 BT")
+    classify_update, second_reply_text = _build_update("movie", update_id=2)
+    cancel_update, third_reply_text = _build_update("取消", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(cancel_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
+    third_reply_text.assert_awaited_once_with(BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
 
 
 def test_handle_message_replies_service_not_ready() -> None:

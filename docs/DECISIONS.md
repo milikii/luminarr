@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v28)
+# docs/DECISIONS.md (v29)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -698,6 +698,37 @@
   先把“直接 BT 下载需求已经识别出来之后，系统下一句该问什么”补成确定性路径，避免入口层又退回到占位提示或误入普通搜片主干；同时继续保持最小边界，不把这一步扩成完整 BT workflow。
 - **验证**：
   已通过 focused pytest（`tests/test_telegram_bot.py`）与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-054 BT `movie / series / anime` TMDB association follow-up 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 在已落地的 BT classification follow-up 之后，`movie` / `series` / `anime` 现在已补上最小 deterministic TMDB association follow-up
+  - 当用户在 BT 分类阶段选择：
+    - `movie`
+    - `series`
+    - `anime`
+    系统不会直接进入下载或目录选择，而是继续要求用户补 TMDB 关联标题（可带年份）
+  - 关联查询协议最小落地为：
+    - `movie` 走 TMDB movie candidates
+    - `series` / `anime` 走 TMDB TV candidates
+  - 当 TMDB 返回单个可靠候选时，Telegram text/callback 路径必须返回确定性的关联结果文本，至少展示：
+    - 标题
+    - 原始标题
+    - 年份
+    - `tmdb_id`
+  - 当 TMDB 返回多个合理候选或无法可靠关联时，系统必须返回确定性的澄清文本，要求用户补年份或更完整片名
+  - 当前这一步严格保持 follow-up-only：
+    - 不持久化新的 BT workflow truth
+    - 不发起 downloader side effects
+    - 不接入 `raw_bt` 目录选择
+    - 不引入 downloader-role binding
+  - `raw_bt` 继续停留在现有 classification-only 路径，不进入 TMDB association
+  - 当前 next smallest path 前进到 `raw_bt` destination-directory follow-up baseline
+- **原因**：
+  先把“媒体型 BT 在分类后到底关联到哪部影视作品”补成确定性路径，再继续往 `raw_bt` 目录选择和更后面的下载器角色绑定推进，能避免不同 BT 子路径在入口阶段再次混在一起。
+- **验证**：
+  已通过 focused pytest（`tests/test_telegram_bot.py tests/test_tmdb_client.py`）、全量 pytest 与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
 ---
 

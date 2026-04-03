@@ -68,6 +68,46 @@ def test_search_movie_without_valid_result_returns_none() -> None:
     assert result is None
 
 
+def test_search_tv_candidates_returns_valid_results() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+    captured: dict[str, Any] = {}
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        captured["path"] = path
+        captured["params"] = params
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1001,
+                        "name": "Three-Body",
+                        "original_name": "三体",
+                        "first_air_date": "2023-01-15",
+                    },
+                    {
+                        "id": 1002,
+                        "name": "Frieren: Beyond Journey's End",
+                        "original_name": "葬送的芙莉莲",
+                        "first_air_date": "2023-09-29",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_tv_candidates("三体", year="2023", limit=2))
+
+    assert captured["path"] == "/3/search/tv"
+    assert captured["params"]["query"] == "三体"
+    assert captured["params"]["first_air_date_year"] == "2023"
+    assert len(result) == 2
+    assert result[0].title == "Three-Body"
+    assert result[0].original_title == "三体"
+    assert result[0].year == "2023"
+    assert result[0].tmdb_id == "1001"
+    assert result[0].media_type == "tv"
+
+
 def _run(coroutine: Awaitable[Any]) -> Any:
     import asyncio
 

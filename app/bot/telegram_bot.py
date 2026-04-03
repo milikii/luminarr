@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import re
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import TypeVar
 
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
+from app.clients.tmdb import TmdbMovie
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
@@ -35,7 +37,7 @@ from app.services.import_to_library import (
     parse_import_query,
 )
 from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
-from app.services.search_media import SearchMediaService
+from app.services.search_media import SearchMediaService, parse_movie_query
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
@@ -54,6 +56,36 @@ BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE = (
     "已记录本次 BT 分类：{label}（{kind}）。\n"
     "当前这一步只完成分类 follow-up，暂不执行 TMDB 关联、下载投递或目录选择。"
 )
+BT_TMDB_ASSOCIATION_PROMPT_TEXT_TEMPLATE = (
+    "已记录本次 BT 分类：{label}（{kind}）。\n"
+    "请继续发送片名，可带年份，例如：{example}\n"
+    "当前这一步只做 TMDB 关联，不会执行下载投递。"
+)
+BT_TMDB_ASSOCIATION_PENDING_REMINDER_TEMPLATE = (
+    "当前正在等待 {label} 的 TMDB 关联标题。\n"
+    "请发送：片名 或 片名 + 年份，例如：{example}"
+)
+BT_TMDB_ASSOCIATION_CANCELLED_TEXT = "已取消当前 BT TMDB 关联，请重新发送磁力或 BT 指令。"
+BT_TMDB_ASSOCIATION_NOT_FOUND_TEMPLATE = (
+    "未找到可用的 TMDB 关联：{query}\n"
+    "请补充更准确的片名，可带年份，例如：{example}\n"
+    "如果这不是影视资源，请改选 raw_bt。"
+)
+BT_TMDB_ASSOCIATION_AMBIGUOUS_TEMPLATE = (
+    "TMDB 关联存在多个候选：{query}\n"
+    "请补充年份或更完整片名后重试。\n"
+    "参考候选：\n"
+    "{options}"
+)
+BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE = (
+    "BT {label} TMDB 关联成功。\n"
+    "标题: {title}\n"
+    "原始标题: {original_title}\n"
+    "年份: {year}\n"
+    "TMDB ID: {tmdb_id}\n"
+    "当前这一步只展示关联结果，暂不执行下载投递。"
+)
+BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT = "TMDB 关联服务未就绪，请稍后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -65,7 +97,11 @@ JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
 BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
+BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
+BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY = "bt_tmdb_movie_candidates_lookup_func"
+BT_TMDB_TV_CANDIDATES_LOOKUP_KEY = "bt_tmdb_tv_candidates_lookup_func"
 T = TypeVar("T")
+LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 
 BT_CLASSIFICATION_ALIASES = {
     "movie": "movie",
@@ -91,6 +127,16 @@ BT_CLASSIFICATION_LABELS = {
     "anime": "动漫",
     "raw_bt": "其他 BT 资源",
 }
+BT_TMDB_ASSOCIATION_EXAMPLES = {
+    "movie": "Dune 2021",
+    "series": "三体 2023",
+    "anime": "葬送的芙莉莲 2023",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class BtTmdbAssociationPending:
+    media_kind: str
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -159,6 +205,8 @@ def build_application(
     telegram_update_repo: TelegramUpdateRepo | None = None,
     job_repo: JobRepo | None = None,
     execution_gate: ExecutionGate | None = None,
+    bt_tmdb_movie_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
+    bt_tmdb_tv_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
 ) -> Application:
     application = Application.builder().token(token).build()
     application.bot_data[SEARCH_SERVICE_KEY] = search_service
@@ -167,6 +215,10 @@ def build_application(
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
     application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
     application.bot_data[EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
+    if bt_tmdb_movie_candidates_lookup_func is not None:
+        application.bot_data[BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
+    if bt_tmdb_tv_candidates_lookup_func is not None:
+        application.bot_data[BT_TMDB_TV_CANDIDATES_LOOKUP_KEY] = bt_tmdb_tv_candidates_lookup_func
     if telegram_update_repo is not None:
         application.bot_data[TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
     if job_repo is not None:
@@ -355,6 +407,68 @@ def _clear_bt_classification_pending(
     return pending_by_chat.pop(chat_id, None) is not None
 
 
+def _pop_bt_classification_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> str | None:
+    if chat_id is None or chat_id <= 0:
+        return None
+    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
+    pending_query = pending_by_chat.pop(chat_id, None)
+    if not isinstance(pending_query, str):
+        return None
+    return pending_query
+
+
+def _resolve_bt_tmdb_association_pending_by_chat(
+    context: ContextTypes.DEFAULT_TYPE,
+) -> dict[int, BtTmdbAssociationPending]:
+    pending_by_chat = context.application.bot_data.get(BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY)
+    if isinstance(pending_by_chat, dict):
+        return pending_by_chat
+    resolved_pending_by_chat: dict[int, BtTmdbAssociationPending] = {}
+    context.application.bot_data[BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
+    return resolved_pending_by_chat
+
+
+def _set_bt_tmdb_association_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    media_kind: str,
+) -> None:
+    if chat_id is None or chat_id <= 0:
+        return
+    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
+    pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind)
+
+
+def _get_bt_tmdb_association_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> BtTmdbAssociationPending | None:
+    if chat_id is None or chat_id <= 0:
+        return None
+    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
+    pending = pending_by_chat.get(chat_id)
+    if not isinstance(pending, BtTmdbAssociationPending):
+        return None
+    return pending
+
+
+def _clear_bt_tmdb_association_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> bool:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
+    return pending_by_chat.pop(chat_id, None) is not None
+
+
 def _parse_bt_classification_choice(text: str) -> str | None:
     normalized_text = re.sub(r"\s+", "", text.strip()).lower()
     if not normalized_text:
@@ -365,6 +479,98 @@ def _parse_bt_classification_choice(text: str) -> str | None:
 def _format_bt_classification_result(media_kind: str) -> str:
     label = BT_CLASSIFICATION_LABELS.get(media_kind, BT_CLASSIFICATION_LABELS["raw_bt"])
     return BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label=label, kind=media_kind)
+
+
+def _format_bt_tmdb_association_prompt(media_kind: str) -> str:
+    label = BT_CLASSIFICATION_LABELS.get(media_kind, media_kind)
+    example = BT_TMDB_ASSOCIATION_EXAMPLES.get(media_kind, "Dune 2021")
+    return BT_TMDB_ASSOCIATION_PROMPT_TEXT_TEMPLATE.format(label=label, kind=media_kind, example=example)
+
+
+def _format_bt_tmdb_association_pending_reminder(media_kind: str) -> str:
+    label = BT_CLASSIFICATION_LABELS.get(media_kind, media_kind)
+    example = BT_TMDB_ASSOCIATION_EXAMPLES.get(media_kind, "Dune 2021")
+    return BT_TMDB_ASSOCIATION_PENDING_REMINDER_TEMPLATE.format(label=label, example=example)
+
+
+def _resolve_bt_tmdb_candidates_lookup(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    media_kind: str,
+) -> LookupTmdbCandidatesFunc | None:
+    key = BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY
+    if media_kind in {"series", "anime"}:
+        key = BT_TMDB_TV_CANDIDATES_LOOKUP_KEY
+    lookup_func = context.application.bot_data.get(key)
+    if callable(lookup_func):
+        return lookup_func
+    return None
+
+
+def _format_bt_tmdb_association_options(options: list[TmdbMovie]) -> str:
+    lines: list[str] = []
+    for index, option in enumerate(options, start=1):
+        title = option.title or option.original_title or "-"
+        year = option.year or "-"
+        lines.append(f"{index}. {title} ({year}) [TMDB ID: {option.tmdb_id or '-'}]")
+    return "\n".join(lines) if lines else "- 暂无可区分候选，请直接补充年份。"
+
+
+def _format_bt_tmdb_association_success(media_kind: str, match: TmdbMovie) -> str:
+    label = BT_CLASSIFICATION_LABELS.get(media_kind, media_kind)
+    title = match.title or match.original_title or "-"
+    original_title = match.original_title or title
+    year = match.year or "-"
+    tmdb_id = match.tmdb_id or "-"
+    return BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE.format(
+        label=label,
+        title=title,
+        original_title=original_title,
+        year=year,
+        tmdb_id=tmdb_id,
+    )
+
+
+def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
+    print(
+        f"\033[31m[BT TMDB 关联失败]\033[0m 类型={media_kind} 查询={query} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。"
+    )
+
+
+async def _handle_bt_tmdb_association_query(
+    *,
+    query: str,
+    pending: BtTmdbAssociationPending,
+    chat_id: int | None,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> str:
+    parsed_query = parse_movie_query(query)
+    if not parsed_query.title:
+        return _format_bt_tmdb_association_pending_reminder(pending.media_kind)
+
+    lookup_func = _resolve_bt_tmdb_candidates_lookup(context=context, media_kind=pending.media_kind)
+    if lookup_func is None:
+        return BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT
+
+    try:
+        matches = await lookup_func(parsed_query.title, parsed_query.year)
+    except Exception as error:
+        _log_bt_tmdb_association_error(media_kind=pending.media_kind, query=query, error=error)
+        return BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT
+
+    if not matches:
+        example = BT_TMDB_ASSOCIATION_EXAMPLES.get(pending.media_kind, "Dune 2021")
+        return BT_TMDB_ASSOCIATION_NOT_FOUND_TEMPLATE.format(query=query.strip(), example=example)
+
+    if not parsed_query.year and len(matches) > 1:
+        return BT_TMDB_ASSOCIATION_AMBIGUOUS_TEMPLATE.format(
+            query=query.strip(),
+            options=_format_bt_tmdb_association_options(matches),
+        )
+
+    _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    return _format_bt_tmdb_association_success(pending.media_kind, matches[0])
 
 
 async def _handle_query_text(
@@ -447,11 +653,15 @@ async def _handle_query_text(
             ):
                 await reply_func(FRUSTRATION_RESET_TEXT)
                 return
+        if _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id):
+            await reply_func(BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
+            return
         if _clear_bt_classification_pending(context=context, chat_id=chat_id):
             await reply_func(BT_CLASSIFICATION_CANCELLED_TEXT)
             return
 
     if _is_bt_direct_intent(query):
+        _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         _set_bt_classification_pending(
             context=context,
             chat_id=chat_id,
@@ -462,8 +672,17 @@ async def _handle_query_text(
 
     bt_classification = _parse_bt_classification_choice(query)
     if bt_classification is not None and _is_bt_classification_pending(context=context, chat_id=chat_id):
-        _clear_bt_classification_pending(context=context, chat_id=chat_id)
-        await reply_func(_format_bt_classification_result(bt_classification))
+        _pop_bt_classification_pending(context=context, chat_id=chat_id)
+        _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        if bt_classification == "raw_bt":
+            await reply_func(_format_bt_classification_result(bt_classification))
+            return
+        _set_bt_tmdb_association_pending(
+            context=context,
+            chat_id=chat_id,
+            media_kind=bt_classification,
+        )
+        await reply_func(_format_bt_tmdb_association_prompt(bt_classification))
         return
 
     task_ref = parse_status_query(query)
@@ -581,6 +800,17 @@ async def _handle_query_text(
                 chat_id=chat_id,
                 user_id=user_id,
             ),
+        )
+        await reply_func(reply)
+        return
+
+    bt_tmdb_pending = _get_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    if bt_tmdb_pending is not None:
+        reply = await _handle_bt_tmdb_association_query(
+            query=query,
+            pending=bt_tmdb_pending,
+            chat_id=chat_id,
+            context=context,
         )
         await reply_func(reply)
         return

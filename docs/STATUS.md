@@ -1,4 +1,4 @@
-# Current status (v29)
+# Current status (v30)
 
 ## Project position
 
@@ -150,6 +150,13 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - frustration/cancel phrases now clear the current BT classification pending state without affecting downloader/import approval flows
   - current step remains follow-up-only: it does not persist a new BT workflow truth, does not dispatch downloader side effects, does not do TMDB association, and does not do raw BT destination selection
   - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
+- smallest movie / series / anime BT TMDB association follow-up baseline is now landed:
+  - after BT classification, `movie` / `series` / `anime` now deterministically enter the next TMDB association follow-up instead of stopping at classification-result text
+  - `movie` association uses TMDB movie candidates; `series` / `anime` association use TMDB TV candidates
+  - when TMDB returns a single reliable candidate, Telegram text/callback path now replies with deterministic association-result text (`title / original_title / year / tmdb_id`) and stays side-effect free
+  - when TMDB returns no reliable candidate or multiple plausible candidates, Telegram text/callback path now returns deterministic clarification text and stays side-effect free
+  - `raw_bt` remains on the existing classification-only path and does not enter TMDB association in this baseline
+  - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -177,8 +184,6 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- movie / series / anime BT TMDB association follow-up:
-  - movie / series / anime magnets should do TMDB association first, then reuse naming / metadata scrape / poster / subtitle / refresh after download completes
 - `raw_bt` destination-directory follow-up:
   - `raw_bt` should skip TMDB; the system should present preconfigured destination-directory options during dispatch inquiry, persist the user's choice, and move files into that selected directory only
 - downloader-role binding (`pt_downloader` / `bt_downloader`) with multiple downloader instances:
@@ -196,8 +201,9 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `152 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `169 passed` (`.venv/bin/python -m pytest -q`)
 - focused tests: `10 passed, 29 deselected` (`.venv/bin/python -m pytest -q tests/test_manage_watchlist.py tests/test_telegram_bot.py -k watchlist`)
+- focused tests: `49 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_tmdb_client.py`)
 - manual verification: series / anime watchlist-driven tracking baseline passed (temporary `tmp_tests/verify_watchlist_media_kind_baseline.py`, script cleaned after run)
 - manual verification: resource auto-selection rules baseline passed (temporary `tmp_tests/verify_resource_auto_selection_baseline.py`, script cleaned after run)
 - manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
@@ -215,6 +221,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - focused tests: `39 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
 - manual verification: PT / BT parser-level intent split baseline passed (temporary `tmp_tests/verify_pt_bt_parser_split_baseline.py`, script cleaned after run)
 - manual verification: BT classification follow-up baseline passed (temporary `tmp_tests/verify_bt_classification_followup.py`, script cleaned after run)
+- manual verification: BT `movie / series / anime` TMDB association follow-up baseline passed (temporary `tmp_tests/verify_bt_tmdb_association_followup.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -224,7 +231,8 @@ Build the next smallest path:
 2. keep landed watchlist media-kind behavior stable
 3. keep landed ambiguous read-only exploration behavior stable
 4. keep landed BT classification follow-up baseline stable
-5. land the smallest movie / series / anime BT TMDB association follow-up baseline without introducing `raw_bt` destination selection, downloader-role binding, or scheduler/platformization
+5. keep landed BT `movie / series / anime` TMDB association follow-up baseline stable
+6. land the smallest `raw_bt` destination-directory follow-up baseline without introducing downloader-role binding, BT dispatch side effects, or scheduler/platformization
 
 ## Current risks
 
@@ -250,18 +258,21 @@ Build the next smallest path:
 - watchlist kind is currently user-declared (`movie` / `series` / `anime`); no automatic kind inference or fuzzy correction is introduced in this baseline
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
 - current BT-direct intent split baseline is intentionally narrow; only raw magnet links and a small set of explicit “下载这个 BT / 磁力” phrases are recognized
-- BT classification follow-up currently keeps only the smallest in-memory chat-scoped pending state; process restart will clear that pending classification by design in this baseline
-- direct BT / magnet demand now reaches deterministic classification follow-up, but TMDB follow-up, destination selection, and dispatch are not landed yet
+- BT classification follow-up and BT TMDB association follow-up currently keep only the smallest in-memory chat-scoped pending state; process restart will clear that pending state by design in this baseline
+- BT `series` / `anime` TMDB association currently uses TMDB TV search only; anime movie-style entries may still require the user to retry with a clearer title/year
+- BT `movie / series / anime` TMDB association is currently result-text only; persisted BT workflow truth, downloader dispatch, and later media-chain reuse are not landed yet
+- `raw_bt` destination selection and later dispatch path are not landed yet
 
 ## Acceptance focus for the next step
 
-- land the smallest movie / series / anime BT TMDB association follow-up baseline without changing existing text-command behavior
+- land the smallest `raw_bt` destination-directory follow-up baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
 - keep the landed metadata scraping (`TMDB + Fanart.tv`) baseline stable
 - keep the landed subtitle auto-translation baseline stable
 - keep the landed BT classification follow-up baseline stable
+- keep the landed BT `movie / series / anime` TMDB association follow-up baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
@@ -273,3 +284,4 @@ Build the next smallest path:
 - current ambiguous read-only exploration + numeric-select blocking behavior remains stable
 - landed PT / BT parser-level intent split baseline remains deterministic and does not bypass existing side-effect boundaries
 - landed BT classification follow-up remains deterministic and does not bypass existing side-effect boundaries
+- landed BT `movie / series / anime` TMDB association follow-up remains deterministic and side-effect free
