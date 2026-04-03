@@ -143,6 +143,63 @@ def test_load_settings_reads_raw_bt_destinations() -> None:
     assert settings.raw_bt_destination_options[1].key == "archive"
 
 
+def test_load_settings_reads_downloader_instances_and_role_binding() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "DOWNLOADER_INSTANCES": (
+                "tr-main|transmission|http://transmission:9091|/data/downloads/tr|user1|pass1;"
+                "qb-main|qb|http://qb:8080|/data/downloads/qb"
+            ),
+            "PT_DOWNLOADER": "tr-main",
+            "BT_DOWNLOADER": "qb-main",
+        }
+    )
+
+    assert len(settings.downloader_instances) == 2
+    assert settings.downloader_instances[0].name == "tr-main"
+    assert settings.downloader_instances[0].downloader_type == "transmission"
+    assert settings.downloader_instances[0].download_dir == "/data/downloads/tr"
+    assert settings.downloader_instances[1].name == "qb-main"
+    assert settings.downloader_instances[1].downloader_type == "qbittorrent"
+    assert settings.downloader_role_binding is not None
+    assert settings.downloader_role_binding.pt_downloader == "tr-main"
+    assert settings.downloader_role_binding.bt_downloader == "qb-main"
+
+
+def test_load_settings_defaults_role_binding_to_first_instance() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "DOWNLOADER_INSTANCES": "tr-main|transmission|http://transmission:9091|/data/downloads/tr",
+        }
+    )
+
+    assert settings.downloader_role_binding is not None
+    assert settings.downloader_role_binding.pt_downloader == "tr-main"
+    assert settings.downloader_role_binding.bt_downloader == "tr-main"
+
+
+def test_load_settings_rejects_unknown_role_binding_instance() -> None:
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "DOWNLOADER_INSTANCES": "tr-main|transmission|http://transmission:9091|/data/downloads/tr",
+                "BT_DOWNLOADER": "missing-instance",
+            }
+        )
+
+
 def test_load_settings_rejects_invalid_subtitle_timeout() -> None:
     with pytest.raises(ConfigError):
         load_settings(

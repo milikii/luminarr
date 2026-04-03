@@ -16,6 +16,11 @@ from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
     ApprovalRepo,
 )
+from app.db.bt_pending_repo import (
+    BT_PENDING_STAGE_RAW_BT_DESTINATION,
+    BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingRepo,
+)
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -233,6 +238,27 @@ def test_clarification_repo_persists_for_restart(tmp_path: Path) -> None:
 
     verify_repo = ClarificationRepo(SqliteDatabase(str(db_path)))
     assert verify_repo.get_pending_query(chat_id=1001) is None
+
+
+def test_bt_pending_repo_persists_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_repo = BtPendingRepo(database)
+    before_restart_repo.upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+        payload_json='{"media_kind":"movie"}',
+    )
+
+    after_restart_repo = BtPendingRepo(SqliteDatabase(str(db_path)))
+    pending = after_restart_repo.get_pending(chat_id=1001)
+    assert pending is not None
+    assert pending.stage == BT_PENDING_STAGE_TMDB_ASSOCIATION
+    assert pending.payload_json == '{"media_kind":"movie"}'
+    assert after_restart_repo.clear_pending(chat_id=1001, expected_stage=BT_PENDING_STAGE_RAW_BT_DESTINATION) is False
+    assert after_restart_repo.clear_pending(chat_id=1001, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION) is True
 
 
 def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None:

@@ -17,6 +17,22 @@ class RawBtDestinationOption:
 
 
 @dataclass(frozen=True, slots=True)
+class DownloaderInstanceConfig:
+    name: str
+    downloader_type: str
+    base_url: str
+    download_dir: str
+    username: str = ""
+    password: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class DownloaderRoleBinding:
+    pt_downloader: str
+    bt_downloader: str
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     telegram_bot_token: str
     prowlarr_base_url: str
@@ -37,6 +53,8 @@ class Settings:
     subtitle_translation_timeout_seconds: float
     sqlite_db_path: str
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...]
+    downloader_instances: tuple[DownloaderInstanceConfig, ...]
+    downloader_role_binding: DownloaderRoleBinding | None
 
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
@@ -95,6 +113,97 @@ def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDesti
     return tuple(options)
 
 
+def _normalize_downloader_type(raw_value: str) -> str:
+    normalized_value = raw_value.strip().lower()
+    aliases = {
+        "transmission": "transmission",
+        "tr": "transmission",
+        "qbittorrent": "qbittorrent",
+        "qb": "qbittorrent",
+    }
+    resolved_value = aliases.get(normalized_value, "")
+    if not resolved_value:
+        raise ConfigError(
+            f"DOWNLOADER_INSTANCES downloader_type must be transmission or qbittorrent, got: {raw_value}"
+        )
+    return resolved_value
+
+
+def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstanceConfig, ...]:
+    raw_value = _read_optional(env, "DOWNLOADER_INSTANCES")
+    if not raw_value:
+        return ()
+
+    instances: list[DownloaderInstanceConfig] = []
+    seen_names: set[str] = set()
+    for raw_item in raw_value.split(";"):
+        cleaned_item = raw_item.strip()
+        if not cleaned_item:
+            continue
+
+        parts = [part.strip() for part in cleaned_item.split("|")]
+        if len(parts) not in {4, 6}:
+            raise ConfigError(
+                "DOWNLOADER_INSTANCES format must be `name|type|base_url|download_dir` or `name|type|base_url|download_dir|username|password`, separated by `;`"
+            )
+
+        name = parts[0]
+        downloader_type = _normalize_downloader_type(parts[1])
+        base_url = parts[2].rstrip("/")
+        download_dir = parts[3]
+        username = ""
+        password = ""
+        if len(parts) == 6:
+            username = parts[4]
+            password = parts[5]
+
+        if not name:
+            raise ConfigError("DOWNLOADER_INSTANCES name cannot be empty")
+        if name in seen_names:
+            raise ConfigError(f"DOWNLOADER_INSTANCES contains duplicate name: {name}")
+        if not base_url:
+            raise ConfigError(f"DOWNLOADER_INSTANCES base_url cannot be empty: {name}")
+        if not download_dir:
+            raise ConfigError(f"DOWNLOADER_INSTANCES download_dir cannot be empty: {name}")
+
+        seen_names.add(name)
+        instances.append(
+            DownloaderInstanceConfig(
+                name=name,
+                downloader_type=downloader_type,
+                base_url=base_url,
+                download_dir=download_dir,
+                username=username,
+                password=password,
+            )
+        )
+
+    return tuple(instances)
+
+
+def _read_downloader_role_binding(
+    env: Mapping[str, str],
+    instances: tuple[DownloaderInstanceConfig, ...],
+) -> DownloaderRoleBinding | None:
+    if not instances:
+        return None
+
+    instance_names = {instance.name for instance in instances}
+    default_instance_name = instances[0].name
+    pt_downloader = _read_optional(env, "PT_DOWNLOADER") or default_instance_name
+    bt_downloader = _read_optional(env, "BT_DOWNLOADER") or default_instance_name
+
+    if pt_downloader not in instance_names:
+        raise ConfigError(f"PT_DOWNLOADER must match a configured downloader instance: {pt_downloader}")
+    if bt_downloader not in instance_names:
+        raise ConfigError(f"BT_DOWNLOADER must match a configured downloader instance: {bt_downloader}")
+
+    return DownloaderRoleBinding(
+        pt_downloader=pt_downloader,
+        bt_downloader=bt_downloader,
+    )
+
+
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
     emby_base_url = _read_optional(env, "EMBY_BASE_URL").rstrip("/")
@@ -108,6 +217,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             subtitle_translation_timeout_seconds = float(subtitle_translation_timeout_raw)
         except ValueError:
             raise ConfigError("SUBTITLE_TRANSLATION_TIMEOUT_SECONDS must be a number")
+    downloader_instances = _read_downloader_instances(env)
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
         prowlarr_base_url=_read_required(env, "PROWLARR_BASE_URL").rstrip("/"),
@@ -128,4 +238,6 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         subtitle_translation_timeout_seconds=subtitle_translation_timeout_seconds,
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
         raw_bt_destination_options=_read_raw_bt_destination_options(env),
+        downloader_instances=downloader_instances,
+        downloader_role_binding=_read_downloader_role_binding(env, downloader_instances),
     )

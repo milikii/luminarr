@@ -77,6 +77,14 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS bt_pending_state (
+        chat_id INTEGER PRIMARY KEY,
+        stage TEXT NOT NULL DEFAULT '',
+        payload_json TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS jobs (
         job_id TEXT PRIMARY KEY,
         chat_id INTEGER NOT NULL DEFAULT 0,

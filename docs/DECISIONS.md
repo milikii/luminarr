@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v30)
+# docs/DECISIONS.md (v31)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -755,6 +755,35 @@
   先把“原始 BT 资源应该落到哪个预设目录”补成确定性路径，再继续进入 downloader-role binding，能避免后续 BT dispatch 阶段继续建立在模糊目标目录之上。
 - **验证**：
   已通过 focused pytest（`tests/test_telegram_bot.py tests/test_config.py`）、全量 pytest 与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
+
+## D-056 downloader-role binding 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 配置层现在已补上最小 downloader instance truth，每个实例当前至少包括：
+    - 实例名
+    - 类型（Transmission / qBittorrent）
+    - 地址
+    - download directory 真相
+    - 可选 username / password
+  - 配置层现在已补上最小 deterministic role binding truth：
+    - `pt_downloader`
+    - `bt_downloader`
+  - 当前这一步只落地“实例 + 角色绑定”的真相，不直接改变已有 downloader side effects
+  - 同时，BT follow-up 当前阶段真相现在已最小持久化到 SQLite（`bt_pending_state`），至少覆盖：
+    - classification pending
+    - TMDB association pending
+    - raw-BT destination pending
+  - 进程重启后，Telegram text/callback 路径必须能够从持久化真相恢复当前 BT follow-up，而不是退回普通搜索或丢失上下文
+  - 当前这一步严格保持 baseline-only：
+    - 不引入 qBittorrent request execution
+    - 不引入新的 BT dispatch side effects
+    - 不把仓库扩成完整多下载器平台
+  - 当前 next smallest path 前进到 BT dispatch / transfer execution baseline
+- **原因**：
+  先把“PT/BT 最终该落到哪个 downloader 实例”以及“BT follow-up 当前停在哪一步”记成可恢复的真相，后面真实接入 BT dispatch / transfer execution 时，才不会继续建立在瞬时内存和硬编码单实例假设之上。
+- **验证**：
+  已通过 focused pytest（`tests/test_config.py tests/test_persistence_sqlite.py tests/test_telegram_bot.py`）、全量 pytest 与临时 `tmp_tests` 手工脚本验收（脚本已按规范清理）。
 
 ---
 

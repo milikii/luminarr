@@ -8,6 +8,7 @@ from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient
 from app.config import load_settings
 from app.db.approval_repo import ApprovalRepo
+from app.db.bt_pending_repo import BtPendingRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -39,6 +40,7 @@ def main() -> None:
     job_event_repo = JobEventRepo(database)
     job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
+    bt_pending_repo = BtPendingRepo(database)
     download_monitor_repo = DownloadMonitorRepo(database)
     telegram_update_repo = TelegramUpdateRepo(database)
     watchlist_repo = WatchlistRepo(database)
@@ -126,9 +128,12 @@ def main() -> None:
         manage_watchlist_service,
         telegram_update_repo=telegram_update_repo,
         job_repo=job_repo,
+        bt_pending_repo=bt_pending_repo,
         bt_tmdb_movie_candidates_lookup_func=tmdb_client.search_movie_candidates if settings.tmdb_api_key else None,
         bt_tmdb_tv_candidates_lookup_func=tmdb_client.search_tv_candidates if settings.tmdb_api_key else None,
         raw_bt_destination_options=settings.raw_bt_destination_options,
+        downloader_instances=settings.downloader_instances,
+        downloader_role_binding=settings.downloader_role_binding,
     )
     application.run_polling(drop_pending_updates=True)
 

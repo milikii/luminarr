@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -8,8 +9,14 @@ from typing import TypeVar
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
-from app.config import RawBtDestinationOption
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
+from app.db.bt_pending_repo import (
+    BT_PENDING_STAGE_CLASSIFICATION,
+    BT_PENDING_STAGE_RAW_BT_DESTINATION,
+    BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingRepo,
+)
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
@@ -123,12 +130,15 @@ MANAGE_WATCHLIST_SERVICE_KEY = "manage_watchlist_service"
 JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
+BT_PENDING_REPO_KEY = "bt_pending_repo"
 BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
 BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
 BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY = "bt_tmdb_movie_candidates_lookup_func"
 BT_TMDB_TV_CANDIDATES_LOOKUP_KEY = "bt_tmdb_tv_candidates_lookup_func"
 RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY = "raw_bt_destination_pending_by_chat"
 RAW_BT_DESTINATION_OPTIONS_KEY = "raw_bt_destination_options"
+DOWNLOADER_INSTANCES_KEY = "downloader_instances"
+DOWNLOADER_ROLE_BINDING_KEY = "downloader_role_binding"
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 
@@ -239,9 +249,12 @@ def build_application(
     telegram_update_repo: TelegramUpdateRepo | None = None,
     job_repo: JobRepo | None = None,
     execution_gate: ExecutionGate | None = None,
+    bt_pending_repo: BtPendingRepo | None = None,
     bt_tmdb_movie_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
     bt_tmdb_tv_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...] = (),
+    downloader_instances: tuple[DownloaderInstanceConfig, ...] = (),
+    downloader_role_binding: DownloaderRoleBinding | None = None,
 ) -> Application:
     application = Application.builder().token(token).build()
     application.bot_data[SEARCH_SERVICE_KEY] = search_service
@@ -250,11 +263,15 @@ def build_application(
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
     application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
     application.bot_data[EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
+    application.bot_data[DOWNLOADER_INSTANCES_KEY] = downloader_instances
+    application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
     if bt_tmdb_movie_candidates_lookup_func is not None:
         application.bot_data[BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
     if bt_tmdb_tv_candidates_lookup_func is not None:
         application.bot_data[BT_TMDB_TV_CANDIDATES_LOOKUP_KEY] = bt_tmdb_tv_candidates_lookup_func
     application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY] = raw_bt_destination_options
+    if bt_pending_repo is not None:
+        application.bot_data[BT_PENDING_REPO_KEY] = bt_pending_repo
     if telegram_update_repo is not None:
         application.bot_data[TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
     if job_repo is not None:
@@ -271,6 +288,13 @@ def _resolve_execution_gate(context: ContextTypes.DEFAULT_TYPE) -> ExecutionGate
     resolved_gate = ExecutionGate()
     context.application.bot_data[EXECUTION_GATE_KEY] = resolved_gate
     return resolved_gate
+
+
+def _resolve_bt_pending_repo(context: ContextTypes.DEFAULT_TYPE) -> BtPendingRepo | None:
+    pending_repo = context.application.bot_data.get(BT_PENDING_REPO_KEY)
+    if isinstance(pending_repo, BtPendingRepo):
+        return pending_repo
+    return None
 
 
 async def _run_sync_with_policy(
@@ -409,6 +433,25 @@ def _resolve_bt_classification_pending_by_chat(context: ContextTypes.DEFAULT_TYP
     return resolved_pending_by_chat
 
 
+def _serialize_bt_pending_payload(payload: dict[str, object]) -> str:
+    try:
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    except TypeError:
+        return "{}"
+
+
+def _deserialize_bt_pending_payload(payload_json: str) -> dict[str, object]:
+    if not payload_json.strip():
+        return {}
+    try:
+        payload = json.loads(payload_json)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
 def _set_bt_classification_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
@@ -418,7 +461,16 @@ def _set_bt_classification_pending(
     if chat_id is None or chat_id <= 0:
         return
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    pending_by_chat[chat_id] = query.strip()
+    cleaned_query = query.strip()
+    pending_by_chat[chat_id] = cleaned_query
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return
+    pending_repo.upsert_pending(
+        chat_id=chat_id,
+        stage=BT_PENDING_STAGE_CLASSIFICATION,
+        payload_json=_serialize_bt_pending_payload({"query": cleaned_query}),
+    )
 
 
 def _is_bt_classification_pending(
@@ -429,7 +481,17 @@ def _is_bt_classification_pending(
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    return chat_id in pending_by_chat
+    if chat_id in pending_by_chat:
+        return True
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return False
+    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
+        return False
+    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    pending_by_chat[chat_id] = str(payload.get("query", "")).strip()
+    return True
 
 
 def _clear_bt_classification_pending(
@@ -437,10 +499,16 @@ def _clear_bt_classification_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> bool:
+    cleared = False
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    return pending_by_chat.pop(chat_id, None) is not None
+    if pending_by_chat.pop(chat_id, None) is not None:
+        cleared = True
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return cleared
+    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION) or cleared
 
 
 def _pop_bt_classification_pending(
@@ -452,9 +520,21 @@ def _pop_bt_classification_pending(
         return None
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
     pending_query = pending_by_chat.pop(chat_id, None)
-    if not isinstance(pending_query, str):
+    if isinstance(pending_query, str):
+        pending_repo = _resolve_bt_pending_repo(context)
+        if pending_repo is not None:
+            pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+        return pending_query
+
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
         return None
-    return pending_query
+    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
+        return None
+    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+    return str(payload.get("query", "")).strip() or None
 
 
 def _resolve_bt_tmdb_association_pending_by_chat(
@@ -489,6 +569,14 @@ def _set_bt_tmdb_association_pending(
         return
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
     pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind)
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return
+    pending_repo.upsert_pending(
+        chat_id=chat_id,
+        stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+        payload_json=_serialize_bt_pending_payload({"media_kind": media_kind}),
+    )
 
 
 def _get_bt_tmdb_association_pending(
@@ -500,9 +588,21 @@ def _get_bt_tmdb_association_pending(
         return None
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
     pending = pending_by_chat.get(chat_id)
-    if not isinstance(pending, BtTmdbAssociationPending):
+    if isinstance(pending, BtTmdbAssociationPending):
+        return pending
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
         return None
-    return pending
+    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
+        return None
+    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    media_kind = str(payload.get("media_kind", "")).strip()
+    if not media_kind:
+        return None
+    resolved_pending = BtTmdbAssociationPending(media_kind=media_kind)
+    pending_by_chat[chat_id] = resolved_pending
+    return resolved_pending
 
 
 def _clear_bt_tmdb_association_pending(
@@ -510,10 +610,16 @@ def _clear_bt_tmdb_association_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> bool:
+    cleared = False
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
-    return pending_by_chat.pop(chat_id, None) is not None
+    if pending_by_chat.pop(chat_id, None) is not None:
+        cleared = True
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return cleared
+    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION) or cleared
 
 
 def _set_raw_bt_destination_pending(
@@ -526,6 +632,25 @@ def _set_raw_bt_destination_pending(
         return
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
     pending_by_chat[chat_id] = RawBtDestinationPending(options=options)
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return
+    pending_repo.upsert_pending(
+        chat_id=chat_id,
+        stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+        payload_json=_serialize_bt_pending_payload(
+            {
+                "options": [
+                    {
+                        "key": option.key,
+                        "label": option.label,
+                        "target_dir": option.target_dir,
+                    }
+                    for option in options
+                ]
+            }
+        ),
+    )
 
 
 def _get_raw_bt_destination_pending(
@@ -537,9 +662,33 @@ def _get_raw_bt_destination_pending(
         return None
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
     pending = pending_by_chat.get(chat_id)
-    if not isinstance(pending, RawBtDestinationPending):
+    if isinstance(pending, RawBtDestinationPending):
+        return pending
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
         return None
-    return pending
+    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_RAW_BT_DESTINATION:
+        return None
+    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    raw_options = payload.get("options")
+    if not isinstance(raw_options, list):
+        return None
+    options: list[RawBtDestinationOption] = []
+    for raw_option in raw_options:
+        if not isinstance(raw_option, dict):
+            continue
+        key = str(raw_option.get("key", "")).strip()
+        label = str(raw_option.get("label", "")).strip()
+        target_dir = str(raw_option.get("target_dir", "")).strip()
+        if not key or not label or not target_dir:
+            continue
+        options.append(RawBtDestinationOption(key=key, label=label, target_dir=target_dir))
+    if not options:
+        return None
+    resolved_pending = RawBtDestinationPending(options=tuple(options))
+    pending_by_chat[chat_id] = resolved_pending
+    return resolved_pending
 
 
 def _clear_raw_bt_destination_pending(
@@ -547,10 +696,16 @@ def _clear_raw_bt_destination_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> bool:
+    cleared = False
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
-    return pending_by_chat.pop(chat_id, None) is not None
+    if pending_by_chat.pop(chat_id, None) is not None:
+        cleared = True
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return cleared
+    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_RAW_BT_DESTINATION) or cleared
 
 
 def _parse_bt_classification_choice(text: str) -> str | None:

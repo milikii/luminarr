@@ -1,4 +1,4 @@
-# Next step (v31)
+# Next step (v32)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -129,10 +129,16 @@ Prerequisite completed:
   - invalid destination replies now return deterministic reminder text with the available options and stay side-effect free
   - missing raw-BT destination configuration now returns explicit not-ready text instead of silently falling through to other routes
   - focused tests + manual verification passed
+- smallest downloader-role binding baseline is now landed:
+  - configuration now supports the smallest downloader instance truth (`name / type / base_url / download_dir`, with optional username/password)
+  - configuration now supports deterministic role binding truth for `pt_downloader` and `bt_downloader`
+  - BT classification / TMDB association / raw-BT destination pending truth now survives process restart through SQLite (`bt_pending_state`)
+  - current step remains truth-only and does not yet change downloader dispatch execution
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **downloader-role binding baseline**.
+Land the smallest **BT dispatch / transfer execution baseline**.
 
 ## Scope
 
@@ -148,12 +154,12 @@ Only do:
 - keep the landed BT classification follow-up baseline unchanged
 - keep the landed BT `movie / series / anime` TMDB association follow-up baseline unchanged
 - keep the landed `raw_bt` destination-directory follow-up baseline unchanged
-- add only the smallest deterministic downloader-role binding truth for:
-  - `pt_downloader`
-  - `bt_downloader`
-- allow configuration to bind PT and BT roles to downloader instance names without dispatching new downloader side effects in this step
-- keep this step focused on role-binding truth only; do not yet add qBittorrent protocol wiring, BT dispatch execution, or persistent raw-BT transfer execution
-- add focused tests/manual verification for downloader-role binding baseline and no-regression
+- keep the landed downloader-role binding baseline unchanged
+- add only the smallest deterministic execution path that starts consuming the landed `pt_downloader` / `bt_downloader` truth
+- PT dispatch should continue using the existing downloader flow but resolve the target instance through `pt_downloader`
+- BT dispatch / transfer execution should stay minimal and deterministic on top of the landed BT classification / TMDB association / raw-BT destination / role-binding truth
+- keep this step focused on execution wiring only; do not yet add qBittorrent protocol execution beyond current Transmission support, and do not broaden into scheduler/platformization
+- add focused tests/manual verification for BT dispatch / transfer execution baseline and no-regression
 
 ## Explicit constraints
 
@@ -165,20 +171,21 @@ Only do:
 - do not regress the landed execution-hygiene baseline
 - do not add global scheduler or multi-process orchestration in this step
 - do not broaden into generic multi-agent platform work
-- do not introduce qBittorrent request dispatch in this step
+- do not introduce qBittorrent request dispatch in this step beyond configuration truth
 - do not introduce a generic tracking platform or user-configurable rule engine in this step
 - do not bypass the landed parser-level PT / BT split with ad-hoc late-stage branching
 - do not regress the landed BT `movie / series / anime` TMDB association follow-up baseline
 - do not regress the landed `raw_bt` destination-directory follow-up baseline
+- do not regress the landed downloader-role binding baseline
 
 ## Suggested implementation shape
 
-1. add the smallest configuration truth for downloader instances and bind `pt_downloader` / `bt_downloader` to instance names
+1. start consuming the landed downloader-role binding truth in the smallest possible execution path
 2. keep normal movie/search/watchlist/status/import/confirm command behavior fully backward compatible
-3. keep this step side-effect free for BT dispatch and raw-BT transfer execution
-4. keep current PT and BT follow-up routing unchanged; this step only prepares the later dispatch truth
+3. keep BT execution strictly bounded by the already-landed PT/BT split, TMDB association, and raw-BT destination follow-up truth
+4. keep current PT and BT follow-up routing unchanged outside the minimal execution wiring needed in this step
 5. keep current manual status/watchlist/import paths fully backward compatible
-6. add focused tests and manual verification steps for downloader-role binding baseline and no-regression
+6. add focused tests and manual verification steps for BT dispatch / transfer execution baseline and no-regression
 
 ## Done when
 
@@ -193,15 +200,16 @@ Only do:
 - landed BT classification follow-up remains deterministic and does not dispatch downloader side effects in this step
 - landed BT `movie / series / anime` TMDB association follow-up remains deterministic and side-effect free in this step
 - landed `raw_bt` destination-directory follow-up remains deterministic and side-effect free in this step
-- downloader-role binding truth is deterministic and remains side-effect free in this step
+- landed downloader-role binding truth remains deterministic and side-effect free in this step
+- the smallest BT dispatch / transfer execution path is deterministic and does not bypass the landed safety boundaries
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After downloader-role binding baseline is stable, advance in this order (still one small goal at a time):
+After BT dispatch / transfer execution baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
-   - BT dispatch / transfer execution on top of the landed PT/BT split, TMDB association follow-up, raw-BT destination follow-up, and downloader-role binding truth
+   - qBittorrent protocol execution and broader multi-instance downloader support on top of the landed role-binding truth
    - only after the above is stable, evaluate BT subscription / continuous-download as another separate small goal
 2. after workflow core is stable, enter stage D:
    - Feishu / WeCom / personal WeChat parallel channel adapters

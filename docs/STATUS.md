@@ -1,4 +1,4 @@
-# Current status (v31)
+# Current status (v32)
 
 ## Project position
 
@@ -164,6 +164,12 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
   - invalid raw-BT directory replies now return deterministic reminder text with the available options and stay side-effect free
   - missing raw-BT destination configuration now returns explicit not-ready text instead of silently falling through to other routes
   - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
+- smallest downloader-role binding baseline is now landed:
+  - configuration now supports the smallest downloader instance truth (`name / type / base_url / download_dir`, with optional username/password)
+  - configuration now supports deterministic role binding truth for `pt_downloader` and `bt_downloader`
+  - role binding currently binds PT / BT to configured downloader instance names without changing existing downloader side effects in this baseline
+  - BT classification / TMDB association / raw-BT destination pending truth is now persisted in SQLite (`bt_pending_state`) and no longer disappears after process restart
+  - existing `search/select/status/import/confirm/watchlist` command words and approval / ownership / replay boundaries remain unchanged
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -191,10 +197,11 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- downloader-role binding (`pt_downloader` / `bt_downloader`) with multiple downloader instances:
-  - later protocol set is Transmission + qBittorrent
-  - multiple Transmission / qBittorrent instances are allowed
-  - PT and BT roles may bind to the same instance or different instances
+- BT dispatch / transfer execution on top of landed role binding truth:
+  - PT tasks should later dispatch through `pt_downloader`
+  - BT tasks should later dispatch through `bt_downloader`
+  - `raw_bt` should later reuse the selected destination-directory truth during transfer execution
+  - qBittorrent protocol execution remains a later step, not current fact
 
 **Stage D channel expansion (documented roadmap, not current step):**
 - Feishu adapter
@@ -206,10 +213,11 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 
 ## Latest verification
 
-- tests: `175 passed` (`.venv/bin/python -m pytest -q`)
+- tests: `182 passed` (`.venv/bin/python -m pytest -q`)
 - focused tests: `10 passed, 29 deselected` (`.venv/bin/python -m pytest -q tests/test_manage_watchlist.py tests/test_telegram_bot.py -k watchlist`)
 - focused tests: `49 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_tmdb_client.py`)
 - focused tests: `62 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_config.py`)
+- focused tests: `92 passed` (`.venv/bin/python -m pytest -q tests/test_config.py tests/test_persistence_sqlite.py tests/test_telegram_bot.py`)
 - manual verification: series / anime watchlist-driven tracking baseline passed (temporary `tmp_tests/verify_watchlist_media_kind_baseline.py`, script cleaned after run)
 - manual verification: resource auto-selection rules baseline passed (temporary `tmp_tests/verify_resource_auto_selection_baseline.py`, script cleaned after run)
 - manual verification: post-download auto import baseline passed (temporary `tmp_tests/verify_post_download_auto_import_baseline.py`, script cleaned after run)
@@ -229,6 +237,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - manual verification: BT classification follow-up baseline passed (temporary `tmp_tests/verify_bt_classification_followup.py`, script cleaned after run)
 - manual verification: BT `movie / series / anime` TMDB association follow-up baseline passed (temporary `tmp_tests/verify_bt_tmdb_association_followup.py`, script cleaned after run)
 - manual verification: `raw_bt` destination-directory follow-up baseline passed (temporary `tmp_tests/verify_raw_bt_destination_followup.py`, script cleaned after run)
+- manual verification: downloader-role binding baseline passed (temporary `tmp_tests/verify_downloader_role_binding_baseline.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -240,7 +249,8 @@ Build the next smallest path:
 4. keep landed BT classification follow-up baseline stable
 5. keep landed BT `movie / series / anime` TMDB association follow-up baseline stable
 6. keep landed `raw_bt` destination-directory follow-up baseline stable
-7. land the smallest downloader-role binding baseline without introducing BT dispatch side effects, qBittorrent wiring, or scheduler/platformization
+7. keep landed downloader-role binding baseline stable
+8. land the smallest BT dispatch / transfer execution baseline without introducing qBittorrent request dispatch or scheduler/platformization
 
 ## Current risks
 
@@ -266,15 +276,16 @@ Build the next smallest path:
 - watchlist kind is currently user-declared (`movie` / `series` / `anime`); no automatic kind inference or fuzzy correction is introduced in this baseline
 - ambiguous-query trigger is rule-based and may still over-trigger for some no-year short titles
 - current BT-direct intent split baseline is intentionally narrow; only raw magnet links and a small set of explicit “下载这个 BT / 磁力” phrases are recognized
-- BT classification follow-up, BT TMDB association follow-up, and raw-BT destination follow-up currently keep only the smallest in-memory chat-scoped pending state; process restart will clear that pending state by design in this baseline
+- BT classification follow-up, BT TMDB association follow-up, and raw-BT destination follow-up now persist restart-durable pending truth in SQLite, but they still use only the smallest stage + payload protocol instead of a full BT workflow state machine
 - BT `series` / `anime` TMDB association currently uses TMDB TV search only; anime movie-style entries may still require the user to retry with a clearer title/year
 - BT `movie / series / anime` TMDB association is currently result-text only; persisted BT workflow truth, downloader dispatch, and later media-chain reuse are not landed yet
 - `raw_bt` destination follow-up is currently result-text only; persisted raw-BT workflow truth and later dispatch/transfer execution are not landed yet
-- downloader-role binding is not landed yet, so PT / BT still cannot bind to separate configured downloader instances
+- downloader-role binding truth is landed, but existing dispatch paths still do not consume `pt_downloader` / `bt_downloader`
+- multiple downloader instance truth is configuration-only in this baseline; qBittorrent request execution is not landed yet
 
 ## Acceptance focus for the next step
 
-- land the smallest downloader-role binding baseline without changing existing text-command behavior
+- land the smallest BT dispatch / transfer execution baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
@@ -283,6 +294,7 @@ Build the next smallest path:
 - keep the landed BT classification follow-up baseline stable
 - keep the landed BT `movie / series / anime` TMDB association follow-up baseline stable
 - keep the landed `raw_bt` destination-directory follow-up baseline stable
+- keep the landed downloader-role binding baseline stable
 - existing downloader/import approval and confirm routing behavior does not regress
 - landed Telegram callback workflow routing behavior does not regress
 - landed cross-filesystem copy fallback approval behavior does not regress
@@ -296,3 +308,4 @@ Build the next smallest path:
 - landed BT classification follow-up remains deterministic and does not bypass existing side-effect boundaries
 - landed BT `movie / series / anime` TMDB association follow-up remains deterministic and side-effect free
 - landed `raw_bt` destination-directory follow-up remains deterministic and side-effect free
+- landed downloader-role binding truth remains deterministic and side-effect free

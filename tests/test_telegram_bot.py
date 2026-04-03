@@ -8,11 +8,12 @@ from unittest.mock import AsyncMock
 
 from telegram.ext import CallbackQueryHandler
 
-from app.config import RawBtDestinationOption
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    BT_PENDING_REPO_KEY,
     BT_CLASSIFICATION_CANCELLED_TEXT,
     BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
     BT_CLASSIFICATION_PROMPT_TEXT,
@@ -26,6 +27,8 @@ from app.bot.telegram_bot import (
     BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
     CLARIFICATION_SELECTION_BLOCKED_TEXT,
     CLARIFICATION_RESET_TEXT,
+    DOWNLOADER_INSTANCES_KEY,
+    DOWNLOADER_ROLE_BINDING_KEY,
     FRUSTRATION_RESET_TEXT,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
@@ -41,6 +44,7 @@ from app.bot.telegram_bot import (
 )
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalRepo
+from app.db.bt_pending_repo import BtPendingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -620,6 +624,157 @@ def test_handle_message_raw_bt_destination_cancel_when_pending() -> None:
     first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
     assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
     third_reply_text.assert_awaited_once_with(RAW_BT_DESTINATION_CANCELLED_TEXT)
+
+
+def test_handle_message_bt_classification_pending_survives_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: BtPendingRepo(database),
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock()),
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(
+                    AsyncMock(return_value=None),
+                    "/data/library/movies",
+                ),
+            }
+        )
+    )
+    before_restart_update, before_restart_reply = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    asyncio.run(handle_message(before_restart_update, before_restart_context))
+    before_restart_reply.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+
+    after_restart_update, after_restart_reply = _build_update("沙丘", update_id=2)
+    after_restart_context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path))),
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock()),
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(
+                    AsyncMock(return_value=None),
+                    "/data/library/movies",
+                ),
+            }
+        )
+    )
+
+    asyncio.run(handle_message(after_restart_update, after_restart_context))
+    after_restart_reply.assert_awaited_once_with(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+
+
+def test_handle_message_bt_tmdb_association_pending_survives_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    async def fake_movie_lookup(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == "2021"
+        return [TmdbMovie(title="Dune", original_title="Dune", year="2021", tmdb_id="438631")]
+
+    before_restart_context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: BtPendingRepo(database),
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock()),
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(
+                    AsyncMock(return_value=None),
+                    "/data/library/movies",
+                ),
+            }
+        )
+    )
+    first_update, first_reply = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    second_update, second_reply = _build_update("movie", update_id=2)
+    asyncio.run(handle_message(first_update, before_restart_context))
+    asyncio.run(handle_message(second_update, before_restart_context))
+    first_reply.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply.await_args.args[0]
+
+    after_restart_update, after_restart_reply = _build_update("Dune 2021", update_id=3)
+    after_restart_context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path))),
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock()),
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(
+                    AsyncMock(return_value=None),
+                    "/data/library/movies",
+                ),
+                BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY: fake_movie_lookup,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(after_restart_update, after_restart_context))
+    success_text = after_restart_reply.await_args.args[0]
+    assert "BT 电影 TMDB 关联成功。" in success_text
+    assert "TMDB ID: 438631" in success_text
+
+
+def test_handle_message_raw_bt_destination_pending_survives_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    options = (
+        RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/data/raw/downloads"),
+        RawBtDestinationOption(key="archive", label="归档目录", target_dir="/data/raw/archive"),
+    )
+    before_restart_context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: BtPendingRepo(database),
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock()),
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(
+                    AsyncMock(return_value=None),
+                    "/data/library/movies",
+                ),
+                RAW_BT_DESTINATION_OPTIONS_KEY: options,
+            }
+        )
+    )
+    first_update, first_reply = _build_update("下载这个 BT")
+    second_update, second_reply = _build_update("raw_bt", update_id=2)
+    asyncio.run(handle_message(first_update, before_restart_context))
+    asyncio.run(handle_message(second_update, before_restart_context))
+    first_reply.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    assert "请选择预设目标目录：" in second_reply.await_args.args[0]
+
+    after_restart_update, after_restart_reply = _build_update("downloads", update_id=3)
+    after_restart_context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path))),
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock()),
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(
+                    AsyncMock(return_value=None),
+                    "/data/library/movies",
+                ),
+                RAW_BT_DESTINATION_OPTIONS_KEY: options,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(after_restart_update, after_restart_context))
+    selected_text = after_restart_reply.await_args.args[0]
+    assert "已记录 raw_bt 目标目录。" in selected_text
+    assert "目录键: downloads" in selected_text
 
 
 def test_handle_message_replies_service_not_ready() -> None:
@@ -1586,6 +1741,19 @@ def test_build_application_registers_services() -> None:
     database = SqliteDatabase(":memory:")
     database.initialize()
     job_repo = JobRepo(database)
+    bt_pending_repo = BtPendingRepo(database)
+    downloader_instances = (
+        DownloaderInstanceConfig(
+            name="tr-main",
+            downloader_type="transmission",
+            base_url="http://transmission:9091",
+            download_dir="/data/downloads/tr",
+        ),
+    )
+    downloader_role_binding = DownloaderRoleBinding(
+        pt_downloader="tr-main",
+        bt_downloader="tr-main",
+    )
     application = build_application(
         "token",
         search_service,
@@ -1594,6 +1762,12 @@ def test_build_application_registers_services() -> None:
         import_service,
         watchlist_service,
         job_repo=job_repo,
+        bt_pending_repo=bt_pending_repo,
+        raw_bt_destination_options=(
+            RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/data/raw/downloads"),
+        ),
+        downloader_instances=downloader_instances,
+        downloader_role_binding=downloader_role_binding,
     )
     assert application.bot_data[SEARCH_SERVICE_KEY] is search_service
     assert application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] is add_service
@@ -1601,6 +1775,10 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] is import_service
     assert application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] is watchlist_service
     assert application.bot_data[JOB_REPO_KEY] is job_repo
+    assert application.bot_data[BT_PENDING_REPO_KEY] is bt_pending_repo
+    assert application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY][0].key == "downloads"
+    assert application.bot_data[DOWNLOADER_INSTANCES_KEY] == downloader_instances
+    assert application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] is downloader_role_binding
     assert any(
         isinstance(handler, CallbackQueryHandler)
         for handlers in application.handlers.values()
