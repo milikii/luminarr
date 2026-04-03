@@ -1,4 +1,4 @@
-# Luminarr (v29)
+# Luminarr (v30)
 
 Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harness**。
 
@@ -84,16 +84,16 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
 
 ## 3. 当前最近一步
 
-当前 next step 不是 BT execution wiring，也不是 qB 协议接入，而是：
+当前 next step 不再是 BT subscription / continuous-download baseline 本身，而是：
 
-- **BT subscription / continuous-download baseline**
+- **BT subscription scheduler-tick baseline**
 
 这一小步的目标是：
 
-- 在已落地的 BT execution + qB protocol 基线上，补最小 BT 连续下载 / 订阅能力
+- 在已落地的手动 `btsub run` 基线上，补最小自动触发 tick
 - 当前这一步不引入通用 scheduler 平台，不把仓库扩成规则引擎
 - 当前这一步要继续保持现有 downloader / import 审批边界和媒体后半段稳定
-- 保持当前 `search/select/add/status/import/confirm/watchlist` 行为稳定
+- 保持当前 `search/select/add/status/import/confirm/watchlist/btsub` 行为稳定
 
 ---
 
@@ -125,7 +125,12 @@ Luminarr 是一个**面向 2–4 人自托管影视场景的垂直自动化 Harn
   - `pt_downloader` / `bt_downloader` 只绑定到实例名，不写死软件类型
   - PT 和 BT 可以共用同一个实例，也可以分别走不同实例
 - `qBittorrent` 真协议已经落地到最小执行形态：add / status / import-source
-- 只有上述执行链稳定后，才继续评估 BT subscription / continuous-download 这类下一小步
+- BT subscription / continuous-download 最小手动基线已落地：
+  - `btsub list/add/remove/clear/run`
+  - SQLite 持久化订阅真相
+  - 命中新资源后仍然进入现有下载待确认边界
+  - 当前仍然是手动 `run`，不是后台自动扫描
+- 下一小步是 BT subscription scheduler-tick baseline
 
 ### 阶段 D：渠道扩展
 
@@ -225,4 +230,4 @@ Luminarr 当前不追求“像一个更通用的 agent”，而追求：
 
 ## 10. 一句话总结
 
-**Luminarr v29 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经补到 completion-monitor、post-download auto import、rename、metadata scraping、subtitle auto-translation、PT/BT 分流、BT execution wiring、downloader role binding，以及 qBittorrent 真协议的最小执行形态；当前最近一步前进到 BT subscription / continuous-download。**
+**Luminarr v30 = 一个电影优先、Telegram 私聊唯一入口的垂直媒体自动化 Harness；当前主线已经补到 completion-monitor、post-download auto import、rename、metadata scraping、subtitle auto-translation、PT/BT 分流、BT execution wiring、downloader role binding、qBittorrent 真协议，以及 BT subscription / continuous-download 的最小手动基线；当前最近一步前进到 BT subscription scheduler-tick baseline。**

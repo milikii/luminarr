@@ -553,6 +553,27 @@ class ApprovalRepo:
                 """,
                 (action_type, cleaned_task_id, cleaned_task_hash),
             ).fetchone()
+            if row is None:
+                row = connection.execute(
+                    """
+                    SELECT
+                        action_type,
+                        task_id,
+                        task_hash,
+                        status,
+                        lease_version,
+                        executed_version,
+                        expires_at,
+                        last_task_ref,
+                        created_at,
+                        updated_at
+                    FROM approval_record
+                    WHERE action_type = ? AND task_id = ?
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (action_type, cleaned_task_id),
+                ).fetchone()
         if row is None:
             return None
         return _to_approval_record(row)

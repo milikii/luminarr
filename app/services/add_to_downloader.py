@@ -153,6 +153,33 @@ class AddToDownloaderService:
         if not cleaned_source.lower().startswith("magnet:?"):
             return BT_SOURCE_UNSUPPORTED_TEXT
 
+        return await self.add_candidate_source(
+            chat_id=chat_id,
+            source=cleaned_source,
+            title=title,
+            user_id=user_id,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
+        )
+
+    async def add_candidate_source(
+        self,
+        *,
+        chat_id: int,
+        source: str,
+        title: str,
+        user_id: int | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> str:
+        cleaned_source = source.strip()
+        if not cleaned_source:
+            return CANDIDATE_SOURCE_MISSING_TEXT
+
         cleaned_title = title.strip() or "(no title)"
         pending_add = _build_pending_add_context(
             task_ref=_build_bt_task_ref(cleaned_source),

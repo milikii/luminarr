@@ -468,6 +468,19 @@ class ImportToLibraryService:
         )
         return IMPORT_CANCELLED_TEXT
 
+    async def _get_import_source(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+    ) -> TransmissionImportSource | None:
+        if chat_id is None:
+            return await self._get_import_source_func(task_ref)
+        try:
+            return await self._get_import_source_func(task_ref, chat_id)
+        except TypeError:
+            return await self._get_import_source_func(task_ref)
+
     async def _prepare_import(
         self,
         task_ref: str,
@@ -475,10 +488,7 @@ class ImportToLibraryService:
         chat_id: int | None = None,
     ) -> tuple[PreparedImport | None, str]:
         try:
-            if chat_id is not None:
-                import_source = await self._get_import_source_func(task_ref, chat_id)
-            else:
-                import_source = await self._get_import_source_func(task_ref)
+            import_source = await self._get_import_source(task_ref, chat_id=chat_id)
         except Exception:
             self._record_event(
                 task_ref=task_ref,

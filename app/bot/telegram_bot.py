@@ -20,6 +20,9 @@ from app.db.bt_pending_repo import (
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
+    ACTION_BT_SUBSCRIPTION_LIST,
+    ACTION_BT_SUBSCRIPTION_MUTATION,
+    ACTION_BT_SUBSCRIPTION_RUN,
     ACTION_ADD_TO_DOWNLOADER,
     ACTION_CANCEL_PENDING_APPROVAL,
     ACTION_CONFIRM_ADD_TO_DOWNLOADER,
@@ -39,6 +42,12 @@ from app.services.add_to_downloader import (
     AddToDownloaderService,
 )
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
+from app.services.manage_bt_subscription import (
+    BtSubscriptionCommand,
+    BtSubscriptionDispatchContext,
+    ManageBtSubscriptionService,
+    parse_bt_subscription_query,
+)
 from app.services.import_to_library import (
     IMPORT_CANCELLED_TEXT,
     ImportToLibraryService,
@@ -128,6 +137,7 @@ ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
 IMPORT_TO_LIBRARY_SERVICE_KEY = "import_to_library_service"
 MANAGE_WATCHLIST_SERVICE_KEY = "manage_watchlist_service"
+MANAGE_BT_SUBSCRIPTION_SERVICE_KEY = "manage_bt_subscription_service"
 JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
@@ -256,6 +266,7 @@ def build_application(
     get_download_status_service: GetDownloadStatusService,
     import_to_library_service: ImportToLibraryService,
     manage_watchlist_service: ManageWatchlistService,
+    manage_bt_subscription_service: ManageBtSubscriptionService,
     telegram_update_repo: TelegramUpdateRepo | None = None,
     job_repo: JobRepo | None = None,
     execution_gate: ExecutionGate | None = None,
@@ -272,6 +283,7 @@ def build_application(
     application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
     application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
+    application.bot_data[MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] = manage_bt_subscription_service
     application.bot_data[EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
     application.bot_data[DOWNLOADER_INSTANCES_KEY] = downloader_instances
     application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
@@ -322,6 +334,14 @@ def _watchlist_policy_action(action: str) -> str:
     if action == "list":
         return ACTION_WATCHLIST_LIST
     return ACTION_WATCHLIST_MUTATION
+
+
+def _bt_subscription_policy_action(command: BtSubscriptionCommand) -> str:
+    if command.action == "list":
+        return ACTION_BT_SUBSCRIPTION_LIST
+    if command.action == "run":
+        return ACTION_BT_SUBSCRIPTION_RUN
+    return ACTION_BT_SUBSCRIPTION_MUTATION
 
 
 def _resolve_chat_id(
@@ -1166,6 +1186,45 @@ async def _handle_query_text(
             _watchlist_policy_action(watchlist_command.action),
             lambda: watchlist_service.handle(
                 watchlist_command,
+                chat_id=chat_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    bt_subscription_command = parse_bt_subscription_query(query)
+    if bt_subscription_command is not None:
+        bt_subscription_service = context.application.bot_data.get(MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
+        if not isinstance(bt_subscription_service, ManageBtSubscriptionService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        if bt_subscription_command.action == "run":
+            downloader_execution, resolution_error = _resolve_bound_downloader_execution(context=context, role="bt")
+            if resolution_error is not None:
+                await reply_func(resolution_error)
+                return
+            if downloader_execution is None:
+                await reply_func(SERVICE_NOT_READY_TEXT)
+                return
+            reply = await execution_gate.run(
+                _bt_subscription_policy_action(bt_subscription_command),
+                lambda: bt_subscription_service.run_once(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    dispatch_context=BtSubscriptionDispatchContext(
+                        downloader_name=downloader_execution.name,
+                        downloader_type=downloader_execution.downloader_type,
+                        download_dir=downloader_execution.download_dir,
+                    ),
+                ),
+            )
+            await reply_func(reply)
+            return
+        reply = await _run_sync_with_policy(
+            execution_gate,
+            _bt_subscription_policy_action(bt_subscription_command),
+            lambda: bt_subscription_service.handle(
+                bt_subscription_command,
                 chat_id=chat_id,
             ),
         )

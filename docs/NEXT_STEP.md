@@ -1,4 +1,4 @@
-# Next step (v34)
+# Next step (v35)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -153,16 +153,32 @@ Prerequisite completed:
   - qBittorrent-bound `raw_bt` tasks continue using the selected destination directory truth during dispatch
   - BT follow-up text protocol and approval boundary remain unchanged; when the user has not sent a real `magnet:?`, Telegram now deterministically asks for the actual magnet link instead of surfacing internal execution wording
   - focused tests + manual verification passed
+- smallest BT subscription / continuous-download baseline is now landed:
+  - SQLite now persists the smallest BT subscription truth (`bt_subscription_item`) with `title / year / media_kind / last_seen_source / last_seen_title`
+  - Telegram now supports the smallest manual BT subscription command path:
+    - `btsub list`
+    - `btsub add <movie|series|anime> <片名 [年份]>`
+    - `btsub remove <条目ID>`
+    - `btsub clear`
+    - `btsub run`
+  - `btsub run` now deterministically scans the current chat's persisted BT subscriptions via the existing Prowlarr search path and reuses the existing downloader approval-pending path on new hits
+  - seen-source de-dup now survives restart through persisted `last_seen_source` truth
+  - current step stays manual and bounded:
+    - no background scheduler loop
+    - no generic rule engine
+    - no automatic `confirm`
+    - no `raw_bt` subscription
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **BT subscription / continuous-download baseline**.
+Land the smallest **BT subscription scheduler-tick baseline**.
 
 ## Scope
 
 Only do:
 - keep current search order, poster-card reply, and candidate mapping behavior unchanged
-- keep current Telegram command words for `search/select/status/import/confirm/watchlist` unchanged
+- keep current Telegram command words for `search/select/status/import/confirm/watchlist/btsub` unchanged
 - keep the landed downloader/import approval flows, post-download auto import, resource auto-selection rules, filename normalization / rename, metadata scraping (`TMDB + Fanart.tv`), subtitle auto-translation, completion-monitor truth, copy-fallback approval, callback/text routing, `telegram_updates` de-dup, `jobs` ownership, confirm wake rebuild, reset/cancel behavior, and watchlist media-kind behavior unchanged
 - keep the landed clarification-stage frustration/reset behavior unchanged
 - keep the landed physical-failure reactive recovery behavior stable
@@ -175,10 +191,11 @@ Only do:
 - keep the landed downloader-role binding baseline unchanged
 - keep the landed BT dispatch / transfer execution baseline unchanged
 - keep the landed qBittorrent protocol execution and broader multi-instance downloader support baseline unchanged
-- add only the smallest BT subscription / continuous-download truth and execution path on top of the already-landed BT execution chain
-- keep this step tightly bounded to BT continuous-download only; do not broaden into generic scheduler/platformization, rule-engine work, or downloader cleanup
+- keep the landed manual BT subscription (`btsub list/add/remove/clear/run`) baseline unchanged
+- add only the smallest scheduler-tick trigger on top of the already-landed BT subscription truth and execution path
+- keep this step tightly bounded to BT subscription auto-trigger only; do not broaden into generic scheduler/platformization, rule-engine work, or downloader cleanup
 - preserve existing downloader/import approval boundaries, existing media post-processing boundaries, and existing `raw_bt` non-media behavior
-- add focused tests/manual verification for BT subscription / continuous-download baseline and no-regression
+- add focused tests/manual verification for BT subscription scheduler-tick baseline and no-regression
 
 ## Explicit constraints
 
@@ -192,6 +209,9 @@ Only do:
 - do not broaden into generic multi-agent platform work
 - do not introduce qBittorrent request dispatch in this step beyond configuration truth
 - do not introduce a generic tracking platform or user-configurable rule engine in this step
+- do not introduce user-configurable scan intervals in this step
+- do not introduce automatic `confirm` in this step
+- do not introduce `raw_bt` subscription in this step
 - do not bypass the landed parser-level PT / BT split with ad-hoc late-stage branching
 - do not regress the landed BT `movie / series / anime` TMDB association follow-up baseline
 - do not regress the landed `raw_bt` destination-directory follow-up baseline
@@ -201,12 +221,12 @@ Only do:
 
 ## Suggested implementation shape
 
-1. keep the current downloader routing truth shape and current Transmission/qBittorrent execution paths unchanged
-2. add the smallest persisted BT subscription / continuous-download truth needed to survive restart
-3. keep continuous-download execution strictly bounded to the already-landed BT execution chain; do not invent a generic scheduler platform
-4. preserve existing `confirm` boundaries and `raw_bt` non-media branch while wiring the smallest repeated BT dispatch behavior needed in this step
+1. keep the current downloader routing truth shape, current Transmission/qBittorrent execution paths, and current manual `btsub run` behavior unchanged
+2. add the smallest in-process scheduler tick that reuses the landed BT subscription scan logic instead of inventing a second execution path
+3. keep the scheduler tick strictly bounded to the already-landed BT subscription truth and downloader approval-pending chain; do not invent a generic scheduler platform
+4. preserve existing `confirm` boundaries and `raw_bt` non-media branch while wiring the smallest automatic scan trigger needed in this step
 5. keep current manual status/watchlist/import paths fully backward compatible
-6. add focused tests and manual verification steps for BT subscription / continuous-download baseline and no-regression
+6. add focused tests and manual verification steps for BT subscription scheduler-tick baseline and no-regression
 
 ## Done when
 
@@ -224,12 +244,13 @@ Only do:
 - landed downloader-role binding truth remains deterministic and side-effect free in this step
 - landed BT dispatch / transfer execution path remains deterministic and does not bypass the landed safety boundaries
 - landed qBittorrent protocol execution path remains deterministic and does not silently fall back to Transmission
-- the smallest BT subscription / continuous-download behavior is persisted, restart-durable, and does not require widening the repository into a generic scheduler platform
+- landed manual `btsub list/add/remove/clear/run` behavior remains deterministic and persistence-backed
+- the smallest BT subscription scheduler tick reuses the landed `btsub run` logic and does not require widening the repository into a generic scheduler platform
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After BT subscription / continuous-download baseline is stable, advance in this order (still one small goal at a time):
+After BT subscription scheduler-tick baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
    - evaluate the next BT-stage automation gap, still one small goal at a time

@@ -34,6 +34,7 @@ from app.bot.telegram_bot import (
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     JOB_REPO_KEY,
     LLM_PHYSICAL_FAILURE_SAFE_TEXT,
+    MANAGE_BT_SUBSCRIPTION_SERVICE_KEY,
     MANAGE_WATCHLIST_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
@@ -45,6 +46,7 @@ from app.bot.telegram_bot import (
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
+from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -53,6 +55,7 @@ from app.db.watchlist_repo import WatchlistRepo
 from app.services.add_to_downloader import ADD_CANCELLED_TEXT, AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
+from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
 from app.services.search_media import SearchMediaService
 
@@ -1321,6 +1324,36 @@ def test_handle_message_watchlist_replies_service_not_ready() -> None:
     reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
 
 
+def test_handle_message_bt_subscription_routes_to_service(tmp_path: Path) -> None:
+    update, reply_text = _build_update("btsub add anime 葬送的芙莉莲 2023")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    bt_subscription_service = ManageBtSubscriptionService(
+        bt_subscription_repo=BtSubscriptionRepo(_make_database(tmp_path)),
+        search_func=_fake_search,
+        add_to_downloader_service=add_service,
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: bt_subscription_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "已加入 BT 订阅" in sent_text
+    assert "葬送的芙莉莲" in sent_text
+
+
 def test_handle_message_confirm_routes_to_import_service() -> None:
     update, reply_text = _build_update("confirm 87")
     search_service = SearchMediaService(_fake_search)
@@ -1740,6 +1773,13 @@ def test_build_application_registers_services() -> None:
     watchlist_db = SqliteDatabase(":memory:")
     watchlist_db.initialize()
     watchlist_service = ManageWatchlistService(WatchlistRepo(watchlist_db))
+    bt_subscription_db = SqliteDatabase(":memory:")
+    bt_subscription_db.initialize()
+    bt_subscription_service = ManageBtSubscriptionService(
+        BtSubscriptionRepo(bt_subscription_db),
+        _fake_search,
+        add_service,
+    )
     database = SqliteDatabase(":memory:")
     database.initialize()
     job_repo = JobRepo(database)
@@ -1763,6 +1803,7 @@ def test_build_application_registers_services() -> None:
         status_service,
         import_service,
         watchlist_service,
+        bt_subscription_service,
         job_repo=job_repo,
         bt_pending_repo=bt_pending_repo,
         raw_bt_destination_options=(
@@ -1776,6 +1817,7 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] is status_service
     assert application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] is import_service
     assert application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] is watchlist_service
+    assert application.bot_data[MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] is bt_subscription_service
     assert application.bot_data[JOB_REPO_KEY] is job_repo
     assert application.bot_data[BT_PENDING_REPO_KEY] is bt_pending_repo
     assert application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY][0].key == "downloads"

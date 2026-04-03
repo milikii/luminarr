@@ -85,6 +85,21 @@ SCHEMA_STATEMENTS = (
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS bt_subscription_item (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chat_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        year TEXT NOT NULL DEFAULT '',
+        media_kind TEXT NOT NULL DEFAULT 'movie',
+        last_seen_source TEXT NOT NULL DEFAULT '',
+        last_seen_title TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(chat_id, title, year, media_kind)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_bt_subscription_item_chat_id ON bt_subscription_item(chat_id)",
+    """
     CREATE TABLE IF NOT EXISTS jobs (
         job_id TEXT PRIMARY KEY,
         chat_id INTEGER NOT NULL DEFAULT 0,

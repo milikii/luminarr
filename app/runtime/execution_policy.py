@@ -9,6 +9,9 @@ ACTION_SEARCH_MEDIA = "search_media"
 ACTION_GET_DOWNLOAD_STATUS = "get_download_status"
 ACTION_WATCHLIST_LIST = "watchlist_list"
 ACTION_WATCHLIST_MUTATION = "watchlist_mutation"
+ACTION_BT_SUBSCRIPTION_LIST = "bt_subscription_list"
+ACTION_BT_SUBSCRIPTION_MUTATION = "bt_subscription_mutation"
+ACTION_BT_SUBSCRIPTION_RUN = "bt_subscription_run"
 ACTION_ADD_TO_DOWNLOADER = "add_to_downloader"
 ACTION_CONFIRM_ADD_TO_DOWNLOADER = "confirm_add_to_downloader"
 ACTION_IMPORT_TO_LIBRARY = "import_to_library"
@@ -21,6 +24,7 @@ READ_ONLY_ACTIONS = frozenset(
     {
         ACTION_SEARCH_MEDIA,
         ACTION_WATCHLIST_LIST,
+        ACTION_BT_SUBSCRIPTION_LIST,
     }
 )
 

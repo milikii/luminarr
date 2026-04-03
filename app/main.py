@@ -12,6 +12,7 @@ from app.clients.transmission import TransmissionClient, TransmissionImportSourc
 from app.config import DownloaderInstanceConfig, load_settings
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
+from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -24,6 +25,7 @@ from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.manage_watchlist import ManageWatchlistService
+from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.metadata_scraper import MetadataScraperService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService
@@ -110,6 +112,7 @@ def main() -> None:
     job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
     bt_pending_repo = BtPendingRepo(database)
+    bt_subscription_repo = BtSubscriptionRepo(database)
     download_monitor_repo = DownloadMonitorRepo(database)
     telegram_update_repo = TelegramUpdateRepo(database)
     watchlist_repo = WatchlistRepo(database)
@@ -230,6 +233,11 @@ def main() -> None:
         post_download_auto_import_service=post_download_auto_import_service,
     )
     manage_watchlist_service = ManageWatchlistService(watchlist_repo)
+    manage_bt_subscription_service = ManageBtSubscriptionService(
+        bt_subscription_repo=bt_subscription_repo,
+        search_func=prowlarr_client.search,
+        add_to_downloader_service=add_to_downloader_service,
+    )
     application = build_application(
         settings.telegram_bot_token,
         search_service,
@@ -237,6 +245,7 @@ def main() -> None:
         get_download_status_service,
         import_to_library_service,
         manage_watchlist_service,
+        manage_bt_subscription_service,
         telegram_update_repo=telegram_update_repo,
         job_repo=job_repo,
         bt_pending_repo=bt_pending_repo,

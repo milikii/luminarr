@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v32)
+# docs/DECISIONS.md (v33)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -826,6 +826,43 @@
   先把已落地的多实例 + 角色绑定真相真正扩展到 qBittorrent 真协议执行，同时继续保持最小边界，不把这一步顺手扩大成调度平台、规则系统或更大范围的下载器抽象层重构。
 - **验证**：
   已通过 focused pytest（`tests/test_qbittorrent_client.py tests/test_add_to_downloader.py tests/test_get_download_status.py tests/test_config.py`、`tests/test_telegram_bot.py tests/test_import_to_library.py`）与临时 `tmp_tests/verify_qbittorrent_protocol_baseline.py` 手工脚本验收（脚本已按规范清理）。
+
+## D-059 BT subscription / continuous-download 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 当前已补上最小 BT 订阅真相：SQLite 新增 `bt_subscription_item`，至少持久化
+    - `title`
+    - `year`
+    - `media_kind`
+    - `last_seen_source`
+    - `last_seen_title`
+  - Telegram 现在已补上最小手动 BT 订阅命令：
+    - `btsub list`
+    - `btsub add <movie|series|anime> <片名 [年份]>`
+    - `btsub remove <条目ID>`
+    - `btsub clear`
+    - `btsub run`
+  - `btsub run` 当前只做“单次扫描”：
+    - 读取当前 chat 的持久化 BT 订阅条目
+    - 用 `title + optional year` 走现有 Prowlarr 搜索
+    - 取第一个可下载候选
+    - 当资源来源与 `last_seen_source` 不同时，进入现有 downloader approval-pending 路径
+  - 命中新资源后，当前步骤仍然必须复用现有 downloader approval -> `confirm` -> dispatch 边界，不得直接投递下载器
+  - 当前最小去重真相采用 `last_seen_source`：
+    - 同一资源来源不会在后续 `btsub run` 中重复进入待确认
+    - 重启后仍保持成立
+  - 当前这一步严格保持最小边界：
+    - 不引入后台常驻 scheduler
+    - 不引入通用规则引擎
+    - 不引入自动 `confirm`
+    - 不引入 `raw_bt` 订阅
+    - 不改现有 `search/select/status/import/confirm/watchlist` 命令词
+  - 当前 next smallest path 前进到 BT subscription scheduler-tick baseline
+- **原因**：
+  先把“BT 订阅条目”和“发现新资源后仍然走原有下载审批边界”这两个最小真相补齐，再继续补自动触发；避免一上来把仓库扩成通用 scheduler 平台、规则系统或新的旁路执行链。
+- **验证**：
+  已通过 focused pytest（`tests/test_manage_bt_subscription.py`、`tests/test_execution_policy.py`、`tests/test_telegram_bot.py`、`tests/test_add_to_downloader.py`、`tests/test_persistence_sqlite.py`）、全量 pytest（`191 passed`）与临时 `tmp_tests/verify_bt_subscription_baseline.py` 手工脚本验收（脚本已按规范清理）。
 
 ---
 

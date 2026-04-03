@@ -1,0 +1,352 @@
+from __future__ import annotations
+
+import re
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
+
+from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
+from app.services.add_to_downloader import AddToDownloaderService
+from app.services.search_media import parse_movie_query
+
+SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
+
+BT_SUBSCRIPTION_USAGE_TEXT = (
+    "BT 订阅命令格式：\n"
+    "btsub list\n"
+    "btsub add <movie|series|anime> <片名 [年份]>\n"
+    "btsub remove <条目ID>\n"
+    "btsub clear\n"
+    "btsub run"
+)
+BT_SUBSCRIPTION_EMPTY_TEXT = "BT 订阅清单为空。"
+BT_SUBSCRIPTION_ADD_USAGE_TEXT = "添加格式：btsub add <movie|series|anime> <片名 [年份]>"
+BT_SUBSCRIPTION_REMOVE_USAGE_TEXT = "删除格式：btsub remove <条目ID>"
+BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
+BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
+BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
+BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。"
+MEDIA_KIND_ALIASES = {
+    "movie": "movie",
+    "film": "movie",
+    "电影": "movie",
+    "series": "series",
+    "tv": "series",
+    "show": "series",
+    "电视剧": "series",
+    "剧集": "series",
+    "anime": "anime",
+    "动漫": "anime",
+    "动画": "anime",
+}
+MEDIA_KIND_LABELS = {
+    "movie": "电影",
+    "series": "剧集",
+    "anime": "动漫",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class BtSubscriptionCommand:
+    action: str
+    arg: str
+
+
+@dataclass(frozen=True, slots=True)
+class BtSubscriptionRunResult:
+    scanned: int
+    matched: int
+    replies: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BtSubscriptionDispatchContext:
+    downloader_name: str
+    downloader_type: str
+    download_dir: str
+
+
+class ManageBtSubscriptionService:
+    def __init__(
+        self,
+        bt_subscription_repo: BtSubscriptionRepo,
+        search_func: SearchFunc,
+        add_to_downloader_service: AddToDownloaderService,
+    ) -> None:
+        self._bt_subscription_repo = bt_subscription_repo
+        self._search_func = search_func
+        self._add_to_downloader_service = add_to_downloader_service
+
+    def handle(self, command: BtSubscriptionCommand, *, chat_id: int | None) -> str:
+        if chat_id is None or chat_id <= 0:
+            return BT_SUBSCRIPTION_USAGE_TEXT
+
+        if command.action == "list":
+            return self._list_text(chat_id=chat_id)
+        if command.action == "add":
+            return self._add_text(chat_id=chat_id, raw_title=command.arg)
+        if command.action == "remove":
+            return self._remove_text(chat_id=chat_id, item_ref=command.arg)
+        if command.action == "clear":
+            return self._clear_text(chat_id=chat_id)
+        return BT_SUBSCRIPTION_USAGE_TEXT
+
+    async def run_once(
+        self,
+        *,
+        chat_id: int | None,
+        user_id: int | None,
+        dispatch_context: BtSubscriptionDispatchContext,
+    ) -> str:
+        if chat_id is None or chat_id <= 0:
+            return BT_SUBSCRIPTION_USAGE_TEXT
+
+        items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+        if not items:
+            return BT_SUBSCRIPTION_RUN_EMPTY_TEXT
+
+        replies: list[str] = []
+        matched = 0
+        for item in items:
+            reply = await self._run_for_item(
+                item=item,
+                chat_id=chat_id,
+                user_id=user_id,
+                dispatch_context=dispatch_context,
+            )
+            if reply is None:
+                continue
+            matched += 1
+            replies.append(reply)
+
+        header = (
+            BT_SUBSCRIPTION_RUN_DONE_TEMPLATE.format(scanned=len(items), matched=matched)
+            if matched > 0
+            else BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE.format(scanned=len(items))
+        )
+        if not replies:
+            return header
+        return f"{header}\n\n" + "\n\n".join(replies)
+
+    def _list_text(self, *, chat_id: int) -> str:
+        items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+        if not items:
+            return BT_SUBSCRIPTION_EMPTY_TEXT
+
+        lines = ["BT 订阅清单："]
+        for index, item in enumerate(items, start=1):
+            year_text = item.year if item.year else "-"
+            last_seen = item.last_seen_title.strip() or "-"
+            lines.append(
+                f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {_media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
+            )
+        return "\n".join(lines)
+
+    def _add_text(self, *, chat_id: int, raw_title: str) -> str:
+        cleaned_title = raw_title.strip()
+        if not cleaned_title:
+            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
+
+        media_kind, parsed_title = _parse_media_kind_prefix(cleaned_title)
+        if media_kind not in {"movie", "series", "anime"}:
+            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
+        parsed = parse_movie_query(parsed_title)
+        title = parsed.title.strip()
+        year = parsed.year.strip()
+        if not title:
+            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
+
+        created = self._bt_subscription_repo.add_item(
+            chat_id=chat_id,
+            title=title,
+            year=year,
+            media_kind=media_kind,
+        )
+        if created is None:
+            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
+        item, is_created = created
+        year_text = item.year if item.year else "-"
+        if is_created:
+            return (
+                f"已加入 BT 订阅：{item.title} ({year_text})\n"
+                f"类型: {_media_kind_label(item.media_kind)}\n"
+                f"条目ID: {item.item_id}"
+            )
+        return (
+            f"BT 订阅已存在：{item.title} ({year_text})\n"
+            f"类型: {_media_kind_label(item.media_kind)}\n"
+            f"条目ID: {item.item_id}"
+        )
+
+    def _remove_text(self, *, chat_id: int, item_ref: str) -> str:
+        cleaned_ref = item_ref.strip()
+        if not cleaned_ref.isdigit():
+            return BT_SUBSCRIPTION_REMOVE_USAGE_TEXT
+        item_id = int(cleaned_ref)
+        if item_id <= 0:
+            return BT_SUBSCRIPTION_REMOVE_USAGE_TEXT
+        removed = self._bt_subscription_repo.remove_item(chat_id=chat_id, item_id=item_id)
+        if not removed:
+            return "未找到对应 BT 订阅条目。"
+        return f"已删除 BT 订阅条目：{item_id}"
+
+    def _clear_text(self, *, chat_id: int) -> str:
+        deleted = self._bt_subscription_repo.clear_items(chat_id=chat_id)
+        if deleted <= 0:
+            return BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT
+        return f"已清空 BT 订阅清单，共删除 {deleted} 条。"
+
+    async def _run_for_item(
+        self,
+        *,
+        item: BtSubscriptionItem,
+        chat_id: int,
+        user_id: int | None,
+        dispatch_context: BtSubscriptionDispatchContext,
+    ) -> str | None:
+        query = _build_subscription_query(item)
+        try:
+            results = await self._search_func(query)
+        except Exception as error:
+            _log_bt_subscription_scan_error(item=item, query=query, error=error)
+            return None
+
+        selected_result = _pick_subscription_candidate(results)
+        if selected_result is None:
+            return None
+
+        selected_source = _resolve_candidate_source(selected_result)
+        if not selected_source or selected_source == item.last_seen_source:
+            return None
+
+        candidate_title = _resolve_candidate_title(selected_result, item=item)
+        pending_text = await self._add_to_downloader_service.add_candidate_source(
+            chat_id=chat_id,
+            user_id=user_id,
+            source=selected_source,
+            title=candidate_title,
+            downloader_name=dispatch_context.downloader_name,
+            downloader_type=dispatch_context.downloader_type,
+            download_dir=dispatch_context.download_dir,
+            auto_import_enabled=True,
+        )
+        if "下载待确认：" not in pending_text:
+            return None
+
+        self._bt_subscription_repo.update_last_seen(
+            chat_id=chat_id,
+            item_id=item.item_id,
+            source=selected_source,
+            title=candidate_title,
+        )
+        year_text = item.year if item.year else "-"
+        return (
+            f"BT 订阅命中新资源：{item.title} ({year_text})\n"
+            f"类型: {_media_kind_label(item.media_kind)}\n"
+            f"命中资源: {candidate_title}\n\n"
+            f"{pending_text}"
+        )
+
+
+def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
+    cleaned_text = text.strip()
+    if not cleaned_text:
+        return None
+
+    matched = re.match(r"^(?i:btsub)(?:\s+(.*))?$", cleaned_text)
+    if not matched:
+        return None
+    tail = (matched.group(1) or "").strip()
+    if not tail:
+        return BtSubscriptionCommand(action="list", arg="")
+
+    lowered_tail = tail.lower()
+    if lowered_tail == "list":
+        return BtSubscriptionCommand(action="list", arg="")
+    if lowered_tail == "clear":
+        return BtSubscriptionCommand(action="clear", arg="")
+    if lowered_tail == "run":
+        return BtSubscriptionCommand(action="run", arg="")
+    if lowered_tail == "add":
+        return BtSubscriptionCommand(action="add", arg="")
+    if lowered_tail in {"remove", "rm"}:
+        return BtSubscriptionCommand(action="remove", arg="")
+
+    matched_add = re.match(r"^(?i:add)\s+(.*)$", tail)
+    if matched_add:
+        return BtSubscriptionCommand(action="add", arg=(matched_add.group(1) or "").strip())
+
+    matched_remove = re.match(r"^(?:(?i:remove)|(?i:rm))\s+(.*)$", tail)
+    if matched_remove:
+        return BtSubscriptionCommand(action="remove", arg=(matched_remove.group(1) or "").strip())
+
+    return BtSubscriptionCommand(action="add", arg=tail)
+
+
+def _parse_media_kind_prefix(raw_title: str) -> tuple[str, str]:
+    cleaned_title = raw_title.strip()
+    if not cleaned_title:
+        return "movie", ""
+
+    head, separator, tail = cleaned_title.partition(" ")
+    direct_media_kind = MEDIA_KIND_ALIASES.get(head.strip().lower())
+    if not separator:
+        if direct_media_kind is not None:
+            return direct_media_kind, ""
+        return "", cleaned_title
+    if direct_media_kind is None:
+        return "", cleaned_title
+    return direct_media_kind, tail.strip()
+
+
+def _media_kind_label(media_kind: str) -> str:
+    return MEDIA_KIND_LABELS.get(media_kind.strip().lower(), MEDIA_KIND_LABELS["movie"])
+
+
+def _build_subscription_query(item: BtSubscriptionItem) -> str:
+    title = item.title.strip()
+    year = item.year.strip()
+    if title and year:
+        return f"{title} {year}"
+    return title
+
+
+def _pick_subscription_candidate(
+    results: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    for result in results:
+        source = _resolve_candidate_source(result)
+        if source:
+            return result
+    return None
+
+
+def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
+    for key in ("downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid"):
+        value = candidate.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _resolve_candidate_title(candidate: Mapping[str, Any], *, item: BtSubscriptionItem) -> str:
+    title = str(candidate.get("title", "")).strip()
+    if title:
+        return title
+    year_text = item.year if item.year else "-"
+    return f"{item.title} ({year_text})"
+
+
+def _log_bt_subscription_scan_error(
+    *,
+    item: BtSubscriptionItem,
+    query: str,
+    error: Exception,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+    )
