@@ -101,32 +101,31 @@ class ManageBtSubscriptionService:
         if chat_id is None or chat_id <= 0:
             return BT_SUBSCRIPTION_USAGE_TEXT
 
-        items = self._bt_subscription_repo.list_items(chat_id=chat_id)
-        if not items:
+        result = await self._scan_chat_once(
+            chat_id=chat_id,
+            user_id=user_id,
+            dispatch_context=dispatch_context,
+        )
+        if result.scanned <= 0:
             return BT_SUBSCRIPTION_RUN_EMPTY_TEXT
+        return _format_bt_subscription_run_result(result)
 
-        replies: list[str] = []
-        matched = 0
-        for item in items:
-            reply = await self._run_for_item(
-                item=item,
+    async def run_scheduler_tick(
+        self,
+        *,
+        dispatch_context: BtSubscriptionDispatchContext,
+    ) -> tuple[tuple[int, str], ...]:
+        notifications: list[tuple[int, str]] = []
+        for chat_id in self._bt_subscription_repo.list_chat_ids():
+            result = await self._scan_chat_once(
                 chat_id=chat_id,
-                user_id=user_id,
+                user_id=None,
                 dispatch_context=dispatch_context,
             )
-            if reply is None:
+            if result.matched <= 0:
                 continue
-            matched += 1
-            replies.append(reply)
-
-        header = (
-            BT_SUBSCRIPTION_RUN_DONE_TEMPLATE.format(scanned=len(items), matched=matched)
-            if matched > 0
-            else BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE.format(scanned=len(items))
-        )
-        if not replies:
-            return header
-        return f"{header}\n\n" + "\n\n".join(replies)
+            notifications.append((chat_id, _format_bt_subscription_run_result(result)))
+        return tuple(notifications)
 
     def _list_text(self, *, chat_id: int) -> str:
         items = self._bt_subscription_repo.list_items(chat_id=chat_id)
@@ -247,6 +246,32 @@ class ManageBtSubscriptionService:
             f"{pending_text}"
         )
 
+    async def _scan_chat_once(
+        self,
+        *,
+        chat_id: int,
+        user_id: int | None,
+        dispatch_context: BtSubscriptionDispatchContext,
+    ) -> BtSubscriptionRunResult:
+        items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+        if not items:
+            return BtSubscriptionRunResult(scanned=0, matched=0, replies=())
+
+        replies: list[str] = []
+        matched = 0
+        for item in items:
+            reply = await self._run_for_item(
+                item=item,
+                chat_id=chat_id,
+                user_id=user_id,
+                dispatch_context=dispatch_context,
+            )
+            if reply is None:
+                continue
+            matched += 1
+            replies.append(reply)
+        return BtSubscriptionRunResult(scanned=len(items), matched=matched, replies=tuple(replies))
+
 
 def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
     cleaned_text = text.strip()
@@ -350,3 +375,14 @@ def _log_bt_subscription_scan_error(
         f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
     )
+
+
+def _format_bt_subscription_run_result(result: BtSubscriptionRunResult) -> str:
+    header = (
+        BT_SUBSCRIPTION_RUN_DONE_TEMPLATE.format(scanned=result.scanned, matched=result.matched)
+        if result.matched > 0
+        else BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE.format(scanned=result.scanned)
+    )
+    if not result.replies:
+        return header
+    return f"{header}\n\n" + "\n\n".join(result.replies)

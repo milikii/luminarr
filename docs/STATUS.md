@@ -1,4 +1,4 @@
-# Current status (v35)
+# Current status (v36)
 
 ## Project position
 
@@ -213,6 +213,17 @@ Luminarr is in early implementation under the fixed v15 runtime profile:
     - no generic rule engine
     - no automatic `confirm`
     - no `raw_bt` subscription
+- smallest BT subscription scheduler-tick baseline is now landed:
+  - Telegram runtime now starts the smallest in-process BT subscription scheduler tick on application startup and stops it during application shutdown
+  - the scheduler tick now reuses the landed `btsub run` scan logic instead of introducing a second BT scan / dispatch path
+  - each tick now scans all chats that have persisted BT subscriptions and only sends Telegram notification text to chats with newly observed hits
+  - newly observed hits still reuse the existing downloader approval-pending path and do not bypass `confirm`
+  - current scheduler-tick baseline stays minimal:
+    - fixed in-process interval
+    - no generic scheduler platform
+    - no configurable scan interval
+    - no automatic `confirm`
+    - no `raw_bt` subscription
 - tests cover config, routing, search/downloader/import/refresh, approval flow, and SQLite persistence baseline
 
 ## Local integration test stack (WSL Docker)
@@ -240,7 +251,7 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - none
 
 **Stage C expansion (documented roadmap, not current step):**
-- BT subscription scheduler-tick baseline on top of the landed manual `btsub run` subscription truth
+- BT subscription deterministic candidate-selection baseline on top of the landed manual/scheduler BT subscription scan truth
 
 **Stage D channel expansion (documented roadmap, not current step):**
 - Feishu adapter
@@ -287,6 +298,8 @@ Use this stack for real downloader/import/refresh verification. The detailed pat
 - focused tests: `2 passed` (`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py::test_downloader_pending_approval_persists_for_restart tests/test_persistence_sqlite.py::test_confirm_rebuilds_context_from_persisted_job_after_restart`)
 - manual verification: qBittorrent protocol execution and broader multi-instance downloader support baseline passed (temporary `tmp_tests/verify_qbittorrent_protocol_baseline.py`, script cleaned after run)
 - manual verification: BT subscription / continuous-download baseline passed (temporary `tmp_tests/verify_bt_subscription_baseline.py`, script cleaned after run)
+- focused tests: `5 passed` (`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py tests/test_telegram_bot.py::test_handle_message_bt_subscription_routes_to_service tests/test_telegram_bot.py::test_build_application_registers_services`)
+- manual verification: BT subscription scheduler-tick baseline passed (temporary `tmp_tests/verify_bt_subscription_scheduler_tick.py`, script cleaned after run)
 - manual end-to-end verification for the watchlist baseline was **not** re-run in this iteration
 
 ## Current priority
@@ -301,7 +314,7 @@ Build the next smallest path:
 7. keep landed downloader-role binding baseline stable
 8. keep landed BT dispatch / transfer execution baseline stable
 9. keep landed qBittorrent protocol execution and broader multi-instance downloader support baseline stable
-10. land the smallest BT subscription scheduler-tick baseline without broadening into generic scheduler/platformization
+10. land the smallest BT subscription deterministic candidate-selection baseline without broadening into generic quality-ranking/rule-engine work
 
 ## Current risks
 
@@ -332,13 +345,14 @@ Build the next smallest path:
 - qBittorrent protocol baseline currently covers add/status/import-source only; categories/tags/rule engine and more advanced qB features are not landed in this step
 - qBittorrent add currently resolves task identity by parsed magnet hash or list-diff fallback after add; unusual duplicate URL-torrent scenarios may still be less deterministic than magnet adds
 - when the user only sends “下载这个 BT” without an actual `magnet:?`, BT follow-up now returns explicit “请补实际磁力” text; this is intentional smallest-boundary behavior, not a generic BT parsing engine
-- BT subscription baseline currently requires manual `btsub run`; background periodic tick is not landed in this step
+- BT subscription scheduler tick currently runs only in-process on the live Telegram runtime; it is not a multi-process/global scheduler
+- BT subscription scheduler tick currently uses a fixed interval and immediate startup scan; user-configurable scan policy is not introduced in this step
 - BT subscription de-dup currently keys on exact `last_seen_source`; if indexer source URL shape changes for the same release, it may still be treated as a new hit
 - BT subscription scan currently picks the first downloadable Prowlarr result and does not introduce a richer quality-ranking rule set in this step
 
 ## Acceptance focus for the next step
 
-- land the smallest BT subscription scheduler-tick baseline without changing existing text-command behavior
+- land the smallest BT subscription deterministic candidate-selection baseline without changing existing text-command behavior
 - keep the landed watchlist media-kind baseline stable
 - keep the landed completion-monitor truth, post-download auto import baseline, and resource auto-selection rules baseline stable
 - keep the landed filename normalization / rename baseline stable
@@ -367,3 +381,4 @@ Build the next smallest path:
 - landed BT dispatch / transfer execution path remains deterministic and does not bypass existing side-effect boundaries
 - landed qBittorrent-bound PT / BT execution path remains deterministic and does not silently fall back to Transmission
 - landed manual `btsub list/add/remove/clear/run` behavior remains deterministic and persistence-backed
+- landed BT subscription scheduler tick remains deterministic and does not widen into a generic scheduler platform

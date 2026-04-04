@@ -1,4 +1,4 @@
-# Next step (v35)
+# Next step (v36)
 
 Prerequisite completed:
 - `search_media` + index-based select works
@@ -169,10 +169,20 @@ Prerequisite completed:
     - no automatic `confirm`
     - no `raw_bt` subscription
   - focused tests + manual verification passed
+- smallest BT subscription scheduler-tick baseline is now landed:
+  - Telegram 应用启动后现在会挂上最小 in-process 后台 tick，并复用已落地的 `btsub run` 扫描逻辑
+  - 后台 tick 现在会按固定节奏扫描所有存在 BT 订阅条目的 chat，只向命中新资源的 chat 发送通知
+  - 命中新资源后仍然只会进入现有 downloader approval-pending 路径；不会自动 `confirm`
+  - 当前 step 继续保持最小边界：
+    - no generic scheduler platform
+    - no configurable scan interval
+    - no automatic `confirm`
+    - no `raw_bt` subscription
+  - focused tests + manual verification passed
 
 ## Goal
 
-Land the smallest **BT subscription scheduler-tick baseline**.
+Land the smallest **BT subscription deterministic candidate-selection baseline**.
 
 ## Scope
 
@@ -192,10 +202,12 @@ Only do:
 - keep the landed BT dispatch / transfer execution baseline unchanged
 - keep the landed qBittorrent protocol execution and broader multi-instance downloader support baseline unchanged
 - keep the landed manual BT subscription (`btsub list/add/remove/clear/run`) baseline unchanged
-- add only the smallest scheduler-tick trigger on top of the already-landed BT subscription truth and execution path
-- keep this step tightly bounded to BT subscription auto-trigger only; do not broaden into generic scheduler/platformization, rule-engine work, or downloader cleanup
+- keep the landed BT subscription scheduler tick baseline unchanged
+- add only the smallest deterministic candidate-selection rule on top of the already-landed manual/scheduler BT subscription scan path
+- make manual `btsub run` and background scheduler tick share the same candidate-selection rule instead of diverging
+- keep this step tightly bounded to BT subscription candidate selection; do not broaden into generic quality engines, rule-engine work, or downloader cleanup
 - preserve existing downloader/import approval boundaries, existing media post-processing boundaries, and existing `raw_bt` non-media behavior
-- add focused tests/manual verification for BT subscription scheduler-tick baseline and no-regression
+- add focused tests/manual verification for BT subscription deterministic candidate-selection baseline and no-regression
 
 ## Explicit constraints
 
@@ -218,15 +230,16 @@ Only do:
 - do not regress the landed downloader-role binding baseline
 - do not regress the landed BT dispatch / transfer execution baseline
 - do not regress the landed qBittorrent protocol execution and broader multi-instance downloader support baseline
+- do not widen BT subscription selection into a full quality-ranking system in this step
 
 ## Suggested implementation shape
 
-1. keep the current downloader routing truth shape, current Transmission/qBittorrent execution paths, and current manual `btsub run` behavior unchanged
-2. add the smallest in-process scheduler tick that reuses the landed BT subscription scan logic instead of inventing a second execution path
-3. keep the scheduler tick strictly bounded to the already-landed BT subscription truth and downloader approval-pending chain; do not invent a generic scheduler platform
-4. preserve existing `confirm` boundaries and `raw_bt` non-media branch while wiring the smallest automatic scan trigger needed in this step
+1. keep the current downloader routing truth shape, current Transmission/qBittorrent execution paths, and current manual `btsub run` plus scheduler-tick behavior unchanged
+2. replace the current “pick first downloadable candidate” behavior with the smallest deterministic candidate-selection rule that is still easy to explain and verify
+3. make manual `btsub run` and scheduler tick both consume that same shared candidate-selection helper
+4. keep the selected hit on the existing downloader approval-pending chain; do not invent a second BT dispatch path
 5. keep current manual status/watchlist/import paths fully backward compatible
-6. add focused tests and manual verification steps for BT subscription scheduler-tick baseline and no-regression
+6. add focused tests and manual verification steps for BT subscription deterministic candidate-selection baseline and no-regression
 
 ## Done when
 
@@ -245,12 +258,13 @@ Only do:
 - landed BT dispatch / transfer execution path remains deterministic and does not bypass the landed safety boundaries
 - landed qBittorrent protocol execution path remains deterministic and does not silently fall back to Transmission
 - landed manual `btsub list/add/remove/clear/run` behavior remains deterministic and persistence-backed
-- the smallest BT subscription scheduler tick reuses the landed `btsub run` logic and does not require widening the repository into a generic scheduler platform
+- landed BT subscription scheduler tick remains deterministic and does not widen into a generic scheduler platform
+- BT subscription scan no longer blindly picks the first downloadable result when a more deterministic shared rule is available
 - ambiguous-query exploration path remains read-only isolated and cannot trigger side effects
 
 ## After this step
 
-After BT subscription scheduler-tick baseline is stable, advance in this order (still one small goal at a time):
+After BT subscription deterministic candidate-selection baseline is stable, advance in this order (still one small goal at a time):
 
 1. keep stage C order:
    - evaluate the next BT-stage automation gap, still one small goal at a time

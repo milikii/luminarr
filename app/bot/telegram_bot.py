@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable
@@ -150,6 +151,9 @@ RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY = "raw_bt_destination_pending_by_chat"
 RAW_BT_DESTINATION_OPTIONS_KEY = "raw_bt_destination_options"
 DOWNLOADER_INSTANCES_KEY = "downloader_instances"
 DOWNLOADER_ROLE_BINDING_KEY = "downloader_role_binding"
+BT_SUBSCRIPTION_SCHEDULER_TASK_KEY = "bt_subscription_scheduler_task"
+BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY = "bt_subscription_scheduler_stop_event"
+BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 
@@ -277,7 +281,13 @@ def build_application(
     downloader_instances: tuple[DownloaderInstanceConfig, ...] = (),
     downloader_role_binding: DownloaderRoleBinding | None = None,
 ) -> Application:
-    application = Application.builder().token(token).build()
+    application = (
+        Application.builder()
+        .token(token)
+        .post_init(_start_bt_subscription_scheduler)
+        .post_shutdown(_stop_bt_subscription_scheduler)
+        .build()
+    )
     application.bot_data[SEARCH_SERVICE_KEY] = search_service
     application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
     application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
@@ -310,6 +320,123 @@ def _resolve_execution_gate(context: ContextTypes.DEFAULT_TYPE) -> ExecutionGate
     resolved_gate = ExecutionGate()
     context.application.bot_data[EXECUTION_GATE_KEY] = resolved_gate
     return resolved_gate
+
+
+def _resolve_execution_gate_for_application(application: Application) -> ExecutionGate:
+    gate = application.bot_data.get(EXECUTION_GATE_KEY)
+    if isinstance(gate, ExecutionGate):
+        return gate
+    resolved_gate = ExecutionGate()
+    application.bot_data[EXECUTION_GATE_KEY] = resolved_gate
+    return resolved_gate
+
+
+async def _start_bt_subscription_scheduler(application: Application) -> None:
+    existing_task = application.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
+    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
+        return
+
+    bt_subscription_service = application.bot_data.get(MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
+    if not isinstance(bt_subscription_service, ManageBtSubscriptionService):
+        return
+
+    downloader_execution, resolution_error = _resolve_bound_downloader_execution_for_application(
+        application=application,
+        role="bt",
+    )
+    if resolution_error is not None:
+        _log_bt_subscription_scheduler_config_error(reason=resolution_error)
+        return
+    if downloader_execution is None:
+        _log_bt_subscription_scheduler_config_error(reason="未配置 BT 下载器角色绑定，后台自动扫描不会启动。")
+        return
+
+    stop_event = asyncio.Event()
+    application.bot_data[BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY] = stop_event
+    application.bot_data[BT_SUBSCRIPTION_SCHEDULER_TASK_KEY] = application.create_task(
+        _bt_subscription_scheduler_loop(
+            application=application,
+            bt_subscription_service=bt_subscription_service,
+            execution_gate=_resolve_execution_gate_for_application(application),
+            stop_event=stop_event,
+            dispatch_context=BtSubscriptionDispatchContext(
+                downloader_name=downloader_execution.name,
+                downloader_type=downloader_execution.downloader_type,
+                download_dir=downloader_execution.download_dir,
+            ),
+        ),
+        name="bt_subscription_scheduler",
+    )
+
+
+async def _stop_bt_subscription_scheduler(application: Application) -> None:
+    stop_event = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
+    task = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
+    if isinstance(stop_event, asyncio.Event):
+        stop_event.set()
+    if not isinstance(task, asyncio.Task):
+        return
+    try:
+        await task
+    except Exception as error:
+        _log_bt_subscription_scheduler_loop_error(error=error)
+
+
+async def _bt_subscription_scheduler_loop(
+    *,
+    application: Application,
+    bt_subscription_service: ManageBtSubscriptionService,
+    execution_gate: ExecutionGate,
+    stop_event: asyncio.Event,
+    dispatch_context: BtSubscriptionDispatchContext,
+) -> None:
+    while not stop_event.is_set():
+        try:
+            await _run_bt_subscription_scheduler_tick_once(
+                application=application,
+                bt_subscription_service=bt_subscription_service,
+                execution_gate=execution_gate,
+                dispatch_context=dispatch_context,
+            )
+        except Exception as error:
+            _log_bt_subscription_scheduler_loop_error(error=error)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS)
+        except asyncio.TimeoutError:
+            continue
+
+
+async def _run_bt_subscription_scheduler_tick_once(
+    *,
+    application: Application,
+    bt_subscription_service: ManageBtSubscriptionService,
+    execution_gate: ExecutionGate,
+    dispatch_context: BtSubscriptionDispatchContext,
+) -> None:
+    notifications = await execution_gate.run(
+        ACTION_BT_SUBSCRIPTION_RUN,
+        lambda: bt_subscription_service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        ),
+    )
+    for chat_id, reply_text in notifications:
+        await _send_bt_subscription_scheduler_message(
+            application=application,
+            chat_id=chat_id,
+            text=reply_text,
+        )
+
+
+async def _send_bt_subscription_scheduler_message(
+    *,
+    application: Application,
+    chat_id: int,
+    text: str,
+) -> None:
+    try:
+        await application.bot.send_message(chat_id=chat_id, text=text)
+    except Exception as error:
+        _log_bt_subscription_scheduler_send_error(chat_id=chat_id, error=error)
 
 
 def _resolve_bt_pending_repo(context: ContextTypes.DEFAULT_TYPE) -> BtPendingRepo | None:
@@ -833,14 +960,7 @@ def _resolve_raw_bt_destination_options(
 def _resolve_downloader_instances(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> dict[str, DownloaderInstanceConfig]:
-    raw_instances = context.application.bot_data.get(DOWNLOADER_INSTANCES_KEY)
-    if not isinstance(raw_instances, tuple):
-        return {}
-    resolved_instances: dict[str, DownloaderInstanceConfig] = {}
-    for instance in raw_instances:
-        if isinstance(instance, DownloaderInstanceConfig):
-            resolved_instances[instance.name] = instance
-    return resolved_instances
+    return _resolve_downloader_instances_for_application(context.application)
 
 
 def _resolve_bound_downloader_execution(
@@ -848,7 +968,18 @@ def _resolve_bound_downloader_execution(
     context: ContextTypes.DEFAULT_TYPE,
     role: str,
 ) -> tuple[ResolvedDownloaderExecution | None, str | None]:
-    role_binding = context.application.bot_data.get(DOWNLOADER_ROLE_BINDING_KEY)
+    return _resolve_bound_downloader_execution_for_application(
+        application=context.application,
+        role=role,
+    )
+
+
+def _resolve_bound_downloader_execution_for_application(
+    *,
+    application: Application,
+    role: str,
+) -> tuple[ResolvedDownloaderExecution | None, str | None]:
+    role_binding = application.bot_data.get(DOWNLOADER_ROLE_BINDING_KEY)
     if not isinstance(role_binding, DownloaderRoleBinding):
         return None, None
 
@@ -858,7 +989,7 @@ def _resolve_bound_downloader_execution(
     if not cleaned_name:
         return None, None
 
-    instances_by_name = _resolve_downloader_instances(context)
+    instances_by_name = _resolve_downloader_instances_for_application(application)
     instance = instances_by_name.get(cleaned_name)
     if instance is None:
         return None, DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE.format(role=role_name, name=cleaned_name)
@@ -871,6 +1002,19 @@ def _resolve_bound_downloader_execution(
         ),
         None,
     )
+
+
+def _resolve_downloader_instances_for_application(
+    application: Application,
+) -> dict[str, DownloaderInstanceConfig]:
+    raw_instances = application.bot_data.get(DOWNLOADER_INSTANCES_KEY)
+    resolved_instances: dict[str, DownloaderInstanceConfig] = {}
+    if not isinstance(raw_instances, tuple):
+        return resolved_instances
+    for instance in raw_instances:
+        if isinstance(instance, DownloaderInstanceConfig):
+            resolved_instances[instance.name] = instance
+    return resolved_instances
 
 
 def _format_raw_bt_destination_options(options: tuple[RawBtDestinationOption, ...]) -> str:
@@ -972,6 +1116,27 @@ def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Except
     print(
         f"\033[31m[BT TMDB 关联失败]\033[0m 类型={media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。"
+    )
+
+
+def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅后台扫描未启动]\033[0m 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 BT 下载器角色绑定和下载器实例配置后重启应用。"
+    )
+
+
+def _log_bt_subscription_scheduler_loop_error(*, error: Exception) -> None:
+    print(
+        f"\033[31m[BT 订阅后台扫描失败]\033[0m 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite 和 Telegram 发送链路后等待下一轮自动扫描。"
+    )
+
+
+def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception) -> None:
+    print(
+        f"\033[31m[BT 订阅后台通知失败]\033[0m chat_id={chat_id} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 Telegram Bot Token、聊天可达性和网络连通性后等待下一轮自动扫描。"
     )
 
 

@@ -102,6 +102,18 @@ class BtSubscriptionRepo:
             ).fetchall()
         return [_to_bt_subscription_item(row) for row in rows]
 
+    def list_chat_ids(self) -> list[int]:
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT chat_id
+                FROM bt_subscription_item
+                WHERE chat_id > 0
+                ORDER BY chat_id ASC
+                """
+            ).fetchall()
+        return [int(row["chat_id"]) for row in rows]
+
     def remove_item(self, *, chat_id: int, item_id: int) -> bool:
         if chat_id <= 0 or item_id <= 0:
             return False

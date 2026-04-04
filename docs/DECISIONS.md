@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v33)
+# docs/DECISIONS.md (v34)
 
 > 目的：记录本项目已经拍板的关键决策，防止后续开发中反复摇摆。
 > 原则：只记录“已决定”的内容，不记录讨论中的想法。
@@ -863,6 +863,26 @@
   先把“BT 订阅条目”和“发现新资源后仍然走原有下载审批边界”这两个最小真相补齐，再继续补自动触发；避免一上来把仓库扩成通用 scheduler 平台、规则系统或新的旁路执行链。
 - **验证**：
   已通过 focused pytest（`tests/test_manage_bt_subscription.py`、`tests/test_execution_policy.py`、`tests/test_telegram_bot.py`、`tests/test_add_to_downloader.py`、`tests/test_persistence_sqlite.py`）、全量 pytest（`191 passed`）与临时 `tmp_tests/verify_bt_subscription_baseline.py` 手工脚本验收（脚本已按规范清理）。
+
+## D-060 BT subscription scheduler-tick 最小基线已并入主线
+- **状态**：已决定
+- **日期**：2026-04-04
+- **结论**：
+  - 当前已在 Telegram 应用生命周期内补上最小 in-process BT subscription scheduler tick
+  - 启动后后台 tick 现在会复用已落地的 `btsub run` 扫描逻辑；不会发明第二套 BT 扫描 / 投递路径
+  - 后台 tick 现在按固定节奏自动扫描所有存在 BT 订阅条目的 chat，并仅对命中新资源的 chat 发送通知
+  - 命中新资源后，当前步骤仍然必须复用现有 downloader approval -> `confirm` -> dispatch 边界，不得自动 `confirm`，不得直接投递下载器
+  - 当前最小边界继续保持：
+    - 不引入通用 scheduler 平台
+    - 不引入用户可配置扫描间隔
+    - 不引入自动 `confirm`
+    - 不引入 `raw_bt` 订阅
+    - 不改现有 `search/select/status/import/confirm/watchlist/btsub` 命令词
+  - 当前 next smallest path 前进到 BT subscription deterministic candidate-selection baseline
+- **原因**：
+  先把“手动单次扫描”补成“最小自动触发”且继续复用原有审批边界，避免顺手把仓库扩成通用调度平台；自动触发稳定后，再单独收紧 BT 订阅选源质量。
+- **验证**：
+  已通过 focused pytest（`tests/test_manage_bt_subscription.py`、`tests/test_telegram_bot.py::test_handle_message_bt_subscription_routes_to_service`、`tests/test_telegram_bot.py::test_build_application_registers_services`）与临时 `tmp_tests/verify_bt_subscription_scheduler_tick.py` 手工脚本验收（脚本已按规范清理）。
 
 ---
 
