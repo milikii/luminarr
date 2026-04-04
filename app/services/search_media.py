@@ -65,6 +65,12 @@ class SearchMediaService:
         self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
         self._clarification_pending_by_chat: dict[int, str] = {}
 
+    async def search_raw_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
+        cleaned_query = query.strip()
+        if not cleaned_query:
+            return ()
+        return await self._search_func(cleaned_query)
+
     async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
         cleaned_query = query.strip()
         if not cleaned_query:

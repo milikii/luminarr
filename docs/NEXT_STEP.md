@@ -1,4 +1,4 @@
-# Next step (v41)
+# Next step (v42)
 
 ## Current baseline
 
@@ -31,6 +31,7 @@
   - BT classification
   - BT `movie / series / anime` TMDB association
   - `raw_bt` destination selection
+  - pure BT single-item ranking baseline
   - downloader role binding
   - Transmission + qBittorrent 最小协议执行
   - `btsub list/add/remove/clear/run`
@@ -39,13 +40,13 @@
 
 ## Goal
 
-Land the smallest **pure BT single-item ranking baseline**.
+Land the smallest **BT external web-source baseline**.
 
 ## Only do
 
-- 只服务 `纯 BT 下载链`
-- 对单个资源候选做最小确定性预过滤
-- 只围绕“单片资源规格是否足够出色”做最小优选
+- 只服务 BT 分流
+- 增加最小 `WebSource`
+- 第一阶段只允许静态 HTML + 直接 magnet-or-torrent link
 - 命中后继续走现有 BT downloader approval-pending 路径
 - 保持现有命令词不变：
   - `search/select/status/import/confirm/watchlist/btsub`
@@ -53,12 +54,13 @@ Land the smallest **pure BT single-item ranking baseline**.
 - 保持现有 PT / BT 分流边界不变
 - 保持现有 downloader approval-pending 边界不变
 - 保持现有原始磁力 processing-path inquiry 边界不变
+- 保持现有 pure BT single-item ranking baseline 不回退
 
 ## Do not do
 
 - 不把这一步扩成通用多轮问答框架
-- 不把 pure BT 优选和影视入库链规则混成一套
-- 不引入 BT external website sources
+- 不把 WebSource 扩成通用站点平台
+- 不把 BT 外部网站源引入 PT 主链
 - 不引入 BT-only read-only helper
 - 不引入通用 scheduler 平台
 - 不引入 automatic `confirm`
@@ -69,28 +71,22 @@ Land the smallest **pure BT single-item ranking baseline**.
 
 ## Done when
 
-- pure BT 下载链不再盲目接受任意单片资源
-- pure BT 单片候选有最小确定性预过滤 / 优选
-- 命中后仍继续走既有 approval-pending 路径
+- BT 分流已能在 Prowlarr 之外接入最小 WebSource
+- WebSource 结果经过最小确定性清洗后仍继续走既有 approval-pending 路径
 - 现有 Telegram 命令行为不回退
 - 现有 downloader/import approval 行为不回退
-- 现有 BT follow-up、原始磁力 processing-path inquiry、qB 执行、`btsub` 共享选源、raw_bt 非媒体边界都不回退
+- 现有 BT follow-up、原始磁力 processing-path inquiry、qB 执行、`btsub` 共享选源、pure BT 单片优选、raw_bt 非媒体边界都不回退
 - 现有 metadata / subtitle / refresh 链路不回退
 
 ## After this step
 
 按顺序继续：
 
-1. 最小 BT external web-source baseline
-   - `Prowlarr + WebSource`
-   - 仅 BT 使用
-   - 仅静态 HTML / 直接 magnet-or-torrent link
-   - 命中后继续走现有 approval-pending 路径
-2. 最小 BT-only read-only helper baseline
+1. 最小 BT-only read-only helper baseline
    - 仅手动探索 / 站点规则维护辅助
    - 只读
    - 不得进入 scheduler truth / approval truth / direct dispatch
-3. 渠道扩展
+2. 渠道扩展
    - Feishu / WeCom / personal WeChat
-4. 运维清理
+3. 运维清理
    - downloader/library asset correlation and cleanup

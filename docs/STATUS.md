@@ -1,4 +1,4 @@
-# Current status (v41)
+# Current status (v42)
 
 ## Project position
 
@@ -50,6 +50,7 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
   - BT classification（`movie / series / anime / raw_bt`）
   - BT `movie / series / anime` TMDB association
   - `raw_bt` destination selection
+  - pure BT single-item ranking baseline（文本型 `下载这个 BT <查询词>` 走最小确定性预过滤 / 优选后进入既有 downloader approval）
   - downloader role binding
   - BT dispatch / transfer execution
   - qBittorrent 最小协议执行（add / status / import-source）
@@ -64,10 +65,9 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 ## What is not implemented yet
 
 - **当前 next step**
-  - pure BT 单片优选 baseline（不复用影视入库链复杂规则）
+  - BT external web-source baseline（`Prowlarr + WebSource`，仅 BT 使用）
 
 - **后续 BT 路线**
-  - BT external web-source baseline（`Prowlarr + WebSource`，仅 BT 使用）
   - BT-only read-only helper baseline（仅手动探索 / 站点规则维护辅助）
 
 - **后续渠道**
@@ -91,7 +91,7 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 - 原始磁力入口当前已先问“影视入库链 / 纯 BT 下载链”，但为兼容旧 follow-up，仍接受 `movie/series/anime/raw_bt` 旧回复捷径
 - subtitle auto-translation 目前只处理现成 `.srt`，还不支持“从视频里提取英文字幕轨”
 - `FANART_API_KEY`、`SUBTITLE_TRANSLATION_API_KEY`、Emby 配置缺失时，相关增强链会失败但不回滚 import success
-- pure BT 当前还没有“单片资源规格优选”能力
+- pure BT 当前已落地最小确定性单片优选，但仍只覆盖文本型 `下载这个 BT <查询词>`，还不是完整质量评分 / 规则引擎
 - BT external web-source 和 BT-only read-only helper 还没落地
 
 ## Latest verification
@@ -104,9 +104,10 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
   - BT subscription scheduler-tick baseline passed
   - BT subscription deterministic candidate-selection baseline passed
   - original magnet processing-path inquiry baseline passed
+  - pure BT single-item ranking baseline passed
 
 ## Current priority
 
 当前只做一件事：
 
-- 为 pure BT 下载链补最小单片资源优选，不复用影视入库链规则。
+- 为 BT 分流补最小 external web-source baseline（`Prowlarr + WebSource`），保持既有 approval 边界不变。

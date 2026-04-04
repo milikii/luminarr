@@ -57,6 +57,7 @@ from app.services.import_to_library import (
     parse_import_query,
 )
 from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
+from app.services.pure_bt import extract_bt_search_query, pick_single_item_candidate
 from app.services.search_media import SearchMediaService, parse_movie_query
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
@@ -142,6 +143,16 @@ RAW_BT_DESTINATION_INVALID_TEMPLATE = (
 RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT = "raw_bt 目录选择未就绪，请先配置预设目标目录后重试。"
 DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE = "下载器角色 {role} 绑定的实例不存在：{name}。请检查配置后重试。"
 BT_SOURCE_REQUIRED_TEXT = "当前还缺少实际的磁力链接，请直接发送 magnet:? 链接后重试。"
+PURE_BT_CANDIDATE_SELECTED_TEMPLATE = (
+    "pure BT 最小优选已命中单片资源。\n"
+    "搜索词: {query}\n"
+    "命中资源: {title}"
+)
+PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE = (
+    "当前没有找到可用于 pure BT 下载链的单片候选：{query}\n"
+    "请补充更具体的标题/编号后重试，或直接发送 magnet:? 链接。"
+)
+PURE_BT_SEARCH_FAILED_TEXT = "pure BT 搜索暂不可用，请稍后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -565,7 +576,7 @@ def _is_bt_direct_intent(text: str) -> bool:
         "下载此bt",
         "下载此bt种子",
         "下载此磁力",
-    }
+    } or bool(extract_bt_search_query(stripped_text))
 
 
 def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -1121,6 +1132,17 @@ def _can_dispatch_bt_source(source: str) -> bool:
     return source.strip().lower().startswith("magnet:?")
 
 
+def _resolve_search_candidate_source(candidate: dict[str, object] | Mapping[str, object]) -> str:
+    for key in ("downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid"):
+        value = candidate.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
 def _resolve_raw_bt_destination_options(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> tuple[RawBtDestinationOption, ...]:
@@ -1266,33 +1288,74 @@ async def _handle_raw_bt_destination_query(
 
     _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
     selected_text = _format_raw_bt_destination_selected(selected_option)
-    if not _can_dispatch_bt_source(pending.source):
-        return f"{selected_text}\n\n{BT_SOURCE_REQUIRED_TEXT}"
     add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
     if not isinstance(add_service, AddToDownloaderService):
         return SERVICE_NOT_READY_TEXT
     downloader_execution, resolution_error = _resolve_bound_downloader_execution(context=context, role="bt")
     if resolution_error is not None:
         return resolution_error
-    pending_text = await add_service.add_bt_source(
+    if _can_dispatch_bt_source(pending.source):
+        pending_text = await add_service.add_bt_source(
+            chat_id=chat_id,
+            user_id=user_id,
+            source=pending.source,
+            title=f"raw_bt -> {selected_option.label}",
+            downloader_name=downloader_execution.name if downloader_execution is not None else "",
+            downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+            download_dir=selected_option.target_dir,
+            auto_import_enabled=False,
+        )
+        if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
+            return pending_text
+        return f"{selected_text}\n\n{pending_text}"
+
+    pure_bt_query = extract_bt_search_query(pending.source)
+    if not pure_bt_query:
+        return f"{selected_text}\n\n{BT_SOURCE_REQUIRED_TEXT}"
+
+    search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
+    if not isinstance(search_service, SearchMediaService):
+        return SERVICE_NOT_READY_TEXT
+    try:
+        raw_results = await search_service.search_raw_candidates(pure_bt_query)
+    except Exception as error:
+        _log_pure_bt_search_error(query=pure_bt_query, error=error)
+        return f"{selected_text}\n\n{PURE_BT_SEARCH_FAILED_TEXT}"
+
+    selected_candidate = pick_single_item_candidate(raw_results, query=pure_bt_query)
+    if selected_candidate is None:
+        return f"{selected_text}\n\n{PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE.format(query=pure_bt_query)}"
+
+    candidate_source = _resolve_search_candidate_source(selected_candidate)
+    candidate_title = str(selected_candidate.get("title", "")).strip() or pure_bt_query
+    pending_text = await add_service.add_candidate_source(
         chat_id=chat_id,
         user_id=user_id,
-        source=pending.source,
-        title=f"raw_bt -> {selected_option.label}",
+        source=candidate_source,
+        title=candidate_title,
         downloader_name=downloader_execution.name if downloader_execution is not None else "",
         downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
         download_dir=selected_option.target_dir,
         auto_import_enabled=False,
     )
-    if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
-        return pending_text
-    return f"{selected_text}\n\n{pending_text}"
+    return (
+        f"{selected_text}\n\n"
+        f"{PURE_BT_CANDIDATE_SELECTED_TEMPLATE.format(query=pure_bt_query, title=candidate_title)}\n\n"
+        f"{pending_text}"
+    )
 
 
 def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
     print(
         f"\033[31m[BT TMDB 关联失败]\033[0m 类型={media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。"
+    )
+
+
+def _log_pure_bt_search_error(*, query: str, error: Exception) -> None:
+    print(
+        f"\033[31m[pure BT 搜索失败]\033[0m 查询={query} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
     )
 
 
