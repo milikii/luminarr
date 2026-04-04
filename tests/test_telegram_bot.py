@@ -14,10 +14,10 @@ from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
     BT_PENDING_REPO_KEY,
-    BT_CLASSIFICATION_CANCELLED_TEXT,
-    BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
     BT_CLASSIFICATION_PROMPT_TEXT,
-    BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE,
+    BT_PROCESSING_PATH_CANCELLED_TEXT,
+    BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
+    BT_PROCESSING_PATH_PROMPT_TEXT,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
     RAW_BT_DESTINATION_OPTIONS_KEY,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
@@ -163,7 +163,7 @@ def test_handle_message_magnet_routes_to_bt_direct_split() -> None:
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -187,7 +187,34 @@ def test_handle_message_explicit_bt_text_routes_to_bt_direct_split() -> None:
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_processing_path_media_import_choice_routes_to_classification_prompt() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text = _build_update("影视入库链", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(follow_up_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -213,10 +240,46 @@ def test_handle_message_bt_classification_reply_when_pending() -> None:
     asyncio.run(handle_message(update, context))
     asyncio.run(handle_message(follow_up_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     second_sent_text = second_reply_text.await_args.args[0]
     assert "已记录本次 BT 分类：电影（movie）。" in second_sent_text
     assert "请继续发送片名，可带年份" in second_sent_text
+    search_service.search_and_format.assert_not_awaited()
+
+
+def test_handle_message_bt_processing_path_pure_bt_choice_routes_to_destination_prompt() -> None:
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    follow_up_update, second_reply_text = _build_update("纯 BT 下载链", update_id=2)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: (
+                    RawBtDestinationOption(
+                        key="downloads",
+                        label="下载目录",
+                        target_dir="/data/raw/downloads",
+                    ),
+                ),
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(follow_up_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    second_sent_text = second_reply_text.await_args.args[0]
+    assert "请选择预设目标目录：" in second_sent_text
+    assert "1. 下载目录 [downloads] -> /data/raw/downloads" in second_sent_text
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -254,9 +317,8 @@ def test_handle_message_bt_raw_classification_reply_when_pending() -> None:
     asyncio.run(handle_message(update, context))
     asyncio.run(handle_message(follow_up_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     second_sent_text = second_reply_text.await_args.args[0]
-    assert "已记录本次 BT 分类：其他 BT 资源（raw_bt）。" in second_sent_text
     assert "请选择预设目标目录：" in second_sent_text
     assert "1. 下载目录 [downloads] -> /data/raw/downloads" in second_sent_text
     search_service.search_and_format.assert_not_awaited()
@@ -284,7 +346,7 @@ def test_handle_message_bt_raw_classification_replies_service_not_ready_without_
     asyncio.run(handle_message(update, context))
     asyncio.run(handle_message(follow_up_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     second_reply_text.assert_awaited_once_with(RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
@@ -310,8 +372,8 @@ def test_handle_message_bt_classification_cancel_when_pending() -> None:
     asyncio.run(handle_message(update, context))
     asyncio.run(handle_message(cancel_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
-    second_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_CANCELLED_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_CANCELLED_TEXT)
 
 
 def test_handle_message_bt_classification_pending_returns_reminder_for_plain_text() -> None:
@@ -336,8 +398,8 @@ def test_handle_message_bt_classification_pending_returns_reminder_for_plain_tex
     asyncio.run(handle_message(update, context))
     asyncio.run(handle_message(follow_up_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
-    second_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    second_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -372,7 +434,7 @@ def test_handle_message_bt_tmdb_association_succeeds_for_movie() -> None:
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(title_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
     success_text = third_reply_text.await_args.args[0]
     assert "BT 电影 TMDB 关联成功。" in success_text
@@ -415,7 +477,7 @@ def test_handle_message_bt_tmdb_association_returns_ambiguous_text_without_year(
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(title_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
     ambiguous_text = third_reply_text.await_args.args[0]
     assert "TMDB 关联存在多个候选：三体" in ambiguous_text
@@ -460,7 +522,7 @@ def test_handle_message_bt_tmdb_association_allows_status_command_while_pending(
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(status_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
     assert "任务 ID: 87" in third_reply_text.await_args.args[0]
     search_service.search_and_format.assert_not_awaited()
@@ -490,7 +552,7 @@ def test_handle_message_bt_tmdb_association_replies_service_not_ready_when_looku
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(title_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
     third_reply_text.assert_awaited_once_with(BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT)
 
@@ -518,7 +580,7 @@ def test_handle_message_bt_tmdb_association_cancel_when_pending() -> None:
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(cancel_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
     third_reply_text.assert_awaited_once_with(BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
 
@@ -552,7 +614,7 @@ def test_handle_message_raw_bt_destination_selection_succeeds() -> None:
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(select_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
     selected_text = third_reply_text.await_args.args[0]
     assert "已记录 raw_bt 目标目录。" in selected_text
@@ -590,7 +652,7 @@ def test_handle_message_raw_bt_destination_invalid_text_returns_reminder() -> No
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(invalid_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
     invalid_text = third_reply_text.await_args.args[0]
     assert "未识别到有效的 raw_bt 目录选项：随便放" in invalid_text
@@ -625,7 +687,7 @@ def test_handle_message_raw_bt_destination_cancel_when_pending() -> None:
     asyncio.run(handle_message(classify_update, context))
     asyncio.run(handle_message(cancel_update, context))
 
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
     third_reply_text.assert_awaited_once_with(RAW_BT_DESTINATION_CANCELLED_TEXT)
 
@@ -651,7 +713,7 @@ def test_handle_message_bt_classification_pending_survives_restart(tmp_path: Pat
     )
     before_restart_update, before_restart_reply = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
     asyncio.run(handle_message(before_restart_update, before_restart_context))
-    before_restart_reply.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    before_restart_reply.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
 
     after_restart_update, after_restart_reply = _build_update("沙丘", update_id=2)
     after_restart_context = SimpleNamespace(
@@ -670,7 +732,7 @@ def test_handle_message_bt_classification_pending_survives_restart(tmp_path: Pat
     )
 
     asyncio.run(handle_message(after_restart_update, after_restart_context))
-    after_restart_reply.assert_awaited_once_with(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+    after_restart_reply.assert_awaited_once_with(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
 
 
 def test_handle_message_bt_tmdb_association_pending_survives_restart(tmp_path: Path) -> None:
@@ -701,7 +763,7 @@ def test_handle_message_bt_tmdb_association_pending_survives_restart(tmp_path: P
     second_update, second_reply = _build_update("movie", update_id=2)
     asyncio.run(handle_message(first_update, before_restart_context))
     asyncio.run(handle_message(second_update, before_restart_context))
-    first_reply.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply.await_args.args[0]
 
     after_restart_update, after_restart_reply = _build_update("Dune 2021", update_id=3)
@@ -755,7 +817,7 @@ def test_handle_message_raw_bt_destination_pending_survives_restart(tmp_path: Pa
     second_update, second_reply = _build_update("raw_bt", update_id=2)
     asyncio.run(handle_message(first_update, before_restart_context))
     asyncio.run(handle_message(second_update, before_restart_context))
-    first_reply.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请选择预设目标目录：" in second_reply.await_args.args[0]
 
     after_restart_update, after_restart_reply = _build_update("downloads", update_id=3)
@@ -927,7 +989,7 @@ def test_handle_callback_query_magnet_routes_to_bt_direct_split() -> None:
     asyncio.run(handle_callback_query(update, context))
 
     answer.assert_awaited_once()
-    reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
 
 
 def test_handle_callback_query_bt_classification_reply_when_pending() -> None:
@@ -961,9 +1023,8 @@ def test_handle_callback_query_bt_classification_reply_when_pending() -> None:
 
     first_answer.assert_awaited_once()
     second_answer.assert_awaited_once()
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     second_sent_text = second_reply_text.await_args.args[0]
-    assert "已记录本次 BT 分类：其他 BT 资源（raw_bt）。" in second_sent_text
     assert "请选择预设目标目录：" in second_sent_text
     assert "1. 下载目录 [downloads] -> /data/raw/downloads" in second_sent_text
     search_service.search_and_format.assert_not_awaited()
@@ -1008,7 +1069,7 @@ def test_handle_callback_query_raw_bt_destination_selection_succeeds() -> None:
     first_answer.assert_awaited_once()
     second_answer.assert_awaited_once()
     third_answer.assert_awaited_once()
-    first_reply_text.assert_awaited_once_with(BT_CLASSIFICATION_PROMPT_TEXT)
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
     selected_text = third_reply_text.await_args.args[0]
     assert "已记录 raw_bt 目标目录。" in selected_text

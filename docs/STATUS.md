@@ -1,4 +1,4 @@
-# Current status (v40)
+# Current status (v41)
 
 ## Project position
 
@@ -46,6 +46,7 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 
 - **BT 主链**
   - PT / BT parser-level split
+  - 原始磁力 processing-path inquiry baseline（`影视入库链 / 纯 BT 下载链`）
   - BT classification（`movie / series / anime / raw_bt`）
   - BT `movie / series / anime` TMDB association
   - `raw_bt` destination selection
@@ -63,10 +64,9 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 ## What is not implemented yet
 
 - **当前 next step**
-  - 原始磁力“处理链”问询 baseline（`影视入库链 / 纯 BT 下载链`）
+  - pure BT 单片优选 baseline（不复用影视入库链复杂规则）
 
 - **后续 BT 路线**
-  - pure BT 单片优选 baseline（不复用影视入库链复杂规则）
   - BT external web-source baseline（`Prowlarr + WebSource`，仅 BT 使用）
   - BT-only read-only helper baseline（仅手动探索 / 站点规则维护辅助）
 
@@ -88,24 +88,25 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 - candidate mapping 仍只保留每个 chat 最近一次搜索窗口
 - completion truth 主要依赖 runtime 观察，不是完整独立后台轮询平台
 - BT subscription 当前已从“盲拿第一个结果”收紧到共享确定性选源，但仍不是完整质量评分 / 规则引擎
+- 原始磁力入口当前已先问“影视入库链 / 纯 BT 下载链”，但为兼容旧 follow-up，仍接受 `movie/series/anime/raw_bt` 旧回复捷径
 - subtitle auto-translation 目前只处理现成 `.srt`，还不支持“从视频里提取英文字幕轨”
 - `FANART_API_KEY`、`SUBTITLE_TRANSLATION_API_KEY`、Emby 配置缺失时，相关增强链会失败但不回滚 import success
-- 原始磁力入口当前仍直接进入现有 BT 分类链，尚未补“影视入库链 / 纯 BT 下载链”问询
 - pure BT 当前还没有“单片资源规格优选”能力
 - BT external web-source 和 BT-only read-only helper 还没落地
 
 ## Latest verification
 
 - tests: `191 passed` (`.venv/bin/python -m pytest -q`)
-- focused tests: `5 passed` (`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`)
+- focused tests: `14 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "bt_processing_path or bt_classification_reply_when_pending or bt_raw_classification_reply_when_pending or bt_tmdb_association_succeeds_for_movie or raw_bt_destination_selection_succeeds or callback_query_magnet_routes_to_bt_direct_split or callback_query_bt_classification_reply_when_pending or callback_query_raw_bt_destination_selection_succeeds or bt_classification_pending_survives_restart or bt_tmdb_association_pending_survives_restart or raw_bt_destination_pending_survives_restart or bt_classification_cancel_when_pending or bt_classification_pending_returns_reminder_for_plain_text"`)
 - manual verification:
   - qBittorrent protocol baseline passed
   - BT subscription baseline passed
   - BT subscription scheduler-tick baseline passed
   - BT subscription deterministic candidate-selection baseline passed
+  - original magnet processing-path inquiry baseline passed
 
 ## Current priority
 
 当前只做一件事：
 
-- 为原始 `magnet:?` / 直接 BT 下载入口补最小“处理链”问询，不重复问 PT / BT。
+- 为 pure BT 下载链补最小单片资源优选，不复用影视入库链规则。

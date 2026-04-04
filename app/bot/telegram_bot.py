@@ -13,6 +13,7 @@ from telegram.ext import Application, CallbackQueryHandler, ContextTypes, Messag
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
+    BT_PENDING_STAGE_PROCESSING_PATH,
     BT_PENDING_STAGE_CLASSIFICATION,
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
@@ -61,19 +62,29 @@ from app.services.search_media import SearchMediaService, parse_movie_query
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
 CLARIFICATION_SELECTION_BLOCKED_TEXT = "当前处于片名澄清中，请先补充片名或年份后再搜索。"
-BT_CLASSIFICATION_PROMPT_TEXT = (
+BT_PROCESSING_PATH_PROMPT_TEXT = (
     "已识别为直接 BT/磁力下载需求。\n"
-    "请回复以下分类之一：movie / series / anime / raw_bt\n"
-    "对应含义：电影 / 剧集 / 动漫 / 其他 BT 资源"
+    "请回复以下处理链之一：影视入库链 / 纯 BT 下载链\n"
+    "对应含义：按影视资源处理并入库 / 仅下载并放到预设目录"
 )
-BT_CLASSIFICATION_CANCELLED_TEXT = "已取消当前 BT 分类，请重新发送磁力或 BT 指令。"
+BT_PROCESSING_PATH_CANCELLED_TEXT = "已取消当前 BT 处理链选择，请重新发送磁力或 BT 指令。"
+BT_PROCESSING_PATH_PENDING_REMINDER_TEXT = (
+    "当前正在等待 BT 处理链选择。\n"
+    "请回复：影视入库链 / 纯 BT 下载链"
+)
+BT_CLASSIFICATION_PROMPT_TEXT = (
+    "已记录后续处理链：影视入库链。\n"
+    "请回复以下媒体类型之一：movie / series / anime\n"
+    "对应含义：电影 / 剧集 / 动漫"
+)
+BT_CLASSIFICATION_CANCELLED_TEXT = "已取消当前 BT 媒体类型选择，请重新发送磁力或 BT 指令。"
 BT_CLASSIFICATION_PENDING_REMINDER_TEXT = (
-    "当前正在等待 BT 分类。\n"
-    "请回复：movie / series / anime / raw_bt"
+    "当前正在等待 BT 媒体类型选择。\n"
+    "请回复：movie / series / anime"
 )
 BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE = (
-    "已记录本次 BT 分类：{label}（{kind}）。\n"
-    "当前这一步只完成分类 follow-up，暂不执行 TMDB 关联、下载投递或目录选择。"
+    "已记录本次 BT 媒体类型：{label}（{kind}）。\n"
+    "当前这一步只完成媒体类型 follow-up，暂不执行 TMDB 关联或下载投递。"
 )
 BT_TMDB_ASSOCIATION_PROMPT_TEXT_TEMPLATE = (
     "已记录本次 BT 分类：{label}（{kind}）。\n"
@@ -143,6 +154,7 @@ JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
 BT_PENDING_REPO_KEY = "bt_pending_repo"
+BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY = "bt_processing_path_pending_by_chat"
 BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
 BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
 BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY = "bt_tmdb_movie_candidates_lookup_func"
@@ -157,6 +169,22 @@ BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 
+BT_PROCESSING_PATH_ALIASES = {
+    "影视入库链": "media_import",
+    "影视入库": "media_import",
+    "入库链": "media_import",
+    "影视": "media_import",
+    "mediaimport": "media_import",
+    "media-import": "media_import",
+    "media_import": "media_import",
+    "纯bt下载链": "pure_bt",
+    "纯bt下载": "pure_bt",
+    "纯bt": "pure_bt",
+    "纯磁力下载链": "pure_bt",
+    "purebt": "pure_bt",
+    "pure-bt": "pure_bt",
+    "pure_bt": "pure_bt",
+}
 BT_CLASSIFICATION_ALIASES = {
     "movie": "movie",
     "film": "movie",
@@ -169,11 +197,6 @@ BT_CLASSIFICATION_ALIASES = {
     "anime": "anime",
     "动漫": "anime",
     "动画": "anime",
-    "raw_bt": "raw_bt",
-    "rawbt": "raw_bt",
-    "raw": "raw_bt",
-    "其他bt资源": "raw_bt",
-    "其他bt": "raw_bt",
 }
 BT_CLASSIFICATION_LABELS = {
     "movie": "电影",
@@ -581,6 +604,15 @@ def _record_callback_update(
     )
 
 
+def _resolve_bt_processing_path_pending_by_chat(context: ContextTypes.DEFAULT_TYPE) -> dict[int, str]:
+    pending_by_chat = context.application.bot_data.get(BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY)
+    if isinstance(pending_by_chat, dict):
+        return pending_by_chat
+    resolved_pending_by_chat: dict[int, str] = {}
+    context.application.bot_data[BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
+    return resolved_pending_by_chat
+
+
 def _resolve_bt_classification_pending_by_chat(context: ContextTypes.DEFAULT_TYPE) -> dict[int, str]:
     pending_by_chat = context.application.bot_data.get(BT_CLASSIFICATION_PENDING_BY_CHAT_KEY)
     if isinstance(pending_by_chat, dict):
@@ -607,6 +639,91 @@ def _deserialize_bt_pending_payload(payload_json: str) -> dict[str, object]:
     if not isinstance(payload, dict):
         return {}
     return payload
+
+
+def _set_bt_processing_path_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    source: str,
+) -> None:
+    if chat_id is None or chat_id <= 0:
+        return
+    pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
+    cleaned_source = source.strip()
+    pending_by_chat[chat_id] = cleaned_source
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return
+    pending_repo.upsert_pending(
+        chat_id=chat_id,
+        stage=BT_PENDING_STAGE_PROCESSING_PATH,
+        payload_json=_serialize_bt_pending_payload({"source": cleaned_source}),
+    )
+
+
+def _is_bt_processing_path_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> bool:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
+    if chat_id in pending_by_chat:
+        return True
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return False
+    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
+        return False
+    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    pending_by_chat[chat_id] = str(payload.get("source", "")).strip()
+    return True
+
+
+def _clear_bt_processing_path_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> bool:
+    cleared = False
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
+    if pending_by_chat.pop(chat_id, None) is not None:
+        cleared = True
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return cleared
+    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH) or cleared
+
+
+def _pop_bt_processing_path_pending(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+) -> str | None:
+    if chat_id is None or chat_id <= 0:
+        return None
+    pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
+    pending_source = pending_by_chat.pop(chat_id, None)
+    if isinstance(pending_source, str):
+        pending_repo = _resolve_bt_pending_repo(context)
+        if pending_repo is not None:
+            pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
+        return pending_source
+
+    pending_repo = _resolve_bt_pending_repo(context)
+    if pending_repo is None:
+        return None
+    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
+        return None
+    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
+    return str(payload.get("source", "")).strip() or None
 
 
 def _set_bt_classification_pending(
@@ -877,9 +994,69 @@ def _parse_bt_classification_choice(text: str) -> str | None:
     return BT_CLASSIFICATION_ALIASES.get(normalized_text)
 
 
+def _parse_bt_processing_path_choice(text: str) -> str | None:
+    normalized_text = re.sub(r"\s+", "", text.strip()).lower()
+    if not normalized_text:
+        return None
+    return BT_PROCESSING_PATH_ALIASES.get(normalized_text)
+
+
+def _parse_bt_processing_path_legacy_shortcut(text: str) -> tuple[str, str | None] | None:
+    normalized_text = re.sub(r"\s+", "", text.strip()).lower()
+    if not normalized_text:
+        return None
+    media_kind = BT_CLASSIFICATION_ALIASES.get(normalized_text)
+    if media_kind is not None:
+        return ("media_import", media_kind)
+    if normalized_text in {"raw_bt", "rawbt", "raw", "其他bt资源", "其他bt"}:
+        return ("pure_bt", None)
+    return None
+
+
 def _format_bt_classification_result(media_kind: str) -> str:
     label = BT_CLASSIFICATION_LABELS.get(media_kind, BT_CLASSIFICATION_LABELS["raw_bt"])
     return BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label=label, kind=media_kind)
+
+
+def _enter_pure_bt_flow(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    source: str,
+) -> str:
+    raw_bt_destination_options = _resolve_raw_bt_destination_options(context)
+    if not raw_bt_destination_options:
+        return RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT
+    _set_raw_bt_destination_pending(
+        context=context,
+        chat_id=chat_id,
+        options=raw_bt_destination_options,
+        source=source,
+    )
+    return _format_raw_bt_destination_prompt(raw_bt_destination_options)
+
+
+def _enter_media_import_bt_flow(
+    *,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    source: str,
+    media_kind: str | None = None,
+) -> str:
+    if media_kind is not None:
+        _set_bt_tmdb_association_pending(
+            context=context,
+            chat_id=chat_id,
+            media_kind=media_kind,
+            source=source,
+        )
+        return _format_bt_tmdb_association_prompt(media_kind)
+    _set_bt_classification_pending(
+        context=context,
+        chat_id=chat_id,
+        query=source,
+    )
+    return BT_CLASSIFICATION_PROMPT_TEXT
 
 
 def _format_bt_tmdb_association_prompt(media_kind: str) -> str:
@@ -1288,43 +1465,84 @@ async def _handle_query_text(
         if _clear_bt_classification_pending(context=context, chat_id=chat_id):
             await reply_func(BT_CLASSIFICATION_CANCELLED_TEXT)
             return
+        if _clear_bt_processing_path_pending(context=context, chat_id=chat_id):
+            await reply_func(BT_PROCESSING_PATH_CANCELLED_TEXT)
+            return
 
     if _is_bt_direct_intent(query):
+        _clear_bt_processing_path_pending(context=context, chat_id=chat_id)
         _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
-        _set_bt_classification_pending(
+        _clear_bt_classification_pending(context=context, chat_id=chat_id)
+        _set_bt_processing_path_pending(
             context=context,
             chat_id=chat_id,
-            query=query,
+            source=query,
         )
-        await reply_func(BT_CLASSIFICATION_PROMPT_TEXT)
+        await reply_func(BT_PROCESSING_PATH_PROMPT_TEXT)
         return
 
     bt_classification = _parse_bt_classification_choice(query)
+    bt_processing_path = _parse_bt_processing_path_choice(query)
+    bt_processing_shortcut = _parse_bt_processing_path_legacy_shortcut(query)
+    if _is_bt_processing_path_pending(context=context, chat_id=chat_id) and (
+        bt_processing_path is not None or bt_processing_shortcut is not None
+    ):
+        bt_source = _pop_bt_processing_path_pending(context=context, chat_id=chat_id) or ""
+        _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        _clear_bt_classification_pending(context=context, chat_id=chat_id)
+        if bt_processing_path == "media_import":
+            await reply_func(
+                _enter_media_import_bt_flow(
+                    context=context,
+                    chat_id=chat_id,
+                    source=bt_source,
+                )
+            )
+            return
+        if bt_processing_path == "pure_bt":
+            await reply_func(
+                _enter_pure_bt_flow(
+                    context=context,
+                    chat_id=chat_id,
+                    source=bt_source,
+                )
+            )
+            return
+        if bt_processing_shortcut is not None:
+            shortcut_path, shortcut_media_kind = bt_processing_shortcut
+            if shortcut_path == "pure_bt":
+                await reply_func(
+                    _enter_pure_bt_flow(
+                        context=context,
+                        chat_id=chat_id,
+                        source=bt_source,
+                    )
+                )
+                return
+            await reply_func(
+                _enter_media_import_bt_flow(
+                    context=context,
+                    chat_id=chat_id,
+                    source=bt_source,
+                    media_kind=shortcut_media_kind,
+                )
+            )
+            return
+
     if bt_classification is not None and _is_bt_classification_pending(context=context, chat_id=chat_id):
         bt_source = _pop_bt_classification_pending(context=context, chat_id=chat_id) or ""
         _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
-        if bt_classification == "raw_bt":
-            raw_bt_destination_options = _resolve_raw_bt_destination_options(context)
-            if not raw_bt_destination_options:
-                await reply_func(RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT)
-                return
-            _set_raw_bt_destination_pending(
+        await reply_func(
+            _enter_media_import_bt_flow(
                 context=context,
                 chat_id=chat_id,
-                options=raw_bt_destination_options,
                 source=bt_source,
+                media_kind=bt_classification,
             )
-            await reply_func(_format_raw_bt_destination_prompt(raw_bt_destination_options))
-            return
-        _set_bt_tmdb_association_pending(
-            context=context,
-            chat_id=chat_id,
-            media_kind=bt_classification,
-            source=bt_source,
         )
-        await reply_func(_format_bt_tmdb_association_prompt(bt_classification))
         return
 
     task_ref = parse_status_query(query)
@@ -1548,6 +1766,10 @@ async def _handle_query_text(
     search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
     if not isinstance(search_service, SearchMediaService):
         await reply_func(SERVICE_NOT_READY_TEXT)
+        return
+
+    if _is_bt_processing_path_pending(context=context, chat_id=chat_id):
+        await reply_func(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
         return
 
     if _is_bt_classification_pending(context=context, chat_id=chat_id):
