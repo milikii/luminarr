@@ -113,6 +113,109 @@ def test_bt_subscription_run_once_enqueues_new_candidate_and_skips_seen_source(t
     assert second_reply == "BT 订阅扫描完成：共扫描 1 条，当前没有新资源。"
 
 
+def test_bt_subscription_run_once_prefers_new_ranked_candidate(tmp_path: Path) -> None:
+    async def _ranked_search(_: str) -> list[dict[str, object]]:
+        return [
+            {
+                "title": "Frieren S01E01 1080p",
+                "downloadUrl": "https://example.com/already-seen.torrent",
+                "seeders": 99,
+                "size": 2_000_000_000,
+            },
+            {
+                "title": "Frieren S01E01 CAM",
+                "downloadUrl": "https://example.com/cam.torrent",
+                "seeders": 500,
+                "size": 3_000_000_000,
+            },
+            {
+                "title": "Frieren S01E01 720p",
+                "downloadUrl": "https://example.com/720p.torrent",
+                "seeders": 50,
+                "size": 1_500_000_000,
+            },
+            {
+                "title": "Frieren S01E01 1080p",
+                "downloadUrl": "https://example.com/1080p.torrent",
+                "seeders": 20,
+                "size": 2_200_000_000,
+            },
+        ]
+
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    created = repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    assert created is not None
+    item, _ = created
+    assert repo.update_last_seen(
+        chat_id=1001,
+        item_id=item.item_id,
+        source="https://example.com/already-seen.torrent",
+        title="Frieren S01E01 1080p",
+    )
+
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _ranked_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert "命中资源: Frieren S01E01 1080p" in reply
+    item = repo.list_items(chat_id=1001)[0]
+    assert item.last_seen_source == "https://example.com/1080p.torrent"
+    assert item.last_seen_title == "Frieren S01E01 1080p"
+
+
+def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_path: Path) -> None:
+    async def _scheduler_search(_: str) -> list[dict[str, object]]:
+        return [
+            {
+                "title": "Frieren S01E01 CAM",
+                "downloadUrl": "https://example.com/cam.torrent",
+                "seeders": 500,
+                "size": 3_000_000_000,
+            },
+            {
+                "title": "Frieren S01E01 720p",
+                "downloadUrl": "https://example.com/720p.torrent",
+                "seeders": 30,
+                "size": 1_500_000_000,
+            },
+        ]
+
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _scheduler_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications
+    chat_id, reply = notifications[0]
+    assert chat_id == 1001
+    assert "命中资源: Frieren S01E01 720p" in reply
+
+
 def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

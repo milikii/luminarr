@@ -66,6 +66,16 @@ class BtSubscriptionDispatchContext:
     download_dir: str
 
 
+@dataclass(frozen=True, slots=True)
+class BtSubscriptionCandidate:
+    index: int
+    result: Mapping[str, Any]
+    quality_rank: int
+    preferred: bool
+    seeders: int
+    size_bytes: int
+
+
 class ManageBtSubscriptionService:
     def __init__(
         self,
@@ -210,12 +220,15 @@ class ManageBtSubscriptionService:
             _log_bt_subscription_scan_error(item=item, query=query, error=error)
             return None
 
-        selected_result = _pick_subscription_candidate(results)
+        selected_result = _pick_subscription_candidate(
+            results,
+            last_seen_source=item.last_seen_source,
+        )
         if selected_result is None:
             return None
 
         selected_source = _resolve_candidate_source(selected_result)
-        if not selected_source or selected_source == item.last_seen_source:
+        if not selected_source:
             return None
 
         candidate_title = _resolve_candidate_title(selected_result, item=item)
@@ -338,12 +351,52 @@ def _build_subscription_query(item: BtSubscriptionItem) -> str:
 
 def _pick_subscription_candidate(
     results: Sequence[Mapping[str, Any]],
+    *,
+    last_seen_source: str,
 ) -> Mapping[str, Any] | None:
-    for result in results:
+    ranked_candidates = sorted(
+        _collect_subscription_candidates(results, last_seen_source=last_seen_source),
+        key=_subscription_candidate_sort_key,
+        reverse=True,
+    )
+    if not ranked_candidates:
+        return None
+    return ranked_candidates[0].result
+
+
+def _collect_subscription_candidates(
+    results: Sequence[Mapping[str, Any]],
+    *,
+    last_seen_source: str,
+) -> list[BtSubscriptionCandidate]:
+    normalized_last_seen_source = last_seen_source.strip()
+    candidates: list[BtSubscriptionCandidate] = []
+    for index, result in enumerate(results):
         source = _resolve_candidate_source(result)
-        if source:
-            return result
-    return None
+        if not source or source == normalized_last_seen_source:
+            continue
+        title = str(result.get("title", "")).strip()
+        candidates.append(
+            BtSubscriptionCandidate(
+                index=index,
+                result=result,
+                quality_rank=_subscription_quality_rank(title),
+                preferred=not _is_subscription_low_quality(title),
+                seeders=_safe_int(result.get("seeders")),
+                size_bytes=_safe_int(result.get("size")),
+            )
+        )
+    return candidates
+
+
+def _subscription_candidate_sort_key(candidate: BtSubscriptionCandidate) -> tuple[int, int, int, int, int]:
+    return (
+        1 if candidate.preferred else 0,
+        candidate.quality_rank,
+        candidate.seeders,
+        candidate.size_bytes,
+        -candidate.index,
+    )
 
 
 def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
@@ -363,6 +416,38 @@ def _resolve_candidate_title(candidate: Mapping[str, Any], *, item: BtSubscripti
         return title
     year_text = item.year if item.year else "-"
     return f"{item.title} ({year_text})"
+
+
+def _subscription_quality_rank(title: str) -> int:
+    lowered_title = title.strip().lower()
+    if not lowered_title:
+        return 0
+    if re.search(r"\b(2160p|4k)\b", lowered_title):
+        return 4
+    if re.search(r"\b1080p\b", lowered_title):
+        return 3
+    if re.search(r"\b720p\b", lowered_title):
+        return 2
+    if re.search(r"\b480p\b", lowered_title):
+        return 1
+    return 0
+
+
+def _is_subscription_low_quality(title: str) -> bool:
+    lowered_title = title.strip().lower()
+    if not lowered_title:
+        return False
+    return re.search(r"\b(cam|hdcam|ts|tc|telesync|telecine|screener)\b", lowered_title) is not None
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        resolved = int(value)
+    except (TypeError, ValueError):
+        return 0
+    if resolved > 0:
+        return resolved
+    return 0
 
 
 def _log_bt_subscription_scan_error(
