@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v40)
+# docs/DECISIONS.md (v41)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -33,7 +33,7 @@
   当前主线固定为：
   - Telegram 私聊
   - TMDB
-  - Prowlarr（当前已实现的搜索聚合来源）
+  - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 支线）
   - Transmission + qBittorrent
   - Emby
   - SQLite
@@ -192,23 +192,24 @@
 - **状态**：已决定
 - **日期**：2026-04-04
 - **结论**：
-  - 后续 BT 主干允许在 Prowlarr 之外增加 `WebSource`。
+  - 当前 BT 主干已在 Prowlarr 之外接入最小 `WebSource` baseline。
   - `WebSource` 只允许服务 BT 分流：
     - 直接 BT / magnet 搜索
     - BT 订阅 / 连续下载
     - BT 手动探索
   - `WebSource` 不得进入 PT 主链。
+  - `Prowlarr + WebSource` 必须先经过共享 BT 来源适配层，再进入 BT 链路。
   - 外部网站源命中结果后，仍必须复用现有 downloader approval -> `confirm` -> dispatch 边界。
   - 第一阶段只允许静态 HTML + 直接 magnet / torrent 链接。
   - 第一阶段不接入 JS 渲染、CAPTCHA、强登录站。
 - **原因**：
   BT 分流确实需要 Prowlarr 之外的资源来源，但不能反过来破坏 PT 主线。
 
-## D-015 BT 站点规则文件与 BT-only read-only helper
+## D-015 BT 站点规则定义与 BT-only read-only helper
 - **状态**：已决定
 - **日期**：2026-04-04
 - **结论**：
-  - 外部 BT 网站源采用“项目内站点规则文件”，不做通用 skill 平台。
+  - 外部 BT 网站源采用“项目内确定性站点规则定义”，不做通用 skill 平台。
   - 运行时主链仍由确定性代码负责：
     - 发请求
     - 解析页面

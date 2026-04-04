@@ -7,6 +7,7 @@ from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import parse_movie_query
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -400,14 +401,7 @@ def _subscription_candidate_sort_key(candidate: BtSubscriptionCandidate) -> tupl
 
 
 def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
-    for key in ("downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid"):
-        value = candidate.get(key)
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            return text
-    return ""
+    return resolve_bt_source(candidate)
 
 
 def _resolve_candidate_title(candidate: Mapping[str, Any], *, item: BtSubscriptionItem) -> str:

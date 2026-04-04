@@ -53,6 +53,7 @@ class Settings:
     subtitle_translation_timeout_seconds: float
     sqlite_db_path: str
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...]
+    bt_web_sources: tuple[str, ...]
     downloader_instances: tuple[DownloaderInstanceConfig, ...]
     downloader_role_binding: DownloaderRoleBinding | None
 
@@ -111,6 +112,22 @@ def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDesti
         )
 
     return tuple(options)
+
+
+def _read_bt_web_sources(env: Mapping[str, str]) -> tuple[str, ...]:
+    raw_value = _read_optional(env, "BT_WEB_SOURCES")
+    if not raw_value:
+        return ()
+
+    sources: list[str] = []
+    seen_sources: set[str] = set()
+    for raw_item in raw_value.replace(";", ",").split(","):
+        source_name = raw_item.strip().lower()
+        if not source_name or source_name in seen_sources:
+            continue
+        seen_sources.add(source_name)
+        sources.append(source_name)
+    return tuple(sources)
 
 
 def _normalize_downloader_type(raw_value: str) -> str:
@@ -238,6 +255,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         subtitle_translation_timeout_seconds=subtitle_translation_timeout_seconds,
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
         raw_bt_destination_options=_read_raw_bt_destination_options(env),
+        bt_web_sources=_read_bt_web_sources(env),
         downloader_instances=downloader_instances,
         downloader_role_binding=_read_downloader_role_binding(env, downloader_instances),
     )

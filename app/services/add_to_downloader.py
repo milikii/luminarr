@@ -16,6 +16,7 @@ from app.db.approval_repo import (
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
@@ -917,14 +918,7 @@ def _parse_selection_index(text: str) -> int | None:
 
 
 def _resolve_source(candidate: Mapping[str, Any]) -> str:
-    for key in ("downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid"):
-        value = candidate.get(key)
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            return text
-    return ""
+    return resolve_bt_source(candidate)
 
 
 def _build_pending_add_context(

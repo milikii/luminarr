@@ -52,12 +52,14 @@ class SearchMediaService:
     def __init__(
         self,
         search_func: SearchFunc,
+        raw_search_func: SearchFunc | None = None,
         limit: int = 5,
         candidate_repo: CandidateMappingRepo | None = None,
         clarification_repo: ClarificationRepo | None = None,
         lookup_movie_func: LookupMovieFunc | None = None,
     ) -> None:
         self._search_func = search_func
+        self._raw_search_func = raw_search_func or search_func
         self._limit = max(1, limit)
         self._candidate_repo = candidate_repo
         self._clarification_repo = clarification_repo
@@ -69,7 +71,7 @@ class SearchMediaService:
         cleaned_query = query.strip()
         if not cleaned_query:
             return ()
-        return await self._search_func(cleaned_query)
+        return await self._raw_search_func(cleaned_query)
 
     async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
         cleaned_query = query.strip()

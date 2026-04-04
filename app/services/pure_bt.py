@@ -5,6 +5,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.bt_sources import resolve_bt_source
+
 
 @dataclass(frozen=True, slots=True)
 class PureBtCandidate:
@@ -88,14 +90,7 @@ def _candidate_sort_key(candidate: PureBtCandidate) -> tuple[int, int, int, int]
 
 
 def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
-    for key in ("downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid"):
-        value = candidate.get(key)
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            return text
-    return ""
+    return resolve_bt_source(candidate)
 
 
 def _title_matches_query(*, title: str, query: str) -> bool:

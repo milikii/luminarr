@@ -39,6 +39,17 @@ async def _fake_search_empty(query: str) -> list[dict[str, object]]:
     return []
 
 
+async def _fake_raw_search(query: str) -> list[dict[str, object]]:
+    assert query == "dune bt"
+    return [
+        {
+            "title": "Dune 2021 1080p",
+            "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            "seeders": 8,
+        }
+    ]
+
+
 async def _fake_search_ambiguous(query: str) -> list[dict[str, object]]:
     assert query == "Dune"
     return [
@@ -74,6 +85,15 @@ def test_search_and_format_no_result() -> None:
     service = SearchMediaService(_fake_search_empty)
     text = _run(service.search_and_format("unknown"))
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
+
+
+def test_search_raw_candidates_uses_dedicated_raw_search_func() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
+    results = _run(service.search_raw_candidates("dune bt"))
+
+    assert len(results) == 1
+    assert results[0]["title"] == "Dune 2021 1080p"
+    assert results[0]["source"].startswith("magnet:?xt=urn:btih:")
 
 
 def test_search_and_format_returns_clarification_for_ambiguous_query() -> None:

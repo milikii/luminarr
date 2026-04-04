@@ -9,6 +9,7 @@ from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
+from app.clients.web_source import SUPPORTED_WEB_SOURCE_RULES, WebSourceClient
 from app.config import DownloaderInstanceConfig, load_settings
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
@@ -22,6 +23,7 @@ from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.db.watchlist_repo import WatchlistRepo
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.manage_watchlist import ManageWatchlistService
@@ -103,6 +105,27 @@ def _resolve_downloader_name_for_task(
     return _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
 
 
+def _build_bt_source_providers(
+    *,
+    prowlarr_client: ProwlarrClient,
+    bt_web_sources: tuple[str, ...],
+) -> tuple[BtSourceProvider, ...]:
+    providers: list[BtSourceProvider] = [
+        BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search),
+    ]
+    for source_name in bt_web_sources:
+        rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
+        if rule is None:
+            print(
+                f"\033[31m[BT 外部站点源配置无效]\033[0m 来源={source_name}\n"
+                "\033[33m[处理建议]\033[0m 检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。"
+            )
+            continue
+        client = WebSourceClient(rule=rule)
+        providers.append(BtSourceProvider(name=rule.name, search_func=client.search))
+    return tuple(providers)
+
+
 def main() -> None:
     settings = load_settings()
     database = SqliteDatabase(settings.sqlite_db_path)
@@ -122,6 +145,12 @@ def main() -> None:
         base_url=settings.prowlarr_base_url,
         api_key=settings.prowlarr_api_key,
     )
+    bt_source_adapter = BtSourceAdapter(
+        _build_bt_source_providers(
+            prowlarr_client=prowlarr_client,
+            bt_web_sources=settings.bt_web_sources,
+        )
+    )
     tmdb_lookup_movie_func = None
     scrape_metadata_func = None
     if settings.tmdb_api_key:
@@ -138,6 +167,7 @@ def main() -> None:
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(
         search_func=prowlarr_client.search,
+        raw_search_func=bt_source_adapter.search,
         candidate_repo=candidate_repo,
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
@@ -235,7 +265,7 @@ def main() -> None:
     manage_watchlist_service = ManageWatchlistService(watchlist_repo)
     manage_bt_subscription_service = ManageBtSubscriptionService(
         bt_subscription_repo=bt_subscription_repo,
-        search_func=prowlarr_client.search,
+        search_func=bt_source_adapter.search,
         add_to_downloader_service=add_to_downloader_service,
     )
     application = build_application(
