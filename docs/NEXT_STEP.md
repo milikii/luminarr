@@ -1,4 +1,4 @@
-# Next step (v86)
+# Next step (v87)
 
 ## Current baseline
 
@@ -74,6 +74,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 ## Only do
 
 - 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 为稳定基线，观察真实回归结果
+- 当前最新 focused cleanup 回归（`tests/test_cleanup_downloaded_source.py`、`tests/test_private_chat_runtime.py`、`tests/test_personal_wechat_text.py`、`tests/test_feishu_adapter.py`、`tests/test_wecom_adapter.py`、`tests/test_telegram_bot.py`）和 `python3 -m compileall app tests` 已再次通过；本 step 继续只观察，不新增 cleanup 行为
 - 保持 shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口回归覆盖稳定，不让 cleanup 协议退回成只在 Telegram 可用
   - 当前已由 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务级测试守住 `cleanup inspect` / `cleanup` 的最小入口回归，并继续把 bare `cleanup` / bare `cleanup inspect` discoverability 用法提示守在这些非 Telegram 入口上；其中 shared private-chat runtime 已显式补齐 bare `清理` / bare `清理检查` 中文 discoverability，personal WeChat 事件适配层、Feishu 直接事件适配层和 WeCom 直接事件适配层也已显式补齐 bare `cleanup` / bare `cleanup inspect` discoverability，personal WeChat 事件适配层、Feishu 直接事件适配层与 WeCom 直接事件适配层现已显式补齐 bare `清理` / bare `清理检查` 中文 discoverability，shared private-chat runtime、personal WeChat 事件适配层、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务层与 WeCom 直接事件适配层现都已显式补上 bare `清理` / bare `清理检查` 和带参 `清理检查 <任务ID或Hash>` / `清理 <任务ID或Hash>` 中文 cleanup 协议回归；后续只继续观察，不扩协议
 - 如果继续推进，也只允许做同一 cleanup 文本闭环里的最小收口，不新增新的 cleanup 副作用

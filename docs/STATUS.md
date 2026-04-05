@@ -1,4 +1,4 @@
-# Current status (v85)
+# Current status (v86)
 
 ## Project position
 
@@ -98,7 +98,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - 暂无独立条目（Telegram richer card/UI polish 当前已收束）
 
 - **后续运维**
-  - 暂无独立条目（当前 next step 已切到 cleanup rejection follow-up guidance）
+  - 暂无独立条目（当前 next step 已切到 cleanup observation 阶段）
 
 - **仍未解决的基础能力**
   - real image/media poster rendering
@@ -131,6 +131,8 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 ## Latest verification
 
+- focused tests: `89 passed, 91 deselected` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `8 passed, 13 deselected` (`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k "cleanup and handle_personal_wechat_private_text_event"`)
 - focused tests: `16 passed, 5 deselected` (`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup`)
 - focused tests: `54 passed, 27 deselected` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py -k cleanup`)
@@ -307,4 +309,4 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 当前只做一件事：
 
-- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，先观察已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 的回归结果；若继续推进，也只允许做同一闭环内的最小收口，不扩成自动 cleanup、批量运维或删种。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，先观察已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 的回归结果；若继续推进，也只允许做同一闭环内的最小收口，不扩成自动 cleanup、批量运维或删种。
