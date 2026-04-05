@@ -1,4 +1,4 @@
-# Next step (v105)
+# Next step (v106)
 
 ## Current baseline
 
@@ -8,7 +8,7 @@
 - cleanup 最小文本闭环已落地：discoverability、`cleanup inspect`、`cleanup`、rejection guidance、success follow-up、failure observability、chat-scoped `task_ref` 解析。
 - cleanup 执行阶段的阻断分支（correlation 缺失 / target 缺失 / source 已不存在 / guard 拒绝）已补齐显式中文日志和处理建议，不改用户文本协议。
 - `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id` 与 `task_hash` 的 `cleanup inspect` / `cleanup` smoke、英文/中文原始 `task_id` 与 `task_hash` 的 `correlation missing` / `target missing` / `source missing` rejection guidance smoke，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
-- `tests/test_cleanup_docs_consistency.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、聚合 smoke gate、`当前结论`、真实私聊 smoke 提示与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致。
+- `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题/退出清单日期一致性、聚合 smoke gate、`当前结论`、真实私聊 smoke 提示与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致。
 - BT 主链已落地：PT / BT 分流、processing-path inquiry、BT classification、TMDB association、`raw_bt` 目标目录、shared source adapter、pure BT single-item ranking、`btsub` scheduler tick。
 
 ## Goal
@@ -50,7 +50,7 @@
 ## Done when
 
 - 已完成 7 天验证窗口。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期和当前结论，且 `当前状态`、退出清单、渠道进度彼此一致。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期和当前结论，且 `当前状态`、窗口标题日期、退出清单、渠道进度彼此一致。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。

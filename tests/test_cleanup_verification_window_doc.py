@@ -63,11 +63,15 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
             assert last_date == "-"
 
     window_completed_match = re.search(
-        r"- \[( |x)\] 完成 \d{4}-\d{2}-\d{2} 到 \d{4}-\d{2}-\d{2} 的真实使用验证窗口",
+        r"- \[( |x)\] 完成 (\d{4}-\d{2}-\d{2}) 到 (\d{4}-\d{2}-\d{2}) 的真实使用验证窗口",
         text,
     )
     assert window_completed_match is not None
     window_completed = window_completed_match.group(1) == "x"
+    checklist_start_date = date.fromisoformat(window_completed_match.group(2))
+    checklist_end_date = date.fromisoformat(window_completed_match.group(3))
+    assert checklist_start_date == start_date
+    assert checklist_end_date == end_date
 
     if window_status == "进行中":
         assert "暂未满足退出条件" in conclusion
