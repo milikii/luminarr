@@ -1,10 +1,11 @@
-# Next step (v45)
+# Next step (v46)
 
 ## Current baseline
 
 以下能力已经落地，并且本 step 默认全部保持稳定：
 
 - **控制层**
+  - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval
@@ -44,11 +45,12 @@
 
 ## Goal
 
-Land the smallest **Feishu private-chat adapter baseline**.
+Continue the smallest **Feishu private-chat adapter baseline** on top of the shared private-chat text runtime.
 
 ## Only do
 
-- 只加 Feishu 私聊单聊入口
+- 只加 Feishu 私聊单聊的最小文本收发
+- 继续复用刚抽出的 shared private-chat text runtime
 - 继续复用现有 workflow 和 service：
   - `search_media`
   - `add_to_downloader`
@@ -62,6 +64,7 @@ Land the smallest **Feishu private-chat adapter baseline**.
 - 继续复用现有 downloader / import approval 边界
 - 继续复用现有 BT 分流、原始磁力 processing-path inquiry、pure BT、`btsub`、BT-only read-only helper
 - 只做最小私聊收发适配，不做群聊
+- 只先处理文本消息和文本回复，不做图片、卡片、按钮回调
 - 保持现有媒体后半段边界不变
 - 保持现有 PT / BT 分流边界不变
 - 保持现有 downloader approval-pending 边界不变
@@ -79,11 +82,13 @@ Land the smallest **Feishu private-chat adapter baseline**.
 - 不引入通用 scheduler 平台
 - 不引入 automatic `confirm`
 - 不新增下载器 / 媒体服务器支持
+- 不回头改 shared private-chat text runtime 的既有文本协议形状
 - 不让 scheduler tick、`btsub run`、恢复逻辑依赖 Feishu 适配
 
 ## Done when
 
-- Feishu 私聊已能进入现有主链的最小可用命令集合
+- Feishu 文本私聊已能通过 shared private-chat text runtime 进入现有主链的最小可用命令集合
+- Feishu 文本消息已能得到最小文本回复
 - 现有 service、approval、jobs、lease 真相边界保持不变
 - Telegram 行为不回退
 - 现有 downloader/import approval 行为不回退

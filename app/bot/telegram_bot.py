@@ -253,7 +253,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not _record_message_update(update=update, context=context):
         return
 
-    await _handle_query_text(
+    await handle_private_chat_query_text(
         query=(message.text or "").strip(),
         reply_func=message.reply_text,
         chat_id=chat_id,
@@ -290,7 +290,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     if not query:
         return
 
-    await _handle_query_text(
+    await handle_private_chat_query_text(
         query=query,
         reply_func=message.reply_text,
         chat_id=chat_id,
@@ -1460,7 +1460,7 @@ async def _handle_bt_tmdb_association_query(
     return f"{association_text}\n\n{pending_text}"
 
 
-async def _handle_query_text(
+async def handle_private_chat_query_text(
     *,
     query: str,
     reply_func: Callable[[str], Awaitable[object]],
