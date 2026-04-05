@@ -1,4 +1,4 @@
-# Current status (v68)
+# Current status (v69)
 
 ## Project position
 
@@ -25,7 +25,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - Telegram import-approval text polish baseline（Telegram 当前会在出口层把共享导入待确认文本收紧为 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区；shared `import_to_library` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并回传 SVG 二维码文件；扫码确认成功后会保存 `wechat-clawbot` 凭据并回发最小结果文本）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
-  - shared private-chat cleanup non-Telegram regression coverage baseline（当前已用 shared runtime + Feishu + WeCom + personal WeChat 回归测试守住 `cleanup inspect` 与 `cleanup` 的非 Telegram 私聊入口，不让 cleanup 协议退回成只在 Telegram 可用）
+  - shared private-chat cleanup non-Telegram regression coverage baseline（当前已用 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 相关回归测试守住 `cleanup inspect` 与 `cleanup` 的非 Telegram 私聊入口，不让 cleanup 协议退回成只在 Telegram 可用）
   - shared private-chat text runtime baseline（已从 Telegram 收发层抽出可复用文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能解析最小私聊文本事件，并稳定投影到现有整数 `chat_id/user_id` 边界）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上，继续复用 shared private-chat text runtime）
@@ -128,6 +128,9 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 ## Latest verification
 
+- focused tests: `28 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_private_chat_runtime.py`)
+- tests: `275 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `33 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_personal_wechat_text.py tests/test_private_chat_runtime.py`)
 - tests: `273 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
 - compile check: `passed` (`python3 -m compileall app tests`)

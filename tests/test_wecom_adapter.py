@@ -305,6 +305,38 @@ def test_handle_wecom_callback_http_request_routes_post_into_shared_runtime_and_
     assert "title-dune" in _read_xml_text(reply_root, "Content")
 
 
+def test_handle_wecom_callback_http_request_routes_cleanup_execution_into_shared_runtime_and_returns_encrypted_reply(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml("cleanup 87"))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="POST",
+            query_params=query_params,
+            body=body,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == WECOM_XML_CONTENT_TYPE
+    encrypted_reply = _extract_encrypt_from_xml(response.body.decode("utf-8"))
+    reply_xml = _decrypt_wecom_plaintext(encrypted_reply)
+    reply_root = ET.fromstring(reply_xml)
+
+    assert "已清理下载源资产" in _read_xml_text(reply_root, "Content")
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in _read_xml_text(
+        reply_root,
+        "Content",
+    )
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
 def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
     async def exercise() -> tuple[str, str]:
         try:
