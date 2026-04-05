@@ -102,6 +102,27 @@ def _build_cleanup_service(
     return CleanupDownloadedSourceService(event_repo, job_repo=job_repo), source_file, target_file
 
 
+def _build_guard_rejected_cleanup_service(
+    base_dir: Path,
+) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    source_dir = base_dir / "downloads" / "Dune.Part.Two.2024"
+    source_dir.mkdir(parents=True)
+    target_file = source_dir / "movie.mkv"
+    target_file.write_bytes(b"demo")
+
+    event_repo = JobEventRepo(_make_database(base_dir))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_dir),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo), source_dir, target_file
+
+
 def _expected_chat_id(channel: str) -> int:
     if channel == "telegram":
         return 1001
@@ -362,6 +383,40 @@ def test_cleanup_source_missing_rejection_guidance_smoke_across_private_chat_cha
     assert f"下载源资产已不存在，无需清理：{source_file}" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
     assert not source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "cleanup 87",
+        "cleanup hash-87",
+        "清理 87",
+        "清理 hash-87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_guard_rejected_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_dir, target_file = _build_guard_rejected_cleanup_service(tmp_path / channel)
+
+    reply_text = runner(query, cleanup_service)
+
+    assert f"检测到 source/target 路径关系异常，已拒绝清理：{source_dir} -> {target_file}" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert source_dir.exists()
     assert target_file.exists()
 
 
