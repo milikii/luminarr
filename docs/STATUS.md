@@ -1,4 +1,4 @@
-# Current status (v100)
+# Current status (v101)
 
 ## Project position
 
@@ -71,6 +71,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前验证目标是：四个渠道都要真实可用，但业务真相仍只维护在 shared runtime、workflow、approval、`jobs` 和 SQLite 一套边界里。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已作为当前验证窗口台账落地；窗口开始日期固定为 2026-04-05，最早可结束日期固定为 2026-04-12。
 - 验证窗口台账当前会显式写出“当前结论”，说明是否已满足退出条件，避免只看状态或只看勾选项。
+- 当前结论快照：验证窗口仍在进行中；截至 2026-04-06，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
 - 当前四个渠道真实私聊 smoke 快照（与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步）：
 
 | 渠道 | 状态 | 最近一次日期 |

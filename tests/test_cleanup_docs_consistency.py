@@ -12,15 +12,23 @@ def _extract_window_dates(text: str) -> tuple[str, str]:
     return start_match.group(1), end_match.group(1)
 
 
+def _extract_current_conclusion(text: str) -> str:
+    conclusion_match = re.search(r"- 当前结论：(.+)", text)
+    assert conclusion_match is not None
+    return conclusion_match.group(1)
+
+
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     window_text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
     start_date, end_date = _extract_window_dates(window_text)
+    current_conclusion = _extract_current_conclusion(window_text)
 
     assert f"开始日期固定为 {start_date}" in status_text
     assert f"最早可结束日期固定为 {end_date}" in status_text
+    assert f"- 当前结论快照：{current_conclusion}" in status_text
 
     for text in (next_step_text, status_text):
         assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in text
