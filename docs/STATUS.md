@@ -1,4 +1,4 @@
-# Current status (v77)
+# Current status (v78)
 
 ## Project position
 
@@ -25,7 +25,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - Telegram import-approval text polish baseline（Telegram 当前会在出口层把共享导入待确认文本收紧为 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区；shared `import_to_library` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并回传 SVG 二维码文件；扫码确认成功后会保存 `wechat-clawbot` 凭据并回发最小结果文本）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
-  - shared private-chat cleanup non-Telegram regression coverage baseline（当前已用 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务级回归测试守住非 Telegram 私聊 `cleanup inspect` / `cleanup` 入口；本次继续把 bare `cleanup` / bare `cleanup inspect` discoverability 用法提示补进 shared runtime、personal WeChat、Feishu webhook HTTP、WeCom callback HTTP 回归覆盖，并把 shared private-chat runtime 的 bare `清理` / bare `清理检查` 中文 discoverability、personal WeChat 事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability，以及 Feishu 直接事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability 也显式补进回归；其中 shared private-chat runtime 与 Feishu webhook HTTP 现已显式补上 `清理检查` / `清理` 中文 cleanup 协议回归，不让 cleanup 协议退回成只在英文命令可用）
+  - shared private-chat cleanup non-Telegram regression coverage baseline（当前已用 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务级回归测试守住非 Telegram 私聊 `cleanup inspect` / `cleanup` 入口；本次继续把 bare `cleanup` / bare `cleanup inspect` discoverability 用法提示补进 shared runtime、personal WeChat、Feishu webhook HTTP、WeCom callback HTTP 回归覆盖，并把 shared private-chat runtime 的 bare `清理` / bare `清理检查` 中文 discoverability、personal WeChat 事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability、Feishu 直接事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability，以及 WeCom 直接事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability 也显式补进回归；其中 shared private-chat runtime 与 Feishu webhook HTTP 现已显式补上 `清理检查` / `清理` 中文 cleanup 协议回归，不让 cleanup 协议退回成只在英文命令可用）
   - shared private-chat text runtime baseline（已从 Telegram 收发层抽出可复用文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能解析最小私聊文本事件，并稳定投影到现有整数 `chat_id/user_id` 边界）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上，继续复用 shared private-chat text runtime）
@@ -128,6 +128,10 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 ## Latest verification
 
+- focused tests: `8 passed, 8 deselected` (`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k cleanup`)
+- focused tests: `61 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py`)
+- tests: `301 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `8 passed, 9 deselected` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k cleanup`)
 - focused tests: `59 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py`)
 - tests: `299 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)

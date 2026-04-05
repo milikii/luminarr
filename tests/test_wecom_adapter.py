@@ -249,6 +249,44 @@ def test_handle_wecom_private_text_event_routes_cleanup_execution_into_shared_ru
     assert target_file.exists()
 
 
+def test_handle_wecom_private_text_event_routes_bare_cleanup_usage_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml("cleanup"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert reply_text == CLEANUP_QUERY_USAGE_TEXT
+
+
+def test_handle_wecom_private_text_event_routes_bare_cleanup_inspect_usage_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml("cleanup inspect"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert reply_text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+
+
 def test_handle_wecom_callback_http_request_returns_decrypted_echostr() -> None:
     echostr = _encrypt_wecom_plaintext("verify-challenge")
 
