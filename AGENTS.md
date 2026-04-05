@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v26)
+# Luminarr AGENTS.md (v27)
 
 This file is the repository contract for AI coding agents.
 
@@ -84,11 +84,11 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 The current next smallest path is:
 
-- **Feishu webhook event-signature verification baseline**
+- **WeCom private-chat identity projection + text event adapter baseline**
 
 Keep these landed baselines stable while doing it:
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
-- shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息
+- shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验
 - downloader/import approval boundaries
 - copy fallback approval
 - completion-monitor + post-download auto import

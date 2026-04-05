@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from app.bot.feishu_adapter import build_feishu_reply_text_func
+from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
 from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
 from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
@@ -294,6 +294,7 @@ def main() -> None:
             app_secret=settings.feishu_app_secret,
             base_url=settings.feishu_base_url,
         )
+        application.bot_data[FEISHU_ENCRYPT_KEY_BOT_DATA_KEY] = settings.feishu_encrypt_key
         application.bot_data["feishu_webhook_reply_text_func"] = build_feishu_reply_text_func(feishu_client)
         application.bot_data["feishu_webhook_server_config"] = FeishuWebhookServerConfig(
             host=settings.feishu_webhook_host,

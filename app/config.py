@@ -58,6 +58,7 @@ class Settings:
     downloader_role_binding: DownloaderRoleBinding | None
     feishu_app_id: str
     feishu_app_secret: str
+    feishu_encrypt_key: str
     feishu_base_url: str
     feishu_webhook_host: str
     feishu_webhook_port: int
@@ -263,8 +264,11 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             raise ConfigError("SUBTITLE_TRANSLATION_TIMEOUT_SECONDS must be a number")
     feishu_app_id = _read_optional(env, "FEISHU_APP_ID")
     feishu_app_secret = _read_optional(env, "FEISHU_APP_SECRET")
-    if bool(feishu_app_id) != bool(feishu_app_secret):
-        raise ConfigError("FEISHU_APP_ID and FEISHU_APP_SECRET must be set together")
+    feishu_encrypt_key = _read_optional(env, "FEISHU_ENCRYPT_KEY")
+    has_any_feishu_credential = bool(feishu_app_id or feishu_app_secret or feishu_encrypt_key)
+    has_all_feishu_credentials = bool(feishu_app_id and feishu_app_secret and feishu_encrypt_key)
+    if has_any_feishu_credential and not has_all_feishu_credentials:
+        raise ConfigError("FEISHU_APP_ID, FEISHU_APP_SECRET and FEISHU_ENCRYPT_KEY must be set together")
     downloader_instances = _read_downloader_instances(env)
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
@@ -291,6 +295,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         downloader_role_binding=_read_downloader_role_binding(env, downloader_instances),
         feishu_app_id=feishu_app_id,
         feishu_app_secret=feishu_app_secret,
+        feishu_encrypt_key=feishu_encrypt_key,
         feishu_base_url=feishu_base_url or "https://open.feishu.cn",
         feishu_webhook_host=_read_optional(env, "FEISHU_WEBHOOK_HOST") or "0.0.0.0",
         feishu_webhook_port=_read_optional_int(env, "FEISHU_WEBHOOK_PORT", 18095),

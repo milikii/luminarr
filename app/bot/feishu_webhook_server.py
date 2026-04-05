@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 from urllib.parse import urlparse
 
+
 @dataclass(frozen=True, slots=True)
 class FeishuWebhookServerConfig:
     host: str
@@ -88,6 +89,7 @@ def _build_handler_class(
             future = asyncio.run_coroutine_threadsafe(
                 handle_feishu_webhook_http_request(
                     body=request_body,
+                    headers=dict(self.headers.items()),
                     bot_data=bot_data,
                     reply_text_func=reply_text_func,
                 ),

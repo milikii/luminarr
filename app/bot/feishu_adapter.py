@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from dataclasses import dataclass
@@ -13,6 +15,10 @@ FEISHU_CHANNEL = "feishu"
 FEISHU_URL_VERIFICATION_TYPE = "url_verification"
 FEISHU_PRIVATE_TEXT_EVENT_TYPE = "im.message.receive_v1"
 FEISHU_JSON_CONTENT_TYPE = "application/json; charset=utf-8"
+FEISHU_REQUEST_TIMESTAMP_HEADER = "x-lark-request-timestamp"
+FEISHU_REQUEST_NONCE_HEADER = "x-lark-request-nonce"
+FEISHU_REQUEST_SIGNATURE_HEADER = "x-lark-signature"
+FEISHU_ENCRYPT_KEY_BOT_DATA_KEY = "feishu_encrypt_key"
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,11 +123,13 @@ def build_feishu_reply_text_func(
 async def handle_feishu_webhook_http_request(
     *,
     body: bytes | str,
+    headers: Mapping[str, str] | None,
     bot_data: MutableMapping[str, object],
     reply_text_func: Callable[[FeishuPrivateTextEvent, str], Awaitable[object]],
 ) -> FeishuWebhookHttpResponse:
+    raw_body = _normalize_request_body(body)
     try:
-        payload = _decode_feishu_webhook_payload(body)
+        payload = _decode_feishu_webhook_payload(raw_body)
     except ValueError as error:
         print(
             f"\033[31m[Feishu webhook 请求体无效]\033[0m 原因={error}\n"
@@ -131,6 +139,17 @@ async def handle_feishu_webhook_http_request(
             status_code=400,
             payload={"code": 400, "msg": "invalid request body"},
         )
+
+    challenge = get_feishu_url_verification_challenge(payload)
+    if challenge is None:
+        encrypt_key = str(bot_data.get(FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, "")).strip()
+        verification_response = _build_signature_verification_failure_response(
+            raw_body=raw_body,
+            headers=headers,
+            encrypt_key=encrypt_key,
+        )
+        if verification_response is not None:
+            return verification_response
 
     try:
         challenge = await handle_feishu_private_text_event(
@@ -172,8 +191,14 @@ def _extract_text_from_content(raw_content: object) -> str:
     return str(content.get("text", "")).strip()
 
 
-def _decode_feishu_webhook_payload(body: bytes | str) -> Mapping[str, Any]:
-    decoded_body = body.decode("utf-8") if isinstance(body, bytes) else body
+def _normalize_request_body(body: bytes | str) -> bytes:
+    if isinstance(body, bytes):
+        return body
+    return body.encode("utf-8")
+
+
+def _decode_feishu_webhook_payload(body: bytes) -> Mapping[str, Any]:
+    decoded_body = body.decode("utf-8")
     cleaned_body = decoded_body.strip()
     if not cleaned_body:
         raise ValueError("empty body")
@@ -184,6 +209,84 @@ def _decode_feishu_webhook_payload(body: bytes | str) -> Mapping[str, Any]:
     if not isinstance(payload, Mapping):
         raise ValueError("payload must be a json object")
     return payload
+
+
+def _build_signature_verification_failure_response(
+    *,
+    raw_body: bytes,
+    headers: Mapping[str, str] | None,
+    encrypt_key: str,
+) -> FeishuWebhookHttpResponse | None:
+    if not encrypt_key:
+        print(
+            "\033[31m[Feishu webhook 验签配置缺失]\033[0m 未配置 FEISHU_ENCRYPT_KEY。\n"
+            "\033[33m[处理建议]\033[0m 配置 FEISHU_ENCRYPT_KEY 后重启服务，再重新发送 Feishu 事件。"
+        )
+        return _build_json_response(status_code=500, payload={"code": 500, "msg": "feishu signature not configured"})
+
+    normalized_headers = _normalize_headers(headers)
+    timestamp = normalized_headers.get(FEISHU_REQUEST_TIMESTAMP_HEADER, "").strip()
+    if not timestamp:
+        print(
+            "\033[31m[Feishu webhook 时间戳缺失]\033[0m 缺少 X-Lark-Request-Timestamp。\n"
+            "\033[33m[处理建议]\033[0m 检查 Feishu 事件订阅验签头是否透传到当前 webhook。"
+        )
+        return _build_json_response(status_code=400, payload={"code": 400, "msg": "missing request timestamp"})
+    try:
+        int(timestamp)
+    except ValueError:
+        print(
+            f"\033[31m[Feishu webhook 时间戳异常]\033[0m 值={timestamp}\n"
+            "\033[33m[处理建议]\033[0m 检查 X-Lark-Request-Timestamp 是否为合法整数。"
+        )
+        return _build_json_response(status_code=400, payload={"code": 400, "msg": "invalid request timestamp"})
+
+    nonce = normalized_headers.get(FEISHU_REQUEST_NONCE_HEADER, "").strip()
+    if not nonce:
+        print(
+            "\033[31m[Feishu webhook nonce 缺失]\033[0m 缺少 X-Lark-Request-Nonce。\n"
+            "\033[33m[处理建议]\033[0m 检查 Feishu 事件订阅验签头是否透传到当前 webhook。"
+        )
+        return _build_json_response(status_code=401, payload={"code": 401, "msg": "missing request nonce"})
+
+    signature = normalized_headers.get(FEISHU_REQUEST_SIGNATURE_HEADER, "").strip().lower()
+    if not signature:
+        print(
+            "\033[31m[Feishu webhook 签名缺失]\033[0m 缺少 X-Lark-Signature。\n"
+            "\033[33m[处理建议]\033[0m 检查 Feishu 事件订阅验签头是否透传到当前 webhook。"
+        )
+        return _build_json_response(status_code=401, payload={"code": 401, "msg": "missing request signature"})
+
+    expected_signature = _build_expected_signature(
+        timestamp=timestamp,
+        nonce=nonce,
+        encrypt_key=encrypt_key,
+        raw_body=raw_body,
+    )
+    if not hmac.compare_digest(signature, expected_signature):
+        print(
+            "\033[31m[Feishu webhook 验签失败]\033[0m X-Lark-Signature 不匹配。\n"
+            "\033[33m[处理建议]\033[0m 检查 FEISHU_ENCRYPT_KEY、请求体是否被代理改写，以及验签头是否来自 Feishu。"
+        )
+        return _build_json_response(status_code=401, payload={"code": 401, "msg": "invalid request signature"})
+    return None
+
+
+def _build_expected_signature(
+    *,
+    timestamp: str,
+    nonce: str,
+    encrypt_key: str,
+    raw_body: bytes,
+) -> str:
+    signature_source = timestamp.encode("utf-8") + nonce.encode("utf-8") + encrypt_key.encode("utf-8") + raw_body
+    return hashlib.sha256(signature_source).hexdigest()
+
+
+def _normalize_headers(headers: Mapping[str, str] | None) -> dict[str, str]:
+    if headers is None:
+        return {}
+    return {str(key).strip().lower(): str(value).strip() for key, value in headers.items()}
 
 
 def _build_json_response(*, status_code: int, payload: Mapping[str, Any]) -> FeishuWebhookHttpResponse:

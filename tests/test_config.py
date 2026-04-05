@@ -36,6 +36,7 @@ def test_load_settings_reads_token() -> None:
     assert settings.sqlite_db_path == "/data/luminarr.db"
     assert settings.feishu_app_id == ""
     assert settings.feishu_app_secret == ""
+    assert settings.feishu_encrypt_key == ""
     assert settings.feishu_base_url == "https://open.feishu.cn"
     assert settings.feishu_webhook_host == "0.0.0.0"
     assert settings.feishu_webhook_port == 18095
@@ -141,6 +142,7 @@ def test_load_settings_reads_feishu_settings() -> None:
             "TRANSMISSION_BASE_URL": "http://transmission:9091/",
             "FEISHU_APP_ID": "cli_a",
             "FEISHU_APP_SECRET": "sec_b",
+            "FEISHU_ENCRYPT_KEY": "encrypt-key-42",
             "FEISHU_BASE_URL": "https://open.feishu.test/",
             "FEISHU_WEBHOOK_HOST": "127.0.0.1",
             "FEISHU_WEBHOOK_PORT": "18096",
@@ -150,6 +152,7 @@ def test_load_settings_reads_feishu_settings() -> None:
 
     assert settings.feishu_app_id == "cli_a"
     assert settings.feishu_app_secret == "sec_b"
+    assert settings.feishu_encrypt_key == "encrypt-key-42"
     assert settings.feishu_base_url == "https://open.feishu.test"
     assert settings.feishu_webhook_host == "127.0.0.1"
     assert settings.feishu_webhook_port == 18096
@@ -292,6 +295,16 @@ def test_load_settings_requires_complete_feishu_credentials() -> None:
                 "PROWLARR_API_KEY": "api-key",
                 "TRANSMISSION_BASE_URL": "http://transmission:9091",
                 "FEISHU_APP_ID": "cli_a",
+            }
+        )
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091",
+                "FEISHU_ENCRYPT_KEY": "encrypt-key-42",
             }
         )
 

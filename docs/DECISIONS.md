@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v42)
+# docs/DECISIONS.md (v43)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -179,8 +179,8 @@
 - **日期**：2026-04-05
 - **结论**：
   当前主线不做：
-  - WeCom / personal WeChat
-  - Feishu 群聊 / 图片 / 卡片 / 按钮回调 / 通用多渠道平台化
+  - personal WeChat
+  - Feishu / WeCom 群聊、图片、卡片、按钮回调、通用多渠道平台化
   - Jellyfin / Plex 并行主线支持
   - 通用 plugin / skill / MCP 平台化
   - React TUI / Web UI / 桌面端
@@ -351,3 +351,20 @@
   - webhook 事件验签作为下一刀单独补，不和这一步的最小收发闭环混在一起。
 - **原因**：
   先把 Feishu 的“真实请求进来、文本能回去”补成最小闭环，再做安全加固，能把 diff 控制在最小范围内，也更容易验证 Telegram 主链不回退。
+
+## D-023 Feishu 事件验签使用原始请求体 + timestamp + nonce + Encrypt Key，且不干扰 URL 验证
+- **状态**：已决定
+- **日期**：2026-04-05
+- **结论**：
+  - Feishu 非 `url_verification` webhook 请求在进入 shared private-chat text runtime 前，必须先做验签。
+  - 当前最小验签输入固定为：
+    - 原始 HTTP request body
+    - `X-Lark-Request-Timestamp`
+    - `X-Lark-Request-Nonce`
+    - `X-Lark-Signature`
+    - `FEISHU_ENCRYPT_KEY`
+  - `url_verification` 仍按 Feishu challenge 原样返回，不走这层签名拒绝。
+  - 缺失签名、签名不匹配、时间戳不是合法整数时，必须在适配层显式拒绝并打印中文日志，不得进入现有 workflow / service。
+  - 当前这一步只做签名校验，不做消息体解密、不做群聊/卡片/按钮回调。
+- **原因**：
+  这一步的目标是先把 Feishu 请求来源校验补上，同时保持现有文本入站链最小改动；URL 验证和后续更重的加解密能力不应混在同一步里。

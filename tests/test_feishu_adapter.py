@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import urllib.request
 from unittest.mock import AsyncMock
@@ -10,6 +11,7 @@ import pytest
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.feishu_adapter import (
     FEISHU_CHANNEL,
+    FEISHU_ENCRYPT_KEY_BOT_DATA_KEY,
     FeishuPrivateTextEvent,
     build_feishu_reply_text_func,
     get_feishu_url_verification_challenge,
@@ -54,6 +56,7 @@ def _build_bot_data() -> dict[str, object]:
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+        FEISHU_ENCRYPT_KEY_BOT_DATA_KEY: "encrypt-key-42",
     }
 
 
@@ -173,6 +176,7 @@ def test_handle_feishu_webhook_http_request_returns_challenge_json() -> None:
     response = asyncio.run(
         handle_feishu_webhook_http_request(
             body=json.dumps({"type": "url_verification", "challenge": "challenge-token"}),
+            headers=None,
             bot_data=_build_bot_data(),
             reply_text_func=AsyncMock(),
         )
@@ -186,6 +190,7 @@ def test_handle_feishu_webhook_http_request_rejects_invalid_json() -> None:
     response = asyncio.run(
         handle_feishu_webhook_http_request(
             body="{",
+            headers=None,
             bot_data=_build_bot_data(),
             reply_text_func=AsyncMock(),
         )
@@ -193,6 +198,62 @@ def test_handle_feishu_webhook_http_request_rejects_invalid_json() -> None:
 
     assert response.status_code == 400
     assert json.loads(response.body.decode("utf-8")) == {"code": 400, "msg": "invalid request body"}
+
+
+def test_handle_feishu_webhook_http_request_rejects_missing_signature() -> None:
+    body = json.dumps(_build_feishu_private_text_payload("dune"), ensure_ascii=False)
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers={
+                "X-Lark-Request-Timestamp": "1711111111",
+                "X-Lark-Request-Nonce": "nonce-1",
+            },
+            bot_data=_build_bot_data(),
+            reply_text_func=AsyncMock(),
+        )
+    )
+
+    assert response.status_code == 401
+    assert json.loads(response.body.decode("utf-8")) == {"code": 401, "msg": "missing request signature"}
+
+
+def test_handle_feishu_webhook_http_request_rejects_invalid_timestamp() -> None:
+    body = json.dumps(_build_feishu_private_text_payload("dune"), ensure_ascii=False)
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers={
+                "X-Lark-Request-Timestamp": "abc",
+                "X-Lark-Request-Nonce": "nonce-1",
+                "X-Lark-Signature": "sig-1",
+            },
+            bot_data=_build_bot_data(),
+            reply_text_func=AsyncMock(),
+        )
+    )
+
+    assert response.status_code == 400
+    assert json.loads(response.body.decode("utf-8")) == {"code": 400, "msg": "invalid request timestamp"}
+
+
+def test_handle_feishu_webhook_http_request_rejects_invalid_signature() -> None:
+    body = json.dumps(_build_feishu_private_text_payload("dune"), ensure_ascii=False)
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers={
+                "X-Lark-Request-Timestamp": "1711111111",
+                "X-Lark-Request-Nonce": "nonce-1",
+                "X-Lark-Signature": "bad-signature",
+            },
+            bot_data=_build_bot_data(),
+            reply_text_func=AsyncMock(),
+        )
+    )
+
+    assert response.status_code == 401
+    assert json.loads(response.body.decode("utf-8")) == {"code": 401, "msg": "invalid request signature"}
 
 
 def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> None:
@@ -209,10 +270,13 @@ def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> No
         except PermissionError as error:
             pytest.skip(f"当前环境禁止本地端口监听：{error}")
         try:
+            payload = _build_feishu_private_text_payload("dune")
+            body = json.dumps(payload, ensure_ascii=False)
             status_code, payload = await asyncio.to_thread(
                 _post_json,
                 f"http://127.0.0.1:{runtime.port}/feishu/webhook",
-                _build_feishu_private_text_payload("dune"),
+                body,
+                _build_signature_headers(body=body, encrypt_key="encrypt-key-42"),
             )
             return status_code, payload
         finally:
@@ -225,11 +289,23 @@ def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> No
     reply_text_func.assert_awaited_once()
 
 
-def _post_json(url: str, payload: dict[str, object]) -> tuple[int, dict[str, object]]:
+def _build_signature_headers(*, body: str, encrypt_key: str) -> dict[str, str]:
+    timestamp = "1711111111"
+    nonce = "nonce-1"
+    signature = hashlib.sha256((timestamp + nonce + encrypt_key + body).encode("utf-8")).hexdigest()
+    return {
+        "Content-Type": "application/json",
+        "X-Lark-Request-Timestamp": timestamp,
+        "X-Lark-Request-Nonce": nonce,
+        "X-Lark-Signature": signature,
+    }
+
+
+def _post_json(url: str, body: str, headers: dict[str, str]) -> tuple[int, dict[str, object]]:
     request = urllib.request.Request(
         url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        data=body.encode("utf-8"),
+        headers=headers,
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=5) as response:
