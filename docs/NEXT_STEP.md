@@ -1,4 +1,4 @@
-# Next step (v66)
+# Next step (v67)
 
 ## Current baseline
 
@@ -63,11 +63,12 @@
 
 ## Goal
 
-Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-inspect-follow-up + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up loop, without precommitting automation, batch cleanup, or delete-scope expansion.
+Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-inspect-follow-up + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up loop, with shared private-chat cleanup routing regression coverage kept stable, without precommitting automation, batch cleanup, or delete-scope expansion.
 
 ## Only do
 
 - 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 为稳定基线，观察真实回归结果
+- 保持 shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口回归覆盖稳定，不让 cleanup 协议退回成只在 Telegram 可用
 - 如果继续推进，也只允许做同一 cleanup 文本闭环里的最小收口，不新增新的 cleanup 副作用
 - 不预先承诺自动 inspect、自动 cleanup、批量入口或新的 cleanup workflow
 - 继续复用现有 `cleanup` parser、service 和当前 SQLite 真相边界
@@ -105,6 +106,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 ## Done when
 
 - 已落地 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 回归稳定，不出现文本回退或 guardrail 回退
+- shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口路由不回退
 - 当前 step 仍不扩成自动删除下载器资产、删种、库内文件清理平台或批量运维入口
 - 若决定继续补文本，也仍只允许在当前 cleanup 文本闭环内做最小收口，不引入新的 cleanup 工作流或副作用
 - 已落地的 cleanup execution baseline 行为和保护栏不回退

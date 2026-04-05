@@ -1,4 +1,4 @@
-# Current status (v65)
+# Current status (v66)
 
 ## Project position
 
@@ -127,6 +127,10 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 ## Latest verification
 
+- focused tests: `4 passed` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py`)
+- focused tests: `19 passed, 66 deselected` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_cleanup_downloaded_source.py tests/test_telegram_bot.py -k cleanup`)
+- tests: `267 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `14 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
 - focused tests: `3 passed, 64 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`)
 - tests: `265 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
