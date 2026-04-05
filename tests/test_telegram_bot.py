@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import pytest
 from telegram.ext import CallbackQueryHandler
 
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
@@ -40,7 +41,9 @@ from app.bot.telegram_bot import (
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_UPDATE_REPO_KEY,
+    TELEGRAM_SEND_MEDIA_FUNC_KEY,
     build_application,
+    build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
 )
@@ -1948,11 +1951,112 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY][0].key == "downloads"
     assert application.bot_data[DOWNLOADER_INSTANCES_KEY] == downloader_instances
     assert application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] is downloader_role_binding
+    assert callable(application.bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY])
     assert any(
         isinstance(handler, CallbackQueryHandler)
         for handlers in application.handlers.values()
         for handler in handlers
     )
+
+
+def test_telegram_media_sender_uses_photo_for_image_path(
+    tmp_path: Path,
+) -> None:
+    send_photo = AsyncMock(return_value="photo-message")
+    sender = build_telegram_send_media_func(
+        SimpleNamespace(
+            bot=SimpleNamespace(
+                send_photo=send_photo,
+                send_document=AsyncMock(),
+            )
+        )
+    )
+    file_path = tmp_path / "wechat-login.png"
+    file_path.write_bytes(b"fake-png")
+
+    result = asyncio.run(sender(1001, file_path, "微信登录二维码"))
+
+    assert result == "photo-message"
+    send_photo.assert_awaited_once_with(
+        chat_id=1001,
+        photo=file_path,
+        caption="微信登录二维码",
+    )
+
+
+def test_telegram_media_sender_uses_document_for_non_image_path(
+    tmp_path: Path,
+) -> None:
+    send_document = AsyncMock(return_value="document-message")
+    sender = build_telegram_send_media_func(
+        SimpleNamespace(
+            bot=SimpleNamespace(
+                send_photo=AsyncMock(),
+                send_document=send_document,
+            )
+        )
+    )
+    file_path = tmp_path / "wechat-login.txt"
+    file_path.write_text("login-token", encoding="utf-8")
+
+    result = asyncio.run(sender(1001, file_path, "登录辅助文件"))
+
+    assert result == "document-message"
+    send_document.assert_awaited_once_with(
+        chat_id=1001,
+        document=file_path,
+        caption="登录辅助文件",
+        filename="wechat-login.txt",
+    )
+
+
+def test_telegram_media_sender_logs_missing_file_and_raises(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sender = build_telegram_send_media_func(
+        SimpleNamespace(
+            bot=SimpleNamespace(
+                send_photo=AsyncMock(),
+                send_document=AsyncMock(),
+            )
+        )
+    )
+    missing_path = tmp_path / "missing-qr.png"
+
+    with pytest.raises(FileNotFoundError):
+        asyncio.run(sender(1001, missing_path, "微信登录二维码"))
+
+    captured = capsys.readouterr()
+    assert "[Telegram 媒资发送失败]" in captured.out
+    assert "文件不存在" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_telegram_media_sender_logs_api_failure_and_reraises(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    send_photo = AsyncMock(side_effect=RuntimeError("telegram api down"))
+    sender = build_telegram_send_media_func(
+        SimpleNamespace(
+            bot=SimpleNamespace(
+                send_photo=send_photo,
+                send_document=AsyncMock(),
+            )
+        )
+    )
+    file_path = tmp_path / "wechat-login.png"
+    file_path.write_bytes(b"fake-png")
+
+    with pytest.raises(RuntimeError, match="telegram api down"):
+        asyncio.run(sender(1001, file_path, "微信登录二维码"))
+
+    captured = capsys.readouterr()
+    assert "[Telegram 媒资发送失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "telegram api down" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def _run(coroutine: Awaitable[str]) -> str:

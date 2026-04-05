@@ -1,10 +1,11 @@
-# Next step (v53)
+# Next step (v54)
 
 ## Current baseline
 
 以下能力已经落地，并且本 step 默认全部保持稳定：
 
 - **控制层**
+  - Telegram media sending baseline（已能按管理员 `chat_id + 本地路径` 发送图片或文件，并以 `bot_data` 闭包形式供后续二维码/文件回传复用）
   - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能把 Feishu 私聊文本事件压成现有 `query/chat/user/reply` 入口）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上）
@@ -50,13 +51,14 @@
 
 ## Goal
 
-Continue the smallest remaining Telegram media sending step for later QR/file handoff.
+Continue the smallest personal WeChat login ingress step by reusing the landed Telegram media sender for QR handoff.
 
 ## Only do
 
-- 只补 Telegram 最小图片/文件发送 baseline
-- 目标只服务后续 personal WeChat 二维码登录等最小媒资回传
-- 继续复用当前 Telegram runtime、Application 和既有管理员私聊入口
+- 只补 personal WeChat 最小二维码登录入口
+- 默认基于 `wechat-clawbot` Python 包，不采用 npm ClawBot 插件作为主实现形态
+- 目标只服务“管理员拿到二维码并完成首次登录”这一条最小闭环
+- 继续复用当前 Telegram runtime、Application、既有管理员私聊入口和已落地的 Telegram 媒资发送闭包
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -70,11 +72,11 @@ Continue the smallest remaining Telegram media sending step for later QR/file ha
   - `manage_bt_subscription`
 - 继续复用现有 downloader / import approval 边界
 - 继续复用现有 BT 分流、原始磁力 processing-path inquiry、pure BT、`btsub`、BT-only read-only helper
-- 只补“发图片 / 发文件”能力，不补新的富文本协议
+- 只补“启动登录客户端 -> 产出二维码 -> 经 Telegram 回传”这条最小链路
 
 ## Do not do
 
-- 不同时做 personal WeChat 接入
+- 不同时做 personal WeChat 私聊文本收发、命令路由、审批执行
 - 不把这一步扩成 Telegram 卡片 UI overhaul
 - 不补群聊、频道、相册、按钮、内联富交互
 - 不改 shared private-chat text runtime 的既有文本协议形状
@@ -84,13 +86,15 @@ Continue the smallest remaining Telegram media sending step for later QR/file ha
 - 不改现有原始磁力处理链问询形状
 - 不引入通用多渠道媒资抽象层
 - 不引入通用文件资产服务、对象存储或 CDN
+- 不做多账号 personal WeChat 编排
 - 不引入 automatic `confirm`
 - 不新增下载器 / 媒体服务器支持
 
 ## Done when
 
-- Telegram 运行时已具备最小图片发送或文件发送能力，能把一份明确媒资回到原管理员私聊
-- 该能力可被后续渠道接入代码直接复用，不要求先做 personal WeChat
+- personal WeChat 最小登录客户端已能在当前进程内启动
+- 当登录需要二维码时，系统能把单个二维码图片或文件经由现有 Telegram 媒资发送能力回到管理员私聊
+- 当前这一步只完成登录入口和二维码回传，不要求立刻接 personal WeChat 文本命令
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
 - 现有 Feishu / WeCom 私聊文本能力不回退
 - 现有 downloader/import approval 行为不回退
@@ -101,7 +105,7 @@ Continue the smallest remaining Telegram media sending step for later QR/file ha
 按顺序继续：
 
 1. 渠道扩展
-   - personal WeChat（默认基于 `wechat-clawbot` Python 包，不采用 npm ClawBot 插件作为主实现形态）
+   - personal WeChat private-chat text baseline
    - Telegram richer card/UI polish
 2. 运维清理
    - downloader/library asset correlation and cleanup

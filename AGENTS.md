@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v28)
+# Luminarr AGENTS.md (v29)
 
 This file is the repository contract for AI coding agents.
 
@@ -77,16 +77,16 @@ Do not expand into:
 - auto-download watchlist in the current mainline
 
 Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
-- personal WeChat adapters
 - downloader/library asset cleanup automation
 
 ## 7. Current priority
 
 The current next smallest path is:
 
-- **Telegram media sending baseline（先补图片/文件发送，用于后续二维码登录等最小媒资回传）**
+- **personal WeChat login ingress baseline（先补最小二维码登录入口，并复用 Telegram 媒资发送回传二维码）**
 
 Keep these landed baselines stable while doing it:
+- Telegram media sending baseline（最小图片/文件发送）
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
 - shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验 + WeCom callback URL 校验 / 解密 / 文本回包
 - downloader/import approval boundaries

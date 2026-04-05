@@ -1,4 +1,4 @@
-# Luminarr (v43)
+# Luminarr (v44)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -31,6 +31,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 已经落地的关键能力：
 
 - 控制层：
+  - Telegram media sending baseline（最小图片/文件发送）
   - shared private-chat text runtime baseline
   - Feishu private-chat identity projection + text event adapter baseline
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息）
@@ -86,20 +87,20 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **WeCom callback envelope + text reply baseline**
+- **Telegram media sending baseline**
 
 这一步已完成：
 
-- WeCom callback GET 已能完成最小 URL 校验
-- WeCom callback POST 已能先验签、解密，再把私聊文本 XML 压进 shared private-chat text runtime
-- WeCom runtime 产出的文本已能按最小加密被动回包形状返回到原私聊
-- 继续复用既有字符串 ID -> 整数 `chat_id/user_id` 投影，不改 SQLite 真相表
+- Telegram Application 启动时已注入最小媒资发送闭包
+- 当前已能按管理员 `chat_id + 本地路径` 发送图片或文件回原私聊
+- 本地图片后缀走 `send_photo`，其余文件走 `send_document`
+- 文件缺失或 Telegram API 发送失败时，会打印显式中文彩色日志和处理建议
 - 不改现有 workflow / service / approval / jobs / lease 真相边界
-- Telegram / Feishu 现有搜索、BT 直达入口继续复用同一条主链
+- Telegram / Feishu / WeCom 现有搜索、BT 直达入口继续复用同一条主链
 
 当前 next step：
 
-- Telegram media sending baseline（先补图片/文件发送，用于后续二维码登录等最小媒资回传）
+- personal WeChat login ingress baseline（先补最小二维码登录入口，并复用 Telegram 媒资发送回传二维码）
 
 启用当前 Feishu 最小基线时，需要补充 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_ENCRYPT_KEY`，并可按需覆盖 `FEISHU_BASE_URL`、`FEISHU_WEBHOOK_HOST`、`FEISHU_WEBHOOK_PORT`、`FEISHU_WEBHOOK_PATH`。
 
@@ -111,8 +112,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. Telegram media sending baseline（先补图片/文件发送，用于后续二维码登录等最小媒资回传）
-2. personal WeChat（默认基于 `wechat-clawbot` Python 包，不采用 npm ClawBot 插件作为主实现形态）
+1. personal WeChat login ingress baseline（默认基于 `wechat-clawbot` Python 包，仅补最小二维码登录入口）
+2. personal WeChat private-chat text baseline
 3. Telegram richer card/UI polish
 4. downloader/library asset correlation and cleanup
 
@@ -123,8 +124,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 当前内建 `nyaa` 规则已能抽出 `size + seeders`，但 richer 字段覆盖和链接校验仍然很薄。
 - Feishu 当前已补最小签名校验，但仍只做私聊文本 webhook + 文本回消息，不做群聊、图片、卡片、按钮回调。
 - WeCom 当前已补最小 callback URL 校验、解密入站和加密被动文本回包，但仍只做私聊文本，不做群聊、图片、卡片、按钮回调或主动发消息客户端。
-- 下一刀转到 Telegram 最小图片/文件发送能力，不急着直接扩到 personal WeChat 登录或更重的 UI 形态。
-- personal WeChat 进入施工前，先补 Telegram 图片/文件发送基线，这样管理员才能先在 Telegram 收到二维码，再用手机微信扫码登录。
+- Telegram 最小图片/文件发送能力已经补上，后续 personal WeChat 登录入口直接复用这条回传链。
+- 下一刀转到 personal WeChat 最小二维码登录入口，不急着直接扩到 personal WeChat 全量私聊文本适配或更重的 UI 形态。
 - personal WeChat 未来默认直接复用 `wechat-clawbot` Python 包提供的 iLink 客户端能力，不把 npm ClawBot 插件作为当前项目的主实现形态。
 - Telegram richer card/UI polish 仍然重要，但它是体验增强，不是 personal WeChat 二维码登录的硬前置。
 
@@ -180,4 +181,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 Telegram media sending baseline。**
+**Luminarr 当前是一个 Telegram + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 personal WeChat login ingress baseline。**
