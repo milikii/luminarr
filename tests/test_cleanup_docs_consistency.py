@@ -44,6 +44,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "真实私聊 smoke" in text
         assert "当前结论" in text
         assert "chat-scoped task_ref -> jobs -> import correlation" in text
+        assert "correlation-missing rejection guidance" in text
         assert "target-missing rejection guidance" in text
         assert "source-missing rejection guidance" in text
 
