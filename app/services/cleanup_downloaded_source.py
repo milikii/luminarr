@@ -61,6 +61,15 @@ CLEANUP_SUCCEEDED_TEXT = (
     "源路径: {source_path}\n"
     "保留目标: {target_path}"
 )
+CLEANUP_CORRELATION_MISSING_FIX_HINT = (
+    "检查 import.succeeded 事件是否已写入 source_path/target_path，"
+    "并先执行 cleanup inspect <任务ID或Hash> / 清理检查 <任务ID或Hash> 复核关联。"
+)
+CLEANUP_TARGET_MISSING_FIX_HINT = "检查库内目标路径是否已被移动或删除；目标不存在时不要执行 cleanup。"
+CLEANUP_SOURCE_MISSING_FIX_HINT = "下载源资产已经不存在，当前无需 cleanup；如需复核可再次执行 cleanup inspect。"
+CLEANUP_GUARD_REJECTED_FIX_HINT = (
+    "检查 source_path 和 target_path 是否指向同一位置或互为父子目录，确认导入关联无误后再重试。"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +121,12 @@ class CleanupDownloadedSourceService:
                 CLEANUP_CORRELATION_MISSING_TEXT,
                 cleaned_ref,
             )
+            _print_cleanup_blocked_log(
+                event_type="cleanup.correlation_missing",
+                task_ref=cleaned_ref,
+                reason=CLEANUP_CORRELATION_MISSING_TEXT,
+                fix_hint=CLEANUP_CORRELATION_MISSING_FIX_HINT,
+            )
             self._record_event(
                 task_ref=cleaned_ref,
                 event_type="cleanup.correlation_missing",
@@ -126,6 +141,16 @@ class CleanupDownloadedSourceService:
 
         if inspection.target_exists is False:
             message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
+            _print_cleanup_blocked_log(
+                event_type="cleanup.target_missing",
+                task_ref=task_ref_for_event,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
+                source_path=str(source_path),
+                target_path=str(target_path),
+                reason=inspection.conclusion,
+                fix_hint=CLEANUP_TARGET_MISSING_FIX_HINT,
+            )
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -139,6 +164,16 @@ class CleanupDownloadedSourceService:
 
         if inspection.source_exists is False:
             message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
+            _print_cleanup_blocked_log(
+                event_type="cleanup.source_missing",
+                task_ref=task_ref_for_event,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
+                source_path=str(source_path),
+                target_path=str(target_path),
+                reason=inspection.conclusion,
+                fix_hint=CLEANUP_SOURCE_MISSING_FIX_HINT,
+            )
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -152,6 +187,16 @@ class CleanupDownloadedSourceService:
 
         if not inspection.cleanup_allowed:
             message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
+            _print_cleanup_blocked_log(
+                event_type="cleanup.guard_rejected",
+                task_ref=task_ref_for_event,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
+                source_path=str(source_path),
+                target_path=str(target_path),
+                reason=inspection.conclusion,
+                fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
+            )
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -481,6 +526,37 @@ def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: 
     print(
         "\033[33m[处理建议]\033[0m 检查 jobs 表是否可读、该 chat 的任务引用是否仍存在；"
         "当前会回退到原始 task_ref 继续尝试匹配 import 关联。",
+        flush=True,
+    )
+
+
+def _print_cleanup_blocked_log(
+    *,
+    event_type: str,
+    task_ref: str,
+    reason: str,
+    fix_hint: str,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
+    print(
+        f"\033[31m[cleanup 执行受阻]\033[0m {details_text} 结论={reason}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {fix_hint}",
         flush=True,
     )
 

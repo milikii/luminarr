@@ -369,6 +369,94 @@ def test_cleanup_by_task_ref_logs_delete_failure_with_fix_hint(
     assert target_file.exists()
 
 
+def test_cleanup_by_task_ref_logs_correlation_missing_with_fix_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    assert "[cleanup 执行受阻]" in captured.out
+    assert "event_type=cleanup.correlation_missing" in captured.out
+    assert "task_ref=87" in captured.out
+    assert f"结论={CLEANUP_CORRELATION_MISSING_TEXT}" in captured.out
+    assert "检查 import.succeeded 事件是否已写入 source_path/target_path" in captured.out
+
+
+def test_cleanup_by_task_ref_logs_target_missing_with_fix_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_file = tmp_path / "library" / "Dune (2021).mkv"
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert CLEANUP_TARGET_MISSING_TEXT.format(target_path=str(target_file)) in reply
+    assert "[cleanup 执行受阻]" in captured.out
+    assert "event_type=cleanup.target_missing" in captured.out
+    assert "task_id=87" in captured.out
+    assert "task_hash=hash-87" in captured.out
+    assert f"source={source_file}" in captured.out
+    assert f"target={target_file}" in captured.out
+    assert "检查库内目标路径是否已被移动或删除" in captured.out
+
+
+def test_cleanup_by_task_ref_logs_source_missing_with_fix_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.write_bytes(b"demo")
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert f"下载源资产已不存在，无需清理：{source_file}" in reply
+    assert "[cleanup 执行受阻]" in captured.out
+    assert "event_type=cleanup.source_missing" in captured.out
+    assert f"source={source_file}" in captured.out
+    assert f"target={target_file}" in captured.out
+    assert "下载源资产已经不存在，当前无需 cleanup" in captured.out
+
+
 def test_inspect_by_task_ref_logs_job_lookup_failure_and_falls_back_to_task_ref(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -466,6 +554,43 @@ def test_cleanup_resolves_chat_scoped_task_ref_via_job_repo(
     assert expected_follow_up in reply
     assert source_file.exists() is expect_source_exists
     assert target_file.exists()
+
+
+def test_cleanup_by_task_ref_logs_guard_rejected_with_fix_hint(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    source_dir = tmp_path / "downloads" / "Dune.Part.Two.2024"
+    source_dir.mkdir(parents=True)
+    target_file = source_dir / "movie.mkv"
+    target_file.write_bytes(b"demo")
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_dir),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert CLEANUP_GUARD_REJECTED_TEXT.format(
+        source_path=str(source_dir),
+        target_path=str(target_file),
+    ) in reply
+    assert "[cleanup 执行受阻]" in captured.out
+    assert "event_type=cleanup.guard_rejected" in captured.out
+    assert "task_id=87" in captured.out
+    assert "task_hash=hash-87" in captured.out
+    assert f"source={source_dir}" in captured.out
+    assert f"target={target_file}" in captured.out
+    assert "检查 source_path 和 target_path 是否指向同一位置或互为父子目录" in captured.out
 
 
 def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
