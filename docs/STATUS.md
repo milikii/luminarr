@@ -1,4 +1,4 @@
-# Current status (v79)
+# Current status (v80)
 
 ## Project position
 
@@ -57,7 +57,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法，帮助用户直接区分执行与预检）
   - downloader/library cleanup rejection follow-up guidance baseline（当前 cleanup 拒绝或失败回复会直接补 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 只读预检提示，并继续显式区分 `cleanup` 的实际清理语义）
   - downloader/library cleanup success follow-up guidance baseline（当前 cleanup 成功回复会直接补 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 只读复核提示，方便用户确认“源已清理、目标保留”）
-  - downloader/library cleanup failure observability baseline（当前 cleanup 在 `job_repo` 任务解析失败、`job_event` 关联查询失败或 `job_event` 写入失败时，会打印显式中文彩色日志和修复提示；现有 cleanup 文本结果、guardrail 判定和删除范围保持不变）
+  - downloader/library cleanup failure observability baseline（当前 cleanup 在 `job_repo` 任务解析失败、`job_event` 关联查询失败、`job_event` 写入失败或删除下载源资产失败时，都会打印显式中文彩色日志和修复提示；现有 cleanup 文本结果、guardrail 判定和删除范围保持不变）
   - completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - filename normalization
@@ -91,7 +91,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 ## What is not implemented yet
 
 - **当前 next step**
-  - 先观察 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 的回归结果；当前已把 `job_repo` 任务解析失败、`job_event` 关联查询失败和 `job_event` 写入失败三类 cleanup 失败可观测性都补进回归，若真实反馈仍显示文本闭环还有缺口，再单独收缩下一步，不预先承诺自动化、批量 cleanup 或删种
+  - 先观察 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 的回归结果；当前已把 `job_repo` 任务解析失败、`job_event` 关联查询失败、`job_event` 写入失败和删除下载源资产失败四类 cleanup 失败可观测性都补进回归，若真实反馈仍显示文本闭环还有缺口，再单独收缩下一步，不预先承诺自动化、批量 cleanup 或删种
 
 - **后续体验**
   - 暂无独立条目（Telegram richer card/UI polish 当前已收束）
@@ -126,11 +126,14 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - pure BT 当前已落地最小确定性单片优选，但仍只覆盖文本型 `下载这个 BT <查询词>`，还不是完整质量评分 / 规则引擎
 - `BT_WEB_SOURCES` 当前只做最小来源开关；首批内建站点仍很少，失败时会显式日志提示但不会自动修复站点规则
 - downloader/library cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早的历史导入事件若只有旧 `message` 目标路径，inspect / cleanup 都会显式拒绝，仍需人工甄别
-- 当前 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up / failure observability 已形成更完整的最小文本闭环；其中 `job_repo` 任务解析失败、`job_event` 关联查询失败和 `job_event` 写入失败三类 cleanup 失败可观测性都已有回归覆盖。下一步只观察真实回归，不继续预埋自动化、批量 cleanup 或删种
+- 当前 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up / failure observability 已形成更完整的最小文本闭环；其中 `job_repo` 任务解析失败、`job_event` 关联查询失败、`job_event` 写入失败和删除下载源资产失败四类 cleanup 失败可观测性都已有回归覆盖。下一步只观察真实回归，不继续预埋自动化、批量 cleanup 或删种
 
 ## Latest verification
 
 - docs consistency check: `passed`（`rg -n "Current mainline profile:|Core responsibilities:|personal WeChat|manage_bt_subscription" AGENTS.md README.md docs/STATUS.md docs/NEXT_STEP.md`）
+- focused tests: `19 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
+- focused tests: `38 passed, 27 deselected` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py -k cleanup`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `18 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
 - focused tests: `16 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
 - tests: `305 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
