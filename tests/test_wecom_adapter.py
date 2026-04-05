@@ -222,6 +222,29 @@ def test_handle_wecom_private_text_event_routes_cleanup_inspect_into_shared_runt
     assert target_file.exists()
 
 
+def test_handle_wecom_private_text_event_routes_cleanup_execution_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml("cleanup 87"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert "已清理下载源资产" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
 def test_handle_wecom_callback_http_request_returns_decrypted_echostr() -> None:
     echostr = _encrypt_wecom_plaintext("verify-challenge")
 

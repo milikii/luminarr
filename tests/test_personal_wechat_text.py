@@ -206,6 +206,37 @@ def test_handle_personal_wechat_private_text_event_routes_cleanup_inspect_into_s
     assert target_file.exists()
 
 
+def test_handle_personal_wechat_private_text_event_routes_cleanup_execution_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    event = asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message("cleanup 87"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text="cleanup 87",
+        context_token="ctx-1",
+    )
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, PersonalWeChatPrivateTextEvent)
+    assert "已清理下载源资产" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
 def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp_path: Path) -> None:
     sync_path = tmp_path / "wx-account-1.sync.json"
     saved_sync_buf: list[tuple[Path, str]] = []
