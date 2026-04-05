@@ -1307,6 +1307,45 @@ def test_handle_message_import_routes_to_import_service() -> None:
     import_service.import_by_task_ref.assert_awaited_once_with("87", chat_id=1001, user_id=2001)
 
 
+def test_handle_message_import_formats_import_approval_for_telegram() -> None:
+    update, reply_text = _build_update("import hash-87")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    import_service.import_by_task_ref = AsyncMock(
+        return_value=(
+            "导入待确认：Dune (2021).mkv\n"
+            "任务 ID: 87\n"
+            "任务 Hash: hash-87\n"
+            "请发送 confirm hash-87 执行导入。"
+        )
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "【导入审批】" in sent_text
+    assert "资源: Dune (2021).mkv" in sent_text
+    assert "任务 ID: 87" in sent_text
+    assert "任务 Hash: hash-87" in sent_text
+    assert "确认命令: confirm hash-87" in sent_text
+    assert "直接回复 confirm hash-87 执行导入" in sent_text
+    assert "导入待确认：" not in sent_text
+    import_service.import_by_task_ref.assert_awaited_once_with("hash-87", chat_id=1001, user_id=2001)
+
+
 def test_handle_message_import_replies_service_not_ready() -> None:
     reply_text = AsyncMock()
     message = SimpleNamespace(text="import 87", reply_text=reply_text)

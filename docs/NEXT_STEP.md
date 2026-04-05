@@ -1,4 +1,4 @@
-# Next step (v58)
+# Next step (v59)
 
 ## Current baseline
 
@@ -8,6 +8,7 @@
   - Telegram media sending baseline（已能按管理员 `chat_id + 本地路径` 发送图片或文件，并以 `bot_data` 闭包形式供后续二维码/文件回传复用）
   - Telegram search-result text polish baseline（Telegram 当前会在出口层把共享电影卡片 + 搜索结果文本收紧为更易扫读的标题分区和显式序号提示；personal WeChat / Feishu / WeCom 仍复用 shared private-chat text runtime 原始纯文本）
   - Telegram downloader-approval text polish baseline（Telegram 当前会在出口层把共享下载待确认文本收紧为 `标题 / 选择序号 / 确认命令` 分区；shared `add_to_downloader` 真相文本和其他渠道回复保持不变）
+  - Telegram import-approval text polish baseline（Telegram 当前会在出口层把共享导入待确认文本收紧为 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区；shared `import_to_library` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并以 SVG 文档文件形式回传二维码；扫码确认成功后会回最小结果文本并保存 `wechat-clawbot` 凭据）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
@@ -55,12 +56,13 @@
 
 ## Goal
 
-Continue the next smallest Telegram richer card/UI polish step by tightening Telegram import-approval message readability, without changing the landed multi-channel text runtime or workflow truth boundaries.
+Continue the next smallest ops-cleanup step by landing a deterministic downloader/library asset-correlation baseline, without automating deletion or changing the landed downloader/import workflow truth boundaries.
 
 ## Only do
 
-- 只补 Telegram richer card/UI polish 的下一小刀，优先收紧 Telegram 导入审批消息的排版和可扫读性
-- 继续复用当前 Telegram runtime、现有 callback/文本协议，以及 shared private-chat text runtime
+- 只补 downloader/library asset correlation 的下一小刀，优先把“下载源路径 / 导入目标路径 / 任务引用”之间的最小确定性关联补齐
+- 优先复用现有 `task_id / task_hash / task_ref`、`job_event`、导入成功事件和当前 SQLite 持久化真相
+- 先做可追溯 correlation 基线，为后续 cleanup 提供依据；当前不直接执行删源、删种或自动清理
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -72,28 +74,25 @@ Continue the next smallest Telegram richer card/UI polish step by tightening Tel
   - `import_to_library`
   - `manage_watchlist`
   - `manage_bt_subscription`
-- 保持现有 approval / jobs / lease / SQLite 协议不变
 - 保持现有 personal WeChat / Feishu / WeCom 最小私聊文本链路不变
-- 当前这一步只处理 Telegram 展示层，不把它扩成通用富交互平台
+- 不把这一步扩成通用资产管理平台或通用清理框架
 
 ## Do not do
 
-- 不回头重做 personal WeChat 二维码登录、凭据协议或私聊文本适配
+- 不在尚未拿到确定性关联真相前直接删除下载目录内容、种子或库内文件
+- 不回头重做 Telegram / personal WeChat / Feishu / WeCom 既有文本链路
 - 不改 shared private-chat text runtime 的既有文本协议形状
-- 不改现有 SQLite / approval / jobs / lease 真相协议
-- 不改现有 downloader / import approval 协议
+- 不改现有 downloader / import approval 协议和 `confirm` 边界
 - 不改现有 BT shared source adapter、WebSource 规则层、`btsub` 共享选源逻辑
-- 不改现有原始磁力处理链问询形状
-- 不引入 poster 渲染、通用媒体资产服务、对象存储或 CDN
-- 不把这一步扩成群聊、图片、文件、卡片按钮或通用多渠道平台化
+- 不引入通用媒体资产服务、对象存储、CDN 或通用运维平台化
 - 不引入 automatic `confirm`
 - 不新增下载器 / 媒体服务器支持
 
 ## Done when
 
-- Telegram 导入审批阶段至少有一处高频消息已收紧为更易扫读的 richer 展示，而不改其业务含义
-- 已落地的 Telegram 搜索结果文本 polish 不回退
-- 已落地的 Telegram 下载审批文本 polish 不回退
+- 至少一条已导入任务拥有可确定追溯的 downloader source -> library target 关联真相
+- 该关联可通过现有 `task_id / task_hash / task_ref` 稳定定位，不依赖自由文本猜测
+- 当前 step 不自动删除下载器资产或库内文件
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
 - 已落地的 personal WeChat `微信登录`、私聊文本收发和凭据落盘行为不回退
 - 现有 Feishu / WeCom 私聊文本能力不回退
@@ -104,5 +103,5 @@ Continue the next smallest Telegram richer card/UI polish step by tightening Tel
 
 按顺序继续：
 
-1. 运维清理
-   - downloader/library asset correlation and cleanup
+1. 运维清理执行
+   - 基于已落地 correlation 真相补最小 cleanup 执行和显式保护栏

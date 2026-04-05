@@ -1,4 +1,4 @@
-# Luminarr (v48)
+# Luminarr (v49)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -34,6 +34,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - Telegram media sending baseline（最小图片/文件发送）
   - Telegram search-result text polish baseline（Telegram 当前会在出口层把共享电影卡片 + 搜索结果文本收紧为更易扫读的标题分区和显式序号提示；personal WeChat / Feishu / WeCom 仍复用 shared private-chat text runtime 原始纯文本）
   - Telegram downloader-approval text polish baseline（Telegram 当前会在出口层把共享下载待确认文本收紧为 `标题 / 选择序号 / 确认命令` 分区；shared `add_to_downloader` 真相文本和其他渠道回复保持不变）
+  - Telegram import-approval text polish baseline（Telegram 当前会在出口层把共享导入待确认文本收紧为 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区；shared `import_to_library` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 即可触发 `wechat-clawbot` 二维码登录，并回传 SVG 二维码文件；扫码成功后会保存凭据并回发最小结果文本）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat text runtime baseline
@@ -91,19 +92,19 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **Telegram downloader-approval text polish baseline**
+- **Telegram import-approval text polish baseline**
 
 这一步已完成：
 
-- Telegram 在用户回复候选序号后，当前会在 Telegram 出口层把共享下载待确认文本收紧成 `标题 / 选择序号 / 确认命令` 分区
-- Telegram 下载审批消息当前会补显式确认命令提示，用户可直接按提示回复 `confirm <序号>` 继续走既有下载审批链
-- personal WeChat / Feishu / WeCom 仍继续复用 shared `add_to_downloader` 和 shared private-chat text runtime 的原始纯文本回复，不跟着 Telegram 展示层一起变化
+- Telegram 在用户发送 `import <任务ID或Hash>` 后，当前会在 Telegram 出口层把共享导入待确认文本收紧成 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区
+- Telegram 导入审批消息当前会补显式确认命令提示，用户可直接按提示回复 `confirm <任务ID或Hash>` 继续走既有导入审批链
+- personal WeChat / Feishu / WeCom 仍继续复用 shared `import_to_library` 和 shared private-chat text runtime 的原始纯文本回复，不跟着 Telegram 展示层一起变化
 - 不改现有 workflow / service / approval / jobs / lease / SQLite 真相边界
-- 不改现有搜索结果 polish、BT follow-up、`微信登录`、Feishu / WeCom 私聊文本链路
+- 不改现有 Telegram 搜索结果 polish、下载审批 polish、BT follow-up、`微信登录`、Feishu / WeCom 私聊文本链路
 
 当前 next step：
 
-- Telegram import approval text polish
+- downloader/library asset correlation and cleanup（下一小步先补最小 correlation baseline，不直接执行清理）
 
 当前 personal WeChat 凭据默认跟随 `wechat-clawbot` 状态目录规则落盘：优先 `OPENCLAW_STATE_DIR`，其次 `CLAWDBOT_STATE_DIR`，否则落到 `~/.openclaw`。
 
@@ -117,8 +118,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. Telegram richer card/UI polish
-2. downloader/library asset correlation and cleanup
+1. downloader/library asset correlation baseline
+2. downloader/library cleanup execution
 
 补充说明：
 
@@ -131,7 +132,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - personal WeChat 最小私聊文本基线已经落地，但当前只支持单账号、私聊文本和启动时读取已保存登录态；不急着扩到群聊、图片、卡片或更重的 UI 形态。
 - personal WeChat 未来默认直接复用 `wechat-clawbot` Python 包提供的 iLink 客户端能力，不把 npm ClawBot 插件作为当前项目的主实现形态。
 - personal WeChat 凭据当前仍由 `wechat-clawbot` 状态目录管理，还没有并入项目自己的 SQLite 真相。
-- Telegram richer card/UI polish 当前已先落了搜索结果文本排版和下载审批文本排版两刀；下一刀优先收紧 Telegram 导入审批消息，但它仍然是体验增强，不改当前多渠道最小文本主链的真相边界。
+- Telegram richer card/UI polish 当前已先落了搜索结果、下载审批、导入审批三刀；当前主线从体验增强切回 downloader/library asset correlation and cleanup，下一小步先补 correlation 真相基线，不直接删文件。
 
 ---
 
@@ -185,4 +186,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、Telegram 下载审批文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 Telegram import approval text polish。**
+**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、Telegram 下载审批文本 polish、Telegram 导入审批文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 downloader/library asset correlation baseline。**

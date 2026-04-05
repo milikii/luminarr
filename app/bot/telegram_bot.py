@@ -180,6 +180,9 @@ TELEGRAM_MOVIE_CARD_HEADER_TEXT = "电影海报卡片"
 TELEGRAM_SEARCH_RESULT_PREFIX = "搜索结果："
 TELEGRAM_ADD_APPROVAL_PREFIX = "下载待确认："
 TELEGRAM_ADD_APPROVAL_TASK_REF_PREFIX = "选择序号:"
+TELEGRAM_IMPORT_APPROVAL_PREFIX = "导入待确认："
+TELEGRAM_IMPORT_APPROVAL_TASK_ID_PREFIX = "任务 ID:"
+TELEGRAM_IMPORT_APPROVAL_TASK_HASH_PREFIX = "任务 Hash:"
 SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
@@ -2147,7 +2150,9 @@ async def _search_with_reactive_recovery(
 
 
 def _format_telegram_reply(text: str) -> str:
-    return _format_telegram_add_approval_reply(_format_telegram_search_reply(text))
+    return _format_telegram_import_approval_reply(
+        _format_telegram_add_approval_reply(_format_telegram_search_reply(text))
+    )
 
 
 def _format_telegram_search_reply(text: str) -> str:
@@ -2217,6 +2222,37 @@ def _format_telegram_add_approval_reply(text: str) -> str:
             f"确认命令: {expected_confirm}",
             "",
             f"直接回复 {expected_confirm} 执行下载",
+        ]
+    )
+
+
+def _format_telegram_import_approval_reply(text: str) -> str:
+    stripped_text = text.strip()
+    if not stripped_text.startswith(TELEGRAM_IMPORT_APPROVAL_PREFIX):
+        return text
+
+    lines = [line.strip() for line in stripped_text.splitlines() if line.strip()]
+    if len(lines) < 4:
+        return text
+
+    name = lines[0].removeprefix(TELEGRAM_IMPORT_APPROVAL_PREFIX).strip()
+    task_id = lines[1].removeprefix(TELEGRAM_IMPORT_APPROVAL_TASK_ID_PREFIX).strip()
+    task_hash = lines[2].removeprefix(TELEGRAM_IMPORT_APPROVAL_TASK_HASH_PREFIX).strip()
+    confirm_line = lines[3]
+    confirm_match = re.match(r"^请发送\s+(confirm\s+.+?)\s+执行导入。?$", confirm_line)
+    if not name or not task_id or not task_hash or confirm_match is None:
+        return text
+
+    confirm_command = confirm_match.group(1).strip()
+    return "\n".join(
+        [
+            "【导入审批】",
+            f"资源: {name}",
+            f"任务 ID: {task_id}",
+            f"任务 Hash: {task_hash}",
+            f"确认命令: {confirm_command}",
+            "",
+            f"直接回复 {confirm_command} 执行导入",
         ]
     )
 
