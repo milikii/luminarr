@@ -1,4 +1,4 @@
-# Luminarr (v52)
+# Luminarr (v53)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -62,6 +62,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - downloader/library asset correlation baseline（导入成功事件当前会结构化记录下载源路径 + 导入目标路径，并可按 `task_ref / task_id / task_hash` 稳定定位）
   - downloader/library cleanup inspect baseline（当前支持 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`；只读返回关联、路径存在性和当前 guardrail 是否允许 cleanup）
   - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
+  - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
@@ -95,17 +96,19 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **downloader/library cleanup inspect baseline**
+- **downloader/library cleanup command discoverability baseline**
 
 这一步已完成：
 
-- 当前私聊文本入口已补 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 最小只读预检闭环
-- inspect 会基于 `job_event` 中已落地的 `source_path + target_path` 关联，明确返回：是否找到关联、源路径/目标路径是否存在、当前 guardrail 是否允许 cleanup
-- inspect 不删除任何文件，也不改现有 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>` 执行语义；execution 仍只清理单个 downloader/source 侧已导入资产，不删 library target、metadata / subtitle sidecar、不顺手删种
+- 当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会直接回两条命令的最小对照用法
+- 文本里会显式区分：
+  - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`：实际清理下载源资产
+  - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`：只读预检，不删除任何文件
+- 不改现有 cleanup inspect / execution 的 guardrail、删除范围和 downloader/import 真相边界
 
 当前 next step：
 
-- downloader/library cleanup command discoverability baseline（在已落地 cleanup inspect + execution 之上，只补最小文本用法提示，让用户更容易区分“只读预检”和“实际清理”）
+- downloader/library cleanup rejection follow-up guidance baseline（在已落地 cleanup inspect + execution + discoverability 之上，只补最小拒绝/失败场景提示，明确提醒先用 `cleanup inspect` 做只读预检）
 
 当前 personal WeChat 凭据默认跟随 `wechat-clawbot` 状态目录规则落盘：优先 `OPENCLAW_STATE_DIR`，其次 `CLAWDBOT_STATE_DIR`，否则落到 `~/.openclaw`。
 
@@ -119,7 +122,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. downloader/library cleanup command discoverability baseline
+1. downloader/library cleanup rejection follow-up guidance baseline
 
 补充说明：
 
@@ -132,7 +135,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - personal WeChat 最小私聊文本基线已经落地，但当前只支持单账号、私聊文本和启动时读取已保存登录态；不急着扩到群聊、图片、卡片或更重的 UI 形态。
 - personal WeChat 未来默认直接复用 `wechat-clawbot` Python 包提供的 iLink 客户端能力，不把 npm ClawBot 插件作为当前项目的主实现形态。
 - personal WeChat 凭据当前仍由 `wechat-clawbot` 状态目录管理，还没有并入项目自己的 SQLite 真相。
-- Telegram richer card/UI polish 当前已先落了搜索结果、下载审批、导入审批三刀；当前主线已经把 cleanup inspect + execution 和显式保护栏补上，下一小步只补 cleanup 命令 discoverability 文本，不直接扩成自动清理。
+- Telegram richer card/UI polish 当前已先落了搜索结果、下载审批、导入审批三刀；当前主线已经把 cleanup inspect + execution、显式保护栏和命令 discoverability 文本补上，下一小步只补 cleanup 拒绝/失败场景的 follow-up 提示，不直接扩成自动清理。
 
 ---
 
@@ -186,4 +189,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、Telegram 下载审批文本 polish、Telegram 导入审批文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包、downloader/library asset correlation baseline、downloader/library cleanup inspect baseline、downloader/library cleanup execution baseline；当前 next step 是 downloader/library cleanup command discoverability baseline。**
+**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、Telegram 下载审批文本 polish、Telegram 导入审批文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包、downloader/library asset correlation baseline、downloader/library cleanup inspect baseline、downloader/library cleanup execution baseline、downloader/library cleanup command discoverability baseline；当前 next step 是 downloader/library cleanup rejection follow-up guidance baseline。**

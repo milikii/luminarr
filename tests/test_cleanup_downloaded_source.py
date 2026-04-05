@@ -39,6 +39,8 @@ def test_parse_cleanup_query_rejects_non_cleanup_text() -> None:
 def test_inspect_by_task_ref_usage_when_empty(tmp_path: Path) -> None:
     service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
     assert service.inspect_by_task_ref("  ") == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+    assert "只读预检，不删除任何文件" in CLEANUP_INSPECT_QUERY_USAGE_TEXT
+    assert "实际清理下载源资产" in CLEANUP_INSPECT_QUERY_USAGE_TEXT
 
 
 def test_inspect_by_task_ref_returns_ready_text_without_deleting_source(tmp_path: Path) -> None:
@@ -94,6 +96,8 @@ def test_inspect_by_task_ref_returns_correlation_missing_state(tmp_path: Path) -
 def test_cleanup_by_task_ref_usage_when_empty(tmp_path: Path) -> None:
     service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
     assert service.cleanup_by_task_ref("  ") == CLEANUP_QUERY_USAGE_TEXT
+    assert "实际清理下载源资产" in CLEANUP_QUERY_USAGE_TEXT
+    assert "只读预检，不删除任何文件" in CLEANUP_QUERY_USAGE_TEXT
 
 
 def test_cleanup_by_task_ref_removes_source_file_and_keeps_target(tmp_path: Path) -> None:

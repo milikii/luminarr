@@ -1,4 +1,4 @@
-# Next step (v62)
+# Next step (v63)
 
 ## Current baseline
 
@@ -35,6 +35,7 @@
   - downloader/library asset correlation baseline（导入成功事件当前会结构化写入 `source_path + target_path`，并可按 `task_ref / task_id / task_hash` 稳定定位）
   - downloader/library cleanup inspect baseline（当前支持 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`；只读返回关联、路径存在性和当前 guardrail 结果）
   - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
+  - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
@@ -59,16 +60,16 @@
 
 ## Goal
 
-Continue the next smallest ops-cleanup step by landing a deterministic downloader/library cleanup-command discoverability baseline, on top of the landed cleanup-inspect + cleanup-execution truth, so the user can more clearly tell apart "只读预检" and "实际清理" from the command help text itself, without turning it into cleanup automation or changing the landed downloader/import workflow truth boundaries.
+Continue the next smallest ops-cleanup step by landing a deterministic downloader/library cleanup-rejection follow-up guidance baseline, on top of the landed cleanup-inspect + cleanup-execution + cleanup-discoverability truth, so the user can see from existing cleanup rejection/failure replies that `cleanup inspect` is the readonly precheck path before retrying, without changing cleanup guardrails, delete scope, or turning it into cleanup automation.
 
 ## Only do
 
-- 只补 cleanup 命令家族的最小 discoverability 文本，不新增新的 cleanup 副作用
-- 明确区分两条已落地路径：
-  - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`：实际清理下载源资产
+- 只补 cleanup 拒绝/失败场景的最小 follow-up 文本，不新增新的 cleanup 副作用
+- 在现有拒绝或失败回复里，明确提醒：
   - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`：只读预检，不删除任何文件
+  - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`：实际清理下载源资产
 - 优先复用现有 `cleanup` parser、service 和当前 SQLite 真相边界，不引入新的 cleanup workflow
-- 保持现有 inspect / execution 真相和 guardrail 判定不变
+- 保持现有 inspect / execution / discoverability 真相和 guardrail 判定不变
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/cleanup/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -89,6 +90,7 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 - 不让 inspect 直接删除任何下载源资产、库内目标、sidecar 或其他任务文件
 - 不在未校验 correlation 真相和 `target_path` 存在前放宽现有 cleanup execution 保护栏
 - 不删除 library target、metadata sidecar、subtitle sidecar 或其他任务资产
+- 不把拒绝提示扩成自动 inspect、自动 cleanup、批量入口或新的工作流状态
 - 不做后台自动 cleanup、scheduler 批量扫描或通用清理平台化
 - 不回头重做 Telegram / personal WeChat / Feishu / WeCom 既有文本链路
 - 不改 shared private-chat text runtime 的既有文本协议形状
@@ -100,9 +102,9 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 ## Done when
 
-- bare `cleanup` / `清理` 或 cleanup inspect 用法提示，能让用户在不看文档时也看出“执行”和“只读预检”的区别
+- 现有 cleanup 拒绝/失败回复能直接提醒用户：`cleanup inspect` 是只读预检，不删除任何文件
 - 不新增新的 cleanup 命令家族、自动化路径或批量入口
-- 已落地 cleanup inspect / execution 的输出、保护栏和删除范围不回退
+- 已落地 cleanup inspect / execution / discoverability 的输出、保护栏和删除范围不回退
 - 当前 step 不扩成自动删除下载器资产、删种、库内文件清理平台或批量运维入口
 - 已落地的 cleanup execution baseline 行为和保护栏不回退
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
@@ -115,4 +117,4 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 按顺序继续：
 
-1. 视最小 cleanup inspect + execution 的保护栏和回归结果，再决定是否继续扩到更连续的运维动作；当前仍不预先承诺自动化、批量 cleanup 或删种
+1. 视 cleanup inspect + execution + discoverability + rejection guidance 的回归结果，再决定是否继续补更连续的运维文本；当前仍不预先承诺自动化、批量 cleanup 或删种

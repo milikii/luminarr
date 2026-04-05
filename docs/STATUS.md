@@ -1,4 +1,4 @@
-# Current status (v61)
+# Current status (v62)
 
 ## Project position
 
@@ -52,6 +52,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - downloader/library asset correlation baseline（导入成功事件当前会结构化记录下载源路径 + 导入目标路径，且可按 `task_ref / task_id / task_hash` 稳定定位）
   - downloader/library cleanup inspect baseline（当前支持 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`；只读返回关联、`source_path / target_path` 是否存在，以及当前 guardrail 是否允许 cleanup）
   - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
+  - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法，帮助用户直接区分执行与预检）
   - completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - filename normalization
@@ -84,13 +85,13 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 ## What is not implemented yet
 
 - **当前 next step**
-  - downloader/library cleanup command discoverability baseline（在已落地 cleanup inspect + execution 之上，下一小步只补最小文本用法提示，让用户更容易区分“只读预检”和“实际清理”）
+  - downloader/library cleanup rejection follow-up guidance baseline（在已落地 cleanup inspect + execution + discoverability 之上，下一小步只补最小拒绝/失败场景提示，明确提醒先用 `cleanup inspect` 做只读预检）
 
 - **后续体验**
   - 暂无独立条目（Telegram richer card/UI polish 当前已收束）
 
 - **后续运维**
-  - 暂无独立条目（当前 next step 已切到 downloader/library cleanup inspect baseline）
+  - 暂无独立条目（当前 next step 已切到 cleanup rejection follow-up guidance）
 
 - **仍未解决的基础能力**
   - real image/media poster rendering
@@ -119,10 +120,16 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - pure BT 当前已落地最小确定性单片优选，但仍只覆盖文本型 `下载这个 BT <查询词>`，还不是完整质量评分 / 规则引擎
 - `BT_WEB_SOURCES` 当前只做最小来源开关；首批内建站点仍很少，失败时会显式日志提示但不会自动修复站点规则
 - downloader/library cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早的历史导入事件若只有旧 `message` 目标路径，inspect / cleanup 都会显式拒绝，仍需人工甄别
-- 当前 bare `cleanup` / `清理` 的最小用法提示仍偏向执行路径；虽然 `cleanup inspect` 已可用，但 discoverability 还不够好
+- 当前 cleanup 拒绝/失败回复仍偏向直接报错；虽然 bare `cleanup` / `cleanup inspect` 已能区分执行与只读预检，但失败场景还没有统一提醒用户先跑 `cleanup inspect`
 
 ## Latest verification
 
+- focused tests: `11 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
+- focused tests: `3 passed, 64 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup"`)
+- tests: `262 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
+- manual verification:
+  - downloader/library cleanup command discoverability baseline passed（已运行临时脚本 `tmp_tests/verify_cleanup_command_discoverability.py`，脚本随后已删除）
 - focused tests: `79 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_telegram_bot.py tests/test_execution_policy.py`)
 - tests: `262 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
 - compile check: `passed` (`python3 -m compileall app tests`)
@@ -205,4 +212,4 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 当前只做一件事：
 
-- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，基于已落地 cleanup inspect + execution 基线，只补最小 cleanup 命令 discoverability 文本，不扩成自动 cleanup 或批量运维。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，基于已落地 cleanup inspect + execution + discoverability 基线，只补最小 cleanup 拒绝/失败 follow-up 提示，不扩成自动 cleanup 或批量运维。

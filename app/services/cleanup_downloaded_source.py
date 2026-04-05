@@ -8,8 +8,16 @@ from pathlib import Path
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 
-CLEANUP_QUERY_USAGE_TEXT = "清理格式：cleanup <任务ID或Hash>"
-CLEANUP_INSPECT_QUERY_USAGE_TEXT = "清理预检格式：cleanup inspect <任务ID或Hash>"
+CLEANUP_QUERY_USAGE_TEXT = (
+    "cleanup 用法：\n"
+    "cleanup <任务ID或Hash> / 清理 <任务ID或Hash>：实际清理下载源资产\n"
+    "cleanup inspect <任务ID或Hash> / 清理检查 <任务ID或Hash>：只读预检，不删除任何文件"
+)
+CLEANUP_INSPECT_QUERY_USAGE_TEXT = (
+    "cleanup inspect 用法：\n"
+    "cleanup inspect <任务ID或Hash> / 清理检查 <任务ID或Hash>：只读预检，不删除任何文件\n"
+    "cleanup <任务ID或Hash> / 清理 <任务ID或Hash>：实际清理下载源资产"
+)
 CLEANUP_CORRELATION_MISSING_TEXT = "未找到带 source_path/target_path 的已导入关联，当前任务暂不能执行 cleanup。"
 CLEANUP_TARGET_MISSING_TEXT = "库内目标路径不存在，已拒绝清理下载源资产：{target_path}"
 CLEANUP_SOURCE_MISSING_TEXT = "下载源资产已不存在，无需清理：{source_path}"
