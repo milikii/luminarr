@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.bot.feishu_adapter import handle_feishu_private_text_event
+from app.bot.channel_identity import project_channel_chat_id
 from app.bot.personal_wechat_text import handle_personal_wechat_private_text_event
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -24,6 +25,7 @@ from app.bot.wecom_adapter import (
     handle_wecom_private_text_event,
 )
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
@@ -38,6 +40,7 @@ from app.services.search_media import SearchMediaService
 _TEST_WECOM_TOKEN = "wecom-token-42"
 _TEST_WECOM_ENCODING_AES_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
 _TEST_WECOM_RECEIVE_ID = "wwcorp123"
+_CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
@@ -59,7 +62,12 @@ def _make_database(base_dir: Path) -> SqliteDatabase:
     return database
 
 
-def _build_cleanup_service(base_dir: Path) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+def _build_cleanup_service(
+    base_dir: Path,
+    *,
+    chat_id: int | None = None,
+    chat_scoped_task_ref: str | None = None,
+) -> tuple[CleanupDownloadedSourceService, Path, Path]:
     download_dir = base_dir / "downloads"
     download_dir.mkdir(parents=True)
     source_file = download_dir / "Dune.2021.mkv"
@@ -70,9 +78,20 @@ def _build_cleanup_service(base_dir: Path) -> tuple[CleanupDownloadedSourceServi
     target_file = target_dir / "Dune (2021).mkv"
     target_file.hardlink_to(source_file)
 
-    event_repo = JobEventRepo(_make_database(base_dir))
+    database = _make_database(base_dir)
+    event_repo = JobEventRepo(database)
+    job_repo = None
+    if chat_id is not None and chat_scoped_task_ref is not None:
+        job_repo = JobRepo(database)
+        job_repo.upsert_import_job_pending(
+            chat_id=chat_id,
+            user_id=2001,
+            task_ref=chat_scoped_task_ref,
+            task_id="87",
+            task_hash="hash-87",
+        )
     event_repo.append_event(
-        task_ref="87",
+        task_ref="hash-87" if job_repo is not None else "87",
         task_id="87",
         task_hash="hash-87",
         event_type="import.succeeded",
@@ -80,7 +99,19 @@ def _build_cleanup_service(base_dir: Path) -> tuple[CleanupDownloadedSourceServi
         source_path=str(source_file),
         target_path=str(target_file),
     )
-    return CleanupDownloadedSourceService(event_repo), source_file, target_file
+    return CleanupDownloadedSourceService(event_repo, job_repo=job_repo), source_file, target_file
+
+
+def _expected_chat_id(channel: str) -> int:
+    if channel == "telegram":
+        return 1001
+    if channel == "personal_wechat":
+        return project_channel_chat_id(channel="personal_wechat", external_chat_id="wx-user-1")
+    if channel == "feishu":
+        return project_channel_chat_id(channel="feishu", external_chat_id="oc_feishu_chat_1")
+    if channel == "wecom":
+        return project_channel_chat_id(channel="wecom", external_chat_id="zhangsan")
+    raise ValueError(f"unexpected channel: {channel}")
 
 
 def _build_bot_data(cleanup_service: CleanupDownloadedSourceService) -> dict[str, object]:
@@ -245,6 +276,57 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
     assert "已清理下载源资产" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
     assert not source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_fragment", "expected_follow_up", "expect_source_exists"),
+    [
+        (
+            f"cleanup inspect {_CHAT_SCOPED_TASK_REF}",
+            "当前 guardrail: 允许 cleanup",
+            "cleanup hash-87 / 清理 hash-87：实际清理下载源资产",
+            True,
+        ),
+        (
+            f"cleanup {_CHAT_SCOPED_TASK_REF}",
+            "已清理下载源资产",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+            False,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_fragment: str,
+    expected_follow_up: str,
+    expect_source_exists: bool,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert expected_fragment in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert expected_follow_up in reply_text
+    assert source_file.exists() is expect_source_exists
     assert target_file.exists()
 
 
