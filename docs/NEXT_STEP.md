@@ -1,4 +1,4 @@
-# Next step (v57)
+# Next step (v58)
 
 ## Current baseline
 
@@ -7,6 +7,7 @@
 - **控制层**
   - Telegram media sending baseline（已能按管理员 `chat_id + 本地路径` 发送图片或文件，并以 `bot_data` 闭包形式供后续二维码/文件回传复用）
   - Telegram search-result text polish baseline（Telegram 当前会在出口层把共享电影卡片 + 搜索结果文本收紧为更易扫读的标题分区和显式序号提示；personal WeChat / Feishu / WeCom 仍复用 shared private-chat text runtime 原始纯文本）
+  - Telegram downloader-approval text polish baseline（Telegram 当前会在出口层把共享下载待确认文本收紧为 `标题 / 选择序号 / 确认命令` 分区；shared `add_to_downloader` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并以 SVG 文档文件形式回传二维码；扫码确认成功后会回最小结果文本并保存 `wechat-clawbot` 凭据）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
@@ -54,11 +55,11 @@
 
 ## Goal
 
-Continue the next smallest Telegram richer card/UI polish step by tightening Telegram downloader-approval message readability, without changing the landed multi-channel text runtime or workflow truth boundaries.
+Continue the next smallest Telegram richer card/UI polish step by tightening Telegram import-approval message readability, without changing the landed multi-channel text runtime or workflow truth boundaries.
 
 ## Only do
 
-- 只补 Telegram richer card/UI polish 的下一小刀，优先收紧 Telegram 下载审批消息的排版和可扫读性
+- 只补 Telegram richer card/UI polish 的下一小刀，优先收紧 Telegram 导入审批消息的排版和可扫读性
 - 继续复用当前 Telegram runtime、现有 callback/文本协议，以及 shared private-chat text runtime
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/watchlist/btsub`
@@ -90,8 +91,9 @@ Continue the next smallest Telegram richer card/UI polish step by tightening Tel
 
 ## Done when
 
-- Telegram 下载审批阶段至少有一处高频消息已收紧为更易扫读的 richer 展示，而不改其业务含义
+- Telegram 导入审批阶段至少有一处高频消息已收紧为更易扫读的 richer 展示，而不改其业务含义
 - 已落地的 Telegram 搜索结果文本 polish 不回退
+- 已落地的 Telegram 下载审批文本 polish 不回退
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
 - 已落地的 personal WeChat `微信登录`、私聊文本收发和凭据落盘行为不回退
 - 现有 Feishu / WeCom 私聊文本能力不回退

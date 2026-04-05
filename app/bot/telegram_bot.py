@@ -178,6 +178,8 @@ SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 TELEGRAM_MOVIE_CARD_HEADER_TEXT = "电影海报卡片"
 TELEGRAM_SEARCH_RESULT_PREFIX = "搜索结果："
+TELEGRAM_ADD_APPROVAL_PREFIX = "下载待确认："
+TELEGRAM_ADD_APPROVAL_TASK_REF_PREFIX = "选择序号:"
 SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
@@ -395,7 +397,7 @@ def _build_telegram_reply_func(
     reply_func: Callable[[str], Awaitable[object]],
 ) -> Callable[[str], Awaitable[object]]:
     async def wrapped(text: str) -> object:
-        return await reply_func(_format_telegram_search_reply(text))
+        return await reply_func(_format_telegram_reply(text))
 
     return wrapped
 
@@ -2144,6 +2146,10 @@ async def _search_with_reactive_recovery(
         raise
 
 
+def _format_telegram_reply(text: str) -> str:
+    return _format_telegram_add_approval_reply(_format_telegram_search_reply(text))
+
+
 def _format_telegram_search_reply(text: str) -> str:
     stripped_text = text.strip()
     if (
@@ -2185,6 +2191,34 @@ def _format_telegram_selection_hint(candidate_count: int) -> str:
     if candidate_count <= 1:
         return "直接回复 1 继续，例如：1"
     return f"直接回复 1-{candidate_count} 中的序号继续，例如：1"
+
+
+def _format_telegram_add_approval_reply(text: str) -> str:
+    stripped_text = text.strip()
+    if not stripped_text.startswith(TELEGRAM_ADD_APPROVAL_PREFIX):
+        return text
+
+    lines = [line.strip() for line in stripped_text.splitlines() if line.strip()]
+    if len(lines) < 3:
+        return text
+
+    title = lines[0].removeprefix(TELEGRAM_ADD_APPROVAL_PREFIX).strip()
+    task_ref = lines[1].removeprefix(TELEGRAM_ADD_APPROVAL_TASK_REF_PREFIX).strip()
+    confirm_line = lines[2]
+    expected_confirm = f"confirm {task_ref}"
+    if not title or not task_ref or expected_confirm not in confirm_line:
+        return text
+
+    return "\n".join(
+        [
+            "【下载审批】",
+            f"标题: {title}",
+            f"选择序号: {task_ref}",
+            f"确认命令: {expected_confirm}",
+            "",
+            f"直接回复 {expected_confirm} 执行下载",
+        ]
+    )
 
 
 def _build_recovery_context(*, query: str, chat_id: int | None) -> dict[str, str]:

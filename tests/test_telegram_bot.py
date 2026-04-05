@@ -942,8 +942,12 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     asyncio.run(handle_message(update, context))
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "下载待确认" in sent_text
-    assert "confirm 1" in sent_text
+    assert "【下载审批】" in sent_text
+    assert "标题: title-dune" in sent_text
+    assert "选择序号: 1" in sent_text
+    assert "确认命令: confirm 1" in sent_text
+    assert "直接回复 confirm 1 执行下载" in sent_text
+    assert "下载待确认：" not in sent_text
 
 
 def test_handle_callback_query_digit_routes_to_add_service() -> None:
@@ -972,8 +976,11 @@ def test_handle_callback_query_digit_routes_to_add_service() -> None:
     answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "下载待确认" in sent_text
-    assert "confirm 1" in sent_text
+    assert "【下载审批】" in sent_text
+    assert "标题: title-dune" in sent_text
+    assert "选择序号: 1" in sent_text
+    assert "确认命令: confirm 1" in sent_text
+    assert "直接回复 confirm 1 执行下载" in sent_text
 
 
 def test_handle_callback_query_magnet_routes_to_bt_direct_split() -> None:
@@ -1110,8 +1117,10 @@ def test_handle_callback_query_digit_uses_callback_context_when_effective_contex
     answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "下载待确认" in sent_text
-    assert "confirm 1" in sent_text
+    assert "【下载审批】" in sent_text
+    assert "标题: title-dune" in sent_text
+    assert "选择序号: 1" in sent_text
+    assert "确认命令: confirm 1" in sent_text
 
 
 def test_handle_message_digit_replies_service_not_ready() -> None:

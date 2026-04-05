@@ -1,4 +1,4 @@
-# Current status (v56)
+# Current status (v57)
 
 ## Project position
 
@@ -21,6 +21,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - Telegram runtime
   - Telegram media sending baseline（已能按管理员 `chat_id + 本地路径` 发送图片或文件，并以 `bot_data` 闭包形式供后续二维码/文件回传复用）
   - Telegram search-result text polish baseline（Telegram 当前会在出口层把共享电影卡片 + 搜索结果文本收紧为更易扫读的标题分区和显式序号提示；personal WeChat / Feishu / WeCom 仍复用 shared private-chat text runtime 原始纯文本）
+  - Telegram downloader-approval text polish baseline（Telegram 当前会在出口层把共享下载待确认文本收紧为 `标题 / 选择序号 / 确认命令` 分区；shared `add_to_downloader` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并回传 SVG 二维码文件；扫码确认成功后会保存 `wechat-clawbot` 凭据并回发最小结果文本）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat text runtime baseline（已从 Telegram 收发层抽出可复用文本分发入口）
@@ -79,7 +80,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 ## What is not implemented yet
 
 - **当前 next step**
-  - Telegram richer card/UI polish（在已稳定的多渠道最小私聊文本主链之上，下一刀优先收紧 Telegram 下载审批消息的排版和字段呈现）
+  - Telegram richer card/UI polish（在已稳定的多渠道最小私聊文本主链之上，下一刀优先收紧 Telegram 导入审批消息的排版和字段呈现）
 
 - **后续体验**
   - 暂无独立条目（当前已收敛到上面的 Telegram richer card/UI polish）
@@ -116,6 +117,12 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 ## Latest verification
 
+- focused tests: `3 passed, 60 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "handle_message_digit_routes_to_add_service or handle_callback_query_digit_routes_to_add_service or handle_callback_query_digit_uses_callback_context_when_effective_context_missing"`)
+- focused tests: `10 passed` (`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py`)
+- focused tests: `63 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
+- focused tests: `25 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_feishu_adapter.py tests/test_personal_wechat_text.py tests/test_wecom_adapter.py`)
+- tests: `245 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `63 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
 - focused tests: `25 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_feishu_adapter.py tests/test_personal_wechat_text.py tests/test_wecom_adapter.py`)
 - tests: `245 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
@@ -174,4 +181,4 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 当前只做一件事：
 
-- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链之上，继续补 Telegram richer card/UI polish 的下一小刀，优先改善 Telegram 下载审批消息的可扫读性和字段呈现；仍然不把这一步扩成通用富交互平台。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链之上，继续补 Telegram richer card/UI polish 的下一小刀，优先改善 Telegram 导入审批消息的可扫读性和字段呈现；仍然不把这一步扩成通用富交互平台。
