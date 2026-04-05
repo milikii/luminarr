@@ -280,6 +280,39 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
 
 
 @pytest.mark.parametrize(
+    "query",
+    [
+        "cleanup 87",
+        "清理 87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_target_missing_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+    target_file.unlink()
+
+    reply_text = runner(query, cleanup_service)
+
+    assert f"库内目标路径不存在，已拒绝清理下载源资产：{target_file}" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert source_file.exists()
+    assert not target_file.exists()
+
+
+@pytest.mark.parametrize(
     ("query", "expected_fragment", "expected_follow_up", "expect_source_exists"),
     [
         (

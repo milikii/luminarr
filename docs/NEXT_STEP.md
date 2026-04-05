@@ -1,4 +1,4 @@
-# Next step (v96)
+# Next step (v97)
 
 ## Current baseline
 
@@ -7,7 +7,7 @@
 - 媒体主链已稳定跑通：`search -> select -> downloader approval -> confirm -> dispatch -> status -> import approval -> confirm -> import -> metadata -> subtitle -> refresh`。
 - cleanup 最小文本闭环已落地：discoverability、`cleanup inspect`、`cleanup`、rejection guidance、success follow-up、failure observability、chat-scoped `task_ref` 解析。
 - cleanup 执行阶段的阻断分支（correlation 缺失 / target 缺失 / source 已不存在 / guard 拒绝）已补齐显式中文日志和处理建议，不改用户文本协议。
-- `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id/hash` 的 `cleanup inspect` / `cleanup` smoke，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
+- `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id/hash` 的 `cleanup inspect` / `cleanup` smoke、英文/中文 `target missing` rejection guidance smoke，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
 - BT 主链已落地：PT / BT 分流、processing-path inquiry、BT classification、TMDB association、`raw_bt` 目标目录、shared source adapter、pure BT single-item ranking、`btsub` scheduler tick。
 
 ## Goal
@@ -19,7 +19,7 @@
 - 执行一个 7 天真实使用验证窗口。
 - 把验证窗口起止日期、四渠道真实私聊 smoke 进度和当前结论持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让退出条件只留在口头描述。
 - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke，确认“消息进来 -> shared runtime -> 文本回去”不回退。
-- 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup discoverability + inspect + execution + `chat-scoped task_ref` 关联路径的聚合验收门，并持续覆盖英文/中文协议变体。
+- 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup discoverability + inspect + execution + target-missing rejection guidance + `chat-scoped task_ref` 关联路径的聚合验收门，并持续覆盖英文/中文协议变体。
 - 保持 cleanup 执行阻断分支的显式中文日志和处理建议稳定，不回退到只回用户文本、服务端无日志。
 - 保持 cleanup 当前协议和语义不变：
   - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`
@@ -50,7 +50,7 @@
 - 已完成 7 天验证窗口。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期和当前结论，且 `当前状态`、退出清单、渠道进度彼此一致。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
-- `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文协议与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道 discoverability / inspect / execution 测试结果。
+- `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / target-missing rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
 - cleanup 失败路径继续打印显式中文日志和修复提示，不再静默吞错。
 - 若验证窗口里出现问题，修复仍保持在现有 cleanup 文本闭环和渠道胶水范围内，没有引入新副作用。
