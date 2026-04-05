@@ -1,11 +1,11 @@
-# Current status (v47)
+# Current status (v48)
 
 ## Project position
 
-Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动化 Harness。
+Luminarr 当前是一个 **Telegram + Feishu（最小私聊文本基线）** 的垂直影视自动化 Harness。
 
 当前固定主线：
-- Telegram
+- Telegram + Feishu（当前为最小私聊文本基线）
 - TMDB
 - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 使用）
 - Transmission + qBittorrent
@@ -21,6 +21,7 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
   - Telegram runtime
   - shared private-chat text runtime baseline（已从 Telegram 收发层抽出可复用文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能解析最小私聊文本事件，并稳定投影到现有整数 `chat_id/user_id` 边界）
+  - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上，继续复用 shared private-chat text runtime）
   - `telegram_updates` 去重
   - `jobs` 执行所有权
   - approval / lease / replay guard
@@ -71,7 +72,7 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 ## What is not implemented yet
 
 - **当前 next step**
-  - Feishu private-chat adapter baseline（当前还差最小出站回消息接线和请求入口壳子）
+  - Feishu webhook event-signature verification baseline
 
 - **后续渠道**
   - WeCom
@@ -86,7 +87,8 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 
 ## Current risks
 
-- Feishu 当前已补最小文本事件适配和渠道作用域整数 ID 投影，但真实请求入口、事件验签和出站发送还未接上
+- Feishu 当前已接最小 webhook 请求入口和文本回消息，但事件验签仍未接上
+- Feishu 当前只支持私聊文本消息 / 文本回复，不支持群聊、图片、卡片、按钮回调
 - poster-card 仍然是文本基线
 - candidate mapping 仍只保留每个 chat 最近一次搜索窗口
 - completion truth 主要依赖 runtime 观察，不是完整独立后台轮询平台
@@ -101,6 +103,11 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 
 ## Latest verification
 
+- focused tests: `28 passed, 1 deselected` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_feishu_client.py tests/test_config.py -k 'not webhook_server_routes_real_http_post_into_shared_runtime'`)
+- focused tests: `1 passed, 8 deselected` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k webhook_server_routes_real_http_post_into_shared_runtime`)
+- focused tests: `60 passed` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py`)
+- tests: `219 passed, 1 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `2 passed` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py`)
 - focused tests: `5 passed` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py`)
 - focused tests: `3 passed, 55 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "handle_message_replies_search_result or handle_message_magnet_routes_to_bt_direct_split or handle_callback_query_magnet_routes_to_bt_direct_split"`)
@@ -124,4 +131,4 @@ Luminarr 当前是一个 **Telegram 私聊唯一入口** 的垂直影视自动�
 
 当前只做一件事：
 
-- 在已落地的 Feishu 文本事件适配和渠道作用域整数 ID 投影之上，继续补最小出站回消息接线和请求入口壳子，仍然复用既有 workflow/service/approval 边界，不做通用多渠道平台化。
+- 在已落地的 Feishu 最小 webhook 请求入口、文本回消息和渠道作用域整数 ID 投影之上，补 webhook 事件验签与显式拒绝，仍然复用既有 workflow/service/approval 边界，不做通用多渠道平台化。

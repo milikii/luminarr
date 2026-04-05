@@ -1,4 +1,4 @@
-# Next step (v47)
+# Next step (v48)
 
 ## Current baseline
 
@@ -7,6 +7,7 @@
 - **控制层**
   - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能把 Feishu 私聊文本事件压成现有 `query/chat/user/reply` 入口）
+  - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval
@@ -46,11 +47,12 @@
 
 ## Goal
 
-Continue the smallest remaining step of the **Feishu private-chat adapter baseline** on top of the shared private-chat text runtime.
+Continue the smallest remaining hardening step of the **Feishu private-chat adapter baseline** on top of the shared private-chat text runtime.
 
 ## Only do
 
-- 只补 Feishu 最小出站回消息接线和请求入口壳子
+- 只补 Feishu webhook 事件验签与显式拒绝
+- 继续复用已落地的 Feishu 最小请求入口壳子和文本回消息
 - 继续复用已落地的 Feishu 私聊字符串 ID -> 整数 `chat_id/user_id` 投影
 - 继续复用刚抽出的 shared private-chat text runtime
 - 继续复用现有 workflow 和 service：
@@ -67,6 +69,7 @@ Continue the smallest remaining step of the **Feishu private-chat adapter baseli
 - 继续复用现有 BT 分流、原始磁力 processing-path inquiry、pure BT、`btsub`、BT-only read-only helper
 - 只做最小私聊收发适配，不做群聊
 - 只先处理文本消息和文本回复，不做图片、卡片、按钮回调
+- 验签失败、时间戳异常、请求体不合法时，必须显式拒绝并打印可读中文日志
 - 保持现有媒体后半段边界不变
 - 保持现有 PT / BT 分流边界不变
 - 保持现有 downloader approval-pending 边界不变
@@ -76,6 +79,7 @@ Continue the smallest remaining step of the **Feishu private-chat adapter baseli
 - 不把这一步扩成通用多轮问答框架
 - 不把 Feishu 适配扩成通用多渠道平台
 - 不同时做 WeCom / personal WeChat
+- 不在这一步补群聊、卡片、按钮、图片消息
 - 不改现有 SQLite / approval / jobs / lease 真相协议
 - 不改现有 downloader / import approval 协议
 - 不改现有 BT shared source adapter、WebSource 规则层、`btsub` 共享选源逻辑
@@ -90,8 +94,9 @@ Continue the smallest remaining step of the **Feishu private-chat adapter baseli
 
 ## Done when
 
-- Feishu 入站文本事件已能通过既有 ID 投影进入 shared private-chat text runtime
-- Feishu 文本回复已能从适配层发回真实会话
+- 合法的 Feishu webhook 文本事件会在验签通过后进入 shared private-chat text runtime
+- 非法或缺失签名的 Feishu webhook 请求会在进入 runtime 前被显式拒绝
+- 现有 Feishu 文本回复继续能从适配层发回真实会话
 - 现有 service、approval、jobs、lease 真相边界保持不变
 - Telegram 行为不回退
 - 现有 downloader/import approval 行为不回退

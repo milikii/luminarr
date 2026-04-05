@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 
+from app.bot.feishu_adapter import build_feishu_reply_text_func
+from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
 from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
+from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
@@ -285,6 +288,18 @@ def main() -> None:
         downloader_instances=settings.downloader_instances,
         downloader_role_binding=settings.downloader_role_binding,
     )
+    if settings.feishu_app_id and settings.feishu_app_secret:
+        feishu_client = FeishuClient(
+            app_id=settings.feishu_app_id,
+            app_secret=settings.feishu_app_secret,
+            base_url=settings.feishu_base_url,
+        )
+        application.bot_data["feishu_webhook_reply_text_func"] = build_feishu_reply_text_func(feishu_client)
+        application.bot_data["feishu_webhook_server_config"] = FeishuWebhookServerConfig(
+            host=settings.feishu_webhook_host,
+            port=settings.feishu_webhook_port,
+            path=settings.feishu_webhook_path,
+        )
     application.run_polling(drop_pending_updates=True)
 
 

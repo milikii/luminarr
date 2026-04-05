@@ -1,8 +1,8 @@
-# Luminarr (v38)
+# Luminarr (v39)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
-它当前不是通用 Agent 平台，也不是通用 skill 平台。它的目标很窄：让 Telegram 私聊里的影视下载和入库链路稳定跑通。
+它当前不是通用 Agent 平台，也不是通用 skill 平台。它的目标很窄：让 Telegram / Feishu 私聊里的影视下载和入库链路稳定跑通。
 
 ---
 
@@ -10,7 +10,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前固定主线：
 
-- Telegram 私聊
+- Telegram + Feishu（当前为最小私聊文本基线）
 - TMDB
 - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 使用）
 - Transmission + qBittorrent
@@ -31,6 +31,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 已经落地的关键能力：
 
 - 控制层：
+  - shared private-chat text runtime baseline
+  - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息）
   - `telegram_updates` 去重
   - `jobs` 执行所有权
   - approval / replay guard / timeout
@@ -80,18 +82,21 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **shared private-chat text runtime baseline**
+- **Feishu private-chat adapter baseline**
 
 这一步已完成：
 
-- 从 Telegram 收发层抽出可复用的私聊文本分发入口
-- Telegram 现有搜索、BT 直达入口继续复用同一条主链
+- Feishu 私聊文本 webhook 已能进入 shared private-chat text runtime
+- Feishu 文本回复已能回发到原 Feishu 私聊会话
+- 继续复用既有字符串 ID -> 整数 `chat_id/user_id` 投影
 - 不改现有 workflow / service / approval / jobs / lease 真相边界
-- 不做通用多渠道平台化，只为下一步 Feishu 文本单聊适配收口
+- Telegram 现有搜索、BT 直达入口继续复用同一条主链
 
 当前 next step：
 
-- Feishu private-chat adapter baseline（先接最小文本单聊收发）
+- Feishu webhook event-signature verification baseline
+
+启用当前 Feishu 最小基线时，需要补充 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`，并可按需覆盖 `FEISHU_BASE_URL`、`FEISHU_WEBHOOK_HOST`、`FEISHU_WEBHOOK_PORT`、`FEISHU_WEBHOOK_PATH`。
 
 ---
 
@@ -99,7 +104,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. Feishu private-chat adapter baseline
+1. Feishu webhook event-signature verification baseline
 2. WeCom / personal WeChat
 3. downloader/library asset correlation and cleanup
 
@@ -108,8 +113,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - BT external web-source 当前已经先通过项目内共享 BT 来源适配层进入 BT 支线，没有污染 PT 主链。
 - BT-only read-only helper 当前只提供最小文本型只读探索，不写 workflow truth、不得 dispatch 下载器、不得触发 import / refresh。
 - 当前内建 `nyaa` 规则已能抽出 `size + seeders`，但 richer 字段覆盖和链接校验仍然很薄。
-- 下一步转到最小 Feishu 私聊适配，不做通用多渠道平台。
-- 当前先补的是 shared private-chat text runtime，下一刀再把 Feishu 文本消息接进这条共享入口。
+- Feishu 当前只做最小私聊文本 webhook + 文本回消息，不做群聊、图片、卡片、按钮回调。
+- Feishu 最小收发已经接通；下一刀先补 webhook 事件验签，不急着扩到其他渠道。
 
 ---
 
@@ -163,4 +168,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram 私聊唯一入口的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper 和 shared private-chat text runtime；当前 next step 是 Feishu private-chat adapter baseline 的最小文本单聊收发。**
+**Luminarr 当前是一个 Telegram + Feishu（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime 和 Feishu 最小私聊收发；当前 next step 是 Feishu webhook event-signature verification baseline。**

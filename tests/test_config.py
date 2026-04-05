@@ -34,6 +34,12 @@ def test_load_settings_reads_token() -> None:
     assert settings.subtitle_translation_model == "gpt-5.4"
     assert settings.subtitle_translation_timeout_seconds == 60.0
     assert settings.sqlite_db_path == "/data/luminarr.db"
+    assert settings.feishu_app_id == ""
+    assert settings.feishu_app_secret == ""
+    assert settings.feishu_base_url == "https://open.feishu.cn"
+    assert settings.feishu_webhook_host == "0.0.0.0"
+    assert settings.feishu_webhook_port == 18095
+    assert settings.feishu_webhook_path == "/feishu/webhook"
 
 
 def test_load_settings_reads_library_target_dir() -> None:
@@ -124,6 +130,30 @@ def test_load_settings_reads_subtitle_translation_settings() -> None:
     assert settings.subtitle_translation_base_url == "https://openai.example/v1"
     assert settings.subtitle_translation_model == "gpt-5.4"
     assert settings.subtitle_translation_timeout_seconds == 45.0
+
+
+def test_load_settings_reads_feishu_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "FEISHU_APP_ID": "cli_a",
+            "FEISHU_APP_SECRET": "sec_b",
+            "FEISHU_BASE_URL": "https://open.feishu.test/",
+            "FEISHU_WEBHOOK_HOST": "127.0.0.1",
+            "FEISHU_WEBHOOK_PORT": "18096",
+            "FEISHU_WEBHOOK_PATH": "hooks/feishu",
+        }
+    )
+
+    assert settings.feishu_app_id == "cli_a"
+    assert settings.feishu_app_secret == "sec_b"
+    assert settings.feishu_base_url == "https://open.feishu.test"
+    assert settings.feishu_webhook_host == "127.0.0.1"
+    assert settings.feishu_webhook_port == 18096
+    assert settings.feishu_webhook_path == "/hooks/feishu"
 
 
 def test_load_settings_reads_raw_bt_destinations() -> None:
@@ -249,5 +279,31 @@ def test_load_settings_requires_transmission_base_url() -> None:
                 "TELEGRAM_BOT_TOKEN": "token",
                 "PROWLARR_BASE_URL": "http://prowlarr:9696",
                 "PROWLARR_API_KEY": "api-key",
+            }
+        )
+
+
+def test_load_settings_requires_complete_feishu_credentials() -> None:
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091",
+                "FEISHU_APP_ID": "cli_a",
+            }
+        )
+
+
+def test_load_settings_rejects_invalid_feishu_webhook_port() -> None:
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091",
+                "FEISHU_WEBHOOK_PORT": "abc",
             }
         )

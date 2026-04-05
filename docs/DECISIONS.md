@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v41)
+# docs/DECISIONS.md (v42)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -28,10 +28,10 @@
 
 ## D-003 当前固定运行画像
 - **状态**：已决定
-- **日期**：2026-04-04
+- **日期**：2026-04-05
 - **结论**：
   当前主线固定为：
-  - Telegram 私聊
+  - Telegram + Feishu（当前为最小私聊文本基线）
   - TMDB
   - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 支线）
   - Transmission + qBittorrent
@@ -176,10 +176,11 @@
 
 ## D-013 当前明确不做
 - **状态**：已决定
-- **日期**：2026-04-04
+- **日期**：2026-04-05
 - **结论**：
   当前主线不做：
-  - Feishu / WeCom / personal WeChat
+  - WeCom / personal WeChat
+  - Feishu 群聊 / 图片 / 卡片 / 按钮回调 / 通用多渠道平台化
   - Jellyfin / Plex 并行主线支持
   - 通用 plugin / skill / MCP 平台化
   - React TUI / Web UI / 桌面端
@@ -328,3 +329,25 @@
   - 原始外部标识只保留在渠道适配层，用于该渠道自己的回消息动作；不得把它直接塞进现有 SQLite 整数真相列。
 - **原因**：
   这样能在不改审批、作业、候选缓存和持久化协议的前提下，先把 Feishu 私聊最小文本入口接进现有主链，保持 diff 最小且风险可控。
+
+## D-022 Feishu 当前只做最小私聊文本 webhook + reply 闭环
+- **状态**：已决定
+- **日期**：2026-04-05
+- **结论**：
+  - Feishu 当前只接：
+    - 私聊 `p2p`
+    - 文本消息
+    - 文本回复
+  - Feishu 适配层当前负责：
+    - webhook 请求入口
+    - Feishu payload 解析
+    - 调用 shared private-chat text runtime
+    - 把 runtime 产出的文本回发到原 Feishu 会话
+  - 现有 workflow / approval / jobs / lease / SQLite 真相边界保持不变。
+  - 这一步不扩成：
+    - 通用 webhook 总线
+    - 通用多渠道平台
+    - 群聊 / 卡片 / 按钮回调
+  - webhook 事件验签作为下一刀单独补，不和这一步的最小收发闭环混在一起。
+- **原因**：
+  先把 Feishu 的“真实请求进来、文本能回去”补成最小闭环，再做安全加固，能把 diff 控制在最小范围内，也更容易验证 Telegram 主链不回退。

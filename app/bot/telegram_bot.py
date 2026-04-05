@@ -10,6 +10,12 @@ from typing import TypeVar
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
+from app.bot.feishu_webhook_server import (
+    FeishuWebhookServerConfig,
+    FeishuWebhookServerRuntime,
+    start_feishu_webhook_server,
+    stop_feishu_webhook_server,
+)
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
@@ -178,6 +184,9 @@ DOWNLOADER_INSTANCES_KEY = "downloader_instances"
 DOWNLOADER_ROLE_BINDING_KEY = "downloader_role_binding"
 BT_SUBSCRIPTION_SCHEDULER_TASK_KEY = "bt_subscription_scheduler_task"
 BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY = "bt_subscription_scheduler_stop_event"
+FEISHU_WEBHOOK_SERVER_CONFIG_KEY = "feishu_webhook_server_config"
+FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY = "feishu_webhook_reply_text_func"
+FEISHU_WEBHOOK_SERVER_RUNTIME_KEY = "feishu_webhook_server_runtime"
 BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
@@ -368,6 +377,8 @@ def _resolve_execution_gate_for_application(application: Application) -> Executi
 
 
 async def _start_bt_subscription_scheduler(application: Application) -> None:
+    _start_feishu_webhook_server_if_configured(application)
+
     existing_task = application.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
     if isinstance(existing_task, asyncio.Task) and not existing_task.done():
         return
@@ -406,6 +417,8 @@ async def _start_bt_subscription_scheduler(application: Application) -> None:
 
 
 async def _stop_bt_subscription_scheduler(application: Application) -> None:
+    _stop_feishu_webhook_server_if_running(application)
+
     stop_event = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
     task = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
     if isinstance(stop_event, asyncio.Event):
@@ -416,6 +429,44 @@ async def _stop_bt_subscription_scheduler(application: Application) -> None:
         await task
     except Exception as error:
         _log_bt_subscription_scheduler_loop_error(error=error)
+
+
+def _start_feishu_webhook_server_if_configured(application: Application) -> None:
+    existing_runtime = application.bot_data.get(FEISHU_WEBHOOK_SERVER_RUNTIME_KEY)
+    if isinstance(existing_runtime, FeishuWebhookServerRuntime):
+        return
+
+    config = application.bot_data.get(FEISHU_WEBHOOK_SERVER_CONFIG_KEY)
+    reply_text_func = application.bot_data.get(FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY)
+    if config is None and reply_text_func is None:
+        return
+    if not isinstance(config, FeishuWebhookServerConfig) or not callable(reply_text_func):
+        print(
+            "\033[31m[Feishu webhook 配置不完整]\033[0m 缺少 server config 或 reply sender。\n"
+            "\033[33m[处理建议]\033[0m 同时配置 FEISHU_APP_ID/FEISHU_APP_SECRET，并在启动阶段注入 webhook host/port/path。"
+        )
+        return
+    try:
+        runtime = start_feishu_webhook_server(
+            loop=asyncio.get_running_loop(),
+            config=config,
+            bot_data=application.bot_data,
+            reply_text_func=reply_text_func,
+        )
+    except OSError as error:
+        print(
+            f"\033[31m[Feishu webhook 启动失败]\033[0m 原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查 FEISHU_WEBHOOK_HOST/PORT 是否可绑定，或确认端口未被占用。"
+        )
+        raise
+    application.bot_data[FEISHU_WEBHOOK_SERVER_RUNTIME_KEY] = runtime
+
+
+def _stop_feishu_webhook_server_if_running(application: Application) -> None:
+    runtime = application.bot_data.pop(FEISHU_WEBHOOK_SERVER_RUNTIME_KEY, None)
+    if not isinstance(runtime, FeishuWebhookServerRuntime):
+        return
+    stop_feishu_webhook_server(runtime)
 
 
 async def _bt_subscription_scheduler_loop(

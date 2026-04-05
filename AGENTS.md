@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v25)
+# Luminarr AGENTS.md (v26)
 
 This file is the repository contract for AI coding agents.
 
@@ -51,7 +51,7 @@ When docs disagree, follow:
 ## 6. Project scope
 
 Current mainline profile:
-- Telegram private chat only
+- Telegram + Feishu（当前为最小私聊文本基线）
 - TMDB
 - Prowlarr（current main source） + minimal BT WebSource（BT-only）
 - Transmission + qBittorrent
@@ -84,10 +84,11 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 The current next smallest path is:
 
-- **Feishu private-chat adapter baseline**
+- **Feishu webhook event-signature verification baseline**
 
 Keep these landed baselines stable while doing it:
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
+- shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息
 - downloader/import approval boundaries
 - copy fallback approval
 - completion-monitor + post-download auto import

@@ -56,6 +56,12 @@ class Settings:
     bt_web_sources: tuple[str, ...]
     downloader_instances: tuple[DownloaderInstanceConfig, ...]
     downloader_role_binding: DownloaderRoleBinding | None
+    feishu_app_id: str
+    feishu_app_secret: str
+    feishu_base_url: str
+    feishu_webhook_host: str
+    feishu_webhook_port: int
+    feishu_webhook_path: str
 
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
@@ -67,6 +73,26 @@ def _read_required(env: Mapping[str, str], key: str) -> str:
 
 def _read_optional(env: Mapping[str, str], key: str) -> str:
     return env.get(key, "").strip()
+
+
+def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
+    raw_value = _read_optional(env, key)
+    if not raw_value:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ConfigError(f"{key} must be an integer") from error
+    if value <= 0:
+        raise ConfigError(f"{key} must be a positive integer")
+    return value
+
+
+def _normalize_http_path(raw_value: str, *, default: str) -> str:
+    cleaned_value = raw_value.strip() or default
+    if not cleaned_value.startswith("/"):
+        return f"/{cleaned_value}"
+    return cleaned_value
 
 
 def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDestinationOption, ...]:
@@ -227,6 +253,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     tmdb_base_url = _read_optional(env, "TMDB_BASE_URL").rstrip("/")
     fanart_base_url = _read_optional(env, "FANART_BASE_URL").rstrip("/")
     subtitle_translation_base_url = _read_optional(env, "SUBTITLE_TRANSLATION_BASE_URL").rstrip("/")
+    feishu_base_url = _read_optional(env, "FEISHU_BASE_URL").rstrip("/")
     subtitle_translation_timeout_raw = _read_optional(env, "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS")
     subtitle_translation_timeout_seconds = 60.0
     if subtitle_translation_timeout_raw:
@@ -234,6 +261,10 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
             subtitle_translation_timeout_seconds = float(subtitle_translation_timeout_raw)
         except ValueError:
             raise ConfigError("SUBTITLE_TRANSLATION_TIMEOUT_SECONDS must be a number")
+    feishu_app_id = _read_optional(env, "FEISHU_APP_ID")
+    feishu_app_secret = _read_optional(env, "FEISHU_APP_SECRET")
+    if bool(feishu_app_id) != bool(feishu_app_secret):
+        raise ConfigError("FEISHU_APP_ID and FEISHU_APP_SECRET must be set together")
     downloader_instances = _read_downloader_instances(env)
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
@@ -258,4 +289,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         bt_web_sources=_read_bt_web_sources(env),
         downloader_instances=downloader_instances,
         downloader_role_binding=_read_downloader_role_binding(env, downloader_instances),
+        feishu_app_id=feishu_app_id,
+        feishu_app_secret=feishu_app_secret,
+        feishu_base_url=feishu_base_url or "https://open.feishu.cn",
+        feishu_webhook_host=_read_optional(env, "FEISHU_WEBHOOK_HOST") or "0.0.0.0",
+        feishu_webhook_port=_read_optional_int(env, "FEISHU_WEBHOOK_PORT", 18095),
+        feishu_webhook_path=_normalize_http_path(
+            _read_optional(env, "FEISHU_WEBHOOK_PATH"),
+            default="/feishu/webhook",
+        ),
     )
