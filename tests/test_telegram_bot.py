@@ -1507,8 +1507,12 @@ def test_handle_message_cleanup_replies_service_not_ready() -> None:
 @pytest.mark.parametrize(
     "query",
     [
+        "cleanup",
         "cleanup inspect hash-87",
+        "cleanup inspect",
+        "清理",
         "清理 hash-87",
+        "清理检查",
         "清理检查 hash-87",
     ],
 )
