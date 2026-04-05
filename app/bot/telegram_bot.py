@@ -176,6 +176,8 @@ PURE_BT_SEARCH_FAILED_TEXT = "pure BT 搜索暂不可用，请稍后重试。"
 BT_READ_ONLY_HELPER_FAILED_TEXT = "BT 只读探索暂不可用，请稍后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
+TELEGRAM_MOVIE_CARD_HEADER_TEXT = "电影海报卡片"
+TELEGRAM_SEARCH_RESULT_PREFIX = "搜索结果："
 SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
@@ -282,7 +284,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await handle_private_chat_query_text(
         query=(message.text or "").strip(),
-        reply_func=message.reply_text,
+        reply_func=_build_telegram_reply_func(message.reply_text),
         chat_id=chat_id,
         user_id=user_id,
         context=context,
@@ -319,7 +321,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
 
     await handle_private_chat_query_text(
         query=query,
-        reply_func=message.reply_text,
+        reply_func=_build_telegram_reply_func(message.reply_text),
         chat_id=chat_id,
         user_id=user_id,
         context=context,
@@ -387,6 +389,15 @@ def build_telegram_send_media_func(application: Application) -> TelegramSendMedi
         )
 
     return send_media
+
+
+def _build_telegram_reply_func(
+    reply_func: Callable[[str], Awaitable[object]],
+) -> Callable[[str], Awaitable[object]]:
+    async def wrapped(text: str) -> object:
+        return await reply_func(_format_telegram_search_reply(text))
+
+    return wrapped
 
 
 async def _send_telegram_media(
@@ -2131,6 +2142,49 @@ async def _search_with_reactive_recovery(
         if _is_llm_physical_failure(error):
             return LLM_PHYSICAL_FAILURE_SAFE_TEXT
         raise
+
+
+def _format_telegram_search_reply(text: str) -> str:
+    stripped_text = text.strip()
+    if (
+        not stripped_text
+        or TELEGRAM_MOVIE_CARD_HEADER_TEXT not in stripped_text
+        or TELEGRAM_SEARCH_RESULT_PREFIX not in stripped_text
+    ):
+        return text
+
+    sections = re.split(r"\n\s*\n", stripped_text)
+    card_section = next(
+        (section for section in sections if section.startswith(TELEGRAM_MOVIE_CARD_HEADER_TEXT)),
+        "",
+    )
+    result_section = next(
+        (section for section in sections if section.startswith(TELEGRAM_SEARCH_RESULT_PREFIX)),
+        "",
+    )
+    if not card_section or not result_section:
+        return text
+
+    card_lines = [line.strip() for line in card_section.splitlines() if line.strip()]
+    result_lines = [line.strip() for line in result_section.splitlines() if line.strip()]
+    if len(card_lines) < 2 or len(result_lines) < 2:
+        return text
+
+    query = result_lines[0].removeprefix(TELEGRAM_SEARCH_RESULT_PREFIX).strip()
+    candidate_count = sum(1 for line in result_lines[1:] if re.match(r"^\d+\.\s", line))
+    if candidate_count <= 0:
+        return text
+
+    formatted_lines = ["【电影卡片】", *card_lines[1:], "", f"【搜索结果】 {query}".rstrip()]
+    formatted_lines.extend(result_lines[1:])
+    formatted_lines.extend(("", _format_telegram_selection_hint(candidate_count)))
+    return "\n".join(formatted_lines)
+
+
+def _format_telegram_selection_hint(candidate_count: int) -> str:
+    if candidate_count <= 1:
+        return "直接回复 1 继续，例如：1"
+    return f"直接回复 1-{candidate_count} 中的序号继续，例如：1"
 
 
 def _build_recovery_context(*, query: str, chat_id: int | None) -> dict[str, str]:

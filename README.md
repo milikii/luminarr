@@ -1,4 +1,4 @@
-# Luminarr (v46)
+# Luminarr (v47)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -32,6 +32,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - 控制层：
   - Telegram media sending baseline（最小图片/文件发送）
+  - Telegram search-result text polish baseline（Telegram 当前会在出口层把共享电影卡片 + 搜索结果文本收紧为更易扫读的标题分区和显式序号提示；personal WeChat / Feishu / WeCom 仍复用 shared private-chat text runtime 原始纯文本）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 即可触发 `wechat-clawbot` 二维码登录，并回传 SVG 二维码文件；扫码成功后会保存凭据并回发最小结果文本）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat text runtime baseline
@@ -89,22 +90,19 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **personal WeChat private-chat text baseline**
+- **Telegram search-result text polish baseline**
 
 这一步已完成：
 
-- Telegram 私聊发送 `微信登录` 后，Luminarr 当前进程仍会调用 `wechat-clawbot` 发起二维码登录，并把凭据保存到 `wechat-clawbot` 状态目录
-- 当前进程启动时会读取 `wechat-clawbot` 已保存的 personal WeChat 凭据；若只检测到一个可用账号，会自动启动最小 personal WeChat 私聊文本轮询
-- personal WeChat 私聊文本入站会先把外部 `from_user_id` 压成带渠道命名空间的整数 `chat_id/user_id`，再进入 shared private-chat text runtime
-- runtime 产出的最小文本回复会通过 `wechat-clawbot sendMessage` 回到原 personal WeChat 私聊
-- 若检测到多个已保存账号或 token 不可用，当前会打印显式中文彩色日志并拒绝启动 personal WeChat 文本服务
-- 当前 personal WeChat 私聊文本轮询只在进程启动时读取已保存登录态；同一进程里刚完成 `微信登录` 后，要等下一次启动才会开始监听 personal WeChat 私聊
+- Telegram 搜索命中时，当前会在 Telegram 出口层把共享电影卡片 + 搜索结果文本收紧成更易扫读的标题分区
+- Telegram 搜索结果当前会补显式序号提示，用户可直接按提示回复数字继续走既有下载审批链
+- personal WeChat / Feishu / WeCom 仍继续复用 shared private-chat text runtime 的原始纯文本回复，不跟着 Telegram 展示层一起变化
 - 不改现有 workflow / service / approval / jobs / lease / SQLite 真相边界
-- Telegram / Feishu / WeCom 现有搜索、BT 直达入口继续复用同一条主链
+- 不改现有 BT follow-up、`微信登录`、Feishu / WeCom 私聊文本链路
 
 当前 next step：
 
-- Telegram richer card/UI polish
+- Telegram downloader approval text polish
 
 当前 personal WeChat 凭据默认跟随 `wechat-clawbot` 状态目录规则落盘：优先 `OPENCLAW_STATE_DIR`，其次 `CLAWDBOT_STATE_DIR`，否则落到 `~/.openclaw`。
 
@@ -132,7 +130,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - personal WeChat 最小私聊文本基线已经落地，但当前只支持单账号、私聊文本和启动时读取已保存登录态；不急着扩到群聊、图片、卡片或更重的 UI 形态。
 - personal WeChat 未来默认直接复用 `wechat-clawbot` Python 包提供的 iLink 客户端能力，不把 npm ClawBot 插件作为当前项目的主实现形态。
 - personal WeChat 凭据当前仍由 `wechat-clawbot` 状态目录管理，还没有并入项目自己的 SQLite 真相。
-- Telegram richer card/UI polish 现在回到队首，但它仍然是体验增强，不改当前多渠道最小文本主链的真相边界。
+- Telegram richer card/UI polish 当前已先落了搜索结果文本排版这一刀；下一刀优先收紧 Telegram 下载审批消息，但它仍然是体验增强，不改当前多渠道最小文本主链的真相边界。
 
 ---
 
@@ -186,4 +184,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 Telegram richer card/UI polish。**
+**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 Telegram downloader approval text polish。**

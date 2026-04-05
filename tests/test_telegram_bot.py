@@ -144,8 +144,11 @@ def test_handle_message_replies_search_result() -> None:
 
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "搜索结果：dune" in sent_text
+    assert "【电影卡片】" in sent_text
+    assert "【搜索结果】 dune" in sent_text
     assert "title-dune" in sent_text
+    assert "直接回复 1 继续，例如：1" in sent_text
+    assert "电影海报卡片" not in sent_text
 
 
 def test_handle_message_magnet_routes_to_bt_direct_split() -> None:
@@ -1807,7 +1810,8 @@ def test_handle_message_frustration_without_state_still_routes_to_search() -> No
 
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "搜索结果：算了" in sent_text
+    assert "【搜索结果】 算了" in sent_text
+    assert "直接回复 1 继续，例如：1" in sent_text
 
 
 def test_handle_message_frustration_cancels_pending_import(tmp_path: Path) -> None:
