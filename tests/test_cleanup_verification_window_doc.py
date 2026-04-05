@@ -11,11 +11,15 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     status_match = re.search(r"- 当前状态：(进行中|已完成)", text)
     start_match = re.search(r"- 开始日期：(\d{4}-\d{2}-\d{2})", text)
     end_match = re.search(r"- 最早可结束日期：(\d{4}-\d{2}-\d{2})", text)
+    conclusion_match = re.search(r"- 当前结论：(.+)", text)
 
     assert status_match is not None
     assert start_match is not None
     assert end_match is not None
+    assert conclusion_match is not None
 
+    window_status = status_match.group(1)
+    conclusion = conclusion_match.group(1)
     start_date = date.fromisoformat(start_match.group(1))
     end_date = date.fromisoformat(end_match.group(1))
     assert (end_date - start_date).days >= 7
@@ -34,8 +38,41 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "Feishu",
         "WeCom",
     }
-    for _, status, last_date in progress_rows:
-        if status == "待验证":
+    channel_checklist_rows = re.findall(
+        r"- \[( |x)\] (Telegram|personal WeChat|Feishu|WeCom) 完成至少 1 次真实私聊 cleanup smoke",
+        text,
+    )
+    assert len(channel_checklist_rows) == 4
+    checklist_status_by_channel = {
+        channel: (checked_flag == "x")
+        for checked_flag, channel in channel_checklist_rows
+    }
+    for _, row_status, last_date in progress_rows:
+        if row_status == "待验证":
             assert last_date == "-"
         else:
             date.fromisoformat(last_date)
+
+    for channel, row_status, last_date in progress_rows:
+        checklist_completed = checklist_status_by_channel[channel]
+        if checklist_completed:
+            assert row_status == "已完成"
+            assert last_date != "-"
+        else:
+            assert row_status == "待验证"
+            assert last_date == "-"
+
+    window_completed_match = re.search(
+        r"- \[( |x)\] 完成 \d{4}-\d{2}-\d{2} 到 \d{4}-\d{2}-\d{2} 的真实使用验证窗口",
+        text,
+    )
+    assert window_completed_match is not None
+    window_completed = window_completed_match.group(1) == "x"
+
+    if window_status == "进行中":
+        assert "暂未满足退出条件" in conclusion
+        assert not window_completed
+    else:
+        assert "已满足退出条件" in conclusion
+        assert window_completed
+        assert all(row_status == "已完成" for _, row_status, _ in progress_rows)
