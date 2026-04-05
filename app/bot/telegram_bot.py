@@ -22,6 +22,7 @@ from app.db.bt_pending_repo import (
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
+    ACTION_BT_READ_ONLY_HELPER,
     ACTION_BT_SUBSCRIPTION_LIST,
     ACTION_BT_SUBSCRIPTION_MUTATION,
     ACTION_BT_SUBSCRIPTION_RUN,
@@ -153,6 +154,7 @@ PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE = (
     "请补充更具体的标题/编号后重试，或直接发送 magnet:? 链接。"
 )
 PURE_BT_SEARCH_FAILED_TEXT = "pure BT 搜索暂不可用，请稍后重试。"
+BT_READ_ONLY_HELPER_FAILED_TEXT = "BT 只读探索暂不可用，请稍后重试。"
 SERVICE_NOT_READY_TEXT = "服务未就绪，请稍后重试。"
 LLM_PHYSICAL_FAILURE_SAFE_TEXT = "请求过长或响应被截断，系统已自动重试一次。请简化描述后重试。"
 SEARCH_SERVICE_KEY = "search_media_service"
@@ -577,6 +579,18 @@ def _is_bt_direct_intent(text: str) -> bool:
         "下载此bt种子",
         "下载此磁力",
     } or bool(extract_bt_search_query(stripped_text))
+
+
+def _extract_bt_read_only_query(text: str) -> str:
+    cleaned_text = re.sub(r"\s+", " ", text.strip())
+    if not cleaned_text:
+        return ""
+
+    lowered_text = cleaned_text.lower()
+    for prefix in ("bt搜 ", "bt search "):
+        if lowered_text.startswith(prefix):
+            return cleaned_text[len(prefix) :].strip()
+    return ""
 
 
 def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -1359,6 +1373,13 @@ def _log_pure_bt_search_error(*, query: str, error: Exception) -> None:
     )
 
 
+def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
+    print(
+        f"\033[31m[BT 只读探索失败]\033[0m 查询={query} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 BT 来源配置、站点可达性和网络连通性后重试。"
+    )
+
+
 def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅后台扫描未启动]\033[0m 原因={reason}\n"
@@ -1543,6 +1564,24 @@ async def _handle_query_text(
             source=query,
         )
         await reply_func(BT_PROCESSING_PATH_PROMPT_TEXT)
+        return
+
+    bt_read_only_query = _extract_bt_read_only_query(query)
+    if bt_read_only_query:
+        search_service = context.application.bot_data.get(SEARCH_SERVICE_KEY)
+        if not isinstance(search_service, SearchMediaService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        try:
+            reply = await execution_gate.run(
+                ACTION_BT_READ_ONLY_HELPER,
+                lambda: search_service.search_bt_read_only_and_format(bt_read_only_query),
+            )
+        except Exception as error:
+            _log_bt_read_only_helper_error(query=bt_read_only_query, error=error)
+            await reply_func(BT_READ_ONLY_HELPER_FAILED_TEXT)
+            return
+        await reply_func(reply)
         return
 
     bt_classification = _parse_bt_classification_choice(query)

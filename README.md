@@ -1,4 +1,4 @@
-# Luminarr (v35)
+# Luminarr (v36)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -61,6 +61,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - pure BT 单片优选
   - BT shared source adapter（`Prowlarr + WebSource`）
   - BT external web-source baseline（当前最小静态 HTML + 直接 magnet / torrent link）
+  - BT-only read-only helper baseline（`bt搜 <关键词>` / `bt search <关键词>` 走共享 BT 来源适配，只返回文本候选和调试参考）
   - downloader role binding
   - BT dispatch / transfer execution
   - qBittorrent 最小协议执行
@@ -78,21 +79,20 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **BT external web-source baseline**
+- **BT-only read-only helper baseline**
 
 这一步已完成：
 
 - 只服务 BT 分流
-- 增加最小 `WebSource`
-- `Prowlarr + WebSource` 已通过项目内共享 BT 来源适配层进入 BT 支线
-- `btsub` 与 pure BT 单片优选已复用同一来源适配入口
-- 当前第一阶段只做静态 HTML + 直接 magnet / torrent link
-- 命中后继续走现有 BT downloader approval-pending 路径
+- 新增 `bt搜 <关键词>` / `bt search <关键词>` 最小只读探索入口
+- helper 复用现有 `Prowlarr + WebSource` 共享 BT 来源适配入口
+- 输出只包含文本候选、来源入口和链接参考
+- helper 不写 workflow truth，不创建 approval，不 dispatch 下载器，不触发 import / refresh
 - 保持现有 downloader / import 审批边界不变
 
 当前 next step：
 
-- BT-only read-only helper
+- richer BT WebSource site-rule enrichment baseline
 
 ---
 
@@ -100,14 +100,15 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. BT-only read-only helper baseline
+1. richer BT WebSource site-rule enrichment baseline
 2. Feishu / WeCom / personal WeChat
 3. downloader/library asset correlation and cleanup
 
 补充说明：
 
 - BT external web-source 当前已经先通过项目内共享 BT 来源适配层进入 BT 支线，没有污染 PT 主链。
-- BT-only read-only helper 下一步只允许做 BT 支线只读辅助，不得写 workflow truth、不得 dispatch 下载器、不得触发 import / refresh。
+- BT-only read-only helper 当前只提供最小文本型只读探索，不写 workflow truth、不得 dispatch 下载器、不得触发 import / refresh。
+- 下一步只扩 WebSource 的确定性站点规则和结构化字段，不把 helper 扩成通用问答框架。
 
 ---
 
@@ -131,7 +132,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 模型不负责执行结果真相
 - 模型不负责 lease/version
 - 背景恢复和 scheduler tick 不依赖 LLM
-- BT helper 未来即使落地，也只能做只读辅助
+- BT helper 当前只做只读辅助
 
 ---
 
@@ -161,4 +162,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram 私聊唯一入口的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter 和 BT external web-source；当前 next step 是 BT-only read-only helper baseline。**
+**Luminarr 当前是一个 Telegram 私聊唯一入口的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source 和 BT-only read-only helper；当前 next step 是 richer BT WebSource site-rule enrichment baseline。**

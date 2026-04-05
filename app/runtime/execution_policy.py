@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 ACTION_SEARCH_MEDIA = "search_media"
+ACTION_BT_READ_ONLY_HELPER = "bt_read_only_helper"
 ACTION_GET_DOWNLOAD_STATUS = "get_download_status"
 ACTION_WATCHLIST_LIST = "watchlist_list"
 ACTION_WATCHLIST_MUTATION = "watchlist_mutation"
@@ -23,6 +24,7 @@ ACTION_RESET_CANDIDATES = "reset_candidates"
 READ_ONLY_ACTIONS = frozenset(
     {
         ACTION_SEARCH_MEDIA,
+        ACTION_BT_READ_ONLY_HELPER,
         ACTION_WATCHLIST_LIST,
         ACTION_BT_SUBSCRIPTION_LIST,
     }

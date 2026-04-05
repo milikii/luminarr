@@ -14,6 +14,9 @@ LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
+BT_READ_ONLY_EMPTY_QUERY_TEXT = "BT 只读探索格式：bt搜 <关键词>"
+BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
+BT_READ_ONLY_NOTICE_TEXT = "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。"
 AMBIGUOUS_QUERY_TEXT_TEMPLATE = (
     "片名可能有多个版本：{query}\n"
     "请补充更具体信息后再搜索，例如：\n"
@@ -72,6 +75,15 @@ class SearchMediaService:
         if not cleaned_query:
             return ()
         return await self._raw_search_func(cleaned_query)
+
+    async def search_bt_read_only_and_format(self, query: str) -> str:
+        cleaned_query = _normalize_spaces(query)
+        if not cleaned_query:
+            return BT_READ_ONLY_EMPTY_QUERY_TEXT
+
+        raw_results = await self.search_raw_candidates(cleaned_query)
+        selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
+        return format_bt_read_only_reply(cleaned_query, selected_raw_results)
 
     async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
         cleaned_query = query.strip()
@@ -280,6 +292,24 @@ def format_movie_query_reply(
     return f"{card_text}\n\n{candidates_text}"
 
 
+def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]]) -> str:
+    if not candidates:
+        return BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query=query)
+
+    lines = [f"BT 只读探索结果：{query}"]
+    for index, item in enumerate(candidates, start=1):
+        title = _safe_text(item.get("title"), default="(no title)")
+        indexer = _safe_indexer(item.get("indexer"), item.get("indexerName"))
+        provider = _safe_text(item.get("sourceProvider"), default=indexer)
+        seeders = _format_seeder_count(item.get("seeders"))
+        size = _format_size(item.get("size"))
+        lines.append(f"{index}. {title}")
+        lines.append(f"   站点: {indexer} | 来源入口: {provider} | 做种: {seeders} | 大小: {size}")
+        lines.append(f"   链接参考: {_format_bt_source_reference(item)}")
+    lines.append(BT_READ_ONLY_NOTICE_TEXT)
+    return "\n".join(lines)
+
+
 def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> str:
     card_title = parsed_query.title or "-"
     card_year = parsed_query.year.strip() or "-"
@@ -338,6 +368,32 @@ def _safe_indexer(indexer_value: Any, indexer_name_value: Any) -> str:
     if name != "-":
         return name
     return _safe_text(indexer_value, default="-")
+
+
+def _format_seeder_count(value: Any) -> str:
+    if value is None:
+        return "-"
+    try:
+        resolved = int(value)
+    except (TypeError, ValueError):
+        return "-"
+    if resolved < 0:
+        return "-"
+    return str(resolved)
+
+
+def _format_bt_source_reference(item: Mapping[str, Any]) -> str:
+    source = _safe_text(item.get("source"), default="-")
+    if source == "-":
+        return source
+
+    info_hash = _safe_text(item.get("infoHash"), default="")
+    if source.lower().startswith("magnet:?"):
+        if info_hash:
+            return f"magnet | infoHash={info_hash}"
+        return _truncate_text(source, limit=96)
+
+    return _truncate_text(source, limit=96)
 
 
 def _format_size(size_value: Any) -> str:
@@ -404,6 +460,14 @@ def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
 
 def _normalize_spaces(value: str) -> str:
     return re.sub(r"\s+", " ", value.strip())
+
+
+def _truncate_text(value: str, *, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    if limit <= 3:
+        return value[:limit]
+    return f"{value[: limit - 3]}..."
 
 
 def _build_query(title: str, year: str) -> str:

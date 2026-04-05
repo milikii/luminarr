@@ -13,6 +13,7 @@ from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    BT_READ_ONLY_HELPER_FAILED_TEXT,
     BT_PENDING_REPO_KEY,
     BT_CLASSIFICATION_PROMPT_TEXT,
     BT_PROCESSING_PATH_CANCELLED_TEXT,
@@ -1413,6 +1414,69 @@ def test_handle_message_bt_subscription_routes_to_service(tmp_path: Path) -> Non
     sent_text = reply_text.await_args.args[0]
     assert "已加入 BT 订阅" in sent_text
     assert "葬送的芙莉莲" in sent_text
+
+
+def test_handle_message_bt_read_only_helper_routes_to_raw_search() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "Frieren S01E01"
+        return [
+            {
+                "title": "title-Frieren S01E01",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    update, reply_text = _build_update("bt搜 Frieren S01E01")
+    search_service = SearchMediaService(_fake_search, raw_search_func=fake_raw_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "BT 只读探索结果：Frieren S01E01" in sent_text
+    assert "title-Frieren S01E01" in sent_text
+    assert "只读说明：" in sent_text
+
+
+def test_handle_message_bt_read_only_helper_search_failure_returns_safe_text() -> None:
+    async def failing_raw_search(_: str) -> list[dict[str, object]]:
+        raise RuntimeError("network down")
+
+    update, reply_text = _build_update("bt search Frieren S01E01")
+    search_service = SearchMediaService(_fake_search, raw_search_func=failing_raw_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(BT_READ_ONLY_HELPER_FAILED_TEXT)
 
 
 def test_handle_message_confirm_routes_to_import_service() -> None:

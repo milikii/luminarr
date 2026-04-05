@@ -7,6 +7,9 @@ from app.clients.tmdb import TmdbMovie
 from app.db.clarification_repo import ClarificationRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.search_media import (
+    BT_READ_ONLY_EMPTY_QUERY_TEXT,
+    BT_READ_ONLY_NOTICE_TEXT,
+    BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE,
     EMPTY_QUERY_TEXT,
     NO_RESULT_TEXT_TEMPLATE,
     SearchMediaService,
@@ -94,6 +97,45 @@ def test_search_raw_candidates_uses_dedicated_raw_search_func() -> None:
     assert len(results) == 1
     assert results[0]["title"] == "Dune 2021 1080p"
     assert results[0]["source"].startswith("magnet:?xt=urn:btih:")
+
+
+def test_search_bt_read_only_and_format_uses_raw_search_func() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "dune bt"
+        return [
+            {
+                "title": "Dune 2021 1080p",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("dune bt"))
+
+    assert "BT 只读探索结果：dune bt" in text
+    assert "1. Dune 2021 1080p" in text
+    assert "站点: Nyaa | 来源入口: nyaa | 做种: 8 | 大小: 2.0 GB" in text
+    assert "链接参考: magnet | infoHash=abcdef1234567890abcdef1234567890abcdef12" in text
+    assert BT_READ_ONLY_NOTICE_TEXT in text
+
+
+def test_search_bt_read_only_and_format_empty_query() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("   "))
+
+    assert text == BT_READ_ONLY_EMPTY_QUERY_TEXT
+
+
+def test_search_bt_read_only_and_format_no_result() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_search_empty)
+    text = _run(service.search_bt_read_only_and_format("unknown"))
+
+    assert text == BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
 
 
 def test_search_and_format_returns_clarification_for_ambiguous_query() -> None:
