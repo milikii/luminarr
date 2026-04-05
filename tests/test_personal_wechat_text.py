@@ -24,6 +24,10 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.cleanup_downloaded_source import (
+    CLEANUP_INSPECT_QUERY_USAGE_TEXT,
+    CLEANUP_QUERY_USAGE_TEXT,
+)
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -369,6 +373,48 @@ def test_personal_wechat_text_service_routes_cleanup_execution_and_removes_sourc
     close_client.assert_awaited_once()
 
 
+def test_personal_wechat_text_service_routes_bare_cleanup_usage(tmp_path: Path) -> None:
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text="cleanup",
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            sync_path=sync_path,
+        )
+    )
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert text == CLEANUP_QUERY_USAGE_TEXT
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    close_client.assert_awaited_once()
+
+
+def test_personal_wechat_text_service_routes_bare_cleanup_inspect_usage(tmp_path: Path) -> None:
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text="cleanup inspect",
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            sync_path=sync_path,
+        )
+    )
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    close_client.assert_awaited_once()
+
+
 def test_personal_wechat_text_service_refuses_multiple_saved_accounts(capsys) -> None:
     get_updates_func = AsyncMock()
     close_client = AsyncMock()
@@ -397,3 +443,9 @@ def test_personal_wechat_text_service_refuses_multiple_saved_accounts(capsys) ->
     assert service._poll_task is None
     get_updates_func.assert_not_awaited()
     close_client.assert_not_awaited()
+
+
+def _make_database(tmp_path: Path) -> SqliteDatabase:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    return database

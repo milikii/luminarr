@@ -36,6 +36,10 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.cleanup_downloaded_source import (
+    CLEANUP_INSPECT_QUERY_USAGE_TEXT,
+    CLEANUP_QUERY_USAGE_TEXT,
+)
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -450,6 +454,39 @@ def test_handle_feishu_webhook_http_request_routes_cleanup_inspect_in_chinese_in
     assert target_file.exists()
 
 
+@pytest.mark.parametrize(
+    ("text", "expected_reply"),
+    [
+        ("cleanup", CLEANUP_QUERY_USAGE_TEXT),
+        ("cleanup inspect", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+        ("清理", CLEANUP_QUERY_USAGE_TEXT),
+        ("清理检查", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+    ],
+)
+def test_handle_feishu_webhook_http_request_routes_bare_cleanup_usage_into_shared_runtime(
+    tmp_path: Path,
+    text: str,
+    expected_reply: str,
+) -> None:
+    reply_text_func = AsyncMock()
+    body = json.dumps(_build_feishu_private_text_payload(text), ensure_ascii=False)
+
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers=_build_signature_headers(body=body, encrypt_key="encrypt-key-42"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert response.status_code == 200
+    assert json.loads(response.body.decode("utf-8")) == {"code": 0}
+    reply_text_func.assert_awaited_once()
+    _event, reply_text = reply_text_func.await_args.args
+    assert reply_text == expected_reply
+
+
 def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> None:
     reply_text_func = AsyncMock()
 
@@ -481,6 +518,12 @@ def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> No
     assert status_code == 200
     assert payload == {"code": 0}
     reply_text_func.assert_awaited_once()
+
+
+def _make_database(tmp_path: Path) -> SqliteDatabase:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    return database
 
 
 def _build_signature_headers(*, body: str, encrypt_key: str) -> dict[str, str]:

@@ -41,6 +41,10 @@ from app.bot.wecom_webhook_server import (
 )
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.cleanup_downloaded_source import (
+    CLEANUP_INSPECT_QUERY_USAGE_TEXT,
+    CLEANUP_QUERY_USAGE_TEXT,
+)
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -370,6 +374,39 @@ def test_handle_wecom_callback_http_request_routes_cleanup_inspect_into_shared_r
     assert target_file.exists()
 
 
+@pytest.mark.parametrize(
+    ("text", "expected_reply"),
+    [
+        ("cleanup", CLEANUP_QUERY_USAGE_TEXT),
+        ("cleanup inspect", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+    ],
+)
+def test_handle_wecom_callback_http_request_routes_bare_cleanup_usage_into_shared_runtime_and_returns_encrypted_reply(
+    tmp_path: Path,
+    text: str,
+    expected_reply: str,
+) -> None:
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml(text))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="POST",
+            query_params=query_params,
+            body=body,
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == WECOM_XML_CONTENT_TYPE
+    encrypted_reply = _extract_encrypt_from_xml(response.body.decode("utf-8"))
+    reply_xml = _decrypt_wecom_plaintext(encrypted_reply)
+    reply_root = ET.fromstring(reply_xml)
+    assert _read_xml_text(reply_root, "Content") == expected_reply
+
+
 def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
     async def exercise() -> tuple[str, str]:
         try:
@@ -405,6 +442,12 @@ def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
     reply_xml = _decrypt_wecom_plaintext(_extract_encrypt_from_xml(reply_body))
     assert "搜索结果：dune" in reply_xml
     assert "title-dune" in reply_xml
+
+
+def _make_database(tmp_path: Path) -> SqliteDatabase:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    return database
 
 
 def _encrypt_wecom_plaintext(plaintext: str, *, receive_id: str = _TEST_RECEIVE_ID) -> str:

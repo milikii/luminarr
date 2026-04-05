@@ -17,6 +17,10 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.cleanup_downloaded_source import (
+    CLEANUP_INSPECT_QUERY_USAGE_TEXT,
+    CLEANUP_QUERY_USAGE_TEXT,
+)
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -262,6 +266,44 @@ def test_dispatch_private_chat_text_routes_cleanup_execution_in_chinese_without_
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in sent_text
     assert not source_file.exists()
     assert target_file.exists()
+
+
+def test_dispatch_private_chat_text_routes_bare_cleanup_usage_without_telegram_update(
+    tmp_path: Path,
+) -> None:
+    reply_text = AsyncMock()
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="cleanup",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    reply_text.assert_awaited_once_with(CLEANUP_QUERY_USAGE_TEXT)
+
+
+def test_dispatch_private_chat_text_routes_bare_cleanup_inspect_usage_without_telegram_update(
+    tmp_path: Path,
+) -> None:
+    reply_text = AsyncMock()
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="cleanup inspect",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    reply_text.assert_awaited_once_with(CLEANUP_INSPECT_QUERY_USAGE_TEXT)
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:
