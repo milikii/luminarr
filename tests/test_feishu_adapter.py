@@ -367,12 +367,67 @@ def test_handle_feishu_webhook_http_request_routes_cleanup_execution_into_shared
     assert target_file.exists()
 
 
+def test_handle_feishu_webhook_http_request_routes_cleanup_execution_in_chinese_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+    body = json.dumps(_build_feishu_private_text_payload("清理 87"), ensure_ascii=False)
+
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers=_build_signature_headers(body=body, encrypt_key="encrypt-key-42"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert response.status_code == 200
+    assert json.loads(response.body.decode("utf-8")) == {"code": 0}
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert "已清理下载源资产" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
 def test_handle_feishu_webhook_http_request_routes_cleanup_inspect_into_shared_runtime(
     tmp_path: Path,
 ) -> None:
     cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
     reply_text_func = AsyncMock()
     body = json.dumps(_build_feishu_private_text_payload("cleanup inspect 87"), ensure_ascii=False)
+
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers=_build_signature_headers(body=body, encrypt_key="encrypt-key-42"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert response.status_code == 200
+    assert json.loads(response.body.decode("utf-8")) == {"code": 0}
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert "清理预检结果：" in reply_text
+    assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
+
+
+def test_handle_feishu_webhook_http_request_routes_cleanup_inspect_in_chinese_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+    body = json.dumps(_build_feishu_private_text_payload("清理检查 87"), ensure_ascii=False)
 
     response = asyncio.run(
         handle_feishu_webhook_http_request(
