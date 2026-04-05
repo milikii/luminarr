@@ -1,4 +1,4 @@
-# Current status (v49)
+# Current status (v50)
 
 ## Project position
 
@@ -23,6 +23,7 @@ Luminarr 当前是一个 **Telegram + Feishu（最小私聊文本基线）** 的
   - Feishu private-chat identity projection + text event adapter baseline（已能解析最小私聊文本事件，并稳定投影到现有整数 `chat_id/user_id` 边界）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上，继续复用 shared private-chat text runtime）
   - Feishu webhook event-signature verification baseline（非 `url_verification` 请求已先验签，再决定是否进入 shared private-chat text runtime）
+  - WeCom private-chat decrypted-text adapter kernel baseline（已能解析最小已解密 XML 私聊文本消息，并把 `FromUserName` 稳定投影到现有整数 `chat_id/user_id` 后进入 shared private-chat text runtime）
   - `telegram_updates` 去重
   - `jobs` 执行所有权
   - approval / lease / replay guard
@@ -73,10 +74,9 @@ Luminarr 当前是一个 **Telegram + Feishu（最小私聊文本基线）** 的
 ## What is not implemented yet
 
 - **当前 next step**
-  - WeCom private-chat identity projection + text event adapter baseline
+  - WeCom callback envelope + text reply baseline
 
 - **后续渠道**
-  - WeCom
   - personal WeChat
 
 - **后续运维**
@@ -90,7 +90,8 @@ Luminarr 当前是一个 **Telegram + Feishu（最小私聊文本基线）** 的
 
 - Feishu 当前已接最小 webhook 请求入口、文本回消息和事件验签
 - Feishu 当前只支持私聊文本消息 / 文本回复，不支持群聊、图片、卡片、按钮回调
-- WeCom / personal WeChat 仍未开始适配
+- WeCom 当前只补了“已解密 XML 私聊文本 -> shared private-chat text runtime”的适配内核，还没接 HTTP callback、URL 校验、解密和回包
+- personal WeChat 仍未开始适配
 - poster-card 仍然是文本基线
 - candidate mapping 仍只保留每个 chat 最近一次搜索窗口
 - completion truth 主要依赖 runtime 观察，不是完整独立后台轮询平台
@@ -105,6 +106,10 @@ Luminarr 当前是一个 **Telegram + Feishu（最小私聊文本基线）** 的
 
 ## Latest verification
 
+- focused tests: `4 passed` (`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py`)
+- focused tests: `17 passed, 1 skipped` (`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py tests/test_private_chat_runtime.py tests/test_feishu_adapter.py`)
+- tests: `226 passed, 1 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `29 passed, 1 skipped` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_config.py`)
 - focused tests: `1 passed, 11 deselected` (`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k feishu_webhook_server_routes_real_http_post_into_shared_runtime`)
 - focused tests: `60 passed` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py`)
@@ -138,4 +143,4 @@ Luminarr 当前是一个 **Telegram + Feishu（最小私聊文本基线）** 的
 
 当前只做一件事：
 
-- 在已落地的 shared private-chat text runtime 和 Feishu 渠道实践之上，先补 WeCom 私聊字符串 ID -> 整数投影与最小文本事件适配入口，仍然复用既有 workflow/service/approval 边界，不做通用多渠道平台化。
+- 在已落地的 shared private-chat text runtime、Feishu 渠道实践和 WeCom 已解密文本适配内核之上，补 WeCom callback 外壳最小闭环：URL 校验 / 解密后文本落到既有 runtime / 文本回包返回；仍然复用既有 workflow/service/approval 边界，不做通用多渠道平台化。

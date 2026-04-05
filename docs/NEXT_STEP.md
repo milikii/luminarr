@@ -1,4 +1,4 @@
-# Next step (v49)
+# Next step (v50)
 
 ## Current baseline
 
@@ -9,6 +9,7 @@
   - Feishu private-chat identity projection + text event adapter baseline（已能把 Feishu 私聊文本事件压成现有 `query/chat/user/reply` 入口）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上）
   - Feishu webhook event-signature verification baseline（非 `url_verification` 请求已先验签）
+  - WeCom private-chat decrypted-text adapter kernel baseline（已能解析最小已解密 XML 私聊文本消息，并把 `FromUserName` 投影到现有整数 `chat_id/user_id` 后进入 shared private-chat text runtime）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval
@@ -48,16 +49,16 @@
 
 ## Goal
 
-Continue the smallest remaining channel-expansion step on top of the shared private-chat text runtime.
+Continue the smallest remaining WeCom callback step on top of the shared private-chat text runtime.
 
 ## Only do
 
-- 只补 WeCom private-chat identity projection + text event adapter baseline
+- 只补 WeCom callback envelope + text reply baseline
 - 继续复用已落地的 shared private-chat text runtime
 - 继续复用已落地的 Feishu / Telegram 主链与当前文本协议形状
-- 先把 WeCom 私聊字符串会话 ID / 用户 ID 稳定投影到现有整数 `chat_id/user_id` 边界
-- 先把 WeCom 最小文本事件压进现有 `query/chat/user/reply` 入口
-- 继续复用刚抽出的 shared private-chat text runtime
+- 继续复用已落地的 WeCom 已解密 XML 文本适配内核
+- 先把 WeCom callback 外壳里的 URL 校验、解密后 XML 和最小文本回包接到既有 `handle_wecom_private_text_event`
+- 继续让 WeCom 私聊外部标识在适配层内投影为现有整数 `chat_id/user_id`，不改既有 SQLite 真相表
 - 继续复用现有 workflow 和 service：
   - `search_media`
   - `add_to_downloader`
@@ -82,6 +83,7 @@ Continue the smallest remaining channel-expansion step on top of the shared priv
 - 不把 WeCom 适配扩成通用多渠道平台
 - 不同时做 personal WeChat
 - 不在这一步补群聊、卡片、按钮、图片消息
+- 不把 WeCom callback 的 URL 校验、解密、回包抽成通用 webhook 总线
 - 不改现有 SQLite / approval / jobs / lease 真相协议
 - 不改现有 downloader / import approval 协议
 - 不改现有 BT shared source adapter、WebSource 规则层、`btsub` 共享选源逻辑
@@ -96,7 +98,8 @@ Continue the smallest remaining channel-expansion step on top of the shared priv
 
 ## Done when
 
-- WeCom 私聊文本事件已能通过既有整数 ID 投影进入 shared private-chat text runtime
+- WeCom callback 请求已能完成最小 URL 校验和解密，并把私聊文本事件压进既有 shared private-chat text runtime
+- WeCom runtime 产出的文本已能按当前最小回包形状回到原私聊
 - 现有 Telegram / Feishu 行为不回退
 - 现有 service、approval、jobs、lease 真相边界保持不变
 - Telegram 行为不回退

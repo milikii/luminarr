@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v43)
+# docs/DECISIONS.md (v44)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -368,3 +368,18 @@
   - 当前这一步只做签名校验，不做消息体解密、不做群聊/卡片/按钮回调。
 - **原因**：
   这一步的目标是先把 Feishu 请求来源校验补上，同时保持现有文本入站链最小改动；URL 验证和后续更重的加解密能力不应混在同一步里。
+
+## D-024 WeCom 先补已解密私聊文本适配内核，私聊会话外部标识暂复用 `FromUserName`
+- **状态**：已决定
+- **日期**：2026-04-05
+- **结论**：
+  - WeCom 当前最小落地顺序拆成两层：
+    - 先补“已解密 XML 私聊文本消息 -> shared private-chat text runtime”的适配内核
+    - 再补 callback URL 校验、解密和文本回包外壳
+  - WeCom 私聊当前若拿不到独立会话 ID，则先把 `FromUserName` 同时作为：
+    - 私聊会话外部标识，用于投影现有整数 `chat_id`
+    - 用户外部标识，用于投影现有整数 `user_id`
+  - `chat_id` 和 `user_id` 虽然都来自 `FromUserName`，但仍必须经过现有 `channel + principal_kind + external_id` 投影，因此最终整数值仍保持分离。
+  - `ToUserName`、`AgentID`、原始 XML 只保留在 WeCom 适配层，用于后续 callback 回包，不进入现有 SQLite 真相表。
+- **原因**：
+  先把 WeCom 的消息解析和 runtime 复用边界补稳，再单独接 callback 外壳，能把 diff 控制在最小范围，也能避免过早把渠道细节渗进既有持久化协议。
