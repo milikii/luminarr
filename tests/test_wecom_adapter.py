@@ -417,6 +417,8 @@ def test_handle_wecom_callback_http_request_routes_cleanup_inspect_into_shared_r
     [
         ("cleanup", CLEANUP_QUERY_USAGE_TEXT),
         ("cleanup inspect", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+        ("清理", CLEANUP_QUERY_USAGE_TEXT),
+        ("清理检查", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
     ],
 )
 def test_handle_wecom_callback_http_request_routes_bare_cleanup_usage_into_shared_runtime_and_returns_encrypted_reply(
@@ -443,6 +445,44 @@ def test_handle_wecom_callback_http_request_routes_bare_cleanup_usage_into_share
     reply_xml = _decrypt_wecom_plaintext(encrypted_reply)
     reply_root = ET.fromstring(reply_xml)
     assert _read_xml_text(reply_root, "Content") == expected_reply
+
+
+@pytest.mark.parametrize(
+    ("text", "expect_source_exists", "expected_fragment"),
+    [
+        ("清理 87", False, "已清理下载源资产"),
+        ("清理检查 87", True, "当前 guardrail: 允许 cleanup"),
+    ],
+)
+def test_handle_wecom_callback_http_request_routes_cleanup_protocol_in_chinese_and_returns_encrypted_reply(
+    tmp_path: Path,
+    text: str,
+    expect_source_exists: bool,
+    expected_fragment: str,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml(text))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="POST",
+            query_params=query_params,
+            body=body,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == WECOM_XML_CONTENT_TYPE
+    encrypted_reply = _extract_encrypt_from_xml(response.body.decode("utf-8"))
+    reply_xml = _decrypt_wecom_plaintext(encrypted_reply)
+    reply_root = ET.fromstring(reply_xml)
+
+    assert expected_fragment in _read_xml_text(reply_root, "Content")
+    assert source_file.exists() is expect_source_exists
+    assert target_file.exists()
 
 
 def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:

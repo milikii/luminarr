@@ -5,6 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
+import pytest
+
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.personal_wechat_text import (
     PERSONAL_WECHAT_CHANNEL,
@@ -466,6 +468,76 @@ def test_personal_wechat_text_service_routes_bare_cleanup_inspect_usage(tmp_path
     assert to == "wx-user-1"
     assert text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
     assert getattr(opts, "context_token", "") == "ctx-1"
+    close_client.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    ("inbound_text", "expected_reply"),
+    [
+        ("清理", CLEANUP_QUERY_USAGE_TEXT),
+        ("清理检查", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+    ],
+)
+def test_personal_wechat_text_service_routes_bare_cleanup_usage_in_chinese(
+    tmp_path: Path,
+    inbound_text: str,
+    expected_reply: str,
+) -> None:
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text=inbound_text,
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            sync_path=sync_path,
+        )
+    )
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert text == expected_reply
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    close_client.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    ("inbound_text", "expect_source_exists", "expected_fragment"),
+    [
+        ("清理检查 87", True, "当前 guardrail: 允许 cleanup"),
+        ("清理 87", False, "已清理下载源资产"),
+    ],
+)
+def test_personal_wechat_text_service_routes_cleanup_protocol_in_chinese(
+    tmp_path: Path,
+    inbound_text: str,
+    expect_source_exists: bool,
+    expected_fragment: str,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text=inbound_text,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            sync_path=sync_path,
+        )
+    )
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert expected_fragment in text
+    assert getattr(opts, "base_url", "") == "https://wx.test"
+    assert getattr(opts, "token", "") == "bot-token-1"
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    assert source_file.exists() is expect_source_exists
+    assert target_file.exists()
     close_client.assert_awaited_once()
 
 
