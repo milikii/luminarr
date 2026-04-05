@@ -1,4 +1,4 @@
-# Next step (v46)
+# Next step (v47)
 
 ## Current baseline
 
@@ -6,6 +6,7 @@
 
 - **控制层**
   - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
+  - Feishu private-chat identity projection + text event adapter baseline（已能把 Feishu 私聊文本事件压成现有 `query/chat/user/reply` 入口）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval
@@ -45,11 +46,12 @@
 
 ## Goal
 
-Continue the smallest **Feishu private-chat adapter baseline** on top of the shared private-chat text runtime.
+Continue the smallest remaining step of the **Feishu private-chat adapter baseline** on top of the shared private-chat text runtime.
 
 ## Only do
 
-- 只加 Feishu 私聊单聊的最小文本收发
+- 只补 Feishu 最小出站回消息接线和请求入口壳子
+- 继续复用已落地的 Feishu 私聊字符串 ID -> 整数 `chat_id/user_id` 投影
 - 继续复用刚抽出的 shared private-chat text runtime
 - 继续复用现有 workflow 和 service：
   - `search_media`
@@ -83,12 +85,13 @@ Continue the smallest **Feishu private-chat adapter baseline** on top of the sha
 - 不引入 automatic `confirm`
 - 不新增下载器 / 媒体服务器支持
 - 不回头改 shared private-chat text runtime 的既有文本协议形状
+- 不为 Feishu 适配去改现有 SQLite 真相表里的整数 `chat_id/user_id` 形状
 - 不让 scheduler tick、`btsub run`、恢复逻辑依赖 Feishu 适配
 
 ## Done when
 
-- Feishu 文本私聊已能通过 shared private-chat text runtime 进入现有主链的最小可用命令集合
-- Feishu 文本消息已能得到最小文本回复
+- Feishu 入站文本事件已能通过既有 ID 投影进入 shared private-chat text runtime
+- Feishu 文本回复已能从适配层发回真实会话
 - 现有 service、approval、jobs、lease 真相边界保持不变
 - Telegram 行为不回退
 - 现有 downloader/import approval 行为不回退

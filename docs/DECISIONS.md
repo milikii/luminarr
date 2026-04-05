@@ -317,3 +317,14 @@
   - 这一步仍不进入 TMDB、metadata、subtitle、refresh，也不复用影视入库链规则。
 - **原因**：
   先把 pure BT 的“文本型单片资源挑一个更像样的版本”补成最小可用基线，同时避免把媒体链规则、`btsub` 规则和新的站点接入混在同一步里。
+
+## D-021 非 Telegram 私聊适配先做“渠道作用域整数 ID 投影”，不改现有真相表主键形状
+- **状态**：已决定
+- **日期**：2026-04-05
+- **结论**：
+  - 当前 `jobs / watchlist / bt_subscription / clarification / bt_pending / candidate_mapping / download_monitor` 这些真相边界继续保留现有整数 `chat_id / user_id` 形状。
+  - 非 Telegram 私聊渠道如果拿到的是字符串会话标识或用户标识，必须先在适配层做**稳定、确定性、带渠道命名空间**的整数投影，再进入 shared private-chat text runtime 和既有 service。
+  - 渠道名必须进入投影输入，避免不同渠道相同原始字符串发生撞号。
+  - 原始外部标识只保留在渠道适配层，用于该渠道自己的回消息动作；不得把它直接塞进现有 SQLite 整数真相列。
+- **原因**：
+  这样能在不改审批、作业、候选缓存和持久化协议的前提下，先把 Feishu 私聊最小文本入口接进现有主链，保持 diff 最小且风险可控。
