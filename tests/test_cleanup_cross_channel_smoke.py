@@ -283,6 +283,51 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
     ("query", "expected_fragment", "expected_follow_up", "expect_source_exists"),
     [
         (
+            "清理检查 87",
+            "当前 guardrail: 允许 cleanup",
+            "cleanup hash-87 / 清理 hash-87：实际清理下载源资产",
+            True,
+        ),
+        (
+            "清理 87",
+            "已清理下载源资产",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+            False,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_protocol_in_chinese_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_fragment: str,
+    expected_follow_up: str,
+    expect_source_exists: bool,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+
+    reply_text = runner(query, cleanup_service)
+
+    assert expected_fragment in reply_text
+    assert expected_follow_up in reply_text
+    assert source_file.exists() is expect_source_exists
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_fragment", "expected_follow_up", "expect_source_exists"),
+    [
+        (
             f"cleanup inspect {_CHAT_SCOPED_TASK_REF}",
             "当前 guardrail: 允许 cleanup",
             "cleanup hash-87 / 清理 hash-87：实际清理下载源资产",
@@ -331,10 +376,63 @@ def test_cleanup_chat_scoped_task_ref_smoke_across_private_chat_channels(
 
 
 @pytest.mark.parametrize(
+    ("query", "expected_fragment", "expected_follow_up", "expect_source_exists"),
+    [
+        (
+            f"清理检查 {_CHAT_SCOPED_TASK_REF}",
+            "当前 guardrail: 允许 cleanup",
+            "cleanup hash-87 / 清理 hash-87：实际清理下载源资产",
+            True,
+        ),
+        (
+            f"清理 {_CHAT_SCOPED_TASK_REF}",
+            "已清理下载源资产",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+            False,
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_in_chinese_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_fragment: str,
+    expected_follow_up: str,
+    expect_source_exists: bool,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert expected_fragment in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert expected_follow_up in reply_text
+    assert source_file.exists() is expect_source_exists
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
     ("query", "expected_reply"),
     [
         ("cleanup", CLEANUP_QUERY_USAGE_TEXT),
         ("cleanup inspect", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+        ("清理", CLEANUP_QUERY_USAGE_TEXT),
+        ("清理检查", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
     ],
 )
 @pytest.mark.parametrize(
