@@ -46,6 +46,7 @@ from app.runtime.execution_policy import (
     ACTION_BT_SUBSCRIPTION_RUN,
     ACTION_ADD_TO_DOWNLOADER,
     ACTION_CANCEL_PENDING_APPROVAL,
+    ACTION_CLEANUP_INSPECT,
     ACTION_PERSONAL_WECHAT_LOGIN,
     ACTION_CONFIRM_ADD_TO_DOWNLOADER,
     ACTION_CLEANUP_DOWNLOADER_SOURCE,
@@ -64,7 +65,11 @@ from app.services.add_to_downloader import (
     BT_SOURCE_UNSUPPORTED_TEXT,
     AddToDownloaderService,
 )
-from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService, parse_cleanup_query
+from app.services.cleanup_downloaded_source import (
+    CleanupDownloadedSourceService,
+    parse_cleanup_inspect_query,
+    parse_cleanup_query,
+)
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
 from app.services.manage_bt_subscription import (
     BtSubscriptionCommand,
@@ -1971,6 +1976,23 @@ async def handle_private_chat_query_text(
                 import_ref,
                 chat_id=chat_id,
                 user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    cleanup_inspect_ref = parse_cleanup_inspect_query(query)
+    if cleanup_inspect_ref is not None:
+        cleanup_service = context.application.bot_data.get(CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
+        if not isinstance(cleanup_service, CleanupDownloadedSourceService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await _run_sync_with_policy(
+            execution_gate,
+            ACTION_CLEANUP_INSPECT,
+            lambda: cleanup_service.inspect_by_task_ref(
+                cleanup_inspect_ref,
+                chat_id=chat_id,
             ),
         )
         await reply_func(reply)

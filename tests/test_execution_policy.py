@@ -4,6 +4,7 @@ from app.runtime.execution_policy import (
     ACTION_BT_READ_ONLY_HELPER,
     ACTION_BT_SUBSCRIPTION_LIST,
     ACTION_BT_SUBSCRIPTION_RUN,
+    ACTION_CLEANUP_INSPECT,
     ACTION_GET_DOWNLOAD_STATUS,
     ACTION_SEARCH_MEDIA,
     ACTION_WATCHLIST_LIST,
@@ -18,6 +19,7 @@ def test_status_action_is_not_concurrency_safe_after_auto_import_baseline() -> N
     bt_read_only_policy = resolve_execution_policy(ACTION_BT_READ_ONLY_HELPER)
     bt_subscription_list_policy = resolve_execution_policy(ACTION_BT_SUBSCRIPTION_LIST)
     bt_subscription_run_policy = resolve_execution_policy(ACTION_BT_SUBSCRIPTION_RUN)
+    cleanup_inspect_policy = resolve_execution_policy(ACTION_CLEANUP_INSPECT)
 
     assert status_policy.concurrency_safe is False
     assert search_policy.concurrency_safe is True
@@ -25,3 +27,4 @@ def test_status_action_is_not_concurrency_safe_after_auto_import_baseline() -> N
     assert bt_read_only_policy.concurrency_safe is True
     assert bt_subscription_list_policy.concurrency_safe is True
     assert bt_subscription_run_policy.concurrency_safe is False
+    assert cleanup_inspect_policy.concurrency_safe is True

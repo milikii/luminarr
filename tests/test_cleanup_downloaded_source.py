@@ -7,9 +7,11 @@ from app.db.sqlite import SqliteDatabase
 from app.services.cleanup_downloaded_source import (
     CLEANUP_CORRELATION_MISSING_TEXT,
     CLEANUP_GUARD_REJECTED_TEXT,
+    CLEANUP_INSPECT_QUERY_USAGE_TEXT,
     CLEANUP_QUERY_USAGE_TEXT,
     CLEANUP_TARGET_MISSING_TEXT,
     CleanupDownloadedSourceService,
+    parse_cleanup_inspect_query,
     parse_cleanup_query,
 )
 
@@ -21,9 +23,72 @@ def test_parse_cleanup_query_supports_prefixes() -> None:
     assert parse_cleanup_query("cleanup") == ""
 
 
+def test_parse_cleanup_inspect_query_supports_prefixes() -> None:
+    assert parse_cleanup_inspect_query("cleanup inspect 87") == "87"
+    assert parse_cleanup_inspect_query("cleanup inspect hash-87") == "hash-87"
+    assert parse_cleanup_inspect_query("清理检查 abc123") == "abc123"
+    assert parse_cleanup_inspect_query("cleanup inspect") == ""
+
+
 def test_parse_cleanup_query_rejects_non_cleanup_text() -> None:
     assert parse_cleanup_query("import 87") is None
     assert parse_cleanup_query("dune") is None
+    assert parse_cleanup_inspect_query("cleanup 87") is None
+
+
+def test_inspect_by_task_ref_usage_when_empty(tmp_path: Path) -> None:
+    service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+    assert service.inspect_by_task_ref("  ") == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+
+
+def test_inspect_by_task_ref_returns_ready_text_without_deleting_source(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    reply = service.inspect_by_task_ref("87")
+
+    assert "清理预检结果：" in reply
+    assert "关联: 已找到" in reply
+    assert f"源路径: {source_file}" in reply
+    assert "源路径状态: 存在" in reply
+    assert f"目标路径: {target_file}" in reply
+    assert "目标路径状态: 存在" in reply
+    assert "当前 guardrail: 允许 cleanup" in reply
+    assert "执行命令: cleanup hash-87" in reply
+    assert source_file.exists()
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert len(events) == 1
+
+
+def test_inspect_by_task_ref_returns_correlation_missing_state(tmp_path: Path) -> None:
+    service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+
+    reply = service.inspect_by_task_ref("87")
+
+    assert "关联: 未找到" in reply
+    assert "源路径状态: 未找到关联" in reply
+    assert "目标路径状态: 未找到关联" in reply
+    assert "当前 guardrail: 拒绝 cleanup" in reply
+    assert f"结论: {CLEANUP_CORRELATION_MISSING_TEXT}" in reply
 
 
 def test_cleanup_by_task_ref_usage_when_empty(tmp_path: Path) -> None:

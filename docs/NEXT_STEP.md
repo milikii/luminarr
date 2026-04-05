@@ -1,4 +1,4 @@
-# Next step (v61)
+# Next step (v62)
 
 ## Current baseline
 
@@ -33,6 +33,7 @@
   - post-download auto import（仍保留 `confirm`）
   - cross-filesystem copy-fallback approval
   - downloader/library asset correlation baseline（导入成功事件当前会结构化写入 `source_path + target_path`，并可按 `task_ref / task_id / task_hash` 稳定定位）
+  - downloader/library cleanup inspect baseline（当前支持 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`；只读返回关联、路径存在性和当前 guardrail 结果）
   - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
@@ -58,14 +59,16 @@
 
 ## Goal
 
-Continue the next smallest ops-cleanup step by landing a deterministic downloader/library cleanup-inspect baseline, on top of the landed cleanup-execution + asset-correlation truth, so the user can read whether a single imported task is cleanup-ready before any deletion, without turning it into automatic cleanup automation or changing the landed downloader/import workflow truth boundaries.
+Continue the next smallest ops-cleanup step by landing a deterministic downloader/library cleanup-command discoverability baseline, on top of the landed cleanup-inspect + cleanup-execution truth, so the user can more clearly tell apart "只读预检" and "实际清理" from the command help text itself, without turning it into cleanup automation or changing the landed downloader/import workflow truth boundaries.
 
 ## Only do
 
-- 只补单个已导入任务的最小 cleanup inspect / preview 文本，一次只检查一个 `task_ref / task_id / task_hash`
-- 优先复用现有 `task_id / task_hash / task_ref`、`job_event` 里的 `source_path / target_path` 和当前 SQLite 持久化真相
-- inspect 结果必须明确返回：是否找到确定性关联、`source_path / target_path` 是否存在、当前 guardrail 是否允许 cleanup
-- 保持现有 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>` execution 语义不变；inspect 当前只读，不删除任何文件
+- 只补 cleanup 命令家族的最小 discoverability 文本，不新增新的 cleanup 副作用
+- 明确区分两条已落地路径：
+  - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`：实际清理下载源资产
+  - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`：只读预检，不删除任何文件
+- 优先复用现有 `cleanup` parser、service 和当前 SQLite 真相边界，不引入新的 cleanup workflow
+- 保持现有 inspect / execution 真相和 guardrail 判定不变
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/cleanup/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -82,6 +85,7 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 ## Do not do
 
+- 不改已落地 cleanup inspect / execution 的判断逻辑、guardrail 条件或删除范围
 - 不让 inspect 直接删除任何下载源资产、库内目标、sidecar 或其他任务文件
 - 不在未校验 correlation 真相和 `target_path` 存在前放宽现有 cleanup execution 保护栏
 - 不删除 library target、metadata sidecar、subtitle sidecar 或其他任务资产
@@ -96,9 +100,9 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 ## Done when
 
-- 至少一条已导入任务可基于现有 `task_id / task_hash / task_ref` + correlation 真相返回确定性的 cleanup inspect 结果
-- inspect 结果会明确区分：可执行 cleanup / guardrail 拒绝 / 关联缺失 / 路径缺失
-- inspect 不依赖自由文本猜测 `source_path / target_path`
+- bare `cleanup` / `清理` 或 cleanup inspect 用法提示，能让用户在不看文档时也看出“执行”和“只读预检”的区别
+- 不新增新的 cleanup 命令家族、自动化路径或批量入口
+- 已落地 cleanup inspect / execution 的输出、保护栏和删除范围不回退
 - 当前 step 不扩成自动删除下载器资产、删种、库内文件清理平台或批量运维入口
 - 已落地的 cleanup execution baseline 行为和保护栏不回退
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退

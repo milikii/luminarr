@@ -18,6 +18,7 @@ ACTION_ADD_TO_DOWNLOADER = "add_to_downloader"
 ACTION_CONFIRM_ADD_TO_DOWNLOADER = "confirm_add_to_downloader"
 ACTION_IMPORT_TO_LIBRARY = "import_to_library"
 ACTION_CONFIRM_IMPORT_TO_LIBRARY = "confirm_import_to_library"
+ACTION_CLEANUP_INSPECT = "cleanup_inspect"
 ACTION_CLEANUP_DOWNLOADER_SOURCE = "cleanup_downloader_source"
 ACTION_CANCEL_PENDING_APPROVAL = "cancel_pending_approval"
 ACTION_RESET_CLARIFICATION = "reset_clarification"
@@ -29,6 +30,7 @@ READ_ONLY_ACTIONS = frozenset(
         ACTION_BT_READ_ONLY_HELPER,
         ACTION_WATCHLIST_LIST,
         ACTION_BT_SUBSCRIPTION_LIST,
+        ACTION_CLEANUP_INSPECT,
     }
 )
 
