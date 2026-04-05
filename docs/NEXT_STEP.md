@@ -1,4 +1,4 @@
-# Next step (v87)
+# Next step (v88)
 
 ## Current baseline
 
@@ -42,6 +42,7 @@
   - downloader/library cleanup rejection follow-up guidance baseline（当前 cleanup 拒绝或失败回复已明确提醒：`cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 是只读预检，不删除任何文件）
   - downloader/library cleanup success follow-up guidance baseline（当前 cleanup 成功回复已明确提醒：如需复核当前结果，可执行 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`）
   - downloader/library cleanup failure observability baseline（当前 cleanup 在 `job_repo` 任务解析失败、`job_event` 关联查询失败、`job_event` 写入失败或删除下载源资产失败时，会打印显式中文彩色日志和修复提示；cleanup 文本结果、guardrail 判定和删除范围保持不变）
+  - downloader/library cleanup chat-scoped task-ref regression coverage baseline（当前已补回归守住 cleanup 在携带 `chat_id` 时，会先用 `jobs` 表把当前聊天里的 `task_ref` 解析到真实 `task_id/task_hash`，再命中既有 `import.succeeded` 关联；不改 cleanup 文本协议、guardrail 或删除范围）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
@@ -74,6 +75,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 ## Only do
 
 - 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 为稳定基线，观察真实回归结果
+- 保持 cleanup 当前已补的 chat-scoped `task_ref -> jobs -> import correlation` 回归守护稳定，不让当前聊天里的短任务引用退回成只能靠原始 `task_id/task_hash` 才能命中 cleanup
 - 当前最新 focused cleanup 回归（`tests/test_cleanup_downloaded_source.py`、`tests/test_private_chat_runtime.py`、`tests/test_personal_wechat_text.py`、`tests/test_feishu_adapter.py`、`tests/test_wecom_adapter.py`、`tests/test_telegram_bot.py`）和 `python3 -m compileall app tests` 已再次通过；本 step 继续只观察，不新增 cleanup 行为
 - 保持 shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口回归覆盖稳定，不让 cleanup 协议退回成只在 Telegram 可用
   - 当前已由 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务级测试守住 `cleanup inspect` / `cleanup` 的最小入口回归，并继续把 bare `cleanup` / bare `cleanup inspect` discoverability 用法提示守在这些非 Telegram 入口上；其中 shared private-chat runtime 已显式补齐 bare `清理` / bare `清理检查` 中文 discoverability，personal WeChat 事件适配层、Feishu 直接事件适配层和 WeCom 直接事件适配层也已显式补齐 bare `cleanup` / bare `cleanup inspect` discoverability，personal WeChat 事件适配层、Feishu 直接事件适配层与 WeCom 直接事件适配层现已显式补齐 bare `清理` / bare `清理检查` 中文 discoverability，shared private-chat runtime、personal WeChat 事件适配层、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务层与 WeCom 直接事件适配层现都已显式补上 bare `清理` / bare `清理检查` 和带参 `清理检查 <任务ID或Hash>` / `清理 <任务ID或Hash>` 中文 cleanup 协议回归；后续只继续观察，不扩协议
@@ -118,6 +120,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 
 - 已落地 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 回归稳定，不出现文本回退或 guardrail 回退
 - cleanup 失败路径不再静默吞错，任务解析失败、关联查询失败、事件写入失败和删除下载源资产失败都能打印显式中文修复提示
+- cleanup 在带 `chat_id` 的入口上仍能先经 `jobs` 表解析当前聊天 `task_ref`，再命中既有 import 关联，不回退到只能依赖原始 `task_id/task_hash`
 - shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口路由、bare discoverability 用法提示，以及 bare `清理` / bare `清理检查` 中文 discoverability 都不回退
 - 当前 step 仍不扩成自动删除下载器资产、删种、库内文件清理平台或批量运维入口
 - 若决定继续补文本，也仍只允许在当前 cleanup 文本闭环内做最小收口，不引入新的 cleanup 工作流或副作用

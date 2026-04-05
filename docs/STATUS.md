@@ -1,4 +1,4 @@
-# Current status (v86)
+# Current status (v87)
 
 ## Project position
 
@@ -59,6 +59,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - downloader/library cleanup rejection follow-up guidance baseline（当前 cleanup 拒绝或失败回复会直接补 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 只读预检提示，并继续显式区分 `cleanup` 的实际清理语义）
   - downloader/library cleanup success follow-up guidance baseline（当前 cleanup 成功回复会直接补 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 只读复核提示，方便用户确认“源已清理、目标保留”）
   - downloader/library cleanup failure observability baseline（当前 cleanup 在 `job_repo` 任务解析失败、`job_event` 关联查询失败、`job_event` 写入失败或删除下载源资产失败时，都会打印显式中文彩色日志和修复提示；现有 cleanup 文本结果、guardrail 判定和删除范围保持不变）
+  - downloader/library cleanup chat-scoped task-ref regression coverage baseline（当前已补回归守住 cleanup 在携带 `chat_id` 时，会先用 `jobs` 表把当前聊天里的 `task_ref` 解析到真实 `task_id/task_hash`，再命中既有 `import.succeeded` 关联；不改 cleanup 文本协议、guardrail 或删除范围）
   - completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - filename normalization
@@ -128,9 +129,14 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - `BT_WEB_SOURCES` 当前只做最小来源开关；首批内建站点仍很少，失败时会显式日志提示但不会自动修复站点规则
 - downloader/library cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早的历史导入事件若只有旧 `message` 目标路径，inspect / cleanup 都会显式拒绝，仍需人工甄别
 - 当前 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up / failure observability 已形成更完整的最小文本闭环；其中 `job_repo` 任务解析失败、`job_event` 关联查询失败、`job_event` 写入失败和删除下载源资产失败四类 cleanup 失败可观测性都已有回归覆盖。下一步只观察真实回归，不继续预埋自动化、批量 cleanup 或删种
+- 当前 cleanup 已额外补上“chat-scoped task_ref 先经 `jobs` 表解析，再命中既有 import 关联”的最小回归守护；这一步只稳住当前聊天短引用，不扩任何新 cleanup 入口或副作用
 
 ## Latest verification
 
+- tests: `339 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- focused tests: `91 passed, 91 deselected` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`)
+- focused tests: `21 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `89 passed, 91 deselected` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`)
 - compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `8 passed, 13 deselected` (`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k "cleanup and handle_personal_wechat_private_text_event"`)

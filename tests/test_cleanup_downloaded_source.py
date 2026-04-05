@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services import cleanup_downloaded_source as cleanup_module
 from app.services.cleanup_downloaded_source import (
@@ -407,6 +408,64 @@ def test_inspect_by_task_ref_logs_job_lookup_failure_and_falls_back_to_task_ref(
     assert "[cleanup 任务解析失败]" in captured.out
     assert "mock job lookup denied" in captured.out
     assert "当前会回退到原始 task_ref 继续尝试匹配 import 关联" in captured.out
+
+
+@pytest.mark.parametrize(
+    ("run_cleanup", "expected_fragment", "expected_follow_up", "expect_source_exists"),
+    [
+        (False, "当前 guardrail: 允许 cleanup", "cleanup hash-87 / 清理 hash-87", True),
+        (True, "已清理下载源资产", "cleanup inspect hash-87 / 清理检查 hash-87", False),
+    ],
+)
+def test_cleanup_resolves_chat_scoped_task_ref_via_job_repo(
+    tmp_path: Path,
+    run_cleanup: bool,
+    expected_fragment: str,
+    expected_follow_up: str,
+    expect_source_exists: bool,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+    if run_cleanup:
+        reply = service.cleanup_by_task_ref("cleanup-shortcut", chat_id=1001)
+    else:
+        reply = service.inspect_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    assert expected_fragment in reply
+    assert "任务 ID: 87" in reply
+    assert "任务 Hash: hash-87" in reply
+    assert expected_follow_up in reply
+    assert source_file.exists() is expect_source_exists
+    assert target_file.exists()
 
 
 def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
