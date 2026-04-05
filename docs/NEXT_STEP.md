@@ -1,4 +1,4 @@
-# Next step (v94)
+# Next step (v95)
 
 ## Current baseline
 
@@ -17,6 +17,7 @@
 ## Only do
 
 - 执行一个 7 天真实使用验证窗口。
+- 把验证窗口起止日期和四渠道真实私聊 smoke 进度持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让退出条件只留在口头描述。
 - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke，确认“消息进来 -> shared runtime -> 文本回去”不回退。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup discoverability + inspect + execution + `chat-scoped task_ref` 关联路径的聚合验收门，并持续覆盖英文/中文协议变体。
 - 保持 cleanup 执行阻断分支的显式中文日志和处理建议稳定，不回退到只回用户文本、服务端无日志。
@@ -47,6 +48,7 @@
 ## Done when
 
 - 已完成 7 天验证窗口。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期和当前结论。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文协议与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道 discoverability / inspect / execution 测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。

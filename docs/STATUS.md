@@ -1,4 +1,4 @@
-# Current status (v93)
+# Current status (v94)
 
 ## Project position
 
@@ -68,6 +68,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前主线不是继续扩 cleanup，而是把 cleanup 收口成一个有退出条件的四渠道验证窗口。
 - 当前验证目标是：四个渠道都要真实可用，但业务真相仍只维护在 shared runtime、workflow、approval、`jobs` 和 SQLite 一套边界里。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已作为当前验证窗口台账落地；窗口开始日期固定为 2026-04-05，最早可结束日期固定为 2026-04-12。
+- 当前四个渠道的真实私聊 smoke 记录仍全部待补；`docs/STATUS.md` 只保留快照，逐项证据写入 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 
 ## Main risks and gaps
 
@@ -86,8 +88,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - four-channel cleanup smoke tests：`48 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`25 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`143 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- cleanup verification window doc check：`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
-- docs consistency check：`passed`（`rg -n "Current mainline profile:|Core responsibilities:|personal WeChat|manage_bt_subscription" AGENTS.md README.md docs/STATUS.md docs/NEXT_STEP.md`）
+- docs consistency check：`passed`（`rg -n "CLEANUP_VERIFICATION_WINDOW|2026-04-05|2026-04-12|真实私聊 smoke|tests/test_cleanup_cross_channel_smoke.py" docs/DECISIONS.md docs/NEXT_STEP.md docs/STATUS.md docs/CLEANUP_VERIFICATION_WINDOW.md`）
 - manual verification：
   - downloader/library cleanup execution baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_execution_baseline.py`）
   - qBittorrent protocol baseline passed
@@ -103,3 +106,4 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Current priority
 
 - 在四渠道都可用的前提下，继续完成 cleanup 的 7 天验证窗口，并保持 `tests/test_cleanup_cross_channel_smoke.py` 这条聚合 smoke gate（含英文/中文协议与 `chat-scoped task_ref -> jobs -> import correlation` 路径）稳定；若出现问题，只修 shared runtime、渠道胶水或显式日志，不扩自动 cleanup、批量 cleanup 或删种。
+- 当前窗口证据统一落在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；完成真实私聊 smoke 后，只更新这份台账和 `docs/STATUS.md` 快照，不新增 cleanup 协议或额外工作流。

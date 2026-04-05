@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v50)
+# docs/DECISIONS.md (v51)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -542,6 +542,7 @@
     - 完成一个明确的真实使用周期
     - 四个渠道都确认过“消息进来 -> shared runtime -> 文本回去”的最小闭环
     - cleanup 协议没有回退
+  - 当前验证窗口的具体起止日期和四渠道 smoke 证据，统一记录在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；`docs/STATUS.md` 只保留窗口快照。
   - 一旦退出条件满足，后续主线应推进到更高用户价值的能力，不再把 cleanup 观察无限延长。
 - **原因**：
   没有退出条件的观察会持续消耗注意力，却不持续增加用户价值。
