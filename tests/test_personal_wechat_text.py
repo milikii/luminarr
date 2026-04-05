@@ -294,6 +294,60 @@ def test_handle_personal_wechat_private_text_event_routes_cleanup_execution_into
     assert target_file.exists()
 
 
+def test_handle_personal_wechat_private_text_event_routes_bare_cleanup_usage_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    event = asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message("cleanup"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text="cleanup",
+        context_token="ctx-1",
+    )
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, PersonalWeChatPrivateTextEvent)
+    assert reply_text == CLEANUP_QUERY_USAGE_TEXT
+
+
+def test_handle_personal_wechat_private_text_event_routes_bare_cleanup_inspect_usage_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    event = asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message("cleanup inspect"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text="cleanup inspect",
+        context_token="ctx-1",
+    )
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, PersonalWeChatPrivateTextEvent)
+    assert reply_text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+
+
 def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp_path: Path) -> None:
     sync_path = tmp_path / "wx-account-1.sync.json"
     saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
