@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
+
+from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
+from app.bot.personal_wechat_text import (
+    PERSONAL_WECHAT_CHANNEL,
+    PersonalWeChatPrivateTextEvent,
+    PersonalWeChatTextService,
+    handle_personal_wechat_private_text_event,
+    parse_personal_wechat_private_text_event,
+)
+from app.bot.telegram_bot import (
+    ADD_TO_DOWNLOADER_SERVICE_KEY,
+    GET_DOWNLOAD_STATUS_SERVICE_KEY,
+    IMPORT_TO_LIBRARY_SERVICE_KEY,
+    SEARCH_SERVICE_KEY,
+)
+from app.services.add_to_downloader import AddToDownloaderService
+from app.services.get_download_status import GetDownloadStatusService
+from app.services.import_to_library import ImportToLibraryService
+from app.services.search_media import SearchMediaService
+
+
+async def _fake_search(query: str) -> list[dict[str, object]]:
+    return [
+        {
+            "title": f"title-{query}",
+            "year": 2026,
+            "quality": "1080p",
+            "size": 1024,
+            "indexerName": "idx",
+            "downloadUrl": "https://example.com/sample.torrent",
+        }
+    ]
+
+
+def _build_bot_data() -> dict[str, object]:
+    search_service = SearchMediaService(_fake_search)
+    return {
+        SEARCH_SERVICE_KEY: search_service,
+        ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
+        GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+        IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+    }
+
+
+def _build_text_message(
+    text: str,
+    *,
+    from_user_id: str = "wx-user-1",
+    context_token: str | None = "ctx-1",
+    message_type: int = 1,
+    group_id: str = "",
+) -> object:
+    return SimpleNamespace(
+        message_type=message_type,
+        group_id=group_id,
+        from_user_id=from_user_id,
+        message_id=987654321,
+        context_token=context_token,
+        item_list=[
+            SimpleNamespace(
+                type=1,
+                text_item=SimpleNamespace(text=text),
+            )
+        ],
+    )
+
+
+def test_parse_personal_wechat_private_text_event_reads_private_text() -> None:
+    event = parse_personal_wechat_private_text_event(
+        account_id="wx-account-1",
+        message=_build_text_message("dune"),
+    )
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text="dune",
+        context_token="ctx-1",
+    )
+
+
+def test_parse_personal_wechat_private_text_event_ignores_non_user_group_or_non_text() -> None:
+    non_user_message = _build_text_message("dune", message_type=2)
+    group_message = _build_text_message("dune", group_id="group-1")
+    empty_text_message = SimpleNamespace(
+        message_type=1,
+        group_id="",
+        from_user_id="wx-user-1",
+        message_id=1,
+        context_token="ctx-1",
+        item_list=[SimpleNamespace(type=1, text_item=SimpleNamespace(text=""))],
+    )
+
+    assert parse_personal_wechat_private_text_event(account_id="wx-account-1", message=non_user_message) is None
+    assert parse_personal_wechat_private_text_event(account_id="wx-account-1", message=group_message) is None
+    assert parse_personal_wechat_private_text_event(account_id="wx-account-1", message=empty_text_message) is None
+
+
+def test_handle_personal_wechat_private_text_event_projects_ids_and_routes_into_shared_runtime(
+    monkeypatch,
+) -> None:
+    dispatch_private_chat_text = AsyncMock()
+    reply_text_func = AsyncMock()
+    monkeypatch.setattr("app.bot.personal_wechat_text.dispatch_private_chat_text", dispatch_private_chat_text)
+
+    event = asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message("dune"),
+            bot_data=_build_bot_data(),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text="dune",
+        context_token="ctx-1",
+    )
+    dispatch_private_chat_text.assert_awaited_once()
+    assert dispatch_private_chat_text.await_args.kwargs["query"] == "dune"
+    assert dispatch_private_chat_text.await_args.kwargs["chat_id"] == project_channel_chat_id(
+        channel=PERSONAL_WECHAT_CHANNEL,
+        external_chat_id="wx-user-1",
+    )
+    assert dispatch_private_chat_text.await_args.kwargs["user_id"] == project_channel_user_id(
+        channel=PERSONAL_WECHAT_CHANNEL,
+        external_user_id="wx-user-1",
+    )
+
+
+def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp_path: Path) -> None:
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf: list[tuple[Path, str]] = []
+    sent_messages: list[tuple[str, str, object]] = []
+    reply_sent = asyncio.Event()
+    restore_context_tokens = Mock()
+    set_context_token = Mock()
+    close_client = AsyncMock()
+
+    async def get_updates_func(**_: object) -> object:
+        if reply_sent.is_set():
+            await asyncio.sleep(3600)
+        return SimpleNamespace(
+            ret=0,
+            errcode=0,
+            errmsg="",
+            msgs=[_build_text_message("dune")],
+            get_updates_buf="buf-new",
+            longpolling_timeout_ms=1500,
+        )
+
+    async def send_text_func(to: str, text: str, opts: object) -> object:
+        sent_messages.append((to, text, opts))
+        reply_sent.set()
+        return {"messageId": "wx-msg-1"}
+
+    service = PersonalWeChatTextService(
+        list_account_ids_func=lambda: ["wx-account-1"],
+        load_account_func=lambda _: SimpleNamespace(token="bot-token-1", base_url="https://wx.test"),
+        restore_context_tokens_func=restore_context_tokens,
+        get_context_token_func=Mock(return_value=None),
+        set_context_token_func=set_context_token,
+        get_sync_buf_file_path_func=lambda _: sync_path,
+        load_sync_buf_func=lambda _: "buf-old",
+        save_sync_buf_func=lambda path, buf: saved_sync_buf.append((path, buf)),
+        get_updates_func=get_updates_func,
+        send_text_func=send_text_func,
+        close_client_func=close_client,
+    )
+
+    async def run_case() -> None:
+        await service.start(bot_data=_build_bot_data())
+        await asyncio.wait_for(reply_sent.wait(), timeout=1)
+        await service.shutdown()
+
+    asyncio.run(run_case())
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert "搜索结果：dune" in text
+    assert "title-dune" in text
+    assert getattr(opts, "base_url", "") == "https://wx.test"
+    assert getattr(opts, "token", "") == "bot-token-1"
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    close_client.assert_awaited_once()
+
+
+def test_personal_wechat_text_service_refuses_multiple_saved_accounts(capsys) -> None:
+    get_updates_func = AsyncMock()
+    close_client = AsyncMock()
+    service = PersonalWeChatTextService(
+        list_account_ids_func=lambda: ["wx-account-1", "wx-account-2"],
+        load_account_func=lambda account_id: SimpleNamespace(
+            token=f"bot-token-for-{account_id}",
+            base_url="https://wx.test",
+        ),
+        restore_context_tokens_func=Mock(),
+        get_context_token_func=Mock(return_value=None),
+        set_context_token_func=Mock(),
+        get_sync_buf_file_path_func=lambda account_id: Path(f"/tmp/{account_id}.sync.json"),
+        load_sync_buf_func=lambda _: "",
+        save_sync_buf_func=lambda _path, _buf: None,
+        get_updates_func=get_updates_func,
+        send_text_func=AsyncMock(),
+        close_client_func=close_client,
+    )
+
+    asyncio.run(service.start(bot_data=_build_bot_data()))
+
+    captured = capsys.readouterr()
+    assert "[personal WeChat 私聊文本未启动]" in captured.out
+    assert "多个已保存的 personal WeChat 账号" in captured.out
+    assert service._poll_task is None
+    get_updates_func.assert_not_awaited()
+    close_client.assert_not_awaited()

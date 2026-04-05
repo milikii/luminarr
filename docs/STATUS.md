@@ -1,11 +1,11 @@
-# Current status (v54)
+# Current status (v55)
 
 ## Project position
 
-Luminarr 当前是一个 **Telegram + Feishu + WeCom（最小私聊文本基线）** 的垂直影视自动化 Harness。
+Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）** 的垂直影视自动化 Harness。
 
 当前固定主线：
-- Telegram + Feishu + WeCom（当前为最小私聊文本基线）
+- Telegram + personal WeChat + Feishu + WeCom（当前为最小私聊文本基线）
 - TMDB
 - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 使用）
 - Transmission + qBittorrent
@@ -21,6 +21,7 @@ Luminarr 当前是一个 **Telegram + Feishu + WeCom（最小私聊文本基线�
   - Telegram runtime
   - Telegram media sending baseline（已能按管理员 `chat_id + 本地路径` 发送图片或文件，并以 `bot_data` 闭包形式供后续二维码/文件回传复用）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并回传 SVG 二维码文件；扫码确认成功后会保存 `wechat-clawbot` 凭据并回发最小结果文本）
+  - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat text runtime baseline（已从 Telegram 收发层抽出可复用文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能解析最小私聊文本事件，并稳定投影到现有整数 `chat_id/user_id` 边界）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上，继续复用 shared private-chat text runtime）
@@ -77,10 +78,10 @@ Luminarr 当前是一个 **Telegram + Feishu + WeCom（最小私聊文本基线�
 ## What is not implemented yet
 
 - **当前 next step**
-  - personal WeChat private-chat text baseline（在已落地二维码登录和凭据保存之上，只补最小私聊文本收发）
+  - Telegram richer card/UI polish（在已稳定的多渠道最小私聊文本主链之上，优先改善 Telegram 搜索/选择阶段的可扫读性和消息表现）
 
 - **后续体验**
-  - Telegram richer card/UI polish
+  - 暂无独立条目（当前已收敛到上面的 Telegram richer card/UI polish）
 
 - **后续运维**
   - downloader/library asset correlation and cleanup
@@ -94,7 +95,9 @@ Luminarr 当前是一个 **Telegram + Feishu + WeCom（最小私聊文本基线�
 - Feishu 当前已接最小 webhook 请求入口、文本回消息和事件验签
 - Feishu 当前只支持私聊文本消息 / 文本回复，不支持群聊、图片、卡片、按钮回调
 - WeCom 当前已接 callback URL 校验、验签解密入站和最小加密被动文本回包，但仍只支持私聊文本，不支持群聊、图片、卡片、按钮回调或主动发消息 API
-- personal WeChat 当前只支持 Telegram 私聊里的 `微信登录` 触发二维码登录；还没接 personal WeChat 私聊文本、命令路由、审批执行
+- personal WeChat 当前只支持单账号、私聊文本；启动时若检测到多个已保存账号，会显式拒绝启动个人微信文本轮询
+- personal WeChat 当前私聊文本轮询在进程启动时读取已保存登录态；同一进程里刚完成 `微信登录` 后，要等下一次启动才会开始监听
+- personal WeChat 当前仍不支持群聊、图片、文件、卡片、按钮或多账号编排
 - 当前二维码回传落地为 Telegram SVG 文档文件，不是直接 PNG 图片；二维码过期后需要重新发送 `微信登录`
 - 当前默认把触发 `微信登录` 的 Telegram 私聊视为管理员二维码回传目标，还没有单独管理员 ACL
 - personal WeChat 凭据当前按 `wechat-clawbot` 状态目录规则落盘（`OPENCLAW_STATE_DIR` / `CLAWDBOT_STATE_DIR` / `~/.openclaw`），还没并入项目 SQLite 真相
@@ -112,6 +115,11 @@ Luminarr 当前是一个 **Telegram + Feishu + WeCom（最小私聊文本基线�
 
 ## Latest verification
 
+- focused tests: `8 passed` (`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py tests/test_personal_wechat_login.py`)
+- focused tests: `1 passed, 62 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k personal_wechat`)
+- focused tests: `91 passed, 2 skipped` (`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_personal_wechat_login.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py`)
+- tests: `245 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `3 passed` (`.venv/bin/python -m pytest -q tests/test_personal_wechat_login.py`)
 - focused tests: `5 passed, 58 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "personal_wechat_login or telegram_media_sender"`)
 - tests: `240 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
@@ -161,4 +169,4 @@ Luminarr 当前是一个 **Telegram + Feishu + WeCom（最小私聊文本基线�
 
 当前只做一件事：
 
-- 在已落地的 personal WeChat 二维码登录和凭据保存基线之上，补最小 personal WeChat 私聊文本收发，并继续复用 shared private-chat text runtime；仍然不把这一步扩成群聊、图片、卡片或通用多渠道平台。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链之上，先补 Telegram richer card/UI polish 的最小一刀，优先改善 Telegram 搜索/选择阶段的可扫读性和消息表现；仍然不把这一步扩成通用富交互平台。

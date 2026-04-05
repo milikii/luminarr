@@ -449,6 +449,7 @@ def _resolve_execution_gate_for_application(application: Application) -> Executi
 async def _start_bt_subscription_scheduler(application: Application) -> None:
     _start_feishu_webhook_server_if_configured(application)
     _start_wecom_webhook_server_if_configured(application)
+    await _start_personal_wechat_text_service_if_available(application)
 
     existing_task = application.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
     if isinstance(existing_task, asyncio.Task) and not existing_task.done():
@@ -490,6 +491,7 @@ async def _start_bt_subscription_scheduler(application: Application) -> None:
 async def _stop_bt_subscription_scheduler(application: Application) -> None:
     _stop_feishu_webhook_server_if_running(application)
     _stop_wecom_webhook_server_if_running(application)
+    await _shutdown_personal_wechat_text_service_if_running(application)
     await _shutdown_personal_wechat_login_service_if_running(application)
 
     stop_event = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
@@ -576,6 +578,37 @@ def _stop_wecom_webhook_server_if_running(application: Application) -> None:
     if not isinstance(runtime, WeComWebhookServerRuntime):
         return
     stop_wecom_webhook_server(runtime)
+
+
+async def _start_personal_wechat_text_service_if_available(application: Application) -> None:
+    from app.bot.personal_wechat_text import (
+        PERSONAL_WECHAT_TEXT_SERVICE_KEY,
+        PersonalWeChatTextService,
+    )
+
+    service = application.bot_data.get(PERSONAL_WECHAT_TEXT_SERVICE_KEY)
+    if service is None:
+        service = PersonalWeChatTextService()
+        application.bot_data[PERSONAL_WECHAT_TEXT_SERVICE_KEY] = service
+    if not isinstance(service, PersonalWeChatTextService):
+        print(
+            "\033[31m[personal WeChat 私聊文本服务配置无效]\033[0m bot_data 中的 personal_wechat_text_service 不是有效服务实例。\n"
+            "\033[33m[处理建议]\033[0m 删除错误注入值，或改为 PersonalWeChatTextService 实例后重启服务。"
+        )
+        return
+    await service.start(bot_data=application.bot_data)
+
+
+async def _shutdown_personal_wechat_text_service_if_running(application: Application) -> None:
+    from app.bot.personal_wechat_text import (
+        PERSONAL_WECHAT_TEXT_SERVICE_KEY,
+        PersonalWeChatTextService,
+    )
+
+    service = application.bot_data.get(PERSONAL_WECHAT_TEXT_SERVICE_KEY)
+    if not isinstance(service, PersonalWeChatTextService):
+        return
+    await service.shutdown()
 
 
 async def _shutdown_personal_wechat_login_service_if_running(application: Application) -> None:

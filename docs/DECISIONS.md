@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v47)
+# docs/DECISIONS.md (v48)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -31,7 +31,7 @@
 - **日期**：2026-04-05
 - **结论**：
   当前主线固定为：
-  - Telegram + Feishu + WeCom（当前为最小私聊文本基线）
+  - Telegram + personal WeChat + Feishu + WeCom（当前为最小私聊文本基线）
   - TMDB
   - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 支线）
   - Transmission + qBittorrent
@@ -179,7 +179,7 @@
 - **日期**：2026-04-05
 - **结论**：
   当前主线不做：
-  - personal WeChat
+  - personal WeChat 群聊、图片、文件、卡片、按钮、多账号编排
   - Feishu / WeCom 群聊、图片、卡片、按钮回调、通用多渠道平台化
   - Jellyfin / Plex 并行主线支持
   - 通用 plugin / skill / MCP 平台化
@@ -393,7 +393,7 @@
 - **状态**：已决定
 - **日期**：2026-04-05
 - **结论**：
-  - 当 `personal WeChat` 被提升为正式 next step 时，默认使用 `wechat-clawbot` Python 包作为当前项目的个人微信渠道底座。
+  - 当前 personal WeChat 默认使用 `wechat-clawbot` Python 包作为当前项目的个人微信渠道底座。
   - 当前项目不把 npm 侧 ClawBot/OpenClaw 插件作为 personal WeChat 的主实现形态。
   - `wechat-clawbot` 在当前项目里的职责只限于提供个人微信所需的底层渠道能力，例如：
     - iLink API 客户端
@@ -404,7 +404,13 @@
   - Luminarr 自身仍负责：
     - 把 personal WeChat 外部标识压进现有 shared private-chat text runtime
     - 继续复用现有 workflow / approval / jobs / lease / SQLite 真相边界
-  - 当前这条决策不提前改变正在施工的 WeCom 路线。
+  - 当前 personal WeChat 最小文本基线固定为：
+    - 启动时读取 `wechat-clawbot` 已保存登录态
+    - 只自动启动唯一可用账号
+    - 用长轮询 `getUpdates` 收私聊文本
+    - 把 runtime 产出的文本通过 `sendMessage` 回到原私聊
+  - 若检测到多个已保存账号，则显式拒绝启动当前 personal WeChat 文本服务，不做多账号编排。
+  - 当前不要求在同一进程里于 QR 登录成功后热启动 personal WeChat 文本轮询；已保存登录态在下次启动时生效即可。
 - **原因**：
   当前主仓库是 Python 主体，后续 personal WeChat 直接复用 `wechat-clawbot` 更贴合现有运行时；这样能避免把渠道适配做成额外的 Node sidecar，也能继续保持“渠道适配薄、业务主链不分叉”的结构。
 
