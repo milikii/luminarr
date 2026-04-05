@@ -107,6 +107,59 @@ def _build_text_message(
     )
 
 
+def _run_personal_wechat_text_service_single_message_case(
+    *,
+    inbound_text: str,
+    bot_data: dict[str, object],
+    sync_path: Path,
+) -> tuple[list[tuple[Path, str]], list[tuple[str, str, object]], Mock, Mock, AsyncMock]:
+    saved_sync_buf: list[tuple[Path, str]] = []
+    sent_messages: list[tuple[str, str, object]] = []
+    reply_sent = asyncio.Event()
+    restore_context_tokens = Mock()
+    set_context_token = Mock()
+    close_client = AsyncMock()
+
+    async def get_updates_func(**_: object) -> object:
+        if reply_sent.is_set():
+            await asyncio.sleep(3600)
+        return SimpleNamespace(
+            ret=0,
+            errcode=0,
+            errmsg="",
+            msgs=[_build_text_message(inbound_text)],
+            get_updates_buf="buf-new",
+            longpolling_timeout_ms=1500,
+        )
+
+    async def send_text_func(to: str, text: str, opts: object) -> object:
+        sent_messages.append((to, text, opts))
+        reply_sent.set()
+        return {"messageId": "wx-msg-1"}
+
+    service = PersonalWeChatTextService(
+        list_account_ids_func=lambda: ["wx-account-1"],
+        load_account_func=lambda _: SimpleNamespace(token="bot-token-1", base_url="https://wx.test"),
+        restore_context_tokens_func=restore_context_tokens,
+        get_context_token_func=Mock(return_value=None),
+        set_context_token_func=set_context_token,
+        get_sync_buf_file_path_func=lambda _: sync_path,
+        load_sync_buf_func=lambda _: "buf-old",
+        save_sync_buf_func=lambda path, buf: saved_sync_buf.append((path, buf)),
+        get_updates_func=get_updates_func,
+        send_text_func=send_text_func,
+        close_client_func=close_client,
+    )
+
+    async def run_case() -> None:
+        await service.start(bot_data=bot_data)
+        await asyncio.wait_for(reply_sent.wait(), timeout=1)
+        await service.shutdown()
+
+    asyncio.run(run_case())
+    return saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client
+
+
 def test_parse_personal_wechat_private_text_event_reads_private_text() -> None:
     event = parse_personal_wechat_private_text_event(
         account_id="wx-account-1",
@@ -239,50 +292,13 @@ def test_handle_personal_wechat_private_text_event_routes_cleanup_execution_into
 
 def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp_path: Path) -> None:
     sync_path = tmp_path / "wx-account-1.sync.json"
-    saved_sync_buf: list[tuple[Path, str]] = []
-    sent_messages: list[tuple[str, str, object]] = []
-    reply_sent = asyncio.Event()
-    restore_context_tokens = Mock()
-    set_context_token = Mock()
-    close_client = AsyncMock()
-
-    async def get_updates_func(**_: object) -> object:
-        if reply_sent.is_set():
-            await asyncio.sleep(3600)
-        return SimpleNamespace(
-            ret=0,
-            errcode=0,
-            errmsg="",
-            msgs=[_build_text_message("dune")],
-            get_updates_buf="buf-new",
-            longpolling_timeout_ms=1500,
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text="dune",
+            bot_data=_build_bot_data(),
+            sync_path=sync_path,
         )
-
-    async def send_text_func(to: str, text: str, opts: object) -> object:
-        sent_messages.append((to, text, opts))
-        reply_sent.set()
-        return {"messageId": "wx-msg-1"}
-
-    service = PersonalWeChatTextService(
-        list_account_ids_func=lambda: ["wx-account-1"],
-        load_account_func=lambda _: SimpleNamespace(token="bot-token-1", base_url="https://wx.test"),
-        restore_context_tokens_func=restore_context_tokens,
-        get_context_token_func=Mock(return_value=None),
-        set_context_token_func=set_context_token,
-        get_sync_buf_file_path_func=lambda _: sync_path,
-        load_sync_buf_func=lambda _: "buf-old",
-        save_sync_buf_func=lambda path, buf: saved_sync_buf.append((path, buf)),
-        get_updates_func=get_updates_func,
-        send_text_func=send_text_func,
-        close_client_func=close_client,
     )
-
-    async def run_case() -> None:
-        await service.start(bot_data=_build_bot_data())
-        await asyncio.wait_for(reply_sent.wait(), timeout=1)
-        await service.shutdown()
-
-    asyncio.run(run_case())
 
     assert saved_sync_buf == [(sync_path, "buf-new")]
     restore_context_tokens.assert_called_once_with("wx-account-1")
@@ -295,6 +311,61 @@ def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp
     assert getattr(opts, "base_url", "") == "https://wx.test"
     assert getattr(opts, "token", "") == "bot-token-1"
     assert getattr(opts, "context_token", "") == "ctx-1"
+    close_client.assert_awaited_once()
+
+
+def test_personal_wechat_text_service_routes_cleanup_inspect_and_keeps_files(tmp_path: Path) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text="cleanup inspect 87",
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            sync_path=sync_path,
+        )
+    )
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert "清理预检结果：" in text
+    assert "当前 guardrail: 允许 cleanup" in text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in text
+    assert getattr(opts, "base_url", "") == "https://wx.test"
+    assert getattr(opts, "token", "") == "bot-token-1"
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    assert source_file.exists()
+    assert target_file.exists()
+    close_client.assert_awaited_once()
+
+
+def test_personal_wechat_text_service_routes_cleanup_execution_and_removes_source(tmp_path: Path) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text="cleanup 87",
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            sync_path=sync_path,
+        )
+    )
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert "已清理下载源资产" in text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in text
+    assert getattr(opts, "base_url", "") == "https://wx.test"
+    assert getattr(opts, "token", "") == "bot-token-1"
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    assert not source_file.exists()
+    assert target_file.exists()
     close_client.assert_awaited_once()
 
 
