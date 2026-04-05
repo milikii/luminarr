@@ -238,6 +238,44 @@ def test_handle_feishu_private_text_event_routes_cleanup_execution_into_shared_r
     assert target_file.exists()
 
 
+def test_handle_feishu_private_text_event_routes_bare_cleanup_usage_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=_build_feishu_private_text_payload("cleanup"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert reply_text == CLEANUP_QUERY_USAGE_TEXT
+
+
+def test_handle_feishu_private_text_event_routes_bare_cleanup_inspect_usage_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=_build_feishu_private_text_payload("cleanup inspect"),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert reply_text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+
+
 def test_build_feishu_reply_text_func_sends_back_to_original_chat() -> None:
     event = FeishuPrivateTextEvent(
         event_id="feishu-event-1",
