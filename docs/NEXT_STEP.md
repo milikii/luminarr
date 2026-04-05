@@ -1,4 +1,4 @@
-# Next step (v50)
+# Next step (v53)
 
 ## Current baseline
 
@@ -10,6 +10,7 @@
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上）
   - Feishu webhook event-signature verification baseline（非 `url_verification` 请求已先验签）
   - WeCom private-chat decrypted-text adapter kernel baseline（已能解析最小已解密 XML 私聊文本消息，并把 `FromUserName` 投影到现有整数 `chat_id/user_id` 后进入 shared private-chat text runtime）
+  - WeCom callback envelope + text reply baseline（已能完成 callback GET URL 校验、POST 验签解密入站，并按最小加密被动文本回包返回到原私聊）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval
@@ -49,62 +50,50 @@
 
 ## Goal
 
-Continue the smallest remaining WeCom callback step on top of the shared private-chat text runtime.
+Continue the smallest remaining Telegram media sending step for later QR/file handoff.
 
 ## Only do
 
-- 只补 WeCom callback envelope + text reply baseline
-- 继续复用已落地的 shared private-chat text runtime
-- 继续复用已落地的 Feishu / Telegram 主链与当前文本协议形状
-- 继续复用已落地的 WeCom 已解密 XML 文本适配内核
-- 先把 WeCom callback 外壳里的 URL 校验、解密后 XML 和最小文本回包接到既有 `handle_wecom_private_text_event`
-- 继续让 WeCom 私聊外部标识在适配层内投影为现有整数 `chat_id/user_id`，不改既有 SQLite 真相表
-- 继续复用现有 workflow 和 service：
+- 只补 Telegram 最小图片/文件发送 baseline
+- 目标只服务后续 personal WeChat 二维码登录等最小媒资回传
+- 继续复用当前 Telegram runtime、Application 和既有管理员私聊入口
+- 保持现有自然语言 / 文本协议形状不变：
+  - `search/select/status/import/confirm/watchlist/btsub`
+  - `bt搜 <关键词>` / `bt search <关键词>`
+- 保持 shared private-chat text runtime 的文本分发边界不变
+- 保持现有 workflow 和 service 真相边界不变：
   - `search_media`
   - `add_to_downloader`
   - `get_download_status`
   - `import_to_library`
   - `manage_watchlist`
   - `manage_bt_subscription`
-- 保持现有自然语言 / 文本协议形状尽量不变：
-  - `search/select/status/import/confirm/watchlist/btsub`
-  - `bt搜 <关键词>` / `bt search <关键词>`
 - 继续复用现有 downloader / import approval 边界
 - 继续复用现有 BT 分流、原始磁力 processing-path inquiry、pure BT、`btsub`、BT-only read-only helper
-- 只做最小私聊收发适配，不做群聊
-- 只先处理文本消息和文本回复入口，不做图片、卡片、按钮回调
-- 保持现有媒体后半段边界不变
-- 保持现有 PT / BT 分流边界不变
-- 保持现有 downloader approval-pending 边界不变
+- 只补“发图片 / 发文件”能力，不补新的富文本协议
 
 ## Do not do
 
-- 不把这一步扩成通用多轮问答框架
-- 不把 WeCom 适配扩成通用多渠道平台
-- 不同时做 personal WeChat
-- 不在这一步补群聊、卡片、按钮、图片消息
-- 不把 WeCom callback 的 URL 校验、解密、回包抽成通用 webhook 总线
+- 不同时做 personal WeChat 接入
+- 不把这一步扩成 Telegram 卡片 UI overhaul
+- 不补群聊、频道、相册、按钮、内联富交互
+- 不改 shared private-chat text runtime 的既有文本协议形状
 - 不改现有 SQLite / approval / jobs / lease 真相协议
 - 不改现有 downloader / import approval 协议
 - 不改现有 BT shared source adapter、WebSource 规则层、`btsub` 共享选源逻辑
 - 不改现有原始磁力处理链问询形状
-- 不引入群聊、机器人平台化中间层、通用 webhook 总线
-- 不引入通用 scheduler 平台
+- 不引入通用多渠道媒资抽象层
+- 不引入通用文件资产服务、对象存储或 CDN
 - 不引入 automatic `confirm`
 - 不新增下载器 / 媒体服务器支持
-- 不回头改 shared private-chat text runtime 的既有文本协议形状
-- 不为 Feishu 适配去改现有 SQLite 真相表里的整数 `chat_id/user_id` 形状
-- 不让 scheduler tick、`btsub run`、恢复逻辑依赖 Feishu 适配
 
 ## Done when
 
-- WeCom callback 请求已能完成最小 URL 校验和解密，并把私聊文本事件压进既有 shared private-chat text runtime
-- WeCom runtime 产出的文本已能按当前最小回包形状回到原私聊
-- 现有 Telegram / Feishu 行为不回退
-- 现有 service、approval、jobs、lease 真相边界保持不变
-- Telegram 行为不回退
+- Telegram 运行时已具备最小图片发送或文件发送能力，能把一份明确媒资回到原管理员私聊
+- 该能力可被后续渠道接入代码直接复用，不要求先做 personal WeChat
+- 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
+- 现有 Feishu / WeCom 私聊文本能力不回退
 - 现有 downloader/import approval 行为不回退
-- 现有 BT follow-up、原始磁力 processing-path inquiry、qB 执行、`btsub` 共享选源、pure BT 单片优选、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、raw_bt 非媒体边界都不回退
 - 现有 metadata / subtitle / refresh 链路不回退
 
 ## After this step
@@ -112,6 +101,7 @@ Continue the smallest remaining WeCom callback step on top of the shared private
 按顺序继续：
 
 1. 渠道扩展
-   - personal WeChat
+   - personal WeChat（默认基于 `wechat-clawbot` Python 包，不采用 npm ClawBot 插件作为主实现形态）
+   - Telegram richer card/UI polish
 2. 运维清理
    - downloader/library asset correlation and cleanup

@@ -41,6 +41,12 @@ def test_load_settings_reads_token() -> None:
     assert settings.feishu_webhook_host == "0.0.0.0"
     assert settings.feishu_webhook_port == 18095
     assert settings.feishu_webhook_path == "/feishu/webhook"
+    assert settings.wecom_token == ""
+    assert settings.wecom_encoding_aes_key == ""
+    assert settings.wecom_receive_id == ""
+    assert settings.wecom_webhook_host == "0.0.0.0"
+    assert settings.wecom_webhook_port == 18097
+    assert settings.wecom_webhook_path == "/wecom/webhook"
 
 
 def test_load_settings_reads_library_target_dir() -> None:
@@ -157,6 +163,30 @@ def test_load_settings_reads_feishu_settings() -> None:
     assert settings.feishu_webhook_host == "127.0.0.1"
     assert settings.feishu_webhook_port == 18096
     assert settings.feishu_webhook_path == "/hooks/feishu"
+
+
+def test_load_settings_reads_wecom_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "WECOM_TOKEN": "wecom-token-42",
+            "WECOM_ENCODING_AES_KEY": "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY",
+            "WECOM_RECEIVE_ID": "wwcorp123",
+            "WECOM_WEBHOOK_HOST": "127.0.0.1",
+            "WECOM_WEBHOOK_PORT": "18101",
+            "WECOM_WEBHOOK_PATH": "hooks/wecom",
+        }
+    )
+
+    assert settings.wecom_token == "wecom-token-42"
+    assert settings.wecom_encoding_aes_key == "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY"
+    assert settings.wecom_receive_id == "wwcorp123"
+    assert settings.wecom_webhook_host == "127.0.0.1"
+    assert settings.wecom_webhook_port == 18101
+    assert settings.wecom_webhook_path == "/hooks/wecom"
 
 
 def test_load_settings_reads_raw_bt_destinations() -> None:
@@ -318,5 +348,41 @@ def test_load_settings_rejects_invalid_feishu_webhook_port() -> None:
                 "PROWLARR_API_KEY": "api-key",
                 "TRANSMISSION_BASE_URL": "http://transmission:9091",
                 "FEISHU_WEBHOOK_PORT": "abc",
+            }
+        )
+
+
+def test_load_settings_requires_complete_wecom_credentials() -> None:
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091",
+                "WECOM_TOKEN": "wecom-token-42",
+            }
+        )
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091",
+                "WECOM_RECEIVE_ID": "wwcorp123",
+            }
+        )
+
+
+def test_load_settings_rejects_invalid_wecom_webhook_port() -> None:
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091",
+                "WECOM_WEBHOOK_PORT": "abc",
             }
         )

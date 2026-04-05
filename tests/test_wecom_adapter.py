@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 from unittest.mock import AsyncMock
 
 import pytest
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.telegram_bot import (
@@ -14,14 +20,32 @@ from app.bot.telegram_bot import (
 )
 from app.bot.wecom_adapter import (
     WECOM_CHANNEL,
+    WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
+    WECOM_RECEIVE_ID_BOT_DATA_KEY,
+    WECOM_TEXT_CONTENT_TYPE,
+    WECOM_TOKEN_BOT_DATA_KEY,
+    WECOM_XML_CONTENT_TYPE,
     WeComPrivateTextEvent,
+    handle_wecom_callback_http_request,
     handle_wecom_private_text_event,
     parse_wecom_private_text_event,
+)
+from app.bot.wecom_webhook_server import (
+    WeComWebhookServerConfig,
+    start_wecom_webhook_server,
+    stop_wecom_webhook_server,
 )
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
+
+_TEST_AES_KEY = bytes(range(32))
+_TEST_ENCODING_AES_KEY = base64.b64encode(_TEST_AES_KEY).decode("utf-8").rstrip("=")
+_TEST_TOKEN = "wecom-token-42"
+_TEST_TIMESTAMP = "1711111111"
+_TEST_NONCE = "nonce-1"
+_TEST_RECEIVE_ID = "wwcorp123"
 
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
@@ -44,13 +68,16 @@ def _build_bot_data() -> dict[str, object]:
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+        WECOM_TOKEN_BOT_DATA_KEY: _TEST_TOKEN,
+        WECOM_ENCODING_AES_KEY_BOT_DATA_KEY: _TEST_ENCODING_AES_KEY,
+        WECOM_RECEIVE_ID_BOT_DATA_KEY: _TEST_RECEIVE_ID,
     }
 
 
 def _build_wecom_private_text_xml(text: str) -> str:
     return (
         "<xml>"
-        "<ToUserName><![CDATA[wwcorp123]]></ToUserName>"
+        f"<ToUserName><![CDATA[{_TEST_RECEIVE_ID}]]></ToUserName>"
         "<FromUserName><![CDATA[zhangsan]]></FromUserName>"
         "<CreateTime>1711111111</CreateTime>"
         "<MsgType><![CDATA[text]]></MsgType>"
@@ -65,7 +92,7 @@ def test_parse_wecom_private_text_event_reads_private_text_xml() -> None:
     event = parse_wecom_private_text_event(_build_wecom_private_text_xml("dune"))
 
     assert event == WeComPrivateTextEvent(
-        corp_id="wwcorp123",
+        corp_id=_TEST_RECEIVE_ID,
         user_id="zhangsan",
         msg_id="9876543210123456",
         agent_id="1000002",
@@ -97,7 +124,7 @@ def test_handle_wecom_private_text_event_projects_ids_and_routes_into_shared_run
     )
 
     assert event == WeComPrivateTextEvent(
-        corp_id="wwcorp123",
+        corp_id=_TEST_RECEIVE_ID,
         user_id="zhangsan",
         msg_id="9876543210123456",
         agent_id="1000002",
@@ -132,3 +159,189 @@ def test_handle_wecom_private_text_event_routes_into_shared_runtime() -> None:
     assert event.user_id == "zhangsan"
     assert "搜索结果：dune" in reply_text
     assert "title-dune" in reply_text
+
+
+def test_handle_wecom_callback_http_request_returns_decrypted_echostr() -> None:
+    echostr = _encrypt_wecom_plaintext("verify-challenge")
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="GET",
+            query_params=_build_signed_query_params(encrypted_text=echostr),
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == WECOM_TEXT_CONTENT_TYPE
+    assert response.body.decode("utf-8") == "verify-challenge"
+
+
+def test_handle_wecom_callback_http_request_rejects_invalid_signature() -> None:
+    echostr = _encrypt_wecom_plaintext("verify-challenge")
+    query_params = _build_signed_query_params(encrypted_text=echostr)
+    query_params["msg_signature"] = "bad-signature"
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="GET",
+            query_params=query_params,
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    assert response.status_code == 401
+    assert response.body == b"invalid msg_signature"
+
+
+def test_handle_wecom_callback_http_request_routes_post_into_shared_runtime_and_returns_encrypted_reply() -> None:
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml("dune"))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="POST",
+            query_params=query_params,
+            body=body,
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == WECOM_XML_CONTENT_TYPE
+    encrypted_reply = _extract_encrypt_from_xml(response.body.decode("utf-8"))
+    reply_xml = _decrypt_wecom_plaintext(encrypted_reply)
+    reply_root = ET.fromstring(reply_xml)
+
+    assert _read_xml_text(reply_root, "ToUserName") == "zhangsan"
+    assert _read_xml_text(reply_root, "FromUserName") == _TEST_RECEIVE_ID
+    assert _read_xml_text(reply_root, "MsgType") == "text"
+    assert "搜索结果：dune" in _read_xml_text(reply_root, "Content")
+    assert "title-dune" in _read_xml_text(reply_root, "Content")
+
+
+def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
+    async def exercise() -> tuple[str, str]:
+        try:
+            runtime = start_wecom_webhook_server(
+                loop=asyncio.get_running_loop(),
+                config=WeComWebhookServerConfig(host="127.0.0.1", port=0, path="/wecom/webhook"),
+                bot_data=_build_bot_data(),
+            )
+        except PermissionError as error:
+            pytest.skip(f"当前环境禁止本地端口监听：{error}")
+        try:
+            echostr = _encrypt_wecom_plaintext("verify-challenge")
+            verification_text = await asyncio.to_thread(
+                _http_get_text,
+                f"http://127.0.0.1:{runtime.port}/wecom/webhook",
+                _build_signed_query_params(encrypted_text=echostr),
+            )
+
+            encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml("dune"))
+            reply_body = await asyncio.to_thread(
+                _http_post_text,
+                f"http://127.0.0.1:{runtime.port}/wecom/webhook",
+                _build_signed_query_params(encrypted_text=encrypted_text),
+                _build_wecom_encrypted_request_body(encrypted_text),
+            )
+            return verification_text, reply_body
+        finally:
+            stop_wecom_webhook_server(runtime)
+
+    verification_text, reply_body = asyncio.run(exercise())
+
+    assert verification_text == "verify-challenge"
+    reply_xml = _decrypt_wecom_plaintext(_extract_encrypt_from_xml(reply_body))
+    assert "搜索结果：dune" in reply_xml
+    assert "title-dune" in reply_xml
+
+
+def _encrypt_wecom_plaintext(plaintext: str, *, receive_id: str = _TEST_RECEIVE_ID) -> str:
+    plaintext_bytes = plaintext.encode("utf-8")
+    raw_plaintext = (
+        b"0123456789abcdef"
+        + len(plaintext_bytes).to_bytes(4, byteorder="big")
+        + plaintext_bytes
+        + receive_id.encode("utf-8")
+    )
+    padded_plaintext = _add_pkcs7_padding(raw_plaintext)
+    encryptor = Cipher(algorithms.AES(_TEST_AES_KEY), modes.CBC(_TEST_AES_KEY[:16])).encryptor()
+    encrypted_bytes = encryptor.update(padded_plaintext) + encryptor.finalize()
+    return base64.b64encode(encrypted_bytes).decode("utf-8")
+
+
+def _decrypt_wecom_plaintext(encrypted_text: str, *, receive_id: str = _TEST_RECEIVE_ID) -> str:
+    encrypted_bytes = base64.b64decode(encrypted_text)
+    decryptor = Cipher(algorithms.AES(_TEST_AES_KEY), modes.CBC(_TEST_AES_KEY[:16])).decryptor()
+    padded_plaintext = decryptor.update(encrypted_bytes) + decryptor.finalize()
+    plaintext = _remove_pkcs7_padding(padded_plaintext)
+    message_length = int.from_bytes(plaintext[16:20], byteorder="big")
+    message_end = 20 + message_length
+    assert plaintext[message_end:].decode("utf-8") == receive_id
+    return plaintext[20:message_end].decode("utf-8")
+
+
+def _add_pkcs7_padding(raw_value: bytes) -> bytes:
+    padding_length = 32 - (len(raw_value) % 32)
+    if padding_length == 0:
+        padding_length = 32
+    return raw_value + bytes([padding_length]) * padding_length
+
+
+def _remove_pkcs7_padding(raw_value: bytes) -> bytes:
+    padding_length = raw_value[-1]
+    return raw_value[:-padding_length]
+
+
+def _build_signed_query_params(*, encrypted_text: str) -> dict[str, str]:
+    return {
+        "msg_signature": _build_wecom_signature(encrypted_text=encrypted_text),
+        "timestamp": _TEST_TIMESTAMP,
+        "nonce": _TEST_NONCE,
+        "echostr": encrypted_text,
+    }
+
+
+def _build_wecom_signature(*, encrypted_text: str) -> str:
+    return hashlib.sha1("".join(sorted((_TEST_TOKEN, _TEST_TIMESTAMP, _TEST_NONCE, encrypted_text))).encode("utf-8")).hexdigest()
+
+
+def _build_wecom_encrypted_request_body(encrypted_text: str) -> str:
+    return (
+        "<xml>"
+        f"<ToUserName><![CDATA[{_TEST_RECEIVE_ID}]]></ToUserName>"
+        f"<Encrypt><![CDATA[{encrypted_text}]]></Encrypt>"
+        "<AgentID><![CDATA[1000002]]></AgentID>"
+        "</xml>"
+    )
+
+
+def _extract_encrypt_from_xml(payload_xml: str) -> str:
+    root = ET.fromstring(payload_xml)
+    return _read_xml_text(root, "Encrypt")
+
+
+def _read_xml_text(root: ET.Element, tag_name: str) -> str:
+    element = root.find(tag_name)
+    if element is None or element.text is None:
+        return ""
+    return element.text.strip()
+
+
+def _http_get_text(url: str, query_params: dict[str, str]) -> str:
+    request_url = f"{url}?{urllib.parse.urlencode(query_params)}"
+    with urllib.request.urlopen(request_url, timeout=5) as response:
+        return response.read().decode("utf-8")
+
+
+def _http_post_text(url: str, query_params: dict[str, str], body: str) -> str:
+    request = urllib.request.Request(
+        f"{url}?{urllib.parse.urlencode(query_params)}",
+        data=body.encode("utf-8"),
+        headers={"Content-Type": "application/xml"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        return response.read().decode("utf-8")

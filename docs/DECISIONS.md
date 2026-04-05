@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v44)
+# docs/DECISIONS.md (v47)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -31,7 +31,7 @@
 - **日期**：2026-04-05
 - **结论**：
   当前主线固定为：
-  - Telegram + Feishu（当前为最小私聊文本基线）
+  - Telegram + Feishu + WeCom（当前为最小私聊文本基线）
   - TMDB
   - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 支线）
   - Transmission + qBittorrent
@@ -381,5 +381,44 @@
     - 用户外部标识，用于投影现有整数 `user_id`
   - `chat_id` 和 `user_id` 虽然都来自 `FromUserName`，但仍必须经过现有 `channel + principal_kind + external_id` 投影，因此最终整数值仍保持分离。
   - `ToUserName`、`AgentID`、原始 XML 只保留在 WeCom 适配层，用于后续 callback 回包，不进入现有 SQLite 真相表。
+  - callback 外壳当前最小实现固定为：
+    - 用 `WECOM_TOKEN + timestamp + nonce + echostr/Encrypt` 做签名校验
+    - 用 `WECOM_ENCODING_AES_KEY + WECOM_RECEIVE_ID` 做 AES 解密和回包加密
+    - runtime 产出的文本通过 callback HTTP response 返回加密被动回复 XML
+  - 当前不新增独立 WeCom 主动发消息客户端；最小文本回包只走 callback response。
 - **原因**：
   先把 WeCom 的消息解析和 runtime 复用边界补稳，再单独接 callback 外壳，能把 diff 控制在最小范围，也能避免过早把渠道细节渗进既有持久化协议。
+
+## D-025 personal WeChat 默认使用 `wechat-clawbot` Python 包作为渠道底座
+- **状态**：已决定
+- **日期**：2026-04-05
+- **结论**：
+  - 当 `personal WeChat` 被提升为正式 next step 时，默认使用 `wechat-clawbot` Python 包作为当前项目的个人微信渠道底座。
+  - 当前项目不把 npm 侧 ClawBot/OpenClaw 插件作为 personal WeChat 的主实现形态。
+  - `wechat-clawbot` 在当前项目里的职责只限于提供个人微信所需的底层渠道能力，例如：
+    - iLink API 客户端
+    - QR 登录
+    - 长轮询 `getUpdates`
+    - `sendMessage`
+    - 凭据持久化
+  - Luminarr 自身仍负责：
+    - 把 personal WeChat 外部标识压进现有 shared private-chat text runtime
+    - 继续复用现有 workflow / approval / jobs / lease / SQLite 真相边界
+  - 当前这条决策不提前改变正在施工的 WeCom 路线。
+- **原因**：
+  当前主仓库是 Python 主体，后续 personal WeChat 直接复用 `wechat-clawbot` 更贴合现有运行时；这样能避免把渠道适配做成额外的 Node sidecar，也能继续保持“渠道适配薄、业务主链不分叉”的结构。
+
+## D-026 personal WeChat 二维码登录先依赖 Telegram 图片发送基线，卡片 UI 不是硬前置
+- **状态**：已决定
+- **日期**：2026-04-05
+- **结论**：
+  - personal WeChat 当前预定的最小登录路径是：
+    - 管理员先在 Telegram 触发 personal WeChat 登录
+    - Luminarr 通过 `wechat-clawbot` 取到登录二维码
+    - Luminarr 先把二维码图片或文件发到 Telegram 私聊
+    - 管理员再用手机微信扫码完成登录
+  - 因此，在 personal WeChat 进入正式施工前，Telegram 必须先具备最小图片/文件发送能力。
+  - Telegram richer card/UI polish 不是 personal WeChat 登录闭环的硬前置；登录最小闭环只要求能发二维码和状态文本。
+  - 这一步仍不把 Telegram 扩成通用富媒体 UI 平台，只补 personal WeChat 登录所需的最小媒资回传能力。
+- **原因**：
+  个人微信二维码登录必须先把二维码可靠地交给管理员；先补 Telegram 图片发送能力，可以把 personal WeChat 的接入拆成更小、更清晰的闭环，同时避免让卡片 UI 优化变成不必要的阻塞项。

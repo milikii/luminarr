@@ -4,6 +4,12 @@ import json
 
 from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
 from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
+from app.bot.wecom_adapter import (
+    WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
+    WECOM_RECEIVE_ID_BOT_DATA_KEY,
+    WECOM_TOKEN_BOT_DATA_KEY,
+)
+from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
@@ -300,6 +306,15 @@ def main() -> None:
             host=settings.feishu_webhook_host,
             port=settings.feishu_webhook_port,
             path=settings.feishu_webhook_path,
+        )
+    if settings.wecom_token and settings.wecom_encoding_aes_key and settings.wecom_receive_id:
+        application.bot_data[WECOM_TOKEN_BOT_DATA_KEY] = settings.wecom_token
+        application.bot_data[WECOM_ENCODING_AES_KEY_BOT_DATA_KEY] = settings.wecom_encoding_aes_key
+        application.bot_data[WECOM_RECEIVE_ID_BOT_DATA_KEY] = settings.wecom_receive_id
+        application.bot_data["wecom_webhook_server_config"] = WeComWebhookServerConfig(
+            host=settings.wecom_webhook_host,
+            port=settings.wecom_webhook_port,
+            path=settings.wecom_webhook_path,
         )
     application.run_polling(drop_pending_updates=True)
 

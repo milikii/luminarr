@@ -63,6 +63,12 @@ class Settings:
     feishu_webhook_host: str
     feishu_webhook_port: int
     feishu_webhook_path: str
+    wecom_token: str
+    wecom_encoding_aes_key: str
+    wecom_receive_id: str
+    wecom_webhook_host: str
+    wecom_webhook_port: int
+    wecom_webhook_path: str
 
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
@@ -269,6 +275,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     has_all_feishu_credentials = bool(feishu_app_id and feishu_app_secret and feishu_encrypt_key)
     if has_any_feishu_credential and not has_all_feishu_credentials:
         raise ConfigError("FEISHU_APP_ID, FEISHU_APP_SECRET and FEISHU_ENCRYPT_KEY must be set together")
+    wecom_token = _read_optional(env, "WECOM_TOKEN")
+    wecom_encoding_aes_key = _read_optional(env, "WECOM_ENCODING_AES_KEY")
+    wecom_receive_id = _read_optional(env, "WECOM_RECEIVE_ID")
+    has_any_wecom_credential = bool(wecom_token or wecom_encoding_aes_key or wecom_receive_id)
+    has_all_wecom_credentials = bool(wecom_token and wecom_encoding_aes_key and wecom_receive_id)
+    if has_any_wecom_credential and not has_all_wecom_credentials:
+        raise ConfigError("WECOM_TOKEN, WECOM_ENCODING_AES_KEY and WECOM_RECEIVE_ID must be set together")
     downloader_instances = _read_downloader_instances(env)
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
@@ -302,5 +315,14 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         feishu_webhook_path=_normalize_http_path(
             _read_optional(env, "FEISHU_WEBHOOK_PATH"),
             default="/feishu/webhook",
+        ),
+        wecom_token=wecom_token,
+        wecom_encoding_aes_key=wecom_encoding_aes_key,
+        wecom_receive_id=wecom_receive_id,
+        wecom_webhook_host=_read_optional(env, "WECOM_WEBHOOK_HOST") or "0.0.0.0",
+        wecom_webhook_port=_read_optional_int(env, "WECOM_WEBHOOK_PORT", 18097),
+        wecom_webhook_path=_normalize_http_path(
+            _read_optional(env, "WECOM_WEBHOOK_PATH"),
+            default="/wecom/webhook",
         ),
     )

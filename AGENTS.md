@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v27)
+# Luminarr AGENTS.md (v28)
 
 This file is the repository contract for AI coding agents.
 
@@ -51,7 +51,7 @@ When docs disagree, follow:
 ## 6. Project scope
 
 Current mainline profile:
-- Telegram + Feishu（当前为最小私聊文本基线）
+- Telegram + Feishu + WeCom（当前为最小私聊文本基线）
 - TMDB
 - Prowlarr（current main source） + minimal BT WebSource（BT-only）
 - Transmission + qBittorrent
@@ -77,18 +77,18 @@ Do not expand into:
 - auto-download watchlist in the current mainline
 
 Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
-- WeCom / personal WeChat adapters
+- personal WeChat adapters
 - downloader/library asset cleanup automation
 
 ## 7. Current priority
 
 The current next smallest path is:
 
-- **WeCom private-chat identity projection + text event adapter baseline**
+- **Telegram media sending baseline（先补图片/文件发送，用于后续二维码登录等最小媒资回传）**
 
 Keep these landed baselines stable while doing it:
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
-- shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验
+- shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验 + WeCom callback URL 校验 / 解密 / 文本回包
 - downloader/import approval boundaries
 - copy fallback approval
 - completion-monitor + post-download auto import
