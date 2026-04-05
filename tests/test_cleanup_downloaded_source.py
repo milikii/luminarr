@@ -131,11 +131,45 @@ def test_cleanup_by_task_ref_removes_source_file_and_keeps_target(tmp_path: Path
 
     assert "已清理下载源资产" in reply
     assert str(source_file) in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
     assert not source_file.exists()
     assert target_file.exists()
     assert target_file.read_bytes() == b"demo"
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert events[-1].event_type == "cleanup.succeeded"
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in events[-1].message
+
+
+def test_inspect_by_task_ref_reports_source_missing_after_cleanup_success(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    cleanup_reply = service.cleanup_by_task_ref("87")
+    inspect_reply = service.inspect_by_task_ref("87")
+
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in cleanup_reply
+    assert "源路径状态: 不存在" in inspect_reply
+    assert "目标路径状态: 存在" in inspect_reply
+    assert f"结论: 下载源资产已不存在，无需清理：{source_file}" in inspect_reply
 
 
 def test_cleanup_by_task_ref_rejects_missing_structured_source_path(tmp_path: Path) -> None:

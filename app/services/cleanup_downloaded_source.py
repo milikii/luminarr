@@ -29,6 +29,10 @@ CLEANUP_FOLLOW_UP_TEMPLATE = (
     "cleanup inspect {task_ref} / 清理检查 {task_ref}：只读预检，不删除任何文件\n"
     "cleanup {task_ref} / 清理 {task_ref}：实际清理下载源资产"
 )
+CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE = (
+    "如需复核当前结果，可执行只读预检：\n"
+    "cleanup inspect {task_ref} / 清理检查 {task_ref}：只读预检，不删除任何文件"
+)
 CLEANUP_INSPECT_RESULT_TEMPLATE = (
     "清理预检结果：\n"
     "查询引用: {query_ref}\n"
@@ -179,11 +183,14 @@ class CleanupDownloadedSourceService:
             )
             return message
 
-        message = CLEANUP_SUCCEEDED_TEXT.format(
-            task_id=inspection.task_id,
-            task_hash=inspection.task_hash,
-            source_path=str(source_path),
-            target_path=str(target_path),
+        message = _append_cleanup_success_follow_up(
+            CLEANUP_SUCCEEDED_TEXT.format(
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
+                source_path=str(source_path),
+                target_path=str(target_path),
+            ),
+            follow_up_ref,
         )
         self._record_event(
             task_ref=task_ref_for_event,
@@ -424,4 +431,14 @@ def _append_cleanup_follow_up(message: str, task_ref: str) -> str:
     return (
         f"{message}\n"
         f"{CLEANUP_FOLLOW_UP_TEMPLATE.format(task_ref=cleaned_ref)}"
+    )
+
+
+def _append_cleanup_success_follow_up(message: str, task_ref: str) -> str:
+    cleaned_ref = task_ref.strip()
+    if not cleaned_ref:
+        return message
+    return (
+        f"{message}\n"
+        f"{CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE.format(task_ref=cleaned_ref)}"
     )
