@@ -83,6 +83,8 @@ def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:
     events = repo.list_events_for_task_ref("87")
     assert [event.event_type for event in events] == ["import.succeeded", "refresh.succeeded"]
     assert events[0].message.endswith("demo.mkv")
+    assert events[0].source_path == ""
+    assert events[0].target_path == ""
     assert events[1].message == "媒体库刷新成功。"
 
 
@@ -342,6 +344,8 @@ def test_import_persists_minimal_events(tmp_path: Path) -> None:
     ]
     assert events[2].task_id == "87"
     assert events[2].task_hash == "hash-87"
+    assert events[2].source_path == str(source_file)
+    assert events[2].target_path == str(target_dir / "Dune (2021).mkv")
 
 
 def test_import_not_completed_persists_event(tmp_path: Path) -> None:
@@ -879,6 +883,8 @@ def test_job_event_repo_can_query_by_task_identity(tmp_path: Path) -> None:
         task_hash="hash-87",
         event_type="import.succeeded",
         message="/data/library/movies/Dune.2021.mkv",
+        source_path="/data/downloads/Dune.2021.mkv",
+        target_path="/data/library/movies/Dune.2021.mkv",
     )
     repo.append_event(
         task_ref="hash-87",
@@ -890,6 +896,27 @@ def test_job_event_repo_can_query_by_task_identity(tmp_path: Path) -> None:
 
     events = repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert [event.event_type for event in events] == ["import.succeeded", "refresh.succeeded"]
+    assert events[0].source_path == "/data/downloads/Dune.2021.mkv"
+    assert events[0].target_path == "/data/library/movies/Dune.2021.mkv"
+
+
+def test_job_event_repo_finds_latest_import_correlation_with_message_fallback(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message="/data/library/movies/Dune.2021.mkv",
+    )
+
+    correlation = repo.find_latest_import_correlation(task_id="87", task_hash="hash-87")
+    assert correlation is not None
+    assert correlation.source_path == ""
+    assert correlation.target_path == "/data/library/movies/Dune.2021.mkv"
 
 
 async def _fake_search_with_download_url(query: str) -> list[dict[str, object]]:

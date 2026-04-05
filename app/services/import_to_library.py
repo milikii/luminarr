@@ -680,6 +680,8 @@ class ImportToLibraryService:
             task_hash=import_source.task_hash,
             event_type="import.succeeded",
             message=str(target_path),
+            source_path=str(source_path),
+            target_path=str(target_path),
         )
         metadata_result = await self._try_scrape_metadata(
             task_ref=task_ref,
@@ -1151,16 +1153,17 @@ class ImportToLibraryService:
         if self._job_event_repo is None:
             return None
         try:
-            events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
+            correlation = self._job_event_repo.find_latest_import_correlation(
+                task_id=task_id,
+                task_hash=task_hash,
+            )
         except Exception:
             return None
-        for event in reversed(events):
-            if event.event_type != "import.succeeded":
-                continue
-            target_path = event.message.strip()
-            if target_path:
-                return target_path
+        if correlation is None:
             return None
+        target_path = correlation.target_path.strip() or correlation.message.strip()
+        if target_path:
+            return target_path
         return None
 
     def _handle_expired_pending_confirm(self, *, task_ref: str, context: ConfirmExecutionContext) -> str | None:
@@ -1231,6 +1234,8 @@ class ImportToLibraryService:
         message: str,
         task_id: str = "",
         task_hash: str = "",
+        source_path: str = "",
+        target_path: str = "",
     ) -> None:
         if self._job_event_repo is None:
             return
@@ -1241,6 +1246,8 @@ class ImportToLibraryService:
                 task_hash=task_hash,
                 event_type=event_type,
                 message=message,
+                source_path=source_path,
+                target_path=target_path,
             )
         except Exception:
             pass

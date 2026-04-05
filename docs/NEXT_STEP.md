@@ -1,4 +1,4 @@
-# Next step (v59)
+# Next step (v60)
 
 ## Current baseline
 
@@ -32,6 +32,7 @@
   - `status` / completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - cross-filesystem copy-fallback approval
+  - downloader/library asset correlation baseline（导入成功事件当前会结构化写入 `source_path + target_path`，并可按 `task_ref / task_id / task_hash` 稳定定位）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
@@ -56,13 +57,14 @@
 
 ## Goal
 
-Continue the next smallest ops-cleanup step by landing a deterministic downloader/library asset-correlation baseline, without automating deletion or changing the landed downloader/import workflow truth boundaries.
+Continue the next smallest ops-cleanup step by landing a deterministic downloader/library cleanup-execution baseline with explicit guardrails, on top of the landed asset-correlation truth, without turning it into automatic cleanup automation or changing the landed downloader/import workflow truth boundaries.
 
 ## Only do
 
-- 只补 downloader/library asset correlation 的下一小刀，优先把“下载源路径 / 导入目标路径 / 任务引用”之间的最小确定性关联补齐
-- 优先复用现有 `task_id / task_hash / task_ref`、`job_event`、导入成功事件和当前 SQLite 持久化真相
-- 先做可追溯 correlation 基线，为后续 cleanup 提供依据；当前不直接执行删源、删种或自动清理
+- 只补基于已落地 correlation 真相的最小 cleanup execution，一次只处理单个已导入任务
+- 优先复用现有 `task_id / task_hash / task_ref`、`job_event` 里的 `source_path / target_path` 和当前 SQLite 持久化真相
+- cleanup 前必须先确认任务已存在确定性关联，且 `target_path` 仍存在，才允许触发 downloader source 侧清理
+- 当前 cleanup 只处理对应任务的 downloader/source 侧已导入资产；不删除 library target，不顺手删种，不扩成批量运维
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -79,7 +81,9 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 ## Do not do
 
-- 不在尚未拿到确定性关联真相前直接删除下载目录内容、种子或库内文件
+- 不在未校验 correlation 真相和 `target_path` 存在前删除任何下载源资产
+- 不删除 library target、metadata sidecar、subtitle sidecar 或其他任务资产
+- 不做后台自动 cleanup、scheduler 批量扫描或通用清理平台化
 - 不回头重做 Telegram / personal WeChat / Feishu / WeCom 既有文本链路
 - 不改 shared private-chat text runtime 的既有文本协议形状
 - 不改现有 downloader / import approval 协议和 `confirm` 边界
@@ -90,9 +94,10 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 ## Done when
 
-- 至少一条已导入任务拥有可确定追溯的 downloader source -> library target 关联真相
-- 该关联可通过现有 `task_id / task_hash / task_ref` 稳定定位，不依赖自由文本猜测
-- 当前 step 不自动删除下载器资产或库内文件
+- 至少一条已导入任务可基于现有 `task_id / task_hash / task_ref` + correlation 真相执行一次受保护的 cleanup
+- cleanup 执行前会校验 `source_path / target_path` 关联和 `target_path` 存在性，不依赖自由文本猜测
+- cleanup 只触达对应 downloader/source 侧资产，不误删库内目标或其他任务文件
+- 当前 step 不扩成自动删除下载器资产、删种或库内文件清理平台
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
 - 已落地的 personal WeChat `微信登录`、私聊文本收发和凭据落盘行为不回退
 - 现有 Feishu / WeCom 私聊文本能力不回退
@@ -103,5 +108,4 @@ Continue the next smallest ops-cleanup step by landing a deterministic downloade
 
 按顺序继续：
 
-1. 运维清理执行
-   - 基于已落地 correlation 真相补最小 cleanup 执行和显式保护栏
+1. 视最小 cleanup execution 的保护栏和回归结果，再决定是否继续扩到更连续的运维动作；当前不预先承诺自动化

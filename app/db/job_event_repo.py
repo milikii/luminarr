@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.db.sqlite import SqliteDatabase
 
@@ -14,6 +14,8 @@ class JobEvent:
     task_hash: str
     event_type: str
     message: str
+    source_path: str
+    target_path: str
     created_at: str
 
 
@@ -29,6 +31,8 @@ class JobEventRepo:
         task_id: str = "",
         task_hash: str = "",
         message: str = "",
+        source_path: str = "",
+        target_path: str = "",
     ) -> None:
         with self._database.connect() as connection:
             connection.execute(
@@ -38,10 +42,12 @@ class JobEventRepo:
                     task_id,
                     task_hash,
                     event_type,
-                    message
-                ) VALUES (?, ?, ?, ?, ?)
+                    message,
+                    source_path,
+                    target_path
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (task_ref, task_id, task_hash, event_type, message),
+                (task_ref, task_id, task_hash, event_type, message, source_path, target_path),
             )
             connection.commit()
 
@@ -49,7 +55,7 @@ class JobEventRepo:
         with self._database.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, task_ref, task_id, task_hash, event_type, message, created_at
+                SELECT id, task_ref, task_id, task_hash, event_type, message, source_path, target_path, created_at
                 FROM job_event
                 WHERE task_ref = ?
                 ORDER BY id ASC
@@ -65,7 +71,7 @@ class JobEventRepo:
             return []
 
         statement = """
-            SELECT id, task_ref, task_id, task_hash, event_type, message, created_at
+            SELECT id, task_ref, task_id, task_hash, event_type, message, source_path, target_path, created_at
             FROM job_event
             WHERE {condition}
             ORDER BY id ASC
@@ -86,6 +92,34 @@ class JobEventRepo:
             rows = connection.execute(statement.format(condition=condition), params).fetchall()
         return [_to_job_event(row) for row in rows]
 
+    def find_latest_import_correlation(
+        self,
+        *,
+        task_ref: str = "",
+        task_id: str = "",
+        task_hash: str = "",
+    ) -> JobEvent | None:
+        cleaned_task_ref = task_ref.strip()
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+
+        events: list[JobEvent] = []
+        if cleaned_task_id or cleaned_task_hash:
+            events = self.list_events_for_task_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
+        if not events and cleaned_task_ref:
+            events = self.list_events_for_task_ref(cleaned_task_ref)
+
+        for event in reversed(events):
+            if event.event_type != "import.succeeded":
+                continue
+            target_path = event.target_path.strip() or event.message.strip()
+            if not target_path:
+                continue
+            if target_path == event.target_path:
+                return event
+            return replace(event, target_path=target_path)
+        return None
+
 
 def _to_job_event(row: Mapping[str, object]) -> JobEvent:
     return JobEvent(
@@ -95,5 +129,7 @@ def _to_job_event(row: Mapping[str, object]) -> JobEvent:
         task_hash=str(row["task_hash"]),
         event_type=str(row["event_type"]),
         message=str(row["message"]),
+        source_path=str(row["source_path"]),
+        target_path=str(row["target_path"]),
         created_at=str(row["created_at"]),
     )

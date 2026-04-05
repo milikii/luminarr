@@ -111,6 +111,40 @@ def test_confirm_import_by_task_ref_executes_after_pending(tmp_path: Path) -> No
     assert source_file.stat().st_ino == target_file.stat().st_ino
 
 
+def test_confirm_import_records_structured_asset_correlation(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert "导入成功" in text
+    correlation = event_repo.find_latest_import_correlation(task_ref="87")
+    assert correlation is not None
+    assert correlation.source_path == str(source_file)
+    assert correlation.target_path == str(target_dir / "Dune (2021).mkv")
+
+
 def test_confirm_import_by_task_ref_requires_pending(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

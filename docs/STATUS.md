@@ -1,4 +1,4 @@
-# Current status (v58)
+# Current status (v59)
 
 ## Project position
 
@@ -49,6 +49,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - `import` approval / `confirm`
   - hardlink import
   - cross-filesystem copy-fallback approval
+  - downloader/library asset correlation baseline（导入成功事件当前会结构化记录下载源路径 + 导入目标路径，且可按 `task_ref / task_id / task_hash` 稳定定位）
   - completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - filename normalization
@@ -81,13 +82,13 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 ## What is not implemented yet
 
 - **当前 next step**
-  - downloader/library asset correlation baseline（在已稳定的审批、导入和媒体后半段真相之上，下一小步优先补“下载源路径 -> 导入目标路径”的最小可追溯关联，为后续 cleanup 提供确定性依据）
+  - downloader/library cleanup execution（在已落地 correlation 真相之上，下一小步补最小清理执行和显式保护栏；当前不扩成自动 cleanup）
 
 - **后续体验**
   - 暂无独立条目（Telegram richer card/UI polish 当前已收束）
 
 - **后续运维**
-  - downloader/library cleanup execution（在 correlation baseline 落地之后再推进）
+  - 暂无独立条目（当前 next step 已切到 downloader/library cleanup execution）
 
 - **仍未解决的基础能力**
   - real image/media poster rendering
@@ -115,9 +116,14 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - `FANART_API_KEY`、`SUBTITLE_TRANSLATION_API_KEY`、Emby 配置缺失时，相关增强链会失败但不回滚 import success
 - pure BT 当前已落地最小确定性单片优选，但仍只覆盖文本型 `下载这个 BT <查询词>`，还不是完整质量评分 / 规则引擎
 - `BT_WEB_SOURCES` 当前只做最小来源开关；首批内建站点仍很少，失败时会显式日志提示但不会自动修复站点规则
+- downloader/library asset correlation 当前只从这次 baseline 起为新导入任务写结构化 `source_path + target_path`；更早的历史导入事件若只有旧 `message` 目标路径，后续 cleanup 仍需人工甄别源路径
 
 ## Latest verification
 
+- focused tests: `28 passed` (`.venv/bin/python -m pytest -q tests/test_import_to_library.py`)
+- focused tests: `25 passed` (`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py`)
+- tests: `248 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `4 passed, 60 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "import_formats_import_approval_for_telegram or handle_message_import_routes_to_import_service or handle_message_digit_routes_to_add_service or handle_callback_query_digit_routes_to_add_service"`)
 - focused tests: `64 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py`)
 - tests: `246 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
@@ -186,4 +192,4 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 当前只做一件事：
 
-- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，先补 downloader/library asset correlation 的最小可追溯基线；当前不直接扩成自动 cleanup 执行。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，基于已落地 correlation 真相补最小 downloader/library cleanup execution 和显式保护栏；当前不扩成自动 cleanup。

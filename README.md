@@ -1,4 +1,4 @@
-# Luminarr (v49)
+# Luminarr (v50)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -59,6 +59,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - cross-filesystem copy fallback approval
+  - downloader/library asset correlation baseline（导入成功事件当前会结构化记录下载源路径 + 导入目标路径，并可按 `task_ref / task_id / task_hash` 稳定定位）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
@@ -92,19 +93,17 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **Telegram import-approval text polish baseline**
+- **downloader/library asset correlation baseline**
 
 这一步已完成：
 
-- Telegram 在用户发送 `import <任务ID或Hash>` 后，当前会在 Telegram 出口层把共享导入待确认文本收紧成 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区
-- Telegram 导入审批消息当前会补显式确认命令提示，用户可直接按提示回复 `confirm <任务ID或Hash>` 继续走既有导入审批链
-- personal WeChat / Feishu / WeCom 仍继续复用 shared `import_to_library` 和 shared private-chat text runtime 的原始纯文本回复，不跟着 Telegram 展示层一起变化
-- 不改现有 workflow / service / approval / jobs / lease / SQLite 真相边界
-- 不改现有 Telegram 搜索结果 polish、下载审批 polish、BT follow-up、`微信登录`、Feishu / WeCom 私聊文本链路
+- 导入成功事件当前会在 `job_event` 中结构化写入 `source_path + target_path`
+- 当前可按 `task_ref / task_id / task_hash` 稳定定位同一条导入关联，不依赖自由文本猜路径
+- 不改现有 `import_to_library` / approval / `confirm` / Telegram / personal WeChat / Feishu / WeCom 既有文本协议和真相边界
 
 当前 next step：
 
-- downloader/library asset correlation and cleanup（下一小步先补最小 correlation baseline，不直接执行清理）
+- downloader/library cleanup execution（基于已落地 correlation 真相补最小清理执行和显式保护栏，不做自动清理）
 
 当前 personal WeChat 凭据默认跟随 `wechat-clawbot` 状态目录规则落盘：优先 `OPENCLAW_STATE_DIR`，其次 `CLAWDBOT_STATE_DIR`，否则落到 `~/.openclaw`。
 
@@ -118,8 +117,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. downloader/library asset correlation baseline
-2. downloader/library cleanup execution
+1. downloader/library cleanup execution
 
 补充说明：
 
@@ -132,7 +130,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - personal WeChat 最小私聊文本基线已经落地，但当前只支持单账号、私聊文本和启动时读取已保存登录态；不急着扩到群聊、图片、卡片或更重的 UI 形态。
 - personal WeChat 未来默认直接复用 `wechat-clawbot` Python 包提供的 iLink 客户端能力，不把 npm ClawBot 插件作为当前项目的主实现形态。
 - personal WeChat 凭据当前仍由 `wechat-clawbot` 状态目录管理，还没有并入项目自己的 SQLite 真相。
-- Telegram richer card/UI polish 当前已先落了搜索结果、下载审批、导入审批三刀；当前主线从体验增强切回 downloader/library asset correlation and cleanup，下一小步先补 correlation 真相基线，不直接删文件。
+- Telegram richer card/UI polish 当前已先落了搜索结果、下载审批、导入审批三刀；当前主线已经把 correlation 真相补齐，下一小步转向 cleanup execution 和显式保护栏，不直接扩成自动清理。
 
 ---
 
@@ -186,4 +184,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、Telegram 下载审批文本 polish、Telegram 导入审批文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 downloader/library asset correlation baseline。**
+**Luminarr 当前是一个 Telegram + personal WeChat + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Telegram 搜索结果文本 polish、Telegram 下载审批文本 polish、Telegram 导入审批文本 polish、personal WeChat 最小二维码登录入口、personal WeChat 最小私聊文本收发、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包、downloader/library asset correlation baseline；当前 next step 是 downloader/library cleanup execution。**

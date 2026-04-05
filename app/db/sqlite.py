@@ -40,6 +40,8 @@ SCHEMA_STATEMENTS = (
         task_hash TEXT NOT NULL DEFAULT '',
         event_type TEXT NOT NULL,
         message TEXT NOT NULL DEFAULT '',
+        source_path TEXT NOT NULL DEFAULT '',
+        target_path TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
     """,
@@ -158,6 +160,7 @@ class SqliteDatabase:
             _ensure_jobs_columns(connection)
             _ensure_download_monitor_columns(connection)
             _ensure_watchlist_item_columns(connection)
+            _ensure_job_event_columns(connection)
             connection.commit()
 
     @contextmanager
@@ -246,3 +249,12 @@ def _ensure_watchlist_item_columns(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE watchlist_item")
     connection.execute("ALTER TABLE watchlist_item_new RENAME TO watchlist_item")
     connection.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_item_chat_id ON watchlist_item(chat_id)")
+
+
+def _ensure_job_event_columns(connection: sqlite3.Connection) -> None:
+    rows = connection.execute("PRAGMA table_info(job_event)").fetchall()
+    existing_columns = {str(row["name"]) for row in rows}
+    if "source_path" not in existing_columns:
+        connection.execute("ALTER TABLE job_event ADD COLUMN source_path TEXT NOT NULL DEFAULT ''")
+    if "target_path" not in existing_columns:
+        connection.execute("ALTER TABLE job_event ADD COLUMN target_path TEXT NOT NULL DEFAULT ''")
