@@ -1,4 +1,4 @@
-# Current status (v89)
+# Current status (v90)
 
 ## Project position
 
@@ -23,7 +23,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - personal WeChat 二维码登录入口 + 单账号私聊文本轮询
   - Feishu 私聊文本 webhook + 文本回消息 + 事件验签
   - WeCom callback URL 校验 + 验签解密入站 + 加密被动文本回包
-  - four-channel cleanup smoke regression gate baseline（`tests/test_cleanup_cross_channel_smoke.py` 当前会用 Telegram / personal WeChat / Feishu / WeCom 四个公开入口聚合验证 `cleanup inspect` 与 `cleanup` 的最小 smoke，不改业务协议）
+  - four-channel cleanup smoke regression gate baseline（`tests/test_cleanup_cross_channel_smoke.py` 当前会用 Telegram / personal WeChat / Feishu / WeCom 四个公开入口聚合验证 bare `cleanup` / bare `cleanup inspect` discoverability，以及 `cleanup inspect` / `cleanup` 执行烟测，不改业务协议）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -83,8 +83,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Latest verification
 
 - tests：`339 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
-- four-channel cleanup smoke tests：`8 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
-- focused cleanup tests：`91 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- four-channel cleanup smoke tests：`16 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
+- focused cleanup tests：`107 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
 - compile check：`passed`（`python3 -m compileall app tests`）
 - docs consistency check：`passed`（`rg -n "Current mainline profile:|Core responsibilities:|personal WeChat|manage_bt_subscription" AGENTS.md README.md docs/STATUS.md docs/NEXT_STEP.md`）
 - manual verification：

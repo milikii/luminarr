@@ -1,4 +1,4 @@
-# Next step (v90)
+# Next step (v91)
 
 ## Current baseline
 
@@ -6,7 +6,7 @@
 - 四个渠道共用 `shared private-chat text runtime`、workflow、approval、`jobs` 和 SQLite 真相；渠道层只保留各自的验签、解密、轮询、回包和最小展示差异。
 - 媒体主链已稳定跑通：`search -> select -> downloader approval -> confirm -> dispatch -> status -> import approval -> confirm -> import -> metadata -> subtitle -> refresh`。
 - cleanup 最小文本闭环已落地：discoverability、`cleanup inspect`、`cleanup`、rejection guidance、success follow-up、failure observability、chat-scoped `task_ref` 解析。
-- `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的 `cleanup inspect` 与 `cleanup` smoke。
+- `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的 bare `cleanup` / bare `cleanup inspect` discoverability，以及 `cleanup inspect` / `cleanup` smoke。
 - BT 主链已落地：PT / BT 分流、processing-path inquiry、BT classification、TMDB association、`raw_bt` 目标目录、shared source adapter、pure BT single-item ranking、`btsub` scheduler tick。
 
 ## Goal
@@ -17,7 +17,7 @@
 
 - 执行一个 7 天真实使用验证窗口。
 - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke，确认“消息进来 -> shared runtime -> 文本回去”不回退。
-- 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup smoke 的聚合验收门。
+- 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup discoverability + inspect + execution 的聚合验收门。
 - 保持 cleanup 当前协议和语义不变：
   - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`
   - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`
@@ -46,7 +46,7 @@
 
 - 已完成 7 天验证窗口。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
-- `tests/test_cleanup_cross_channel_smoke.py` 持续通过，不回退到只能靠人工拼多个渠道测试结果。
+- `tests/test_cleanup_cross_channel_smoke.py` 持续通过，不回退到只能靠人工拼多个渠道 discoverability / inspect / execution 测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
 - cleanup 失败路径继续打印显式中文日志和修复提示，不再静默吞错。
 - 若验证窗口里出现问题，修复仍保持在现有 cleanup 文本闭环和渠道胶水范围内，没有引入新副作用。

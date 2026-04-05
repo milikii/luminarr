@@ -27,6 +27,10 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.cleanup_downloaded_source import (
+    CLEANUP_INSPECT_QUERY_USAGE_TEXT,
+    CLEANUP_QUERY_USAGE_TEXT,
+)
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -242,3 +246,33 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
     assert not source_file.exists()
     assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_reply"),
+    [
+        ("cleanup", CLEANUP_QUERY_USAGE_TEXT),
+        ("cleanup inspect", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_discoverability_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_reply: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, _, _ = _build_cleanup_service(tmp_path / channel)
+
+    reply_text = runner(query, cleanup_service)
+
+    assert reply_text == expected_reply
