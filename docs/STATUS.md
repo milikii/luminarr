@@ -1,4 +1,4 @@
-# Current status (v64)
+# Current status (v65)
 
 ## Project position
 
@@ -51,6 +51,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - cross-filesystem copy-fallback approval
   - downloader/library asset correlation baseline（导入成功事件当前会结构化记录下载源路径 + 导入目标路径，且可按 `task_ref / task_id / task_hash` 稳定定位）
   - downloader/library cleanup inspect baseline（当前支持 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`；只读返回关联、`source_path / target_path` 是否存在，以及当前 guardrail 是否允许 cleanup）
+  - downloader/library cleanup inspect follow-up guidance baseline（当前 cleanup inspect 结果在“允许 cleanup”时会直接给出执行命令，在“已找到关联但当前不允许 cleanup”时会明确提醒先不要执行 cleanup，并保留同一任务的只读复核入口）
   - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
   - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法，帮助用户直接区分执行与预检）
   - downloader/library cleanup rejection follow-up guidance baseline（当前 cleanup 拒绝或失败回复会直接补 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 只读预检提示，并继续显式区分 `cleanup` 的实际清理语义）
@@ -87,7 +88,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 ## What is not implemented yet
 
 - **当前 next step**
-  - 先观察 cleanup inspect + execution + discoverability + rejection guidance + success follow-up 的回归结果；若真实反馈仍显示 inspect 文本衔接不足，再决定是否补最小 inspect-side follow-up，不预先承诺自动化、批量 cleanup 或删种
+  - 先观察 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 的回归结果；若真实反馈仍显示文本闭环还有缺口，再单独收缩下一步，不预先承诺自动化、批量 cleanup 或删种
 
 - **后续体验**
   - 暂无独立条目（Telegram richer card/UI polish 当前已收束）
@@ -122,10 +123,16 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - pure BT 当前已落地最小确定性单片优选，但仍只覆盖文本型 `下载这个 BT <查询词>`，还不是完整质量评分 / 规则引擎
 - `BT_WEB_SOURCES` 当前只做最小来源开关；首批内建站点仍很少，失败时会显式日志提示但不会自动修复站点规则
 - downloader/library cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早的历史导入事件若只有旧 `message` 目标路径，inspect / cleanup 都会显式拒绝，仍需人工甄别
-- 当前 cleanup inspect / execution / discoverability / rejection guidance / success follow-up 已形成更完整的最小文本闭环，但 inspect 输出本身仍是结果导向文本；若真实回归仍显示衔接不足，再考虑是否只补最小 inspect-side follow-up
+- 当前 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 已形成更完整的最小文本闭环；下一步只观察真实回归，不继续预埋自动化、批量 cleanup 或删种
 
 ## Latest verification
 
+- focused tests: `14 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
+- focused tests: `3 passed, 64 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`)
+- tests: `265 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
+- manual verification:
+  - downloader/library cleanup inspect follow-up guidance baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_inspect_follow_up_baseline.py`，脚本随后已删除）
 - focused tests: `13 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
 - focused tests: `3 passed, 64 deselected` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`)
 - tests: `264 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
@@ -226,4 +233,4 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 当前只做一件事：
 
-- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，先观察已落地 cleanup inspect + execution + discoverability + rejection guidance + success follow-up 的回归结果；若继续推进，也只考虑最小 inspect-side 运维补文，不扩成自动 cleanup、批量运维或删种。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，先观察已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 的回归结果；若继续推进，也只允许做同一闭环内的最小收口，不扩成自动 cleanup、批量运维或删种。

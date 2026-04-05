@@ -78,7 +78,8 @@ def test_inspect_by_task_ref_returns_ready_text_without_deleting_source(tmp_path
     assert f"目标路径: {target_file}" in reply
     assert "目标路径状态: 存在" in reply
     assert "当前 guardrail: 允许 cleanup" in reply
-    assert "执行命令: cleanup hash-87" in reply
+    assert "下一步：" in reply
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply
     assert source_file.exists()
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert len(events) == 1
@@ -94,6 +95,33 @@ def test_inspect_by_task_ref_returns_correlation_missing_state(tmp_path: Path) -
     assert "目标路径状态: 未找到关联" in reply
     assert "当前 guardrail: 拒绝 cleanup" in reply
     assert f"结论: {CLEANUP_CORRELATION_MISSING_TEXT}" in reply
+    assert "下一步：" not in reply
+
+
+def test_inspect_by_task_ref_returns_blocked_follow_up_when_guard_rejected(tmp_path: Path) -> None:
+    source_dir = tmp_path / "downloads" / "Dune.Part.Two.2024"
+    source_dir.mkdir(parents=True)
+    target_file = source_dir / "movie.mkv"
+    target_file.write_bytes(b"demo")
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_dir),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    reply = service.inspect_by_task_ref("87")
+
+    assert "当前 guardrail: 拒绝 cleanup" in reply
+    assert "下一步：" in reply
+    assert "当前先不要执行 cleanup" in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in reply
 
 
 def test_cleanup_by_task_ref_usage_when_empty(tmp_path: Path) -> None:
@@ -170,6 +198,8 @@ def test_inspect_by_task_ref_reports_source_missing_after_cleanup_success(tmp_pa
     assert "源路径状态: 不存在" in inspect_reply
     assert "目标路径状态: 存在" in inspect_reply
     assert f"结论: 下载源资产已不存在，无需清理：{source_file}" in inspect_reply
+    assert "当前先不要执行 cleanup" in inspect_reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in inspect_reply
 
 
 def test_cleanup_by_task_ref_rejects_missing_structured_source_path(tmp_path: Path) -> None:

@@ -33,6 +33,14 @@ CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE = (
     "如需复核当前结果，可执行只读预检：\n"
     "cleanup inspect {task_ref} / 清理检查 {task_ref}：只读预检，不删除任何文件"
 )
+CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE = (
+    "下一步：\n"
+    "cleanup {task_ref} / 清理 {task_ref}：实际清理下载源资产"
+)
+CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE = (
+    "下一步：\n"
+    "当前先不要执行 cleanup；如需后续复核，可再次运行 cleanup inspect {task_ref} / 清理检查 {task_ref}"
+)
 CLEANUP_INSPECT_RESULT_TEMPLATE = (
     "清理预检结果：\n"
     "查询引用: {query_ref}\n"
@@ -229,7 +237,9 @@ class CleanupDownloadedSourceService:
             )
         ]
         if inspection.cleanup_allowed:
-            lines.append(f"执行命令: cleanup {_preferred_cleanup_ref(inspection)}")
+            lines.append(_format_cleanup_inspect_follow_up(inspection))
+        elif inspection.correlation_found:
+            lines.append(_format_cleanup_inspect_follow_up(inspection))
         return "\n".join(lines)
 
     def _inspect_cleanup(
@@ -442,3 +452,12 @@ def _append_cleanup_success_follow_up(message: str, task_ref: str) -> str:
         f"{message}\n"
         f"{CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE.format(task_ref=cleaned_ref)}"
     )
+
+
+def _format_cleanup_inspect_follow_up(inspection: CleanupInspection) -> str:
+    task_ref = _preferred_cleanup_ref(inspection).strip()
+    if not task_ref:
+        return ""
+    if inspection.cleanup_allowed:
+        return CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE.format(task_ref=task_ref)
+    return CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE.format(task_ref=task_ref)

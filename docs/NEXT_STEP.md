@@ -1,4 +1,4 @@
-# Next step (v65)
+# Next step (v66)
 
 ## Current baseline
 
@@ -34,6 +34,7 @@
   - cross-filesystem copy-fallback approval
   - downloader/library asset correlation baseline（导入成功事件当前会结构化写入 `source_path + target_path`，并可按 `task_ref / task_id / task_hash` 稳定定位）
   - downloader/library cleanup inspect baseline（当前支持 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`；只读返回关联、路径存在性和当前 guardrail 结果）
+  - downloader/library cleanup inspect follow-up guidance baseline（当前 cleanup inspect 结果在“允许 cleanup”时会直接给出执行命令，在“已找到关联但当前不允许 cleanup”时会明确提醒先不要执行 cleanup，并保留同一任务的只读复核入口）
   - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
   - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法）
   - downloader/library cleanup rejection follow-up guidance baseline（当前 cleanup 拒绝或失败回复已明确提醒：`cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 是只读预检，不删除任何文件）
@@ -62,15 +63,15 @@
 
 ## Goal
 
-Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up loop, and only decide whether to add a minimal inspect-side continuity hint after real regression feedback, without precommitting automation, batch cleanup, or delete-scope expansion.
+Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-inspect-follow-up + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up loop, without precommitting automation, batch cleanup, or delete-scope expansion.
 
 ## Only do
 
-- 先以已落地 cleanup inspect + execution + discoverability + rejection guidance + success follow-up 为稳定基线，观察真实回归结果
-- 如果继续推进，也只考虑最小的 inspect-side cleanup 运维文本连续性，不新增新的 cleanup 副作用
+- 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 为稳定基线，观察真实回归结果
+- 如果继续推进，也只允许做同一 cleanup 文本闭环里的最小收口，不新增新的 cleanup 副作用
 - 不预先承诺自动 inspect、自动 cleanup、批量入口或新的 cleanup workflow
 - 继续复用现有 `cleanup` parser、service 和当前 SQLite 真相边界
-- 保持现有 inspect / execution / discoverability / rejection guidance / success follow-up 真相和 guardrail 判定不变
+- 保持现有 inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 真相和 guardrail 判定不变
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/cleanup/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -87,7 +88,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 
 ## Do not do
 
-- 不改已落地 cleanup inspect / execution / rejection guidance / success follow-up 的判断逻辑、guardrail 条件或删除范围
+- 不改已落地 cleanup inspect / inspect-side follow-up / execution / rejection guidance / success follow-up 的判断逻辑、guardrail 条件或删除范围
 - 不让 inspect 直接删除任何下载源资产、库内目标、sidecar 或其他任务文件
 - 不在未校验 correlation 真相和 `target_path` 存在前放宽现有 cleanup execution 保护栏
 - 不删除 library target、metadata sidecar、subtitle sidecar 或其他任务资产
@@ -103,9 +104,9 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 
 ## Done when
 
-- 已落地 cleanup inspect / execution / discoverability / rejection guidance / success follow-up 回归稳定，不出现文本回退或 guardrail 回退
+- 已落地 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 回归稳定，不出现文本回退或 guardrail 回退
 - 当前 step 仍不扩成自动删除下载器资产、删种、库内文件清理平台或批量运维入口
-- 若决定继续补文本，也仍保持最小 inspect-side 文本收紧，不引入新的 cleanup 工作流或副作用
+- 若决定继续补文本，也仍只允许在当前 cleanup 文本闭环内做最小收口，不引入新的 cleanup 工作流或副作用
 - 已落地的 cleanup execution baseline 行为和保护栏不回退
 - 现有 Telegram 文本消息、callback、搜索、审批、BT follow-up 不回退
 - 已落地的 personal WeChat `微信登录`、私聊文本收发和凭据落盘行为不回退
@@ -117,4 +118,4 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 
 按顺序继续：
 
-1. 若 cleanup 真实回归仍显示 inspect 结果文本衔接不足，再单独收缩出下一步最小 inspect-side cleanup follow-up；否则继续保持当前闭环稳定，不预先承诺自动化、批量 cleanup 或删种
+1. 继续观察 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 的真实回归；若仍有明确缺口，再单独收缩下一步最小文本收口，否则继续保持当前闭环稳定，不预先承诺自动化、批量 cleanup 或删种
