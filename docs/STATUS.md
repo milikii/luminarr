@@ -1,4 +1,4 @@
-# Current status (v96)
+# Current status (v98)
 
 ## Project position
 
@@ -24,6 +24,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - Feishu 私聊文本 webhook + 文本回消息 + 事件验签
   - WeCom callback URL 校验 + 验签解密入站 + 加密被动文本回包
   - four-channel cleanup smoke regression gate baseline（`tests/test_cleanup_cross_channel_smoke.py` 当前会用 Telegram / personal WeChat / Feishu / WeCom 四个公开入口聚合验证英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id/hash` 的 `cleanup inspect` / `cleanup` 执行烟测、英文/中文 `target missing` rejection guidance 烟测，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` 烟测，不改业务协议）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、聚合 smoke gate、`当前结论`、真实私聊 smoke 提示与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -85,13 +86,13 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：`339 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- tests：`401 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`56 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`25 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`151 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification window doc check：`57 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- cleanup verification window doc check：`58 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
-- docs consistency check：`passed`（`rg -n "tests/test_cleanup_cross_channel_smoke.py|target missing|rejection guidance|当前结论|真实私聊 smoke" docs/NEXT_STEP.md docs/STATUS.md docs/CLEANUP_VERIFICATION_WINDOW.md`）
+- docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
   - downloader/library cleanup execution baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_execution_baseline.py`）
   - qBittorrent protocol baseline passed
