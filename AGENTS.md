@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v30)
+# Luminarr AGENTS.md (v31)
 
 This file is the repository contract for AI coding agents.
 
@@ -84,9 +84,10 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 The current next smallest path is:
 
-- **downloader/library cleanup text-loop observation baseline（只观察已落地 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up / failure observability 回归，不扩自动化、批量 cleanup 或删种）**
+- **four-channel cleanup verification baseline（把已落地 cleanup 文本闭环收口成有退出条件的验证窗口；四个渠道都要保持可用，但不扩自动 cleanup、批量 cleanup 或删种）**
 
 Keep these landed baselines stable while doing it:
+- four-channel shared private-chat text runtime baseline（Telegram / personal WeChat / Feishu / WeCom 共用一套 workflow / approval / jobs / SQLite 真相）
 - downloader/library cleanup inspect baseline
 - downloader/library cleanup inspect follow-up guidance baseline
 - downloader/library cleanup execution baseline
@@ -94,7 +95,7 @@ Keep these landed baselines stable while doing it:
 - downloader/library cleanup rejection follow-up guidance baseline
 - downloader/library cleanup success follow-up guidance baseline
 - downloader/library cleanup failure observability baseline
-- shared private-chat cleanup non-Telegram regression coverage baseline
+- shared private-chat cleanup cross-channel regression coverage baseline
 - Telegram media sending baseline（最小图片/文件发送）
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
 - shared private-chat text runtime + personal WeChat 最小私聊文本收发 + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验 + WeCom callback URL 校验 / 解密 / 文本回包
