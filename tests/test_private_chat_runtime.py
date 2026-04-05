@@ -306,6 +306,44 @@ def test_dispatch_private_chat_text_routes_bare_cleanup_inspect_usage_without_te
     reply_text.assert_awaited_once_with(CLEANUP_INSPECT_QUERY_USAGE_TEXT)
 
 
+def test_dispatch_private_chat_text_routes_bare_cleanup_usage_in_chinese_without_telegram_update(
+    tmp_path: Path,
+) -> None:
+    reply_text = AsyncMock()
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="清理",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    reply_text.assert_awaited_once_with(CLEANUP_QUERY_USAGE_TEXT)
+
+
+def test_dispatch_private_chat_text_routes_bare_cleanup_inspect_usage_in_chinese_without_telegram_update(
+    tmp_path: Path,
+) -> None:
+    reply_text = AsyncMock()
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="清理检查",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    reply_text.assert_awaited_once_with(CLEANUP_INSPECT_QUERY_USAGE_TEXT)
+
+
 def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
