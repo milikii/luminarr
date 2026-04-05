@@ -321,6 +321,90 @@ def test_cleanup_by_task_ref_appends_follow_up_when_delete_fails(
     assert "cleanup inspect hash-87 / 清理检查 hash-87" in events[-1].message
 
 
+def test_inspect_by_task_ref_logs_job_lookup_failure_and_falls_back_to_task_ref(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+
+    class FailingJobRepo:
+        def get_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> None:
+            raise RuntimeError("mock job lookup denied")
+
+    service = CleanupDownloadedSourceService(event_repo, job_repo=FailingJobRepo())  # type: ignore[arg-type]
+
+    reply = service.inspect_by_task_ref("87", chat_id=1001)
+
+    captured = capsys.readouterr()
+    assert "清理预检结果：" in reply
+    assert "当前 guardrail: 允许 cleanup" in reply
+    assert "[cleanup 任务解析失败]" in captured.out
+    assert "mock job lookup denied" in captured.out
+    assert "当前会回退到原始 task_ref 继续尝试匹配 import 关联" in captured.out
+
+
+def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    def _raise_append_error(**_: object) -> None:
+        raise RuntimeError("mock append denied")
+
+    monkeypatch.setattr(event_repo, "append_event", _raise_append_error)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert "已清理下载源资产" in reply
+    assert not source_file.exists()
+    assert target_file.exists()
+    assert "[cleanup 事件写入失败]" in captured.out
+    assert "mock append denied" in captured.out
+    assert "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘" in captured.out
+
+
 def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

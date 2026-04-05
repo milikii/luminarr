@@ -311,7 +311,12 @@ class CleanupDownloadedSourceService:
         if self._job_repo is not None and chat_id is not None and chat_id > 0:
             try:
                 job = self._job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-            except Exception:
+            except Exception as error:
+                _print_cleanup_job_lookup_failed_log(
+                    task_ref=task_ref,
+                    chat_id=chat_id,
+                    error=error,
+                )
                 job = None
             if job is not None:
                 resolved_task_ref = job.task_ref or task_ref
@@ -370,7 +375,12 @@ class CleanupDownloadedSourceService:
                 source_path=source_path,
                 target_path=target_path,
             )
-        except Exception:
+        except Exception as error:
+            _print_cleanup_event_append_failed_log(
+                task_ref=task_ref,
+                event_type=event_type,
+                error=error,
+            )
             return
 
 
@@ -461,3 +471,27 @@ def _format_cleanup_inspect_follow_up(inspection: CleanupInspection) -> str:
     if inspection.cleanup_allowed:
         return CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE.format(task_ref=task_ref)
     return CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE.format(task_ref=task_ref)
+
+
+def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: Exception) -> None:
+    print(
+        f"\033[31m[cleanup 任务解析失败]\033[0m chat_id={chat_id} task_ref={task_ref} 原因={error}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 jobs 表是否可读、该 chat 的任务引用是否仍存在；"
+        "当前会回退到原始 task_ref 继续尝试匹配 import 关联。",
+        flush=True,
+    )
+
+
+def _print_cleanup_event_append_failed_log(*, task_ref: str, event_type: str, error: Exception) -> None:
+    print(
+        f"\033[31m[cleanup 事件写入失败]\033[0m task_ref={task_ref} event_type={event_type} 原因={error}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可写、磁盘是否只读或已满；"
+        "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘。",
+        flush=True,
+    )

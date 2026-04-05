@@ -40,6 +40,7 @@
   - downloader/library cleanup command discoverability baseline（当前 bare `cleanup` / `清理` 和 bare `cleanup inspect` / `清理检查` 都会同屏提示“实际清理”与“只读预检”两条用法）
   - downloader/library cleanup rejection follow-up guidance baseline（当前 cleanup 拒绝或失败回复已明确提醒：`cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>` 是只读预检，不删除任何文件）
   - downloader/library cleanup success follow-up guidance baseline（当前 cleanup 成功回复已明确提醒：如需复核当前结果，可执行 `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`）
+  - downloader/library cleanup failure observability baseline（当前 cleanup 在 `job_repo` 任务解析失败或 `job_event` 写入失败时，会打印显式中文彩色日志和修复提示；cleanup 文本结果、guardrail 判定和删除范围保持不变）
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
@@ -64,14 +65,15 @@
 
 ## Goal
 
-Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-inspect-follow-up + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up loop, with shared private-chat cleanup routing + discoverability regression coverage kept stable, without precommitting automation, batch cleanup, or delete-scope expansion.
+Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-inspect-follow-up + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up + cleanup-failure-observability loop, with shared private-chat cleanup routing + discoverability regression coverage kept stable, without precommitting automation, batch cleanup, or delete-scope expansion.
 
 ## Only do
 
-- 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 为稳定基线，观察真实回归结果
+- 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 为稳定基线，观察真实回归结果
 - 保持 shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口回归覆盖稳定，不让 cleanup 协议退回成只在 Telegram 可用
   - 当前已由 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务级测试守住 `cleanup inspect` / `cleanup` 的最小入口回归，并继续把 bare `cleanup` / bare `cleanup inspect` discoverability 用法提示守在这些非 Telegram 入口上；其中 shared private-chat runtime 已显式补齐 bare `清理` / bare `清理检查` 中文 discoverability，personal WeChat 事件适配层、Feishu 直接事件适配层和 WeCom 直接事件适配层也已显式补齐 bare `cleanup` / bare `cleanup inspect` discoverability，Feishu 直接事件适配层也已显式补齐 bare `清理` / bare `清理检查` 中文 discoverability，shared private-chat runtime 与 Feishu webhook HTTP 已显式补上 `清理检查` / `清理` 中文协议回归，WeCom callback HTTP 与 personal WeChat 轮询服务层继续保持现有英文 cleanup 入口回归；后续只继续观察，不扩协议
 - 如果继续推进，也只允许做同一 cleanup 文本闭环里的最小收口，不新增新的 cleanup 副作用
+- 若继续补行为，也只允许补 cleanup 失败可观测性和现有文本闭环里的最小缺口，不改 cleanup 真相与删除范围
 - 不预先承诺自动 inspect、自动 cleanup、批量入口或新的 cleanup workflow
 - 继续复用现有 `cleanup` parser、service 和当前 SQLite 真相边界
 - 保持现有 inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 真相和 guardrail 判定不变
@@ -108,6 +110,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 ## Done when
 
 - 已落地 cleanup inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 回归稳定，不出现文本回退或 guardrail 回退
+- cleanup 失败路径不再静默吞错，任务解析失败和事件写入失败都能打印显式中文修复提示
 - shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口路由、bare discoverability 用法提示，以及 bare `清理` / bare `清理检查` 中文 discoverability 都不回退
 - 当前 step 仍不扩成自动删除下载器资产、删种、库内文件清理平台或批量运维入口
 - 若决定继续补文本，也仍只允许在当前 cleanup 文本闭环内做最小收口，不引入新的 cleanup 工作流或副作用
@@ -122,4 +125,4 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 
 按顺序继续：
 
-1. 继续观察 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 的真实回归；若仍有明确缺口，再单独收缩下一步最小文本收口，否则继续保持当前闭环稳定，不预先承诺自动化、批量 cleanup 或删种
+1. 继续观察 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up + failure observability 的真实回归；若仍有明确缺口，再单独收缩下一步最小文本收口，否则继续保持当前闭环稳定，不预先承诺自动化、批量 cleanup 或删种
