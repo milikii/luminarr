@@ -231,6 +231,13 @@ def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourc
 
 
 @pytest.mark.parametrize(
+    "task_ref",
+    [
+        "87",
+        "hash-87",
+    ],
+)
+@pytest.mark.parametrize(
     ("channel", "runner"),
     [
         ("telegram", _run_telegram_cleanup_query),
@@ -241,12 +248,13 @@ def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourc
 )
 def test_cleanup_inspect_smoke_across_private_chat_channels(
     tmp_path: Path,
+    task_ref: str,
     channel: str,
     runner,
 ) -> None:
     cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
 
-    reply_text = runner("cleanup inspect 87", cleanup_service)
+    reply_text = runner(f"cleanup inspect {task_ref}", cleanup_service)
 
     assert "清理预检结果：" in reply_text
     assert "当前 guardrail: 允许 cleanup" in reply_text
@@ -255,6 +263,13 @@ def test_cleanup_inspect_smoke_across_private_chat_channels(
     assert target_file.exists()
 
 
+@pytest.mark.parametrize(
+    "task_ref",
+    [
+        "87",
+        "hash-87",
+    ],
+)
 @pytest.mark.parametrize(
     ("channel", "runner"),
     [
@@ -266,12 +281,13 @@ def test_cleanup_inspect_smoke_across_private_chat_channels(
 )
 def test_cleanup_execution_smoke_across_private_chat_channels(
     tmp_path: Path,
+    task_ref: str,
     channel: str,
     runner,
 ) -> None:
     cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
 
-    reply_text = runner("cleanup 87", cleanup_service)
+    reply_text = runner(f"cleanup {task_ref}", cleanup_service)
 
     assert "已清理下载源资产" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
@@ -322,7 +338,19 @@ def test_cleanup_target_missing_rejection_guidance_smoke_across_private_chat_cha
             True,
         ),
         (
+            "清理检查 hash-87",
+            "当前 guardrail: 允许 cleanup",
+            "cleanup hash-87 / 清理 hash-87：实际清理下载源资产",
+            True,
+        ),
+        (
             "清理 87",
+            "已清理下载源资产",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+            False,
+        ),
+        (
+            "清理 hash-87",
             "已清理下载源资产",
             "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
             False,
