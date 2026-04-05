@@ -287,6 +287,66 @@ def test_handle_wecom_private_text_event_routes_bare_cleanup_inspect_usage_into_
     assert reply_text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
 
 
+@pytest.mark.parametrize(
+    ("text", "expected_reply"),
+    [
+        ("清理", CLEANUP_QUERY_USAGE_TEXT),
+        ("清理检查", CLEANUP_INSPECT_QUERY_USAGE_TEXT),
+    ],
+)
+def test_handle_wecom_private_text_event_routes_bare_cleanup_usage_in_chinese_into_shared_runtime(
+    tmp_path: Path,
+    text: str,
+    expected_reply: str,
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml(text),
+            bot_data=_build_bot_data(cleanup_service=CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert reply_text == expected_reply
+
+
+@pytest.mark.parametrize(
+    ("text", "expect_source_exists", "expected_fragment"),
+    [
+        ("清理检查 87", True, "当前 guardrail: 允许 cleanup"),
+        ("清理 87", False, "已清理下载源资产"),
+    ],
+)
+def test_handle_wecom_private_text_event_routes_cleanup_protocol_in_chinese_into_shared_runtime(
+    tmp_path: Path,
+    text: str,
+    expect_source_exists: bool,
+    expected_fragment: str,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml(text),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert expected_fragment in reply_text
+    assert source_file.exists() is expect_source_exists
+    assert target_file.exists()
+
+
 def test_handle_wecom_callback_http_request_returns_decrypted_echostr() -> None:
     echostr = _encrypt_wecom_plaintext("verify-challenge")
 
