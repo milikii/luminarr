@@ -24,6 +24,11 @@ CLEANUP_SOURCE_MISSING_TEXT = "下载源资产已不存在，无需清理：{sou
 CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT = "下载源不是文件或目录，无法清理。"
 CLEANUP_GUARD_REJECTED_TEXT = "检测到 source/target 路径关系异常，已拒绝清理：{source_path} -> {target_path}"
 CLEANUP_FAILED_TEXT = "清理下载源资产失败：{reason}"
+CLEANUP_FOLLOW_UP_TEMPLATE = (
+    "如需复核，可先执行只读预检：\n"
+    "cleanup inspect {task_ref} / 清理检查 {task_ref}：只读预检，不删除任何文件\n"
+    "cleanup {task_ref} / 清理 {task_ref}：实际清理下载源资产"
+)
 CLEANUP_INSPECT_RESULT_TEMPLATE = (
     "清理预检结果：\n"
     "查询引用: {query_ref}\n"
@@ -91,19 +96,24 @@ class CleanupDownloadedSourceService:
 
         inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
         if not inspection.correlation_found:
+            message = _append_cleanup_follow_up(
+                CLEANUP_CORRELATION_MISSING_TEXT,
+                cleaned_ref,
+            )
             self._record_event(
                 task_ref=cleaned_ref,
                 event_type="cleanup.correlation_missing",
-                message=CLEANUP_CORRELATION_MISSING_TEXT,
+                message=message,
             )
-            return CLEANUP_CORRELATION_MISSING_TEXT
+            return message
 
         source_path = Path(inspection.source_path).expanduser()
         target_path = Path(inspection.target_path).expanduser()
         task_ref_for_event = inspection.task_ref or cleaned_ref
+        follow_up_ref = _preferred_cleanup_ref(inspection)
 
         if inspection.target_exists is False:
-            message = inspection.conclusion
+            message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -116,7 +126,7 @@ class CleanupDownloadedSourceService:
             return message
 
         if inspection.source_exists is False:
-            message = inspection.conclusion
+            message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -129,21 +139,25 @@ class CleanupDownloadedSourceService:
             return message
 
         if not inspection.cleanup_allowed:
+            message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
                 event_type="cleanup.guard_rejected",
-                message=inspection.conclusion,
+                message=message,
                 source_path=str(source_path),
                 target_path=str(target_path),
             )
-            return inspection.conclusion
+            return message
 
         try:
             _delete_source_asset(source_path)
         except OSError as error:
-            message = CLEANUP_FAILED_TEXT.format(reason=str(error))
+            message = _append_cleanup_follow_up(
+                CLEANUP_FAILED_TEXT.format(reason=str(error)),
+                follow_up_ref,
+            )
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -401,3 +415,13 @@ def _preferred_cleanup_ref(inspection: CleanupInspection) -> str:
         if cleaned_value:
             return cleaned_value
     return inspection.query_ref
+
+
+def _append_cleanup_follow_up(message: str, task_ref: str) -> str:
+    cleaned_ref = task_ref.strip()
+    if not cleaned_ref:
+        return message
+    return (
+        f"{message}\n"
+        f"{CLEANUP_FOLLOW_UP_TEMPLATE.format(task_ref=cleaned_ref)}"
+    )

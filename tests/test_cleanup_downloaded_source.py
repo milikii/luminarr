@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
+from app.services import cleanup_downloaded_source as cleanup_module
 from app.services.cleanup_downloaded_source import (
     CLEANUP_CORRELATION_MISSING_TEXT,
     CLEANUP_GUARD_REJECTED_TEXT,
@@ -154,7 +157,9 @@ def test_cleanup_by_task_ref_rejects_missing_structured_source_path(tmp_path: Pa
 
     reply = service.cleanup_by_task_ref("87")
 
-    assert reply == CLEANUP_CORRELATION_MISSING_TEXT
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    assert "cleanup inspect 87 / 清理检查 87：只读预检，不删除任何文件" in reply
+    assert "cleanup 87 / 清理 87：实际清理下载源资产" in reply
 
 
 def test_cleanup_by_task_ref_rejects_when_target_missing(tmp_path: Path) -> None:
@@ -178,7 +183,8 @@ def test_cleanup_by_task_ref_rejects_when_target_missing(tmp_path: Path) -> None
 
     reply = service.cleanup_by_task_ref("87")
 
-    assert reply == CLEANUP_TARGET_MISSING_TEXT.format(target_path=str(target_file))
+    assert CLEANUP_TARGET_MISSING_TEXT.format(target_path=str(target_file)) in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
     assert source_file.exists()
 
 
@@ -202,11 +208,53 @@ def test_cleanup_by_task_ref_rejects_overlapping_source_and_target(tmp_path: Pat
 
     reply = service.cleanup_by_task_ref("87")
 
-    assert reply == CLEANUP_GUARD_REJECTED_TEXT.format(
+    assert CLEANUP_GUARD_REJECTED_TEXT.format(
         source_path=str(source_dir),
         target_path=str(target_file),
-    )
+    ) in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
     assert source_dir.exists()
+
+
+def test_cleanup_by_task_ref_appends_follow_up_when_delete_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+    monkeypatch.setattr(
+        cleanup_module,
+        "_delete_source_asset",
+        lambda source_path: (_ for _ in ()).throw(OSError("mock delete denied")),
+    )
+
+    reply = service.cleanup_by_task_ref("87")
+
+    assert "清理下载源资产失败：mock delete denied" in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
+    assert source_file.exists()
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert events[-1].event_type == "cleanup.failed"
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in events[-1].message
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:
