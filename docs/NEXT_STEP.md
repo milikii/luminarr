@@ -63,6 +63,9 @@
   - BT subscription scheduler tick
   - BT subscription deterministic candidate-selection baseline
 
+- **仓库约束**
+  - repository contract alignment baseline（AGENTS 当前 mainline profile 已显式补齐 personal WeChat，core responsibilities 已显式补齐 `manage_bt_subscription`，保持与当前 cleanup 观察阶段一致）
+
 ## Goal
 
 Continue the smallest next ops-cleanup path by watching the landed cleanup-inspect + cleanup-inspect-follow-up + cleanup-execution + cleanup-discoverability + cleanup-rejection-guidance + cleanup-success-follow-up + cleanup-failure-observability loop, with shared private-chat cleanup routing + discoverability regression coverage kept stable, without precommitting automation, batch cleanup, or delete-scope expansion.
@@ -76,6 +79,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 - 若继续补行为，也只允许补 cleanup 失败可观测性和现有文本闭环里的最小缺口；当前 `job_repo` 任务解析失败、`job_event` 关联查询失败和 `job_event` 写入失败三类可观测性都已补进回归，不改 cleanup 真相与删除范围
 - 不预先承诺自动 inspect、自动 cleanup、批量入口或新的 cleanup workflow
 - 继续复用现有 `cleanup` parser、service 和当前 SQLite 真相边界
+- 保持 AGENTS 仓库契约里的 mainline profile、core responsibilities 和当前 cleanup 观察阶段一致，不回退到旧 scope 文案
 - 保持现有 inspect / inspect-side follow-up / execution / discoverability / rejection guidance / success follow-up 真相和 guardrail 判定不变
 - 保持现有自然语言 / 文本协议形状不变：
   - `search/select/status/import/confirm/cleanup/watchlist/btsub`

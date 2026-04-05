@@ -51,7 +51,7 @@ When docs disagree, follow:
 ## 6. Project scope
 
 Current mainline profile:
-- Telegram + Feishu + WeCom（当前为最小私聊文本基线）
+- Telegram + personal WeChat + Feishu + WeCom（当前为最小私聊文本基线）
 - TMDB
 - Prowlarr（current main source） + minimal BT WebSource（BT-only）
 - Transmission + qBittorrent
@@ -68,6 +68,7 @@ Core responsibilities:
 - `import_to_library`
 - `refresh_media_server`
 - `manage_watchlist`
+- `manage_bt_subscription`
 
 Do not expand into:
 - generic AI assistant behavior

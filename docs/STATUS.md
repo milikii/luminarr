@@ -86,6 +86,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - **其他业务面**
   - `watchlist` 手动持久化基线
   - `watchlist` 的 `movie / series / anime` 分类真相
+  - repository contract alignment baseline（AGENTS 当前 mainline profile 已显式补齐 personal WeChat，core responsibilities 已显式补齐 `manage_bt_subscription`，不再沿用旧 scope 文案）
 
 ## What is not implemented yet
 
@@ -129,6 +130,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 ## Latest verification
 
+- docs consistency check: `passed`（`rg -n "Current mainline profile:|Core responsibilities:|personal WeChat|manage_bt_subscription" AGENTS.md README.md docs/STATUS.md docs/NEXT_STEP.md`）
 - focused tests: `18 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
 - focused tests: `16 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`)
 - tests: `305 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
