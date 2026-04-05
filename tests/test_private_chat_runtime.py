@@ -131,6 +131,51 @@ def test_dispatch_private_chat_text_routes_cleanup_inspect_without_telegram_upda
     assert target_file.exists()
 
 
+def test_dispatch_private_chat_text_routes_cleanup_inspect_in_chinese_without_telegram_update(
+    tmp_path: Path,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    cleanup_service = CleanupDownloadedSourceService(event_repo)
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="清理检查 87",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "清理预检结果：" in sent_text
+    assert "当前 guardrail: 允许 cleanup" in sent_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in sent_text
+    assert source_file.exists()
+    assert target_file.exists()
+
+
 def test_dispatch_private_chat_text_routes_cleanup_execution_without_telegram_update(
     tmp_path: Path,
 ) -> None:
@@ -160,6 +205,50 @@ def test_dispatch_private_chat_text_routes_cleanup_execution_without_telegram_up
     asyncio.run(
         dispatch_private_chat_text(
             query="cleanup 87",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "已清理下载源资产" in sent_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in sent_text
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
+def test_dispatch_private_chat_text_routes_cleanup_execution_in_chinese_without_telegram_update(
+    tmp_path: Path,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    cleanup_service = CleanupDownloadedSourceService(event_repo)
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="清理 87",
             reply_func=reply_text,
             chat_id=1001,
             user_id=2001,
