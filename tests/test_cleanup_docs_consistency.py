@@ -30,3 +30,13 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "chat-scoped task_ref -> jobs -> import correlation" in text
         assert "target-missing rejection guidance" in text
 
+    window_progress_rows = re.findall(
+        r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
+        window_text,
+    )
+    status_progress_rows = re.findall(
+        r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
+        status_text,
+    )
+    assert len(window_progress_rows) == 4
+    assert status_progress_rows == window_progress_rows
