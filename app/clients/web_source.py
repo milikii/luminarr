@@ -10,6 +10,7 @@ from urllib.parse import quote_plus, urljoin
 import httpx
 
 _ROW_PATTERN = re.compile(r"<tr\b[^>]*>(?P<html>.*?)</tr>", re.IGNORECASE | re.DOTALL)
+_CELL_PATTERN = re.compile(r"<t[dh]\b[^>]*>(?P<html>.*?)</t[dh]>", re.IGNORECASE | re.DOTALL)
 _TITLE_ATTR_PATTERN = re.compile(
     r"""href=["'][^"']*/view/\d+(?:#[^"']*)?["'][^>]*title=["'](?P<title>[^"']+)["']""",
     re.IGNORECASE | re.DOTALL,
@@ -21,6 +22,7 @@ _TITLE_LINK_PATTERN = re.compile(
 _MAGNET_PATTERN = re.compile(r"""href=["'](?P<link>magnet:\?[^"']+)["']""", re.IGNORECASE)
 _TORRENT_PATTERN = re.compile(r"""href=["'](?P<link>[^"']+\.torrent(?:\?[^"']*)?)["']""", re.IGNORECASE)
 _TAG_PATTERN = re.compile(r"<[^>]+>")
+_SIZE_PATTERN = re.compile(r"(?P<number>\d+(?:\.\d+)?)\s*(?P<unit>tib|gib|mib|kib|tb|gb|mb|kb|b)\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,13 +88,13 @@ def parse_web_source_html(html: str, *, rule: WebSourceRule) -> list[dict[str, A
         source = _extract_source(row_html, base_url=rule.base_url)
         if not title or not source:
             continue
-        candidates.append(
-            {
-                "title": title,
-                "source": source,
-                "indexerName": rule.name,
-            }
-        )
+        candidate = {
+            "title": title,
+            "source": source,
+            "indexerName": rule.name,
+        }
+        candidate.update(_extract_metadata(row_html))
+        candidates.append(candidate)
     return candidates
 
 
@@ -125,6 +127,65 @@ def _extract_source(row_html: str, *, base_url: str) -> str:
     if not torrent_link:
         return ""
     return urljoin(base_url, unescape(torrent_link))
+
+
+def _extract_metadata(row_html: str) -> dict[str, Any]:
+    cell_texts = [_clean_html_text(cell_html) for cell_html in _CELL_PATTERN.findall(row_html)]
+    size_index, size_bytes = _extract_size_bytes(cell_texts)
+    seeders = _extract_seeders(cell_texts, size_index=size_index)
+
+    metadata: dict[str, Any] = {}
+    if size_bytes > 0:
+        metadata["size"] = size_bytes
+    if seeders >= 0:
+        metadata["seeders"] = seeders
+    return metadata
+
+
+def _extract_size_bytes(cell_texts: list[str]) -> tuple[int, int]:
+    for index, text in enumerate(cell_texts):
+        size_bytes = _parse_size_bytes(text)
+        if size_bytes > 0:
+            return index, size_bytes
+    return -1, 0
+
+
+def _extract_seeders(cell_texts: list[str], *, size_index: int) -> int:
+    if size_index < 0:
+        return -1
+    for text in cell_texts[size_index + 1 :]:
+        cleaned_text = text.strip()
+        if re.fullmatch(r"\d+", cleaned_text) is None:
+            continue
+        return int(cleaned_text)
+    return -1
+
+
+def _parse_size_bytes(text: str) -> int:
+    matched = _SIZE_PATTERN.search(text.strip())
+    if matched is None:
+        return 0
+
+    try:
+        number = float(str(matched.group("number") or "0"))
+    except ValueError:
+        return 0
+
+    unit = str(matched.group("unit") or "").strip().lower()
+    multiplier = {
+        "b": 1,
+        "kb": 1024,
+        "kib": 1024,
+        "mb": 1024**2,
+        "mib": 1024**2,
+        "gb": 1024**3,
+        "gib": 1024**3,
+        "tb": 1024**4,
+        "tib": 1024**4,
+    }.get(unit, 0)
+    if multiplier <= 0:
+        return 0
+    return int(number * multiplier)
 
 
 def _clean_html_text(value: str) -> str:

@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v24)
+# Luminarr AGENTS.md (v25)
 
 This file is the repository contract for AI coding agents.
 
@@ -77,15 +77,14 @@ Do not expand into:
 - auto-download watchlist in the current mainline
 
 Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
-- BT-only read-only helper support
-- Feishu / WeCom / personal WeChat adapters
+- WeCom / personal WeChat adapters
 - downloader/library asset cleanup automation
 
 ## 7. Current priority
 
 The current next smallest path is:
 
-- **BT-only read-only helper baseline**
+- **Feishu private-chat adapter baseline**
 
 Keep these landed baselines stable while doing it:
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
@@ -98,6 +97,8 @@ Keep these landed baselines stable while doing it:
 - BT subscription scheduler tick
 - pure BT single-item ranking baseline
 - BT external web-source baseline
+- BT WebSource richer metadata extraction baseline
+- BT-only read-only helper baseline
 
 ## 8. Runtime rules
 

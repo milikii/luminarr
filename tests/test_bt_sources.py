@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+from app.clients.web_source import NYAA_RULE, parse_web_source_html
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, build_bt_candidate_dedupe_key
 
 
@@ -73,3 +74,35 @@ def test_bt_source_adapter_skips_candidates_without_title_or_source() -> None:
     results = asyncio.run(adapter.search("frieren"))
 
     assert results == []
+
+
+def test_parse_web_source_html_extracts_size_and_seeders_for_nyaa() -> None:
+    html = """
+    <table>
+      <tbody>
+        <tr class="default">
+          <td class="text-center"><a href="/?c=1_2">Anime</a></td>
+          <td colspan="2">
+            <a href="/view/123" title="Frieren S01E01 1080p">Frieren S01E01 1080p</a>
+            <a href="/download/123.torrent">torrent</a>
+            <a href="magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12&amp;dn=frieren">magnet</a>
+          </td>
+          <td class="text-center">1.5 GiB</td>
+          <td class="text-center">2026-04-05 12:00</td>
+          <td class="text-center">88</td>
+          <td class="text-center">4</td>
+          <td class="text-center">1024</td>
+        </tr>
+      </tbody>
+    </table>
+    """
+
+    results = parse_web_source_html(html, rule=NYAA_RULE)
+
+    assert len(results) == 1
+    first = results[0]
+    assert first["title"] == "Frieren S01E01 1080p"
+    assert first["source"].startswith("magnet:?xt=urn:btih:ABCDEF1234567890ABCDEF1234567890ABCDEF12")
+    assert first["indexerName"] == "nyaa"
+    assert first["seeders"] == 88
+    assert first["size"] == int(1.5 * 1024 * 1024 * 1024)
