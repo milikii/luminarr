@@ -299,7 +299,9 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
     "query",
     [
         "cleanup 87",
+        "cleanup hash-87",
         "清理 87",
+        "清理 hash-87",
     ],
 )
 @pytest.mark.parametrize(
