@@ -1,4 +1,4 @@
-# Next step (v67)
+# Next step (v68)
 
 ## Current baseline
 
@@ -11,6 +11,7 @@
   - Telegram import-approval text polish baseline（Telegram 当前会在出口层把共享导入待确认文本收紧为 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区；shared `import_to_library` 真相文本和其他渠道回复保持不变）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并以 SVG 文档文件形式回传二维码；扫码确认成功后会回最小结果文本并保存 `wechat-clawbot` 凭据）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
+  - shared private-chat cleanup non-Telegram regression coverage baseline（当前已用 shared runtime + Feishu + WeCom + personal WeChat 回归测试守住 `cleanup inspect` 非 Telegram 私聊入口，不让 cleanup 协议退回成只在 Telegram 可用）
   - shared private-chat text runtime baseline（Telegram 继续走原路径，非 Telegram 私聊适配可复用同一文本分发入口）
   - Feishu private-chat identity projection + text event adapter baseline（已能把 Feishu 私聊文本事件压成现有 `query/chat/user/reply` 入口）
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息已接上）
@@ -69,6 +70,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
 
 - 先以已落地 cleanup inspect + inspect-side follow-up + execution + discoverability + rejection guidance + success follow-up 为稳定基线，观察真实回归结果
 - 保持 shared private-chat text runtime 下 `cleanup inspect` / `cleanup` 的非 Telegram 私聊入口回归覆盖稳定，不让 cleanup 协议退回成只在 Telegram 可用
+  - 当前已由 shared runtime + Feishu + WeCom + personal WeChat 测试守住最小入口回归；后续只继续观察，不扩协议
 - 如果继续推进，也只允许做同一 cleanup 文本闭环里的最小收口，不新增新的 cleanup 副作用
 - 不预先承诺自动 inspect、自动 cleanup、批量入口或新的 cleanup workflow
 - 继续复用现有 `cleanup` parser、service 和当前 SQLite 真相边界

@@ -15,11 +15,15 @@ from app.bot.personal_wechat_text import (
 )
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
 )
+from app.db.job_event_repo import JobEventRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -38,14 +42,46 @@ async def _fake_search(query: str) -> list[dict[str, object]]:
     ]
 
 
-def _build_bot_data() -> dict[str, object]:
+def _build_bot_data(
+    *,
+    cleanup_service: CleanupDownloadedSourceService | None = None,
+) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
-    return {
+    bot_data = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
     }
+    if cleanup_service is not None:
+        bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
+    return bot_data
+
+
+def _build_cleanup_service(tmp_path: Path) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo), source_file, target_file
 
 
 def _build_text_message(
@@ -136,6 +172,38 @@ def test_handle_personal_wechat_private_text_event_projects_ids_and_routes_into_
         channel=PERSONAL_WECHAT_CHANNEL,
         external_user_id="wx-user-1",
     )
+
+
+def test_handle_personal_wechat_private_text_event_routes_cleanup_inspect_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    event = asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message("cleanup inspect 87"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text="cleanup inspect 87",
+        context_token="ctx-1",
+    )
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, PersonalWeChatPrivateTextEvent)
+    assert "清理预检结果：" in reply_text
+    assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
 
 
 def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp_path: Path) -> None:

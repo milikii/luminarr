@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import urllib.request
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -26,11 +27,15 @@ from app.bot.feishu_webhook_server import (
 )
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
 )
+from app.db.job_event_repo import JobEventRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -49,15 +54,47 @@ async def _fake_search(query: str) -> list[dict[str, object]]:
     ]
 
 
-def _build_bot_data() -> dict[str, object]:
+def _build_bot_data(
+    *,
+    cleanup_service: CleanupDownloadedSourceService | None = None,
+) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
-    return {
+    bot_data = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
         FEISHU_ENCRYPT_KEY_BOT_DATA_KEY: "encrypt-key-42",
     }
+    if cleanup_service is not None:
+        bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
+    return bot_data
+
+
+def _build_cleanup_service(tmp_path: Path) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo), source_file, target_file
 
 
 def _build_feishu_private_text_payload(text: str) -> dict[str, object]:
@@ -148,6 +185,30 @@ def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
     assert event.chat_id == "oc_feishu_chat_1"
     assert "搜索结果：dune" in reply_text
     assert "title-dune" in reply_text
+
+
+def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=_build_feishu_private_text_payload("cleanup inspect 87"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert "清理预检结果：" in reply_text
+    assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
 
 
 def test_build_feishu_reply_text_func_sends_back_to_original_chat() -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+from pathlib import Path
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -14,6 +15,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
@@ -30,12 +32,15 @@ from app.bot.wecom_adapter import (
     handle_wecom_private_text_event,
     parse_wecom_private_text_event,
 )
+from app.db.job_event_repo import JobEventRepo
+from app.db.sqlite import SqliteDatabase
 from app.bot.wecom_webhook_server import (
     WeComWebhookServerConfig,
     start_wecom_webhook_server,
     stop_wecom_webhook_server,
 )
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
@@ -61,9 +66,12 @@ async def _fake_search(query: str) -> list[dict[str, object]]:
     ]
 
 
-def _build_bot_data() -> dict[str, object]:
+def _build_bot_data(
+    *,
+    cleanup_service: CleanupDownloadedSourceService | None = None,
+) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
-    return {
+    bot_data = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
@@ -72,6 +80,35 @@ def _build_bot_data() -> dict[str, object]:
         WECOM_ENCODING_AES_KEY_BOT_DATA_KEY: _TEST_ENCODING_AES_KEY,
         WECOM_RECEIVE_ID_BOT_DATA_KEY: _TEST_RECEIVE_ID,
     }
+    if cleanup_service is not None:
+        bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
+    return bot_data
+
+
+def _build_cleanup_service(tmp_path: Path) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo), source_file, target_file
 
 
 def _build_wecom_private_text_xml(text: str) -> str:
@@ -159,6 +196,30 @@ def test_handle_wecom_private_text_event_routes_into_shared_runtime() -> None:
     assert event.user_id == "zhangsan"
     assert "搜索结果：dune" in reply_text
     assert "title-dune" in reply_text
+
+
+def test_handle_wecom_private_text_event_routes_cleanup_inspect_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml("cleanup inspect 87"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert "清理预检结果：" in reply_text
+    assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
 
 
 def test_handle_wecom_callback_http_request_returns_decrypted_echostr() -> None:
