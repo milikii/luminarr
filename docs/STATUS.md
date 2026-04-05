@@ -1,4 +1,4 @@
-# Current status (v59)
+# Current status (v60)
 
 ## Project position
 
@@ -50,6 +50,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
   - hardlink import
   - cross-filesystem copy-fallback approval
   - downloader/library asset correlation baseline（导入成功事件当前会结构化记录下载源路径 + 导入目标路径，且可按 `task_ref / task_id / task_hash` 稳定定位）
+  - downloader/library cleanup execution baseline（当前支持 `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`；会先校验 `source_path + target_path` 关联和 `target_path` 仍存在，再只清理单个 downloader/source 侧已导入资产）
   - completion-monitor
   - post-download auto import（仍保留 `confirm`）
   - filename normalization
@@ -82,13 +83,13 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 ## What is not implemented yet
 
 - **当前 next step**
-  - downloader/library cleanup execution（在已落地 correlation 真相之上，下一小步补最小清理执行和显式保护栏；当前不扩成自动 cleanup）
+  - downloader/library cleanup inspect baseline（在已落地 cleanup execution + guardrails 之上，下一小步补最小只读预检文本；当前不扩成自动 cleanup）
 
 - **后续体验**
   - 暂无独立条目（Telegram richer card/UI polish 当前已收束）
 
 - **后续运维**
-  - 暂无独立条目（当前 next step 已切到 downloader/library cleanup execution）
+  - 暂无独立条目（当前 next step 已切到 downloader/library cleanup inspect baseline）
 
 - **仍未解决的基础能力**
   - real image/media poster rendering
@@ -116,10 +117,14 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - `FANART_API_KEY`、`SUBTITLE_TRANSLATION_API_KEY`、Emby 配置缺失时，相关增强链会失败但不回滚 import success
 - pure BT 当前已落地最小确定性单片优选，但仍只覆盖文本型 `下载这个 BT <查询词>`，还不是完整质量评分 / 规则引擎
 - `BT_WEB_SOURCES` 当前只做最小来源开关；首批内建站点仍很少，失败时会显式日志提示但不会自动修复站点规则
-- downloader/library asset correlation 当前只从这次 baseline 起为新导入任务写结构化 `source_path + target_path`；更早的历史导入事件若只有旧 `message` 目标路径，后续 cleanup 仍需人工甄别源路径
+- downloader/library cleanup execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早的历史导入事件若只有旧 `message` 目标路径，cleanup 会显式拒绝，仍需人工甄别
 
 ## Latest verification
 
+- focused tests: `10 passed, 63 deselected` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_telegram_bot.py -k "cleanup or build_application_registers_services"`)
+- focused tests: `126 passed` (`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py tests/test_import_to_library.py tests/test_persistence_sqlite.py tests/test_telegram_bot.py`)
+- tests: `257 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
+- compile check: `passed` (`python3 -m compileall app tests`)
 - focused tests: `28 passed` (`.venv/bin/python -m pytest -q tests/test_import_to_library.py`)
 - focused tests: `25 passed` (`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py`)
 - tests: `248 passed, 2 skipped` (`.venv/bin/python -m pytest -q`)
@@ -178,6 +183,7 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 - focused tests: `23 passed` (`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_manage_bt_subscription.py tests/test_config.py`)
 - focused tests: `14 passed` (`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "bt_processing_path or bt_classification_reply_when_pending or bt_raw_classification_reply_when_pending or bt_tmdb_association_succeeds_for_movie or raw_bt_destination_selection_succeeds or callback_query_magnet_routes_to_bt_direct_split or callback_query_bt_classification_reply_when_pending or callback_query_raw_bt_destination_selection_succeeds or bt_classification_pending_survives_restart or bt_tmdb_association_pending_survives_restart or raw_bt_destination_pending_survives_restart or bt_classification_cancel_when_pending or bt_classification_pending_returns_reminder_for_plain_text"`)
 - manual verification:
+  - downloader/library cleanup execution baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_execution_baseline.py`）
   - qBittorrent protocol baseline passed
   - BT subscription baseline passed
   - BT subscription scheduler-tick baseline passed
@@ -192,4 +198,4 @@ Luminarr 当前是一个 **Telegram + personal WeChat + Feishu + WeCom（最小�
 
 当前只做一件事：
 
-- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，基于已落地 correlation 真相补最小 downloader/library cleanup execution 和显式保护栏；当前不扩成自动 cleanup。
+- 在已稳定的 Telegram + personal WeChat + Feishu + WeCom 最小私聊文本主链、审批边界和媒体后半段真相之上，基于已落地 cleanup execution + guardrails 补最小 downloader/library cleanup inspect 文本；当前不扩成自动 cleanup。

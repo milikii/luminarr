@@ -34,6 +34,7 @@ from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.db.watchlist_repo import WatchlistRepo
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.manage_watchlist import ManageWatchlistService
@@ -272,6 +273,10 @@ def main() -> None:
         job_event_repo=job_event_repo,
         post_download_auto_import_service=post_download_auto_import_service,
     )
+    cleanup_downloaded_source_service = CleanupDownloadedSourceService(
+        job_event_repo=job_event_repo,
+        job_repo=job_repo,
+    )
     manage_watchlist_service = ManageWatchlistService(watchlist_repo)
     manage_bt_subscription_service = ManageBtSubscriptionService(
         bt_subscription_repo=bt_subscription_repo,
@@ -284,6 +289,7 @@ def main() -> None:
         add_to_downloader_service,
         get_download_status_service,
         import_to_library_service,
+        cleanup_downloaded_source_service,
         manage_watchlist_service,
         manage_bt_subscription_service,
         telegram_update_repo=telegram_update_repo,

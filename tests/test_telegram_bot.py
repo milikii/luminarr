@@ -30,6 +30,7 @@ from app.bot.telegram_bot import (
     BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
     CLARIFICATION_SELECTION_BLOCKED_TEXT,
     CLARIFICATION_RESET_TEXT,
+    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
     DOWNLOADER_INSTANCES_KEY,
     DOWNLOADER_ROLE_BINDING_KEY,
     FRUSTRATION_RESET_TEXT,
@@ -53,11 +54,13 @@ from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.clarification_repo import ClarificationRepo
+from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.db.watchlist_repo import WatchlistRepo
 from app.services.add_to_downloader import ADD_CANCELLED_TEXT, AddToDownloaderService
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
 from app.services.manage_bt_subscription import ManageBtSubscriptionService
@@ -1346,6 +1349,54 @@ def test_handle_message_import_formats_import_approval_for_telegram() -> None:
     import_service.import_by_task_ref.assert_awaited_once_with("hash-87", chat_id=1001, user_id=2001)
 
 
+def test_handle_message_cleanup_routes_to_cleanup_service(tmp_path: Path) -> None:
+    update, reply_text = _build_update("cleanup hash-87")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+    cleanup_service.cleanup_by_task_ref = Mock(return_value="已清理下载源资产。")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY: cleanup_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with("已清理下载源资产。")
+    cleanup_service.cleanup_by_task_ref.assert_called_once_with("hash-87", chat_id=1001)
+
+
+def test_handle_message_cleanup_replies_service_not_ready() -> None:
+    update, reply_text = _build_update("cleanup hash-87")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+
+
 def test_handle_message_import_replies_service_not_ready() -> None:
     reply_text = AsyncMock()
     message = SimpleNamespace(text="import 87", reply_text=reply_text)
@@ -1951,6 +2002,9 @@ def test_build_application_registers_services() -> None:
     add_service = AddToDownloaderService(search_service, AsyncMock())
     status_service = GetDownloadStatusService(AsyncMock())
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    cleanup_db = SqliteDatabase(":memory:")
+    cleanup_db.initialize()
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(cleanup_db))
     watchlist_db = SqliteDatabase(":memory:")
     watchlist_db.initialize()
     watchlist_service = ManageWatchlistService(WatchlistRepo(watchlist_db))
@@ -1983,6 +2037,7 @@ def test_build_application_registers_services() -> None:
         add_service,
         status_service,
         import_service,
+        cleanup_service,
         watchlist_service,
         bt_subscription_service,
         job_repo=job_repo,
@@ -1997,6 +2052,7 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] is add_service
     assert application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] is status_service
     assert application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] is import_service
+    assert application.bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] is cleanup_service
     assert application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] is watchlist_service
     assert application.bot_data[MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] is bt_subscription_service
     assert application.bot_data[JOB_REPO_KEY] is job_repo

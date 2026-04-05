@@ -48,6 +48,7 @@ from app.runtime.execution_policy import (
     ACTION_CANCEL_PENDING_APPROVAL,
     ACTION_PERSONAL_WECHAT_LOGIN,
     ACTION_CONFIRM_ADD_TO_DOWNLOADER,
+    ACTION_CLEANUP_DOWNLOADER_SOURCE,
     ACTION_CONFIRM_IMPORT_TO_LIBRARY,
     ACTION_GET_DOWNLOAD_STATUS,
     ACTION_IMPORT_TO_LIBRARY,
@@ -63,6 +64,7 @@ from app.services.add_to_downloader import (
     BT_SOURCE_UNSUPPORTED_TEXT,
     AddToDownloaderService,
 )
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService, parse_cleanup_query
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
 from app.services.manage_bt_subscription import (
     BtSubscriptionCommand,
@@ -187,6 +189,7 @@ SEARCH_SERVICE_KEY = "search_media_service"
 ADD_TO_DOWNLOADER_SERVICE_KEY = "add_to_downloader_service"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
 IMPORT_TO_LIBRARY_SERVICE_KEY = "import_to_library_service"
+CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY = "cleanup_downloaded_source_service"
 MANAGE_WATCHLIST_SERVICE_KEY = "manage_watchlist_service"
 MANAGE_BT_SUBSCRIPTION_SERVICE_KEY = "manage_bt_subscription_service"
 JOB_REPO_KEY = "job_repo"
@@ -339,6 +342,7 @@ def build_application(
     add_to_downloader_service: AddToDownloaderService,
     get_download_status_service: GetDownloadStatusService,
     import_to_library_service: ImportToLibraryService,
+    cleanup_downloaded_source_service: CleanupDownloadedSourceService,
     manage_watchlist_service: ManageWatchlistService,
     manage_bt_subscription_service: ManageBtSubscriptionService,
     telegram_update_repo: TelegramUpdateRepo | None = None,
@@ -362,6 +366,7 @@ def build_application(
     application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
     application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
+    application.bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_downloaded_source_service
     application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
     application.bot_data[MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] = manage_bt_subscription_service
     application.bot_data[EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
@@ -1966,6 +1971,23 @@ async def handle_private_chat_query_text(
                 import_ref,
                 chat_id=chat_id,
                 user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    cleanup_ref = parse_cleanup_query(query)
+    if cleanup_ref is not None:
+        cleanup_service = context.application.bot_data.get(CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
+        if not isinstance(cleanup_service, CleanupDownloadedSourceService):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await _run_sync_with_policy(
+            execution_gate,
+            ACTION_CLEANUP_DOWNLOADER_SOURCE,
+            lambda: cleanup_service.cleanup_by_task_ref(
+                cleanup_ref,
+                chat_id=chat_id,
             ),
         )
         await reply_func(reply)
