@@ -1,0 +1,244 @@
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
+
+import pytest
+
+from app.bot.feishu_adapter import handle_feishu_private_text_event
+from app.bot.personal_wechat_text import handle_personal_wechat_private_text_event
+from app.bot.telegram_bot import (
+    ADD_TO_DOWNLOADER_SERVICE_KEY,
+    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
+    GET_DOWNLOAD_STATUS_SERVICE_KEY,
+    IMPORT_TO_LIBRARY_SERVICE_KEY,
+    SEARCH_SERVICE_KEY,
+    handle_message,
+)
+from app.bot.wecom_adapter import (
+    WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
+    WECOM_RECEIVE_ID_BOT_DATA_KEY,
+    WECOM_TOKEN_BOT_DATA_KEY,
+    handle_wecom_private_text_event,
+)
+from app.db.job_event_repo import JobEventRepo
+from app.db.sqlite import SqliteDatabase
+from app.services.add_to_downloader import AddToDownloaderService
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.get_download_status import GetDownloadStatusService
+from app.services.import_to_library import ImportToLibraryService
+from app.services.search_media import SearchMediaService
+
+_TEST_WECOM_TOKEN = "wecom-token-42"
+_TEST_WECOM_ENCODING_AES_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+_TEST_WECOM_RECEIVE_ID = "wwcorp123"
+
+
+async def _fake_search(query: str) -> list[dict[str, object]]:
+    return [
+        {
+            "title": f"title-{query}",
+            "year": 2026,
+            "quality": "1080p",
+            "size": 1024,
+            "indexerName": "idx",
+            "downloadUrl": "https://example.com/sample.torrent",
+        }
+    ]
+
+
+def _make_database(base_dir: Path) -> SqliteDatabase:
+    database = SqliteDatabase(str(base_dir / "state.sqlite3"))
+    database.initialize()
+    return database
+
+
+def _build_cleanup_service(base_dir: Path) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    download_dir = base_dir / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = base_dir / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(base_dir))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo), source_file, target_file
+
+
+def _build_bot_data(cleanup_service: CleanupDownloadedSourceService) -> dict[str, object]:
+    search_service = SearchMediaService(_fake_search)
+    return {
+        SEARCH_SERVICE_KEY: search_service,
+        ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
+        GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+        IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+        CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY: cleanup_service,
+        WECOM_TOKEN_BOT_DATA_KEY: _TEST_WECOM_TOKEN,
+        WECOM_ENCODING_AES_KEY_BOT_DATA_KEY: _TEST_WECOM_ENCODING_AES_KEY,
+        WECOM_RECEIVE_ID_BOT_DATA_KEY: _TEST_WECOM_RECEIVE_ID,
+    }
+
+
+def _run_telegram_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+    reply_text = AsyncMock()
+    message = SimpleNamespace(text=query, reply_text=reply_text)
+    update = SimpleNamespace(
+        effective_message=message,
+        effective_chat=SimpleNamespace(id=1001),
+        effective_user=SimpleNamespace(id=2001),
+    )
+    context = SimpleNamespace(application=SimpleNamespace(bot_data=_build_bot_data(cleanup_service)))
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    return reply_text.await_args.args[0]
+
+
+def _run_personal_wechat_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+    reply_text_func = AsyncMock()
+    message = SimpleNamespace(
+        message_type=1,
+        group_id="",
+        from_user_id="wx-user-1",
+        message_id=987654321,
+        context_token="ctx-1",
+        item_list=[SimpleNamespace(type=1, text_item=SimpleNamespace(text=query))],
+    )
+
+    asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=message,
+            bot_data=_build_bot_data(cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    return reply_text_func.await_args.args[1]
+
+
+def _run_feishu_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+    reply_text_func = AsyncMock()
+    payload = {
+        "schema": "2.0",
+        "header": {
+            "event_id": "feishu-event-1",
+            "event_type": "im.message.receive_v1",
+        },
+        "event": {
+            "sender": {
+                "sender_id": {
+                    "open_id": "ou_feishu_user_1",
+                }
+            },
+            "message": {
+                "message_id": "om_feishu_message_1",
+                "chat_id": "oc_feishu_chat_1",
+                "chat_type": "p2p",
+                "message_type": "text",
+                "content": f'{{"text":"{query}"}}',
+            },
+        },
+    }
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=payload,
+            bot_data=_build_bot_data(cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    return reply_text_func.await_args.args[1]
+
+
+def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+    reply_text_func = AsyncMock()
+    payload_xml = (
+        "<xml>"
+        f"<ToUserName><![CDATA[{_TEST_WECOM_RECEIVE_ID}]]></ToUserName>"
+        "<FromUserName><![CDATA[zhangsan]]></FromUserName>"
+        "<CreateTime>1711111111</CreateTime>"
+        "<MsgType><![CDATA[text]]></MsgType>"
+        f"<Content><![CDATA[{query}]]></Content>"
+        "<MsgId>9876543210123456</MsgId>"
+        "<AgentID>1000002</AgentID>"
+        "</xml>"
+    )
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=payload_xml,
+            bot_data=_build_bot_data(cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    return reply_text_func.await_args.args[1]
+
+
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+
+    reply_text = runner("cleanup inspect 87", cleanup_service)
+
+    assert "清理预检结果：" in reply_text
+    assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_execution_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+
+    reply_text = runner("cleanup 87", cleanup_service)
+
+    assert "已清理下载源资产" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert not source_file.exists()
+    assert target_file.exists()
