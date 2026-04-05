@@ -1,4 +1,4 @@
-# Next step (v81)
+# Next step (v82)
 
 ## Current baseline
 
@@ -9,6 +9,7 @@
   - Telegram search-result text polish baseline（Telegram 当前会在出口层把共享电影卡片 + 搜索结果文本收紧为更易扫读的标题分区和显式序号提示；personal WeChat / Feishu / WeCom 仍复用 shared private-chat text runtime 原始纯文本）
   - Telegram downloader-approval text polish baseline（Telegram 当前会在出口层把共享下载待确认文本收紧为 `标题 / 选择序号 / 确认命令` 分区；shared `add_to_downloader` 真相文本和其他渠道回复保持不变）
   - Telegram import-approval text polish baseline（Telegram 当前会在出口层把共享导入待确认文本收紧为 `资源 / 任务 ID / 任务 Hash / 确认命令` 分区；shared `import_to_library` 真相文本和其他渠道回复保持不变）
+  - Telegram cleanup handler regression coverage baseline（当前已在 Telegram `handle_message` 级回归守住 `cleanup` / `cleanup inspect` 与 `清理` / `清理检查` 的带参路由和 bare discoverability 用法提示，不让 Telegram cleanup 文本协议退回成只剩英文带参路径）
   - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 时，当前进程会调用 `wechat-clawbot` 发起二维码登录；当前把触发该命令的 Telegram 私聊作为回传目标，并以 SVG 文档文件形式回传二维码；扫码确认成功后会回最小结果文本并保存 `wechat-clawbot` 凭据）
   - personal WeChat private-chat text baseline（当前进程启动时会读取 `wechat-clawbot` 已保存凭据；若只检测到一个可用账号，则启动最小 `getUpdates -> shared private-chat text runtime -> sendMessage` 文本闭环）
   - shared private-chat cleanup non-Telegram regression coverage baseline（当前已用 shared runtime、Feishu webhook HTTP、WeCom callback HTTP、personal WeChat 轮询服务级回归测试守住非 Telegram 私聊 `cleanup inspect` / `cleanup` 入口；本次继续把 bare `cleanup` / bare `cleanup inspect` discoverability 用法提示补进 shared runtime、personal WeChat、Feishu webhook HTTP、WeCom callback HTTP 回归覆盖，并把 shared private-chat runtime 的 bare `清理` / bare `清理检查` 中文 discoverability、personal WeChat 事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability、Feishu 直接事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability、Feishu 直接事件适配层的 bare `清理` / bare `清理检查` 中文 discoverability，以及 WeCom 直接事件适配层的 bare `cleanup` / bare `cleanup inspect` discoverability 也显式补进回归；其中 shared private-chat runtime 与 Feishu webhook HTTP 现已显式补上 `清理检查` / `清理` 中文 cleanup 协议回归，不让 cleanup 协议退回成只在英文命令可用）
@@ -93,6 +94,7 @@ Continue the smallest next ops-cleanup path by watching the landed cleanup-inspe
   - `manage_watchlist`
   - `manage_bt_subscription`
 - 保持现有 personal WeChat / Feishu / WeCom 最小私聊文本链路不变
+- 保持现有 Telegram cleanup handler 对 bare discoverability 用法提示与 `清理` / `清理检查` 中文协议的回归覆盖不变
 - 不把这一步扩成通用资产管理平台或通用清理框架
 
 ## Do not do

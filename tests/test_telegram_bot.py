@@ -1401,6 +1401,87 @@ def test_handle_message_cleanup_inspect_routes_to_cleanup_service(tmp_path: Path
     cleanup_service.inspect_by_task_ref.assert_called_once_with("hash-87", chat_id=1001)
 
 
+@pytest.mark.parametrize(
+    ("query", "mock_reply", "service_attr", "expected_ref"),
+    [
+        ("cleanup", "cleanup 用法", "cleanup_by_task_ref", ""),
+        ("cleanup inspect", "cleanup inspect 用法", "inspect_by_task_ref", ""),
+        ("清理", "cleanup 用法", "cleanup_by_task_ref", ""),
+        ("清理检查", "cleanup inspect 用法", "inspect_by_task_ref", ""),
+    ],
+)
+def test_handle_message_cleanup_usage_variants_route_to_service(
+    tmp_path: Path,
+    query: str,
+    mock_reply: str,
+    service_attr: str,
+    expected_ref: str,
+) -> None:
+    update, reply_text = _build_update(query)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+    mocked_service_method = Mock(return_value=mock_reply)
+    setattr(cleanup_service, service_attr, mocked_service_method)
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY: cleanup_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(mock_reply)
+    mocked_service_method.assert_called_once_with(expected_ref, chat_id=1001)
+
+
+@pytest.mark.parametrize(
+    ("query", "mock_reply", "service_attr"),
+    [
+        ("清理 hash-87", "已清理下载源资产。", "cleanup_by_task_ref"),
+        ("清理检查 hash-87", "清理预检结果。", "inspect_by_task_ref"),
+    ],
+)
+def test_handle_message_cleanup_chinese_routes_to_service(
+    tmp_path: Path,
+    query: str,
+    mock_reply: str,
+    service_attr: str,
+) -> None:
+    update, reply_text = _build_update(query)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path)))
+    mocked_service_method = Mock(return_value=mock_reply)
+    setattr(cleanup_service, service_attr, mocked_service_method)
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY: cleanup_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with(mock_reply)
+    mocked_service_method.assert_called_once_with("hash-87", chat_id=1001)
+
+
 def test_handle_message_cleanup_replies_service_not_ready() -> None:
     update, reply_text = _build_update("cleanup hash-87")
     search_service = SearchMediaService(_fake_search)
