@@ -1,4 +1,4 @@
-# Luminarr (v44)
+# Luminarr (v45)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -32,6 +32,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - 控制层：
   - Telegram media sending baseline（最小图片/文件发送）
+  - personal WeChat login ingress baseline（Telegram 私聊发送 `微信登录` 即可触发 `wechat-clawbot` 二维码登录，并回传 SVG 二维码文件；扫码成功后会保存凭据并回发最小结果文本）
   - shared private-chat text runtime baseline
   - Feishu private-chat identity projection + text event adapter baseline
   - Feishu private-chat adapter baseline（最小 webhook 请求入口 + 文本回消息）
@@ -87,20 +88,22 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前刚落地：
 
-- **Telegram media sending baseline**
+- **personal WeChat login ingress baseline**
 
 这一步已完成：
 
-- Telegram Application 启动时已注入最小媒资发送闭包
-- 当前已能按管理员 `chat_id + 本地路径` 发送图片或文件回原私聊
-- 本地图片后缀走 `send_photo`，其余文件走 `send_document`
-- 文件缺失或 Telegram API 发送失败时，会打印显式中文彩色日志和处理建议
-- 不改现有 workflow / service / approval / jobs / lease 真相边界
+- Telegram 私聊发送 `微信登录` 后，Luminarr 当前进程会调用 `wechat-clawbot` 发起二维码登录
+- 当前把触发该命令的 Telegram 私聊视为二维码回传目标，并复用现有 Telegram 媒资发送回传 SVG 二维码文件
+- 扫码确认成功后，会把最小结果文本回发到同一 Telegram 私聊，并把凭据保存到 `wechat-clawbot` 状态目录
+- personal WeChat 登录启动、二维码生成、二维码回传、等待登录、结果通知失败时，都会打印显式中文彩色日志和处理建议
+- 不改现有 workflow / service / approval / jobs / lease / SQLite 真相边界
 - Telegram / Feishu / WeCom 现有搜索、BT 直达入口继续复用同一条主链
 
 当前 next step：
 
-- personal WeChat login ingress baseline（先补最小二维码登录入口，并复用 Telegram 媒资发送回传二维码）
+- personal WeChat private-chat text baseline（在已落地二维码登录和凭据保存之上，只补最小私聊文本收发）
+
+当前 personal WeChat 凭据默认跟随 `wechat-clawbot` 状态目录规则落盘：优先 `OPENCLAW_STATE_DIR`，其次 `CLAWDBOT_STATE_DIR`，否则落到 `~/.openclaw`。
 
 启用当前 Feishu 最小基线时，需要补充 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_ENCRYPT_KEY`，并可按需覆盖 `FEISHU_BASE_URL`、`FEISHU_WEBHOOK_HOST`、`FEISHU_WEBHOOK_PORT`、`FEISHU_WEBHOOK_PATH`。
 
@@ -112,10 +115,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 当前已明确的后续顺序：
 
-1. personal WeChat login ingress baseline（默认基于 `wechat-clawbot` Python 包，仅补最小二维码登录入口）
-2. personal WeChat private-chat text baseline
-3. Telegram richer card/UI polish
-4. downloader/library asset correlation and cleanup
+1. personal WeChat private-chat text baseline
+2. Telegram richer card/UI polish
+3. downloader/library asset correlation and cleanup
 
 补充说明：
 
@@ -124,10 +126,11 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 当前内建 `nyaa` 规则已能抽出 `size + seeders`，但 richer 字段覆盖和链接校验仍然很薄。
 - Feishu 当前已补最小签名校验，但仍只做私聊文本 webhook + 文本回消息，不做群聊、图片、卡片、按钮回调。
 - WeCom 当前已补最小 callback URL 校验、解密入站和加密被动文本回包，但仍只做私聊文本，不做群聊、图片、卡片、按钮回调或主动发消息客户端。
-- Telegram 最小图片/文件发送能力已经补上，后续 personal WeChat 登录入口直接复用这条回传链。
-- 下一刀转到 personal WeChat 最小二维码登录入口，不急着直接扩到 personal WeChat 全量私聊文本适配或更重的 UI 形态。
+- Telegram 最小图片/文件发送能力已经被 personal WeChat 登录入口复用，当前二维码回传形态为 SVG 文档文件。
+- personal WeChat 最小二维码登录入口已经落地，下一刀转到 personal WeChat 最小私聊文本适配，不急着扩到群聊、图片或更重的 UI 形态。
 - personal WeChat 未来默认直接复用 `wechat-clawbot` Python 包提供的 iLink 客户端能力，不把 npm ClawBot 插件作为当前项目的主实现形态。
-- Telegram richer card/UI polish 仍然重要，但它是体验增强，不是 personal WeChat 二维码登录的硬前置。
+- personal WeChat 凭据当前仍由 `wechat-clawbot` 状态目录管理，还没有并入项目自己的 SQLite 真相。
+- Telegram richer card/UI polish 仍然重要，但它是体验增强，不是 personal WeChat 最小私聊文本基线的硬前置。
 
 ---
 
@@ -181,4 +184,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 一句话总结
 
-**Luminarr 当前是一个 Telegram + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 personal WeChat login ingress baseline。**
+**Luminarr 当前是一个 Telegram + Feishu + WeCom（最小私聊文本基线）的垂直影视自动化 Harness；当前主线已经打通搜索、审批、下载、状态、导入、命名、刮削、字幕、刷新，以及 PT/BT 分流、pure BT 单片优选、BT shared source adapter、BT external web-source、BT WebSource richer metadata extraction、BT-only read-only helper、shared private-chat text runtime、Telegram 最小图片/文件发送、personal WeChat 最小二维码登录入口、Feishu 最小私聊收发和 webhook 签名校验、WeCom callback URL 校验 / 解密入站 / 加密被动文本回包；当前 next step 是 personal WeChat private-chat text baseline。**

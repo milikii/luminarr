@@ -4,6 +4,7 @@ import json
 
 from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
 from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
+from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
     WECOM_RECEIVE_ID_BOT_DATA_KEY,
@@ -294,6 +295,7 @@ def main() -> None:
         downloader_instances=settings.downloader_instances,
         downloader_role_binding=settings.downloader_role_binding,
     )
+    application.bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()
     if settings.feishu_app_id and settings.feishu_app_secret:
         feishu_client = FeishuClient(
             app_id=settings.feishu_app_id,

@@ -4,11 +4,12 @@ import asyncio
 from collections.abc import Awaitable
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from telegram.ext import CallbackQueryHandler
 
+from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
@@ -1956,6 +1957,81 @@ def test_build_application_registers_services() -> None:
         isinstance(handler, CallbackQueryHandler)
         for handlers in application.handlers.values()
         for handler in handlers
+    )
+
+
+def test_handle_message_routes_personal_wechat_login_and_sends_qr_result(
+    tmp_path: Path,
+) -> None:
+    async def start_login_func(**_: object) -> object:
+        return SimpleNamespace(
+            qrcode_url="https://login.example/qr/telegram",
+            session_key="session-telegram",
+            message="ok",
+        )
+
+    async def wait_login_func(**_: object) -> object:
+        return SimpleNamespace(
+            connected=True,
+            account_id="wx-account-telegram",
+            bot_token="bot-token-telegram",
+            base_url="https://ilinkai.weixin.qq.com",
+            user_id="wx-user-telegram",
+        )
+
+    send_message = AsyncMock()
+    send_media = AsyncMock(return_value="document-ok")
+
+    def build_qr_artifact(_: str):
+        qr_dir = tmp_path / "telegram-qr"
+        qr_dir.mkdir()
+        file_path = qr_dir / "wechat-login.svg"
+        file_path.write_text("<svg />", encoding="utf-8")
+        return SimpleNamespace(dir_path=qr_dir, file_path=file_path)
+
+    async def close_client() -> None:
+        return None
+
+    service = PersonalWeChatLoginService(
+        start_login_func=start_login_func,
+        wait_login_func=wait_login_func,
+        save_account_func=Mock(),
+        register_account_func=Mock(),
+        clear_stale_accounts_func=Mock(),
+        close_client_func=close_client,
+        qr_artifact_builder=build_qr_artifact,
+    )
+
+    update, reply_text = _build_update("微信登录", update_id=79)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot=SimpleNamespace(send_message=send_message),
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                TELEGRAM_SEND_MEDIA_FUNC_KEY: send_media,
+                PERSONAL_WECHAT_LOGIN_SERVICE_KEY: service,
+            },
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    if service._wait_task is not None:
+        asyncio.run(service._wait_task)
+
+    reply_text.assert_awaited_once_with(
+        "已发起 personal WeChat 登录。\n二维码文件已回传到当前 Telegram 私聊，请直接打开并扫码。\n当前这一步只补登录入口，暂不接微信私聊文本命令。"
+    )
+    send_media.assert_awaited_once()
+    send_message.assert_awaited_once_with(
+        chat_id=1001,
+        text="personal WeChat 登录成功。\n账号 ID: wx-account-telegram\n用户 ID: wx-user-telegram",
     )
 
 

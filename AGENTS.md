@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v29)
+# Luminarr AGENTS.md (v30)
 
 This file is the repository contract for AI coding agents.
 
@@ -83,9 +83,10 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 The current next smallest path is:
 
-- **personal WeChat login ingress baseline（先补最小二维码登录入口，并复用 Telegram 媒资发送回传二维码）**
+- **personal WeChat private-chat text baseline（在已落地二维码登录和凭据保存基线之上，只补最小私聊文本收发）**
 
 Keep these landed baselines stable while doing it:
+- personal WeChat login ingress baseline（Telegram 私聊 `微信登录` -> `wechat-clawbot` 二维码登录 -> SVG 二维码文件回传 -> 凭据保存）
 - Telegram media sending baseline（最小图片/文件发送）
 - execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
 - shared private-chat text runtime + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验 + WeCom callback URL 校验 / 解密 / 文本回包

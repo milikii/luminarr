@@ -17,6 +17,11 @@ from app.bot.feishu_webhook_server import (
     start_feishu_webhook_server,
     stop_feishu_webhook_server,
 )
+from app.bot.personal_wechat_login import (
+    PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
+    PersonalWeChatLoginService,
+    parse_personal_wechat_login_query,
+)
 from app.bot.wecom_webhook_server import (
     WeComWebhookServerConfig,
     WeComWebhookServerRuntime,
@@ -41,6 +46,7 @@ from app.runtime.execution_policy import (
     ACTION_BT_SUBSCRIPTION_RUN,
     ACTION_ADD_TO_DOWNLOADER,
     ACTION_CANCEL_PENDING_APPROVAL,
+    ACTION_PERSONAL_WECHAT_LOGIN,
     ACTION_CONFIRM_ADD_TO_DOWNLOADER,
     ACTION_CONFIRM_IMPORT_TO_LIBRARY,
     ACTION_GET_DOWNLOAD_STATUS,
@@ -484,6 +490,7 @@ async def _start_bt_subscription_scheduler(application: Application) -> None:
 async def _stop_bt_subscription_scheduler(application: Application) -> None:
     _stop_feishu_webhook_server_if_running(application)
     _stop_wecom_webhook_server_if_running(application)
+    await _shutdown_personal_wechat_login_service_if_running(application)
 
     stop_event = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
     task = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
@@ -569,6 +576,13 @@ def _stop_wecom_webhook_server_if_running(application: Application) -> None:
     if not isinstance(runtime, WeComWebhookServerRuntime):
         return
     stop_wecom_webhook_server(runtime)
+
+
+async def _shutdown_personal_wechat_login_service_if_running(application: Application) -> None:
+    service = application.bot_data.get(PERSONAL_WECHAT_LOGIN_SERVICE_KEY)
+    if not isinstance(service, PersonalWeChatLoginService):
+        return
+    await service.shutdown()
 
 
 async def _bt_subscription_scheduler_loop(
@@ -1717,6 +1731,28 @@ async def handle_private_chat_query_text(
             source=query,
         )
         await reply_func(BT_PROCESSING_PATH_PROMPT_TEXT)
+        return
+
+    if parse_personal_wechat_login_query(query):
+        personal_wechat_login_service = context.application.bot_data.get(PERSONAL_WECHAT_LOGIN_SERVICE_KEY)
+        telegram_send_media_func = context.application.bot_data.get(TELEGRAM_SEND_MEDIA_FUNC_KEY)
+        telegram_send_text_func = getattr(getattr(context.application, "bot", None), "send_message", None)
+        if (
+            not isinstance(personal_wechat_login_service, PersonalWeChatLoginService)
+            or not callable(telegram_send_media_func)
+            or chat_id is None
+        ):
+            await reply_func(SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            ACTION_PERSONAL_WECHAT_LOGIN,
+            lambda: personal_wechat_login_service.start_login(
+                chat_id=chat_id,
+                send_media_func=telegram_send_media_func,
+                send_text_func=telegram_send_text_func if callable(telegram_send_text_func) else None,
+            ),
+        )
+        await reply_func(reply)
         return
 
     bt_read_only_query = _extract_bt_read_only_query(query)
