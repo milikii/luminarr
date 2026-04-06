@@ -1,4 +1,4 @@
-# Next step (v116)
+# Next step (v117)
 
 ## Current baseline
 
@@ -14,6 +14,7 @@
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate 与 cleanup 协议回归验证日期就必须同步到当天日期，避免窗口台账停在旧日期。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：验证窗口不得早于最早可结束日期就被标记为 `已完成`，避免 7 天窗口被文档提前关闭。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外证据回填进窗口台账。
+- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，验证窗口就必须立刻改成已完成，避免退出条件已齐但台账仍挂进行中。
 - BT 主链已落地：PT / BT 分流、processing-path inquiry、BT classification、TMDB association、`raw_bt` 目标目录、shared source adapter、pure BT single-item ranking、`btsub` scheduler tick。
 
 ## Goal
@@ -31,6 +32,7 @@
 - 只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate 与 cleanup 协议回归验证日期就必须同步到当天日期，避免窗口台账和 `docs/STATUS.md` 快照停在旧日期。
 - 即使四渠道真实私聊 smoke 和 cleanup 协议回归都已满足，也不得早于最早可结束日期把验证窗口标记为 `已完成`。
 - 已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外日期误记成当前验证窗口证据。
+- 一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都满足，验证窗口就必须立刻改成已完成，不能继续保留进行中文案。
 - 让 exit checklist 里的 smoke gate / cleanup 协议两项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态。
 - `docs/STATUS.md` 还要同步保留 `窗口活性` 快照，避免最早可结束日期前后仍写成同一类进行中。

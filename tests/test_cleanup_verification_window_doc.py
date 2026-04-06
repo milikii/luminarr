@@ -47,6 +47,32 @@ def _assert_completed_channel_dates_stay_within_window_snapshot(
         assert start_date <= channel_date <= conclusion_date
 
 
+def _assert_window_completes_immediately_when_exit_conditions_are_met(
+    *,
+    current_date: date,
+    end_date: date,
+    window_status: str,
+    window_activity: str,
+    conclusion: str,
+    window_completed: bool,
+    progress_rows: list[tuple[str, str, str]],
+    smoke_gate_checklist_completed: bool,
+    protocol_regression_checklist_completed: bool,
+) -> None:
+    exit_conditions_met = (
+        current_date >= end_date
+        and all(row_status == "已完成" for _, row_status, _ in progress_rows)
+        and smoke_gate_checklist_completed
+        and protocol_regression_checklist_completed
+    )
+    if not exit_conditions_met:
+        return
+    assert window_status == "已完成"
+    assert window_activity == "已满足退出条件"
+    assert window_completed
+    assert "已满足退出条件" in conclusion
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -215,6 +241,17 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         window_status=window_status,
         current_date=current_date,
         end_date=end_date,
+    )
+    _assert_window_completes_immediately_when_exit_conditions_are_met(
+        current_date=current_date,
+        end_date=end_date,
+        window_status=window_status,
+        window_activity=window_activity,
+        conclusion=conclusion,
+        window_completed=window_completed,
+        progress_rows=progress_rows,
+        smoke_gate_checklist_completed=smoke_gate_checklist_completed,
+        protocol_regression_checklist_completed=protocol_regression_checklist_completed,
     )
 
     if window_status == "已完成":
