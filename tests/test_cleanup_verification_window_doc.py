@@ -493,6 +493,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert focused_cleanup_date == conclusion_date
     assert docs_gate_date == conclusion_date
     assert protocol_observation_date == conclusion_date
+    assert "missing-structured-import-correlation identity retention" in protocol_observation_text
     _assert_active_window_dates_are_current(
         window_status=window_status,
         current_date=current_date,
@@ -502,9 +503,9 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         docs_gate_date=docs_gate_date,
         protocol_observation_date=protocol_observation_date,
     )
-    assert smoke_gate_result == "328 passed"
+    assert smoke_gate_result == "336 passed"
     assert smoke_gate_command == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py"
-    assert focused_cleanup_result == "436 passed, 91 deselected"
+    assert focused_cleanup_result == "444 passed, 91 deselected"
     assert (
         focused_cleanup_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py "
