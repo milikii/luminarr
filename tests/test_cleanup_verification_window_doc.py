@@ -202,6 +202,23 @@ def _assert_conclusion_only_mentions_end_date_blocker_when_it_is_the_last_remain
     assert "verification docs gate" not in conclusion
 
 
+def _assert_completed_conclusion_drops_gap_wording(
+    *,
+    window_status: str,
+    conclusion: str,
+) -> None:
+    if window_status != "已完成":
+        return
+    assert "已满足退出条件" in conclusion
+    assert "待补" not in conclusion
+    assert "缺口" not in conclusion
+    assert "smoke gate" not in conclusion
+    assert "cleanup 协议" not in conclusion
+    assert "verification docs gate" not in conclusion
+    assert "尚未到最早可结束日期" not in conclusion
+    assert "已到最早可结束日期" not in conclusion
+
+
 def _assert_channel_progress_notes_match_status(
     *,
     progress_rows_with_notes: list[tuple[str, str, str, str]],
@@ -270,6 +287,19 @@ def test_conclusion_keeps_only_end_date_blocker_when_everything_else_is_done_ear
                 "验证窗口仍在进行中；截至 2026-04-06，尚未到最早可结束日期 2026-04-12，"
                 "但 smoke gate 仍待补，暂未满足退出条件。"
             ),
+        )
+
+
+def test_completed_conclusion_drops_pending_and_gap_wording() -> None:
+    _assert_completed_conclusion_drops_gap_wording(
+        window_status="已完成",
+        conclusion="验证窗口已满足退出条件；截至 2026-04-12，已满足退出条件。",
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_completed_conclusion_drops_gap_wording(
+            window_status="已完成",
+            conclusion="验证窗口已满足退出条件；截至 2026-04-12，已满足退出条件，但 verification docs gate 缺口仍待补。",
         )
 
 
@@ -364,7 +394,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "244 passed"
+    assert docs_gate_result == "245 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
@@ -530,6 +560,10 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
         docs_gate_checklist_completed=docs_gate_checklist_completed,
+    )
+    _assert_completed_conclusion_drops_gap_wording(
+        window_status=window_status,
+        conclusion=conclusion,
     )
 
     if window_status == "已完成":
