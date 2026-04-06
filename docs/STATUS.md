@@ -1,4 +1,4 @@
-# Current status (v140)
+# Current status (v141)
 
 ## Project position
 
@@ -32,7 +32,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `chat-scoped task_ref target-missing` / `source-missing` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `chat-scoped task_ref source-type-unsupported` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `chat-scoped task_ref guard-rejected` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
-  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”和“待验证备注也必须保留窗口开始日期”这五条收口规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”和“待验证备注也必须保留窗口开始日期”这六条收口规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -93,6 +93,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 已完成后，`当前结论` 只能保留已满足退出条件，不得继续残留待补、缺口或日期阻塞文案。
 - `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
 - 当渠道缺口已经补齐、剩余缺口只剩 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名这些剩余缺口，不能只删掉“四渠道真实私聊 smoke 证据”旧文案。
+- 当渠道缺口和三项证据都已补齐、只剩最早可结束日期时，`当前 cleanup 协议观察` 只能保留未见协议回退，不能继续残留 smoke gate、cleanup 协议或 verification docs gate 缺口文案。
 - 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
 - `Channel progress` 的 `待验证` 备注也必须保留窗口开始日期，不能只剩笼统的待补文案。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Channel progress` 备注列也必须和渠道状态同步，不能在 `已完成` 后继续保留待补真实私聊 smoke 文案。
@@ -131,11 +132,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：`641 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- tests：`642 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`288 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`28 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`386 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification docs gate：`295 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- cleanup verification docs gate：`296 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
 - docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
@@ -162,6 +163,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 只要渠道进度表里还存在 `待验证`，台账和这里的 `当前结论` 都必须显式点名真实私聊 cleanup smoke 仍待补。
 - 若渠道进度表里已经没有 `待验证`，台账和这里的 `当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”。
 - 若剩余缺口已经收缩到 smoke gate、cleanup 协议回归或 verification docs gate，台账和这里的 `当前结论` 都必须显式点名对应缺口。
+- 若渠道缺口和三项证据都已补齐、只剩最早可结束日期，台账里的 `当前 cleanup 协议观察` 也必须收口成未见协议回退，不能继续残留非日期缺口文案。
 - `Channel progress` 的备注列也必须跟随渠道状态更新，避免表格里状态和备注互相打架。
 - 台账里的 `窗口活性`、`当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“最早可结束日期已到但仍写未到窗口期”或“状态已完成但渠道仍待验证”这类漂移。
 - cleanup 窗口之后，当前已明确排定的顺序是：先补 `series / anime` 独立名称解析，再补 shared private-chat 交付体验与最小人类可用入口，然后再推进 BT 共享确定性评分器；Jellyfin / Plex 与 plugin 体系继续后置。

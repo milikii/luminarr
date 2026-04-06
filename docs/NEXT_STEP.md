@@ -1,4 +1,4 @@
-# Next step (v140)
+# Next step (v141)
 
 ## Current baseline
 
@@ -16,7 +16,7 @@
 - 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref target-missing` / `source-missing` rejection guidance 锁成解析后 follow-up：即使用户入口发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
 - 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref source-type-unsupported` rejection guidance 锁成解析后 follow-up：即使用户入口发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
 - 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref guard-rejected` rejection guidance 锁成解析后 follow-up：即使用户入口发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”和“待验证备注也必须保留窗口开始日期”这五条规则上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细。
+- `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”和“待验证备注也必须保留窗口开始日期”这六条规则上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细。
 - `docs/STATUS.md` 当前还要同步保留仓库级 `.venv/bin/python -m pytest -q` 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照，避免 focused cleanup / docs gate 已更新，但总体回归、cleanup 服务回归、语法快照或 docs gate 快照还停在旧数字。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前标题直接带 `2026-04-05 to 2026-04-12` 日期，避免窗口起止日期只藏在正文条目里。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前不只记录四渠道真实私聊 smoke 进度，也要记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 结果，避免验证窗口只剩“待勾选项”。
@@ -62,6 +62,7 @@
 - 已完成后，`当前结论` 只能保留已满足退出条件，不得继续残留待补、缺口或日期阻塞文案。
 - `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
 - 当渠道缺口已经补齐、剩余缺口只剩 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名这些剩余缺口，不能只删掉“四渠道真实私聊 smoke 证据”旧文案。
+- 当渠道缺口和三项证据都已补齐、只剩最早可结束日期时，`当前 cleanup 协议观察` 只能保留未见协议回退，不能继续残留 smoke gate、cleanup 协议或 verification docs gate 缺口文案。
 - 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
 - `Channel progress` 的 `待验证` 备注也必须保留窗口开始日期，不能只剩笼统的待补文案。
 - `Channel progress` 的备注列必须与渠道状态同步；若渠道仍待验证，备注继续写待补真实私聊 smoke 记录；若渠道已完成，备注不得继续沿用待补文案。
@@ -104,6 +105,7 @@
 - exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项已与上述证据保持同步，不会继续停留在未勾选状态。
 - 若验证窗口已写成 `已完成`，则 smoke gate / cleanup 协议 / verification docs gate 三项也必须仍然处于已勾选状态，不能只改状态不改证据清单。
 - `当前 cleanup 协议观察` 已跟随渠道缺口同步收缩，不会在渠道全部补齐后继续停留在“当前缺口只剩四渠道真实私聊 smoke 证据”。
+- 当验证窗口只剩最早可结束日期阻塞时，`当前 cleanup 协议观察` 也必须继续收口成未见协议回退，不能继续带 smoke gate、cleanup 协议或 verification docs gate 旧缺口文案。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / target-missing cleanup inspect follow-up guidance / source-missing cleanup inspect follow-up guidance / cleanup inspect follow-up guidance / guard-rejected cleanup inspect follow-up guidance / post-cleanup cleanup inspect confirmation / chat-scoped task_ref post-cleanup cleanup inspect confirmation / chat-scoped task_ref target-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance / chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance / chat-scoped task_ref target-missing rejection guidance / chat-scoped task_ref source-missing rejection guidance / chat-scoped task_ref source-type-unsupported rejection guidance / chat-scoped task_ref guard-rejected rejection guidance / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance / source-type-unsupported rejection guidance / guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。

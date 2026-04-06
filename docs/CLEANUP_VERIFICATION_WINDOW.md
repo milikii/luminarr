@@ -1,4 +1,4 @@
-# Cleanup verification window (2026-04-05 to 2026-04-12) (v30)
+# Cleanup verification window (2026-04-05 to 2026-04-12) (v31)
 
 ## Window
 
@@ -34,7 +34,7 @@
 
 - 最近一次聚合 smoke gate：2026-04-06，`288 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - 最近一次 cleanup 协议回归验证：2026-04-06，`386 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- 最近一次 verification docs gate：2026-04-06，`295 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- 最近一次 verification docs gate：2026-04-06，`296 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - 当前 cleanup 协议观察：截至 2026-04-06，cleanup discoverability / inspect / target-missing cleanup inspect follow-up guidance / source-missing cleanup inspect follow-up guidance / cleanup inspect follow-up guidance / guard-rejected cleanup inspect follow-up guidance / post-cleanup cleanup inspect confirmation / chat-scoped task_ref post-cleanup cleanup inspect confirmation / chat-scoped task_ref target-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance / chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance / chat-scoped task_ref target-missing rejection guidance / chat-scoped task_ref source-missing rejection guidance / chat-scoped task_ref source-type-unsupported rejection guidance / chat-scoped task_ref guard-rejected rejection guidance / execution / correlation-missing / target-missing / source-missing / source-type-unsupported / guard-rejected rejection guidance / success follow-up / failure observability 未见协议回退；当前缺口只剩四渠道真实私聊 smoke 证据。
 
 ## Update rule
@@ -51,6 +51,7 @@
 - 已完成后，`当前结论` 只能保留已满足退出条件，不得继续残留待补、缺口或日期阻塞文案。
 - `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
 - 当渠道缺口已经补齐、剩余缺口收缩到 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名对应缺口，不能只删除旧文案却不写清还差什么。
+- 当渠道缺口和三项证据都已补齐、只剩最早可结束日期时，`当前 cleanup 协议观察` 只能保留“未见协议回退”，不能继续残留 smoke gate、cleanup 协议或 verification docs gate 缺口文案。
 - 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
 - 退出条件满足后，`当前状态` 改成 `已完成`，`窗口活性` 改成 `已满足退出条件`，`当前结论` 同步写成已满足退出条件。
 - 一旦到达最早可结束日期，且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都已满足，就必须立刻改成 `已完成`，不能继续挂在进行中。

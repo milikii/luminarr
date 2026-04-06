@@ -134,6 +134,31 @@ def _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_rem
         assert "verification docs gate" in protocol_observation_text
 
 
+def _assert_protocol_observation_keeps_only_no_regression_when_only_end_date_blocks_completion(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    smoke_gate_checklist_completed: bool,
+    protocol_regression_checklist_completed: bool,
+    docs_gate_checklist_completed: bool,
+    current_date: date,
+    end_date: date,
+    protocol_observation_text: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    has_non_channel_gap = not (
+        smoke_gate_checklist_completed
+        and protocol_regression_checklist_completed
+        and docs_gate_checklist_completed
+    )
+    if has_pending_channel or has_non_channel_gap or current_date >= end_date:
+        return
+    assert "未见协议回退" in protocol_observation_text
+    assert "缺口" not in protocol_observation_text
+    assert "smoke gate" not in protocol_observation_text
+    assert "cleanup 协议" not in protocol_observation_text
+    assert "verification docs gate" not in protocol_observation_text
+
+
 def _assert_completed_protocol_observation_drops_gap_wording(
     *,
     window_status: str,
@@ -338,6 +363,39 @@ def test_conclusion_keeps_only_end_date_blocker_when_everything_else_is_done_ear
         )
 
 
+def test_protocol_observation_keeps_only_no_regression_when_everything_else_is_done_early() -> None:
+    resolved_progress_rows = [
+        ("Telegram", "已完成", "2026-04-05"),
+        ("personal WeChat", "已完成", "2026-04-05"),
+        ("Feishu", "已完成", "2026-04-05"),
+        ("WeCom", "已完成", "2026-04-05"),
+    ]
+
+    _assert_protocol_observation_keeps_only_no_regression_when_only_end_date_blocks_completion(
+        progress_rows=resolved_progress_rows,
+        smoke_gate_checklist_completed=True,
+        protocol_regression_checklist_completed=True,
+        docs_gate_checklist_completed=True,
+        current_date=date(2026, 4, 6),
+        end_date=date(2026, 4, 12),
+        protocol_observation_text="cleanup discoverability / inspect / execution 未见协议回退。",
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_protocol_observation_keeps_only_no_regression_when_only_end_date_blocks_completion(
+            progress_rows=resolved_progress_rows,
+            smoke_gate_checklist_completed=True,
+            protocol_regression_checklist_completed=True,
+            docs_gate_checklist_completed=True,
+            current_date=date(2026, 4, 6),
+            end_date=date(2026, 4, 12),
+            protocol_observation_text=(
+                "cleanup discoverability / inspect / execution 未见协议回退；"
+                "当前缺口是 smoke gate 和 verification docs gate。"
+            ),
+        )
+
+
 def test_completed_conclusion_drops_pending_and_gap_wording() -> None:
     _assert_completed_conclusion_drops_gap_wording(
         window_status="已完成",
@@ -442,7 +500,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "295 passed"
+    assert docs_gate_result == "296 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
@@ -542,6 +600,15 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
         docs_gate_checklist_completed=docs_gate_checklist_completed,
+        protocol_observation_text=protocol_observation_text,
+    )
+    _assert_protocol_observation_keeps_only_no_regression_when_only_end_date_blocks_completion(
+        progress_rows=progress_rows,
+        smoke_gate_checklist_completed=smoke_gate_checklist_completed,
+        protocol_regression_checklist_completed=protocol_regression_checklist_completed,
+        docs_gate_checklist_completed=docs_gate_checklist_completed,
+        current_date=current_date,
+        end_date=end_date,
         protocol_observation_text=protocol_observation_text,
     )
     _assert_conclusion_mentions_pending_channel_gap_when_needed(
