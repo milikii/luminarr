@@ -890,6 +890,62 @@ def test_cleanup_by_task_ref_logs_source_type_unsupported_with_fix_hint(
     assert "检查 source_path 是否误指到管道、套接字、失效链接等非常规类型" in captured.out
 
 
+def test_cleanup_by_task_ref_logs_source_type_unsupported_with_chat_scoped_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+    monkeypatch.setattr(
+        cleanup_module,
+        "_validate_cleanup_paths",
+        lambda **_: CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    )
+
+    reply = service.cleanup_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    captured = capsys.readouterr()
+    assert CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
+    assert "[cleanup 执行受阻]" in captured.out
+    assert "task_ref=hash-87" in captured.out
+    assert "event_type=cleanup.source_type_unsupported" in captured.out
+    assert "task_id=87" in captured.out
+    assert "task_hash=hash-87" in captured.out
+    assert f"source={source_file}" in captured.out
+    assert f"target={target_file}" in captured.out
+    assert "检查 source_path 是否误指到管道、套接字、失效链接等非常规类型" in captured.out
+
+
 def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
