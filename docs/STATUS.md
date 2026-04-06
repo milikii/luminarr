@@ -1,4 +1,4 @@
-# Current status (v107)
+# Current status (v108)
 
 ## Project position
 
@@ -24,7 +24,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - Feishu 私聊文本 webhook + 文本回消息 + 事件验签
   - WeCom callback URL 校验 + 验签解密入站 + 加密被动文本回包
   - four-channel cleanup smoke regression gate baseline（`tests/test_cleanup_cross_channel_smoke.py` 当前会用 Telegram / personal WeChat / Feishu / WeCom 四个公开入口聚合验证英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id` 与 `task_hash` 的 `cleanup inspect` / `cleanup` 执行烟测、英文/中文原始 `task_id` 与 `task_hash` 的 `correlation missing` / `target missing` / `source missing` / `guard rejected` rejection guidance 烟测，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` 烟测，不改业务协议）
-  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题/退出清单日期一致性、聚合 smoke gate、`当前结论`、真实私聊 smoke 提示、`guard-rejected rejection guidance` 与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致，避免窗口台账和快照文档漂移）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`guard-rejected rejection guidance` 与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -70,7 +70,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前主线不是继续扩 cleanup，而是把 cleanup 收口成一个有退出条件的四渠道验证窗口。
 - 当前验证目标是：四个渠道都要真实可用，但业务真相仍只维护在 shared runtime、workflow、approval、`jobs` 和 SQLite 一套边界里。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已作为当前验证窗口台账落地；窗口开始日期固定为 2026-04-05，最早可结束日期固定为 2026-04-12。
+- 验证窗口台账当前会显式写出“窗口活性”，区分“尚未到最早可结束日期”和“已到最早可结束日期但仍待补退出条件”，避免只写笼统的进行中。
 - 验证窗口台账当前会显式写出“当前结论”，说明是否已满足退出条件，避免只看状态或只看勾选项。
+- 窗口活性快照：未到最早可结束日期
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-06，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
 - 当前四个渠道真实私聊 smoke 快照（与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步）：
@@ -120,4 +122,4 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 在四渠道都可用的前提下，继续完成 cleanup 的 7 天验证窗口，并保持 `tests/test_cleanup_cross_channel_smoke.py` 这条聚合 smoke gate（含英文/中文 discoverability、inspect、execution、correlation-missing rejection guidance、target-missing rejection guidance、source-missing rejection guidance、guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径）稳定；若出现问题，只修 shared runtime、渠道胶水或显式日志，不扩自动 cleanup、批量 cleanup 或删种。
 - 当前窗口证据统一落在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；完成真实私聊 smoke 后，只更新这份台账和 `docs/STATUS.md` 快照，不新增 cleanup 协议或额外工作流。
-- 台账里的 `当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“状态已完成但渠道仍待验证”这类漂移。
+- 台账里的 `窗口活性`、`当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“最早可结束日期已到但仍写未到窗口期”或“状态已完成但渠道仍待验证”这类漂移。
