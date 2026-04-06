@@ -542,6 +542,7 @@ def test_cleanup_source_type_unsupported_rejection_guidance_smoke_across_private
 
     assert CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert source_file.exists()
     assert target_file.exists()
 
@@ -576,6 +577,7 @@ def test_cleanup_guard_rejected_rejection_guidance_smoke_across_private_chat_cha
 
     assert f"检测到 source/target 路径关系异常，已拒绝清理：{source_dir} -> {target_file}" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert source_dir.exists()
     assert target_file.exists()
 
