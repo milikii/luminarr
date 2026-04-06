@@ -579,12 +579,12 @@ def test_cleanup_guard_rejected_rejection_guidance_smoke_across_private_chat_cha
 
 
 @pytest.mark.parametrize(
-    "query",
+    ("query", "task_ref"),
     [
-        "cleanup 87",
-        "cleanup hash-87",
-        "清理 87",
-        "清理 hash-87",
+        ("cleanup 87", "87"),
+        ("cleanup hash-87", "hash-87"),
+        ("清理 87", "87"),
+        ("清理 hash-87", "hash-87"),
     ],
 )
 @pytest.mark.parametrize(
@@ -599,6 +599,7 @@ def test_cleanup_guard_rejected_rejection_guidance_smoke_across_private_chat_cha
 def test_cleanup_correlation_missing_rejection_guidance_smoke_across_private_chat_channels(
     tmp_path: Path,
     query: str,
+    task_ref: str,
     channel: str,
     runner,
 ) -> None:
@@ -609,8 +610,14 @@ def test_cleanup_correlation_missing_rejection_guidance_smoke_across_private_cha
     reply_text = runner(query, cleanup_service)
 
     assert "未找到带 source_path/target_path 的已导入关联，当前任务暂不能执行 cleanup。" in reply_text
-    assert "cleanup inspect" in reply_text
-    assert "清理检查" in reply_text
+    assert (
+        f"cleanup inspect {task_ref} / 清理检查 {task_ref}：只读预检，不删除任何文件"
+        in reply_text
+    )
+    assert (
+        f"cleanup {task_ref} / 清理 {task_ref}：实际清理下载源资产"
+        in reply_text
+    )
 
 
 @pytest.mark.parametrize(
