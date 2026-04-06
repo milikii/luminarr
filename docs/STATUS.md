@@ -1,4 +1,4 @@
-# Current status (v125)
+# Current status (v126)
 
 ## Project position
 
@@ -41,7 +41,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
     - discoverability
     - rejection guidance
     - success follow-up
-    - failure observability（删除失败、关联查询失败、任务解析失败、事件落盘失败，以及 cleanup 执行被 correlation 缺失 / target 缺失 / source 已不存在 / guard 拒绝阻断时，都会打印显式中文日志和处理建议）
+    - failure observability（删除失败、关联查询失败、任务解析失败、事件落盘失败，以及 cleanup 执行被 correlation 缺失 / target 缺失 / source 已不存在 / source 不是文件或目录 / guard 拒绝阻断时，都会打印显式中文日志和处理建议）
     - chat-scoped `task_ref` 解析
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
@@ -117,8 +117,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - tests：`457 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`128 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
-- cleanup service tests：`25 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
-- focused cleanup tests：`223 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- cleanup service tests：`27 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
+- focused cleanup tests：`225 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
 - cleanup verification docs gate：`130 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
 - docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）

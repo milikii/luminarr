@@ -215,7 +215,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     )
     assert smoke_gate_result == "128 passed"
     assert smoke_gate_command == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py"
-    assert focused_cleanup_result == "223 passed, 91 deselected"
+    assert focused_cleanup_result == "225 passed, 91 deselected"
     assert (
         focused_cleanup_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py "

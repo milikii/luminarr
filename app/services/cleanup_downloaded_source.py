@@ -67,6 +67,10 @@ CLEANUP_CORRELATION_MISSING_FIX_HINT = (
 )
 CLEANUP_TARGET_MISSING_FIX_HINT = "检查库内目标路径是否已被移动或删除；目标不存在时不要执行 cleanup。"
 CLEANUP_SOURCE_MISSING_FIX_HINT = "下载源资产已经不存在，当前无需 cleanup；如需复核可再次执行 cleanup inspect。"
+CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT = (
+    "检查 source_path 是否误指到管道、套接字、失效链接等非常规类型；"
+    "修正导入关联后再重试 cleanup。"
+)
 CLEANUP_GUARD_REJECTED_FIX_HINT = (
     "检查 source_path 和 target_path 是否指向同一位置或互为父子目录，确认导入关联无误后再重试。"
 )
@@ -186,22 +190,23 @@ class CleanupDownloadedSourceService:
             return message
 
         if not inspection.cleanup_allowed:
+            blocked_event_type, blocked_fix_hint = _resolve_cleanup_blocked_event_details(inspection)
             message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
             _print_cleanup_blocked_log(
-                event_type="cleanup.guard_rejected",
+                event_type=blocked_event_type,
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
                 source_path=str(source_path),
                 target_path=str(target_path),
                 reason=inspection.conclusion,
-                fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
+                fix_hint=blocked_fix_hint,
             )
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
-                event_type="cleanup.guard_rejected",
+                event_type=blocked_event_type,
                 message=message,
                 source_path=str(source_path),
                 target_path=str(target_path),
@@ -487,6 +492,12 @@ def _preferred_cleanup_ref(inspection: CleanupInspection) -> str:
         if cleaned_value:
             return cleaned_value
     return inspection.query_ref
+
+
+def _resolve_cleanup_blocked_event_details(inspection: CleanupInspection) -> tuple[str, str]:
+    if inspection.conclusion == CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT:
+        return "cleanup.source_type_unsupported", CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT
+    return "cleanup.guard_rejected", CLEANUP_GUARD_REJECTED_FIX_HINT
 
 
 def _append_cleanup_follow_up(message: str, task_ref: str) -> str:
