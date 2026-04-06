@@ -1,4 +1,4 @@
-# Current status (v126)
+# Current status (v127)
 
 ## Project position
 
@@ -115,7 +115,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：`457 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- tests：`475 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`128 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`27 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`225 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
