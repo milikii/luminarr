@@ -1,4 +1,4 @@
-# Next step (v154)
+# Next step (v155)
 
 ## Current goal
 
@@ -25,6 +25,7 @@
 - 保持 `chat-scoped task_ref` 在 `job_event` 关联查询失败时也继续打印 resolved `lookup_task_ref/task_id/task_hash`，且 inspect / cleanup 文本不要丢掉已解析出的身份。
 - 保持 `chat-scoped task_ref` 命中历史 `import.succeeded` 但缺 `source_path/target_path` 时，也继续回显 resolved identity，并保持 correlation-missing 文本协议不变。
 - 保持 `chat-scoped task_ref` 在真正执行 cleanup 但删除失败时，也继续使用已解析出的真实任务身份写 `cleanup.failed` 事件和红色日志。
+- 保持 `chat-scoped task_ref` 在 cleanup 已成功但 `cleanup.succeeded` 事件写入失败时，也继续打印真实任务身份，且不隐藏成功文本。
 - 保持 cleanup 失败可观测性稳定：
   - 删除失败日志：`[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`
   - 关联查询失败日志：`task_ref + lookup_task_ref/task_id/task_hash`

@@ -939,6 +939,65 @@ def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
     assert "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘" in captured.out
 
 
+def test_cleanup_by_task_ref_logs_event_append_failure_with_chat_scoped_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+    def _raise_append_error(**_: object) -> None:
+        raise RuntimeError("mock append denied")
+
+    monkeypatch.setattr(event_repo, "append_event", _raise_append_error)
+
+    reply = service.cleanup_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    captured = capsys.readouterr()
+    assert "已清理下载源资产" in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
+    assert not source_file.exists()
+    assert target_file.exists()
+    assert "[cleanup 事件写入失败]" in captured.out
+    assert "task_ref=hash-87" in captured.out
+    assert "event_type=cleanup.succeeded" in captured.out
+    assert "task_id=87" in captured.out
+    assert "task_hash=hash-87" in captured.out
+    assert f"source={source_file}" in captured.out
+    assert f"target={target_file}" in captured.out
+    assert "mock append denied" in captured.out
+    assert "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘" in captured.out
+
+
 def test_inspect_by_task_ref_logs_correlation_query_failure_and_returns_missing_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
