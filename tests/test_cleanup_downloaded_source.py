@@ -594,6 +594,48 @@ def test_cleanup_by_task_ref_logs_guard_rejected_with_fix_hint(
     assert "检查 source_path 和 target_path 是否指向同一位置或互为父子目录" in captured.out
 
 
+def test_inspect_by_task_ref_reports_source_type_unsupported_with_blocked_follow_up(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+    monkeypatch.setattr(
+        cleanup_module,
+        "_validate_cleanup_paths",
+        lambda **_: CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    )
+
+    reply = service.inspect_by_task_ref("87")
+
+    assert "当前 guardrail: 拒绝 cleanup" in reply
+    assert f"结论: {CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT}" in reply
+    assert "下一步：" in reply
+    assert "当前先不要执行 cleanup" in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in reply
+    assert source_file.exists()
+    assert target_file.exists()
+
+
 def test_cleanup_by_task_ref_records_source_type_unsupported_with_follow_up(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
