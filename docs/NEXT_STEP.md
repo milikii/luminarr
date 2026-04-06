@@ -1,4 +1,4 @@
-# Next step (v156)
+# Next step (v158)
 
 ## Current goal
 
@@ -21,6 +21,7 @@
 - 持续记录窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 到 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / `chat-scoped task_ref -> jobs -> import correlation` 的聚合 smoke gate。
+- 在 cleanup 验证窗口正式退出前，至少评估并记录 PT 下载任务的做种状态 guardrail（`pt_min_seed_hours` 保护、下载器 seeding 信息等）是否已在 guardrail 里覆盖；窗口台账里必须明确写出“当前 cleanup guardrail 未读取下载器 seeding 状态、`pt_min_seed_hours` 未进入 cleanup 阻断判断、因此本窗口只记录风险，不扩 cleanup 行为”。
 - 保持 cleanup 身份展示边界稳定：只有 `chat-scoped task_ref` 真正从 `jobs` 解析出身份时才回显和记录 `task_id/task_hash`；普通 correlation-missing inspect 继续显示 `-`，cleanup follow-up 继续落到稳定的 hash / id。
 - 保持 `chat-scoped task_ref` 在 `job_event` 关联查询失败时也继续打印 resolved `lookup_task_ref/task_id/task_hash`，且 inspect / cleanup 文本不要丢掉已解析出的身份。
 - 保持 `chat-scoped task_ref` 命中历史 `import.succeeded` 但缺 `source_path/target_path` 时，也继续回显 resolved identity，并保持 correlation-missing 文本协议不变。
@@ -65,9 +66,11 @@
 
 ## After this step
 
-1. `series / anime` 独立名称解析最小实现
-2. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-3. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-4. BT 共享确定性评分器
-5. Jellyfin / Plex 支持（后续）
-6. plugin 体系继续后置
+1. 独立后台下载完成轮询（复用 `download_monitor` 和现有 `PostDownloadAutoImportService`，不扩成通用 scheduler 平台）。
+2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
+3. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
+4. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
+5. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
+6. BT 共享确定性评分器。
+7. Jellyfin / Plex 支持（后续）。
+8. plugin 体系继续后置。

@@ -1,4 +1,4 @@
-# Cleanup verification window (2026-04-05 to 2026-04-12) (v39)
+# Cleanup verification window (2026-04-05 to 2026-04-12) (v40)
 
 ## Window
 
@@ -36,6 +36,14 @@
 - 最近一次 cleanup 协议回归验证：2026-04-07，`420 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
 - 最近一次 verification docs gate：2026-04-07，`320 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - 当前 cleanup 协议观察：截至 2026-04-07，cleanup discoverability / inspect / correlation-missing unresolved-identity blank display / target-missing cleanup inspect follow-up guidance / source-missing cleanup inspect follow-up guidance / cleanup inspect follow-up guidance / guard-rejected cleanup inspect follow-up guidance / post-cleanup cleanup inspect confirmation / chat-scoped task_ref post-cleanup cleanup inspect confirmation / chat-scoped task_ref correlation-missing inspect identity resolution / chat-scoped task_ref correlation-missing rejection guidance / chat-scoped task_ref correlation-query-failure observability / chat-scoped task_ref missing-structured-import-correlation identity retention / chat-scoped task_ref delete-failure observability / chat-scoped task_ref success-event-append-failure observability / chat-scoped task_ref source-type-unsupported blocked-log observability / chat-scoped task_ref target-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance / chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance / chat-scoped task_ref target-missing rejection guidance / chat-scoped task_ref source-missing rejection guidance / chat-scoped task_ref source-type-unsupported rejection guidance / chat-scoped task_ref guard-rejected rejection guidance / execution / correlation-missing / target-missing / source-missing / source-type-unsupported / guard-rejected rejection guidance / success follow-up / failure observability 未见协议回退；当前缺口只剩四渠道真实私聊 smoke 证据。
+
+## PT 做种 guardrail 评估
+
+- 评估日期：2026-04-07
+- 已核对代码入口：`app/services/cleanup_downloaded_source.py::_inspect_cleanup`、`app/services/cleanup_downloaded_source.py::_validate_cleanup_paths`
+- 当前 cleanup guardrail 是否读取下载器做种状态：未覆盖；现有 guardrail 只检查 import 关联、`source_path/target_path` 是否存在、源类型是否合法、以及 source/target 路径关系。
+- `pt_min_seed_hours` 是否进入 cleanup 阻断判断：未进入；当前 cleanup 路径没有读取下载器 seeding 信息，也没有把 PT 做种时长接入阻断条件。
+- 当前结论：不得把删除仍在做种中的 PT 资产视为已验证稳定能力；本窗口只记录风险，不扩 cleanup 行为。
 
 ## Update rule
 

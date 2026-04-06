@@ -152,6 +152,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "Done when" in text
             assert "After this step" in text
             assert "bring-up 入口稳定" in text
+            assert "pt_min_seed_hours" in text
+            assert "只记录风险，不扩 cleanup 行为" in text
         if text is status_text:
             assert "four-channel cleanup smoke tests" in text
             assert "当前结论" in text
@@ -161,6 +163,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "What is implemented now" in text
             assert "Main risks and gaps" in text
             assert "Latest verification" in text
+            assert "PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`" in text
+            assert "pt_min_seed_hours" in text
 
     assert "docs/INDEX.md" in readme_text
     assert "docs/GETTING_STARTED.md" in readme_text
@@ -220,5 +224,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert re.search(r"^\| 渠道 \| 状态 \| 最近一次日期 \| 备注 \|$", status_text, re.MULTILINE) is None
     assert "待补真实私聊 smoke 记录" not in status_text
     assert re.search(r"^- 当前 cleanup 协议观察：", status_text, re.MULTILINE) is None
+    assert "## PT 做种 guardrail 评估" in window_text
+    assert "pt_min_seed_hours" in window_text
+    assert "做种" in window_text
+    assert "只记录风险，不扩 cleanup 行为" in window_text
     assert len(window_progress_rows) == 4
     assert status_progress_rows == window_progress_rows
