@@ -111,7 +111,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "尚未到最早可结束日期" in text
         assert "已到最早可结束日期" in text
         assert "cleanup 协议回归验证" in text
-        assert "smoke gate / cleanup 协议两项" in text
+        assert "smoke gate / cleanup 协议 / verification docs gate 三项" in text
+        assert "verification docs gate 持续通过" in text
         assert "chat-scoped task_ref -> jobs -> import correlation" in text
         assert "correlation-missing rejection guidance" in text
         assert "target-missing rejection guidance" in text

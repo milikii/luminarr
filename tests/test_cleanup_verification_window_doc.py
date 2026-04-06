@@ -60,12 +60,14 @@ def _assert_window_completes_immediately_when_exit_conditions_are_met(
     progress_rows: list[tuple[str, str, str]],
     smoke_gate_checklist_completed: bool,
     protocol_regression_checklist_completed: bool,
+    docs_gate_checklist_completed: bool,
 ) -> None:
     exit_conditions_met = (
         current_date >= end_date
         and all(row_status == "已完成" for _, row_status, _ in progress_rows)
         and smoke_gate_checklist_completed
         and protocol_regression_checklist_completed
+        and docs_gate_checklist_completed
     )
     if not exit_conditions_met:
         return
@@ -235,12 +237,19 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         r"- \[( |x)\] cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退",
         text,
     )
+    docs_gate_checklist_match = re.search(
+        r"- \[( |x)\] verification docs gate 持续通过",
+        text,
+    )
     assert smoke_gate_checklist_match is not None
     assert protocol_regression_checklist_match is not None
+    assert docs_gate_checklist_match is not None
     smoke_gate_checklist_completed = smoke_gate_checklist_match.group(1) == "x"
     protocol_regression_checklist_completed = protocol_regression_checklist_match.group(1) == "x"
+    docs_gate_checklist_completed = docs_gate_checklist_match.group(1) == "x"
     assert smoke_gate_checklist_completed == ("passed" in smoke_gate_result)
     assert protocol_regression_checklist_completed == ("未见协议回退" in protocol_observation_text)
+    assert docs_gate_checklist_completed == ("passed" in docs_gate_result)
 
     assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
     assert "verification docs gate" in text
@@ -345,6 +354,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         progress_rows=progress_rows,
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
+        docs_gate_checklist_completed=docs_gate_checklist_completed,
     )
 
     if window_status == "已完成":

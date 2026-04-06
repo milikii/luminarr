@@ -1,4 +1,4 @@
-# Next step (v123)
+# Next step (v124)
 
 ## Current baseline
 
@@ -40,6 +40,7 @@
 - 当窗口仍处于 `未到最早可结束日期` 时，`当前结论` 也要显式写出“尚未到最早可结束日期 <绝对日期>”，不要只写笼统的进行中。
 - 当窗口已到 `最早可结束日期` 但仍未完成时，`当前结论` 也要显式写出“已到最早可结束日期 <绝对日期>，但退出条件仍未满足”，不要继续沿用未到期文案。
 - 把最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，让退出清单和窗口台账都有对应证据。
+- 保持 `verification docs gate 持续通过`，避免窗口台账、状态快照和施工文档各写各的还能被误判成窗口已收口。
 - 只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期，避免窗口台账和 `docs/STATUS.md` 快照停在旧日期。
 - 即使四渠道真实私聊 smoke 和 cleanup 协议回归都已满足，也不得早于最早可结束日期把验证窗口标记为 `已完成`。
 - 已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外日期误记成当前验证窗口证据。
@@ -48,7 +49,7 @@
 - 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
 - 当剩余缺口已经不是渠道，而是聚合 smoke gate 或 cleanup 协议回归时，`当前结论` 也必须显式写出 smoke gate 或 cleanup 协议缺口，不能退化成只写日期或泛泛的“退出条件未满足”。
 - `Channel progress` 的备注列必须与渠道状态同步；若渠道仍待验证，备注继续写待补真实私聊 smoke 记录；若渠道已完成，备注不得继续沿用待补文案。
-- 让 exit checklist 里的 smoke gate / cleanup 协议两项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
+- 让 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态。
 - `docs/STATUS.md` 还要同步保留 `窗口活性` 快照，避免最早可结束日期前后仍写成同一类进行中。
 - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke，确认“消息进来 -> shared runtime -> 文本回去”不回退。
@@ -84,7 +85,7 @@
 - 已完成 7 天验证窗口。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期、窗口活性和当前结论，且 `窗口活性`、`当前状态`、窗口标题日期、退出清单、渠道进度彼此一致。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已同步记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令，避免“测试已跑过但窗口台账没有证据”。
-- exit checklist 里的 smoke gate / cleanup 协议两项已与上述证据保持同步，不会继续停留在未勾选状态。
+- exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项已与上述证据保持同步，不会继续停留在未勾选状态。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance / guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
