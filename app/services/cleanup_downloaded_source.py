@@ -382,7 +382,9 @@ class CleanupDownloadedSourceService:
             )
         except Exception as error:
             print(
-                f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} 原因={error}",
+                f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
+                f"lookup_task_ref={resolved_task_ref} lookup_task_id={resolved_task_id} "
+                f"lookup_task_hash={resolved_task_hash} 原因={error}",
                 flush=True,
             )
             print(

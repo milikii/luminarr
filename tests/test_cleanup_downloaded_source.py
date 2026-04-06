@@ -795,6 +795,10 @@ def test_inspect_by_task_ref_logs_correlation_query_failure_and_returns_missing_
     assert "当前 guardrail: 拒绝 cleanup" in reply
     assert f"结论: {CLEANUP_CORRELATION_MISSING_TEXT}" in reply
     assert "[cleanup 关联查询失败]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "lookup_task_ref=87" in captured.out
+    assert "lookup_task_id=87" in captured.out
+    assert "lookup_task_hash=87" in captured.out
     assert "mock correlation lookup denied" in captured.out
     assert "检查 SQLite job_event 是否可读、导入成功事件是否已落盘" in captured.out
 
@@ -820,6 +824,10 @@ def test_cleanup_by_task_ref_logs_correlation_query_failure_and_keeps_follow_up(
     assert "cleanup inspect 87 / 清理检查 87：只读预检，不删除任何文件" in reply
     assert "cleanup 87 / 清理 87：实际清理下载源资产" in reply
     assert "[cleanup 关联查询失败]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "lookup_task_ref=87" in captured.out
+    assert "lookup_task_id=87" in captured.out
+    assert "lookup_task_hash=87" in captured.out
     assert "mock correlation lookup denied" in captured.out
     assert "检查 SQLite job_event 是否可读、导入成功事件是否已落盘" in captured.out
 
