@@ -36,6 +36,42 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert (end_date - start_date).days >= 7
     assert start_date <= conclusion_date <= current_date
 
+    smoke_gate_match = re.search(
+        r"- 最近一次聚合 smoke gate：(\d{4}-\d{2}-\d{2})，`([^`]+)`（`([^`]+)`）",
+        text,
+    )
+    focused_cleanup_match = re.search(
+        r"- 最近一次 cleanup 协议回归验证：(\d{4}-\d{2}-\d{2})，`([^`]+)`（`([^`]+)`）",
+        text,
+    )
+    protocol_observation_match = re.search(r"- 当前 cleanup 协议观察：截至 (\d{4}-\d{2}-\d{2})，(.+)", text)
+    assert smoke_gate_match is not None
+    assert focused_cleanup_match is not None
+    assert protocol_observation_match is not None
+    smoke_gate_date = date.fromisoformat(smoke_gate_match.group(1))
+    smoke_gate_result = smoke_gate_match.group(2)
+    smoke_gate_command = smoke_gate_match.group(3)
+    focused_cleanup_date = date.fromisoformat(focused_cleanup_match.group(1))
+    focused_cleanup_result = focused_cleanup_match.group(2)
+    focused_cleanup_command = focused_cleanup_match.group(3)
+    protocol_observation_date = date.fromisoformat(protocol_observation_match.group(1))
+    protocol_observation_text = protocol_observation_match.group(2)
+    assert smoke_gate_date == conclusion_date
+    assert focused_cleanup_date == conclusion_date
+    assert protocol_observation_date == conclusion_date
+    assert smoke_gate_result == "128 passed"
+    assert smoke_gate_command == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py"
+    assert focused_cleanup_result == "223 passed, 91 deselected"
+    assert (
+        focused_cleanup_command
+        == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py "
+        "tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py "
+        "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
+        "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
+    )
+    assert "未见协议回退" in protocol_observation_text
+    assert "真实私聊 smoke 证据" in protocol_observation_text
+
     assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
     assert "消息进来 -> shared runtime -> 文本回去" in text
 

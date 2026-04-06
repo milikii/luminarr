@@ -27,6 +27,15 @@ def _extract_window_activity(text: str) -> str:
     return activity_match.group(1)
 
 
+def _extract_verification_evidence(text: str, label: str) -> tuple[str, str, str]:
+    evidence_match = re.search(
+        rf"- {re.escape(label)}：(\d{{4}}-\d{{2}}-\d{{2}})，`([^`]+)`（`([^`]+)`）",
+        text,
+    )
+    assert evidence_match is not None
+    return evidence_match.group(1), evidence_match.group(2), evidence_match.group(3)
+
+
 def _extract_window_status(text: str) -> str:
     status_match = re.search(r"- 当前状态：(进行中|已完成)", text)
     assert status_match is not None
@@ -41,6 +50,14 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     start_date, end_date = _extract_window_dates(window_text)
     current_conclusion = _extract_current_conclusion(window_text)
     window_activity = _extract_window_activity(window_text)
+    smoke_gate_date, smoke_gate_result, smoke_gate_command = _extract_verification_evidence(
+        window_text,
+        "最近一次聚合 smoke gate",
+    )
+    focused_cleanup_date, focused_cleanup_result, focused_cleanup_command = _extract_verification_evidence(
+        window_text,
+        "最近一次 cleanup 协议回归验证",
+    )
     window_status = _extract_window_status(window_text)
 
     assert f"开始日期固定为 {start_date}" in status_text
@@ -48,6 +65,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert f"- 窗口活性快照：{window_activity}" in status_text
     assert f"- 当前状态快照：{window_status}" in status_text
     assert f"- 当前结论快照：{current_conclusion}" in status_text
+    assert f"- four-channel cleanup smoke tests：`{smoke_gate_result}`（{smoke_gate_date}，`{smoke_gate_command}`）" in status_text
+    assert (
+        f"- focused cleanup tests：`{focused_cleanup_result}`（{focused_cleanup_date}，"
+        f"`{focused_cleanup_command}`）"
+    ) in status_text
 
     for text in (next_step_text, status_text):
         assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in text
@@ -55,6 +77,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "真实私聊 smoke" in text
         assert "当前结论" in text
         assert "窗口活性" in text
+        assert "cleanup 协议回归验证" in text
         assert "chat-scoped task_ref -> jobs -> import correlation" in text
         assert "correlation-missing rejection guidance" in text
         assert "target-missing rejection guidance" in text

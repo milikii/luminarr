@@ -1,4 +1,4 @@
-# Cleanup verification window (v4)
+# Cleanup verification window (v5)
 
 ## Window
 
@@ -29,10 +29,17 @@
 | Feishu | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |
 | WeCom | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |
 
+## Verification evidence
+
+- 最近一次聚合 smoke gate：2026-04-06，`128 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
+- 最近一次 cleanup 协议回归验证：2026-04-06，`223 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- 当前 cleanup 协议观察：截至 2026-04-06，cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 未见协议回退；当前缺口只剩四渠道真实私聊 smoke 证据。
+
 ## Update rule
 
 - 每次真实私聊 smoke 完成后，立刻把对应渠道状态改成 `已完成`，并写入绝对日期。
 - 最早可结束日期之前，`窗口活性` 保持为 `未到最早可结束日期`；到达最早可结束日期但退出条件未满足时，改成 `已到最早可结束日期，待补退出条件`。
 - 退出条件满足后，`当前状态` 改成 `已完成`，`窗口活性` 改成 `已满足退出条件`，`当前结论` 同步写成已满足退出条件。
+- 每次重跑 `tests/test_cleanup_cross_channel_smoke.py` 或 focused cleanup 回归集后，立刻把最新日期、结果和命令同步写回这份台账。
 - 如果 smoke 暴露回归，只允许记录并修 shared runtime、渠道胶水或显式中文日志缺口，不新增 cleanup 行为。
 - `docs/STATUS.md` 只保留当前窗口快照；这份文件负责保留当前窗口的逐项证据。
