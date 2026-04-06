@@ -481,6 +481,47 @@ def test_cleanup_chat_scoped_task_ref_post_success_inspect_confirmation_smoke_ac
 @pytest.mark.parametrize(
     "query",
     [
+        f"cleanup inspect {_CHAT_SCOPED_TASK_REF}",
+        f"清理检查 {_CHAT_SCOPED_TASK_REF}",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_target_missing_inspect_follow_up_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+    target_file.unlink()
+
+    reply_text = runner(query, cleanup_service)
+
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert "当前 guardrail: 拒绝 cleanup" in reply_text
+    assert f"结论: 库内目标路径不存在，已拒绝清理下载源资产：{target_file}" in reply_text
+    assert "当前先不要执行 cleanup" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in reply_text
+    assert source_file.exists()
+    assert not target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "cleanup inspect 87",
         "cleanup inspect hash-87",
         "清理检查 87",
