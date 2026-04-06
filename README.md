@@ -1,4 +1,4 @@
-# Luminarr (v60)
+# Luminarr (v61)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -91,27 +91,33 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - 四个渠道都要可用，但业务真相只维护一套；不为同一条协议做四份分叉实现。
 - 当前只支持私聊文本主线；Feishu / WeCom 不做群聊、卡片、按钮回调，personal WeChat 不做多账号编排。
+- personal WeChat 当前回复依赖有效 `context_token`；WeCom 仍只有 callback 被动回包，没有独立主动发消息客户端。
 - 交付形态继续以私聊 bot 为主；后续体验优化优先走渠道内更美观的图片/信息卡片/字符排版，不做 Web UI。
 - cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
+- cleanup 当前还没有 PT 做种状态 / `pt_min_seed_hours` 保护校验；cleanup 验证窗口退出前必须把这条风险确认清楚。
 - 当前最稳的是 movie-first；`series / anime` 独立名称解析还没实现。
+- 字幕翻译当前仅处理 `.srt`；`series / anime` 落地时需同步评估 `.ass`。
 - BT 路线已可用，但还没升级成共享确定性评分器。
 
 ## 5. 当前 next step
 
 - 当前不再把 cleanup 当成无限观察项，而是执行一个有退出条件的四渠道验证窗口。
+- cleanup 详细窗口台账和当前进度统一看 `docs/CLEANUP_VERIFICATION_WINDOW.md` 与 `docs/STATUS.md`，不要把窗口细节再抄回仓库入口。
 - 退出条件：
   - 完成 7 天真实使用验证
   - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke
   - cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退
 - 这一步只允许修 shared runtime 回归、渠道胶水回归和显式日志缺口，不新增自动 cleanup、批量 cleanup 或删种。
 - cleanup 验证窗口结束后，下一步按顺序推进：
-  1. `series / anime` 独立名称解析最小实现
-  2. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-  3. 最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-  4. BT 共享确定性评分器
-  5. Jellyfin / Plex 支持（后续）
-  6. plugin 体系后置评估
+  1. 独立后台下载完成轮询
+  2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
+  3. `.ass` 字幕支持评估与最小实现
+  4. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+  5. 最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+  6. BT 共享确定性评分器
+  7. Jellyfin / Plex 支持（后续）
+  8. plugin 体系后置评估
 
 ## 6. 当前明确不做
 

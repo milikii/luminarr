@@ -82,6 +82,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     dockerignore_text = Path(".dockerignore").read_text(encoding="utf-8")
     readme_text = Path("README.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
     architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
     getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
@@ -169,10 +170,21 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docs/INDEX.md" in readme_text
     assert "docs/GETTING_STARTED.md" in readme_text
     assert "docs/ARCHITECTURE.md" in readme_text
+    assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
+    assert "docs/STATUS.md" in readme_text
     assert ".env.example" in readme_text
     assert "Makefile" in readme_text
     assert "docker-compose.yml" in readme_text
     assert "Dockerfile" in readme_text
+    assert "context_token" in readme_text
+    assert "pt_min_seed_hours" in readme_text
+    assert ".ass" in readme_text
+    assert "独立后台下载完成轮询" in readme_text
+    assert "context_token" in decisions_text
+    assert "pt_min_seed_hours" in decisions_text
+    assert ".ass" in decisions_text
+    assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in decisions_text
+    assert "docs/STATUS.md" in decisions_text
     assert "docs/INDEX.md" in agents_text
     assert "docs/ARCHITECTURE.md" in agents_text
     assert "docs/NEXT_STEP.md" in agents_text
