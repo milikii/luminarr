@@ -106,15 +106,29 @@ def _build_cleanup_service(
 
 def _build_guard_rejected_cleanup_service(
     base_dir: Path,
+    *,
+    chat_id: int | None = None,
+    chat_scoped_task_ref: str | None = None,
 ) -> tuple[CleanupDownloadedSourceService, Path, Path]:
     source_dir = base_dir / "downloads" / "Dune.Part.Two.2024"
     source_dir.mkdir(parents=True)
     target_file = source_dir / "movie.mkv"
     target_file.write_bytes(b"demo")
 
-    event_repo = JobEventRepo(_make_database(base_dir))
+    database = _make_database(base_dir)
+    event_repo = JobEventRepo(database)
+    job_repo = None
+    if chat_id is not None and chat_scoped_task_ref is not None:
+        job_repo = JobRepo(database)
+        job_repo.upsert_import_job_pending(
+            chat_id=chat_id,
+            user_id=2001,
+            task_ref=chat_scoped_task_ref,
+            task_id="87",
+            task_hash="hash-87",
+        )
     event_repo.append_event(
-        task_ref="87",
+        task_ref="hash-87" if job_repo is not None else "87",
         task_id="87",
         task_hash="hash-87",
         event_type="import.succeeded",
@@ -122,7 +136,7 @@ def _build_guard_rejected_cleanup_service(
         source_path=str(source_dir),
         target_path=str(target_file),
     )
-    return CleanupDownloadedSourceService(event_repo), source_dir, target_file
+    return CleanupDownloadedSourceService(event_repo, job_repo=job_repo), source_dir, target_file
 
 
 def _expected_chat_id(channel: str) -> int:
@@ -653,6 +667,45 @@ def test_cleanup_chat_scoped_task_ref_source_type_unsupported_rejection_guidance
     assert f"cleanup inspect {_CHAT_SCOPED_TASK_REF}" not in reply_text
     assert f"cleanup {_CHAT_SCOPED_TASK_REF}：" not in reply_text
     assert source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        f"cleanup {_CHAT_SCOPED_TASK_REF}",
+        f"清理 {_CHAT_SCOPED_TASK_REF}",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_guard_rejected_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_dir, target_file = _build_guard_rejected_cleanup_service(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert f"检测到 source/target 路径关系异常，已拒绝清理：{source_dir} -> {target_file}" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert f"cleanup inspect {_CHAT_SCOPED_TASK_REF}" not in reply_text
+    assert f"cleanup {_CHAT_SCOPED_TASK_REF}：" not in reply_text
+    assert source_dir.exists()
     assert target_file.exists()
 
 
