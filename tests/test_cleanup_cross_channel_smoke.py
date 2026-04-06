@@ -614,6 +614,51 @@ def test_cleanup_chat_scoped_task_ref_missing_path_rejection_guidance_smoke_acro
 @pytest.mark.parametrize(
     "query",
     [
+        f"cleanup {_CHAT_SCOPED_TASK_REF}",
+        f"清理 {_CHAT_SCOPED_TASK_REF}",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_source_type_unsupported_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+    monkeypatch.setattr(
+        cleanup_module,
+        "_validate_cleanup_paths",
+        lambda **_: CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert f"cleanup inspect {_CHAT_SCOPED_TASK_REF}" not in reply_text
+    assert f"cleanup {_CHAT_SCOPED_TASK_REF}：" not in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "cleanup inspect 87",
         "cleanup inspect hash-87",
         "清理检查 87",
