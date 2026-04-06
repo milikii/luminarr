@@ -1,136 +1,67 @@
-# Next step (v148)
+# Next step (v149)
 
-## Current baseline
+## Current goal
 
-- 仓库知识入口当前新增并固定为：`README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md -> docs/NEXT_STEP.md/STATUS.md/DECISIONS.md`。
-- `.env.example` 当前作为运行配置模板，`Makefile` 当前作为常用命令入口；bring-up 说明统一收口到 `docs/GETTING_STARTED.md`。
-- 四个渠道当前都是正式私聊入口：Telegram / personal WeChat / Feishu / WeCom。
-- 四个渠道共用 `shared private-chat text runtime`、workflow、approval、`jobs` 和 SQLite 真相；渠道层只保留各自的验签、解密、轮询、回包和最小展示差异。
-- 媒体主链已稳定跑通：`search -> select -> downloader approval -> confirm -> dispatch -> status -> import approval -> confirm -> import -> metadata -> subtitle -> refresh`。
-- cleanup 最小文本闭环已落地：discoverability、`cleanup inspect`、`cleanup`、rejection guidance、success follow-up、failure observability、chat-scoped `task_ref` 解析。
-- cleanup 执行阶段的阻断分支（correlation 缺失 / target 缺失 / source 已不存在 / source 不是文件或目录 / guard 拒绝）已补齐显式中文日志和处理建议，不改用户文本协议。
-- cleanup 删除失败路径当前也要继续打印统一的 `[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target` 显式中文日志，方便四渠道验证窗口里直接按日志回查具体 cleanup 和保留目标。
-- cleanup 关联查询失败路径当前也要继续打印带 `task_ref + lookup_task_ref/task_id/task_hash` 的显式中文日志，方便直接看出服务端按哪组键在查 `job_event`。
-- cleanup 事件写入失败路径当前也要继续打印带 `task_ref + task_id/task_hash + source + target` 的显式中文日志，避免文本已回用户但运维侧还看不出是哪次 cleanup 落盘失败。
-- `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id` 与 `task_hash` 的 `cleanup inspect` / `cleanup` smoke、英文/中文原始 `task_id` 与 `task_hash` 的 `correlation missing` / `target missing` / `source missing` / `source-type-unsupported` / `guard rejected` rejection guidance smoke、`target-missing cleanup inspect follow-up guidance`、`source-missing cleanup inspect follow-up guidance`、`source-type-unsupported` 场景下的 `cleanup inspect follow-up guidance`、`guard-rejected cleanup inspect follow-up guidance`、成功 cleanup 之后的 post-cleanup `cleanup inspect` confirmation、`chat-scoped task_ref post-cleanup cleanup inspect confirmation`、`chat-scoped task_ref target-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance`、`chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance`、`chat-scoped task_ref target-missing rejection guidance`、`chat-scoped task_ref source-missing rejection guidance`、`chat-scoped task_ref source-type-unsupported rejection guidance`、`chat-scoped task_ref guard-rejected rejection guidance`，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
-- 上面这条聚合 smoke gate 当前还把 `correlation missing` rejection guidance 的双语 follow-up 锁成精确断言：必须同时保留 `cleanup inspect <ref> / 清理检查 <ref>` 和 `cleanup <ref> / 清理 <ref>` 两行引导，不能退化成只剩关键词提示。
-- 同一条聚合 smoke gate 当前也把 `target missing` / `source missing` rejection guidance 的双语 follow-up 锁成精确断言：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- 同一条聚合 smoke gate 当前还把 `source-type-unsupported` / `guard rejected` rejection guidance 的双语 follow-up 锁成精确断言：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref source-type-unsupported cleanup inspect` follow-up 锁成解析后 blocked guidance：即使用户入口发的是 `cleanup inspect <快捷引用>` / `清理检查 <快捷引用>`，返回里也必须继续保留“当前先不要执行 cleanup”和 `cleanup inspect hash-87 / 清理检查 hash-87`。
-- 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref guard-rejected cleanup inspect` follow-up 锁成解析后 blocked guidance：即使用户入口发的是 `cleanup inspect <快捷引用>` / `清理检查 <快捷引用>`，返回里也必须继续保留“当前先不要执行 cleanup”和 `cleanup inspect hash-87 / 清理检查 hash-87`。
-- 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref target-missing` / `source-missing` rejection guidance 锁成解析后 follow-up：即使用户入口发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref source-type-unsupported` rejection guidance 锁成解析后 follow-up：即使用户入口发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- 同一条聚合 smoke gate 当前还把 `chat-scoped task_ref guard-rejected` rejection guidance 锁成解析后 follow-up：即使用户入口发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”“待验证备注也必须保留窗口开始日期”“已完成备注必须写完成日期与真实私聊 smoke 结论”，以及 cleanup 删除失败 / 关联查询失败 / 事件落盘失败三条日志的字段承诺这八类规则上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细。
-- `docs/STATUS.md` 当前还要同步保留仓库级 `.venv/bin/python -m pytest -q` 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照，避免 focused cleanup / docs gate 已更新，但总体回归、cleanup 服务回归、语法快照或 docs gate 快照还停在旧数字。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前标题直接带 `2026-04-05 to 2026-04-12` 日期，避免窗口起止日期只藏在正文条目里。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前不只记录四渠道真实私聊 smoke 进度，也要记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 结果，避免验证窗口只剩“待勾选项”。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期，避免窗口台账停在旧日期。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：验证窗口不得早于最早可结束日期就被标记为 `已完成`，避免 7 天窗口被文档提前关闭。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外证据回填进窗口台账。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，验证窗口就必须立刻改成已完成，避免退出条件已齐但台账仍挂进行中。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，避免结论退化成笼统的“退出条件未满足”。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”，避免结论和渠道进度表互相打架。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成泛泛文案。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：`Channel progress` 的备注列必须和渠道状态一致，不能在 `已完成` 后继续保留待补文案；一旦写成 `已完成`，备注也必须同步写出 `<绝对日期> 已完成真实私聊 smoke`。
-- cleanup 窗口收口后，当前已经明确的后续主线顺序是：
-  1. `series / anime` 独立名称解析最小实现
-  2. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-  3. 最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-  4. BT 共享确定性评分器
-  5. Jellyfin / Plex 支持（后续）
-  6. plugin 体系继续后置
-- BT 主链已落地：PT / BT 分流、processing-path inquiry、BT classification、TMDB association、`raw_bt` 目标目录、shared source adapter、pure BT single-item ranking、`btsub` scheduler tick。
+- 当前唯一主线：**four-channel cleanup verification baseline**
+- 当前窗口：`2026-04-05 to 2026-04-12`
+- 详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
 
-## Goal
+## Source of truth
 
-把 cleanup 从“继续观察”收口成“有退出条件的四渠道验证窗口”，不新增任何 cleanup 行为。
+- 长期边界：`docs/DECISIONS.md`
+- 当前目标：`docs/NEXT_STEP.md`
+- 当前快照：`docs/STATUS.md`
+- cleanup 详细窗口规则和证据：`docs/CLEANUP_VERIFICATION_WINDOW.md`
+- 知识入口：`README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md`
 
 ## Only do
 
-- 执行一个 7 天真实使用验证窗口。
-- 把验证窗口起止日期、四渠道真实私聊 smoke 进度和当前结论持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让退出条件只留在口头描述。
-- 把验证窗口当前是否仍处于“未到最早可结束日期”还是“已到最早可结束日期但待补退出条件”显式写进 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让窗口活性只靠人工脑补。
-- 当窗口仍处于 `未到最早可结束日期` 时，`当前结论` 也要显式写出“尚未到最早可结束日期 <绝对日期>”，不要只写笼统的进行中。
-- 当窗口已到 `最早可结束日期` 但仍未完成时，`当前结论` 也要显式写出“已到最早可结束日期 <绝对日期>，但退出条件仍未满足”，不要继续沿用未到期文案。
-- 把最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，让退出清单和窗口台账都有对应证据。
-- 保持 `verification docs gate 持续通过`，避免窗口台账、状态快照和施工文档各写各的还能被误判成窗口已收口。
-- 只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期，避免窗口台账和 `docs/STATUS.md` 快照停在旧日期。
-- 即使四渠道真实私聊 smoke 和 cleanup 协议回归都已满足，也不得早于最早可结束日期把验证窗口标记为 `已完成`。
-- 已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外日期误记成当前验证窗口证据。
-- 一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都满足，验证窗口就必须立刻改成已完成，不能继续保留进行中文案。
-- 一旦把验证窗口写成 `已完成`，exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项也必须同时保持勾选，不能出现“状态已完成但证据项未完成”。
-- 只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，不能退化成笼统的“退出条件未满足”。
-- 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
-- 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成只写日期或泛泛的“退出条件未满足”。
-- 当渠道缺口和三项证据都已补齐、只剩最早可结束日期时，`当前结论` 只能保留窗口日期阻塞，不能继续捎带 smoke gate、cleanup 协议或 verification docs gate 缺口文案。
-- 已完成后，`当前结论` 只能保留已满足退出条件，不得继续残留待补、缺口或日期阻塞文案。
-- `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
-- 当渠道缺口已经补齐、剩余缺口只剩 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名这些剩余缺口，不能只删掉“四渠道真实私聊 smoke 证据”旧文案。
-- 当渠道缺口和三项证据都已补齐、只剩最早可结束日期时，`当前 cleanup 协议观察` 只能保留未见协议回退，不能继续残留 smoke gate、cleanup 协议或 verification docs gate 缺口文案。
-- 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
-- `Channel progress` 的 `待验证` 备注也必须保留窗口开始日期，不能只剩笼统的待补文案。
-- `Channel progress` 的备注列必须与渠道状态同步；若渠道仍待验证，备注继续写待补真实私聊 smoke 记录；若渠道已完成，备注不得继续沿用待补文案，且必须写成 `<绝对日期> 已完成真实私聊 smoke`。
-- 让 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
-- `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态，也不要把 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细抄回 `docs/STATUS.md`。
-- `docs/STATUS.md` 还要同步保留 `窗口活性` 快照，避免最早可结束日期前后仍写成同一类进行中。
-- Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke，确认“消息进来 -> shared runtime -> 文本回去”不回退。
-- 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup discoverability + inspect + execution + target-missing cleanup inspect follow-up guidance + source-missing cleanup inspect follow-up guidance + cleanup inspect follow-up guidance + guard-rejected cleanup inspect follow-up guidance + post-cleanup cleanup inspect confirmation + chat-scoped task_ref post-cleanup cleanup inspect confirmation + chat-scoped task_ref target-missing cleanup inspect follow-up guidance + chat-scoped task_ref source-missing cleanup inspect follow-up guidance + chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance + chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance + chat-scoped task_ref target-missing rejection guidance + chat-scoped task_ref source-missing rejection guidance + chat-scoped task_ref source-type-unsupported rejection guidance + chat-scoped task_ref guard-rejected rejection guidance + correlation-missing rejection guidance + target-missing rejection guidance + source-missing rejection guidance + source-type-unsupported rejection guidance + guard-rejected rejection guidance + `chat-scoped task_ref` 关联路径的聚合验收门，并持续覆盖英文/中文协议变体。
-- 保持 cleanup 执行阻断分支的显式中文日志和处理建议稳定，不回退到只回用户文本、服务端无日志。
-- 保持 cleanup 删除失败日志里的 `[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target` 稳定，不回退到非 cleanup 前缀或只剩 task_id/task_hash。
-- 保持 cleanup 关联查询失败日志里的 `task_ref + lookup_task_ref/task_id/task_hash` 稳定，不回退到只剩用户输入和报错文本。
-- 保持 cleanup 事件写入失败日志里的 `task_ref + task_id/task_hash + source + target` 稳定，不回退到只剩 event_type 和报错文本。
-- 保持 cleanup 当前协议和语义不变：
-  - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`
-  - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`
-  - bare `cleanup` / `清理`
-  - bare `cleanup inspect` / `清理检查`
-- 保持 `chat-scoped task_ref -> jobs -> import correlation` 稳定，不回退到只能依赖原始 `task_id / task_hash`；当前聚合 smoke gate 也要覆盖这条路径。
-- 若验证期间出现问题，只允许修：
+- 完成一个 7 天真实使用验证窗口，不新增任何 cleanup 行为。
+- 保持 Telegram / personal WeChat / Feishu / WeCom 四个渠道都可用，且继续共用同一套 shared runtime、workflow、approval、`jobs` 和 SQLite 真相。
+- 持续记录窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 到 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+- 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
+- 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / `chat-scoped task_ref -> jobs -> import correlation` 的聚合 smoke gate。
+- 保持 cleanup 失败可观测性稳定：
+  - 删除失败日志：`[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`
+  - 关联查询失败日志：`task_ref + lookup_task_ref/task_id/task_hash`
+  - 事件写入失败日志：`task_ref + task_id/task_hash + source + target`
+- 只允许修：
   - shared runtime 回归
   - 渠道适配胶水回归
   - 显式中文日志和修复提示缺口
-- 保持 downloader / import approval、copy fallback、completion-monitor、metadata scraping、subtitle auto-translation、Emby refresh、BT 主链现状不回退。
-- 新业务协议仍先落 shared runtime 或 service，再补四渠道适配层最小验证；不为同一条业务逻辑维护四套分叉实现。
+- 保持 bring-up 入口稳定：
+  - `.env.example`
+  - `Makefile`
+  - `Dockerfile`
+  - `docker-compose.yml`
+  - `docs/GETTING_STARTED.md`
 
 ## Do not do
 
 - 不新增自动 inspect、自动 cleanup、批量 cleanup、删种或新的 cleanup workflow。
 - 不放宽现有 cleanup guardrail、删除范围或 correlation 校验。
-- 不把四渠道适配重构成通用多渠道平台、通用 webhook 总线、通用 plugin / skill / MCP 平台。
-- 不在这一步启动 `series / anime` 实现、shared private-chat 交付体验 polish、最小人类可用入口、BT 共享评分器重写、Jellyfin / Plex 支持或新的下载器 / 媒体服务器接入。
-- 不把“给别人用的体验”误解成 Web UI 主线；这一步之后的体验增强继续优先走私聊渠道回包层。
+- 不把四渠道适配重构成通用多渠道平台、通用 webhook 总线或通用 plugin / skill / MCP 平台。
+- 不在这一步启动 `series / anime` 实现、shared private-chat 交付体验 polish、最小人类可用入口之外的新产品面、BT 共享评分器重写、Jellyfin / Plex 支持或其他新集成。
 - 不回退现有文本协议：
-  - `search/select/status/import/confirm/cleanup/watchlist/btsub`
-  - `bt搜 <关键词>` / `bt search <关键词>`
-  - `微信登录`
+  - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`
+  - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`
+  - bare `cleanup` / `清理`
+  - bare `cleanup inspect` / `清理检查`
 
 ## Done when
 
 - 已完成 7 天验证窗口。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期、窗口活性和当前结论，且 `窗口活性`、`当前状态`、窗口标题日期、退出清单、渠道进度彼此一致。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已同步记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令，避免“测试已跑过但窗口台账没有证据”。
-- exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项已与上述证据保持同步，不会继续停留在未勾选状态。
-- 若验证窗口已写成 `已完成`，则 smoke gate / cleanup 协议 / verification docs gate 三项也必须仍然处于已勾选状态，不能只改状态不改证据清单。
-- `当前 cleanup 协议观察` 已跟随渠道缺口同步收缩，不会在渠道全部补齐后继续停留在“当前缺口只剩四渠道真实私聊 smoke 证据”。
-- 当验证窗口只剩最早可结束日期阻塞时，`当前 cleanup 协议观察` 也必须继续收口成未见协议回退，不能继续带 smoke gate、cleanup 协议或 verification docs gate 旧缺口文案。
-- `Channel progress` 若出现 `已完成`，备注也必须和 `最近一次日期` 对齐成同一天的真实私聊 smoke 完成说明，不能只写笼统的“已完成”。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
-- `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / target-missing cleanup inspect follow-up guidance / source-missing cleanup inspect follow-up guidance / cleanup inspect follow-up guidance / guard-rejected cleanup inspect follow-up guidance / post-cleanup cleanup inspect confirmation / chat-scoped task_ref post-cleanup cleanup inspect confirmation / chat-scoped task_ref target-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance / chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance / chat-scoped task_ref target-missing rejection guidance / chat-scoped task_ref source-missing rejection guidance / chat-scoped task_ref source-type-unsupported rejection guidance / chat-scoped task_ref guard-rejected rejection guidance / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance / source-type-unsupported rejection guidance / guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
-- cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
-- cleanup 失败路径继续打印显式中文日志和修复提示，不再静默吞错。
-- cleanup 删除失败日志继续能直接看见 `[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`，不需要额外翻数据库才知道是哪条 cleanup 失败。
-- cleanup 关联查询失败日志继续能直接看见 `task_ref + lookup_task_ref/task_id/task_hash`，不需要额外猜服务端用了哪组键查库。
-- cleanup 事件写入失败日志继续能直接看见 `task_ref + task_id/task_hash + source + target`，不需要额外翻数据库才知道哪次落盘失败。
-- 若验证窗口里出现问题，修复仍保持在现有 cleanup 文本闭环和渠道胶水范围内，没有引入新副作用。
-- 文档优先级仍保持一致：`DECISIONS -> NEXT_STEP -> STATUS -> README -> AGENTS`。
-- 仓库知识入口当前也应保持稳定：`README` 做入口、`docs/INDEX.md` 做地图、`docs/ARCHITECTURE.md` 做结构说明、`docs/GETTING_STARTED.md` 做 bring-up，不再把这些说明散落回 `NEXT_STEP` 或 `STATUS`。
+- `tests/test_cleanup_cross_channel_smoke.py` 持续通过。
+- cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、证据、当前状态和当前结论。
+- `docs/STATUS.md` 快照、`docs/NEXT_STEP.md` 目标和窗口台账保持一致。
 
 ## After this step
 
-1. 启动 `series / anime` 独立名称解析最小实现，先落 `title / year / season / episode / quality_tags` 结构。
-2. 收口 shared private-chat 交付体验，优先补图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI。
-3. 补最小人类可用入口，至少包含 quick start、配置模板和首个渠道 bring-up。
-4. 把 `pure_bt`、`manage_bt_subscription`、后续媒体型 BT 选源收敛到共享确定性评分器。
-5. 在 Emby 主线稳定后，再推进 Jellyfin / Plex 支持。
-6. plugin 体系继续后置，不作为当前主线阻塞项。
+1. `series / anime` 独立名称解析最小实现
+2. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+3. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+4. BT 共享确定性评分器
+5. Jellyfin / Plex 支持（后续）
+6. plugin 体系继续后置

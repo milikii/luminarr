@@ -16,7 +16,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 1. 复制 `.env.example` 为 `.env`
 2. 按 `docs/GETTING_STARTED.md` 填配置
-3. 用 `make run` 或 `set -a && . ./.env && set +a && .venv/bin/python -m app.main` 启动
+3. 用 `make run` / `docker compose up -d`，或 `set -a && . ./.env && set +a && .venv/bin/python -m app.main` 启动
 
 ## 1. 它在解决什么问题
 
@@ -160,3 +160,4 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `.env.example`：配置模板
 - `Makefile`：常用命令入口
+- `Dockerfile` / `docker-compose.yml`：最小容器启动入口

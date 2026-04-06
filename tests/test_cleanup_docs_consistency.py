@@ -77,6 +77,9 @@ def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str]:
 
 
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
+    dockerfile_text = Path("Dockerfile").read_text(encoding="utf-8")
+    docker_compose_text = Path("docker-compose.yml").read_text(encoding="utf-8")
+    dockerignore_text = Path(".dockerignore").read_text(encoding="utf-8")
     readme_text = Path("README.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
     index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
@@ -120,8 +123,6 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert compile_check_command == "python3 -m compileall app tests"
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
-    assert f"开始日期固定为 {start_date}" in status_text
-    assert f"最早可结束日期固定为 {end_date}" in status_text
     assert f"- 窗口活性快照：{window_activity}" in status_text
     assert f"- 当前状态快照：{window_status}" in status_text
     assert f"- 当前结论快照：{current_conclusion}" in status_text
@@ -137,62 +138,37 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
 
     for text in (next_step_text, status_text):
         assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in text
-        assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
         assert "verification docs gate" in text
         assert "真实私聊 smoke" in text
-        assert "当前结论" in text
-        assert "窗口活性" in text
-        assert "cleanup inspect follow-up guidance" in text
-        assert "target-missing cleanup inspect follow-up guidance" in text
-        assert "source-missing cleanup inspect follow-up guidance" in text
-        assert "chat-scoped task_ref post-cleanup cleanup inspect confirmation" in text
-        assert "chat-scoped task_ref target-missing cleanup inspect follow-up guidance" in text
-        assert "chat-scoped task_ref source-missing cleanup inspect follow-up guidance" in text
-        assert "chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance" in text
-        assert "chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance" in text
-        assert "chat-scoped task_ref target-missing rejection guidance" in text
-        assert "chat-scoped task_ref source-missing rejection guidance" in text
-        assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
-        assert "chat-scoped task_ref guard-rejected rejection guidance" in text
-        assert "同步到当天日期" in text
-        assert "不得早于最早可结束日期" in text
-        assert "不得早于窗口开始日期" in text
-        assert "不得晚于当前结论快照日期" in text
-        assert "必须立刻改成已完成" in text
-        assert "真实私聊 cleanup smoke 仍待补" in text
-        assert "不得继续写“真实私聊 cleanup smoke 仍待补”" in text
-        assert "必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口" in text
-        assert "只剩最早可结束日期" in text
-        assert "已完成后，`当前结论` 只能保留已满足退出条件" in text
-        assert "已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退" in text
-        assert "待验证备注也必须保留窗口开始日期" in text
-        assert "备注列" in text
-        assert "尚未到最早可结束日期" in text
-        assert "已到最早可结束日期" in text
-        assert "cleanup 协议回归验证" in text
-        assert "smoke gate / cleanup 协议 / verification docs gate 三项" in text
-        assert "verification docs gate 持续通过" in text
-        assert "chat-scoped task_ref -> jobs -> import correlation" in text
-        assert "correlation-missing rejection guidance" in text
-        assert "target-missing rejection guidance" in text
-        assert "source-missing rejection guidance" in text
-        assert "source-type-unsupported rejection guidance" in text
-        assert "guard-rejected rejection guidance" in text
-        assert "cleanup 执行失败" in text
-        assert "event_type=cleanup.failed" in text
-        assert "lookup_task_ref/task_id/task_hash" in text
-        assert "task_id/task_hash + source + target" in text
-
-    assert "仓库级 `.venv/bin/python -m pytest -q` 快照" in next_step_text
-    assert "`cleanup service tests` 快照" in next_step_text
-    assert "`compile check` 快照" in next_step_text
-    assert "`docs consistency check` 快照" in next_step_text
+        if text is next_step_text:
+            assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
+            assert "cleanup 执行失败" in text
+            assert "event_type=cleanup.failed" in text
+            assert "lookup_task_ref/task_id/task_hash" in text
+            assert "task_id/task_hash + source + target" in text
+            assert "Current goal" in text
+            assert "Only do" in text
+            assert "Do not do" in text
+            assert "Done when" in text
+            assert "After this step" in text
+            assert "bring-up 入口稳定" in text
+        if text is status_text:
+            assert "four-channel cleanup smoke tests" in text
+            assert "当前结论" in text
+            assert "窗口活性" in text
+            assert "focused cleanup tests" in text
+            assert "Knowledge entrypoints" in text
+            assert "What is implemented now" in text
+            assert "Main risks and gaps" in text
+            assert "Latest verification" in text
 
     assert "docs/INDEX.md" in readme_text
     assert "docs/GETTING_STARTED.md" in readme_text
     assert "docs/ARCHITECTURE.md" in readme_text
     assert ".env.example" in readme_text
     assert "Makefile" in readme_text
+    assert "docker-compose.yml" in readme_text
+    assert "Dockerfile" in readme_text
     assert "docs/INDEX.md" in agents_text
     assert "docs/ARCHITECTURE.md" in agents_text
     assert "docs/NEXT_STEP.md" in agents_text
@@ -201,6 +177,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docs/GETTING_STARTED.md" in index_text
     assert "docs/ARCHITECTURE.md" in index_text
     assert "AGENTS.md" in index_text
+    assert "Makefile" in index_text
     assert "app/main.py" in architecture_text
     assert "app/bot/private_chat_runtime.py" in architecture_text
     assert "app/services/" in architecture_text
@@ -209,14 +186,27 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Makefile" in getting_started_text
     assert "make run" in getting_started_text
     assert ".venv/bin/python -m app.main" in getting_started_text
+    assert "docker compose up -d" in getting_started_text
+    assert "Dockerfile" in getting_started_text
+    assert "docker-compose.yml" in getting_started_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
     assert "TRANSMISSION_BASE_URL=" in env_example_text
     assert "LIBRARY_TARGET_DIR=" in env_example_text
+    assert "SHARED_MEDIA_ROOT=" in env_example_text
     assert "test-cleanup:" in makefile_text
     assert "test-docs:" in makefile_text
     assert "compile:" in makefile_text
     assert "run:" in makefile_text
+    assert "docker-build:" in makefile_text
+    assert "docker-up:" in makefile_text
+    assert "python:3.12-slim" in dockerfile_text
+    assert "python\", \"-m\", \"app.main" in dockerfile_text
+    assert "build:" in docker_compose_text
+    assert "env_file:" in docker_compose_text
+    assert "SHARED_MEDIA_ROOT" in docker_compose_text
+    assert ".venv" in dockerignore_text
+    assert "logs" in dockerignore_text
 
     window_progress_rows = re.findall(
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",

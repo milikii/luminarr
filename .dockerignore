@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+.pytest_cache
+__pycache__
+*.pyc
+*.db
+*.sqlite3
+data
+logs
+tmp_tests
+tests
+acceptance-*.log
+Luminarr_v15.md

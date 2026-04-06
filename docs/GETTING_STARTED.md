@@ -7,6 +7,7 @@
 - Debian / Ubuntu / WSL 环境
 - `python3`
 - `make`（可选；没有也能直接跑下面的一行命令）
+- `docker` / `docker compose`（可选；想走容器启动时需要）
 - 一份可用的 `.env`
 - 当前最少要能访问：
   - Telegram Bot
@@ -59,6 +60,8 @@ curl -s http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Sessio
 
 ## 5. 运行应用
 
+### 方案 A：直接用本地 Python 运行
+
 当前代码不会自动读取 `.env`，所以启动前要先把 `.env` 导入当前 shell：
 
 ```bash
@@ -70,6 +73,39 @@ set -a && . ./.env && set +a && .venv/bin/python -m app.main
 ```bash
 make run
 ```
+
+### 方案 B：用 Docker Compose 运行
+
+当前仓库已经提供：
+
+- `Dockerfile`
+- `docker-compose.yml`
+
+容器启动前也需要先准备 `.env`。
+
+默认读取 `.env`；如果你想临时改用别的文件，可以在命令前加：
+
+```bash
+LUMINARR_ENV_FILE=.env.example docker compose config
+```
+
+启动：
+
+```bash
+docker compose up -d
+```
+
+看日志：
+
+```bash
+docker compose logs -f luminarr
+```
+
+说明：
+
+- 容器内应用代码目录是 `/app`
+- Docker Compose 会强制把 `SQLITE_DB_PATH` 覆盖成 `/app/state/luminarr.db`，并落到宿主机 `./data`
+- `SHARED_MEDIA_ROOT` 默认映射为宿主机 `/data` 到容器内 `/data`，用来保持 downloader / library 路径语义一致
 
 ## 6. 第一条人工验证怎么做
 
@@ -107,6 +143,9 @@ make help
 - `make test-docs`：跑文档一致性 gate
 - `make compile`：跑 `compileall`
 - `make run`：读取 `.env` 后启动应用
+- `make docker-build`：构建镜像
+- `make docker-up`：启动 compose
+- `make docker-logs`：看容器日志
 
 ## 8. 常见问题
 
@@ -129,6 +168,11 @@ make run
 
 因为这两个渠道当前是可选入口。
 只要对应的三元组配置留空，启动时就不会挂 webhook server。
+
+### 为什么 Docker Compose 里还要挂 `/data`
+
+因为当前 cleanup / import / refresh 路径默认围绕 `/data/...` 组织。
+如果容器内看不到和下载器、媒体库同一套共享路径，hardlink / import / cleanup 语义会变掉。
 
 ### 为什么 personal WeChat 没有 `.env` 配置项
 

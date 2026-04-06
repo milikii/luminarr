@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test test-cleanup test-docs compile run
+.PHONY: help install test test-cleanup test-docs compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test test-cleanup test-docs compile run'
+	@printf '%s\n' 'targets: install test test-cleanup test-docs compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -25,3 +25,12 @@ compile:
 
 run:
 	set -a && . ./$(ENV_FILE) && set +a && $(PYTHON) -m app.main
+
+docker-build:
+	docker compose build
+
+docker-up:
+	docker compose up -d
+
+docker-logs:
+	docker compose logs -f luminarr

@@ -1,0 +1,18 @@
+services:
+  luminarr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: luminarr
+    env_file:
+      - ${LUMINARR_ENV_FILE:-.env}
+    environment:
+      SQLITE_DB_PATH: /app/state/luminarr.db
+    volumes:
+      - ${LUMINARR_STATE_DIR:-./data}:/app/state
+      - ${LUMINARR_LOG_DIR:-./logs}:/app/logs
+      - ${SHARED_MEDIA_ROOT:-/data}:/data
+    ports:
+      - "${FEISHU_WEBHOOK_PORT:-18095}:${FEISHU_WEBHOOK_PORT:-18095}"
+      - "${WECOM_WEBHOOK_PORT:-18097}:${WECOM_WEBHOOK_PORT:-18097}"
+    restart: unless-stopped
