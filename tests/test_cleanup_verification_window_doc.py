@@ -91,6 +91,28 @@ def _assert_completed_window_keeps_all_evidence_checks_completed(
     assert docs_gate_checklist_completed
 
 
+def _assert_protocol_observation_mentions_pending_channel_gap_when_needed(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    protocol_observation_text: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    if not has_pending_channel:
+        return
+    assert "当前缺口只剩四渠道真实私聊 smoke 证据" in protocol_observation_text
+
+
+def _assert_protocol_observation_drops_pending_channel_gap_when_resolved(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    protocol_observation_text: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    if has_pending_channel:
+        return
+    assert "当前缺口只剩四渠道真实私聊 smoke 证据" not in protocol_observation_text
+
+
 def _assert_conclusion_mentions_pending_channel_gap_when_needed(
     *,
     progress_rows: list[tuple[str, str, str]],
@@ -319,6 +341,14 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         progress_rows=progress_rows,
         start_date=start_date,
         conclusion_date=conclusion_date,
+    )
+    _assert_protocol_observation_mentions_pending_channel_gap_when_needed(
+        progress_rows=progress_rows,
+        protocol_observation_text=protocol_observation_text,
+    )
+    _assert_protocol_observation_drops_pending_channel_gap_when_resolved(
+        progress_rows=progress_rows,
+        protocol_observation_text=protocol_observation_text,
     )
     _assert_conclusion_mentions_pending_channel_gap_when_needed(
         progress_rows=progress_rows,

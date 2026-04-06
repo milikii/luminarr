@@ -50,6 +50,7 @@
 - 只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，不能退化成笼统的“退出条件未满足”。
 - 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
 - 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成只写日期或泛泛的“退出条件未满足”。
+- `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
 - `Channel progress` 的备注列必须与渠道状态同步；若渠道仍待验证，备注继续写待补真实私聊 smoke 记录；若渠道已完成，备注不得继续沿用待补文案。
 - 让 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态。
@@ -89,6 +90,7 @@
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已同步记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令，避免“测试已跑过但窗口台账没有证据”。
 - exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项已与上述证据保持同步，不会继续停留在未勾选状态。
 - 若验证窗口已写成 `已完成`，则 smoke gate / cleanup 协议 / verification docs gate 三项也必须仍然处于已勾选状态，不能只改状态不改证据清单。
+- `当前 cleanup 协议观察` 已跟随渠道缺口同步收缩，不会在渠道全部补齐后继续停留在“当前缺口只剩四渠道真实私聊 smoke 证据”。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / cleanup inspect follow-up guidance / guard-rejected cleanup inspect follow-up guidance / post-cleanup cleanup inspect confirmation / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance / source-type-unsupported rejection guidance / guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
