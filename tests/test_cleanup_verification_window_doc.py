@@ -249,9 +249,9 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         docs_gate_date=docs_gate_date,
         protocol_observation_date=protocol_observation_date,
     )
-    assert smoke_gate_result == "184 passed"
+    assert smoke_gate_result == "200 passed"
     assert smoke_gate_command == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py"
-    assert focused_cleanup_result == "282 passed, 91 deselected"
+    assert focused_cleanup_result == "298 passed, 91 deselected"
     assert (
         focused_cleanup_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py "
@@ -259,7 +259,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "186 passed"
+    assert docs_gate_result == "202 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "

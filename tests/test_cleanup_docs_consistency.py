@@ -105,7 +105,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
 
     assert title_start_date == start_date
     assert title_end_date == end_date
-    assert full_suite_result == "532 passed, 2 skipped"
+    assert full_suite_result == "548 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_result == "28 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"
@@ -136,6 +136,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "当前结论" in text
         assert "窗口活性" in text
         assert "cleanup inspect follow-up guidance" in text
+        assert "target-missing cleanup inspect follow-up guidance" in text
         assert "同步到当天日期" in text
         assert "不得早于最早可结束日期" in text
         assert "不得早于窗口开始日期" in text
