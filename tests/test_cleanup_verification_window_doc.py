@@ -493,6 +493,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert focused_cleanup_date == conclusion_date
     assert docs_gate_date == conclusion_date
     assert protocol_observation_date == conclusion_date
+    assert "correlation-query-failure observability" in protocol_observation_text
     assert "missing-structured-import-correlation identity retention" in protocol_observation_text
     assert "correlation-query-failure identity retention" in protocol_observation_text
     _assert_active_window_dates_are_current(
@@ -514,7 +515,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "344 passed"
+    assert docs_gate_result == "360 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
