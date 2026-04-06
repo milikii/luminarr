@@ -1,4 +1,4 @@
-# Next step (v161)
+# Next step (v162)
 
 ## Current goal
 
@@ -31,6 +31,7 @@
 - 保持 verification docs gate 继续显式校验 `correlation-missing inspect identity resolution` 命名观察，避免窗口台账把 chat-scoped inspect 身份解析成功后的文本边界写丢。
 - 保持 verification docs gate 继续显式校验 `correlation-missing rejection guidance` 命名观察，避免窗口台账把这类关联缺失后的 follow-up 引导写丢。
 - 保持 verification docs gate 继续显式校验 `post-cleanup cleanup inspect confirmation` 命名观察，避免窗口台账把 cleanup 成功后的复核文本边界写丢。
+- 保持 verification docs gate 继续显式校验 `chat-scoped task_ref post-cleanup cleanup inspect confirmation` 命名观察，避免窗口台账把 chat-scoped cleanup 成功后的复核文本边界写丢。
 - 保持 verification docs gate 继续显式校验 `source-type-unsupported rejection guidance` 命名观察，避免窗口台账把这类 source-type 阻断后的 follow-up 引导写丢。
 - 保持 verification docs gate 继续显式校验 `chat-scoped task_ref post-cleanup cleanup inspect confirmation` 命名观察，避免窗口台账把 chat-scoped cleanup 成功后的复核文本边界写丢。
 - 在 cleanup 验证窗口正式退出前，至少评估并记录 PT 下载任务的做种状态 guardrail（`pt_min_seed_hours` 保护、下载器 seeding 信息等）是否已在 guardrail 里覆盖；窗口台账里必须明确写出“当前 cleanup guardrail 未读取下载器 seeding 状态、`pt_min_seed_hours` 未进入 cleanup 阻断判断、因此本窗口只记录风险，不扩 cleanup 行为”。
