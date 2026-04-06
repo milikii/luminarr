@@ -69,6 +69,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         window_text,
         "最近一次 cleanup 协议回归验证",
     )
+    docs_gate_date, docs_gate_result, docs_gate_command = _extract_verification_evidence(
+        window_text,
+        "最近一次 verification docs gate",
+    )
     window_status = _extract_window_status(window_text)
 
     assert title_start_date == start_date
@@ -83,10 +87,15 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         f"- focused cleanup tests：`{focused_cleanup_result}`（{focused_cleanup_date}，"
         f"`{focused_cleanup_command}`）"
     ) in status_text
+    assert (
+        f"- cleanup verification docs gate：`{docs_gate_result}`（{docs_gate_date}，"
+        f"`{docs_gate_command}`）"
+    ) in status_text
 
     for text in (next_step_text, status_text):
         assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in text
         assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
+        assert "verification docs gate" in text
         assert "真实私聊 smoke" in text
         assert "当前结论" in text
         assert "窗口活性" in text

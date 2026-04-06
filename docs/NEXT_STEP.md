@@ -1,4 +1,4 @@
-# Next step (v122)
+# Next step (v123)
 
 ## Current baseline
 
@@ -10,8 +10,8 @@
 - `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id` 与 `task_hash` 的 `cleanup inspect` / `cleanup` smoke、英文/中文原始 `task_id` 与 `task_hash` 的 `correlation missing` / `target missing` / `source missing` / `guard rejected` rejection guidance smoke，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
 - `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`guard-rejected rejection guidance` 与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前标题直接带 `2026-04-05 to 2026-04-12` 日期，避免窗口起止日期只藏在正文条目里。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前不只记录四渠道真实私聊 smoke 进度，也要记录最近一次聚合 smoke gate 与 cleanup 协议回归验证结果，避免验证窗口只剩“待勾选项”。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate 与 cleanup 协议回归验证日期就必须同步到当天日期，避免窗口台账停在旧日期。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前不只记录四渠道真实私聊 smoke 进度，也要记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 结果，避免验证窗口只剩“待勾选项”。
+- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期，避免窗口台账停在旧日期。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：验证窗口不得早于最早可结束日期就被标记为 `已完成`，避免 7 天窗口被文档提前关闭。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外证据回填进窗口台账。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，验证窗口就必须立刻改成已完成，避免退出条件已齐但台账仍挂进行中。
@@ -39,8 +39,8 @@
 - 把验证窗口当前是否仍处于“未到最早可结束日期”还是“已到最早可结束日期但待补退出条件”显式写进 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让窗口活性只靠人工脑补。
 - 当窗口仍处于 `未到最早可结束日期` 时，`当前结论` 也要显式写出“尚未到最早可结束日期 <绝对日期>”，不要只写笼统的进行中。
 - 当窗口已到 `最早可结束日期` 但仍未完成时，`当前结论` 也要显式写出“已到最早可结束日期 <绝对日期>，但退出条件仍未满足”，不要继续沿用未到期文案。
-- 把最近一次聚合 smoke gate 与 cleanup 协议回归验证的日期、结果和命令持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，让退出清单有对应证据。
-- 只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate 与 cleanup 协议回归验证日期就必须同步到当天日期，避免窗口台账和 `docs/STATUS.md` 快照停在旧日期。
+- 把最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，让退出清单和窗口台账都有对应证据。
+- 只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期，避免窗口台账和 `docs/STATUS.md` 快照停在旧日期。
 - 即使四渠道真实私聊 smoke 和 cleanup 协议回归都已满足，也不得早于最早可结束日期把验证窗口标记为 `已完成`。
 - 已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外日期误记成当前验证窗口证据。
 - 一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都满足，验证窗口就必须立刻改成已完成，不能继续保留进行中文案。
@@ -83,7 +83,7 @@
 
 - 已完成 7 天验证窗口。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期、窗口活性和当前结论，且 `窗口活性`、`当前状态`、窗口标题日期、退出清单、渠道进度彼此一致。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已同步记录最近一次聚合 smoke gate 与 cleanup 协议回归验证的日期、结果和命令，避免“测试已跑过但窗口台账没有证据”。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已同步记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 的日期、结果和命令，避免“测试已跑过但窗口台账没有证据”。
 - exit checklist 里的 smoke gate / cleanup 协议两项已与上述证据保持同步，不会继续停留在未勾选状态。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance / guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。

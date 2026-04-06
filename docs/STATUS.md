@@ -1,4 +1,4 @@
-# Current status (v122)
+# Current status (v123)
 
 ## Project position
 
@@ -72,8 +72,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已作为当前验证窗口台账落地；窗口开始日期固定为 2026-04-05，最早可结束日期固定为 2026-04-12。
 - 验证窗口台账标题当前直接写出 `2026-04-05 to 2026-04-12`，并与正文起止日期、退出清单日期一起受文档 gate 校验，避免窗口标题和正文各写各的。
 - 验证窗口台账当前会显式写出“窗口活性”，区分“尚未到最早可结束日期”和“已到最早可结束日期但仍待补退出条件”，避免只写笼统的进行中。
-- 验证窗口台账当前还会保留最近一次聚合 smoke gate 与 cleanup 协议回归验证结果，避免退出清单只有待勾选项、没有已执行证据。
-- 验证窗口只要仍处于进行中，台账里的 `当前结论`、最近一次聚合 smoke gate 与 cleanup 协议回归验证日期就必须同步到当天日期；如果停在旧日期，视为验证窗口台账失活。
+- 验证窗口台账当前还会保留最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 结果，避免退出清单只有待勾选项、没有已执行证据。
+- 验证窗口只要仍处于进行中，台账里的 `当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期；如果停在旧日期，视为验证窗口台账失活。
 - 验证窗口即使已经补齐四渠道真实私聊 smoke 和 cleanup 协议回归项，也不得早于最早可结束日期把 `当前状态` 改成 `已完成`。
 - 验证窗口里已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期；不能把窗口外证据回填成当前窗口进度。
 - 一旦到达最早可结束日期，且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，窗口状态就必须立刻改成已完成，不能继续挂在进行中。
@@ -119,7 +119,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - four-channel cleanup smoke tests：`128 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`25 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`223 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification window doc check：`130 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- cleanup verification docs gate：`130 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
 - docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
@@ -137,7 +137,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Current priority
 
 - 在四渠道都可用的前提下，继续完成 cleanup 的 7 天验证窗口，并保持 `tests/test_cleanup_cross_channel_smoke.py` 这条聚合 smoke gate（含英文/中文 discoverability、inspect、execution、correlation-missing rejection guidance、target-missing rejection guidance、source-missing rejection guidance、guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径）稳定；若出现问题，只修 shared runtime、渠道胶水或显式日志，不扩自动 cleanup、批量 cleanup 或删种。
-- 当前窗口证据统一落在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；完成真实私聊 smoke 后，只更新这份台账和 `docs/STATUS.md` 快照，不新增 cleanup 协议或额外工作流。
+- 当前窗口证据统一落在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；完成真实私聊 smoke 后，只更新这份台账和 `docs/STATUS.md` 快照，不新增 cleanup 协议或额外工作流，并持续记录 verification docs gate 结果避免账本自漂移。
 - 只要窗口仍在进行中，`docs/CLEANUP_VERIFICATION_WINDOW.md` 和这里的状态快照都必须同步到当天日期，避免窗口账本停在旧日期还继续显示进行中。
 - 即使窗口内其他勾选项都满足，也不得早于最早可结束日期把窗口写成已完成。
 - 渠道进度表里一旦写成 `已完成`，对应日期不得早于窗口开始日期，也不得晚于当前结论快照日期。
