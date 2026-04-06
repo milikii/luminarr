@@ -73,6 +73,18 @@ def _assert_window_completes_immediately_when_exit_conditions_are_met(
     assert "已满足退出条件" in conclusion
 
 
+def _assert_conclusion_mentions_pending_channel_gap_when_needed(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    conclusion: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    if not has_pending_channel:
+        return
+    assert "真实私聊 cleanup smoke" in conclusion
+    assert "待补" in conclusion
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -217,6 +229,10 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         progress_rows=progress_rows,
         start_date=start_date,
         conclusion_date=conclusion_date,
+    )
+    _assert_conclusion_mentions_pending_channel_gap_when_needed(
+        progress_rows=progress_rows,
+        conclusion=conclusion,
     )
 
     window_completed_match = re.search(
