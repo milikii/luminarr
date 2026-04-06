@@ -64,6 +64,12 @@ def _extract_status_cleanup_service_snapshot(text: str) -> tuple[str, str]:
     return cleanup_service_match.group(1), cleanup_service_match.group(2)
 
 
+def _extract_status_compile_check_snapshot(text: str) -> tuple[str, str]:
+    compile_check_match = re.search(r"- compile check：`([^`]+)`（`([^`]+)`）", text)
+    assert compile_check_match is not None
+    return compile_check_match.group(1), compile_check_match.group(2)
+
+
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
@@ -88,6 +94,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     window_status = _extract_window_status(window_text)
     full_suite_result, full_suite_command = _extract_status_full_suite_snapshot(status_text)
     cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
+    compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
 
     assert title_start_date == start_date
     assert title_end_date == end_date
@@ -95,6 +102,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_result == "27 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"
+    assert compile_check_result == "passed"
+    assert compile_check_command == "python3 -m compileall app tests"
     assert f"开始日期固定为 {start_date}" in status_text
     assert f"最早可结束日期固定为 {end_date}" in status_text
     assert f"- 窗口活性快照：{window_activity}" in status_text
@@ -139,6 +148,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
 
     assert "仓库级 `.venv/bin/python -m pytest -q` 快照" in next_step_text
     assert "`cleanup service tests` 快照" in next_step_text
+    assert "`compile check` 快照" in next_step_text
 
     window_progress_rows = re.findall(
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",

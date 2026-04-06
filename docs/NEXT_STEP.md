@@ -1,4 +1,4 @@
-# Next step (v128)
+# Next step (v129)
 
 ## Current baseline
 
@@ -9,7 +9,7 @@
 - cleanup 执行阶段的阻断分支（correlation 缺失 / target 缺失 / source 已不存在 / source 不是文件或目录 / guard 拒绝）已补齐显式中文日志和处理建议，不改用户文本协议。
 - `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id` 与 `task_hash` 的 `cleanup inspect` / `cleanup` smoke、英文/中文原始 `task_id` 与 `task_hash` 的 `correlation missing` / `target missing` / `source missing` / `guard rejected` rejection guidance smoke，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
 - `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`guard-rejected rejection guidance` 与 `chat-scoped task_ref -> jobs -> import correlation` 描述上保持一致。
-- `docs/STATUS.md` 当前还要同步保留仓库级 `.venv/bin/python -m pytest -q` 快照与 `cleanup service tests` 快照，避免 focused cleanup / docs gate 已更新，但总体回归或 cleanup 服务回归快照还停在旧数字。
+- `docs/STATUS.md` 当前还要同步保留仓库级 `.venv/bin/python -m pytest -q` 快照、`cleanup service tests` 快照与 `compile check` 快照，避免 focused cleanup / docs gate 已更新，但总体回归、cleanup 服务回归或语法快照还停在旧数字。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前标题直接带 `2026-04-05 to 2026-04-12` 日期，避免窗口起止日期只藏在正文条目里。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前不只记录四渠道真实私聊 smoke 进度，也要记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 结果，避免验证窗口只剩“待勾选项”。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要验证窗口仍处于进行中，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期就必须同步到当天日期，避免窗口台账停在旧日期。
