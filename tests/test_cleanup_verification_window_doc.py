@@ -148,5 +148,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         assert window_activity == "已满足退出条件"
     elif current_date < end_date:
         assert window_activity == "未到最早可结束日期"
+        assert "尚未到最早可结束日期" in conclusion
+        assert end_match.group(1) in conclusion
     else:
         assert window_activity == "已到最早可结束日期，待补退出条件"

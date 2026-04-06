@@ -77,6 +77,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "真实私聊 smoke" in text
         assert "当前结论" in text
         assert "窗口活性" in text
+        assert "尚未到最早可结束日期" in text
         assert "cleanup 协议回归验证" in text
         assert "smoke gate / cleanup 协议两项" in text
         assert "chat-scoped task_ref -> jobs -> import correlation" in text
