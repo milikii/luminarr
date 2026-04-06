@@ -28,10 +28,12 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services import cleanup_downloaded_source as cleanup_module
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.cleanup_downloaded_source import (
     CLEANUP_INSPECT_QUERY_USAGE_TEXT,
     CLEANUP_QUERY_USAGE_TEXT,
+    CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
 )
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
@@ -383,6 +385,46 @@ def test_cleanup_source_missing_rejection_guidance_smoke_across_private_chat_cha
     assert f"下载源资产已不存在，无需清理：{source_file}" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
     assert not source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "cleanup 87",
+        "cleanup hash-87",
+        "清理 87",
+        "清理 hash-87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_source_type_unsupported_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+    monkeypatch.setattr(
+        cleanup_module,
+        "_validate_cleanup_paths",
+        lambda **_: CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert source_file.exists()
     assert target_file.exists()
 
 
