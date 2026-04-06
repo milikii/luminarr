@@ -494,6 +494,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert docs_gate_date == conclusion_date
     assert protocol_observation_date == conclusion_date
     assert "missing-structured-import-correlation identity retention" in protocol_observation_text
+    assert "correlation-query-failure identity retention" in protocol_observation_text
     _assert_active_window_dates_are_current(
         window_status=window_status,
         current_date=current_date,
