@@ -24,7 +24,7 @@ from app.bot.wecom_adapter import (
     WECOM_TOKEN_BOT_DATA_KEY,
     handle_wecom_private_text_event,
 )
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventRepo, JobEvent
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
@@ -43,6 +43,17 @@ _TEST_WECOM_TOKEN = "wecom-token-42"
 _TEST_WECOM_ENCODING_AES_KEY = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
 _TEST_WECOM_RECEIVE_ID = "wwcorp123"
 _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
+
+
+class _FailingJobEventRepo(JobEventRepo):
+    def find_latest_import_correlation(
+        self,
+        *,
+        task_ref: str = "",
+        task_id: str = "",
+        task_hash: str = "",
+    ) -> JobEvent | None:
+        raise RuntimeError("simulated job_event failure")
 
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
@@ -137,6 +148,57 @@ def _build_guard_rejected_cleanup_service(
         target_path=str(target_file),
     )
     return CleanupDownloadedSourceService(event_repo, job_repo=job_repo), source_dir, target_file
+
+
+def _build_cleanup_service_with_missing_structured_paths(
+    base_dir: Path,
+    *,
+    chat_id: int,
+    chat_scoped_task_ref: str,
+) -> CleanupDownloadedSourceService:
+    target_dir = base_dir / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.write_bytes(b"demo")
+
+    database = _make_database(base_dir)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=chat_id,
+        user_id=2001,
+        task_ref=chat_scoped_task_ref,
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+
+def _build_cleanup_service_with_event_lookup_failure(
+    base_dir: Path,
+    *,
+    chat_id: int,
+    chat_scoped_task_ref: str,
+) -> CleanupDownloadedSourceService:
+    database = _make_database(base_dir)
+    event_repo = _FailingJobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=chat_id,
+        user_id=2001,
+        task_ref=chat_scoped_task_ref,
+        task_id="87",
+        task_hash="hash-87",
+    )
+    return CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
 
 
 def _expected_chat_id(channel: str) -> int:
@@ -1336,6 +1398,147 @@ def test_cleanup_inspect_chat_scoped_task_ref_correlation_missing_shows_resolved
     assert "任务 Hash: hash-87" in reply_text
     assert "关联: 未找到" in reply_text
     assert "当前 guardrail: 拒绝 cleanup" in reply_text
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_query_ref"),
+    [
+        (f"cleanup inspect {_CHAT_SCOPED_TASK_REF}", _CHAT_SCOPED_TASK_REF),
+        (f"清理检查 {_CHAT_SCOPED_TASK_REF}", _CHAT_SCOPED_TASK_REF),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_chat_scoped_task_ref_missing_structured_import_correlation_keeps_resolved_identity_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_query_ref: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service = _build_cleanup_service_with_missing_structured_paths(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert f"查询引用: {expected_query_ref}" in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert "关联: 未找到" in reply_text
+    assert "源路径状态: 未找到关联" in reply_text
+    assert "目标路径状态: 未找到关联" in reply_text
+    assert "结论: 未找到带 source_path/target_path 的已导入关联，当前任务暂不能执行 cleanup。" in reply_text
+    assert "下一步：" not in reply_text
+
+
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_chat_scoped_task_ref_job_event_failure_keeps_resolved_identity_across_private_chat_channels(
+    tmp_path: Path,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service = _build_cleanup_service_with_event_lookup_failure(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(f"cleanup inspect {_CHAT_SCOPED_TASK_REF}", cleanup_service)
+
+    assert "查询引用: cleanup-shortcut" in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert "关联: 未找到" in reply_text
+
+
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_job_event_failure_rejection_follow_up_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service = _build_cleanup_service_with_event_lookup_failure(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(f"cleanup {_CHAT_SCOPED_TASK_REF}", cleanup_service)
+
+    assert "未找到带 source_path/target_path 的已导入关联" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup inspect cleanup-shortcut" not in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_follow_up"),
+    [
+        (
+            f"cleanup {_CHAT_SCOPED_TASK_REF}",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+        ),
+        (
+            f"清理 {_CHAT_SCOPED_TASK_REF}",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_missing_structured_import_correlation_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_follow_up: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service = _build_cleanup_service_with_missing_structured_paths(
+        tmp_path / channel,
+        chat_id=_expected_chat_id(channel),
+        chat_scoped_task_ref=_CHAT_SCOPED_TASK_REF,
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert "未找到带 source_path/target_path 的已导入关联，当前任务暂不能执行 cleanup。" in reply_text
+    assert expected_follow_up in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert f"cleanup inspect {_CHAT_SCOPED_TASK_REF}" not in reply_text
+    assert f"cleanup {_CHAT_SCOPED_TASK_REF}：" not in reply_text
 
 
 @pytest.mark.parametrize(
