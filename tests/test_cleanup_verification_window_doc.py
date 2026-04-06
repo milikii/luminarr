@@ -77,6 +77,20 @@ def _assert_window_completes_immediately_when_exit_conditions_are_met(
     assert "已满足退出条件" in conclusion
 
 
+def _assert_completed_window_keeps_all_evidence_checks_completed(
+    *,
+    window_status: str,
+    smoke_gate_checklist_completed: bool,
+    protocol_regression_checklist_completed: bool,
+    docs_gate_checklist_completed: bool,
+) -> None:
+    if window_status != "已完成":
+        return
+    assert smoke_gate_checklist_completed
+    assert protocol_regression_checklist_completed
+    assert docs_gate_checklist_completed
+
+
 def _assert_conclusion_mentions_pending_channel_gap_when_needed(
     *,
     progress_rows: list[tuple[str, str, str]],
@@ -356,6 +370,12 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         conclusion=conclusion,
         window_completed=window_completed,
         progress_rows=progress_rows,
+        smoke_gate_checklist_completed=smoke_gate_checklist_completed,
+        protocol_regression_checklist_completed=protocol_regression_checklist_completed,
+        docs_gate_checklist_completed=docs_gate_checklist_completed,
+    )
+    _assert_completed_window_keeps_all_evidence_checks_completed(
+        window_status=window_status,
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
         docs_gate_checklist_completed=docs_gate_checklist_completed,

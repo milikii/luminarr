@@ -77,11 +77,13 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 验证窗口即使已经补齐四渠道真实私聊 smoke 和 cleanup 协议回归项，也不得早于最早可结束日期把 `当前状态` 改成 `已完成`。
 - 验证窗口里已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期；不能把窗口外证据回填成当前窗口进度。
 - 一旦到达最早可结束日期，且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，窗口状态就必须立刻改成已完成，不能继续挂在进行中。
+- 一旦把验证窗口写成 `已完成`，exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项也必须同时保持勾选，不能出现“状态已完成但证据项未完成”。
 - 只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，不能退化成笼统的“退出条件未满足”。
 - 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
 - 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成泛泛文案。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Channel progress` 备注列也必须和渠道状态同步，不能在 `已完成` 后继续保留待补真实私聊 smoke 文案。
 - 验证窗口 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项当前会直接跟随这些证据同步，不再和四渠道真实私聊 smoke 待补项混成一组未完成。
+- 若窗口已完成，上面三项证据勾选也必须继续保持完成，不能只把窗口状态改成已完成。
 - 验证窗口未到期时，`当前结论` 当前会显式写出“尚未到最早可结束日期 <绝对日期>”，避免只写泛泛的进行中。
 - 验证窗口到达最早可结束日期但仍未完成时，`当前结论` 也必须显式改成“已到最早可结束日期 <绝对日期>，但退出条件仍未满足”，避免继续沿用未到期文案。
 - 验证窗口台账当前会显式写出“当前结论”，说明是否已满足退出条件，避免只看状态或只看勾选项。

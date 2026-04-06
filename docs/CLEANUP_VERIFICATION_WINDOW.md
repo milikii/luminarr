@@ -49,6 +49,7 @@
 - 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成只写日期或泛泛的“退出条件未满足”。
 - 退出条件满足后，`当前状态` 改成 `已完成`，`窗口活性` 改成 `已满足退出条件`，`当前结论` 同步写成已满足退出条件。
 - 一旦到达最早可结束日期，且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都已满足，就必须立刻改成 `已完成`，不能继续挂在进行中。
+- 一旦把验证窗口写成 `已完成`，exit checklist 里的 `tests/test_cleanup_cross_channel_smoke.py`、cleanup 协议回归和 verification docs gate 三项也必须同时保持勾选，不能出现“状态已完成但证据项未完成”。
 - 即使四渠道真实私聊 smoke 和协议回归项都已补齐，也不得早于最早可结束日期把验证窗口标记为 `已完成`。
 - 验证窗口仍在进行中时，`当前结论`、最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 日期必须同步到当天日期；只有窗口已完成后，才允许保留完成日快照。
 - 每次重跑 `tests/test_cleanup_cross_channel_smoke.py`、focused cleanup 回归集或 verification docs gate 后，立刻把最新日期、结果和命令同步写回这份台账，并同步勾选或取消 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项。
