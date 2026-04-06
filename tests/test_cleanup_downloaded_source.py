@@ -764,6 +764,12 @@ def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
     assert not source_file.exists()
     assert target_file.exists()
     assert "[cleanup 事件写入失败]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "event_type=cleanup.succeeded" in captured.out
+    assert "task_id=87" in captured.out
+    assert "task_hash=hash-87" in captured.out
+    assert f"source={source_file}" in captured.out
+    assert f"target={target_file}" in captured.out
     assert "mock append denied" in captured.out
     assert "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘" in captured.out
 

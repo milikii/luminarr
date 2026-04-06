@@ -430,6 +430,10 @@ class CleanupDownloadedSourceService:
             _print_cleanup_event_append_failed_log(
                 task_ref=task_ref,
                 event_type=event_type,
+                task_id=task_id,
+                task_hash=task_hash,
+                source_path=source_path,
+                target_path=target_path,
                 error=error,
             )
             return
@@ -573,9 +577,28 @@ def _print_cleanup_blocked_log(
     )
 
 
-def _print_cleanup_event_append_failed_log(*, task_ref: str, event_type: str, error: Exception) -> None:
+def _print_cleanup_event_append_failed_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    error: Exception,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
     print(
-        f"\033[31m[cleanup 事件写入失败]\033[0m task_ref={task_ref} event_type={event_type} 原因={error}",
+        f"\033[31m[cleanup 事件写入失败]\033[0m {details_text} 原因={error}",
         flush=True,
     )
     print(

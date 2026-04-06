@@ -1,4 +1,4 @@
-# Next step (v143)
+# Next step (v144)
 
 ## Current baseline
 
@@ -8,6 +8,7 @@
 - cleanup 最小文本闭环已落地：discoverability、`cleanup inspect`、`cleanup`、rejection guidance、success follow-up、failure observability、chat-scoped `task_ref` 解析。
 - cleanup 执行阶段的阻断分支（correlation 缺失 / target 缺失 / source 已不存在 / source 不是文件或目录 / guard 拒绝）已补齐显式中文日志和处理建议，不改用户文本协议。
 - cleanup 删除失败路径当前也要继续打印带 `task_ref + source + target` 的显式中文日志，方便四渠道验证窗口里直接按日志回查具体 cleanup 和保留目标。
+- cleanup 事件写入失败路径当前也要继续打印带 `task_ref + task_id/task_hash + source + target` 的显式中文日志，避免文本已回用户但运维侧还看不出是哪次 cleanup 落盘失败。
 - `tests/test_cleanup_cross_channel_smoke.py` 已落地，当前会聚合验证 Telegram / personal WeChat / Feishu / WeCom 四个公开入口上的英文/中文 bare `cleanup` / bare `cleanup inspect` discoverability、英文/中文原始 `task_id` 与 `task_hash` 的 `cleanup inspect` / `cleanup` smoke、英文/中文原始 `task_id` 与 `task_hash` 的 `correlation missing` / `target missing` / `source missing` / `source-type-unsupported` / `guard rejected` rejection guidance smoke、`target-missing cleanup inspect follow-up guidance`、`source-missing cleanup inspect follow-up guidance`、`source-type-unsupported` 场景下的 `cleanup inspect follow-up guidance`、`guard-rejected cleanup inspect follow-up guidance`、成功 cleanup 之后的 post-cleanup `cleanup inspect` confirmation、`chat-scoped task_ref post-cleanup cleanup inspect confirmation`、`chat-scoped task_ref target-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance`、`chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance`、`chat-scoped task_ref target-missing rejection guidance`、`chat-scoped task_ref source-missing rejection guidance`、`chat-scoped task_ref source-type-unsupported rejection guidance`、`chat-scoped task_ref guard-rejected rejection guidance`，以及英文/中文 `chat-scoped task_ref -> jobs -> import correlation` smoke。
 - 上面这条聚合 smoke gate 当前还把 `correlation missing` rejection guidance 的双语 follow-up 锁成精确断言：必须同时保留 `cleanup inspect <ref> / 清理检查 <ref>` 和 `cleanup <ref> / 清理 <ref>` 两行引导，不能退化成只剩关键词提示。
 - 同一条聚合 smoke gate 当前也把 `target missing` / `source missing` rejection guidance 的双语 follow-up 锁成精确断言：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
@@ -74,6 +75,7 @@
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，作为当前四渠道 cleanup discoverability + inspect + execution + target-missing cleanup inspect follow-up guidance + source-missing cleanup inspect follow-up guidance + cleanup inspect follow-up guidance + guard-rejected cleanup inspect follow-up guidance + post-cleanup cleanup inspect confirmation + chat-scoped task_ref post-cleanup cleanup inspect confirmation + chat-scoped task_ref target-missing cleanup inspect follow-up guidance + chat-scoped task_ref source-missing cleanup inspect follow-up guidance + chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance + chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance + chat-scoped task_ref target-missing rejection guidance + chat-scoped task_ref source-missing rejection guidance + chat-scoped task_ref source-type-unsupported rejection guidance + chat-scoped task_ref guard-rejected rejection guidance + correlation-missing rejection guidance + target-missing rejection guidance + source-missing rejection guidance + source-type-unsupported rejection guidance + guard-rejected rejection guidance + `chat-scoped task_ref` 关联路径的聚合验收门，并持续覆盖英文/中文协议变体。
 - 保持 cleanup 执行阻断分支的显式中文日志和处理建议稳定，不回退到只回用户文本、服务端无日志。
 - 保持 cleanup 删除失败日志里的 `task_ref + source + target` 三组定位信息稳定，不回退到只剩 task_id/task_hash。
+- 保持 cleanup 事件写入失败日志里的 `task_ref + task_id/task_hash + source + target` 稳定，不回退到只剩 event_type 和报错文本。
 - 保持 cleanup 当前协议和语义不变：
   - `cleanup inspect <任务ID或Hash>` / `清理检查 <任务ID或Hash>`
   - `cleanup <任务ID或Hash>` / `清理 <任务ID或Hash>`
@@ -114,6 +116,7 @@
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
 - cleanup 失败路径继续打印显式中文日志和修复提示，不再静默吞错。
 - cleanup 删除失败日志继续能直接看见 `task_ref + source + target`，不需要额外翻数据库才知道是哪条 cleanup 失败。
+- cleanup 事件写入失败日志继续能直接看见 `task_ref + task_id/task_hash + source + target`，不需要额外翻数据库才知道哪次落盘失败。
 - 若验证窗口里出现问题，修复仍保持在现有 cleanup 文本闭环和渠道胶水范围内，没有引入新副作用。
 - 文档优先级仍保持一致：`DECISIONS -> NEXT_STEP -> STATUS -> README -> AGENTS`。
 
