@@ -98,6 +98,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "真实私聊 cleanup smoke 仍待补" in text
         assert "不得继续写“真实私聊 cleanup smoke 仍待补”" in text
         assert "必须显式写出 smoke gate 或 cleanup 协议缺口" in text
+        assert "备注列" in text
         assert "尚未到最早可结束日期" in text
         assert "已到最早可结束日期" in text
         assert "cleanup 协议回归验证" in text

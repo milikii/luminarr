@@ -113,6 +113,18 @@ def _assert_conclusion_mentions_non_channel_gaps_when_they_are_the_remaining_blo
         assert "cleanup 协议" in conclusion
 
 
+def _assert_channel_progress_notes_match_status(
+    *,
+    progress_rows_with_notes: list[tuple[str, str, str, str]],
+) -> None:
+    for _, row_status, last_date, note in progress_rows_with_notes:
+        if row_status == "待验证":
+            assert last_date == "-"
+            assert "待补真实私聊 smoke 记录" in note
+            continue
+        assert "待补真实私聊 smoke 记录" not in note
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -223,7 +235,12 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
         text,
     )
+    progress_rows_with_notes = re.findall(
+        r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \| ([^|]+) \|",
+        text,
+    )
     assert len(progress_rows) == 4
+    assert len(progress_rows_with_notes) == 4
     assert {channel for channel, _, _ in progress_rows} == {
         "Telegram",
         "personal WeChat",
@@ -271,6 +288,9 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
         conclusion=conclusion,
+    )
+    _assert_channel_progress_notes_match_status(
+        progress_rows_with_notes=progress_rows_with_notes,
     )
 
     window_completed_match = re.search(
