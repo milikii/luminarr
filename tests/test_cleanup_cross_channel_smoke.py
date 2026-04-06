@@ -329,6 +329,42 @@ def test_cleanup_inspect_source_type_unsupported_follow_up_smoke_across_private_
 
 
 @pytest.mark.parametrize(
+    "query",
+    [
+        "cleanup inspect 87",
+        "cleanup inspect hash-87",
+        "清理检查 87",
+        "清理检查 hash-87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_guard_rejected_follow_up_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_dir, target_file = _build_guard_rejected_cleanup_service(tmp_path / channel)
+
+    reply_text = runner(query, cleanup_service)
+
+    assert "当前 guardrail: 拒绝 cleanup" in reply_text
+    assert f"结论: 检测到 source/target 路径关系异常，已拒绝清理：{source_dir} -> {target_file}" in reply_text
+    assert "当前先不要执行 cleanup" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in reply_text
+    assert source_dir.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
     "task_ref",
     [
         "87",
