@@ -87,6 +87,9 @@ class ImportCorrelation:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedCleanupTaskIdentity:
+    lookup_task_ref: str
+    lookup_task_id: str
+    lookup_task_hash: str
     task_ref: str
     task_id: str
     task_hash: str
@@ -372,15 +375,15 @@ class CleanupDownloadedSourceService:
         )
         try:
             event = self._job_event_repo.find_latest_import_correlation(
-                task_ref=resolved_identity.task_ref,
-                task_id=resolved_identity.task_id,
-                task_hash=resolved_identity.task_hash,
+                task_ref=resolved_identity.lookup_task_ref,
+                task_id=resolved_identity.lookup_task_id,
+                task_hash=resolved_identity.lookup_task_hash,
             )
         except Exception as error:
             print(
                 f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
-                f"lookup_task_ref={resolved_identity.task_ref} lookup_task_id={resolved_identity.task_id} "
-                f"lookup_task_hash={resolved_identity.task_hash} 原因={error}",
+                f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+                f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
                 flush=True,
             )
             print(
@@ -410,8 +413,11 @@ class CleanupDownloadedSourceService:
         chat_id: int | None,
     ) -> ResolvedCleanupTaskIdentity:
         resolved_task_ref = task_ref
-        resolved_task_id = task_ref
-        resolved_task_hash = task_ref
+        resolved_task_id = ""
+        resolved_task_hash = ""
+        lookup_task_ref = task_ref
+        lookup_task_id = task_ref
+        lookup_task_hash = task_ref
 
         if self._job_repo is not None and chat_id is not None and chat_id > 0:
             try:
@@ -425,10 +431,16 @@ class CleanupDownloadedSourceService:
                 job = None
             if job is not None:
                 resolved_task_ref = (job.task_ref or task_ref).strip() or resolved_task_ref
-                resolved_task_id = (job.task_id or "").strip() or resolved_task_id
-                resolved_task_hash = (job.task_hash or "").strip() or resolved_task_hash
+                resolved_task_id = (job.task_id or "").strip()
+                resolved_task_hash = (job.task_hash or "").strip()
+                lookup_task_ref = resolved_task_ref
+                lookup_task_id = resolved_task_id or lookup_task_id
+                lookup_task_hash = resolved_task_hash or lookup_task_hash
 
         return ResolvedCleanupTaskIdentity(
+            lookup_task_ref=lookup_task_ref,
+            lookup_task_id=lookup_task_id,
+            lookup_task_hash=lookup_task_hash,
             task_ref=resolved_task_ref,
             task_id=resolved_task_id,
             task_hash=resolved_task_hash,

@@ -92,6 +92,8 @@ def test_inspect_by_task_ref_returns_correlation_missing_state(tmp_path: Path) -
 
     reply = service.inspect_by_task_ref("87")
 
+    assert "任务 ID: -" in reply
+    assert "任务 Hash: -" in reply
     assert "关联: 未找到" in reply
     assert "源路径状态: 未找到关联" in reply
     assert "目标路径状态: 未找到关联" in reply
@@ -386,6 +388,8 @@ def test_cleanup_by_task_ref_logs_correlation_missing_with_fix_hint(
     assert "[cleanup 执行受阻]" in captured.out
     assert "event_type=cleanup.correlation_missing" in captured.out
     assert "task_ref=87" in captured.out
+    assert "task_id=" not in captured.out
+    assert "task_hash=" not in captured.out
     assert f"结论={CLEANUP_CORRELATION_MISSING_TEXT}" in captured.out
     assert "检查 import.succeeded 事件是否已写入 source_path/target_path" in captured.out
 

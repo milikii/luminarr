@@ -1061,6 +1061,34 @@ def test_cleanup_correlation_missing_rejection_guidance_smoke_across_private_cha
     )
 
 
+@pytest.mark.parametrize("task_ref", ["87", "hash-87"])
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_correlation_missing_keeps_identity_blank_across_private_chat_channels(
+    tmp_path: Path,
+    task_ref: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(_make_database(tmp_path / channel)))
+
+    reply_text = runner(f"cleanup inspect {task_ref}", cleanup_service)
+
+    assert f"查询引用: {task_ref}" in reply_text
+    assert "任务 ID: -" in reply_text
+    assert "任务 Hash: -" in reply_text
+    assert "关联: 未找到" in reply_text
+    assert "当前 guardrail: 拒绝 cleanup" in reply_text
+    assert "下一步：" not in reply_text
+
+
 @pytest.mark.parametrize(
     ("query", "expected_fragment", "expected_follow_up", "expect_source_exists"),
     [

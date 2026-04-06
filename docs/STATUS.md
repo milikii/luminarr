@@ -1,4 +1,4 @@
-# Current status (v150)
+# Current status (v151)
 
 ## Project position
 
@@ -38,6 +38,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - copy fallback、completion-monitor、post-download auto import
   - cleanup 最小闭环：inspect / cleanup / discoverability / rejection guidance / success follow-up / failure observability / `chat-scoped task_ref`
   - `chat-scoped task_ref` 命中 jobs 但 import 关联缺失时，inspect / cleanup 会继续回显解析出的 `task_id/task_hash`
+  - 普通 correlation-missing inspect 在没有真实解析结果时继续显示 `任务 ID/Hash: -`，不把用户原始输入伪装成真实身份
   - metadata scraping、subtitle auto-translation、Emby refresh
 - BT 主链：
   - PT / BT split、processing-path inquiry、BT classification、TMDB association
@@ -80,11 +81,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：`660 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
-- four-channel cleanup smoke tests：`304 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
+- tests：`668 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- four-channel cleanup smoke tests：`312 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`30 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
-- focused cleanup tests：`404 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification docs gate：`312 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- focused cleanup tests：`412 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- cleanup verification docs gate：`320 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
 - docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
