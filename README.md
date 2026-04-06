@@ -1,8 +1,22 @@
-# Luminarr (v59)
+# Luminarr (v60)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
 它当前同时服务 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口，但不做通用 AI 助手、通用多渠道平台或通用 plugin / skill / MCP 平台。
+
+## 0. 从哪里开始
+
+如果你是第一次看这个仓库，先读：
+
+1. `docs/INDEX.md`
+2. `docs/GETTING_STARTED.md`
+3. `docs/ARCHITECTURE.md`
+
+如果你想直接跑：
+
+1. 复制 `.env.example` 为 `.env`
+2. 按 `docs/GETTING_STARTED.md` 填配置
+3. 用 `make run` 或 `set -a && . ./.env && set +a && .venv/bin/python -m app.main` 启动
 
 ## 1. 它在解决什么问题
 
@@ -130,9 +144,19 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 开始任何新任务前，先读：
 
-1. `docs/DECISIONS.md`
-2. `docs/NEXT_STEP.md`
-3. `docs/STATUS.md`
-4. `README.md`
-5. `AGENTS.md`
-6. `docs/HISTORY.md`（只看背景，不看当前执行真相）
+1. `docs/INDEX.md`
+2. `docs/GETTING_STARTED.md`
+3. `docs/ARCHITECTURE.md`
+4. `docs/DECISIONS.md`
+5. `docs/NEXT_STEP.md`
+6. `docs/STATUS.md`
+7. `AGENTS.md`
+8. `docs/HISTORY.md`（只看背景，不看当前执行真相）
+
+常用入口：
+
+- `docs/INDEX.md`：文档地图
+- `docs/GETTING_STARTED.md`：从零到跑通
+- `docs/ARCHITECTURE.md`：系统怎么工作
+- `.env.example`：配置模板
+- `Makefile`：常用命令入口

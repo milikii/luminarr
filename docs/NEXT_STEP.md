@@ -1,7 +1,9 @@
-# Next step (v147)
+# Next step (v148)
 
 ## Current baseline
 
+- 仓库知识入口当前新增并固定为：`README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md -> docs/NEXT_STEP.md/STATUS.md/DECISIONS.md`。
+- `.env.example` 当前作为运行配置模板，`Makefile` 当前作为常用命令入口；bring-up 说明统一收口到 `docs/GETTING_STARTED.md`。
 - 四个渠道当前都是正式私聊入口：Telegram / personal WeChat / Feishu / WeCom。
 - 四个渠道共用 `shared private-chat text runtime`、workflow、approval、`jobs` 和 SQLite 真相；渠道层只保留各自的验签、解密、轮询、回包和最小展示差异。
 - 媒体主链已稳定跑通：`search -> select -> downloader approval -> confirm -> dispatch -> status -> import approval -> confirm -> import -> metadata -> subtitle -> refresh`。
@@ -122,6 +124,7 @@
 - cleanup 事件写入失败日志继续能直接看见 `task_ref + task_id/task_hash + source + target`，不需要额外翻数据库才知道哪次落盘失败。
 - 若验证窗口里出现问题，修复仍保持在现有 cleanup 文本闭环和渠道胶水范围内，没有引入新副作用。
 - 文档优先级仍保持一致：`DECISIONS -> NEXT_STEP -> STATUS -> README -> AGENTS`。
+- 仓库知识入口当前也应保持稳定：`README` 做入口、`docs/INDEX.md` 做地图、`docs/ARCHITECTURE.md` 做结构说明、`docs/GETTING_STARTED.md` 做 bring-up，不再把这些说明散落回 `NEXT_STEP` 或 `STATUS`。
 
 ## After this step
 

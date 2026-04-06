@@ -77,6 +77,13 @@ def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str]:
 
 
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
+    readme_text = Path("README.md").read_text(encoding="utf-8")
+    agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
+    architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
+    env_example_text = Path(".env.example").read_text(encoding="utf-8")
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     window_text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
@@ -180,6 +187,36 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "`cleanup service tests` 快照" in next_step_text
     assert "`compile check` 快照" in next_step_text
     assert "`docs consistency check` 快照" in next_step_text
+
+    assert "docs/INDEX.md" in readme_text
+    assert "docs/GETTING_STARTED.md" in readme_text
+    assert "docs/ARCHITECTURE.md" in readme_text
+    assert ".env.example" in readme_text
+    assert "Makefile" in readme_text
+    assert "docs/INDEX.md" in agents_text
+    assert "docs/ARCHITECTURE.md" in agents_text
+    assert "docs/NEXT_STEP.md" in agents_text
+    assert "docs/DECISIONS.md" in agents_text
+    assert "README.md" in index_text
+    assert "docs/GETTING_STARTED.md" in index_text
+    assert "docs/ARCHITECTURE.md" in index_text
+    assert "AGENTS.md" in index_text
+    assert "app/main.py" in architecture_text
+    assert "app/bot/private_chat_runtime.py" in architecture_text
+    assert "app/services/" in architecture_text
+    assert "app/db/" in architecture_text
+    assert ".env.example" in getting_started_text
+    assert "Makefile" in getting_started_text
+    assert "make run" in getting_started_text
+    assert ".venv/bin/python -m app.main" in getting_started_text
+    assert "TELEGRAM_BOT_TOKEN=" in env_example_text
+    assert "PROWLARR_BASE_URL=" in env_example_text
+    assert "TRANSMISSION_BASE_URL=" in env_example_text
+    assert "LIBRARY_TARGET_DIR=" in env_example_text
+    assert "test-cleanup:" in makefile_text
+    assert "test-docs:" in makefile_text
+    assert "compile:" in makefile_text
+    assert "run:" in makefile_text
 
     window_progress_rows = re.findall(
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",

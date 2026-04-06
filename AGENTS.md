@@ -1,4 +1,4 @@
-# Luminarr AGENTS.md (v31)
+# Luminarr AGENTS.md (v32)
 
 This file is the repository contract for AI coding agents.
 
@@ -9,14 +9,25 @@ This file is the repository contract for AI coding agents.
 - Before modifying a file, explain its role in 1-2 plain Chinese sentences.
 - Never fail silently. On operational failure, print explicit colored Chinese logs with a clear fix hint.
 
-## 2. Environment
+## 2. Read Order
+
+Before touching code, read in this order:
+
+1. `docs/INDEX.md`
+2. `docs/ARCHITECTURE.md`
+3. `docs/NEXT_STEP.md`
+4. `docs/DECISIONS.md`
+5. `docs/STATUS.md`
+6. `docs/TEST_ENV.md`（only when the task depends on real downloader/import/refresh verification）
+
+## 3. Environment
 
 - Host OS: Windows
 - Dev shell: WSL Ubuntu
 - Interaction mode: Codex CLI in pure terminal
 - Repo path: inside WSL filesystem
 
-## 3. Local integration test stack
+## 4. Local integration test stack
 
 Use the WSL Docker test stack for real downloader/import/refresh verification when the task depends on:
 - hardlink execution
@@ -29,7 +40,7 @@ Services:
 
 Read `docs/TEST_ENV.md` before touching these paths.
 
-## 4. CLI rules
+## 5. CLI rules
 
 - No heredoc or multiline commands in user-facing instructions.
 - Use single-line commands.
@@ -37,7 +48,7 @@ Read `docs/TEST_ENV.md` before touching these paths.
 - If a task needs manual verification, provide a one-line command.
 - Wrap executable commands in standard ` ```bash ` blocks.
 
-## 5. Document priority
+## 6. Document priority
 
 When docs disagree, follow:
 1. `docs/DECISIONS.md`
@@ -48,7 +59,7 @@ When docs disagree, follow:
 
 `docs/HISTORY.md` is background only. Do not use it as the source of current execution truth.
 
-## 6. Project scope
+## 7. Project scope
 
 Current mainline profile:
 - Telegram + personal WeChat + Feishu + WeCom（当前为最小私聊文本基线）
@@ -80,38 +91,19 @@ Do not expand into:
 Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 - downloader/library asset cleanup automation
 
-## 7. Current priority
+## 8. Current priority
 
 The current next smallest path is:
 
 - **four-channel cleanup verification baseline（把已落地 cleanup 文本闭环收口成有退出条件的验证窗口；四个渠道都要保持可用，但不扩自动 cleanup、批量 cleanup 或删种）**
 
-Keep these landed baselines stable while doing it:
-- four-channel shared private-chat text runtime baseline（Telegram / personal WeChat / Feishu / WeCom 共用一套 workflow / approval / jobs / SQLite 真相）
-- downloader/library cleanup inspect baseline
-- downloader/library cleanup inspect follow-up guidance baseline
-- downloader/library cleanup execution baseline
-- downloader/library cleanup command discoverability baseline
-- downloader/library cleanup rejection follow-up guidance baseline
-- downloader/library cleanup success follow-up guidance baseline
-- downloader/library cleanup failure observability baseline
-- shared private-chat cleanup cross-channel regression coverage baseline
-- Telegram media sending baseline（最小图片/文件发送）
-- execution hygiene (`telegram_updates`, `jobs`, confirm wake rebuild)
-- shared private-chat text runtime + personal WeChat 最小私聊文本收发 + Feishu 最小 webhook 请求入口 / 文本回消息 / 签名校验 + WeCom callback URL 校验 / 解密 / 文本回包
-- downloader/import approval boundaries
-- copy fallback approval
-- completion-monitor + post-download auto import
-- metadata scraping + subtitle auto-translation
-- PT / BT split + BT follow-up chain
-- downloader role binding + qBittorrent protocol
-- BT subscription scheduler tick
-- pure BT single-item ranking baseline
-- BT external web-source baseline
-- BT WebSource richer metadata extraction baseline
-- BT-only read-only helper baseline
+Detailed current baselines and exit conditions live in:
 
-## 8. Runtime rules
+- `docs/NEXT_STEP.md`
+- `docs/STATUS.md`
+- `docs/CLEANUP_VERIFICATION_WINDOW.md`
+
+## 9. Runtime rules
 
 ### Model usage
 - Parser-first, LLM-fallback.
@@ -139,7 +131,7 @@ Keep these landed baselines stable while doing it:
 - That helper may not write workflow truth, mutate approvals/jobs, dispatch downloads, or trigger import side effects.
 - Scheduler ticks and automatic recovery must not depend on that helper.
 
-## 9. Engineering conventions
+## 10. Engineering conventions
 
 - Python 3.12 style.
 - Prefer small explicit functions.
@@ -148,7 +140,16 @@ Keep these landed baselines stable while doing it:
 - Do not refactor unrelated modules.
 - Update docs whenever behavior or rules change.
 
-## 10. High-risk paths
+## 11. Task protocol
+
+- Identify the smallest reasonable closed loop from `docs/NEXT_STEP.md` and current codebase state.
+- Work on one small task at a time; do not bundle unrelated cleanup or refactors.
+- Prefer reusing existing tests and scripts; only create `tmp_tests/` files when necessary.
+- Run verification yourself; do not stop at “here is the command”.
+- After implementation, review the diff for scope creep, debug leftovers, and temporary files.
+- If behavior, rules, or entrypoints changed, update the relevant docs in the same turn.
+
+## 12. High-risk paths
 
 Do not casually modify these without updating docs and calling out the risk:
 - persistence schema / migrations
@@ -159,7 +160,7 @@ Do not casually modify these without updating docs and calling out the risk:
 - restore / backup scripts
 - secrets or token wiring
 
-## 11. Definition of done
+## 13. Definition of done
 
 A task is done only when:
 1. code or docs are complete

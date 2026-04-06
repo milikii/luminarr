@@ -1,4 +1,4 @@
-# Current status (v147)
+# Current status (v148)
 
 ## Project position
 
@@ -17,6 +17,12 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
+- 知识入口当前已补齐基础层：
+  - `docs/INDEX.md`：文档地图
+  - `docs/ARCHITECTURE.md`：系统结构说明
+  - `docs/GETTING_STARTED.md`：从零到跑通
+  - `.env.example`：配置模板
+  - `Makefile`：常用命令入口
 - 控制层：
   - `shared private-chat text runtime`
   - Telegram runtime + 最小图片/文件发送 + 搜索结果/下载审批/导入审批文本 polish
@@ -121,6 +127,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - `series / anime` 独立名称解析还没实现；当前最稳的是 movie-first。
 - 当前“给别人用”的体验还偏工程向：私聊返回仍缺更美观的图片/信息卡片/字符排版，quick start 与配置模板也还没补齐。
+- 当前还没有生产版 `docker-compose.yml` 和 `Dockerfile`；这一步先补知识入口和本地 bring-up，不把镜像工程化一起打包进来。
 - 四个渠道都在真用，最大的维护风险是渠道适配层和 shared runtime 漂移，导致同一协议在四处长出不同分支。
 - personal WeChat 当前只支持单账号、私聊文本；同一进程里刚完成 `微信登录` 后，要到下一次启动才会开始轮询。
 - Feishu / WeCom 当前只支持最小私聊文本，不支持群聊、图片、卡片、按钮回调；WeCom 也还没有主动发消息客户端。
