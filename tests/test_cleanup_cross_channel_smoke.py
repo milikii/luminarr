@@ -1221,6 +1221,96 @@ def test_cleanup_chat_scoped_task_ref_in_chinese_smoke_across_private_chat_chann
 
 
 @pytest.mark.parametrize(
+    ("query", "expected_follow_up"),
+    [
+        (
+            f"cleanup {_CHAT_SCOPED_TASK_REF}",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+        ),
+        (
+            f"清理 {_CHAT_SCOPED_TASK_REF}",
+            "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_chat_scoped_task_ref_correlation_missing_rejection_guidance_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_follow_up: str,
+    channel: str,
+    runner,
+) -> None:
+    database = _make_database(tmp_path / channel)
+    job_repo = JobRepo(database)
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(database), job_repo=job_repo)
+    job_repo.upsert_import_job_pending(
+        chat_id=_expected_chat_id(channel),
+        user_id=2001,
+        task_ref=_CHAT_SCOPED_TASK_REF,
+        task_id="87",
+        task_hash="hash-87",
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert "未找到带 source_path/target_path 的已导入关联，当前任务暂不能执行 cleanup。" in reply_text
+    assert expected_follow_up in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_query_ref"),
+    [
+        (f"cleanup inspect {_CHAT_SCOPED_TASK_REF}", _CHAT_SCOPED_TASK_REF),
+        (f"清理检查 {_CHAT_SCOPED_TASK_REF}", _CHAT_SCOPED_TASK_REF),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_chat_scoped_task_ref_correlation_missing_shows_resolved_identity_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    expected_query_ref: str,
+    channel: str,
+    runner,
+) -> None:
+    database = _make_database(tmp_path / channel)
+    job_repo = JobRepo(database)
+    cleanup_service = CleanupDownloadedSourceService(JobEventRepo(database), job_repo=job_repo)
+    job_repo.upsert_import_job_pending(
+        chat_id=_expected_chat_id(channel),
+        user_id=2001,
+        task_ref=_CHAT_SCOPED_TASK_REF,
+        task_id="87",
+        task_hash="hash-87",
+    )
+
+    reply_text = runner(query, cleanup_service)
+
+    assert f"查询引用: {expected_query_ref}" in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert "关联: 未找到" in reply_text
+    assert "当前 guardrail: 拒绝 cleanup" in reply_text
+
+
+@pytest.mark.parametrize(
     ("query", "expected_reply"),
     [
         ("cleanup", CLEANUP_QUERY_USAGE_TEXT),

@@ -86,6 +86,13 @@ class ImportCorrelation:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedCleanupTaskIdentity:
+    task_ref: str
+    task_id: str
+    task_hash: str
+
+
+@dataclass(frozen=True, slots=True)
 class CleanupInspection:
     query_ref: str
     task_ref: str
@@ -120,19 +127,25 @@ class CleanupDownloadedSourceService:
             return CLEANUP_QUERY_USAGE_TEXT
 
         inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
+        task_ref_for_event = inspection.task_ref or cleaned_ref
+        follow_up_ref = _preferred_cleanup_ref(inspection)
         if not inspection.correlation_found:
             message = _append_cleanup_follow_up(
                 CLEANUP_CORRELATION_MISSING_TEXT,
-                cleaned_ref,
+                follow_up_ref,
             )
             _print_cleanup_blocked_log(
                 event_type="cleanup.correlation_missing",
-                task_ref=cleaned_ref,
+                task_ref=task_ref_for_event,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
                 reason=CLEANUP_CORRELATION_MISSING_TEXT,
                 fix_hint=CLEANUP_CORRELATION_MISSING_FIX_HINT,
             )
             self._record_event(
-                task_ref=cleaned_ref,
+                task_ref=task_ref_for_event,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
                 event_type="cleanup.correlation_missing",
                 message=message,
             )
@@ -140,8 +153,6 @@ class CleanupDownloadedSourceService:
 
         source_path = Path(inspection.source_path).expanduser()
         target_path = Path(inspection.target_path).expanduser()
-        task_ref_for_event = inspection.task_ref or cleaned_ref
-        follow_up_ref = _preferred_cleanup_ref(inspection)
 
         if inspection.target_exists is False:
             message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
@@ -299,13 +310,13 @@ class CleanupDownloadedSourceService:
         task_ref: str,
         chat_id: int | None,
     ) -> CleanupInspection:
-        correlation = self._find_import_correlation(task_ref=task_ref, chat_id=chat_id)
+        resolved_identity, correlation = self._find_import_correlation(task_ref=task_ref, chat_id=chat_id)
         if correlation is None:
             return CleanupInspection(
                 query_ref=task_ref,
-                task_ref=task_ref,
-                task_id="",
-                task_hash="",
+                task_ref=resolved_identity.task_ref,
+                task_id=resolved_identity.task_id,
+                task_hash=resolved_identity.task_hash,
                 source_path="",
                 target_path="",
                 correlation_found=False,
@@ -337,9 +348,9 @@ class CleanupDownloadedSourceService:
 
         return CleanupInspection(
             query_ref=task_ref,
-            task_ref=correlation.task_ref.strip() or task_ref,
-            task_id=correlation.task_id.strip(),
-            task_hash=correlation.task_hash.strip(),
+            task_ref=correlation.task_ref.strip() or resolved_identity.task_ref,
+            task_id=correlation.task_id.strip() or resolved_identity.task_id,
+            task_hash=correlation.task_hash.strip() or resolved_identity.task_hash,
             source_path=str(source_path),
             target_path=str(target_path),
             correlation_found=True,
@@ -354,7 +365,50 @@ class CleanupDownloadedSourceService:
         *,
         task_ref: str,
         chat_id: int | None,
-    ) -> ImportCorrelation | None:
+    ) -> tuple[ResolvedCleanupTaskIdentity, ImportCorrelation | None]:
+        resolved_identity = self._resolve_cleanup_task_identity(
+            task_ref=task_ref,
+            chat_id=chat_id,
+        )
+        try:
+            event = self._job_event_repo.find_latest_import_correlation(
+                task_ref=resolved_identity.task_ref,
+                task_id=resolved_identity.task_id,
+                task_hash=resolved_identity.task_hash,
+            )
+        except Exception as error:
+            print(
+                f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
+                f"lookup_task_ref={resolved_identity.task_ref} lookup_task_id={resolved_identity.task_id} "
+                f"lookup_task_hash={resolved_identity.task_hash} 原因={error}",
+                flush=True,
+            )
+            print(
+                "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
+                "再重试 cleanup。",
+                flush=True,
+            )
+            return resolved_identity, None
+        if event is None:
+            return resolved_identity, None
+        source_path = event.source_path.strip()
+        target_path = event.target_path.strip()
+        if not source_path or not target_path:
+            return resolved_identity, None
+        return resolved_identity, ImportCorrelation(
+            task_ref=event.task_ref.strip() or resolved_identity.task_ref,
+            task_id=event.task_id.strip() or resolved_identity.task_id,
+            task_hash=event.task_hash.strip() or resolved_identity.task_hash,
+            source_path=source_path,
+            target_path=target_path,
+        )
+
+    def _resolve_cleanup_task_identity(
+        self,
+        *,
+        task_ref: str,
+        chat_id: int | None,
+    ) -> ResolvedCleanupTaskIdentity:
         resolved_task_ref = task_ref
         resolved_task_id = task_ref
         resolved_task_hash = task_ref
@@ -370,41 +424,14 @@ class CleanupDownloadedSourceService:
                 )
                 job = None
             if job is not None:
-                resolved_task_ref = job.task_ref or task_ref
-                resolved_task_id = job.task_id or task_ref
-                resolved_task_hash = job.task_hash or task_ref
+                resolved_task_ref = (job.task_ref or task_ref).strip() or resolved_task_ref
+                resolved_task_id = (job.task_id or "").strip() or resolved_task_id
+                resolved_task_hash = (job.task_hash or "").strip() or resolved_task_hash
 
-        try:
-            event = self._job_event_repo.find_latest_import_correlation(
-                task_ref=resolved_task_ref,
-                task_id=resolved_task_id,
-                task_hash=resolved_task_hash,
-            )
-        except Exception as error:
-            print(
-                f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
-                f"lookup_task_ref={resolved_task_ref} lookup_task_id={resolved_task_id} "
-                f"lookup_task_hash={resolved_task_hash} 原因={error}",
-                flush=True,
-            )
-            print(
-                "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
-                "再重试 cleanup。",
-                flush=True,
-            )
-            return None
-        if event is None:
-            return None
-        source_path = event.source_path.strip()
-        target_path = event.target_path.strip()
-        if not source_path or not target_path:
-            return None
-        return ImportCorrelation(
-            task_ref=event.task_ref.strip() or resolved_task_ref,
-            task_id=event.task_id.strip(),
-            task_hash=event.task_hash.strip(),
-            source_path=source_path,
-            target_path=target_path,
+        return ResolvedCleanupTaskIdentity(
+            task_ref=resolved_task_ref,
+            task_id=resolved_task_id,
+            task_hash=resolved_task_hash,
         )
 
     def _record_event(

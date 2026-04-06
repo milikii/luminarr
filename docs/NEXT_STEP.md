@@ -1,4 +1,4 @@
-# Next step (v149)
+# Next step (v150)
 
 ## Current goal
 
@@ -21,6 +21,7 @@
 - 持续记录窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 到 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / `chat-scoped task_ref -> jobs -> import correlation` 的聚合 smoke gate。
+- 保持 `chat-scoped task_ref` 在 correlation-missing 场景下也能回显和记录已解析出的 `task_id/task_hash`，且 cleanup follow-up 优先落到稳定的 hash / id。
 - 保持 cleanup 失败可观测性稳定：
   - 删除失败日志：`[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`
   - 关联查询失败日志：`task_ref + lookup_task_ref/task_id/task_hash`
