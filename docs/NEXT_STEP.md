@@ -1,4 +1,4 @@
-# Next step (v118)
+# Next step (v119)
 
 ## Current baseline
 
@@ -16,6 +16,13 @@
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期，避免把窗口外证据回填进窗口台账。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，验证窗口就必须立刻改成已完成，避免退出条件已齐但台账仍挂进行中。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，避免结论退化成笼统的“退出条件未满足”。
+- cleanup 窗口收口后，当前已经明确的后续主线顺序是：
+  1. `series / anime` 独立名称解析最小实现
+  2. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+  3. 最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+  4. BT 共享确定性评分器
+  5. Jellyfin / Plex 支持（后续）
+  6. plugin 体系继续后置
 - BT 主链已落地：PT / BT 分流、processing-path inquiry、BT classification、TMDB association、`raw_bt` 目标目录、shared source adapter、pure BT single-item ranking、`btsub` scheduler tick。
 
 ## Goal
@@ -59,7 +66,8 @@
 - 不新增自动 inspect、自动 cleanup、批量 cleanup、删种或新的 cleanup workflow。
 - 不放宽现有 cleanup guardrail、删除范围或 correlation 校验。
 - 不把四渠道适配重构成通用多渠道平台、通用 webhook 总线、通用 plugin / skill / MCP 平台。
-- 不在这一步启动 `series / anime` 实现、BT 共享评分器重写、Jellyfin / Plex 支持或新的下载器 / 媒体服务器接入。
+- 不在这一步启动 `series / anime` 实现、shared private-chat 交付体验 polish、最小人类可用入口、BT 共享评分器重写、Jellyfin / Plex 支持或新的下载器 / 媒体服务器接入。
+- 不把“给别人用的体验”误解成 Web UI 主线；这一步之后的体验增强继续优先走私聊渠道回包层。
 - 不回退现有文本协议：
   - `search/select/status/import/confirm/cleanup/watchlist/btsub`
   - `bt搜 <关键词>` / `bt search <关键词>`
@@ -81,4 +89,8 @@
 ## After this step
 
 1. 启动 `series / anime` 独立名称解析最小实现，先落 `title / year / season / episode / quality_tags` 结构。
-2. 把 `pure_bt`、`manage_bt_subscription`、后续媒体型 BT 选源收敛到共享确定性评分器。
+2. 收口 shared private-chat 交付体验，优先补图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI。
+3. 补最小人类可用入口，至少包含 quick start、配置模板和首个渠道 bring-up。
+4. 把 `pure_bt`、`manage_bt_subscription`、后续媒体型 BT 选源收敛到共享确定性评分器。
+5. 在 Emby 主线稳定后，再推进 Jellyfin / Plex 支持。
+6. plugin 体系继续后置，不作为当前主线阻塞项。

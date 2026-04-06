@@ -1,4 +1,4 @@
-# Luminarr (v58)
+# Luminarr (v59)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -22,7 +22,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - 验签、解密、轮询或回包
   - 外部会话标识投影到现有 `chat_id / user_id`
   - 调用 shared runtime
-  - 把文本或最小媒资发回原渠道
+  - 把文本、图片/文件或最小信息卡片发回原渠道
 - 当前固定主线：
   - TMDB
   - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 使用）
@@ -77,6 +77,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - 四个渠道都要可用，但业务真相只维护一套；不为同一条协议做四份分叉实现。
 - 当前只支持私聊文本主线；Feishu / WeCom 不做群聊、卡片、按钮回调，personal WeChat 不做多账号编排。
+- 交付形态继续以私聊 bot 为主；后续体验优化优先走渠道内更美观的图片/信息卡片/字符排版，不做 Web UI。
 - cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
 - 当前最稳的是 movie-first；`series / anime` 独立名称解析还没实现。
@@ -92,13 +93,18 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 这一步只允许修 shared runtime 回归、渠道胶水回归和显式日志缺口，不新增自动 cleanup、批量 cleanup 或删种。
 - cleanup 验证窗口结束后，下一步按顺序推进：
   1. `series / anime` 独立名称解析最小实现
-  2. BT 共享确定性评分器
+  2. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+  3. 最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+  4. BT 共享确定性评分器
+  5. Jellyfin / Plex 支持（后续）
+  6. plugin 体系后置评估
 
 ## 6. 当前明确不做
 
 - 通用 AI 助手
 - 通用 Agent 平台
 - 通用 plugin / skill / MCP 平台化
+- Jellyfin / Plex 并行主线支持（当前不做，后续再补）
 - Web UI / 桌面端
 - Telegram / 微信群聊主线
 - Redis / MQ / PostgreSQL

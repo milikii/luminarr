@@ -1,4 +1,4 @@
-# Current status (v118)
+# Current status (v119)
 
 ## Project position
 
@@ -99,6 +99,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - `series / anime` 独立名称解析还没实现；当前最稳的是 movie-first。
+- 当前“给别人用”的体验还偏工程向：私聊返回仍缺更美观的图片/信息卡片/字符排版，quick start 与配置模板也还没补齐。
 - 四个渠道都在真用，最大的维护风险是渠道适配层和 shared runtime 漂移，导致同一协议在四处长出不同分支。
 - personal WeChat 当前只支持单账号、私聊文本；同一进程里刚完成 `微信登录` 后，要到下一次启动才会开始轮询。
 - Feishu / WeCom 当前只支持最小私聊文本，不支持群聊、图片、卡片、按钮回调；WeCom 也还没有主动发消息客户端。
@@ -106,6 +107,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - completion truth 仍主要依赖当前 runtime 观察，不是完整独立后台轮询平台。
 - metadata scraping、subtitle auto-translation、Emby refresh 失败时不会回滚 import success；缺配置时会显式失败。
 - BT shared source adapter、BT external web-source、pure BT ranking、`btsub` 选源都已可用，但还不是共享确定性评分器。
+- 当前主线只支持 Emby；Jellyfin / Plex 仍是后续扩展，不在 cleanup 窗口这一步混入。
+- 通用 plugin / skill / MCP 平台化仍然继续后置，不是当前收口目标。
 
 ## Latest verification
 
@@ -138,3 +141,4 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 一旦到达最早可结束日期且其他退出条件都满足，台账和这里的快照都必须立刻改成已完成，不能继续保留进行中文案。
 - 只要渠道进度表里还存在 `待验证`，台账和这里的 `当前结论` 都必须显式点名真实私聊 cleanup smoke 仍待补。
 - 台账里的 `窗口活性`、`当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“最早可结束日期已到但仍写未到窗口期”或“状态已完成但渠道仍待验证”这类漂移。
+- cleanup 窗口之后，当前已明确排定的顺序是：先补 `series / anime` 独立名称解析，再补 shared private-chat 交付体验与最小人类可用入口，然后再推进 BT 共享确定性评分器；Jellyfin / Plex 与 plugin 体系继续后置。
