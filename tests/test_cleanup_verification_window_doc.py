@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
 
+import pytest
+
 
 def _assert_active_window_dates_are_current(
     *,
@@ -113,6 +115,25 @@ def _assert_protocol_observation_drops_pending_channel_gap_when_resolved(
     assert "当前缺口只剩四渠道真实私聊 smoke 证据" not in protocol_observation_text
 
 
+def _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    smoke_gate_checklist_completed: bool,
+    protocol_regression_checklist_completed: bool,
+    docs_gate_checklist_completed: bool,
+    protocol_observation_text: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    if has_pending_channel:
+        return
+    if not smoke_gate_checklist_completed:
+        assert "smoke gate" in protocol_observation_text
+    if not protocol_regression_checklist_completed:
+        assert "cleanup 协议" in protocol_observation_text
+    if not docs_gate_checklist_completed:
+        assert "verification docs gate" in protocol_observation_text
+
+
 def _assert_conclusion_mentions_pending_channel_gap_when_needed(
     *,
     progress_rows: list[tuple[str, str, str]],
@@ -166,6 +187,32 @@ def _assert_channel_progress_notes_match_status(
             assert "待补真实私聊 smoke 记录" in note
             continue
         assert "待补真实私聊 smoke 记录" not in note
+
+
+def test_protocol_observation_requires_named_non_channel_gaps_after_channel_gap_is_closed() -> None:
+    resolved_progress_rows = [
+        ("Telegram", "已完成", "2026-04-05"),
+        ("personal WeChat", "已完成", "2026-04-05"),
+        ("Feishu", "已完成", "2026-04-05"),
+        ("WeCom", "已完成", "2026-04-05"),
+    ]
+
+    _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
+        progress_rows=resolved_progress_rows,
+        smoke_gate_checklist_completed=False,
+        protocol_regression_checklist_completed=True,
+        docs_gate_checklist_completed=False,
+        protocol_observation_text="cleanup discoverability 未见协议回退；剩余缺口是 smoke gate 和 verification docs gate。",
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
+            progress_rows=resolved_progress_rows,
+            smoke_gate_checklist_completed=False,
+            protocol_regression_checklist_completed=True,
+            docs_gate_checklist_completed=False,
+            protocol_observation_text="cleanup discoverability 未见协议回退。",
+        )
 
 
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
@@ -259,7 +306,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "242 passed"
+    assert docs_gate_result == "243 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
@@ -348,6 +395,13 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     )
     _assert_protocol_observation_drops_pending_channel_gap_when_resolved(
         progress_rows=progress_rows,
+        protocol_observation_text=protocol_observation_text,
+    )
+    _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
+        progress_rows=progress_rows,
+        smoke_gate_checklist_completed=smoke_gate_checklist_completed,
+        protocol_regression_checklist_completed=protocol_regression_checklist_completed,
+        docs_gate_checklist_completed=docs_gate_checklist_completed,
         protocol_observation_text=protocol_observation_text,
     )
     _assert_conclusion_mentions_pending_channel_gap_when_needed(

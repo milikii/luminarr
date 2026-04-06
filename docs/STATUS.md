@@ -27,7 +27,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 其中 `correlation missing` rejection guidance 当前已把双语 follow-up 锁成精确断言：必须同时保留 `cleanup inspect <ref> / 清理检查 <ref>` 和 `cleanup <ref> / 清理 <ref>` 两行引导，避免回退成只剩关键词级别检查
   - `target missing` / `source missing` rejection guidance 当前也已锁成完整双语 follow-up：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `source-type-unsupported` / `guard rejected` rejection guidance 当前也已锁成完整双语 follow-up：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
-  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”这条收口规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -85,6 +85,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
 - 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成泛泛文案。
 - `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
+- 当渠道缺口已经补齐、剩余缺口只剩 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名这些剩余缺口，不能只删掉“四渠道真实私聊 smoke 证据”旧文案。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Channel progress` 备注列也必须和渠道状态同步，不能在 `已完成` 后继续保留待补真实私聊 smoke 文案。
 - 验证窗口 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项当前会直接跟随这些证据同步，不再和四渠道真实私聊 smoke 待补项混成一组未完成。
 - 若窗口已完成，上面三项证据勾选也必须继续保持完成，不能只把窗口状态改成已完成。
@@ -121,11 +122,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：`588 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- tests：`589 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`240 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：`28 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`338 passed, 91 deselected`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification docs gate：`242 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- cleanup verification docs gate：`243 passed`（2026-04-06，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：`passed`（`python3 -m compileall app tests`）
 - docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
