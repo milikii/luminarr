@@ -361,6 +361,44 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
 
 
 @pytest.mark.parametrize(
+    ("cleanup_query", "inspect_query"),
+    [
+        ("cleanup 87", "cleanup inspect hash-87"),
+        ("清理 87", "清理检查 hash-87"),
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_post_success_inspect_confirmation_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    cleanup_query: str,
+    inspect_query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+
+    cleanup_reply = runner(cleanup_query, cleanup_service)
+    inspect_reply = runner(inspect_query, cleanup_service)
+
+    assert "已清理下载源资产" in cleanup_reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in cleanup_reply
+    assert "源路径状态: 不存在" in inspect_reply
+    assert f"结论: 下载源资产已不存在，无需清理：{source_file}" in inspect_reply
+    assert "当前先不要执行 cleanup" in inspect_reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in inspect_reply
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
     "query",
     [
         "cleanup 87",
