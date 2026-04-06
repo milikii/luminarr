@@ -23,6 +23,17 @@ def _assert_active_window_dates_are_current(
     assert protocol_observation_date == current_date
 
 
+def _assert_completed_window_not_before_end_date(
+    *,
+    window_status: str,
+    current_date: date,
+    end_date: date,
+) -> None:
+    if window_status != "已完成":
+        return
+    assert current_date >= end_date
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -125,6 +136,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
     assert "消息进来 -> shared runtime -> 文本回去" in text
     assert "同步到当天日期" in text
+    assert "不得早于最早可结束日期" in text
 
     progress_rows = re.findall(
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
@@ -179,6 +191,11 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         assert "已满足退出条件" in conclusion
         assert window_completed
         assert all(row_status == "已完成" for _, row_status, _ in progress_rows)
+    _assert_completed_window_not_before_end_date(
+        window_status=window_status,
+        current_date=current_date,
+        end_date=end_date,
+    )
 
     if window_status == "已完成":
         assert window_activity == "已满足退出条件"

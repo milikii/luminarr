@@ -91,6 +91,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "当前结论" in text
         assert "窗口活性" in text
         assert "同步到当天日期" in text
+        assert "不得早于最早可结束日期" in text
         assert "尚未到最早可结束日期" in text
         assert "已到最早可结束日期" in text
         assert "cleanup 协议回归验证" in text
