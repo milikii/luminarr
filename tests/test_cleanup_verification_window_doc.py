@@ -34,6 +34,19 @@ def _assert_completed_window_not_before_end_date(
     assert current_date >= end_date
 
 
+def _assert_completed_channel_dates_stay_within_window_snapshot(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    start_date: date,
+    conclusion_date: date,
+) -> None:
+    for _, row_status, last_date in progress_rows:
+        if row_status != "已完成":
+            continue
+        channel_date = date.fromisoformat(last_date)
+        assert start_date <= channel_date <= conclusion_date
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -137,6 +150,8 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert "消息进来 -> shared runtime -> 文本回去" in text
     assert "同步到当天日期" in text
     assert "不得早于最早可结束日期" in text
+    assert "不得早于窗口开始日期" in text
+    assert "不得晚于当前结论快照日期" in text
 
     progress_rows = re.findall(
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
@@ -172,6 +187,11 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         else:
             assert row_status == "待验证"
             assert last_date == "-"
+    _assert_completed_channel_dates_stay_within_window_snapshot(
+        progress_rows=progress_rows,
+        start_date=start_date,
+        conclusion_date=conclusion_date,
+    )
 
     window_completed_match = re.search(
         r"- \[( |x)\] 完成 (\d{4}-\d{2}-\d{2}) 到 (\d{4}-\d{2}-\d{2}) 的真实使用验证窗口",
