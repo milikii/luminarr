@@ -106,6 +106,7 @@ def _assert_conclusion_mentions_non_channel_gaps_when_they_are_the_remaining_blo
     progress_rows: list[tuple[str, str, str]],
     smoke_gate_checklist_completed: bool,
     protocol_regression_checklist_completed: bool,
+    docs_gate_checklist_completed: bool,
     conclusion: str,
 ) -> None:
     has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
@@ -115,6 +116,8 @@ def _assert_conclusion_mentions_non_channel_gaps_when_they_are_the_remaining_blo
         assert "smoke gate" in conclusion
     if not protocol_regression_checklist_completed:
         assert "cleanup 协议" in conclusion
+    if not docs_gate_checklist_completed:
+        assert "verification docs gate" in conclusion
 
 
 def _assert_channel_progress_notes_match_status(
@@ -315,6 +318,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         progress_rows=progress_rows,
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
+        docs_gate_checklist_completed=docs_gate_checklist_completed,
         conclusion=conclusion,
     )
     _assert_channel_progress_notes_match_status(

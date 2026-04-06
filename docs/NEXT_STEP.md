@@ -1,4 +1,4 @@
-# Next step (v124)
+# Next step (v125)
 
 ## Current baseline
 
@@ -17,7 +17,7 @@
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，验证窗口就必须立刻改成已完成，避免退出条件已齐但台账仍挂进行中。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，避免结论退化成笼统的“退出条件未满足”。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”，避免结论和渠道进度表互相打架。
-- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：当剩余缺口已经不是渠道，而是聚合 smoke gate 或 cleanup 协议回归时，`当前结论` 也必须显式写出 smoke gate 或 cleanup 协议缺口，不能退化成泛泛文案。
+- `tests/test_cleanup_verification_window_doc.py` 当前还会要求：当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成泛泛文案。
 - `tests/test_cleanup_verification_window_doc.py` 当前还会要求：`Channel progress` 的备注列必须和渠道状态一致，不能在 `已完成` 后继续保留待补文案。
 - cleanup 窗口收口后，当前已经明确的后续主线顺序是：
   1. `series / anime` 独立名称解析最小实现
@@ -47,7 +47,7 @@
 - 一旦到达最早可结束日期且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都满足，验证窗口就必须立刻改成已完成，不能继续保留进行中文案。
 - 只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，不能退化成笼统的“退出条件未满足”。
 - 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
-- 当剩余缺口已经不是渠道，而是聚合 smoke gate 或 cleanup 协议回归时，`当前结论` 也必须显式写出 smoke gate 或 cleanup 协议缺口，不能退化成只写日期或泛泛的“退出条件未满足”。
+- 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成只写日期或泛泛的“退出条件未满足”。
 - `Channel progress` 的备注列必须与渠道状态同步；若渠道仍待验证，备注继续写待补真实私聊 smoke 记录；若渠道已完成，备注不得继续沿用待补文案。
 - 让 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态。

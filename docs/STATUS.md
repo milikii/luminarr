@@ -1,4 +1,4 @@
-# Current status (v124)
+# Current status (v125)
 
 ## Project position
 
@@ -79,7 +79,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 一旦到达最早可结束日期，且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归都已满足，窗口状态就必须立刻改成已完成，不能继续挂在进行中。
 - 只要四渠道里仍有待补项，`当前结论` 就必须显式写出真实私聊 cleanup smoke 仍待补，不能退化成笼统的“退出条件未满足”。
 - 当四渠道真实私聊 smoke 已全部补齐后，`当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”；若窗口仍未完成，只能改写成日期或其他剩余缺口。
-- 当剩余缺口已经不是渠道，而是聚合 smoke gate 或 cleanup 协议回归时，`当前结论` 也必须显式写出 smoke gate 或 cleanup 协议缺口，不能退化成泛泛文案。
+- 当剩余缺口已经不是渠道，而是聚合 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前结论` 也必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口，不能退化成泛泛文案。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Channel progress` 备注列也必须和渠道状态同步，不能在 `已完成` 后继续保留待补真实私聊 smoke 文案。
 - 验证窗口 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项当前会直接跟随这些证据同步，不再和四渠道真实私聊 smoke 待补项混成一组未完成。
 - 验证窗口未到期时，`当前结论` 当前会显式写出“尚未到最早可结束日期 <绝对日期>”，避免只写泛泛的进行中。
@@ -145,7 +145,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 一旦到达最早可结束日期且其他退出条件都满足，台账和这里的快照都必须立刻改成已完成，不能继续保留进行中文案。
 - 只要渠道进度表里还存在 `待验证`，台账和这里的 `当前结论` 都必须显式点名真实私聊 cleanup smoke 仍待补。
 - 若渠道进度表里已经没有 `待验证`，台账和这里的 `当前结论` 就不得继续写“真实私聊 cleanup smoke 仍待补”。
-- 若剩余缺口已经收缩到 smoke gate 或 cleanup 协议回归，台账和这里的 `当前结论` 都必须显式点名对应缺口。
+- 若剩余缺口已经收缩到 smoke gate、cleanup 协议回归或 verification docs gate，台账和这里的 `当前结论` 都必须显式点名对应缺口。
 - `Channel progress` 的备注列也必须跟随渠道状态更新，避免表格里状态和备注互相打架。
 - 台账里的 `窗口活性`、`当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“最早可结束日期已到但仍写未到窗口期”或“状态已完成但渠道仍待验证”这类漂移。
 - cleanup 窗口之后，当前已明确排定的顺序是：先补 `series / anime` 独立名称解析，再补 shared private-chat 交付体验与最小人类可用入口，然后再推进 BT 共享确定性评分器；Jellyfin / Plex 与 plugin 体系继续后置。
