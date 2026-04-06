@@ -970,6 +970,84 @@ def test_cleanup_by_task_ref_logs_correlation_query_failure_with_chat_scoped_ide
     assert "cleanup inspect hash-87 / 清理检查 hash-87" in events[-1].message
 
 
+def test_inspect_by_task_ref_keeps_chat_scoped_identity_when_import_event_lacks_structured_paths(
+    tmp_path: Path,
+) -> None:
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.write_bytes(b"demo")
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+    reply = service.inspect_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    assert "查询引用: cleanup-shortcut" in reply
+    assert "任务 ID: 87" in reply
+    assert "任务 Hash: hash-87" in reply
+    assert "关联: 未找到" in reply
+    assert "源路径状态: 未找到关联" in reply
+    assert "目标路径状态: 未找到关联" in reply
+    assert f"结论: {CLEANUP_CORRELATION_MISSING_TEXT}" in reply
+    assert "下一步：" not in reply
+
+
+def test_cleanup_by_task_ref_keeps_chat_scoped_identity_when_import_event_lacks_structured_paths(
+    tmp_path: Path,
+) -> None:
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.write_bytes(b"demo")
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+    reply = service.cleanup_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert events[-1].event_type == "cleanup.correlation_missing"
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in events[-1].message
+
+
 def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

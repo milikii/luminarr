@@ -1,4 +1,4 @@
-# Next step (v152)
+# Next step (v153)
 
 ## Current goal
 
@@ -23,6 +23,7 @@
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / `chat-scoped task_ref -> jobs -> import correlation` 的聚合 smoke gate。
 - 保持 cleanup 身份展示边界稳定：只有 `chat-scoped task_ref` 真正从 `jobs` 解析出身份时才回显和记录 `task_id/task_hash`；普通 correlation-missing inspect 继续显示 `-`，cleanup follow-up 继续落到稳定的 hash / id。
 - 保持 `chat-scoped task_ref` 在 `job_event` 关联查询失败时也继续打印 resolved `lookup_task_ref/task_id/task_hash`，且 inspect / cleanup 文本不要丢掉已解析出的身份。
+- 保持 `chat-scoped task_ref` 命中历史 `import.succeeded` 但缺 `source_path/target_path` 时，也继续回显 resolved identity，并保持 correlation-missing 文本协议不变。
 - 保持 cleanup 失败可观测性稳定：
   - 删除失败日志：`[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`
   - 关联查询失败日志：`task_ref + lookup_task_ref/task_id/task_hash`
