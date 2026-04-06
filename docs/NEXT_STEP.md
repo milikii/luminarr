@@ -1,4 +1,4 @@
-# Next step (v164)
+# Next step (v165)
 
 ## Current goal
 
@@ -35,6 +35,7 @@
 - 保持 verification docs gate 继续显式校验 `chat-scoped task_ref target-missing cleanup inspect follow-up guidance` 命名观察，避免窗口台账把 chat-scoped target-missing inspect follow-up 写丢。
 - 保持 verification docs gate 继续显式校验 `chat-scoped task_ref source-missing cleanup inspect follow-up guidance` 命名观察，避免窗口台账把 chat-scoped source-missing inspect follow-up 写丢。
 - 保持 verification docs gate 继续显式校验 `chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance` 命名观察，避免窗口台账把 chat-scoped source-type inspect follow-up 写丢。
+- 保持 verification docs gate 继续显式校验 `chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance` 命名观察，避免窗口台账把 chat-scoped guard-rejected inspect follow-up 写丢。
 - 保持 verification docs gate 继续显式校验 `source-type-unsupported rejection guidance` 命名观察，避免窗口台账把这类 source-type 阻断后的 follow-up 引导写丢。
 - 在 cleanup 验证窗口正式退出前，至少评估并记录 PT 下载任务的做种状态 guardrail（`pt_min_seed_hours` 保护、下载器 seeding 信息等）是否已在 guardrail 里覆盖；窗口台账里必须明确写出“当前 cleanup guardrail 未读取下载器 seeding 状态、`pt_min_seed_hours` 未进入 cleanup 阻断判断、因此本窗口只记录风险，不扩 cleanup 行为”。
 - 保持 cleanup 身份展示边界稳定：只有 `chat-scoped task_ref` 真正从 `jobs` 解析出身份时才回显和记录 `task_id/task_hash`；普通 correlation-missing inspect 继续显示 `-`，cleanup follow-up 继续落到稳定的 hash / id。
