@@ -152,3 +152,5 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         assert end_match.group(1) in conclusion
     else:
         assert window_activity == "已到最早可结束日期，待补退出条件"
+        assert "已到最早可结束日期" in conclusion
+        assert end_match.group(1) in conclusion

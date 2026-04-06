@@ -1,4 +1,4 @@
-# Next step (v111)
+# Next step (v112)
 
 ## Current baseline
 
@@ -22,6 +22,7 @@
 - 把验证窗口起止日期、四渠道真实私聊 smoke 进度和当前结论持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让退出条件只留在口头描述。
 - 把验证窗口当前是否仍处于“未到最早可结束日期”还是“已到最早可结束日期但待补退出条件”显式写进 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让窗口活性只靠人工脑补。
 - 当窗口仍处于 `未到最早可结束日期` 时，`当前结论` 也要显式写出“尚未到最早可结束日期 <绝对日期>”，不要只写笼统的进行中。
+- 当窗口已到 `最早可结束日期` 但仍未完成时，`当前结论` 也要显式写出“已到最早可结束日期 <绝对日期>，但退出条件仍未满足”，不要继续沿用未到期文案。
 - 把最近一次聚合 smoke gate 与 cleanup 协议回归验证的日期、结果和命令持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，让退出清单有对应证据。
 - 让 exit checklist 里的 smoke gate / cleanup 协议两项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态。
