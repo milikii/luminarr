@@ -6,6 +6,23 @@ import re
 from zoneinfo import ZoneInfo
 
 
+def _assert_active_window_dates_are_current(
+    *,
+    window_status: str,
+    current_date: date,
+    conclusion_date: date,
+    smoke_gate_date: date,
+    focused_cleanup_date: date,
+    protocol_observation_date: date,
+) -> None:
+    if window_status != "进行中":
+        return
+    assert conclusion_date == current_date
+    assert smoke_gate_date == current_date
+    assert focused_cleanup_date == current_date
+    assert protocol_observation_date == current_date
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -69,6 +86,14 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert smoke_gate_date == conclusion_date
     assert focused_cleanup_date == conclusion_date
     assert protocol_observation_date == conclusion_date
+    _assert_active_window_dates_are_current(
+        window_status=window_status,
+        current_date=current_date,
+        conclusion_date=conclusion_date,
+        smoke_gate_date=smoke_gate_date,
+        focused_cleanup_date=focused_cleanup_date,
+        protocol_observation_date=protocol_observation_date,
+    )
     assert smoke_gate_result == "128 passed"
     assert smoke_gate_command == ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py"
     assert focused_cleanup_result == "223 passed, 91 deselected"
@@ -99,6 +124,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
 
     assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
     assert "消息进来 -> shared runtime -> 文本回去" in text
+    assert "同步到当天日期" in text
 
     progress_rows = re.findall(
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
