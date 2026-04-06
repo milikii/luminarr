@@ -134,6 +134,20 @@ def _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_rem
         assert "verification docs gate" in protocol_observation_text
 
 
+def _assert_completed_protocol_observation_drops_gap_wording(
+    *,
+    window_status: str,
+    protocol_observation_text: str,
+) -> None:
+    if window_status != "已完成":
+        return
+    assert "未见协议回退" in protocol_observation_text
+    assert "待补" not in protocol_observation_text
+    assert "缺口" not in protocol_observation_text
+    assert "smoke gate" not in protocol_observation_text
+    assert "verification docs gate" not in protocol_observation_text
+
+
 def _assert_conclusion_mentions_pending_channel_gap_when_needed(
     *,
     progress_rows: list[tuple[str, str, str]],
@@ -254,6 +268,19 @@ def test_protocol_observation_requires_named_non_channel_gaps_after_channel_gap_
             protocol_regression_checklist_completed=True,
             docs_gate_checklist_completed=False,
             protocol_observation_text="cleanup discoverability 未见协议回退。",
+        )
+
+
+def test_completed_protocol_observation_drops_gap_wording() -> None:
+    _assert_completed_protocol_observation_drops_gap_wording(
+        window_status="已完成",
+        protocol_observation_text="cleanup discoverability / inspect / execution 未见协议回退。",
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_completed_protocol_observation_drops_gap_wording(
+            window_status="已完成",
+            protocol_observation_text="cleanup discoverability / inspect / execution 未见协议回退；当前缺口是 verification docs gate。",
         )
 
 
@@ -394,7 +421,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "245 passed"
+    assert docs_gate_result == "246 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
@@ -483,6 +510,10 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     )
     _assert_protocol_observation_drops_pending_channel_gap_when_resolved(
         progress_rows=progress_rows,
+        protocol_observation_text=protocol_observation_text,
+    )
+    _assert_completed_protocol_observation_drops_gap_wording(
+        window_status=window_status,
         protocol_observation_text=protocol_observation_text,
     )
     _assert_protocol_observation_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
