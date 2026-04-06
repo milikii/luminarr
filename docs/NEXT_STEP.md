@@ -11,7 +11,7 @@
 - 上面这条聚合 smoke gate 当前还把 `correlation missing` rejection guidance 的双语 follow-up 锁成精确断言：必须同时保留 `cleanup inspect <ref> / 清理检查 <ref>` 和 `cleanup <ref> / 清理 <ref>` 两行引导，不能退化成只剩关键词提示。
 - 同一条聚合 smoke gate 当前也把 `target missing` / `source missing` rejection guidance 的双语 follow-up 锁成精确断言：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
 - 同一条聚合 smoke gate 当前还把 `source-type-unsupported` / `guard rejected` rejection guidance 的双语 follow-up 锁成精确断言：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导。
-- `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“已完成后 `当前结论` 只能保留已满足退出条件”和“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”这四条规则上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细。
+- `tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 已落地，当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”和“待验证备注也必须保留窗口开始日期”这五条规则上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细。
 - `docs/STATUS.md` 当前还要同步保留仓库级 `.venv/bin/python -m pytest -q` 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照，避免 focused cleanup / docs gate 已更新，但总体回归、cleanup 服务回归、语法快照或 docs gate 快照还停在旧数字。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前标题直接带 `2026-04-05 to 2026-04-12` 日期，避免窗口起止日期只藏在正文条目里。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 当前不只记录四渠道真实私聊 smoke 进度，也要记录最近一次聚合 smoke gate、cleanup 协议回归验证和 verification docs gate 结果，避免验证窗口只剩“待勾选项”。
@@ -58,6 +58,7 @@
 - `当前 cleanup 协议观察` 也必须跟随渠道缺口同步收缩；只要四渠道里仍有待补项，可以写“当前缺口只剩四渠道真实私聊 smoke 证据”，但渠道全部补齐后就不得继续沿用这句旧缺口文案。
 - 当渠道缺口已经补齐、剩余缺口只剩 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名这些剩余缺口，不能只删掉“四渠道真实私聊 smoke 证据”旧文案。
 - 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
+- `Channel progress` 的 `待验证` 备注也必须保留窗口开始日期，不能只剩笼统的待补文案。
 - `Channel progress` 的备注列必须与渠道状态同步；若渠道仍待验证，备注继续写待补真实私聊 smoke 记录；若渠道已完成，备注不得继续沿用待补文案。
 - 让 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态，也不要把 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细抄回 `docs/STATUS.md`。

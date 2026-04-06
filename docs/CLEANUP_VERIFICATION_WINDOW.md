@@ -34,13 +34,13 @@
 
 - 最近一次聚合 smoke gate：2026-04-06，`240 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - 最近一次 cleanup 协议回归验证：2026-04-06，`338 passed, 91 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- 最近一次 verification docs gate：2026-04-06，`246 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- 最近一次 verification docs gate：2026-04-06，`247 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - 当前 cleanup 协议观察：截至 2026-04-06，cleanup discoverability / inspect / target-missing cleanup inspect follow-up guidance / source-missing cleanup inspect follow-up guidance / cleanup inspect follow-up guidance / guard-rejected cleanup inspect follow-up guidance / post-cleanup cleanup inspect confirmation / chat-scoped task_ref post-cleanup cleanup inspect confirmation / chat-scoped task_ref target-missing cleanup inspect follow-up guidance / chat-scoped task_ref source-missing cleanup inspect follow-up guidance / execution / correlation-missing / target-missing / source-missing / source-type-unsupported / guard-rejected rejection guidance / success follow-up / failure observability 未见协议回退；当前缺口只剩四渠道真实私聊 smoke 证据。
 
 ## Update rule
 
 - 每次真实私聊 smoke 完成后，立刻把对应渠道状态改成 `已完成`，并写入绝对日期。
-- `Channel progress` 里的备注列必须和渠道状态一致：`待验证` 时继续写待补真实私聊 smoke 记录；`已完成` 后不得继续沿用待补文案。
+- `Channel progress` 里的备注列必须和渠道状态一致：`待验证` 时继续写待补真实私聊 smoke 记录，并保留窗口开始日期的绝对时间锚点；`已完成` 后不得继续沿用待补文案。
 - 已完成渠道写入的真实私聊 smoke 日期不得早于窗口开始日期，也不得晚于当前结论快照日期；不要把窗口外日期回填成窗口内证据。
 - 最早可结束日期之前，`窗口活性` 保持为 `未到最早可结束日期`；`当前结论` 也要显式写出“尚未到最早可结束日期 <绝对日期>”。
 - 到达最早可结束日期但退出条件未满足时，`窗口活性` 改成 `已到最早可结束日期，待补退出条件`；`当前结论` 也要显式写出“已到最早可结束日期 <绝对日期>，但退出条件仍未满足”。

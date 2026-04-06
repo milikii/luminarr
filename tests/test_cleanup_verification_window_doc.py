@@ -235,11 +235,14 @@ def _assert_completed_conclusion_drops_gap_wording(
 
 def _assert_channel_progress_notes_match_status(
     *,
+    start_date: date,
     progress_rows_with_notes: list[tuple[str, str, str, str]],
 ) -> None:
     for _, row_status, last_date, note in progress_rows_with_notes:
         if row_status == "待验证":
             assert last_date == "-"
+            assert start_date.isoformat() in note
+            assert "启动验证窗口" in note
             assert "待补真实私聊 smoke 记录" in note
             continue
         assert "待补真实私聊 smoke 记录" not in note
@@ -281,6 +284,24 @@ def test_completed_protocol_observation_drops_gap_wording() -> None:
         _assert_completed_protocol_observation_drops_gap_wording(
             window_status="已完成",
             protocol_observation_text="cleanup discoverability / inspect / execution 未见协议回退；当前缺口是 verification docs gate。",
+        )
+
+
+def test_pending_channel_notes_keep_window_start_date_anchor() -> None:
+    _assert_channel_progress_notes_match_status(
+        start_date=date(2026, 4, 5),
+        progress_rows_with_notes=[
+            ("Telegram", "待验证", "-", "2026-04-05 启动验证窗口，待补真实私聊 smoke 记录"),
+            ("personal WeChat", "已完成", "2026-04-06", "2026-04-06 已完成真实私聊 smoke"),
+        ],
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_channel_progress_notes_match_status(
+            start_date=date(2026, 4, 5),
+            progress_rows_with_notes=[
+                ("Telegram", "待验证", "-", "待补真实私聊 smoke 记录"),
+            ],
         )
 
 
@@ -421,7 +442,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "246 passed"
+    assert docs_gate_result == "247 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
@@ -548,6 +569,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         conclusion=conclusion,
     )
     _assert_channel_progress_notes_match_status(
+        start_date=start_date,
         progress_rows_with_notes=progress_rows_with_notes,
     )
 
