@@ -171,6 +171,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "source-missing rejection guidance" in text
         assert "source-type-unsupported rejection guidance" in text
         assert "guard-rejected rejection guidance" in text
+        assert "cleanup 执行失败" in text
+        assert "event_type=cleanup.failed" in text
+        assert "lookup_task_ref/task_id/task_hash" in text
+        assert "task_id/task_hash + source + target" in text
 
     assert "仓库级 `.venv/bin/python -m pytest -q` 快照" in next_step_text
     assert "`cleanup service tests` 快照" in next_step_text

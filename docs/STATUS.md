@@ -1,4 +1,4 @@
-# Current status (v146)
+# Current status (v147)
 
 ## Project position
 
@@ -32,7 +32,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `chat-scoped task_ref target-missing` / `source-missing` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `chat-scoped task_ref source-type-unsupported` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `chat-scoped task_ref guard-rejected` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
-  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”“待验证备注也必须保留窗口开始日期”和“已完成备注必须写完成日期与真实私聊 smoke 结论”这七条收口规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”“待验证备注也必须保留窗口开始日期”“已完成备注必须写完成日期与真实私聊 smoke 结论”，以及 cleanup 删除失败 / 关联查询失败 / 事件落盘失败三条日志的字段承诺这八类规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
