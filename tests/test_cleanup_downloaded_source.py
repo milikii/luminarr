@@ -893,6 +893,83 @@ def test_cleanup_by_task_ref_logs_correlation_query_failure_and_keeps_follow_up(
     assert "检查 SQLite job_event 是否可读、导入成功事件是否已落盘" in captured.out
 
 
+def test_inspect_by_task_ref_logs_correlation_query_failure_with_chat_scoped_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+    monkeypatch.setattr(
+        event_repo,
+        "find_latest_import_correlation",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("mock correlation lookup denied")),
+    )
+
+    reply = service.inspect_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    captured = capsys.readouterr()
+    assert "查询引用: cleanup-shortcut" in reply
+    assert "任务 ID: 87" in reply
+    assert "任务 Hash: hash-87" in reply
+    assert "关联: 未找到" in reply
+    assert "当前 guardrail: 拒绝 cleanup" in reply
+    assert "[cleanup 关联查询失败]" in captured.out
+    assert "task_ref=cleanup-shortcut" in captured.out
+    assert "lookup_task_ref=cleanup-shortcut" in captured.out
+    assert "lookup_task_id=87" in captured.out
+    assert "lookup_task_hash=hash-87" in captured.out
+
+
+def test_cleanup_by_task_ref_logs_correlation_query_failure_with_chat_scoped_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="cleanup-shortcut",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+
+    monkeypatch.setattr(
+        event_repo,
+        "find_latest_import_correlation",
+        lambda **_: (_ for _ in ()).throw(RuntimeError("mock correlation lookup denied")),
+    )
+
+    reply = service.cleanup_by_task_ref("cleanup-shortcut", chat_id=1001)
+
+    captured = capsys.readouterr()
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply
+    assert "[cleanup 关联查询失败]" in captured.out
+    assert "task_ref=cleanup-shortcut" in captured.out
+    assert "lookup_task_ref=cleanup-shortcut" in captured.out
+    assert "lookup_task_id=87" in captured.out
+    assert "lookup_task_hash=hash-87" in captured.out
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert events[-1].event_type == "cleanup.correlation_missing"
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in events[-1].message
+
+
 def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
