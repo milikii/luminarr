@@ -1,4 +1,4 @@
-# Current status (v134)
+# Current status (v135)
 
 ## Project position
 
@@ -27,7 +27,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 其中 `correlation missing` rejection guidance 当前已把双语 follow-up 锁成精确断言：必须同时保留 `cleanup inspect <ref> / 清理检查 <ref>` 和 `cleanup <ref> / 清理 <ref>` 两行引导，避免回退成只剩关键词级别检查
   - `target missing` / `source missing` rejection guidance 当前也已锁成完整双语 follow-up：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `source-type-unsupported` / `guard rejected` rejection guidance 当前也已锁成完整双语 follow-up：必须继续同时保留 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
-  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述上保持一致，避免窗口台账和快照文档漂移）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述上保持一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -103,7 +103,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 | Feishu | 待验证 | - |
 | WeCom | 待验证 | - |
 
-- `docs/STATUS.md` 只保留这份快照；逐项备注和证据继续写入 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+- `docs/STATUS.md` 只保留这份快照；逐项备注和证据继续写入 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要把 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细回填到这里。
 
 ## Main risks and gaps
 

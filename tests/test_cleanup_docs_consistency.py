@@ -170,5 +170,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         r"\| (Telegram|personal WeChat|Feishu|WeCom) \| (待验证|已完成) \| ([0-9-]+|-) \|",
         status_text,
     )
+    assert re.search(r"^\| 渠道 \| 状态 \| 最近一次日期 \| 备注 \|$", window_text, re.MULTILINE) is not None
+    assert re.search(r"^\| 渠道 \| 状态 \| 最近一次日期 \| 备注 \|$", status_text, re.MULTILINE) is None
+    assert "待补真实私聊 smoke 记录" not in status_text
+    assert re.search(r"^- 当前 cleanup 协议观察：", status_text, re.MULTILINE) is None
     assert len(window_progress_rows) == 4
     assert status_progress_rows == window_progress_rows
