@@ -1,4 +1,4 @@
-# Cleanup verification window (v5)
+# Cleanup verification window (v6)
 
 ## Window
 
@@ -17,8 +17,8 @@
 - [ ] personal WeChat 完成至少 1 次真实私聊 cleanup smoke
 - [ ] Feishu 完成至少 1 次真实私聊 cleanup smoke
 - [ ] WeCom 完成至少 1 次真实私聊 cleanup smoke
-- [ ] `tests/test_cleanup_cross_channel_smoke.py` 持续通过
-- [ ] cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退
+- [x] `tests/test_cleanup_cross_channel_smoke.py` 持续通过
+- [x] cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退
 
 ## Channel progress
 
@@ -40,6 +40,6 @@
 - 每次真实私聊 smoke 完成后，立刻把对应渠道状态改成 `已完成`，并写入绝对日期。
 - 最早可结束日期之前，`窗口活性` 保持为 `未到最早可结束日期`；到达最早可结束日期但退出条件未满足时，改成 `已到最早可结束日期，待补退出条件`。
 - 退出条件满足后，`当前状态` 改成 `已完成`，`窗口活性` 改成 `已满足退出条件`，`当前结论` 同步写成已满足退出条件。
-- 每次重跑 `tests/test_cleanup_cross_channel_smoke.py` 或 focused cleanup 回归集后，立刻把最新日期、结果和命令同步写回这份台账。
+- 每次重跑 `tests/test_cleanup_cross_channel_smoke.py` 或 focused cleanup 回归集后，立刻把最新日期、结果和命令同步写回这份台账，并同步勾选或取消 exit checklist 里的 smoke gate / cleanup 协议两项。
 - 如果 smoke 暴露回归，只允许记录并修 shared runtime、渠道胶水或显式中文日志缺口，不新增 cleanup 行为。
 - `docs/STATUS.md` 只保留当前窗口快照；这份文件负责保留当前窗口的逐项证据。

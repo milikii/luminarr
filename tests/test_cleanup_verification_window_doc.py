@@ -72,6 +72,21 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert "未见协议回退" in protocol_observation_text
     assert "真实私聊 smoke 证据" in protocol_observation_text
 
+    smoke_gate_checklist_match = re.search(
+        r"- \[( |x)\] `tests/test_cleanup_cross_channel_smoke\.py` 持续通过",
+        text,
+    )
+    protocol_regression_checklist_match = re.search(
+        r"- \[( |x)\] cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退",
+        text,
+    )
+    assert smoke_gate_checklist_match is not None
+    assert protocol_regression_checklist_match is not None
+    smoke_gate_checklist_completed = smoke_gate_checklist_match.group(1) == "x"
+    protocol_regression_checklist_completed = protocol_regression_checklist_match.group(1) == "x"
+    assert smoke_gate_checklist_completed == ("passed" in smoke_gate_result)
+    assert protocol_regression_checklist_completed == ("未见协议回退" in protocol_observation_text)
+
     assert "`tests/test_cleanup_cross_channel_smoke.py`" in text
     assert "消息进来 -> shared runtime -> 文本回去" in text
 

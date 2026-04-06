@@ -1,4 +1,4 @@
-# Current status (v109)
+# Current status (v110)
 
 ## Project position
 
@@ -72,6 +72,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已作为当前验证窗口台账落地；窗口开始日期固定为 2026-04-05，最早可结束日期固定为 2026-04-12。
 - 验证窗口台账当前会显式写出“窗口活性”，区分“尚未到最早可结束日期”和“已到最早可结束日期但仍待补退出条件”，避免只写笼统的进行中。
 - 验证窗口台账当前还会保留最近一次聚合 smoke gate 与 cleanup 协议回归验证结果，避免退出清单只有待勾选项、没有已执行证据。
+- 验证窗口 exit checklist 里的 smoke gate / cleanup 协议两项当前会直接跟随这些证据同步，不再和四渠道真实私聊 smoke 待补项混成一组未完成。
 - 验证窗口台账当前会显式写出“当前结论”，说明是否已满足退出条件，避免只看状态或只看勾选项。
 - 窗口活性快照：未到最早可结束日期
 - 当前状态快照：进行中

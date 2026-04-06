@@ -1,4 +1,4 @@
-# Next step (v109)
+# Next step (v110)
 
 ## Current baseline
 
@@ -22,6 +22,7 @@
 - 把验证窗口起止日期、四渠道真实私聊 smoke 进度和当前结论持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让退出条件只留在口头描述。
 - 把验证窗口当前是否仍处于“未到最早可结束日期”还是“已到最早可结束日期但待补退出条件”显式写进 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不要让窗口活性只靠人工脑补。
 - 把最近一次聚合 smoke gate 与 cleanup 协议回归验证的日期、结果和命令持续记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，让退出清单有对应证据。
+- 让 exit checklist 里的 smoke gate / cleanup 协议两项直接跟随上述证据同步；仍待补的只保留真实私聊 smoke 和窗口起止条件。
 - `docs/STATUS.md` 只保留与 `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步的当前状态快照、四渠道当前快照和当前结论快照；逐项备注和证据继续只写在验证窗口台账里，不要两边各写一套状态。
 - `docs/STATUS.md` 还要同步保留 `窗口活性` 快照，避免最早可结束日期前后仍写成同一类进行中。
 - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke，确认“消息进来 -> shared runtime -> 文本回去”不回退。
@@ -56,6 +57,7 @@
 - 已完成 7 天验证窗口。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、四渠道真实私聊 smoke 日期、窗口活性和当前结论，且 `窗口活性`、`当前状态`、窗口标题日期、退出清单、渠道进度彼此一致。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 已同步记录最近一次聚合 smoke gate 与 cleanup 协议回归验证的日期、结果和命令，避免“测试已跑过但窗口台账没有证据”。
+- exit checklist 里的 smoke gate / cleanup 协议两项已与上述证据保持同步，不会继续停留在未勾选状态。
 - 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
 - `tests/test_cleanup_cross_channel_smoke.py` 持续通过，并持续覆盖英文/中文 discoverability / inspect / execution / correlation-missing rejection guidance / target-missing rejection guidance / source-missing rejection guidance / guard-rejected rejection guidance 与 `chat-scoped task_ref -> jobs -> import correlation` 路径，不回退到只能靠人工拼多个渠道测试结果。
 - cleanup discoverability、inspect、execution、rejection guidance、success follow-up、failure observability 都没有协议回退。
