@@ -359,8 +359,9 @@ def test_cleanup_by_task_ref_logs_delete_failure_with_fix_hint(
 
     captured = capsys.readouterr()
     assert "清理下载源资产失败：mock delete denied" in reply
-    assert "[下载源清理失败]" in captured.out
+    assert "[cleanup 执行失败]" in captured.out
     assert "task_ref=87" in captured.out
+    assert "event_type=cleanup.failed" in captured.out
     assert "task_id=87" in captured.out
     assert "task_hash=hash-87" in captured.out
     assert f"source={source_file}" in captured.out

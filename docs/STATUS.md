@@ -1,4 +1,4 @@
-# Current status (v145)
+# Current status (v146)
 
 ## Project position
 
@@ -49,7 +49,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
     - discoverability
     - rejection guidance
     - success follow-up
-    - failure observability（删除失败、关联查询失败、任务解析失败、事件落盘失败，以及 cleanup 执行被 correlation 缺失 / target 缺失 / source 已不存在 / source 不是文件或目录 / guard 拒绝阻断时，都会打印显式中文日志和处理建议；其中删除失败日志当前会带上 `task_ref + source + target`，关联查询失败日志当前会带上 `task_ref + lookup_task_ref/task_id/task_hash`，事件落盘失败日志当前会带上 `task_ref + task_id/task_hash + source + target`，方便直接定位是哪条 cleanup 和哪组路径出问题）
+    - failure observability（删除失败、关联查询失败、任务解析失败、事件落盘失败，以及 cleanup 执行被 correlation 缺失 / target 缺失 / source 已不存在 / source 不是文件或目录 / guard 拒绝阻断时，都会打印显式中文日志和处理建议；其中删除失败日志当前统一使用 `[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`，关联查询失败日志当前会带上 `task_ref + lookup_task_ref/task_id/task_hash`，事件落盘失败日志当前会带上 `task_ref + task_id/task_hash + source + target`，方便直接定位是哪条 cleanup 和哪组路径出问题）
     - chat-scoped `task_ref` 解析
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
@@ -167,7 +167,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 若渠道缺口和三项证据都已补齐、只剩最早可结束日期，台账里的 `当前 cleanup 协议观察` 也必须收口成未见协议回退，不能继续残留非日期缺口文案。
 - `Channel progress` 的备注列也必须跟随渠道状态更新，避免表格里状态和备注互相打架。
 - 若 `Channel progress` 某行已完成，备注也必须跟随 `最近一次日期` 写出同一天的真实私聊 smoke 完成说明。
-- cleanup 删除失败日志也必须继续带 `task_ref + source + target` 三组定位信息，避免只剩 task_id/task_hash 后还要人工回查目标路径。
+- cleanup 删除失败日志也必须继续保持 `[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`，避免 grep 不到 cleanup 前缀或只剩 task_id/task_hash。
 - cleanup 关联查询失败日志也必须继续带 `task_ref + lookup_task_ref/task_id/task_hash`，避免查库失败时看不出服务端到底尝试了哪组键。
 - cleanup 事件写入失败日志也必须继续带 `task_ref + task_id/task_hash + source + target`，避免用户文本已返回但服务端仍要靠人工拼上下文。
 - 台账里的 `窗口活性`、`当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“最早可结束日期已到但仍写未到窗口期”或“状态已完成但渠道仍待验证”这类漂移。

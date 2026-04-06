@@ -230,8 +230,8 @@ class CleanupDownloadedSourceService:
                 target_path=str(target_path),
             )
             print(
-                f"\033[31m[下载源清理失败]\033[0m task_ref={task_ref_for_event} "
-                f"task_id={inspection.task_id} task_hash={inspection.task_hash} "
+                f"\033[31m[cleanup 执行失败]\033[0m task_ref={task_ref_for_event} "
+                f"event_type=cleanup.failed task_id={inspection.task_id} task_hash={inspection.task_hash} "
                 f"source={source_path} target={target_path} 原因={error}",
                 flush=True,
             )
