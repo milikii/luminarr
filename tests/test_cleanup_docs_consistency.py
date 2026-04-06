@@ -12,6 +12,16 @@ def _extract_window_dates(text: str) -> tuple[str, str]:
     return start_match.group(1), end_match.group(1)
 
 
+def _extract_window_title_dates(text: str) -> tuple[str, str]:
+    title_match = re.search(
+        r"^# Cleanup verification window \((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\) \(v\d+\)$",
+        text,
+        re.MULTILINE,
+    )
+    assert title_match is not None
+    return title_match.group(1), title_match.group(2)
+
+
 def _extract_current_conclusion(text: str) -> str:
     conclusion_match = re.search(r"- 当前结论：(.+)", text)
     assert conclusion_match is not None
@@ -47,6 +57,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     window_text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
+    title_start_date, title_end_date = _extract_window_title_dates(window_text)
     start_date, end_date = _extract_window_dates(window_text)
     current_conclusion = _extract_current_conclusion(window_text)
     window_activity = _extract_window_activity(window_text)
@@ -60,6 +71,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     )
     window_status = _extract_window_status(window_text)
 
+    assert title_start_date == start_date
+    assert title_end_date == end_date
     assert f"开始日期固定为 {start_date}" in status_text
     assert f"最早可结束日期固定为 {end_date}" in status_text
     assert f"- 窗口活性快照：{window_activity}" in status_text

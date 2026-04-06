@@ -9,6 +9,11 @@ from zoneinfo import ZoneInfo
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
+    title_match = re.search(
+        r"^# Cleanup verification window \((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\) \(v\d+\)$",
+        text,
+        re.MULTILINE,
+    )
     status_match = re.search(r"- 当前状态：(进行中|已完成)", text)
     start_match = re.search(r"- 开始日期：(\d{4}-\d{2}-\d{2})", text)
     end_match = re.search(r"- 最早可结束日期：(\d{4}-\d{2}-\d{2})", text)
@@ -19,6 +24,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     conclusion_match = re.search(r"- 当前结论：(.+)", text)
     conclusion_date_match = re.search(r"截至 (\d{4}-\d{2}-\d{2})", text)
 
+    assert title_match is not None
     assert status_match is not None
     assert start_match is not None
     assert end_match is not None
@@ -26,6 +32,8 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert conclusion_match is not None
     assert conclusion_date_match is not None
 
+    title_start_date = date.fromisoformat(title_match.group(1))
+    title_end_date = date.fromisoformat(title_match.group(2))
     window_status = status_match.group(1)
     conclusion = conclusion_match.group(1)
     start_date = date.fromisoformat(start_match.group(1))
@@ -34,6 +42,8 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     conclusion_date = date.fromisoformat(conclusion_date_match.group(1))
     current_date = datetime.now(ZoneInfo("Asia/Shanghai")).date()
     assert (end_date - start_date).days >= 7
+    assert title_start_date == start_date
+    assert title_end_date == end_date
     assert start_date <= conclusion_date <= current_date
 
     smoke_gate_match = re.search(
