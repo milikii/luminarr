@@ -474,6 +474,43 @@ def test_cleanup_inspect_target_missing_follow_up_smoke_across_private_chat_chan
 @pytest.mark.parametrize(
     "query",
     [
+        "cleanup inspect 87",
+        "cleanup inspect hash-87",
+        "清理检查 87",
+        "清理检查 hash-87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_inspect_source_missing_follow_up_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+    source_file.unlink()
+
+    reply_text = runner(query, cleanup_service)
+
+    assert "当前 guardrail: 拒绝 cleanup" in reply_text
+    assert f"结论: 下载源资产已不存在，无需清理：{source_file}" in reply_text
+    assert "当前先不要执行 cleanup" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87" in reply_text
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "cleanup 87",
         "cleanup hash-87",
         "清理 87",
