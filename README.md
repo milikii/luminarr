@@ -109,6 +109,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - Telegram / personal WeChat / Feishu / WeCom 四个渠道各至少完成 1 次真实私聊 smoke
   - cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退
 - 这一步只允许修 shared runtime 回归、渠道胶水回归和显式日志缺口，不新增自动 cleanup、批量 cleanup 或删种。
+- `tests/test_cleanup_cross_channel_smoke.py` 继续保障四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / chat-scoped `task_ref` -> jobs -> import correlation，且已把缺结构化 `source_path/target_path` 的 identity retention 与 rejection guidance 验证进来。
 - cleanup 验证窗口结束后，下一步按顺序推进：
   1. 独立后台下载完成轮询
   2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
