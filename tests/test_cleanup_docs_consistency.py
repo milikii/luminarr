@@ -105,7 +105,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
 
     assert title_start_date == start_date
     assert title_end_date == end_date
-    assert full_suite_result == "589 passed, 2 skipped"
+    assert full_suite_result == "590 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_result == "28 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"
@@ -149,6 +149,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "真实私聊 cleanup smoke 仍待补" in text
         assert "不得继续写“真实私聊 cleanup smoke 仍待补”" in text
         assert "必须显式写出 smoke gate、cleanup 协议或 verification docs gate 缺口" in text
+        assert "只剩最早可结束日期" in text
         assert "备注列" in text
         assert "尚未到最早可结束日期" in text
         assert "已到最早可结束日期" in text

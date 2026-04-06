@@ -177,6 +177,31 @@ def _assert_conclusion_mentions_non_channel_gaps_when_they_are_the_remaining_blo
         assert "verification docs gate" in conclusion
 
 
+def _assert_conclusion_only_mentions_end_date_blocker_when_it_is_the_last_remaining_gap(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    smoke_gate_checklist_completed: bool,
+    protocol_regression_checklist_completed: bool,
+    docs_gate_checklist_completed: bool,
+    current_date: date,
+    end_date: date,
+    conclusion: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    has_non_channel_gap = not (
+        smoke_gate_checklist_completed
+        and protocol_regression_checklist_completed
+        and docs_gate_checklist_completed
+    )
+    if has_pending_channel or has_non_channel_gap or current_date >= end_date:
+        return
+    assert "尚未到最早可结束日期" in conclusion
+    assert end_date.isoformat() in conclusion
+    assert "smoke gate" not in conclusion
+    assert "cleanup 协议" not in conclusion
+    assert "verification docs gate" not in conclusion
+
+
 def _assert_channel_progress_notes_match_status(
     *,
     progress_rows_with_notes: list[tuple[str, str, str, str]],
@@ -212,6 +237,39 @@ def test_protocol_observation_requires_named_non_channel_gaps_after_channel_gap_
             protocol_regression_checklist_completed=True,
             docs_gate_checklist_completed=False,
             protocol_observation_text="cleanup discoverability 未见协议回退。",
+        )
+
+
+def test_conclusion_keeps_only_end_date_blocker_when_everything_else_is_done_early() -> None:
+    resolved_progress_rows = [
+        ("Telegram", "已完成", "2026-04-05"),
+        ("personal WeChat", "已完成", "2026-04-05"),
+        ("Feishu", "已完成", "2026-04-05"),
+        ("WeCom", "已完成", "2026-04-05"),
+    ]
+
+    _assert_conclusion_only_mentions_end_date_blocker_when_it_is_the_last_remaining_gap(
+        progress_rows=resolved_progress_rows,
+        smoke_gate_checklist_completed=True,
+        protocol_regression_checklist_completed=True,
+        docs_gate_checklist_completed=True,
+        current_date=date(2026, 4, 6),
+        end_date=date(2026, 4, 12),
+        conclusion="验证窗口仍在进行中；截至 2026-04-06，尚未到最早可结束日期 2026-04-12，暂未满足退出条件。",
+    )
+
+    with pytest.raises(AssertionError):
+        _assert_conclusion_only_mentions_end_date_blocker_when_it_is_the_last_remaining_gap(
+            progress_rows=resolved_progress_rows,
+            smoke_gate_checklist_completed=True,
+            protocol_regression_checklist_completed=True,
+            docs_gate_checklist_completed=True,
+            current_date=date(2026, 4, 6),
+            end_date=date(2026, 4, 12),
+            conclusion=(
+                "验证窗口仍在进行中；截至 2026-04-06，尚未到最早可结束日期 2026-04-12，"
+                "但 smoke gate 仍待补，暂未满足退出条件。"
+            ),
         )
 
 
@@ -306,7 +364,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_personal_wechat_text.py tests/test_feishu_adapter.py "
         "tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup"
     )
-    assert docs_gate_result == "243 passed"
+    assert docs_gate_result == "244 passed"
     assert (
         docs_gate_command
         == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py "
@@ -417,6 +475,15 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         smoke_gate_checklist_completed=smoke_gate_checklist_completed,
         protocol_regression_checklist_completed=protocol_regression_checklist_completed,
         docs_gate_checklist_completed=docs_gate_checklist_completed,
+        conclusion=conclusion,
+    )
+    _assert_conclusion_only_mentions_end_date_blocker_when_it_is_the_last_remaining_gap(
+        progress_rows=progress_rows,
+        smoke_gate_checklist_completed=smoke_gate_checklist_completed,
+        protocol_regression_checklist_completed=protocol_regression_checklist_completed,
+        docs_gate_checklist_completed=docs_gate_checklist_completed,
+        current_date=current_date,
+        end_date=end_date,
         conclusion=conclusion,
     )
     _assert_channel_progress_notes_match_status(
