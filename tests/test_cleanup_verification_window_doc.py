@@ -97,6 +97,22 @@ def _assert_conclusion_drops_pending_channel_gap_when_resolved(
     assert "真实私聊 cleanup smoke 记录仍待补" not in conclusion
 
 
+def _assert_conclusion_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
+    *,
+    progress_rows: list[tuple[str, str, str]],
+    smoke_gate_checklist_completed: bool,
+    protocol_regression_checklist_completed: bool,
+    conclusion: str,
+) -> None:
+    has_pending_channel = any(row_status == "待验证" for _, row_status, _ in progress_rows)
+    if has_pending_channel:
+        return
+    if not smoke_gate_checklist_completed:
+        assert "smoke gate" in conclusion
+    if not protocol_regression_checklist_completed:
+        assert "cleanup 协议" in conclusion
+
+
 def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> None:
     text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
@@ -248,6 +264,12 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     )
     _assert_conclusion_drops_pending_channel_gap_when_resolved(
         progress_rows=progress_rows,
+        conclusion=conclusion,
+    )
+    _assert_conclusion_mentions_non_channel_gaps_when_they_are_the_remaining_blockers(
+        progress_rows=progress_rows,
+        smoke_gate_checklist_completed=smoke_gate_checklist_completed,
+        protocol_regression_checklist_completed=protocol_regression_checklist_completed,
         conclusion=conclusion,
     )
 
