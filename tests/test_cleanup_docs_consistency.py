@@ -166,6 +166,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "Latest verification" in text
             assert "PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`" in text
             assert "pt_min_seed_hours" in text
+            assert "job_event` 关联查询失败" in text
+            assert "缺结构化 `source_path/target_path`" in text
 
     assert "docs/INDEX.md" in readme_text
     assert "docs/GETTING_STARTED.md" in readme_text
@@ -180,6 +182,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "pt_min_seed_hours" in readme_text
     assert ".ass" in readme_text
     assert "独立后台下载完成轮询" in readme_text
+    assert "job_event` 关联查询失败" in readme_text
+    assert "缺结构化 `source_path/target_path`" in readme_text
     assert "context_token" in decisions_text
     assert "pt_min_seed_hours" in decisions_text
     assert ".ass" in decisions_text
