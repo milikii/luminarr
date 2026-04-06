@@ -1,4 +1,4 @@
-# Current status (v141)
+# Current status (v142)
 
 ## Project position
 
@@ -32,7 +32,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `chat-scoped task_ref target-missing` / `source-missing` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `chat-scoped task_ref source-type-unsupported` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
   - `chat-scoped task_ref guard-rejected` rejection guidance 当前也已锁成解析后 follow-up：用户即使发的是 `cleanup <快捷引用>` / `清理 <快捷引用>`，返回里也必须继续落到解析后的 `cleanup inspect hash-87 / 清理检查 hash-87` 和 `cleanup hash-87 / 清理 hash-87` 两行引导
-  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”和“待验证备注也必须保留窗口开始日期”这六条收口规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
+  - cleanup verification docs consistency gate baseline（`tests/test_cleanup_docs_consistency.py` 与 `tests/test_cleanup_verification_window_doc.py` 当前会校验 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/CLEANUP_VERIFICATION_WINDOW.md` 在验证窗口日期、窗口标题日期与正文起止/退出清单日期一致性、聚合 smoke gate、`窗口活性`、`当前结论`、真实私聊 smoke 提示、`source-type-unsupported rejection guidance`、`guard-rejected rejection guidance`、`chat-scoped task_ref -> jobs -> import correlation`，以及“渠道缺口消失后 `当前 cleanup 协议观察` 仍需显式点名剩余 smoke gate / cleanup 协议 / verification docs gate 缺口”“只剩最早可结束日期时 `当前结论` 只能保留日期阻塞”“只剩最早可结束日期时 `当前 cleanup 协议观察` 只能保留未见协议回退”“已完成后 `当前结论` 只能保留已满足退出条件”“已完成后 `当前 cleanup 协议观察` 只能保留未见协议回退”“待验证备注也必须保留窗口开始日期”和“已完成备注必须写完成日期与真实私聊 smoke 结论”这七条收口规则，同时保持 `docs/STATUS.md` 里的仓库级 pytest 快照、`cleanup service tests` 快照、`compile check` 快照与 `docs consistency check` 快照描述一致，并继续锁住 `docs/STATUS.md` 只保留三列快照，不回填 `Channel progress` 备注列或 `当前 cleanup 协议观察` 明细，避免窗口台账和快照文档漂移）
   - `telegram_updates` 去重
   - `jobs.version + lease_owner + lease_until` 执行所有权
   - downloader / import approval、approval timeout、confirm wake rebuild、clarification durable truth、read-only concurrency-safe execution policy
@@ -97,6 +97,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
 - `Channel progress` 的 `待验证` 备注也必须保留窗口开始日期，不能只剩笼统的待补文案。
 - `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Channel progress` 备注列也必须和渠道状态同步，不能在 `已完成` 后继续保留待补真实私聊 smoke 文案。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Channel progress` 若写成 `已完成`，备注也必须同步写成 `<绝对日期> 已完成真实私聊 smoke`，不能只剩模糊完成态。
 - 验证窗口 exit checklist 里的 smoke gate / cleanup 协议 / verification docs gate 三项当前会直接跟随这些证据同步，不再和四渠道真实私聊 smoke 待补项混成一组未完成。
 - 若窗口已完成，上面三项证据勾选也必须继续保持完成，不能只把窗口状态改成已完成。
 - 验证窗口未到期时，`当前结论` 当前会显式写出“尚未到最早可结束日期 <绝对日期>”，避免只写泛泛的进行中。
@@ -165,5 +166,6 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 若剩余缺口已经收缩到 smoke gate、cleanup 协议回归或 verification docs gate，台账和这里的 `当前结论` 都必须显式点名对应缺口。
 - 若渠道缺口和三项证据都已补齐、只剩最早可结束日期，台账里的 `当前 cleanup 协议观察` 也必须收口成未见协议回退，不能继续残留非日期缺口文案。
 - `Channel progress` 的备注列也必须跟随渠道状态更新，避免表格里状态和备注互相打架。
+- 若 `Channel progress` 某行已完成，备注也必须跟随 `最近一次日期` 写出同一天的真实私聊 smoke 完成说明。
 - 台账里的 `窗口活性`、`当前状态`、`当前结论`、窗口标题日期、退出清单和四渠道进度必须相互一致，不能出现“最早可结束日期已到但仍写未到窗口期”或“状态已完成但渠道仍待验证”这类漂移。
 - cleanup 窗口之后，当前已明确排定的顺序是：先补 `series / anime` 独立名称解析，再补 shared private-chat 交付体验与最小人类可用入口，然后再推进 BT 共享确定性评分器；Jellyfin / Plex 与 plugin 体系继续后置。

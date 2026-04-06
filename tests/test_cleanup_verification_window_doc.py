@@ -270,6 +270,10 @@ def _assert_channel_progress_notes_match_status(
             assert "启动验证窗口" in note
             assert "待补真实私聊 smoke 记录" in note
             continue
+        assert last_date != "-"
+        assert last_date in note
+        assert "已完成真实私聊 smoke" in note
+        assert "启动验证窗口" not in note
         assert "待补真实私聊 smoke 记录" not in note
 
 
@@ -326,6 +330,14 @@ def test_pending_channel_notes_keep_window_start_date_anchor() -> None:
             start_date=date(2026, 4, 5),
             progress_rows_with_notes=[
                 ("Telegram", "待验证", "-", "待补真实私聊 smoke 记录"),
+            ],
+        )
+
+    with pytest.raises(AssertionError):
+        _assert_channel_progress_notes_match_status(
+            start_date=date(2026, 4, 5),
+            progress_rows_with_notes=[
+                ("Telegram", "已完成", "2026-04-06", "已完成真实私聊 smoke"),
             ],
         )
 
