@@ -360,9 +360,11 @@ def test_cleanup_by_task_ref_logs_delete_failure_with_fix_hint(
     captured = capsys.readouterr()
     assert "清理下载源资产失败：mock delete denied" in reply
     assert "[下载源清理失败]" in captured.out
+    assert "task_ref=87" in captured.out
     assert "task_id=87" in captured.out
     assert "task_hash=hash-87" in captured.out
     assert f"source={source_file}" in captured.out
+    assert f"target={target_file}" in captured.out
     assert "原因=mock delete denied" in captured.out
     assert "[处理建议]" in captured.out
     assert "检查 source_path 是否仍可访问、当前进程是否有删除权限" in captured.out
