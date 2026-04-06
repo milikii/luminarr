@@ -465,6 +465,7 @@ def test_cleanup_target_missing_rejection_guidance_smoke_across_private_chat_cha
 
     assert f"库内目标路径不存在，已拒绝清理下载源资产：{target_file}" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert source_file.exists()
     assert not target_file.exists()
 
@@ -500,6 +501,7 @@ def test_cleanup_source_missing_rejection_guidance_smoke_across_private_chat_cha
 
     assert f"下载源资产已不存在，无需清理：{source_file}" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert not source_file.exists()
     assert target_file.exists()
 
