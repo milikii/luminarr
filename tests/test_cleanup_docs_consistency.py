@@ -105,7 +105,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
 
     assert title_start_date == start_date
     assert title_end_date == end_date
-    assert full_suite_result == "633 passed, 2 skipped"
+    assert full_suite_result == "641 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_result == "28 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"
@@ -142,6 +142,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         assert "chat-scoped task_ref target-missing cleanup inspect follow-up guidance" in text
         assert "chat-scoped task_ref source-missing cleanup inspect follow-up guidance" in text
         assert "chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance" in text
+        assert "chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance" in text
         assert "chat-scoped task_ref target-missing rejection guidance" in text
         assert "chat-scoped task_ref source-missing rejection guidance" in text
         assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
