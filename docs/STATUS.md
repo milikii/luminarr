@@ -1,4 +1,4 @@
-# Current status (v174)
+# Current status (v175)
 
 ## Project position
 
@@ -57,7 +57,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前唯一主线仍然是 cleanup 四渠道验证窗口。
 - 详细规则、退出条件、证据和渠道进度统一看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-window` / `make test-cleanup-smoke` 两条本地 gate 入口；`docs/GETTING_STARTED.md` 已补当前 cleanup 窗口真实私聊 smoke 需要 `.env` 四渠道凭据和 personal WeChat 登录态；`.env.example` 已补 Telegram / Feishu / WeCom 凭据提示和 personal WeChat 本地登录态说明；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+- 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-window` / `make test-cleanup-smoke` 两条本地 gate 入口和无 `make` 备用命令；`docs/GETTING_STARTED.md` 已补当前 cleanup 窗口真实私聊 smoke 需要 `.env` 四渠道凭据和 personal WeChat 登录态；`.env.example` 已补 Telegram / Feishu / WeCom 凭据提示和 personal WeChat 本地登录态说明；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 窗口活性快照：未到最早可结束日期
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-10，尚未到最早可结束日期 2026-04-12，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。

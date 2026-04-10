@@ -134,6 +134,12 @@ docker compose logs -f luminarr
 make test-cleanup-smoke
 ```
 
+如果你的环境没有 `make`，就直接跑：
+
+```bash
+.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py
+```
+
 ## 7. 常用命令
 
 仓库根目录已经提供 `Makefile`：
@@ -149,6 +155,7 @@ make help
 - `make test-cleanup`：跑 cleanup 聚合回归
 - `make test-docs`：跑文档一致性 gate
 - `make test-cleanup-window`：连续跑当前 cleanup 验证窗口需要的 smoke gate、cleanup 聚合回归和文档 gate
+- 没有 `make` 时，`make test-cleanup-window` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py && .venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup && .venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`
 - `make compile`：跑 `compileall`
 - `make run`：读取 `.env` 后启动应用
 - `make docker-build`：构建镜像

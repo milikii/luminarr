@@ -222,11 +222,15 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
     assert "make test-cleanup-window" in getting_started_text
+    assert "如果你的环境没有 `make`" in getting_started_text
+    assert ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py" in getting_started_text
+    assert "tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py" in getting_started_text
     assert "Dockerfile" in getting_started_text
     assert "docker-compose.yml" in getting_started_text
     assert "make test-cleanup-smoke" in getting_started_text
     assert "make test-cleanup-smoke" in readme_text
     assert "make test-cleanup-window" in readme_text
+    assert "如果当前环境没有 `make`" in readme_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
     assert "TRANSMISSION_BASE_URL=" in env_example_text
