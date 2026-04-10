@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test test-cleanup test-docs compile run docker-build docker-up docker-logs
+.PHONY: help install test test-cleanup-smoke test-cleanup test-docs test-cleanup-window compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test test-cleanup test-docs compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test test-cleanup-smoke test-cleanup test-docs test-cleanup-window compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -14,11 +14,19 @@ install:
 test:
 	$(PYTHON) -m pytest -q
 
+test-cleanup-smoke:
+	$(PYTHON) -m pytest -q tests/test_cleanup_cross_channel_smoke.py
+
 test-cleanup:
 	$(PYTHON) -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup
 
 test-docs:
 	$(PYTHON) -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py
+
+test-cleanup-window:
+	$(MAKE) test-cleanup-smoke
+	$(MAKE) test-cleanup
+	$(MAKE) test-docs
 
 compile:
 	python3 -m compileall app tests

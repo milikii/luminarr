@@ -221,8 +221,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "四渠道真实私聊 smoke" in getting_started_text
     assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
+    assert "make test-cleanup-window" in getting_started_text
     assert "Dockerfile" in getting_started_text
     assert "docker-compose.yml" in getting_started_text
+    assert "make test-cleanup-smoke" in getting_started_text
+    assert "make test-cleanup-smoke" in readme_text
+    assert "make test-cleanup-window" in readme_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
     assert "TRANSMISSION_BASE_URL=" in env_example_text
@@ -230,8 +234,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "SHARED_MEDIA_ROOT=" in env_example_text
     assert "real four-channel private-chat cleanup smoke" in env_example_text
     assert "personal WeChat still relies on a local login state" in env_example_text
+    assert "test-cleanup-smoke:" in makefile_text
     assert "test-cleanup:" in makefile_text
     assert "test-docs:" in makefile_text
+    assert "test-cleanup-window:" in makefile_text
     assert "compile:" in makefile_text
     assert "run:" in makefile_text
     assert "docker-build:" in makefile_text

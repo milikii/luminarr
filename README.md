@@ -110,6 +110,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退
 - 这一步只允许修 shared runtime 回归、渠道胶水回归和显式日志缺口，不新增自动 cleanup、批量 cleanup 或删种。
 - `tests/test_cleanup_cross_channel_smoke.py` 继续保障四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case 英文 `cleanup / cleanup inspect` 输入 / chat-scoped `task_ref` -> jobs -> import correlation，且已把 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention，以及 `guard-rejected` rejection guidance 验证进来。
+- 当前 cleanup 窗口的本地 gate 入口有两条：`make test-cleanup-smoke` 只跑四渠道 smoke gate，`make test-cleanup-window` 会连续跑 smoke gate、cleanup 聚合回归和文档 gate；两者都不能替代四渠道真实私聊 smoke 证据。
 - cleanup 验证窗口结束后，下一步按顺序推进：
   1. 独立后台下载完成轮询
   2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
