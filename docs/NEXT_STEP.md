@@ -1,4 +1,4 @@
-# Next step (v169)
+# Next step (v170)
 
 ## Current goal
 
@@ -22,6 +22,7 @@
 - 保持仍在进行中的 cleanup 验证窗口快照和最近一次验证日期同步到当天绝对日期，避免窗口台账和 `docs/STATUS.md` 停留旧日期。
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `README.md` 只同步仓库入口需要知道的当前边界、cleanup 风险和后续路线；窗口逐项证据继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md`。
+- 保持 `docs/GETTING_STARTED.md` 明确区分“能启动应用”和“能补当前 cleanup 验证窗口四渠道真实私聊 smoke 证据”的前置条件，避免把本地回归误当成真实渠道验证。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case english cleanup protocol / `chat-scoped task_ref -> jobs -> import correlation` / correlation-query-failure identity retention / missing-structured-import-correlation identity retention 的聚合 smoke gate。
 - 保持 README / STATUS 对 cleanup 聚合 smoke gate 的入口描述也同步覆盖 mixed-case 英文 `cleanup / cleanup inspect` 输入、`job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance，以及 `guard-rejected` rejection guidance，避免入口文档落后于当前 gate。
 - 保持 verification docs gate 继续显式校验 `mixed-case english cleanup protocol` 命名观察，避免窗口台账把英文字母大小写输入边界写丢。

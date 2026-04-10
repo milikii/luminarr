@@ -1,4 +1,4 @@
-# docs/GETTING_STARTED.md (v1)
+# docs/GETTING_STARTED.md (v2)
 
 > 目的：让一个不会写代码、但能用命令行的人，也能把仓库在本机跑起来并完成第一次验证。
 
@@ -16,6 +16,12 @@
 - 如果要跑真实 import / refresh：
   - Transmission 本地测试栈
   - Emby 本地测试栈
+
+如果你要补**当前 cleanup 验证窗口**里的“四渠道真实私聊 smoke”退出条件，还要额外满足：
+
+- `.env` 里至少有可用的 `TELEGRAM_BOT_TOKEN`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_ENCRYPT_KEY`、`WECOM_TOKEN`、`WECOM_ENCODING_AES_KEY`、`WECOM_RECEIVE_ID`
+- personal WeChat 需要本地已有可用登录态；它不靠 `.env` 三元组启动
+- 只跑 `pytest` 只能证明 shared runtime 协议没回退，不能替代四渠道真实私聊 smoke 证据
 
 本地测试栈端点见 `docs/TEST_ENV.md`。
 

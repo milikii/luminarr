@@ -218,6 +218,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make run" in getting_started_text
     assert ".venv/bin/python -m app.main" in getting_started_text
     assert "docker compose up -d" in getting_started_text
+    assert "四渠道真实私聊 smoke" in getting_started_text
+    assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
+    assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
     assert "Dockerfile" in getting_started_text
     assert "docker-compose.yml" in getting_started_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
