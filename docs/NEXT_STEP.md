@@ -1,4 +1,4 @@
-# Next step (v181)
+# Next step (v182)
 
 ## Current goal
 
@@ -30,6 +30,7 @@
 - 保持 `Makefile` 明确暴露 `test-cleanup-service-not-ready`，让 cleanup service-not-ready observability 有独立 gate，避免这条专项 smoke 只能从 `docs/STATUS.md` 里的底层 pytest 命令回推。
 - 保持 `Makefile` 明确暴露 `test-cleanup-telegram`，让 Telegram cleanup 入口回归有稳定入口，避免 `docs/STATUS.md` 里的单渠道回归仍只能靠底层 pytest 命令手敲。
 - 保持 `README.md` / `docs/GETTING_STARTED.md` 继续提供无 `make` 环境下的等价一行 pytest 备用命令，避免把 Makefile 当成当前 cleanup 窗口 gate 的唯一入口。
+- 保持 verification docs gate 继续显式校验 `test-cleanup-window` 仍按 `smoke gate -> cleanup 聚合回归 -> verification docs gate` 顺序执行，且 `docs/GETTING_STARTED.md` 里的无 `make` 备用命令与这三段 Makefile 入口保持一致，避免窗口 gate 入口拆成多份后互相漂移。
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 对 Transmission / Emby 本地测试栈的 compose 文件位置、启动命令和配置目录位置保持一致，避免把不存在的目录误写成 compose 根目录。
 - 保持 `docs/STATUS.md` 里的 tests / cleanup service / compile check / docs consistency check 都带绝对日期，避免这些本地验证快照比 smoke / docs gate 更难判断是否过期。
 - 保持 cleanup 验证窗口仍在进行中时，`docs/CLEANUP_VERIFICATION_WINDOW.md` 的 smoke gate / cleanup 协议回归 / verification docs gate 日期，与 `docs/STATUS.md` 的 tests / cleanup service / compile check / docs consistency check 一起滚动到当天绝对日期，避免只更新半套快照。
