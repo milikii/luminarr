@@ -1,4 +1,4 @@
-# Next step (v182)
+# Next step (v183)
 
 ## Current goal
 
@@ -22,6 +22,7 @@
 - 保持仍在进行中的 cleanup 验证窗口快照和最近一次验证日期同步到当天绝对日期，避免窗口台账和 `docs/STATUS.md` 停留旧日期。
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `README.md` 只同步仓库入口需要知道的当前边界、cleanup 风险和后续路线；窗口逐项证据继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md`。
+- 保持 `README.md` 当前 next step 的退出条件也显式覆盖 `verification docs gate`，避免用户只看仓库入口时误以为 docs gate 不是 cleanup 验证窗口的正式退出条件。
 - 保持历史单体主文档 `Luminarr_v15.md` 不再作为当前知识入口，避免过期总纲和 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口重新分叉。
 - 保持 `docs/GETTING_STARTED.md` 明确区分“能启动应用”和“能补当前 cleanup 验证窗口四渠道真实私聊 smoke 证据”的前置条件，避免把本地回归误当成真实渠道验证。
 - 保持 `.env.example` 用中文详细说明每个变量的作用、默认值语义，以及“只为启动最小本地测试”时真正必填的变量集合，避免把配置模板误读成完整渠道准备状态。
