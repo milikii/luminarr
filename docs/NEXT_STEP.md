@@ -1,4 +1,4 @@
-# Next step (v168)
+# Next step (v169)
 
 ## Current goal
 
@@ -23,7 +23,7 @@
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `README.md` 只同步仓库入口需要知道的当前边界、cleanup 风险和后续路线；窗口逐项证据继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md`。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case english cleanup protocol / `chat-scoped task_ref -> jobs -> import correlation` / correlation-query-failure identity retention / missing-structured-import-correlation identity retention 的聚合 smoke gate。
-- 保持 README / STATUS 对 cleanup 聚合 smoke gate 的入口描述也同步覆盖 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance，避免入口文档落后于当前 gate。
+- 保持 README / STATUS 对 cleanup 聚合 smoke gate 的入口描述也同步覆盖 mixed-case 英文 `cleanup / cleanup inspect` 输入、`job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance，以及 `guard-rejected` rejection guidance，避免入口文档落后于当前 gate。
 - 保持 verification docs gate 继续显式校验 `mixed-case english cleanup protocol` 命名观察，避免窗口台账把英文字母大小写输入边界写丢。
 - 保持 verification docs gate 继续显式校验 `NEXT_STEP current-window sync`，避免 `docs/NEXT_STEP.md` 里的 `当前窗口` 日期和 `docs/CLEANUP_VERIFICATION_WINDOW.md` 的窗口日期只改一处。
 - 保持 verification docs gate 继续显式校验 `correlation-query-failure observability` 命名观察，避免窗口台账把这类 query failure 可观测性写丢。

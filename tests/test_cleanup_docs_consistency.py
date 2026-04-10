@@ -193,6 +193,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "独立后台下载完成轮询" in readme_text
     assert "job_event` 关联查询失败" in readme_text
     assert "缺结构化 `source_path/target_path`" in readme_text
+    assert "mixed-case 英文 `cleanup / cleanup inspect` 输入" in readme_text
+    assert "guard-rejected` rejection guidance" in readme_text
     assert "context_token" in decisions_text
     assert "pt_min_seed_hours" in decisions_text
     assert ".ass" in decisions_text
