@@ -1,4 +1,4 @@
-# Current status (v175)
+# Current status (v176)
 
 ## Project position
 
@@ -95,8 +95,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - cleanup service tests：`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - focused cleanup tests：`460 passed, 91 deselected`（2026-04-10，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
 - cleanup verification docs gate：`360 passed`（2026-04-10，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
-- compile check：`passed`（`python3 -m compileall app tests`）
-- docs consistency check：`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- compile check：2026-04-10，`passed`（`python3 -m compileall app tests`）
+- docs consistency check：2026-04-10，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
   - downloader/library cleanup execution baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_execution_baseline.py`）
   - qBittorrent protocol baseline passed

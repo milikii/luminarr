@@ -70,16 +70,16 @@ def _extract_status_cleanup_service_snapshot(text: str) -> tuple[str, str]:
     return cleanup_service_match.group(1), cleanup_service_match.group(2)
 
 
-def _extract_status_compile_check_snapshot(text: str) -> tuple[str, str]:
-    compile_check_match = re.search(r"- compile check：`([^`]+)`（`([^`]+)`）", text)
+def _extract_status_compile_check_snapshot(text: str) -> tuple[str, str, str]:
+    compile_check_match = re.search(r"- compile check：(\d{4}-\d{2}-\d{2})，`([^`]+)`（`([^`]+)`）", text)
     assert compile_check_match is not None
-    return compile_check_match.group(1), compile_check_match.group(2)
+    return compile_check_match.group(1), compile_check_match.group(2), compile_check_match.group(3)
 
 
-def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str]:
-    docs_consistency_match = re.search(r"- docs consistency check：`([^`]+)`（`([^`]+)`）", text)
+def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str, str]:
+    docs_consistency_match = re.search(r"- docs consistency check：(\d{4}-\d{2}-\d{2})，`([^`]+)`（`([^`]+)`）", text)
     assert docs_consistency_match is not None
-    return docs_consistency_match.group(1), docs_consistency_match.group(2)
+    return docs_consistency_match.group(1), docs_consistency_match.group(2), docs_consistency_match.group(3)
 
 
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
@@ -118,8 +118,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     window_status = _extract_window_status(window_text)
     full_suite_result, full_suite_command = _extract_status_full_suite_snapshot(status_text)
     cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
-    compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
-    docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
+    compile_check_date, compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
+    docs_consistency_date, docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
 
     assert title_start_date == start_date
     assert title_end_date == end_date
@@ -129,8 +129,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_result == "38 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"
+    assert compile_check_date == docs_gate_date
     assert compile_check_result == "passed"
     assert compile_check_command == "python3 -m compileall app tests"
+    assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
     assert f"- 窗口活性快照：{window_activity}" in status_text
