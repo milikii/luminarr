@@ -169,6 +169,7 @@ make help
 
 - `make test`：跑全量 pytest
 - `make test-cleanup-smoke`：跑四渠道 cleanup smoke gate
+- `make test-cleanup-service-not-ready`：跑 cleanup service-not-ready 专项 smoke
 - `make test-cleanup`：跑 cleanup 聚合回归
 - `make test-docs`：跑文档一致性 gate
 - `make test-cleanup-docs-gate`：跑 cleanup verification docs gate

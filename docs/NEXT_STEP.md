@@ -27,6 +27,7 @@
 - 保持 `.env.example` 用中文详细说明每个变量的作用、默认值语义，以及“只为启动最小本地测试”时真正必填的变量集合，避免把配置模板误读成完整渠道准备状态。
 - 保持 `Makefile` 同时提供独立的四渠道 cleanup smoke gate 入口和当前 cleanup 验证窗口的一键 gate 入口，避免把 smoke gate、cleanup 聚合回归和 docs gate 混成一条不透明命令。
 - 保持 `Makefile` 明确暴露 `test-cleanup-docs-gate`，让 cleanup verification docs gate 和普通 `test-docs` 分开，避免把 docs consistency gate 误当成当前 cleanup 窗口的完整文档 gate。
+- 保持 `Makefile` 明确暴露 `test-cleanup-service-not-ready`，让 cleanup service-not-ready observability 有独立 gate，避免这条专项 smoke 只能从 `docs/STATUS.md` 里的底层 pytest 命令回推。
 - 保持 `README.md` / `docs/GETTING_STARTED.md` 继续提供无 `make` 环境下的等价一行 pytest 备用命令，避免把 Makefile 当成当前 cleanup 窗口 gate 的唯一入口。
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 对 Transmission / Emby 本地测试栈的 compose 文件位置、启动命令和配置目录位置保持一致，避免把不存在的目录误写成 compose 根目录。
 - 保持 `docs/STATUS.md` 里的 tests / cleanup service / compile check / docs consistency check 都带绝对日期，避免这些本地验证快照比 smoke / docs gate 更难判断是否过期。

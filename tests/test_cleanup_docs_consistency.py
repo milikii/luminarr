@@ -253,6 +253,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
     assert "make test-cleanup-window" in getting_started_text
     assert "make test-cleanup-docs-gate" in getting_started_text
+    assert "make test-cleanup-service-not-ready" in getting_started_text
     assert "如果你的环境没有 `make`" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py" in getting_started_text
     assert (
@@ -263,6 +264,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docker-compose.yml" in getting_started_text
     assert "make test-cleanup-smoke" in getting_started_text
     assert "make test-cleanup-smoke" in readme_text
+    assert "make test-cleanup-service-not-ready" in readme_text
     assert "make test-cleanup-docs-gate" in readme_text
     assert "make test-cleanup-window" in readme_text
     assert "如果当前环境没有 `make`" in readme_text
@@ -278,6 +280,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d" in test_env_text
     assert "/home/alex/luminarr-test/config/transmission" in test_env_text
     assert "test-cleanup-smoke:" in makefile_text
+    assert "test-cleanup-service-not-ready:" in makefile_text
     assert "test-cleanup:" in makefile_text
     assert "test-docs:" in makefile_text
     assert "test-cleanup-docs-gate:" in makefile_text
