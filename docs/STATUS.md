@@ -1,4 +1,4 @@
-# Current status (v178)
+# Current status (v179)
 
 ## Project position
 
@@ -60,7 +60,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-window` / `make test-cleanup-smoke` 两条本地 gate 入口和无 `make` 备用命令；`docs/GETTING_STARTED.md` 已补当前 cleanup 窗口真实私聊 smoke 需要 `.env` 四渠道凭据和 personal WeChat 登录态，并把测试栈启动命令同步到仓库内 `docker-compose.test.yml`；`.env.example` 已改成中文详细注释并标出最少必填变量；`docs/TEST_ENV.md` 已同步测试栈 compose 文件真实位置；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 窗口活性快照：未到最早可结束日期
 - 当前状态快照：进行中
-- 当前结论快照：验证窗口仍在进行中；截至 2026-04-10，尚未到最早可结束日期 2026-04-12，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
+- 当前结论快照：验证窗口仍在进行中；截至 2026-04-11，尚未到最早可结束日期 2026-04-12，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
 - 聚合 smoke gate 快照：已把 `mixed-case` 英文 `cleanup / cleanup inspect` 输入，以及 `chat-scoped task_ref` 命中 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance 补进四渠道 cleanup smoke。
 - verification docs gate 快照：`mixed-case english cleanup protocol`、`NEXT_STEP current-window sync`、`correlation-query-failure observability`、`source-type-unsupported blocked-log observability`、`success-event-append-failure observability`、`delete-failure observability`、`correlation-missing unresolved-identity blank display`、`correlation-missing inspect identity resolution`、`correlation-missing rejection guidance`、`post-cleanup cleanup inspect confirmation`、`source-type-unsupported rejection guidance`、`chat-scoped task_ref post-cleanup cleanup inspect confirmation`、`chat-scoped task_ref target-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance`、`chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance`、`chat-scoped task_ref guard-rejected rejection guidance` 已纳入窗口台账门禁，避免 mixed-case-english-protocol / next-step-current-window-sync / query-failure / blocked-log / event-append-failure / delete-failure / unresolved-identity / inspect-identity-resolution / rejection-guidance / post-cleanup-confirmation / source-type-unsupported-guidance / chat-scoped-post-cleanup-confirmation / chat-scoped-target-missing-follow-up / chat-scoped-source-missing-follow-up / chat-scoped-source-type-follow-up / chat-scoped-guard-rejected-follow-up / chat-scoped-guard-rejected-rejection-guidance 可观测性命名从台账里漂走。
 - 当前四个渠道真实私聊 smoke 快照（与窗口台账同步）：
@@ -91,13 +91,13 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：2026-04-10，`716 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
-- four-channel cleanup smoke tests：`352 passed`（2026-04-10，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
-- cleanup service tests：2026-04-10，`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
-- focused cleanup tests：`460 passed, 91 deselected`（2026-04-10，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification docs gate：`360 passed`（2026-04-10，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
-- compile check：2026-04-10，`passed`（`python3 -m compileall app tests`）
-- docs consistency check：2026-04-10，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- tests：2026-04-11，`716 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- four-channel cleanup smoke tests：`352 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
+- cleanup service tests：2026-04-11，`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
+- focused cleanup tests：`460 passed, 91 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- cleanup verification docs gate：`360 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- compile check：2026-04-11，`passed`（`python3 -m compileall app tests`）
+- docs consistency check：2026-04-11，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - manual verification：
   - downloader/library cleanup execution baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_execution_baseline.py`）
   - qBittorrent protocol baseline passed
