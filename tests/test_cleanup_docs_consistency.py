@@ -58,16 +58,16 @@ def _extract_window_status(text: str) -> str:
     return status_match.group(1)
 
 
-def _extract_status_full_suite_snapshot(text: str) -> tuple[str, str]:
-    full_suite_match = re.search(r"- tests：`([^`]+)`（`([^`]+)`）", text)
+def _extract_status_full_suite_snapshot(text: str) -> tuple[str, str, str]:
+    full_suite_match = re.search(r"- tests：(\d{4}-\d{2}-\d{2})，`([^`]+)`（`([^`]+)`）", text)
     assert full_suite_match is not None
-    return full_suite_match.group(1), full_suite_match.group(2)
+    return full_suite_match.group(1), full_suite_match.group(2), full_suite_match.group(3)
 
 
-def _extract_status_cleanup_service_snapshot(text: str) -> tuple[str, str]:
-    cleanup_service_match = re.search(r"- cleanup service tests：`([^`]+)`（`([^`]+)`）", text)
+def _extract_status_cleanup_service_snapshot(text: str) -> tuple[str, str, str]:
+    cleanup_service_match = re.search(r"- cleanup service tests：(\d{4}-\d{2}-\d{2})，`([^`]+)`（`([^`]+)`）", text)
     assert cleanup_service_match is not None
-    return cleanup_service_match.group(1), cleanup_service_match.group(2)
+    return cleanup_service_match.group(1), cleanup_service_match.group(2), cleanup_service_match.group(3)
 
 
 def _extract_status_compile_check_snapshot(text: str) -> tuple[str, str, str]:
@@ -116,8 +116,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         "最近一次 verification docs gate",
     )
     window_status = _extract_window_status(window_text)
-    full_suite_result, full_suite_command = _extract_status_full_suite_snapshot(status_text)
-    cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
+    full_suite_date, full_suite_result, full_suite_command = _extract_status_full_suite_snapshot(status_text)
+    cleanup_service_date, cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
     compile_check_date, compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
     docs_consistency_date, docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
 
@@ -125,8 +125,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert title_end_date == end_date
     assert next_step_start_date == start_date
     assert next_step_end_date == end_date
+    assert full_suite_date == docs_gate_date
     assert full_suite_result == "716 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
+    assert cleanup_service_date == docs_gate_date
     assert cleanup_service_result == "38 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"
     assert compile_check_date == docs_gate_date
