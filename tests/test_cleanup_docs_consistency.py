@@ -301,6 +301,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-docs-gate" in readme_text
     assert "make test-cleanup-window" in readme_text
     assert "如果当前环境没有 `make`" in readme_text
+    assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
     assert "TRANSMISSION_BASE_URL=" in env_example_text
