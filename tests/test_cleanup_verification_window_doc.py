@@ -496,6 +496,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert "correlation-query-failure observability" in protocol_observation_text
     assert "mixed-case english cleanup protocol" in protocol_observation_text
     assert "source-type-unsupported blocked-log observability" in protocol_observation_text
+    assert "cleanup-service-not-ready fix-hint observability" in protocol_observation_text
     assert "success-event-append-failure observability" in protocol_observation_text
     assert "delete-failure observability" in protocol_observation_text
     assert "correlation-missing unresolved-identity blank display" in protocol_observation_text

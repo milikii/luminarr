@@ -172,6 +172,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "chat-scoped task_ref source-missing rejection guidance" in text
             assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
             assert "chat-scoped task_ref guard-rejected rejection guidance" in text
+            assert "cleanup-service-not-ready fix-hint observability" in text
             assert "Current goal" in text
             assert "Only do" in text
             assert "Do not do" in text
@@ -202,6 +203,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "chat-scoped task_ref source-missing rejection guidance" in text
             assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
             assert "chat-scoped task_ref guard-rejected rejection guidance" in text
+            assert "cleanup-service-not-ready fix-hint observability" in text
 
     assert "docs/INDEX.md" in readme_text
     assert "docs/GETTING_STARTED.md" in readme_text

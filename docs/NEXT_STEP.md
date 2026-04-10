@@ -38,6 +38,7 @@
 - 保持 verification docs gate 继续显式校验 `NEXT_STEP current-window sync`，避免 `docs/NEXT_STEP.md` 里的 `当前窗口` 日期和 `docs/CLEANUP_VERIFICATION_WINDOW.md` 的窗口日期只改一处。
 - 保持 verification docs gate 继续显式校验 `correlation-query-failure observability` 命名观察，避免窗口台账把这类 query failure 可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `source-type-unsupported blocked-log observability` 命名观察，避免窗口台账把这类阻断日志可观测性写丢。
+- 保持 verification docs gate 继续显式校验 `cleanup-service-not-ready fix-hint observability` 命名观察，避免窗口台账把 cleanup service 未注入时的红色日志和处理建议写丢。
 - 保持 verification docs gate 继续显式校验 `success-event-append-failure observability` 命名观察，避免窗口台账把这类事件落盘失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `delete-failure observability` 命名观察，避免窗口台账把这类删除失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `correlation-missing unresolved-identity blank display` 命名观察，避免窗口台账把这条空白身份展示边界写丢。
