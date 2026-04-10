@@ -163,6 +163,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "event_type=cleanup.failed" in text
             assert "lookup_task_ref/task_id/task_hash" in text
             assert "task_id/task_hash + source + target" in text
+            assert "cleanup 服务未就绪" in text
+            assert "`查询=`" in text
+            assert "SERVICE_NOT_READY_TEXT" in text
             assert "chat-scoped task_ref target-missing rejection guidance" in text
             assert "chat-scoped task_ref source-missing rejection guidance" in text
             assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
@@ -180,6 +183,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "当前结论" in text
             assert "窗口活性" in text
             assert "focused cleanup tests" in text
+            assert "cleanup 服务未就绪" in text
+            assert "查询=" in text
+            assert "cleanup service-not-ready smoke tests" in text
             assert "Knowledge entrypoints" in text
             assert "What is implemented now" in text
             assert "Main risks and gaps" in text

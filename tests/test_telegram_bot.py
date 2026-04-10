@@ -1482,7 +1482,7 @@ def test_handle_message_cleanup_chinese_routes_to_service(
     mocked_service_method.assert_called_once_with("hash-87", chat_id=1001)
 
 
-def test_handle_message_cleanup_replies_service_not_ready() -> None:
+def test_handle_message_cleanup_replies_service_not_ready(capsys: pytest.CaptureFixture[str]) -> None:
     update, reply_text = _build_update("cleanup hash-87")
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
@@ -1500,23 +1500,32 @@ def test_handle_message_cleanup_replies_service_not_ready() -> None:
     )
 
     asyncio.run(handle_message(update, context))
+    captured = capsys.readouterr()
 
     reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert "动作=cleanup" in captured.out
+    assert "cleanup hash-87" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 @pytest.mark.parametrize(
-    "query",
+    ("query", "expected_action"),
     [
-        "cleanup",
-        "cleanup inspect hash-87",
-        "cleanup inspect",
-        "清理",
-        "清理 hash-87",
-        "清理检查",
-        "清理检查 hash-87",
+        ("cleanup", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+        ("cleanup inspect", "cleanup_inspect"),
+        ("清理", "cleanup"),
+        ("清理 hash-87", "cleanup"),
+        ("清理检查", "cleanup_inspect"),
+        ("清理检查 hash-87", "cleanup_inspect"),
     ],
 )
-def test_handle_message_cleanup_variants_reply_service_not_ready(query: str) -> None:
+def test_handle_message_cleanup_variants_reply_service_not_ready(
+    query: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     update, reply_text = _build_update(query)
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
@@ -1534,8 +1543,13 @@ def test_handle_message_cleanup_variants_reply_service_not_ready(query: str) -> 
     )
 
     asyncio.run(handle_message(update, context))
+    captured = capsys.readouterr()
 
     reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert query in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def test_handle_message_import_replies_service_not_ready() -> None:

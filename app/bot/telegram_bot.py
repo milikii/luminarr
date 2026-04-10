@@ -1606,6 +1606,14 @@ def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
     )
 
 
+def _log_cleanup_service_not_ready(*, action: str, query: str) -> None:
+    print(
+        f"\033[31m[cleanup 服务未就绪]\033[0m 动作={action} 查询={query.strip() or '-'}\n"
+        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 cleanup_downloaded_source_service，"
+        "并确认 CleanupDownloadedSourceService 实例创建成功后重试。"
+    )
+
+
 def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅后台扫描未启动]\033[0m 原因={reason}\n"
@@ -1985,6 +1993,7 @@ async def handle_private_chat_query_text(
     if cleanup_inspect_ref is not None:
         cleanup_service = context.application.bot_data.get(CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
         if not isinstance(cleanup_service, CleanupDownloadedSourceService):
+            _log_cleanup_service_not_ready(action="cleanup_inspect", query=query)
             await reply_func(SERVICE_NOT_READY_TEXT)
             return
         reply = await _run_sync_with_policy(
@@ -2002,6 +2011,7 @@ async def handle_private_chat_query_text(
     if cleanup_ref is not None:
         cleanup_service = context.application.bot_data.get(CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
         if not isinstance(cleanup_service, CleanupDownloadedSourceService):
+            _log_cleanup_service_not_ready(action="cleanup", query=query)
             await reply_func(SERVICE_NOT_READY_TEXT)
             return
         reply = await _run_sync_with_policy(

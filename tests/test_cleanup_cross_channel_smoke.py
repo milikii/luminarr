@@ -16,6 +16,7 @@ from app.bot.telegram_bot import (
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
+    SERVICE_NOT_READY_TEXT,
     handle_message,
 )
 from app.bot.wecom_adapter import (
@@ -213,21 +214,23 @@ def _expected_chat_id(channel: str) -> int:
     raise ValueError(f"unexpected channel: {channel}")
 
 
-def _build_bot_data(cleanup_service: CleanupDownloadedSourceService) -> dict[str, object]:
+def _build_bot_data(cleanup_service: CleanupDownloadedSourceService | None = None) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
-    return {
+    bot_data: dict[str, object] = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
-        CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY: cleanup_service,
         WECOM_TOKEN_BOT_DATA_KEY: _TEST_WECOM_TOKEN,
         WECOM_ENCODING_AES_KEY_BOT_DATA_KEY: _TEST_WECOM_ENCODING_AES_KEY,
         WECOM_RECEIVE_ID_BOT_DATA_KEY: _TEST_WECOM_RECEIVE_ID,
     }
+    if cleanup_service is not None:
+        bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
+    return bot_data
 
 
-def _run_telegram_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+def _run_telegram_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService | None) -> str:
     reply_text = AsyncMock()
     message = SimpleNamespace(text=query, reply_text=reply_text)
     update = SimpleNamespace(
@@ -243,7 +246,7 @@ def _run_telegram_cleanup_query(query: str, cleanup_service: CleanupDownloadedSo
     return reply_text.await_args.args[0]
 
 
-def _run_personal_wechat_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+def _run_personal_wechat_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService | None) -> str:
     reply_text_func = AsyncMock()
     message = SimpleNamespace(
         message_type=1,
@@ -267,7 +270,7 @@ def _run_personal_wechat_cleanup_query(query: str, cleanup_service: CleanupDownl
     return reply_text_func.await_args.args[1]
 
 
-def _run_feishu_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+def _run_feishu_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService | None) -> str:
     reply_text_func = AsyncMock()
     payload = {
         "schema": "2.0",
@@ -303,7 +306,7 @@ def _run_feishu_cleanup_query(query: str, cleanup_service: CleanupDownloadedSour
     return reply_text_func.await_args.args[1]
 
 
-def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService) -> str:
+def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourceService | None) -> str:
     reply_text_func = AsyncMock()
     payload_xml = (
         "<xml>"
@@ -327,6 +330,31 @@ def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourc
 
     reply_text_func.assert_awaited_once()
     return reply_text_func.await_args.args[1]
+
+
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_service_not_ready_logs_fix_hint_across_private_chat_channels(
+    channel: str,
+    runner,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = runner("cleanup hash-87", None)
+    captured = capsys.readouterr()
+
+    assert reply_text == SERVICE_NOT_READY_TEXT
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert "动作=cleanup" in captured.out
+    assert "cleanup hash-87" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
 
 
 @pytest.mark.parametrize(
