@@ -1,4 +1,4 @@
-# Cleanup verification window (2026-04-05 to 2026-04-12) (v45)
+# Cleanup verification window (2026-04-05 to 2026-04-12) (v46)
 
 ## Window
 
@@ -61,6 +61,7 @@
 - 当渠道缺口已经补齐、剩余缺口收缩到 smoke gate、cleanup 协议回归或 verification docs gate 时，`当前 cleanup 协议观察` 也必须显式点名对应缺口，不能只删除旧文案却不写清还差什么。
 - 当渠道缺口和三项证据都已补齐、只剩最早可结束日期时，`当前 cleanup 协议观察` 只能保留“未见协议回退”，不能继续残留 smoke gate、cleanup 协议或 verification docs gate 缺口文案。
 - 已完成后，`当前 cleanup 协议观察` 只能保留未见协议回退，不得继续残留缺口、待补或其他退出条件文案。
+- 已完成后，`当前 cleanup 协议观察` 也不得继续残留 `尚未到最早可结束日期`、`已到最早可结束日期` 或 `真实私聊 cleanup smoke` 待补这类进行中窗口文案。
 - 退出条件满足后，`当前状态` 改成 `已完成`，`窗口活性` 改成 `已满足退出条件`，`当前结论` 同步写成已满足退出条件。
 - 一旦到达最早可结束日期，且四渠道真实私聊 smoke、smoke gate、cleanup 协议回归三类退出条件都已满足，就必须立刻改成 `已完成`，不能继续挂在进行中。
 - 一旦把验证窗口写成 `已完成`，exit checklist 里的 `tests/test_cleanup_cross_channel_smoke.py`、cleanup 协议回归和 verification docs gate 三项也必须同时保持勾选，不能出现“状态已完成但证据项未完成”。

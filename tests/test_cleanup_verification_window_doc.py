@@ -171,6 +171,9 @@ def _assert_completed_protocol_observation_drops_gap_wording(
     assert "缺口" not in protocol_observation_text
     assert "smoke gate" not in protocol_observation_text
     assert "verification docs gate" not in protocol_observation_text
+    assert "真实私聊 cleanup smoke" not in protocol_observation_text
+    assert "尚未到最早可结束日期" not in protocol_observation_text
+    assert "已到最早可结束日期" not in protocol_observation_text
 
 
 def _assert_conclusion_mentions_pending_channel_gap_when_needed(
@@ -313,6 +316,15 @@ def test_completed_protocol_observation_drops_gap_wording() -> None:
         _assert_completed_protocol_observation_drops_gap_wording(
             window_status="已完成",
             protocol_observation_text="cleanup discoverability / inspect / execution 未见协议回退；当前缺口是 verification docs gate。",
+        )
+
+    with pytest.raises(AssertionError):
+        _assert_completed_protocol_observation_drops_gap_wording(
+            window_status="已完成",
+            protocol_observation_text=(
+                "cleanup discoverability / inspect / execution 未见协议回退；"
+                "已到最早可结束日期 2026-04-12，但真实私聊 cleanup smoke 仍待补。"
+            ),
         )
 
 
