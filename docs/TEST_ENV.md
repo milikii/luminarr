@@ -9,7 +9,13 @@
 
 ## 测试栈位置
 
-Docker Compose 根目录：
+Docker Compose 文件：
+
+```text
+/home/alex/projects/luminarr/docker-compose.test.yml
+```
+
+测试栈配置目录根：
 
 ```text
 /home/alex/luminarr-test
@@ -18,13 +24,13 @@ Docker Compose 根目录：
 启动测试栈：
 
 ```bash
-cd /home/alex/luminarr-test && docker compose up -d
+docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
 ```
 
 停止测试栈：
 
 ```bash
-cd /home/alex/luminarr-test && docker compose down
+docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 ```
 
 说明：
@@ -32,6 +38,7 @@ cd /home/alex/luminarr-test && docker compose down
 - Emby 配置目录：`/home/alex/luminarr-test/config/emby`
 - 两个容器都运行在 WSL 本机 Docker 中，通过宿主机端口映射给应用访问
 - Transmission 使用整块 `/data:/data` 挂载；Emby 使用 `/data/library:/data/library` 挂载
+- 当前 compose 文件在仓库里，实际容器配置和状态仍落在 `/home/alex/luminarr-test`
 
 ---
 

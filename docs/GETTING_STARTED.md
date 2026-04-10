@@ -41,19 +41,32 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env
 ```
 
-然后手动编辑 `.env`，至少填这几个：
+然后手动编辑 `.env`。
 
-- `TELEGRAM_BOT_TOKEN`
+如果你只想让应用先跑起来并做最小本地测试，至少填这些：
+
 - `PROWLARR_BASE_URL`
 - `PROWLARR_API_KEY`
+- `TMDB_API_KEY`
 - `TRANSMISSION_BASE_URL` 或 `DOWNLOADER_INSTANCES`
 
-如果要跑 TMDB / Emby / 字幕翻译 / Feishu / WeCom，再补各自配置。
+如果你还要跑 import / refresh 联调，再补这些：
+
+- `LIBRARY_TARGET_DIR`
+- `EMBY_BASE_URL`
+- `EMBY_API_KEY`
+
+如果你还要用 Telegram 私聊入口，再补：
+
+- `TELEGRAM_BOT_TOKEN`
+
+如果你要补 Feishu / WeCom 真实私聊 smoke，再补各自 webhook 三元组。
+personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动。
 
 ## 4. 启动本地测试栈（需要真实 import / refresh 时）
 
 ```bash
-cd /home/alex/luminarr-test && docker compose up -d
+docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
 ```
 
 启动后先做健康检查：
@@ -62,7 +75,11 @@ cd /home/alex/luminarr-test && docker compose up -d
 curl -s http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
 ```
 
-如果这里只想跑纯单元测试，不做真实导入和刷新，可以先跳过这一步。
+说明：
+
+- compose 文件在仓库里：`/home/alex/projects/luminarr/docker-compose.test.yml`
+- Transmission / Emby 的配置目录仍然落在 `/home/alex/luminarr-test/config/...`
+- 如果这里只想跑纯单元测试，不做真实导入和刷新，可以先跳过这一步
 
 ## 5. 运行应用
 

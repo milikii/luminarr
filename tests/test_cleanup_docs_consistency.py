@@ -92,6 +92,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
     architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
     getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
+    test_env_text = Path("docs/TEST_ENV.md").read_text(encoding="utf-8")
     env_example_text = Path(".env.example").read_text(encoding="utf-8")
     makefile_text = Path("Makefile").read_text(encoding="utf-8")
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
@@ -221,7 +222,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Makefile" in getting_started_text
     assert "make run" in getting_started_text
     assert ".venv/bin/python -m app.main" in getting_started_text
-    assert "docker compose up -d" in getting_started_text
+    assert "docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d" in getting_started_text
     assert "四渠道真实私聊 smoke" in getting_started_text
     assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
@@ -240,8 +241,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "TRANSMISSION_BASE_URL=" in env_example_text
     assert "LIBRARY_TARGET_DIR=" in env_example_text
     assert "SHARED_MEDIA_ROOT=" in env_example_text
-    assert "real four-channel private-chat cleanup smoke" in env_example_text
-    assert "personal WeChat still relies on a local login state" in env_example_text
+    assert "只为启动 Luminarr 并做最小本地测试" in env_example_text
+    assert "personal WeChat 依赖本地登录态" in env_example_text
+    assert "如果你只想启动 Transmission / Emby 本地测试栈" in env_example_text
+    assert "/home/alex/projects/luminarr/docker-compose.test.yml" in test_env_text
+    assert "docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d" in test_env_text
+    assert "/home/alex/luminarr-test/config/transmission" in test_env_text
     assert "test-cleanup-smoke:" in makefile_text
     assert "test-cleanup:" in makefile_text
     assert "test-docs:" in makefile_text

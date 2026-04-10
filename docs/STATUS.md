@@ -1,4 +1,4 @@
-# Current status (v177)
+# Current status (v178)
 
 ## Project position
 
@@ -57,7 +57,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前唯一主线仍然是 cleanup 四渠道验证窗口。
 - 详细规则、退出条件、证据和渠道进度统一看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-window` / `make test-cleanup-smoke` 两条本地 gate 入口和无 `make` 备用命令；`docs/GETTING_STARTED.md` 已补当前 cleanup 窗口真实私聊 smoke 需要 `.env` 四渠道凭据和 personal WeChat 登录态；`.env.example` 已补 Telegram / Feishu / WeCom 凭据提示和 personal WeChat 本地登录态说明；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+- 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-window` / `make test-cleanup-smoke` 两条本地 gate 入口和无 `make` 备用命令；`docs/GETTING_STARTED.md` 已补当前 cleanup 窗口真实私聊 smoke 需要 `.env` 四渠道凭据和 personal WeChat 登录态，并把测试栈启动命令同步到仓库内 `docker-compose.test.yml`；`.env.example` 已改成中文详细注释并标出最少必填变量；`docs/TEST_ENV.md` 已同步测试栈 compose 文件真实位置；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 窗口活性快照：未到最早可结束日期
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-10，尚未到最早可结束日期 2026-04-12，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
@@ -87,6 +87,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - BT shared source adapter、BT external web-source、pure BT ranking、`btsub` 选源都已可用，但还不是共享确定性评分器。
 - 当前主线只支持 Emby；Jellyfin / Plex 仍是后续扩展，不在 cleanup 窗口这一步混入。
 - 通用 plugin / skill / MCP 平台化仍然继续后置，不是当前收口目标。
+- 当前会话里 `docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d` 已确认命中文件，但 Docker API 访问仍被本机权限阻塞；在 `docker.sock` 权限或 `sudo` 密码问题解决前，无法替本机真正拉起 Transmission / Emby 测试栈。
 
 ## Latest verification
 
