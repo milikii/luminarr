@@ -83,6 +83,7 @@ def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str, str]
 
 
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
+    legacy_overview_path = Path("Luminarr_v15.md")
     dockerfile_text = Path("Dockerfile").read_text(encoding="utf-8")
     docker_compose_text = Path("docker-compose.yml").read_text(encoding="utf-8")
     dockerignore_text = Path(".dockerignore").read_text(encoding="utf-8")
@@ -122,6 +123,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     compile_check_date, compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
     docs_consistency_date, docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
 
+    assert not legacy_overview_path.exists()
     assert title_start_date == start_date
     assert title_end_date == end_date
     assert next_step_start_date == start_date
@@ -217,6 +219,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in agents_text
     assert "docs/NEXT_STEP.md" in agents_text
     assert "docs/DECISIONS.md" in agents_text
+    assert "Luminarr_v15.md" not in readme_text
+    assert "Luminarr_v15.md" not in index_text
+    assert "Luminarr_v15.md" not in agents_text
+    assert "Luminarr_v15.md" in next_step_text
+    assert "Luminarr_v15.md" in status_text
     assert "README.md" in index_text
     assert "docs/GETTING_STARTED.md" in index_text
     assert "docs/ARCHITECTURE.md" in index_text

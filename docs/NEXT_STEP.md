@@ -1,4 +1,4 @@
-# Next step (v179)
+# Next step (v180)
 
 ## Current goal
 
@@ -22,6 +22,7 @@
 - 保持仍在进行中的 cleanup 验证窗口快照和最近一次验证日期同步到当天绝对日期，避免窗口台账和 `docs/STATUS.md` 停留旧日期。
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `README.md` 只同步仓库入口需要知道的当前边界、cleanup 风险和后续路线；窗口逐项证据继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md`。
+- 保持历史单体主文档 `Luminarr_v15.md` 不再作为当前知识入口，避免过期总纲和 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口重新分叉。
 - 保持 `docs/GETTING_STARTED.md` 明确区分“能启动应用”和“能补当前 cleanup 验证窗口四渠道真实私聊 smoke 证据”的前置条件，避免把本地回归误当成真实渠道验证。
 - 保持 `.env.example` 用中文详细说明每个变量的作用、默认值语义，以及“只为启动最小本地测试”时真正必填的变量集合，避免把配置模板误读成完整渠道准备状态。
 - 保持 `Makefile` 同时提供独立的四渠道 cleanup smoke gate 入口和当前 cleanup 验证窗口的一键 gate 入口，避免把 smoke gate、cleanup 聚合回归和 docs gate 混成一条不透明命令。
@@ -58,6 +59,7 @@
 - 保持 `chat-scoped task_ref` 在真正执行 cleanup 但删除失败时，也继续使用已解析出的真实任务身份写 `cleanup.failed` 事件和红色日志。
 - 保持 `chat-scoped task_ref` 在 cleanup 已成功但 `cleanup.succeeded` 事件写入失败时，也继续打印真实任务身份，且不隐藏成功文本。
 - 保持 `chat-scoped task_ref` 在 guardrail 判成 `source_type_unsupported` 时，也继续用真实关联任务身份打印阻断日志和 follow-up。
+- 保持 cleanup service 未注入时也继续打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=` 与 `[处理建议]` 修复提示，避免四渠道只回 `SERVICE_NOT_READY_TEXT` 却没有运维可见性。
 - 保持 cleanup 失败可观测性稳定：
   - 删除失败日志：`[cleanup 执行失败] + event_type=cleanup.failed + task_ref + source + target`
   - 关联查询失败日志：`task_ref + lookup_task_ref/task_id/task_hash`

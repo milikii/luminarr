@@ -1,4 +1,4 @@
-# Current status (v180)
+# Current status (v181)
 
 ## Project position
 
@@ -32,6 +32,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `shared private-chat text runtime`
   - Telegram / personal WeChat / Feishu / WeCom 四个正式私聊入口
   - `telegram_updates` 去重、`jobs` 执行所有权、approval timeout、confirm wake rebuild
+  - cleanup service 未注入时，shared runtime 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=` 和 `[处理建议]` 修复提示
 - 媒体主链：
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
   - `import approval -> confirm -> hardlink import`
@@ -58,6 +59,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前唯一主线仍然是 cleanup 四渠道验证窗口。
 - 详细规则、退出条件、证据和渠道进度统一看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-window` / `make test-cleanup-smoke` 两条本地 gate 入口和无 `make` 备用命令；`docs/GETTING_STARTED.md` 已补当前 cleanup 窗口真实私聊 smoke 需要 `.env` 四渠道凭据和 personal WeChat 登录态，并把测试栈启动命令同步到仓库内 `docker-compose.test.yml`；`.env.example` 已改成中文详细注释并标出最少必填变量；`docs/TEST_ENV.md` 已同步测试栈 compose 文件真实位置；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+- 知识入口快照：历史单体主文档 `Luminarr_v15.md` 已移除，当前只保留 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口，避免过期总纲继续和当前主线并行。
 - 窗口活性快照：未到最早可结束日期
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-11，尚未到最早可结束日期 2026-04-12，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
@@ -98,6 +100,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - cleanup verification docs gate：`360 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - compile check：2026-04-11，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-11，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- cleanup service-not-ready smoke tests：`4 passed, 352 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`）
+- telegram cleanup tests：`16 passed, 64 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`）
 - manual verification：
   - downloader/library cleanup execution baseline passed（`.venv/bin/python tmp_tests/verify_cleanup_execution_baseline.py`）
   - qBittorrent protocol baseline passed
