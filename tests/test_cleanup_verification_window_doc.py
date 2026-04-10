@@ -507,6 +507,9 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert "chat-scoped task_ref source-missing cleanup inspect follow-up guidance" in protocol_observation_text
     assert "chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance" in protocol_observation_text
     assert "chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance" in protocol_observation_text
+    assert "chat-scoped task_ref target-missing rejection guidance" in protocol_observation_text
+    assert "chat-scoped task_ref source-missing rejection guidance" in protocol_observation_text
+    assert "chat-scoped task_ref source-type-unsupported rejection guidance" in protocol_observation_text
     assert "source-type-unsupported rejection guidance" in protocol_observation_text
     assert "chat-scoped task_ref guard-rejected rejection guidance" in protocol_observation_text
     assert "missing-structured-import-correlation identity retention" in protocol_observation_text

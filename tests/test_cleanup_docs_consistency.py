@@ -161,6 +161,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "event_type=cleanup.failed" in text
             assert "lookup_task_ref/task_id/task_hash" in text
             assert "task_id/task_hash + source + target" in text
+            assert "chat-scoped task_ref target-missing rejection guidance" in text
+            assert "chat-scoped task_ref source-missing rejection guidance" in text
+            assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
+            assert "chat-scoped task_ref guard-rejected rejection guidance" in text
             assert "Current goal" in text
             assert "Only do" in text
             assert "Do not do" in text
@@ -182,6 +186,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "pt_min_seed_hours" in text
             assert "job_event` 关联查询失败" in text
             assert "缺结构化 `source_path/target_path`" in text
+            assert "chat-scoped task_ref target-missing rejection guidance" in text
+            assert "chat-scoped task_ref source-missing rejection guidance" in text
+            assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
+            assert "chat-scoped task_ref guard-rejected rejection guidance" in text
 
     assert "docs/INDEX.md" in readme_text
     assert "docs/GETTING_STARTED.md" in readme_text
@@ -229,7 +237,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-window" in getting_started_text
     assert "如果你的环境没有 `make`" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py" in getting_started_text
-    assert "tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py" in getting_started_text
+    assert (
+        "tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py "
+        "tests/test_cleanup_cross_channel_smoke.py"
+    ) in getting_started_text
     assert "Dockerfile" in getting_started_text
     assert "docker-compose.yml" in getting_started_text
     assert "make test-cleanup-smoke" in getting_started_text
