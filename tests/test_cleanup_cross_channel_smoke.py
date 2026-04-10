@@ -341,18 +341,27 @@ def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourc
         ("wecom", _run_wecom_cleanup_query),
     ],
 )
+@pytest.mark.parametrize(
+    ("query", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
 def test_cleanup_service_not_ready_logs_fix_hint_across_private_chat_channels(
     channel: str,
     runner,
+    query: str,
+    expected_action: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    reply_text = runner("cleanup hash-87", None)
+    reply_text = runner(query, None)
     captured = capsys.readouterr()
 
     assert reply_text == SERVICE_NOT_READY_TEXT
     assert "[cleanup 服务未就绪]" in captured.out
-    assert "动作=cleanup" in captured.out
-    assert "cleanup hash-87" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert query in captured.out
     assert "[处理建议]" in captured.out
     assert "cleanup_downloaded_source_service" in captured.out
 

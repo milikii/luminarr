@@ -32,7 +32,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `shared private-chat text runtime`
   - Telegram / personal WeChat / Feishu / WeCom 四个正式私聊入口
   - `telegram_updates` 去重、`jobs` 执行所有权、approval timeout、confirm wake rebuild
-  - cleanup service 未注入时，shared runtime 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=`、`查询=` 和 `[处理建议]` 修复提示
+  - cleanup service 未注入时，`cleanup` / `cleanup inspect` 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=cleanup/cleanup_inspect`、`查询=` 和 `[处理建议]` 修复提示
 - 媒体主链：
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
   - `import approval -> confirm -> hardlink import`

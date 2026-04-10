@@ -166,6 +166,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "cleanup 服务未就绪" in text
             assert "`查询=`" in text
             assert "SERVICE_NOT_READY_TEXT" in text
+            assert "cleanup inspect" in text
+            assert "cleanup_inspect" in text
             assert "chat-scoped task_ref target-missing rejection guidance" in text
             assert "chat-scoped task_ref source-missing rejection guidance" in text
             assert "chat-scoped task_ref source-type-unsupported rejection guidance" in text
@@ -186,6 +188,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "cleanup 服务未就绪" in text
             assert "查询=" in text
             assert "cleanup service-not-ready smoke tests" in text
+            assert "cleanup inspect" in text
+            assert "cleanup_inspect" in text
             assert "Knowledge entrypoints" in text
             assert "What is implemented now" in text
             assert "Main risks and gaps" in text
