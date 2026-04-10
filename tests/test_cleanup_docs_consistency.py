@@ -228,6 +228,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "TRANSMISSION_BASE_URL=" in env_example_text
     assert "LIBRARY_TARGET_DIR=" in env_example_text
     assert "SHARED_MEDIA_ROOT=" in env_example_text
+    assert "real four-channel private-chat cleanup smoke" in env_example_text
+    assert "personal WeChat still relies on a local login state" in env_example_text
     assert "test-cleanup:" in makefile_text
     assert "test-docs:" in makefile_text
     assert "compile:" in makefile_text
