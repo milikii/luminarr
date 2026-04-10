@@ -24,6 +24,7 @@ from app.services.cleanup_downloaded_source import (
 def test_parse_cleanup_query_supports_prefixes() -> None:
     assert parse_cleanup_query("cleanup 87") == "87"
     assert parse_cleanup_query("CLEANUP hash-87") == "hash-87"
+    assert parse_cleanup_query("ClEaNuP hash-87") == "hash-87"
     assert parse_cleanup_query("清理 abc123") == "abc123"
     assert parse_cleanup_query("cleanup") == ""
 
@@ -31,6 +32,7 @@ def test_parse_cleanup_query_supports_prefixes() -> None:
 def test_parse_cleanup_inspect_query_supports_prefixes() -> None:
     assert parse_cleanup_inspect_query("cleanup inspect 87") == "87"
     assert parse_cleanup_inspect_query("cleanup inspect hash-87") == "hash-87"
+    assert parse_cleanup_inspect_query("ClEaNuP InSpEcT hash-87") == "hash-87"
     assert parse_cleanup_inspect_query("清理检查 abc123") == "abc123"
     assert parse_cleanup_inspect_query("cleanup inspect") == ""
 

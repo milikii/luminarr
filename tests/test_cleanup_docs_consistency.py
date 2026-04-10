@@ -22,6 +22,12 @@ def _extract_window_title_dates(text: str) -> tuple[str, str]:
     return title_match.group(1), title_match.group(2)
 
 
+def _extract_next_step_current_window_dates(text: str) -> tuple[str, str]:
+    window_match = re.search(r"- 当前窗口：`(\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})`", text)
+    assert window_match is not None
+    return window_match.group(1), window_match.group(2)
+
+
 def _extract_current_conclusion(text: str) -> str:
     conclusion_match = re.search(r"- 当前结论：(.+)", text)
     assert conclusion_match is not None
@@ -93,6 +99,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     window_text = Path("docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
 
     title_start_date, title_end_date = _extract_window_title_dates(window_text)
+    next_step_start_date, next_step_end_date = _extract_next_step_current_window_dates(next_step_text)
     start_date, end_date = _extract_window_dates(window_text)
     current_conclusion = _extract_current_conclusion(window_text)
     window_activity = _extract_window_activity(window_text)
@@ -116,7 +123,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
 
     assert title_start_date == start_date
     assert title_end_date == end_date
-    assert full_suite_result == "676 passed, 2 skipped"
+    assert next_step_start_date == start_date
+    assert next_step_end_date == end_date
+    assert full_suite_result == "716 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_result == "38 passed"
     assert cleanup_service_command == ".venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py"

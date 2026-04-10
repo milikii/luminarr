@@ -365,6 +365,39 @@ def test_cleanup_inspect_smoke_across_private_chat_channels(
 @pytest.mark.parametrize(
     "query",
     [
+        "ClEaNuP InSpEcT 87",
+        "cLeAnUp iNsPeCt hash-87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_mixed_case_inspect_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+
+    reply_text = runner(query, cleanup_service)
+
+    assert "清理预检结果：" in reply_text
+    assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
         "cleanup inspect 87",
         "cleanup inspect hash-87",
         "清理检查 87",
@@ -465,6 +498,38 @@ def test_cleanup_execution_smoke_across_private_chat_channels(
     cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
 
     reply_text = runner(f"cleanup {task_ref}", cleanup_service)
+
+    assert "已清理下载源资产" in reply_text
+    assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
+    assert not source_file.exists()
+    assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "ClEaNuP 87",
+        "cLeAnUp hash-87",
+    ],
+)
+@pytest.mark.parametrize(
+    ("channel", "runner"),
+    [
+        ("telegram", _run_telegram_cleanup_query),
+        ("personal_wechat", _run_personal_wechat_cleanup_query),
+        ("feishu", _run_feishu_cleanup_query),
+        ("wecom", _run_wecom_cleanup_query),
+    ],
+)
+def test_cleanup_mixed_case_execution_smoke_across_private_chat_channels(
+    tmp_path: Path,
+    query: str,
+    channel: str,
+    runner,
+) -> None:
+    cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path / channel)
+
+    reply_text = runner(query, cleanup_service)
 
     assert "已清理下载源资产" in reply_text
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
