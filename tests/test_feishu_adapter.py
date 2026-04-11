@@ -566,6 +566,44 @@ def test_handle_feishu_webhook_http_request_routes_cleanup_inspect_in_chinese_in
 
 
 @pytest.mark.parametrize(
+    ("query", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
+def test_handle_feishu_webhook_http_request_logs_cleanup_service_not_ready(
+    query: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text_func = AsyncMock()
+    body = json.dumps(_build_feishu_private_text_payload(query), ensure_ascii=False)
+
+    response = asyncio.run(
+        handle_feishu_webhook_http_request(
+            body=body,
+            headers=_build_signature_headers(body=body, encrypt_key="encrypt-key-42"),
+            bot_data=_build_bot_data(),
+            reply_text_func=reply_text_func,
+        )
+    )
+    captured = capsys.readouterr()
+
+    assert response.status_code == 200
+    assert json.loads(response.body.decode("utf-8")) == {"code": 0}
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert reply_text == SERVICE_NOT_READY_TEXT
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert query in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
+
+
+@pytest.mark.parametrize(
     ("text", "expected_reply"),
     [
         ("cleanup", CLEANUP_QUERY_USAGE_TEXT),

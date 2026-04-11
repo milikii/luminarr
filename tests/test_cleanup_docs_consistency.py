@@ -160,6 +160,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     telegram_service_latest_result, telegram_service_latest_date, telegram_service_latest_command = (
         _extract_status_named_verification_entry(status_text, "Telegram cleanup service-not-ready tests")
     )
+    feishu_webhook_snapshot_result, feishu_webhook_snapshot_date, feishu_webhook_snapshot_command = (
+        _extract_status_named_verification_entry(status_text, "Feishu webhook cleanup 快照")
+    )
+    feishu_webhook_latest_result, feishu_webhook_latest_date, feishu_webhook_latest_command = (
+        _extract_status_named_verification_entry(status_text, "Feishu webhook cleanup tests")
+    )
     wecom_service_snapshot_result, wecom_service_snapshot_date, wecom_service_snapshot_command = (
         _extract_status_named_verification_entry(status_text, "WeCom cleanup service-not-ready 快照")
     )
@@ -198,6 +204,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert telegram_service_snapshot_result == telegram_service_latest_result
     assert telegram_service_snapshot_date == telegram_service_latest_date
     assert telegram_service_snapshot_command == telegram_service_latest_command
+    assert feishu_webhook_snapshot_result == feishu_webhook_latest_result
+    assert feishu_webhook_snapshot_date == feishu_webhook_latest_date
+    assert feishu_webhook_snapshot_command == feishu_webhook_latest_command
     assert wecom_service_snapshot_result == wecom_service_latest_result
     assert wecom_service_snapshot_date == wecom_service_latest_date
     assert wecom_service_snapshot_command == wecom_service_latest_command
@@ -238,6 +247,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "tests/test_telegram_bot.py" in text
             assert "tests/test_personal_wechat_text.py" in text
             assert "tests/test_feishu_adapter.py" in text
+            assert 'webhook_http_request and cleanup' in text
             assert "tests/test_wecom_adapter.py" in text
             assert "Current goal" in text
             assert "Only do" in text
@@ -259,6 +269,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "Telegram cleanup service-not-ready tests" in text
             assert "personal WeChat cleanup service-not-ready tests" in text
             assert "Feishu cleanup service-not-ready tests" in text
+            assert "Feishu webhook cleanup tests" in text
             assert "WeCom cleanup service-not-ready tests" in text
             assert "cleanup inspect" in text
             assert "cleanup_inspect" in text
