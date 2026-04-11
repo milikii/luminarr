@@ -382,9 +382,18 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
+    assert "PROWLARR_API_KEY=" in env_example_text
+    assert "TMDB_API_KEY=" in env_example_text
     assert "TRANSMISSION_BASE_URL=" in env_example_text
+    assert "DOWNLOADER_INSTANCES=" in env_example_text
     assert "LIBRARY_TARGET_DIR=" in env_example_text
     assert "SHARED_MEDIA_ROOT=" in env_example_text
+    assert "FEISHU_APP_ID=" in env_example_text
+    assert "FEISHU_APP_SECRET=" in env_example_text
+    assert "FEISHU_ENCRYPT_KEY=" in env_example_text
+    assert "WECOM_TOKEN=" in env_example_text
+    assert "WECOM_ENCODING_AES_KEY=" in env_example_text
+    assert "WECOM_RECEIVE_ID=" in env_example_text
     assert "type 目前写 transmission 或 qbittorrent" in env_example_text
     assert "值必须和 DOWNLOADER_INSTANCES 里的 name 完全一致" in env_example_text
     assert "key 是用户回复时选用的短键" in env_example_text
