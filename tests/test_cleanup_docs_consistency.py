@@ -292,6 +292,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in readme_text
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
     assert "docs/STATUS.md" in readme_text
+    assert "`TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL` 是当前启动硬必填" in readme_text
+    assert "`TMDB_API_KEY` 当前不是启动硬必填" in readme_text
+    assert "`DOWNLOADER_INSTANCES` 当前只是多实例路由补充配置" in readme_text
     assert ".env.example" in readme_text
     assert "Makefile" in readme_text
     assert "docker-compose.yml" in readme_text

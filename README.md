@@ -18,6 +18,12 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 2. 按 `docs/GETTING_STARTED.md` 填配置
 3. 用 `make run` / `docker compose up -d`，或 `set -a && . ./.env && set +a && .venv/bin/python -m app.main` 启动
 
+当前最小启动真相：
+
+- `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL` 是当前启动硬必填
+- `TMDB_API_KEY` 当前不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
+- `DOWNLOADER_INSTANCES` 当前只是多实例路由补充配置，不能替代 `TRANSMISSION_BASE_URL`
+
 ## 1. 它在解决什么问题
 
 一个人用手机发一句话，系统完成搜索、审批、下载、入库、刷新，让内容出现在私人媒体库里。
