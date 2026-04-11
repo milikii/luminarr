@@ -111,7 +111,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - verification docs gate 持续通过
 - 这一步只允许修 shared runtime 回归、渠道胶水回归和显式日志缺口，不新增自动 cleanup、批量 cleanup 或删种。
 - `tests/test_cleanup_cross_channel_smoke.py` 继续保障四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case 英文 `cleanup / cleanup inspect` 输入 / chat-scoped `task_ref` -> jobs -> import correlation，且已把 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention，以及 `guard-rejected` rejection guidance 验证进来。
-- 当前 cleanup 窗口的本地 gate 入口有六条：`make test-cleanup-smoke` 只跑四渠道 smoke gate，`make test-cleanup-service-not-ready` 单独盯 service-not-ready observability，`make test-cleanup-telegram` 跑 Telegram cleanup 入口回归，`make test-cleanup-personal-wechat` 跑 personal WeChat cleanup 入口回归，`make test-cleanup-docs-gate` 跑 cleanup verification docs gate，`make test-cleanup-window` 会连续跑 smoke gate、cleanup 聚合回归和 verification docs gate；它们都不能替代四渠道真实私聊 smoke 证据。
+- 当前 cleanup 窗口的本地 gate 入口有七条：`make test-cleanup-smoke` 只跑四渠道 smoke gate，`make test-cleanup-service-not-ready` 单独盯 service-not-ready observability，`make test-cleanup-telegram` 跑 Telegram cleanup 入口回归，`make test-cleanup-personal-wechat` 跑 personal WeChat cleanup 入口回归，`make test-cleanup-feishu` 跑 Feishu cleanup 入口回归，`make test-cleanup-docs-gate` 跑 cleanup verification docs gate，`make test-cleanup-window` 会连续跑 smoke gate、cleanup 聚合回归和 verification docs gate；它们都不能替代四渠道真实私聊 smoke 证据。
 - 如果当前环境没有 `make`，就直接用底层一行命令跑：四渠道 smoke gate 用 `.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`，cleanup 窗口组合 gate 用 `docs/GETTING_STARTED.md` 里的等价一行 pytest 命令。
 - cleanup 验证窗口结束后，下一步按顺序推进：
   1. 独立后台下载完成轮询

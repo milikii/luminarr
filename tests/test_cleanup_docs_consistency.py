@@ -287,9 +287,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-service-not-ready" in getting_started_text
     assert "make test-cleanup-telegram" in getting_started_text
     assert "make test-cleanup-personal-wechat" in getting_started_text
+    assert "make test-cleanup-feishu" in getting_started_text
     assert "如果你的环境没有 `make`" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup" in getting_started_text
+    assert ".venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k cleanup" in getting_started_text
     assert (
         "tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py "
         "tests/test_cleanup_cross_channel_smoke.py"
@@ -301,6 +303,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-service-not-ready" in readme_text
     assert "make test-cleanup-telegram" in readme_text
     assert "make test-cleanup-personal-wechat" in readme_text
+    assert "make test-cleanup-feishu" in readme_text
     assert "make test-cleanup-docs-gate" in readme_text
     assert "make test-cleanup-window" in readme_text
     assert "如果当前环境没有 `make`" in readme_text
@@ -320,6 +323,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "test-cleanup-service-not-ready:" in makefile_text
     assert "test-cleanup-telegram:" in makefile_text
     assert "test-cleanup-personal-wechat:" in makefile_text
+    assert "test-cleanup-feishu:" in makefile_text
     assert "test-cleanup:" in makefile_text
     assert "test-docs:" in makefile_text
     assert "test-cleanup-docs-gate:" in makefile_text
@@ -334,6 +338,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     ]
     assert _extract_makefile_target_commands(makefile_text, "test-cleanup-personal-wechat") == [
         "$(PYTHON) -m pytest -q tests/test_personal_wechat_text.py -k cleanup"
+    ]
+    assert _extract_makefile_target_commands(makefile_text, "test-cleanup-feishu") == [
+        "$(PYTHON) -m pytest -q tests/test_feishu_adapter.py -k cleanup"
     ]
     assert cleanup_docs_gate_target_commands == [
         "$(PYTHON) -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py"
