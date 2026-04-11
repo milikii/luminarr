@@ -154,6 +154,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     cleanup_service_date, cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
     compile_check_date, compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
     docs_consistency_date, docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
+    telegram_service_snapshot_result, telegram_service_snapshot_date, telegram_service_snapshot_command = (
+        _extract_status_named_verification_entry(status_text, "Telegram cleanup service-not-ready 快照")
+    )
+    telegram_service_latest_result, telegram_service_latest_date, telegram_service_latest_command = (
+        _extract_status_named_verification_entry(status_text, "Telegram cleanup service-not-ready tests")
+    )
     wecom_service_snapshot_result, wecom_service_snapshot_date, wecom_service_snapshot_command = (
         _extract_status_named_verification_entry(status_text, "WeCom cleanup service-not-ready 快照")
     )
@@ -183,6 +189,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
+    assert telegram_service_snapshot_result == telegram_service_latest_result
+    assert telegram_service_snapshot_date == telegram_service_latest_date
+    assert telegram_service_snapshot_command == telegram_service_latest_command
     assert wecom_service_snapshot_result == wecom_service_latest_result
     assert wecom_service_snapshot_date == wecom_service_latest_date
     assert wecom_service_snapshot_command == wecom_service_latest_command
@@ -220,6 +229,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "chat-scoped task_ref guard-rejected rejection guidance" in text
             assert "cleanup-service-not-ready fix-hint observability" in text
             assert "tests/test_private_chat_runtime.py" in text
+            assert "tests/test_telegram_bot.py" in text
             assert "tests/test_personal_wechat_text.py" in text
             assert "tests/test_feishu_adapter.py" in text
             assert "tests/test_wecom_adapter.py" in text
@@ -240,6 +250,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "查询=" in text
             assert "cleanup service-not-ready smoke tests" in text
             assert "shared runtime cleanup service-not-ready tests" in text
+            assert "Telegram cleanup service-not-ready tests" in text
             assert "personal WeChat cleanup service-not-ready tests" in text
             assert "Feishu cleanup service-not-ready tests" in text
             assert "WeCom cleanup service-not-ready tests" in text
