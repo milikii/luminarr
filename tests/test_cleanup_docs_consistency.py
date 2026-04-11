@@ -167,10 +167,16 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         _extract_status_named_verification_entry(status_text, "WeCom cleanup service-not-ready tests")
     )
     cleanup_smoke_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-smoke")
+    cleanup_service_not_ready_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-service-not-ready")
+    cleanup_telegram_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-telegram")
     cleanup_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup")
     cleanup_docs_gate_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-docs-gate")
     cleanup_window_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-window")
     cleanup_window_fallback_command = _extract_getting_started_cleanup_window_fallback(getting_started_text)
+    cleanup_service_not_ready_fallback_command = _normalize_makefile_python_command(cleanup_service_not_ready_target_commands[0])
+    cleanup_telegram_fallback_command = _normalize_makefile_python_command(cleanup_telegram_target_commands[0])
+    cleanup_target_fallback_command = _normalize_makefile_python_command(cleanup_target_commands[0])
+    cleanup_docs_gate_fallback_command = _normalize_makefile_python_command(cleanup_docs_gate_target_commands[0])
 
     assert not legacy_overview_path.exists()
     assert title_start_date == start_date
@@ -329,10 +335,14 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-feishu-webhook" in getting_started_text
     assert "make test-cleanup" in getting_started_text
     assert "如果你的环境没有 `make`" in getting_started_text
+    assert cleanup_service_not_ready_fallback_command in getting_started_text
+    assert cleanup_telegram_fallback_command in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k cleanup" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k cleanup" in getting_started_text
+    assert cleanup_target_fallback_command in getting_started_text
+    assert cleanup_docs_gate_fallback_command in getting_started_text
     assert (
         "tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py "
         "tests/test_cleanup_cross_channel_smoke.py"
@@ -354,6 +364,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "十条本地 gate 入口" in status_text
     assert "README.md` 的十条 cleanup 本地 gate 入口" in next_step_text
     assert "如果当前环境没有 `make`" in readme_text
+    assert cleanup_service_not_ready_fallback_command in readme_text
+    assert cleanup_telegram_fallback_command in readme_text
+    assert cleanup_target_fallback_command in readme_text
+    assert cleanup_docs_gate_fallback_command in readme_text
     assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
