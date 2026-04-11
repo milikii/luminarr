@@ -30,6 +30,7 @@
 - 保持 `.env.example` 用中文详细说明每个变量的作用、默认值语义，以及“只为启动最小本地测试”时真正必填的变量集合，避免把配置模板误读成完整渠道准备状态。
 - 保持 `.env.example` 对 `DOWNLOADER_INSTANCES` / `PT_DOWNLOADER` / `BT_DOWNLOADER` / `RAW_BT_DESTINATIONS` / `BT_WEB_SOURCES` / `FEISHU_*` / `WECOM_*` 继续写清中文作用、取值格式和默认语义，避免用户拿到 token 后仍不知道其他必需字段该填什么。
 - 保持 verification docs gate 继续显式校验 `.env.example` 里的 `PROWLARR_API_KEY` / `TMDB_API_KEY` / `DOWNLOADER_INSTANCES` / `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_ENCRYPT_KEY` / `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID`，避免最小 bring-up 必填键和四渠道真实 smoke 键从模板说明里漂走。
+- 保持 `.env.example` / `docs/GETTING_STARTED.md` 对 `TELEGRAM_BOT_TOKEN`、`TMDB_API_KEY`、`TRANSMISSION_BASE_URL`、`DOWNLOADER_INSTANCES`、`PT_DOWNLOADER` / `BT_DOWNLOADER` 默认语义，以及 Feishu / WeCom 三元组 all-or-none 约束的中文说明与 `app/config.py` 当前真相一致，避免用户按旧文档配出启动失败的 `.env`。
 - 保持 `Makefile` 同时提供独立的四渠道 cleanup smoke gate 入口和当前 cleanup 验证窗口的一键 gate 入口，避免把 smoke gate、cleanup 聚合回归和 docs gate 混成一条不透明命令。
 - 保持 `Makefile` 明确暴露 `test-cleanup-docs-gate`，让 cleanup verification docs gate 和普通 `test-docs` 分开，避免把 docs consistency gate 误当成当前 cleanup 窗口的完整文档 gate。
 - 保持 `Makefile` 明确暴露 `test-cleanup-service-not-ready`，让 cleanup service-not-ready observability 有独立 gate，避免这条专项 smoke 只能从 `docs/STATUS.md` 里的底层 pytest 命令回推。

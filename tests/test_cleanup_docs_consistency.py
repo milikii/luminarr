@@ -339,6 +339,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Transmission 已在 `http://127.0.0.1:19091` 跑着" in getting_started_text
     assert "Emby 已在 `http://127.0.0.1:18096` 跑着" in getting_started_text
     assert "你只想先打通 Telegram 私聊最小链路" in getting_started_text
+    assert "当前 `TELEGRAM_BOT_TOKEN` 是启动硬必填" in getting_started_text
+    assert "当前 `TMDB_API_KEY` 不是启动硬必填" in getting_started_text
+    assert "当前 `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`" in getting_started_text
+    assert "默认取第一个实例名" in getting_started_text
+    assert "这两组三元组都必须“要么都空，要么都填”" in getting_started_text
     assert "`TRANSMISSION_BASE_URL=http://127.0.0.1:19091`" in getting_started_text
     assert "`LIBRARY_TARGET_DIR=/data/library/movies`" in getting_started_text
     assert "`EMBY_BASE_URL=http://127.0.0.1:18096`" in getting_started_text
@@ -409,6 +414,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "值来自企业微信回调配置页" in env_example_text
     assert "企业微信回调里的 EncodingAESKey" in env_example_text
     assert "默认 60 秒" in env_example_text
+    assert "TELEGRAM_BOT_TOKEN / PROWLARR_BASE_URL / PROWLARR_API_KEY / TRANSMISSION_BASE_URL" in env_example_text
+    assert "TMDB / Fanart / 字幕翻译当前都不是启动硬必填" in env_example_text
+    assert "当前启动真相里 TRANSMISSION_BASE_URL 仍然是硬必填" in env_example_text
+    assert "不填时默认取第一个实例名" in env_example_text
+    assert "这三个键要么都空，要么都填" in env_example_text
+    assert "本地 Python 运行时不会直接读取这项" in env_example_text
     assert "只为启动 Luminarr 并做最小本地测试" in env_example_text
     assert "personal WeChat 依赖本地登录态" in env_example_text
     assert "如果你只想启动 Transmission / Emby 本地测试栈" in env_example_text

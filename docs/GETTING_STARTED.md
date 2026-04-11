@@ -45,10 +45,17 @@ cp .env.example .env
 
 如果你只想让应用先跑起来并做最小本地测试，至少填这些：
 
+- `TELEGRAM_BOT_TOKEN`
 - `PROWLARR_BASE_URL`
 - `PROWLARR_API_KEY`
-- `TMDB_API_KEY`
-- `TRANSMISSION_BASE_URL` 或 `DOWNLOADER_INSTANCES`
+- `TRANSMISSION_BASE_URL`
+
+说明：
+
+- 当前 `TELEGRAM_BOT_TOKEN` 是启动硬必填，不是“只在你要用 Telegram 时才需要”
+- 当前 `TMDB_API_KEY` 不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
+- 当前 `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；它只是多实例路由补充配置
+- 如果你配置了 `DOWNLOADER_INSTANCES` 但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
 
 如果你还要跑 import / refresh 联调，再补这些：
 
@@ -68,11 +75,10 @@ cp .env.example .env
 
 那 `.env` 最小组合就是：
 
+- `TELEGRAM_BOT_TOKEN`
 - `PROWLARR_BASE_URL`
 - `PROWLARR_API_KEY`
-- `TMDB_API_KEY`
 - `TRANSMISSION_BASE_URL=http://127.0.0.1:19091`
-- `TELEGRAM_BOT_TOKEN`
 
 如果你还想顺手验证 import / refresh，再在上面补：
 
@@ -81,6 +87,7 @@ cp .env.example .env
 - `EMBY_API_KEY`
 
 如果你要补 Feishu / WeCom 真实私聊 smoke，再补各自 webhook 三元组。
+这两组三元组都必须“要么都空，要么都填”，不能只填一部分。
 personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动。
 
 ## 4. 启动本地测试栈（需要真实 import / refresh 时）
