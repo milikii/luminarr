@@ -336,6 +336,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "四渠道真实私聊 smoke" in getting_started_text
     assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
+    assert "Transmission 已在 `http://127.0.0.1:19091` 跑着" in getting_started_text
+    assert "Emby 已在 `http://127.0.0.1:18096` 跑着" in getting_started_text
+    assert "你只想先打通 Telegram 私聊最小链路" in getting_started_text
+    assert "`TRANSMISSION_BASE_URL=http://127.0.0.1:19091`" in getting_started_text
+    assert "`LIBRARY_TARGET_DIR=/data/library/movies`" in getting_started_text
+    assert "`EMBY_BASE_URL=http://127.0.0.1:18096`" in getting_started_text
     assert "make test-cleanup-window" in getting_started_text
     assert "make test-cleanup-docs-gate" in getting_started_text
     assert "make test-cleanup-service-not-ready" in getting_started_text

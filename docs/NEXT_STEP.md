@@ -26,6 +26,7 @@
 - 保持 verification docs gate 继续显式校验 `README.md` 的十条 cleanup 本地 gate 入口仍写明“不能替代四渠道真实私聊 smoke 证据”，避免用户把本地 pytest / docs gate 误读成真实渠道退出证据。
 - 保持历史单体主文档 `Luminarr_v15.md` 不再作为当前知识入口，避免过期总纲和 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口重新分叉。
 - 保持 `docs/GETTING_STARTED.md` 明确区分“能启动应用”和“能补当前 cleanup 验证窗口四渠道真实私聊 smoke 证据”的前置条件，避免把本地回归误当成真实渠道验证。
+- 保持 `docs/GETTING_STARTED.md` 对“Telegram + 本地 Transmission/Emby 已启动”这条最小 bring-up 路径写出明确的 `.env` 变量组合，避免用户拿着 token 和本地测试栈仍然要自己拼配置。
 - 保持 `.env.example` 用中文详细说明每个变量的作用、默认值语义，以及“只为启动最小本地测试”时真正必填的变量集合，避免把配置模板误读成完整渠道准备状态。
 - 保持 `.env.example` 对 `DOWNLOADER_INSTANCES` / `PT_DOWNLOADER` / `BT_DOWNLOADER` / `RAW_BT_DESTINATIONS` / `BT_WEB_SOURCES` / `FEISHU_*` / `WECOM_*` 继续写清中文作用、取值格式和默认语义，避免用户拿到 token 后仍不知道其他必需字段该填什么。
 - 保持 verification docs gate 继续显式校验 `.env.example` 里的 `PROWLARR_API_KEY` / `TMDB_API_KEY` / `DOWNLOADER_INSTANCES` / `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_ENCRYPT_KEY` / `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID`，避免最小 bring-up 必填键和四渠道真实 smoke 键从模板说明里漂走。

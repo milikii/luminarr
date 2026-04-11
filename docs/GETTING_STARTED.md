@@ -60,6 +60,26 @@ cp .env.example .env
 
 - `TELEGRAM_BOT_TOKEN`
 
+如果你现在的本机状态就是：
+
+- Transmission 已在 `http://127.0.0.1:19091` 跑着
+- Emby 已在 `http://127.0.0.1:18096` 跑着
+- 你只想先打通 Telegram 私聊最小链路
+
+那 `.env` 最小组合就是：
+
+- `PROWLARR_BASE_URL`
+- `PROWLARR_API_KEY`
+- `TMDB_API_KEY`
+- `TRANSMISSION_BASE_URL=http://127.0.0.1:19091`
+- `TELEGRAM_BOT_TOKEN`
+
+如果你还想顺手验证 import / refresh，再在上面补：
+
+- `LIBRARY_TARGET_DIR=/data/library/movies`
+- `EMBY_BASE_URL=http://127.0.0.1:18096`
+- `EMBY_API_KEY`
+
 如果你要补 Feishu / WeCom 真实私聊 smoke，再补各自 webhook 三元组。
 personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动。
 
