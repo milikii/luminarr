@@ -44,6 +44,7 @@
 - 保持 `README.md` / `docs/GETTING_STARTED.md` 继续提供无 `make` 环境下的等价一行 pytest 备用命令，至少显式覆盖 `test-cleanup-service-not-ready`、`test-cleanup-telegram`、`test-cleanup`、`test-cleanup-docs-gate` 和 `test-cleanup-window`，避免把 Makefile 当成当前 cleanup 窗口 gate 的唯一入口。
 - 保持 verification docs gate 继续显式校验 `test-cleanup-window` 仍按 `smoke gate -> cleanup 聚合回归 -> verification docs gate` 顺序执行，且 `docs/GETTING_STARTED.md` 里的无 `make` 备用命令与这三段 Makefile 入口保持一致，避免窗口 gate 入口拆成多份后互相漂移。
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 对 Transmission / Emby 本地测试栈的 compose 文件位置、启动命令和配置目录位置保持一致，避免把不存在的目录误写成 compose 根目录。
+- 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 的 Transmission 健康检查继续使用 `curl -si` 读取 `X-Transmission-Session-Id` 响应头，避免把正常的 `409 Conflict` 误判成服务不可达。
 - 保持 `docs/STATUS.md` 里的 tests / cleanup service / compile check / docs consistency check 都带绝对日期，避免这些本地验证快照比 smoke / docs gate 更难判断是否过期。
 - 保持 `docs/STATUS.md` 把配置真相回归（`tests/test_config.py` 里和当前文档变更直接相关的 focused config checks）也写成带绝对日期的快照，避免配置入口更新后状态页看不到对应验证证据。
 - 保持 `docs/STATUS.md` 对本机 Transmission / Emby 测试栈的当前 shell 健康检查结果和权限 blocker 写成显式快照，避免把“用户说已经启动”误写成当前 shell 已验证通过的事实。

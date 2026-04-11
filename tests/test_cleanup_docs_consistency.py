@@ -354,6 +354,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make run" in getting_started_text
     assert ".venv/bin/python -m app.main" in getting_started_text
     assert "docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d" in getting_started_text
+    assert 'curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id"' in getting_started_text
     assert "四渠道真实私聊 smoke" in getting_started_text
     assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
@@ -446,6 +447,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "如果你只想启动 Transmission / Emby 本地测试栈" in env_example_text
     assert "/home/alex/projects/luminarr/docker-compose.test.yml" in test_env_text
     assert "docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d" in test_env_text
+    assert 'curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id"' in test_env_text
     assert "/home/alex/luminarr-test/config/transmission" in test_env_text
     assert "test-cleanup-smoke:" in makefile_text
     assert "test-cleanup-service-not-ready:" in makefile_text

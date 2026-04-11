@@ -57,7 +57,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 健康检查：
 
 ```bash
-curl -s http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
+curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"
 ```
 
 ---

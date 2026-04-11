@@ -99,7 +99,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
 启动后先做健康检查：
 
 ```bash
-curl -s http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
+curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
 ```
 
 说明：
