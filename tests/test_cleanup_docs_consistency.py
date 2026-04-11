@@ -352,6 +352,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert ".env.example" in getting_started_text
     assert "Makefile" in getting_started_text
     assert "make run" in getting_started_text
+    assert "[环境文件缺失]" in getting_started_text
+    assert "ENV_FILE=/绝对路径 make run" in getting_started_text
     assert ".venv/bin/python -m app.main" in getting_started_text
     assert "docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d" in getting_started_text
     assert 'curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id"' in getting_started_text
@@ -394,7 +396,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Dockerfile" in getting_started_text
     assert "docker-compose.yml" in getting_started_text
     assert "make test-cleanup-smoke" in getting_started_text
+    assert 'if [ ! -f "$(ENV_FILE)" ]' in makefile_text
+    assert '. "$(ENV_FILE)"' in makefile_text
     assert "make test-cleanup-smoke" in readme_text
+    assert "[环境文件缺失]" in readme_text
+    assert "ENV_FILE=/绝对路径 make run" in readme_text
     assert "make test-cleanup-service-not-ready" in readme_text
     assert "make test-cleanup-telegram" in readme_text
     assert "make test-cleanup-personal-wechat" in readme_text
@@ -413,6 +419,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert cleanup_target_fallback_command in readme_text
     assert cleanup_docs_gate_fallback_command in readme_text
     assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
+    assert "[环境文件缺失]" in next_step_text
+    assert "ENV_FILE=/绝对路径 make run" in next_step_text
+    assert "[环境文件缺失]" in status_text
+    assert "make run env-file guard tests" in status_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
     assert "PROWLARR_API_KEY=" in env_example_text

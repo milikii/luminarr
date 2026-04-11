@@ -1,4 +1,4 @@
-# Luminarr (v61)
+# Luminarr (v62)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -23,6 +23,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL` 是当前启动硬必填
 - `TMDB_API_KEY` 当前不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
 - `DOWNLOADER_INSTANCES` 当前只是多实例路由补充配置，不能替代 `TRANSMISSION_BASE_URL`
+- `make run` 现在会先检查 `ENV_FILE` 指向的环境文件是否存在；缺失时会打印红色中文 `[环境文件缺失]` 和 `[处理建议]`
+- 如果环境文件不在仓库根目录，可用 `ENV_FILE=/绝对路径 make run` 指向已有配置
 
 ## 1. 它在解决什么问题
 

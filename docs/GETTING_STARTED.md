@@ -1,4 +1,4 @@
-# docs/GETTING_STARTED.md (v3)
+# docs/GETTING_STARTED.md (v4)
 
 > 目的：让一个不会写代码、但能用命令行的人，也能把仓库在本机跑起来并完成第一次验证。
 
@@ -124,6 +124,16 @@ set -a && . ./.env && set +a && .venv/bin/python -m app.main
 make run
 ```
 
+说明：
+
+- `make run` 现在会先检查 `ENV_FILE` 指向的环境文件是否存在
+- 如果缺少 `.env`，会打印红色中文 `[环境文件缺失]` 和 `[处理建议]`
+- 如果你想临时改用别的环境文件，可以直接运行：
+
+```bash
+ENV_FILE=/绝对路径/你的.env make run
+```
+
 ### 方案 B：用 Docker Compose 运行
 
 当前仓库已经提供：
@@ -237,6 +247,8 @@ set -a && . ./.env && set +a && .venv/bin/python -m app.main
 ```bash
 make run
 ```
+
+如果 `.env` 根本还没准备好，`make run` 会先打印 `[环境文件缺失]`，提醒你先复制 `.env.example` 或改用 `ENV_FILE=/绝对路径 make run`。
 
 ### 为什么 Feishu / WeCom 不配也能启动
 

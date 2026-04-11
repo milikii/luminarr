@@ -1,4 +1,4 @@
-# Next step (v188)
+# Next step (v189)
 
 ## Current goal
 
@@ -103,6 +103,7 @@
   - `Dockerfile`
   - `docker-compose.yml`
   - `docs/GETTING_STARTED.md`
+- 保持 `make run` 在 `ENV_FILE` 缺失时先打印红色中文 `[环境文件缺失]` 日志和 `[处理建议]`，并支持 `ENV_FILE=/绝对路径 make run`，避免当前 Telegram bring-up 还没进入 runtime 就掉进 shell 原始报错。
 
 ## Do not do
 

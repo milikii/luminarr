@@ -53,7 +53,8 @@ compile:
 	python3 -m compileall app tests
 
 run:
-	set -a && . ./$(ENV_FILE) && set +a && $(PYTHON) -m app.main
+	@if [ ! -f "$(ENV_FILE)" ]; then printf '\033[31m[环境文件缺失]\033[0m 未找到启动所需环境文件：%s\n\033[33m[处理建议]\033[0m 先执行 cp .env.example .env，再补齐最小必填项；如果环境文件不在仓库根目录，请使用 ENV_FILE=/绝对路径 make run。\n' "$(ENV_FILE)"; exit 1; fi
+	@set -a && . "$(ENV_FILE)" && set +a && $(PYTHON) -m app.main
 
 docker-build:
 	docker compose build
