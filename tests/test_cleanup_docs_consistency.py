@@ -385,6 +385,15 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "TRANSMISSION_BASE_URL=" in env_example_text
     assert "LIBRARY_TARGET_DIR=" in env_example_text
     assert "SHARED_MEDIA_ROOT=" in env_example_text
+    assert "type 目前写 transmission 或 qbittorrent" in env_example_text
+    assert "值必须和 DOWNLOADER_INSTANCES 里的 name 完全一致" in env_example_text
+    assert "key 是用户回复时选用的短键" in env_example_text
+    assert "留空表示只走 Prowlarr，不启用 BT 外站抓取" in env_example_text
+    assert "值来自 Feishu Open Platform 应用凭据" in env_example_text
+    assert "用于当前 webhook 验签" in env_example_text
+    assert "值来自企业微信回调配置页" in env_example_text
+    assert "企业微信回调里的 EncodingAESKey" in env_example_text
+    assert "默认 60 秒" in env_example_text
     assert "只为启动 Luminarr 并做最小本地测试" in env_example_text
     assert "personal WeChat 依赖本地登录态" in env_example_text
     assert "如果你只想启动 Transmission / Emby 本地测试栈" in env_example_text
