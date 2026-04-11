@@ -82,6 +82,15 @@ def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str, str]
     return docs_consistency_match.group(1), docs_consistency_match.group(2), docs_consistency_match.group(3)
 
 
+def _extract_status_focused_config_snapshot(text: str) -> tuple[str, str, str]:
+    focused_config_match = re.search(
+        r'- focused config truth tests：`([^`]+)`（(\d{4}-\d{2}-\d{2})，`([^`]+)`）',
+        text,
+    )
+    assert focused_config_match is not None
+    return focused_config_match.group(2), focused_config_match.group(1), focused_config_match.group(3)
+
+
 def _extract_status_named_verification_entry(text: str, label: str) -> tuple[str, str, str]:
     entry_match = re.search(
         rf"- {re.escape(label)}：`([^`]+)`（(\d{{4}}-\d{{2}}-\d{{2}})，`([^`]+)`）",
@@ -154,6 +163,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     cleanup_service_date, cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
     compile_check_date, compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
     docs_consistency_date, docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
+    focused_config_date, focused_config_result, focused_config_command = _extract_status_focused_config_snapshot(status_text)
     telegram_service_snapshot_result, telegram_service_snapshot_date, telegram_service_snapshot_command = (
         _extract_status_named_verification_entry(status_text, "Telegram cleanup service-not-ready 快照")
     )
@@ -201,6 +211,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
+    assert focused_config_date == docs_gate_date
+    assert focused_config_result == "4 passed, 17 deselected"
+    assert (
+        focused_config_command
+        == '.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"'
+    )
     assert telegram_service_snapshot_result == telegram_service_latest_result
     assert telegram_service_snapshot_date == telegram_service_latest_date
     assert telegram_service_snapshot_command == telegram_service_latest_command
