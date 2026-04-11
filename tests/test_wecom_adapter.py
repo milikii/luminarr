@@ -34,6 +34,7 @@ from app.bot.wecom_adapter import (
     parse_wecom_private_text_event,
 )
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.bot.wecom_webhook_server import (
     WeComWebhookServerConfig,
@@ -56,6 +57,7 @@ _TEST_TOKEN = "wecom-token-42"
 _TEST_TIMESTAMP = "1711111111"
 _TEST_NONCE = "nonce-1"
 _TEST_RECEIVE_ID = "wwcorp123"
+_CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
@@ -114,6 +116,43 @@ def _build_cleanup_service(tmp_path: Path) -> tuple[CleanupDownloadedSourceServi
         target_path=str(target_file),
     )
     return CleanupDownloadedSourceService(event_repo), source_file, target_file
+
+
+def _build_chat_scoped_cleanup_service(
+    tmp_path: Path,
+) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    projected_chat_id = project_channel_chat_id(channel=WECOM_CHANNEL, external_chat_id="zhangsan")
+    projected_user_id = project_channel_user_id(channel=WECOM_CHANNEL, external_user_id="zhangsan")
+    job_repo.upsert_import_job_pending(
+        chat_id=projected_chat_id,
+        user_id=projected_user_id,
+        task_ref=_CHAT_SCOPED_TASK_REF,
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo, job_repo=job_repo), source_file, target_file
 
 
 def _build_wecom_private_text_xml(text: str) -> str:
@@ -507,6 +546,38 @@ def test_handle_wecom_callback_http_request_routes_cleanup_inspect_into_shared_r
         reply_root,
         "Content",
     )
+    assert source_file.exists()
+    assert target_file.exists()
+
+
+def test_handle_wecom_callback_http_request_routes_chat_scoped_cleanup_shortcut_and_returns_encrypted_reply(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_chat_scoped_cleanup_service(tmp_path)
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml(f"cleanup inspect {_CHAT_SCOPED_TASK_REF}"))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="POST",
+            query_params=query_params,
+            body=body,
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.content_type == WECOM_XML_CONTENT_TYPE
+    encrypted_reply = _extract_encrypt_from_xml(response.body.decode("utf-8"))
+    reply_xml = _decrypt_wecom_plaintext(encrypted_reply)
+    reply_root = ET.fromstring(reply_xml)
+    reply_text = _read_xml_text(reply_root, "Content")
+
+    assert "查询引用: cleanup-shortcut" in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert source_file.exists()
     assert target_file.exists()
 

@@ -80,6 +80,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Feishu 私聊 chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 Feishu adapter 后仍能解析出真实 `task_id/task_hash`，避免这个渠道把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
 - Feishu webhook service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 Feishu 加密 HTTP 入口只对英文带任务引用路径保留日志可观测性。
 - WeCom 私聊 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 WeCom 私聊入口只对英文带任务引用路径保留日志可观测性。
+- WeCom callback chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 WeCom 加密 callback 入口后仍能解析出真实 `task_id/task_hash`，避免这个加密入站链路把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
 - 四渠道聚合 service-not-ready 门禁快照：`tests/test_cleanup_cross_channel_smoke.py -k service_not_ready` 现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免跨渠道聚合 smoke 只剩英文带任务引用路径。
 - 当前四个渠道真实私聊 smoke 快照（与窗口台账同步）：
 

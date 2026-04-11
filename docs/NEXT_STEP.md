@@ -67,6 +67,7 @@
 - 保持 `tests/test_feishu_adapter.py` 单独覆盖 Feishu 私聊入口 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个渠道把 `cleanup-shortcut` 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"` 单独覆盖 Feishu webhook cleanup 路由和 service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个加密 webhook 入口只有正常路径回归、缺少未注入服务时的可观测性保护。
 - 保持 `tests/test_wecom_adapter.py` 单独覆盖 WeCom 私聊入口 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个渠道的解密入站和加密回包路径只能靠聚合 smoke 或英文带任务引用路径间接兜底。
+- 保持 `tests/test_wecom_adapter.py` 单独覆盖 WeCom callback 里的 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个加密入站链路把 shortcut 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `docs/STATUS.md` 里的 WeCom cleanup service-not-ready 快照和 Latest verification 同步到同一组跑数，避免同一轮结果在同一文件里写出两套数字。
 - 保持 verification docs gate 继续显式校验 `success-event-append-failure observability` 命名观察，避免窗口台账把这类事件落盘失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `delete-failure observability` 命名观察，避免窗口台账把这类删除失败可观测性写丢。
