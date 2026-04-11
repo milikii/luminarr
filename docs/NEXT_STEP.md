@@ -23,7 +23,7 @@
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `README.md` 只同步仓库入口需要知道的当前边界、cleanup 风险和后续路线；窗口逐项证据继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md`。
 - 保持 `README.md` 当前 next step 的退出条件也显式覆盖 `verification docs gate`，避免用户只看仓库入口时误以为 docs gate 不是 cleanup 验证窗口的正式退出条件。
-- 保持 verification docs gate 继续显式校验 `README.md` 的七条 cleanup 本地 gate 入口仍写明“不能替代四渠道真实私聊 smoke 证据”，避免用户把本地 pytest / docs gate 误读成真实渠道退出证据。
+- 保持 verification docs gate 继续显式校验 `README.md` 的八条 cleanup 本地 gate 入口仍写明“不能替代四渠道真实私聊 smoke 证据”，避免用户把本地 pytest / docs gate 误读成真实渠道退出证据。
 - 保持历史单体主文档 `Luminarr_v15.md` 不再作为当前知识入口，避免过期总纲和 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口重新分叉。
 - 保持 `docs/GETTING_STARTED.md` 明确区分“能启动应用”和“能补当前 cleanup 验证窗口四渠道真实私聊 smoke 证据”的前置条件，避免把本地回归误当成真实渠道验证。
 - 保持 `.env.example` 用中文详细说明每个变量的作用、默认值语义，以及“只为启动最小本地测试”时真正必填的变量集合，避免把配置模板误读成完整渠道准备状态。
@@ -33,6 +33,7 @@
 - 保持 `Makefile` 明确暴露 `test-cleanup-telegram`，让 Telegram cleanup 入口回归有稳定入口，避免 `docs/STATUS.md` 里的单渠道回归仍只能靠底层 pytest 命令手敲。
 - 保持 `Makefile` 明确暴露 `test-cleanup-personal-wechat`，让 personal WeChat cleanup 入口回归有稳定入口，避免这个私聊渠道的 cleanup 回归仍只能从聚合 gate 里拆命令。
 - 保持 `Makefile` 明确暴露 `test-cleanup-feishu`，让 Feishu cleanup 入口回归有稳定入口，避免这个私聊渠道的 cleanup 回归仍只能从聚合 gate 里拆命令。
+- 保持 `Makefile` 明确暴露 `test-cleanup-wecom`，让 WeCom cleanup 入口回归有稳定入口，避免这个私聊渠道的 cleanup 回归仍只能从聚合 gate 里拆命令。
 - 保持 `README.md` / `docs/GETTING_STARTED.md` 继续提供无 `make` 环境下的等价一行 pytest 备用命令，避免把 Makefile 当成当前 cleanup 窗口 gate 的唯一入口。
 - 保持 verification docs gate 继续显式校验 `test-cleanup-window` 仍按 `smoke gate -> cleanup 聚合回归 -> verification docs gate` 顺序执行，且 `docs/GETTING_STARTED.md` 里的无 `make` 备用命令与这三段 Makefile 入口保持一致，避免窗口 gate 入口拆成多份后互相漂移。
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 对 Transmission / Emby 本地测试栈的 compose 文件位置、启动命令和配置目录位置保持一致，避免把不存在的目录误写成 compose 根目录。
