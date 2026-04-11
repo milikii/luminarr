@@ -1,4 +1,4 @@
-# Current status (v191)
+# Current status (v192)
 
 ## Project position
 
@@ -69,10 +69,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - verification docs gate 快照：`mixed-case english cleanup protocol`、`NEXT_STEP current-window sync`、`correlation-query-failure observability`、`source-type-unsupported blocked-log observability`、`cleanup-service-not-ready fix-hint observability`、`success-event-append-failure observability`、`delete-failure observability`、`correlation-missing unresolved-identity blank display`、`correlation-missing inspect identity resolution`、`correlation-missing rejection guidance`、`post-cleanup cleanup inspect confirmation`、`source-type-unsupported rejection guidance`、`chat-scoped task_ref post-cleanup cleanup inspect confirmation`、`chat-scoped task_ref target-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-missing cleanup inspect follow-up guidance`、`chat-scoped task_ref source-type-unsupported cleanup inspect follow-up guidance`、`chat-scoped task_ref guard-rejected cleanup inspect follow-up guidance`、`chat-scoped task_ref target-missing rejection guidance`、`chat-scoped task_ref source-missing rejection guidance`、`chat-scoped task_ref source-type-unsupported rejection guidance`、`chat-scoped task_ref guard-rejected rejection guidance` 已纳入窗口台账门禁，并继续卡住“窗口已完成后，`当前 cleanup 协议观察` 不得残留窗口日期阻塞或真实私聊 smoke 待补文案”，同时也校验 `test-cleanup-window` 顺序、`docs/GETTING_STARTED.md` 无 `make` 备用命令与三段 Makefile gate 保持一致、`README.md` 入口退出条件显式覆盖 `verification docs gate`，以及 README 十条 cleanup 本地 gate 入口继续明确“不能替代四渠道真实私聊 smoke 证据”，避免 mixed-case-english-protocol / next-step-current-window-sync / query-failure / blocked-log / cleanup-service-not-ready-fix-hint / event-append-failure / delete-failure / unresolved-identity / inspect-identity-resolution / rejection-guidance / post-cleanup-confirmation / source-type-unsupported-guidance / chat-scoped-post-cleanup-confirmation / chat-scoped-target-missing-follow-up / chat-scoped-source-missing-follow-up / chat-scoped-source-type-follow-up / chat-scoped-guard-rejected-follow-up / chat-scoped-target-missing-rejection-guidance / chat-scoped-source-missing-rejection-guidance / chat-scoped-source-type-rejection-guidance / chat-scoped-guard-rejected-rejection-guidance 可观测性命名从台账里漂走，也避免窗口收口后台账还保留进行中文案或入口退出条件漂移。
 - shared runtime cleanup service-not-ready 快照：`2 passed, 10 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k service_not_ready`）
 - Telegram cleanup service-not-ready 快照：`8 passed, 74 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup and service_not_ready"`）
-- personal WeChat cleanup service-not-ready 快照：`4 passed, 21 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k service_not_ready`）
+- personal WeChat cleanup service-not-ready 快照：`12 passed, 21 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k service_not_ready`）
 - Feishu cleanup service-not-ready 快照：`2 passed, 26 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k service_not_ready`）
 - Feishu webhook cleanup 快照：`10 passed, 20 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"`）
 - WeCom cleanup service-not-ready 快照：`2 passed, 24 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k service_not_ready`）
+- personal WeChat 单渠道 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 personal WeChat 只对带任务引用的英文 cleanup 命令保留日志可观测性。
 - 当前四个渠道真实私聊 smoke 快照（与窗口台账同步）：
 
 | 渠道 | 状态 | 最近一次日期 |
@@ -110,7 +111,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - make run env-file guard tests：`2 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - shared runtime cleanup service-not-ready tests：`2 passed, 10 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k service_not_ready`）
 - Telegram cleanup service-not-ready tests：`8 passed, 74 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup and service_not_ready"`）
-- personal WeChat cleanup service-not-ready tests：`4 passed, 21 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k service_not_ready`）
+- personal WeChat cleanup service-not-ready tests：`12 passed, 21 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k service_not_ready`）
 - Feishu cleanup service-not-ready tests：`2 passed, 26 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k service_not_ready`）
 - Feishu webhook cleanup tests：`10 passed, 20 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"`）
 - WeCom cleanup service-not-ready tests：`2 passed, 24 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k service_not_ready`）

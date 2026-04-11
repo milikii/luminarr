@@ -432,6 +432,10 @@ def test_handle_personal_wechat_private_text_event_routes_cleanup_protocol_in_ch
     [
         ("cleanup hash-87", "cleanup"),
         ("cleanup inspect hash-87", "cleanup_inspect"),
+        ("cleanup", "cleanup"),
+        ("cleanup inspect", "cleanup_inspect"),
+        ("清理", "cleanup"),
+        ("清理检查", "cleanup_inspect"),
     ],
 )
 def test_handle_personal_wechat_private_text_event_logs_cleanup_service_not_ready(
@@ -664,6 +668,10 @@ def test_personal_wechat_text_service_routes_cleanup_protocol_in_chinese(
     [
         ("cleanup hash-87", "cleanup"),
         ("cleanup inspect hash-87", "cleanup_inspect"),
+        ("cleanup", "cleanup"),
+        ("cleanup inspect", "cleanup_inspect"),
+        ("清理", "cleanup"),
+        ("清理检查", "cleanup_inspect"),
     ],
 )
 def test_personal_wechat_text_service_logs_cleanup_service_not_ready(

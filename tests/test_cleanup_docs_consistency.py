@@ -423,6 +423,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "ENV_FILE=/绝对路径 make run" in next_step_text
     assert "[环境文件缺失]" in status_text
     assert "make run env-file guard tests" in status_text
+    assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
+    assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
     assert "PROWLARR_BASE_URL=" in env_example_text
     assert "PROWLARR_API_KEY=" in env_example_text
