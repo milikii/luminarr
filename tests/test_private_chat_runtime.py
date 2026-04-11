@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import pytest
+
 from app.bot.private_chat_runtime import dispatch_private_chat_text
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -12,6 +14,7 @@ from app.bot.telegram_bot import (
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
+    SERVICE_NOT_READY_TEXT,
 )
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -342,6 +345,39 @@ def test_dispatch_private_chat_text_routes_bare_cleanup_inspect_usage_in_chinese
     )
 
     reply_text.assert_awaited_once_with(CLEANUP_INSPECT_QUERY_USAGE_TEXT)
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
+def test_dispatch_private_chat_text_logs_cleanup_service_not_ready_without_telegram_update(
+    query: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query=query,
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(),
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert query in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:
