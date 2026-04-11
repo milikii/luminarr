@@ -19,6 +19,7 @@ from app.bot.telegram_bot import (
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
+    SERVICE_NOT_READY_TEXT,
 )
 from app.bot.wecom_adapter import (
     WECOM_CHANNEL,
@@ -345,6 +346,40 @@ def test_handle_wecom_private_text_event_routes_cleanup_protocol_in_chinese_into
     assert expected_fragment in reply_text
     assert source_file.exists() is expect_source_exists
     assert target_file.exists()
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
+def test_handle_wecom_private_text_event_logs_cleanup_service_not_ready(
+    query: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml(query),
+            bot_data=_build_bot_data(),
+            reply_text_func=reply_text_func,
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, WeComPrivateTextEvent)
+    assert reply_text == SERVICE_NOT_READY_TEXT
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert query in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
 
 
 def test_handle_wecom_callback_http_request_returns_decrypted_echostr() -> None:

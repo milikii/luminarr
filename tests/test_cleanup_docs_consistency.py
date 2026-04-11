@@ -204,6 +204,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "tests/test_private_chat_runtime.py" in text
             assert "tests/test_personal_wechat_text.py" in text
             assert "tests/test_feishu_adapter.py" in text
+            assert "tests/test_wecom_adapter.py" in text
             assert "Current goal" in text
             assert "Only do" in text
             assert "Do not do" in text
@@ -223,6 +224,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "shared runtime cleanup service-not-ready tests" in text
             assert "personal WeChat cleanup service-not-ready tests" in text
             assert "Feishu cleanup service-not-ready tests" in text
+            assert "WeCom cleanup service-not-ready tests" in text
             assert "cleanup inspect" in text
             assert "cleanup_inspect" in text
             assert "Knowledge entrypoints" in text
