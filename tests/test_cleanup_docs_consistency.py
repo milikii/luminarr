@@ -123,6 +123,15 @@ def _extract_getting_started_cleanup_window_fallback(text: str) -> str:
     return fallback_match.group(1)
 
 
+def _extract_getting_started_sync_cleanup_doc_snapshots_fallback(text: str) -> str:
+    fallback_match = re.search(
+        r"`make sync-cleanup-doc-snapshots` 的等价一行命令是：`([^`]+)`",
+        text,
+    )
+    assert fallback_match is not None
+    return fallback_match.group(1)
+
+
 def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     legacy_overview_path = Path("Luminarr_v15.md")
     dockerfile_text = Path("Dockerfile").read_text(encoding="utf-8")
@@ -188,11 +197,21 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     cleanup_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup")
     cleanup_docs_gate_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-docs-gate")
     cleanup_window_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-window")
+    sync_cleanup_doc_snapshots_target_commands = _extract_makefile_target_commands(
+        makefile_text,
+        "sync-cleanup-doc-snapshots",
+    )
     cleanup_window_fallback_command = _extract_getting_started_cleanup_window_fallback(getting_started_text)
+    sync_cleanup_doc_snapshots_fallback_command = _extract_getting_started_sync_cleanup_doc_snapshots_fallback(
+        getting_started_text
+    )
     cleanup_service_not_ready_fallback_command = _normalize_makefile_python_command(cleanup_service_not_ready_target_commands[0])
     cleanup_telegram_fallback_command = _normalize_makefile_python_command(cleanup_telegram_target_commands[0])
     cleanup_target_fallback_command = _normalize_makefile_python_command(cleanup_target_commands[0])
     cleanup_docs_gate_fallback_command = _normalize_makefile_python_command(cleanup_docs_gate_target_commands[0])
+    sync_cleanup_doc_snapshots_fallback_makefile_command = _normalize_makefile_python_command(
+        sync_cleanup_doc_snapshots_target_commands[0]
+    )
 
     assert not legacy_overview_path.exists()
     assert title_start_date == start_date
@@ -481,6 +500,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "test-docs:" in makefile_text
     assert "test-cleanup-docs-gate:" in makefile_text
     assert "test-cleanup-window:" in makefile_text
+    assert "sync-cleanup-doc-snapshots:" in makefile_text
     assert "compile:" in makefile_text
     assert "run:" in makefile_text
     assert "docker-build:" in makefile_text
@@ -506,6 +526,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         "$(MAKE) test-cleanup",
         "$(MAKE) test-cleanup-docs-gate",
     ]
+    assert sync_cleanup_doc_snapshots_target_commands == [
+        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency"
+    ]
     assert cleanup_window_fallback_command == " && ".join(
         [
             _normalize_makefile_python_command(cleanup_smoke_target_commands[0]),
@@ -513,6 +536,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             _normalize_makefile_python_command(cleanup_docs_gate_target_commands[0]),
         ]
     )
+    assert sync_cleanup_doc_snapshots_fallback_command == sync_cleanup_doc_snapshots_fallback_makefile_command
     assert "python:3.12-slim" in dockerfile_text
     assert "python\", \"-m\", \"app.main" in dockerfile_text
     assert "build:" in docker_compose_text
