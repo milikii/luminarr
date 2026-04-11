@@ -574,6 +574,10 @@ def test_handle_feishu_webhook_http_request_routes_cleanup_inspect_in_chinese_in
     [
         ("cleanup hash-87", "cleanup"),
         ("cleanup inspect hash-87", "cleanup_inspect"),
+        ("cleanup", "cleanup"),
+        ("cleanup inspect", "cleanup_inspect"),
+        ("清理", "cleanup"),
+        ("清理检查", "cleanup_inspect"),
     ],
 )
 def test_handle_feishu_webhook_http_request_logs_cleanup_service_not_ready(

@@ -427,6 +427,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "shared runtime service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
     assert "Feishu 私聊入口 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
     assert "Feishu 私聊 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
+    assert 'Feishu webhook cleanup 路由和 service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`' in next_step_text
+    assert "Feishu webhook service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
     assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
     assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
