@@ -1,4 +1,4 @@
-# Next step (v194)
+# Next step (v195)
 
 ## Current goal
 
@@ -57,6 +57,7 @@
 - 保持 verification docs gate 继续显式校验 `correlation-query-failure observability` 命名观察，避免窗口台账把这类 query failure 可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `source-type-unsupported blocked-log observability` 命名观察，避免窗口台账把这类阻断日志可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `cleanup-service-not-ready fix-hint observability` 命名观察，避免窗口台账把 cleanup service 未注入时的红色日志和处理建议写丢。
+- 保持 `tests/test_cleanup_cross_channel_smoke.py -k service_not_ready` 继续锁住四渠道 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 的 cleanup service-not-ready observability，避免单渠道各自通过后，聚合 smoke 仍遗漏跨渠道协议漂移。
 - 保持 `tests/test_private_chat_runtime.py` 单独覆盖 shared runtime 直调路径的 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这条共享入口只能靠四渠道 smoke 或英文带任务引用路径侧面兜底。
 - 保持 `tests/test_telegram_bot.py -k "cleanup and service_not_ready"` 单独覆盖 Telegram cleanup service-not-ready observability，避免这个渠道的 cleanup 命令入口只能靠聚合 smoke 或非 cleanup service-not-ready 测试间接兜底。
 - 保持 `tests/test_personal_wechat_text.py` 单独覆盖 personal WeChat cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个渠道只对带任务引用的英文 cleanup 命令保留可观测性。

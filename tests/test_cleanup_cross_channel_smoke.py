@@ -346,6 +346,10 @@ def _run_wecom_cleanup_query(query: str, cleanup_service: CleanupDownloadedSourc
     [
         ("cleanup hash-87", "cleanup"),
         ("cleanup inspect hash-87", "cleanup_inspect"),
+        ("cleanup", "cleanup"),
+        ("cleanup inspect", "cleanup_inspect"),
+        ("清理", "cleanup"),
+        ("清理检查", "cleanup_inspect"),
     ],
 )
 def test_cleanup_service_not_ready_logs_fix_hint_across_private_chat_channels(
