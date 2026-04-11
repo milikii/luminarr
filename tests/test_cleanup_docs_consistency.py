@@ -82,6 +82,15 @@ def _extract_status_docs_consistency_snapshot(text: str) -> tuple[str, str, str]
     return docs_consistency_match.group(1), docs_consistency_match.group(2), docs_consistency_match.group(3)
 
 
+def _extract_status_named_verification_entry(text: str, label: str) -> tuple[str, str, str]:
+    entry_match = re.search(
+        rf"- {re.escape(label)}：`([^`]+)`（(\d{{4}}-\d{{2}}-\d{{2}})，`([^`]+)`）",
+        text,
+    )
+    assert entry_match is not None
+    return entry_match.group(1), entry_match.group(2), entry_match.group(3)
+
+
 def _extract_makefile_target_commands(text: str, target: str) -> list[str]:
     target_match = re.search(
         rf"^{re.escape(target)}:\n((?:\t[^\n]+\n)+)",
@@ -145,6 +154,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     cleanup_service_date, cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
     compile_check_date, compile_check_result, compile_check_command = _extract_status_compile_check_snapshot(status_text)
     docs_consistency_date, docs_consistency_result, docs_consistency_command = _extract_status_docs_consistency_snapshot(status_text)
+    wecom_service_snapshot_result, wecom_service_snapshot_date, wecom_service_snapshot_command = (
+        _extract_status_named_verification_entry(status_text, "WeCom cleanup service-not-ready 快照")
+    )
+    wecom_service_latest_result, wecom_service_latest_date, wecom_service_latest_command = (
+        _extract_status_named_verification_entry(status_text, "WeCom cleanup service-not-ready tests")
+    )
     cleanup_smoke_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-smoke")
     cleanup_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup")
     cleanup_docs_gate_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-docs-gate")
@@ -168,6 +183,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
+    assert wecom_service_snapshot_result == wecom_service_latest_result
+    assert wecom_service_snapshot_date == wecom_service_latest_date
+    assert wecom_service_snapshot_command == wecom_service_latest_command
     assert f"- 窗口活性快照：{window_activity}" in status_text
     assert f"- 当前状态快照：{window_status}" in status_text
     assert f"- 当前结论快照：{current_conclusion}" in status_text

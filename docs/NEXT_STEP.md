@@ -51,6 +51,7 @@
 - 保持 `tests/test_personal_wechat_text.py` 单独覆盖 personal WeChat cleanup service-not-ready observability，避免这个渠道的单条消息处理和轮询发消息路径只能靠聚合 smoke 间接兜底。
 - 保持 `tests/test_feishu_adapter.py` 单独覆盖 Feishu 私聊入口 cleanup service-not-ready observability，避免这个渠道的私聊入站链路只能靠聚合 smoke 间接兜底。
 - 保持 `tests/test_wecom_adapter.py` 单独覆盖 WeCom 私聊入口 cleanup service-not-ready observability，避免这个渠道的解密入站和加密回包路径只能靠聚合 smoke 间接兜底。
+- 保持 `docs/STATUS.md` 里的 WeCom cleanup service-not-ready 快照和 Latest verification 同步到同一组跑数，避免同一轮结果在同一文件里写出两套数字。
 - 保持 verification docs gate 继续显式校验 `success-event-append-failure observability` 命名观察，避免窗口台账把这类事件落盘失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `delete-failure observability` 命名观察，避免窗口台账把这类删除失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `correlation-missing unresolved-identity blank display` 命名观察，避免窗口台账把这条空白身份展示边界写丢。
