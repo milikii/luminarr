@@ -77,6 +77,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - WeCom cleanup service-not-ready 快照：`6 passed, 24 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k service_not_ready`）
 - shared runtime service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免共用入口只对英文带任务引用路径保留日志可观测性。
 - personal WeChat 单渠道 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 personal WeChat 只对带任务引用的英文 cleanup 命令保留日志可观测性。
+- personal WeChat chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 personal WeChat 文本入口后仍能解析出真实 `task_id/task_hash`，避免这个私聊入口把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
 - Feishu 私聊 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 Feishu 私聊入口只对英文带任务引用路径保留日志可观测性。
 - Feishu 私聊 chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 Feishu adapter 后仍能解析出真实 `task_id/task_hash`，避免这个渠道把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
 - Feishu webhook service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 Feishu 加密 HTTP 入口只对英文带任务引用路径保留日志可观测性。

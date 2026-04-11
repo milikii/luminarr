@@ -64,6 +64,7 @@
 - 保持 `tests/test_private_chat_runtime.py` 单独覆盖 shared runtime 直调路径的 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这条共享入口只能靠四渠道 smoke 或英文带任务引用路径侧面兜底。
 - 保持 `tests/test_telegram_bot.py -k "cleanup and service_not_ready"` 单独覆盖 Telegram cleanup service-not-ready observability，避免这个渠道的 cleanup 命令入口只能靠聚合 smoke 或非 cleanup service-not-ready 测试间接兜底。
 - 保持 `tests/test_personal_wechat_text.py` 单独覆盖 personal WeChat cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个渠道只对带任务引用的英文 cleanup 命令保留可观测性。
+- 保持 `tests/test_personal_wechat_text.py` 单独覆盖 personal WeChat 入口里的 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个私聊入口把 shortcut 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `tests/test_feishu_adapter.py` 单独覆盖 Feishu 私聊入口 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个渠道的私聊入站链路只能靠聚合 smoke 或英文带任务引用路径间接兜底。
 - 保持 `tests/test_feishu_adapter.py` 单独覆盖 Feishu 私聊入口 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个渠道把 `cleanup-shortcut` 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"` 单独覆盖 Feishu webhook cleanup 路由和 service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个加密 webhook 入口只有正常路径回归、缺少未注入服务时的可观测性保护。
