@@ -31,6 +31,7 @@ from app.bot.telegram_bot import (
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
+    SERVICE_NOT_READY_TEXT,
 )
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -312,6 +313,40 @@ def test_handle_feishu_private_text_event_routes_bare_cleanup_inspect_usage_in_c
     event, reply_text = reply_text_func.await_args.args
     assert isinstance(event, FeishuPrivateTextEvent)
     assert reply_text == CLEANUP_INSPECT_QUERY_USAGE_TEXT
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
+def test_handle_feishu_private_text_event_logs_cleanup_service_not_ready(
+    query: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=_build_feishu_private_text_payload(query),
+            bot_data=_build_bot_data(),
+            reply_text_func=reply_text_func,
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert reply_text == SERVICE_NOT_READY_TEXT
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert query in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
 
 
 def test_build_feishu_reply_text_func_sends_back_to_original_chat() -> None:
