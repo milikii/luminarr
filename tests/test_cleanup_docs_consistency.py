@@ -450,6 +450,14 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Feishu webhook service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
     assert "WeCom 私聊入口 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
     assert "WeCom 私聊 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in status_text
+    assert "Telegram 入口里的 `cleanup-shortcut`" in next_step_text
+    assert "personal WeChat 入口里的 `cleanup-shortcut`" in next_step_text
+    assert "Feishu 私聊入口 `cleanup-shortcut`" in next_step_text
+    assert "WeCom callback 里的 `cleanup-shortcut`" in next_step_text
+    assert "Telegram chat-scoped shortcut 门禁快照" in status_text
+    assert "personal WeChat chat-scoped shortcut 门禁快照" in status_text
+    assert "Feishu 私聊 chat-scoped shortcut 门禁快照" in status_text
+    assert "WeCom callback chat-scoped shortcut 门禁快照" in status_text
     assert "tests/test_cleanup_cross_channel_smoke.py -k service_not_ready" in next_step_text
     assert "四渠道聚合 service-not-ready 门禁快照" in status_text
     assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
