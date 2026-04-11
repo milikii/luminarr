@@ -293,6 +293,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "What is implemented now" in text
             assert "Main risks and gaps" in text
             assert "Latest verification" in text
+            assert "local test stack endpoint health checks" in text
+            assert "local test stack path device check" in text
             assert "PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`" in text
             assert "pt_min_seed_hours" in text
             assert "job_event` 关联查询失败" in text

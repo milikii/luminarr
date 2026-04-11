@@ -96,7 +96,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - BT shared source adapter、BT external web-source、pure BT ranking、`btsub` 选源都已可用，但还不是共享确定性评分器。
 - 当前主线只支持 Emby；Jellyfin / Plex 仍是后续扩展，不在 cleanup 窗口这一步混入。
 - 通用 plugin / skill / MCP 平台化仍然继续后置，不是当前收口目标。
-- 当前会话里 `docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d` 已确认命中文件，但 Docker API 访问仍被本机权限阻塞；在 `docker.sock` 权限或 `sudo` 密码问题解决前，无法替本机真正拉起 Transmission / Emby 测试栈。
+- 2026-04-11 当前 shell 健康检查显示 `TR down / Emby down`；虽然 `/data/downloads/tr` 与 `/data/library/movies` 仍在同一文件系统上，但当前 shell 既连不上 19091 / 18096，也拿不到 `docker.sock` 权限，`sudo docker ps` 还要求密码，因此本轮无法从当前 shell 确认容器真实运行状态。
 
 ## Latest verification
 
@@ -115,6 +115,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - personal WeChat cleanup tests：`16 passed, 5 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup`）
 - Feishu cleanup tests：`18 passed, 12 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k cleanup`）
 - WeCom cleanup tests：`18 passed, 8 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k cleanup`）
+- local test stack endpoint health checks：`TR down / Emby down`（2026-04-11，`curl -s http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"`；`curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"`）
+- local test stack path device check：`passed (same device)`（2026-04-11，`stat -c "%d %n" /data/downloads/tr /data/library/movies`）
 - compile check：2026-04-11，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-11，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - cleanup service-not-ready smoke tests：`4 passed, 352 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`）
