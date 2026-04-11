@@ -67,6 +67,8 @@ from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
 from app.services.search_media import SearchMediaService
 
+_CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
+
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
@@ -1399,6 +1401,62 @@ def test_handle_message_cleanup_inspect_routes_to_cleanup_service(tmp_path: Path
 
     reply_text.assert_awaited_once_with("清理预检结果。")
     cleanup_service.inspect_by_task_ref.assert_called_once_with("hash-87", chat_id=1001)
+
+
+def test_handle_message_cleanup_inspect_routes_chat_scoped_shortcut_into_shared_runtime(tmp_path: Path) -> None:
+    update, reply_text = _build_update(f"cleanup inspect {_CHAT_SCOPED_TASK_REF}")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    job_repo.upsert_import_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref=_CHAT_SCOPED_TASK_REF,
+        task_id="87",
+        task_hash="hash-87",
+    )
+    source_file = tmp_path / "downloads" / "Dune.2021.mkv"
+    source_file.parent.mkdir(parents=True)
+    source_file.write_bytes(b"demo")
+    target_file = tmp_path / "library" / "Dune (2021).mkv"
+    target_file.parent.mkdir(parents=True)
+    target_file.hardlink_to(source_file)
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    cleanup_service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY: cleanup_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "查询引用: cleanup-shortcut" in sent_text
+    assert "任务 ID: 87" in sent_text
+    assert "任务 Hash: hash-87" in sent_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in sent_text
+    assert source_file.exists()
+    assert target_file.exists()
 
 
 @pytest.mark.parametrize(
