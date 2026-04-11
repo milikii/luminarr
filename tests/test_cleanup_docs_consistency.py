@@ -315,6 +315,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-personal-wechat" in getting_started_text
     assert "make test-cleanup-feishu" in getting_started_text
     assert "make test-cleanup-wecom" in getting_started_text
+    assert "make test-cleanup-feishu-webhook" in getting_started_text
+    assert "make test-cleanup" in getting_started_text
     assert "如果你的环境没有 `make`" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py" in getting_started_text
     assert ".venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup" in getting_started_text
@@ -333,8 +335,13 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "make test-cleanup-personal-wechat" in readme_text
     assert "make test-cleanup-feishu" in readme_text
     assert "make test-cleanup-wecom" in readme_text
+    assert "make test-cleanup-feishu-webhook" in readme_text
+    assert "make test-cleanup" in readme_text
     assert "make test-cleanup-docs-gate" in readme_text
     assert "make test-cleanup-window" in readme_text
+    assert "本地 gate 入口有十条" in readme_text
+    assert "十条本地 gate 入口" in status_text
+    assert "README.md` 的十条 cleanup 本地 gate 入口" in next_step_text
     assert "如果当前环境没有 `make`" in readme_text
     assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
     assert "TELEGRAM_BOT_TOKEN=" in env_example_text
