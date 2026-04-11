@@ -34,6 +34,7 @@ from app.bot.telegram_bot import (
     SERVICE_NOT_READY_TEXT,
 )
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
@@ -44,6 +45,8 @@ from app.services.cleanup_downloaded_source import (
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
+
+_CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
@@ -100,6 +103,43 @@ def _build_cleanup_service(tmp_path: Path) -> tuple[CleanupDownloadedSourceServi
         target_path=str(target_file),
     )
     return CleanupDownloadedSourceService(event_repo), source_file, target_file
+
+
+def _build_chat_scoped_cleanup_service(
+    tmp_path: Path,
+) -> tuple[CleanupDownloadedSourceService, Path, Path]:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    job_repo = JobRepo(database)
+    projected_chat_id = project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="oc_feishu_chat_1")
+    projected_user_id = project_channel_user_id(channel=FEISHU_CHANNEL, external_user_id="ou_feishu_user_1")
+    job_repo.upsert_import_job_pending(
+        chat_id=projected_chat_id,
+        user_id=projected_user_id,
+        task_ref=_CHAT_SCOPED_TASK_REF,
+        task_id="87",
+        task_hash="hash-87",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return CleanupDownloadedSourceService(event_repo, job_repo=job_repo), source_file, target_file
 
 
 def _build_feishu_private_text_payload(text: str) -> dict[str, object]:
@@ -211,6 +251,31 @@ def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_run
     assert isinstance(event, FeishuPrivateTextEvent)
     assert "清理预检结果：" in reply_text
     assert "当前 guardrail: 允许 cleanup" in reply_text
+    assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
+    assert source_file.exists()
+    assert target_file.exists()
+
+
+def test_handle_feishu_private_text_event_routes_chat_scoped_cleanup_shortcut_into_shared_runtime(
+    tmp_path: Path,
+) -> None:
+    cleanup_service, source_file, target_file = _build_chat_scoped_cleanup_service(tmp_path)
+    reply_text_func = AsyncMock()
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=_build_feishu_private_text_payload(f"cleanup inspect {_CHAT_SCOPED_TASK_REF}"),
+            bot_data=_build_bot_data(cleanup_service=cleanup_service),
+            reply_text_func=reply_text_func,
+        )
+    )
+
+    reply_text_func.assert_awaited_once()
+    event, reply_text = reply_text_func.await_args.args
+    assert isinstance(event, FeishuPrivateTextEvent)
+    assert "查询引用: cleanup-shortcut" in reply_text
+    assert "任务 ID: 87" in reply_text
+    assert "任务 Hash: hash-87" in reply_text
     assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert source_file.exists()
     assert target_file.exists()
