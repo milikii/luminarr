@@ -21,6 +21,7 @@ from app.bot.telegram_bot import (
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
+    SERVICE_NOT_READY_TEXT,
 )
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -426,6 +427,47 @@ def test_handle_personal_wechat_private_text_event_routes_cleanup_protocol_in_ch
     assert target_file.exists()
 
 
+@pytest.mark.parametrize(
+    ("inbound_text", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
+def test_handle_personal_wechat_private_text_event_logs_cleanup_service_not_ready(
+    inbound_text: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text_func = AsyncMock()
+
+    event = asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message(inbound_text),
+            bot_data=_build_bot_data(),
+            reply_text_func=reply_text_func,
+        )
+    )
+    captured = capsys.readouterr()
+
+    assert event == PersonalWeChatPrivateTextEvent(
+        account_id="wx-account-1",
+        from_user_id="wx-user-1",
+        message_id="987654321",
+        text=inbound_text,
+        context_token="ctx-1",
+    )
+    reply_text_func.assert_awaited_once()
+    _, reply_text = reply_text_func.await_args.args
+    assert reply_text == SERVICE_NOT_READY_TEXT
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert inbound_text in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
+
+
 def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp_path: Path) -> None:
     sync_path = tmp_path / "wx-account-1.sync.json"
     saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
@@ -614,6 +656,45 @@ def test_personal_wechat_text_service_routes_cleanup_protocol_in_chinese(
     assert getattr(opts, "context_token", "") == "ctx-1"
     assert source_file.exists() is expect_source_exists
     assert target_file.exists()
+    close_client.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    ("inbound_text", "expected_action"),
+    [
+        ("cleanup hash-87", "cleanup"),
+        ("cleanup inspect hash-87", "cleanup_inspect"),
+    ],
+)
+def test_personal_wechat_text_service_logs_cleanup_service_not_ready(
+    tmp_path: Path,
+    inbound_text: str,
+    expected_action: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sync_path = tmp_path / "wx-account-1.sync.json"
+    saved_sync_buf, sent_messages, restore_context_tokens, set_context_token, close_client = (
+        _run_personal_wechat_text_service_single_message_case(
+            inbound_text=inbound_text,
+            bot_data=_build_bot_data(),
+            sync_path=sync_path,
+        )
+    )
+    captured = capsys.readouterr()
+
+    assert saved_sync_buf == [(sync_path, "buf-new")]
+    restore_context_tokens.assert_called_once_with("wx-account-1")
+    set_context_token.assert_called_once_with("wx-account-1", "wx-user-1", "ctx-1")
+    assert len(sent_messages) == 1
+    to, text, opts = sent_messages[0]
+    assert to == "wx-user-1"
+    assert text == SERVICE_NOT_READY_TEXT
+    assert getattr(opts, "context_token", "") == "ctx-1"
+    assert "[cleanup 服务未就绪]" in captured.out
+    assert f"动作={expected_action}" in captured.out
+    assert inbound_text in captured.out
+    assert "[处理建议]" in captured.out
+    assert "cleanup_downloaded_source_service" in captured.out
     close_client.assert_awaited_once()
 
 

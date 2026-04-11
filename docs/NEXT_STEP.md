@@ -1,4 +1,4 @@
-# Next step (v187)
+# Next step (v188)
 
 ## Current goal
 
@@ -48,6 +48,7 @@
 - 保持 verification docs gate 继续显式校验 `source-type-unsupported blocked-log observability` 命名观察，避免窗口台账把这类阻断日志可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `cleanup-service-not-ready fix-hint observability` 命名观察，避免窗口台账把 cleanup service 未注入时的红色日志和处理建议写丢。
 - 保持 `tests/test_private_chat_runtime.py` 单独覆盖 shared runtime 直调路径的 cleanup service-not-ready observability，避免这条共享入口只能靠四渠道 smoke 侧面兜底。
+- 保持 `tests/test_personal_wechat_text.py` 单独覆盖 personal WeChat cleanup service-not-ready observability，避免这个渠道的单条消息处理和轮询发消息路径只能靠聚合 smoke 间接兜底。
 - 保持 verification docs gate 继续显式校验 `success-event-append-failure observability` 命名观察，避免窗口台账把这类事件落盘失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `delete-failure observability` 命名观察，避免窗口台账把这类删除失败可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `correlation-missing unresolved-identity blank display` 命名观察，避免窗口台账把这条空白身份展示边界写丢。

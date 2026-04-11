@@ -202,6 +202,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "chat-scoped task_ref guard-rejected rejection guidance" in text
             assert "cleanup-service-not-ready fix-hint observability" in text
             assert "tests/test_private_chat_runtime.py" in text
+            assert "tests/test_personal_wechat_text.py" in text
             assert "Current goal" in text
             assert "Only do" in text
             assert "Do not do" in text
@@ -219,6 +220,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "查询=" in text
             assert "cleanup service-not-ready smoke tests" in text
             assert "shared runtime cleanup service-not-ready tests" in text
+            assert "personal WeChat cleanup service-not-ready tests" in text
             assert "cleanup inspect" in text
             assert "cleanup_inspect" in text
             assert "Knowledge entrypoints" in text

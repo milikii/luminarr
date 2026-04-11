@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window compile run docker-build docker-up docker-logs
+.PHONY: help install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -31,6 +31,9 @@ test-cleanup-feishu:
 
 test-cleanup-wecom:
 	$(PYTHON) -m pytest -q tests/test_wecom_adapter.py -k cleanup
+
+test-cleanup-feishu-webhook:
+	$(PYTHON) -m pytest -q tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"
 
 test-cleanup:
 	$(PYTHON) -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup
