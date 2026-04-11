@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window compile run docker-build docker-up docker-logs
+.PHONY: help install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -48,6 +48,9 @@ test-cleanup-window:
 	$(MAKE) test-cleanup-smoke
 	$(MAKE) test-cleanup
 	$(MAKE) test-cleanup-docs-gate
+
+sync-cleanup-doc-snapshots:
+	$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency
 
 compile:
 	python3 -m compileall app tests

@@ -46,6 +46,7 @@
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 对 Transmission / Emby 本地测试栈的 compose 文件位置、启动命令和配置目录位置保持一致，避免把不存在的目录误写成 compose 根目录。
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 的 Transmission 健康检查继续使用 `curl -si` 读取 `X-Transmission-Session-Id` 响应头，避免把正常的 `409 Conflict` 误判成服务不可达。
 - 保持 `docs/STATUS.md` 里的 tests / cleanup service / compile check / docs consistency check 都带绝对日期，避免这些本地验证快照比 smoke / docs gate 更难判断是否过期。
+- 保持仓库里有显式的 cleanup 验证快照同步工具，把固定验证命令的最新结果批量写回 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 7 天窗口里的验证快照继续靠人工抄写而漂移。
 - 保持 `docs/STATUS.md` 把配置真相回归（`tests/test_config.py` 里和当前文档变更直接相关的 focused config checks）也写成带绝对日期的快照，避免配置入口更新后状态页看不到对应验证证据。
 - 保持 `docs/STATUS.md` 对本机 Transmission / Emby 测试栈的当前 shell 健康检查结果和权限 blocker 写成显式快照，避免把“用户说已经启动”误写成当前 shell 已验证通过的事实。
 - 保持 cleanup 验证窗口仍在进行中时，`docs/CLEANUP_VERIFICATION_WINDOW.md` 的 smoke gate / cleanup 协议回归 / verification docs gate 日期，与 `docs/STATUS.md` 的 tests / cleanup service / compile check / docs consistency check 一起滚动到当天绝对日期，避免只更新半套快照。
