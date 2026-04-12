@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
+from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import dispatch_private_chat_text
 
 WECOM_CHANNEL = "wecom"
@@ -88,20 +89,31 @@ async def handle_wecom_private_text_event(
     if event is None:
         return None
 
+    chat_id = project_channel_chat_id(
+        channel=WECOM_CHANNEL,
+        external_chat_id=_resolve_private_chat_external_id(event),
+    )
+    user_id = project_channel_user_id(
+        channel=WECOM_CHANNEL,
+        external_user_id=event.user_id,
+    )
+
     async def reply_with_event(reply_text: str) -> object:
-        return await reply_text_func(event, reply_text)
+        result = await reply_text_func(event, reply_text)
+        log_cleanup_private_chat_smoke(
+            channel=WECOM_CHANNEL,
+            query=event.text,
+            reply_text=reply_text,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        return result
 
     await dispatch_private_chat_text(
         query=event.text,
         reply_func=reply_with_event,
-        chat_id=project_channel_chat_id(
-            channel=WECOM_CHANNEL,
-            external_chat_id=_resolve_private_chat_external_id(event),
-        ),
-        user_id=project_channel_user_id(
-            channel=WECOM_CHANNEL,
-            external_user_id=event.user_id,
-        ),
+        chat_id=chat_id,
+        user_id=user_id,
         bot_data=bot_data,
     )
     return event
