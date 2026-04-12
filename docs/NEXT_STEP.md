@@ -47,6 +47,7 @@
 - 保持 `docs/GETTING_STARTED.md` / `docs/TEST_ENV.md` 的 Transmission 健康检查继续使用 `curl -si` 读取 `X-Transmission-Session-Id` 响应头，避免把正常的 `409 Conflict` 误判成服务不可达。
 - 保持 `docs/STATUS.md` 里的 tests / cleanup service / compile check / docs consistency check 都带绝对日期，避免这些本地验证快照比 smoke / docs gate 更难判断是否过期。
 - 保持仓库里有显式的 cleanup 验证快照同步工具，把固定验证命令的最新结果批量写回 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 7 天窗口里的验证快照继续靠人工抄写而漂移。
+- 保持四渠道真实私聊 cleanup smoke 证据后续统一落到同一套 `cleanup 私聊 smoke` 日志协议里，至少固定 `date/channel/action/query/reply_head` 这组字段，避免 Telegram / personal WeChat / Feishu / WeCom 各自打印不同格式、后面无法稳定回填窗口台账。
 - 保持 verification docs gate 继续显式校验 `sync-cleanup-doc-snapshots` 这条新同步入口在 `Makefile` 和 `docs/GETTING_STARTED.md` 里保持一致，避免刚加的 docs 维护路径下一轮又重新分叉。
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
 - 保持 `docs/STATUS.md` 把配置真相回归（`tests/test_config.py` 里和当前文档变更直接相关的 focused config checks）也写成带绝对日期的快照，避免配置入口更新后状态页看不到对应验证证据。
