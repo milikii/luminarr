@@ -171,6 +171,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         window_text,
         "当前环境就绪快照",
     )
+    window_telegram_bot_api_date, window_telegram_bot_api_result, window_telegram_bot_api_command = (
+        _extract_verification_evidence(
+            window_text,
+            "当前 Telegram Bot API 就绪快照",
+        )
+    )
     window_local_evidence_date, window_local_evidence_result, window_local_evidence_command = _extract_verification_evidence(
         window_text,
         "当前仓库证据快照",
@@ -206,6 +212,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     env_readiness_result, env_readiness_date, env_readiness_command = _extract_status_named_verification_entry(
         status_text,
         "env readiness snapshot",
+    )
+    telegram_bot_api_result, telegram_bot_api_date, telegram_bot_api_command = (
+        _extract_status_named_verification_entry(status_text, "telegram bot api snapshot")
     )
     local_smoke_evidence_result, local_smoke_evidence_date, local_smoke_evidence_command = (
         _extract_status_named_verification_entry(status_text, "local smoke evidence snapshot")
@@ -258,6 +267,13 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert env_readiness_result == window_env_readiness_result
     assert env_readiness_date == window_env_readiness_date
     assert env_readiness_command == window_env_readiness_command
+    assert telegram_bot_api_result == "telegram bot api ready"
+    assert telegram_bot_api_date == docs_gate_date
+    assert telegram_bot_api_result == window_telegram_bot_api_result
+    assert telegram_bot_api_date == window_telegram_bot_api_date
+    assert telegram_bot_api_command == window_telegram_bot_api_command
+    assert "api.telegram.org/bot" in telegram_bot_api_command
+    assert "getMe" in telegram_bot_api_command
     assert local_smoke_evidence_result == "no in-window cleanup smoke evidence in repo"
     assert local_smoke_evidence_date == docs_gate_date
     assert local_smoke_evidence_result == window_local_evidence_result
@@ -334,6 +350,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         if text is status_text:
             assert "four-channel cleanup smoke tests" in text
             assert "env readiness snapshot" in text
+            assert "telegram bot api snapshot" in text
             assert "local smoke evidence snapshot" in text
             assert "runtime process snapshot" in text
             assert "当前结论" in text
@@ -379,8 +396,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "docker-compose.yml" in readme_text
     assert "Dockerfile" in readme_text
     assert "当前环境就绪快照" in window_text
+    assert "当前 Telegram Bot API 就绪快照" in window_text
     assert "当前仓库证据快照" in window_text
     assert "当前运行进程快照" in window_text
+    assert "Telegram Bot API 就绪快照" in status_text
     assert "context_token" in readme_text
     assert "pt_min_seed_hours" in readme_text
     assert ".ass" in readme_text
@@ -580,7 +599,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         "$(MAKE) test-cleanup-docs-gate",
     ]
     assert sync_cleanup_doc_snapshots_target_commands == [
-        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness local_smoke_evidence runtime_process"
+        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness telegram_bot_api local_smoke_evidence runtime_process"
     ]
     assert cleanup_window_fallback_command == " && ".join(
         [

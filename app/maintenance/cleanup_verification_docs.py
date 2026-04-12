@@ -4,10 +4,13 @@ from argparse import ArgumentParser
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
+import urllib.error
+import urllib.request
 from zoneinfo import ZoneInfo
 
 from app.bot.cleanup_smoke_logging import parse_cleanup_private_chat_smoke_log_line
@@ -112,13 +115,23 @@ RUNTIME_PROCESS_COMMAND_DISPLAY = (
     "  matches.append(f'{pid_dir.name} ' + ' '.join(tokens)); "
     "print('\\\\n'.join(matches))\""
 )
+TELEGRAM_BOT_API_COMMAND_DISPLAY = (
+    "python3 -c \"import json, os, subprocess, urllib.request; from pathlib import Path; token=os.getenv('TELEGRAM_BOT_TOKEN','').strip(); "
+    "env_path=Path('.env'); env_map={}; text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
+    "lines=(line.strip() for line in text.splitlines()); "
+    "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
+    "env_map.update(((key.removeprefix('export ').strip()), value.strip()) for key, _, value in pairs); "
+    "token=token or env_map.get('TELEGRAM_BOT_TOKEN','').strip(); "
+    "token=token or next((line.partition('=')[2].strip() for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True, text=True).stdout.splitlines() if line.startswith('TELEGRAM_BOT_TOKEN=')), ''); "
+    "print('telegram bot token missing' if not token else ('telegram bot api ready' if json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=5)).get('ok') else 'telegram bot api rejected token'))\""
+)
 
 
-def _read_current_shell_env_status() -> dict[str, bool]:
-    return {key: bool(os.getenv(key, "").strip()) for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+def _read_current_shell_env_values() -> dict[str, str]:
+    return {key: os.getenv(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 
-def _read_windows_env_status() -> dict[str, bool]:
+def _read_windows_env_values() -> dict[str, str]:
     try:
         completed = subprocess.run(
             ("cmd.exe", "/c", "set"),
@@ -127,20 +140,22 @@ def _read_windows_env_status() -> dict[str, bool]:
             check=False,
         )
     except FileNotFoundError:
-        return {key: False for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+        return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
     if completed.returncode != 0:
-        return {key: False for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
-    windows_env_lines = completed.stdout.lower()
-    return {
-        key: f"{key.lower()}=" in windows_env_lines
-        for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS
-    }
+        return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    windows_env_values: dict[str, str] = {}
+    for raw_line in completed.stdout.splitlines():
+        if "=" not in raw_line:
+            continue
+        key, _, value = raw_line.partition("=")
+        windows_env_values[key.strip()] = value.strip()
+    return {key: windows_env_values.get(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 
-def _read_env_file_status(cwd: Path) -> dict[str, bool]:
+def _read_env_file_values(cwd: Path) -> dict[str, str]:
     env_file_path = cwd / ".env"
     if not env_file_path.exists():
-        return {key: False for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+        return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
     env_values: dict[str, str] = {}
     for raw_line in env_file_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
@@ -149,7 +164,11 @@ def _read_env_file_status(cwd: Path) -> dict[str, bool]:
         key, _, value = line.partition("=")
         normalized_key = key.removeprefix("export ").strip()
         env_values[normalized_key] = value.strip()
-    return {key: bool(env_values.get(key, "").strip()) for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    return {key: env_values.get(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+
+
+def _build_env_status(values: dict[str, str]) -> dict[str, bool]:
+    return {key: bool(values.get(key, "").strip()) for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 
 def _merge_env_statuses(*statuses: dict[str, bool]) -> dict[str, bool]:
@@ -164,9 +183,9 @@ def _all_env_keys_ready(status: dict[str, bool], keys: tuple[str, ...]) -> bool:
 
 
 def _run_env_readiness_snapshot(cwd: Path) -> str:
-    current_shell_status = _read_current_shell_env_status()
-    windows_env_status = _read_windows_env_status()
-    env_file_status = _read_env_file_status(cwd)
+    current_shell_status = _build_env_status(_read_current_shell_env_values())
+    windows_env_status = _build_env_status(_read_windows_env_values())
+    env_file_status = _build_env_status(_read_env_file_values(cwd))
     merged_status = _merge_env_statuses(current_shell_status, windows_env_status, env_file_status)
     if (
         _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS)
@@ -181,6 +200,30 @@ def _run_env_readiness_snapshot(cwd: Path) -> str:
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS):
         return "local runtime env ready; import/refresh env incomplete"
     return "missing local runtime env"
+
+
+def _resolve_env_value(*, key: str, cwd: Path) -> str:
+    current_shell_value = _read_current_shell_env_values().get(key, "").strip()
+    if current_shell_value:
+        return current_shell_value
+    env_file_value = _read_env_file_values(cwd).get(key, "").strip()
+    if env_file_value:
+        return env_file_value
+    return _read_windows_env_values().get(key, "").strip()
+
+
+def _run_telegram_bot_api_snapshot(cwd: Path) -> str:
+    token = _resolve_env_value(key="TELEGRAM_BOT_TOKEN", cwd=cwd)
+    if not token:
+        return "telegram bot token missing"
+    try:
+        with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=5) as response:
+            payload = json.load(response)
+    except (TimeoutError, urllib.error.URLError, json.JSONDecodeError):
+        return "telegram bot api unreachable"
+    if not isinstance(payload, dict) or payload.get("ok") is not True:
+        return "telegram bot api rejected token"
+    return "telegram bot api ready"
 
 
 def _load_window_start_date(cwd: Path) -> str:
@@ -391,6 +434,15 @@ SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {
         status_style="result_first",
         status_aliases=("current shell env readiness check",),
         window_label="当前环境就绪快照",
+    ),
+    "telegram_bot_api": SnapshotSpec(
+        key="telegram_bot_api",
+        result_kind="custom",
+        runner=_run_telegram_bot_api_snapshot,
+        command_display=TELEGRAM_BOT_API_COMMAND_DISPLAY,
+        status_label="telegram bot api snapshot",
+        status_style="result_first",
+        window_label="当前 Telegram Bot API 就绪快照",
     ),
     "local_smoke_evidence": SnapshotSpec(
         key="local_smoke_evidence",

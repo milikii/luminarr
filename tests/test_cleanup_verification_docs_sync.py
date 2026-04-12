@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from app.maintenance.cleanup_verification_docs import (
     _run_env_readiness_snapshot,
     _run_local_smoke_evidence_snapshot,
     _run_runtime_process_snapshot,
+    _run_telegram_bot_api_snapshot,
     parse_pytest_result,
     update_status_text,
     update_window_text,
@@ -90,6 +92,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     original = (
         "## Latest verification\n\n"
         "- env readiness snapshot：`old result`（2026-04-10，`old env command`）\n"
+        "- telegram bot api snapshot：`old bot result`（2026-04-10，`old bot command`）\n"
         "- local smoke evidence snapshot：`old evidence`（2026-04-10，`old evidence command`）\n"
         "- runtime process snapshot：`old process result`（2026-04-10，`old process command`）\n"
     )
@@ -98,6 +101,11 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
             result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
+        ),
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["telegram_bot_api"],
+            date_text="2026-04-11",
+            result_text="telegram bot api ready",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
@@ -117,6 +125,9 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
     assert "env_path=Path('.env')" in updated
+    assert "- telegram bot api snapshot：`telegram bot api ready`" in updated
+    assert "api.telegram.org/bot" in updated
+    assert "getMe" in updated
     assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
@@ -148,6 +159,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     original = (
         "## Verification evidence\n\n"
         "- 当前环境就绪快照：2026-04-10，`old env result`（`old env command`）\n"
+        "- 当前 Telegram Bot API 就绪快照：2026-04-10，`old bot result`（`old bot command`）\n"
         "- 当前仓库证据快照：2026-04-10，`old evidence result`（`old evidence command`）\n"
         "- 当前运行进程快照：2026-04-10，`old process result`（`old process command`）\n"
     )
@@ -156,6 +168,11 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
             result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
+        ),
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["telegram_bot_api"],
+            date_text="2026-04-11",
+            result_text="telegram bot api ready",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
@@ -178,6 +195,9 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
     assert "env_path=Path('.env')" in updated
+    assert "- 当前 Telegram Bot API 就绪快照：2026-04-11，`telegram bot api ready`" in updated
+    assert "api.telegram.org/bot" in updated
+    assert "getMe" in updated
     assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
@@ -242,6 +262,60 @@ def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_abs
         _run_env_readiness_snapshot(tmp_path)
         == "local runtime/import env ready; four-channel cleanup smoke env incomplete"
     )
+
+
+def test_run_telegram_bot_api_snapshot_returns_missing_when_token_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot token missing"
+
+
+def test_run_telegram_bot_api_snapshot_reads_env_file_and_returns_ready(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=test-token\n", encoding="utf-8")
+
+    class _FakeResponse(io.BytesIO):
+        def __enter__(self) -> "_FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+    def _fake_urlopen(url: str, timeout: int):
+        assert "test-token" in url
+        assert timeout == 5
+        return _FakeResponse(b'{"ok": true, "result": {"username": "demo_bot"}}')
+
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.urllib.request.urlopen", _fake_urlopen)
+
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api ready"
+
+
+def test_run_telegram_bot_api_snapshot_returns_rejected_when_api_says_not_ok(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+
+    class _FakeResponse(io.BytesIO):
+        def __enter__(self) -> "_FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.urllib.request.urlopen",
+        lambda url, timeout: _FakeResponse(b'{"ok": false, "description": "unauthorized"}'),
+    )
+
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api rejected token"
 
 
 def test_run_local_smoke_evidence_snapshot_returns_missing_when_repo_has_no_window_evidence(tmp_path: Path) -> None:
