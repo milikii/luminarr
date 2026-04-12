@@ -1,4 +1,4 @@
-# Current status (v197)
+# Current status (v199)
 
 ## Project position
 
@@ -61,9 +61,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 入口文档快照：`README.md` 已同步 cleanup 窗口、personal WeChat / WeCom 回复边界、PT 做种风险、mixed-case 英文 cleanup 输入、`guard-rejected` rejection guidance，以及 `make test-cleanup-smoke` / `make test-cleanup-service-not-ready` / `make test-cleanup-telegram` / `make test-cleanup-personal-wechat` / `make test-cleanup-feishu` / `make test-cleanup-wecom` / `make test-cleanup-feishu-webhook` / `make test-cleanup` / `make test-cleanup-docs-gate` / `make test-cleanup-window` 十条本地 gate 入口和无 `make` 备用命令；`README.md` / `docs/GETTING_STARTED.md` 现在也显式补齐了 `test-cleanup-service-not-ready`、`test-cleanup-telegram`、`test-cleanup`、`test-cleanup-docs-gate`、`test-cleanup-window` 的等价一行 pytest 命令；`README.md` 快速启动入口也已经写清 `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL` 是硬必填，`TMDB_API_KEY` 可空，`DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；`docs/GETTING_STARTED.md` 已额外写清“Telegram + 本地 Transmission/Emby 已启动”这条最小 `.env` 组合，并把 Feishu / WeCom 三元组 all-or-none 约束同步到当前配置真相；`.env.example` 也已按同一真相补齐中文说明；`tests/test_config.py` 相关配置回归和 docs gate 都已覆盖这些说明；`docs/TEST_ENV.md` 已同步测试栈 compose 文件真实位置；窗口细节继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - bring-up 入口快照：`Makefile` 的 `make run` 现在会先检查 `ENV_FILE` 指向的环境文件；缺失时打印红色中文 `[环境文件缺失]` 日志和 `[处理建议]`，并支持 `ENV_FILE=/绝对路径 make run`，避免当前工作区没有 `.env` 时直接掉进 shell 原始 `source` 报错。
 - 知识入口快照：历史单体主文档 `Luminarr_v15.md` 已移除，当前只保留 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口，避免过期总纲继续和当前主线并行。
-- 窗口活性快照：未到最早可结束日期
+- 窗口活性快照：已到最早可结束日期，待补退出条件
 - 当前状态快照：进行中
-- 当前结论快照：验证窗口仍在进行中；截至 2026-04-11，尚未到最早可结束日期 2026-04-12，四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
+- 当前结论快照：验证窗口仍在进行中；截至 2026-04-12，已到最早可结束日期 2026-04-12，但四个渠道真实私聊 cleanup smoke 记录仍待补，暂未满足退出条件。
 - 聚合 smoke gate 快照：已把 `mixed-case` 英文 `cleanup / cleanup inspect` 输入、四渠道 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 的 service-not-ready observability，以及 `chat-scoped task_ref` 命中 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance 补进四渠道 cleanup smoke。
 - 单渠道入口快照：`tests/test_telegram_bot.py -k cleanup` 现在也单独锁住 Telegram cleanup mixed-case 英文 `cleanup / cleanup inspect` 路由，避免 Telegram 胶水层大小写回退只能从聚合 smoke 间接发现。
 - Telegram chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 Telegram handler 后仍能解析出真实 `task_id/task_hash`，避免主入口把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
@@ -99,6 +99,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前“给别人用”的体验还偏工程向：私聊返回仍缺更美观的图片/信息卡片/字符排版。
 - 当前虽然已经有最小 `Dockerfile` / `docker-compose.yml`，但还没有把 Transmission / Emby / Prowlarr 整套依赖一起内置到主 compose。
 - 四个渠道都在真用，最大的维护风险是渠道适配层和 shared runtime 漂移，导致同一协议在四处长出不同分支。
+- `shared private-chat runtime` 入口当前仍通过 `app/bot/private_chat_runtime.py -> app/bot/telegram_bot.py.handle_private_chat_query_text` 反向依赖 Telegram；大多数文本路径虽然已经可以在无 Telegram update 的前提下直跑，但 `微信登录` 仍直接依赖 Telegram 的二维码/文本回传能力。这条结构债已记录为 cleanup 窗口后的最小抽离项：把 shared runtime 入口从 `telegram_bot.py` 独立出来，并把 Telegram-only 媒资回传收口成显式注入能力，不在当前 cleanup 验证窗口内展开。
 - personal WeChat 仍然仅限单账号私聊文本，每次回复依赖最新消息里的 `context_token`；一旦用户长时间不发言旧 token 会过期，当前没有可靠的 personal WeChat 主动推送闭环；登录成功后仍需下次启动才能开始轮询。
 - Feishu / WeCom 当前只支持最小私聊文本，不支持群聊、图片、卡片、按钮回调；WeCom 也还没有主动发消息客户端。
 - cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早历史任务仍需人工甄别。
@@ -112,13 +113,13 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- tests：2026-04-11，`724 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
-- four-channel cleanup smoke tests：`376 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
-- cleanup service tests：2026-04-11，`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
-- focused cleanup tests：`522 passed, 91 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification docs gate：`384 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
-- focused config truth tests：`4 passed, 17 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
-- make run env-file guard tests：`2 passed`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
+- tests：2026-04-12，`790 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- four-channel cleanup smoke tests：`376 passed`（2026-04-12，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
+- cleanup service tests：2026-04-12，`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
+- focused cleanup tests：`526 passed, 91 deselected`（2026-04-12，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- cleanup verification docs gate：`384 passed`（2026-04-12，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- focused config truth tests：`4 passed, 17 deselected`（2026-04-12，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
+- make run env-file guard tests：`2 passed`（2026-04-12，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - shared runtime cleanup service-not-ready tests：`6 passed, 10 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k service_not_ready`）
 - Telegram cleanup service-not-ready tests：`8 passed, 74 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup and service_not_ready"`）
 - personal WeChat cleanup service-not-ready tests：`12 passed, 21 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k service_not_ready`）
@@ -130,8 +131,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - WeCom cleanup tests：`18 passed, 8 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k cleanup`）
 - local test stack endpoint health checks：`passed (TR up / Emby up)`（2026-04-11，`curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"`；`curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"`）
 - local test stack path device check：`passed (same device)`（2026-04-11，`stat -c "%d %n" /data/downloads/tr /data/library/movies`）
-- compile check：2026-04-11，`passed`（`python3 -m compileall app tests`）
-- docs consistency check：2026-04-11，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- compile check：2026-04-12，`passed`（`python3 -m compileall app tests`）
+- docs consistency check：2026-04-12，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - cleanup service-not-ready smoke tests：`24 passed, 352 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`）
 - telegram cleanup tests：`16 passed, 64 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`）
 - manual verification：

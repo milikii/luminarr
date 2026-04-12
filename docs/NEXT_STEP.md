@@ -1,4 +1,4 @@
-# Next step (v195)
+# Next step (v197)
 
 ## Current goal
 
@@ -57,6 +57,7 @@
 - 保持 README / STATUS 对 cleanup 聚合 smoke gate 的入口描述也同步覆盖 mixed-case 英文 `cleanup / cleanup inspect` 输入、`job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance，以及 `guard-rejected` rejection guidance，避免入口文档落后于当前 gate。
 - 保持 verification docs gate 继续显式校验 `mixed-case english cleanup protocol` 命名观察，避免窗口台账把英文字母大小写输入边界写丢。
 - 保持 verification docs gate 继续显式校验 `NEXT_STEP current-window sync`，避免 `docs/NEXT_STEP.md` 里的 `当前窗口` 日期和 `docs/CLEANUP_VERIFICATION_WINDOW.md` 的窗口日期只改一处。
+- 保持 verification docs gate 继续显式校验到达最早可结束日期但退出条件未满足时，`docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 同步切成 `已到最早可结束日期，待补退出条件`，避免窗口已经跨过结束日却还停留在 `未到最早可结束日期` 的旧快照。
 - 保持 verification docs gate 继续显式校验 `correlation-query-failure observability` 命名观察，避免窗口台账把这类 query failure 可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `source-type-unsupported blocked-log observability` 命名观察，避免窗口台账把这类阻断日志可观测性写丢。
 - 保持 verification docs gate 继续显式校验 `cleanup-service-not-ready fix-hint observability` 命名观察，避免窗口台账把 cleanup service 未注入时的红色日志和处理建议写丢。
@@ -139,8 +140,9 @@
 1. 独立后台下载完成轮询（复用 `download_monitor` 和现有 `PostDownloadAutoImportService`，不扩成通用 scheduler 平台）。
 2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
 3. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
-4. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
-5. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
-6. BT 共享确定性评分器。
-7. Jellyfin / Plex 支持（后续）。
-8. plugin 体系继续后置。
+4. `shared private-chat runtime` 最小抽离：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，改成显式 runtime context / injected capability；保留 `微信登录` 的 Telegram 二维码回传能力为注入项，不做多渠道平台化。
+5. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
+6. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
+7. BT 共享确定性评分器。
+8. Jellyfin / Plex 支持（后续）。
+9. plugin 体系继续后置。

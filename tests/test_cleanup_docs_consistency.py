@@ -219,7 +219,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert next_step_start_date == start_date
     assert next_step_end_date == end_date
     assert full_suite_date == docs_gate_date
-    assert full_suite_result == "724 passed, 2 skipped"
+    assert full_suite_result == "790 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_date == docs_gate_date
     assert cleanup_service_result == "38 passed"
@@ -249,6 +249,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert f"- 当前状态快照：{window_status}" in status_text
     assert f"- 当前结论快照：{current_conclusion}" in status_text
     assert f"- four-channel cleanup smoke tests：`{smoke_gate_result}`（{smoke_gate_date}，`{smoke_gate_command}`）" in status_text
+    assert focused_cleanup_result == "526 passed, 91 deselected"
     assert (
         f"- focused cleanup tests：`{focused_cleanup_result}`（{focused_cleanup_date}，"
         f"`{focused_cleanup_command}`）"
