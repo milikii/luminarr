@@ -1,4 +1,4 @@
-# Next step (v197)
+# Next step (v198)
 
 ## Current goal
 
@@ -49,7 +49,7 @@
 - 保持仓库里有显式的 cleanup 验证快照同步工具，把固定验证命令的最新结果批量写回 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 7 天窗口里的验证快照继续靠人工抄写而漂移。
 - 保持 verification docs gate 继续显式校验 `sync-cleanup-doc-snapshots` 这条新同步入口在 `Makefile` 和 `docs/GETTING_STARTED.md` 里保持一致，避免刚加的 docs 维护路径下一轮又重新分叉。
 - 保持 `docs/STATUS.md` 把配置真相回归（`tests/test_config.py` 里和当前文档变更直接相关的 focused config checks）也写成带绝对日期的快照，避免配置入口更新后状态页看不到对应验证证据。
-- 保持 `docs/STATUS.md` 对本机 Transmission / Emby 测试栈的当前 shell 健康检查结果和权限 blocker 写成显式快照，避免把“用户说已经启动”误写成当前 shell 已验证通过的事实。
+- 保持 `docs/STATUS.md` 对本机 Transmission / Emby 测试栈的当前 shell 健康检查结果、Docker 权限 blocker，以及 Telegram 真实 smoke 所需 `.env` / 环境变量缺口写成显式快照，避免把“用户说已经启动 / token 已准备好”误写成当前 shell 已具备真实 smoke 条件。
 - 保持 cleanup 验证窗口仍在进行中时，`docs/CLEANUP_VERIFICATION_WINDOW.md` 的 smoke gate / cleanup 协议回归 / verification docs gate 日期，与 `docs/STATUS.md` 的 tests / cleanup service / compile check / docs consistency check 一起滚动到当天绝对日期，避免只更新半套快照。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case english cleanup protocol / `chat-scoped task_ref -> jobs -> import correlation` / correlation-query-failure identity retention / missing-structured-import-correlation identity retention 的聚合 smoke gate。
 - 保持 `tests/test_telegram_bot.py -k cleanup` 单独覆盖 Telegram cleanup mixed-case 英文 `cleanup / cleanup inspect` 入口路由，避免 Telegram 渠道胶水大小写回退只能等聚合 smoke 才暴露。

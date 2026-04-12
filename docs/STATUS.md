@@ -1,4 +1,4 @@
-# Current status (v199)
+# Current status (v200)
 
 ## Project position
 
@@ -109,7 +109,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - BT shared source adapter、BT external web-source、pure BT ranking、`btsub` 选源都已可用，但还不是共享确定性评分器。
 - 当前主线只支持 Emby；Jellyfin / Plex 仍是后续扩展，不在 cleanup 窗口这一步混入。
 - 通用 plugin / skill / MCP 平台化仍然继续后置，不是当前收口目标。
-- 2026-04-11 当前 shell 默认沙箱里的 `curl` 会把本机 19091 / 18096 端口误判成不可达；经提权检查后，`sudo docker ps` 确认 Transmission / Emby 容器都在运行，Transmission 也返回 `409 Conflict + X-Transmission-Session-Id`，Emby `/System/Info/Public` 正常返回 JSON，因此当前本机测试栈端点本身可达。
+- 2026-04-12 当前 shell 与提权 shell 都没有加载 `.env`，`TELEGRAM_BOT_TOKEN` / `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` / `TRANSMISSION_BASE_URL` / `EMBY_BASE_URL` 仍是缺失状态，所以今天还不能从这个 shell 直接启动 Luminarr 去补 Telegram 真实私聊 smoke；不过提权 `curl` 已确认 Transmission 返回 `409 Conflict + X-Transmission-Session-Id`、Emby `/System/Info/Public` 正常返回 JSON，`stat -c "%d %n" /data/downloads/tr /data/library/movies` 也确认两条路径仍在同一设备上。当前剩余环境 blocker 是 Docker socket / `sudo docker ps` 仍需要密码，无法从当前 shell 继续补容器列表快照。
 
 ## Latest verification
 
@@ -129,8 +129,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - personal WeChat cleanup tests：`16 passed, 5 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup`）
 - Feishu cleanup tests：`18 passed, 12 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k cleanup`）
 - WeCom cleanup tests：`18 passed, 8 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k cleanup`）
-- local test stack endpoint health checks：`passed (TR up / Emby up)`（2026-04-11，`curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "TR up" || echo "TR down"`；`curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName" && echo "Emby up" || echo "Emby down"`）
-- local test stack path device check：`passed (same device)`（2026-04-11，`stat -c "%d %n" /data/downloads/tr /data/library/movies`）
+- local test stack endpoint health checks：`passed (TR up / Emby up)`（2026-04-12，`curl -si http://127.0.0.1:19091/transmission/rpc`；`curl -s http://127.0.0.1:18096/System/Info/Public`）
+- local test stack path device check：`passed (same device)`（2026-04-12，`stat -c "%d %n" /data/downloads/tr /data/library/movies`）
 - compile check：2026-04-12，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-12，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - cleanup service-not-ready smoke tests：`24 passed, 352 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`）
