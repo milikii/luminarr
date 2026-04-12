@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
+from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import dispatch_private_chat_text
 
 PERSONAL_WECHAT_CHANNEL = "personal_wechat"
@@ -144,7 +145,21 @@ async def handle_personal_wechat_private_text_event(
         return None
 
     async def reply_with_event(reply_text: str) -> object:
-        return await reply_text_func(event, reply_text)
+        result = await reply_text_func(event, reply_text)
+        log_cleanup_private_chat_smoke(
+            channel=PERSONAL_WECHAT_CHANNEL,
+            query=event.text,
+            reply_text=reply_text,
+            chat_id=project_channel_chat_id(
+                channel=PERSONAL_WECHAT_CHANNEL,
+                external_chat_id=event.from_user_id,
+            ),
+            user_id=project_channel_user_id(
+                channel=PERSONAL_WECHAT_CHANNEL,
+                external_user_id=event.from_user_id,
+            ),
+        )
+        return result
 
     await dispatch_private_chat_text(
         query=event.text,
