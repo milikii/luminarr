@@ -33,6 +33,7 @@ class SnapshotSpec:
     runner: SnapshotRunner | None = None
     status_label: str | None = None
     status_style: str | None = None
+    status_aliases: tuple[str, ...] = ()
     window_label: str | None = None
 
 
@@ -43,19 +44,31 @@ class SnapshotRun:
     result_text: str
 
 
-REQUIRED_CHANNEL_RUNTIME_ENV_KEYS = (
+LOCAL_RUNTIME_ENV_KEYS = (
     "TELEGRAM_BOT_TOKEN",
     "PROWLARR_BASE_URL",
     "PROWLARR_API_KEY",
     "TRANSMISSION_BASE_URL",
+)
+
+IMPORT_REFRESH_ENV_KEYS = (
     "EMBY_BASE_URL",
     "EMBY_API_KEY",
+)
+
+FOUR_CHANNEL_SMOKE_ENV_KEYS = (
     "FEISHU_APP_ID",
     "FEISHU_APP_SECRET",
     "FEISHU_ENCRYPT_KEY",
     "WECOM_TOKEN",
     "WECOM_ENCODING_AES_KEY",
     "WECOM_RECEIVE_ID",
+)
+
+REQUIRED_CHANNEL_RUNTIME_ENV_KEYS = (
+    *LOCAL_RUNTIME_ENV_KEYS,
+    *IMPORT_REFRESH_ENV_KEYS,
+    *FOUR_CHANNEL_SMOKE_ENV_KEYS,
 )
 
 ENV_READINESS_COMMAND_DISPLAY = (
@@ -69,7 +82,15 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
     "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
     "out=subprocess.run(['cmd.exe','/c','set'], capture_output=True, text=True).stdout.lower(); "
-    "print('\\\\n'.join(f'{k}=' + ('set' if f'{k.lower()}=' in out else 'missing') for k in keys))\""
+    "print('\\\\n'.join(f'{k}=' + ('set' if f'{k.lower()}=' in out else 'missing') for k in keys))\" ; "
+    "python3 -c \"from pathlib import Path; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
+    "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
+    "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; data={}; "
+    "env_path=Path('.env'); text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
+    "lines=(line.strip() for line in text.splitlines()); "
+    "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
+    "data.update(((key.removeprefix('export ').strip()), value.strip()) for key, _, value in pairs); "
+    "print('\\\\n'.join(f'{k}=' + ('set' if data.get(k, '').strip() else 'missing') for k in keys))\""
 )
 
 LOCAL_SMOKE_EVIDENCE_COMMAND_DISPLAY = (
@@ -104,12 +125,50 @@ def _read_windows_env_status() -> dict[str, bool]:
     }
 
 
-def _run_env_readiness_snapshot(_: Path) -> str:
+def _read_env_file_status(cwd: Path) -> dict[str, bool]:
+    env_file_path = cwd / ".env"
+    if not env_file_path.exists():
+        return {key: False for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    env_values: dict[str, str] = {}
+    for raw_line in env_file_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        normalized_key = key.removeprefix("export ").strip()
+        env_values[normalized_key] = value.strip()
+    return {key: bool(env_values.get(key, "").strip()) for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+
+
+def _merge_env_statuses(*statuses: dict[str, bool]) -> dict[str, bool]:
+    return {
+        key: any(status.get(key, False) for status in statuses)
+        for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS
+    }
+
+
+def _all_env_keys_ready(status: dict[str, bool], keys: tuple[str, ...]) -> bool:
+    return all(status.get(key, False) for key in keys)
+
+
+def _run_env_readiness_snapshot(cwd: Path) -> str:
     current_shell_status = _read_current_shell_env_status()
     windows_env_status = _read_windows_env_status()
-    if all(current_shell_status.values()) and all(windows_env_status.values()):
-        return "required channel/runtime env ready"
-    return "missing required channel/runtime env"
+    env_file_status = _read_env_file_status(cwd)
+    merged_status = _merge_env_statuses(current_shell_status, windows_env_status, env_file_status)
+    if (
+        _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS)
+        and _all_env_keys_ready(merged_status, IMPORT_REFRESH_ENV_KEYS)
+        and _all_env_keys_ready(merged_status, FOUR_CHANNEL_SMOKE_ENV_KEYS)
+    ):
+        return "four-channel cleanup smoke env ready"
+    if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS) and _all_env_keys_ready(
+        merged_status, IMPORT_REFRESH_ENV_KEYS
+    ):
+        return "local runtime/import env ready; four-channel cleanup smoke env incomplete"
+    if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS):
+        return "local runtime env ready; import/refresh env incomplete"
+    return "missing local runtime env"
 
 
 def _load_window_start_date(cwd: Path) -> str:
@@ -282,8 +341,9 @@ SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {
         result_kind="custom",
         runner=_run_env_readiness_snapshot,
         command_display=ENV_READINESS_COMMAND_DISPLAY,
-        status_label="current shell env readiness check",
+        status_label="env readiness snapshot",
         status_style="result_first",
+        status_aliases=("current shell env readiness check",),
         window_label="当前环境就绪快照",
     ),
     "local_smoke_evidence": SnapshotSpec(
@@ -373,13 +433,14 @@ def update_window_text(text: str, runs: list[SnapshotRun]) -> str:
 
 
 def _replace_status_entry(text: str, run: SnapshotRun) -> str:
-    label = re.escape(run.spec.status_label or "")
+    labels = tuple(run.spec.status_aliases) + (run.spec.status_label or "",)
+    label_pattern = "|".join(re.escape(label) for label in labels if label)
     command = run.spec.command_display
     if run.spec.status_style == "date_first":
-        pattern = rf"^- {label}：\d{{4}}-\d{{2}}-\d{{2}}，`[^`]+`（`[^`]+`）$"
+        pattern = rf"^- (?:{label_pattern})：\d{{4}}-\d{{2}}-\d{{2}}，`[^`]+`（`[^`]+`）$"
         replacement = f"- {run.spec.status_label}：{run.date_text}，`{run.result_text}`（`{command}`）"
     elif run.spec.status_style == "result_first":
-        pattern = rf"^- {label}：`[^`]+`（\d{{4}}-\d{{2}}-\d{{2}}，`[^`]+`）$"
+        pattern = rf"^- (?:{label_pattern})：`[^`]+`（\d{{4}}-\d{{2}}-\d{{2}}，`[^`]+`）$"
         replacement = f"- {run.spec.status_label}：`{run.result_text}`（{run.date_text}，`{command}`）"
     else:
         raise CleanupVerificationDocsSyncError(

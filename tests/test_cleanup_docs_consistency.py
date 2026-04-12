@@ -201,7 +201,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     )
     env_readiness_result, env_readiness_date, env_readiness_command = _extract_status_named_verification_entry(
         status_text,
-        "current shell env readiness check",
+        "env readiness snapshot",
     )
     local_smoke_evidence_result, local_smoke_evidence_date, local_smoke_evidence_command = (
         _extract_status_named_verification_entry(status_text, "local smoke evidence snapshot")
@@ -245,7 +245,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
-    assert env_readiness_result == "missing required channel/runtime env"
+    assert env_readiness_result == "local runtime/import env ready; four-channel cleanup smoke env incomplete"
     assert env_readiness_date == docs_gate_date
     assert env_readiness_result == window_env_readiness_result
     assert env_readiness_date == window_env_readiness_date
@@ -320,7 +320,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "只记录风险，不扩 cleanup 行为" in text
         if text is status_text:
             assert "four-channel cleanup smoke tests" in text
-            assert "current shell env readiness check" in text
+            assert "env readiness snapshot" in text
             assert "local smoke evidence snapshot" in text
             assert "当前结论" in text
             assert "窗口活性" in text

@@ -87,14 +87,14 @@ def test_update_window_text_replaces_verification_evidence_entry() -> None:
 def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     original = (
         "## Latest verification\n\n"
-        "- current shell env readiness check：`old result`（2026-04-10，`old env command`）\n"
+        "- env readiness snapshot：`old result`（2026-04-10，`old env command`）\n"
         "- local smoke evidence snapshot：`old evidence`（2026-04-10，`old evidence command`）\n"
     )
     runs = [
         SnapshotRun(
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
-            result_text="missing required channel/runtime env",
+            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
@@ -105,12 +105,33 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
 
     updated = update_status_text(original, runs)
 
-    assert "- current shell env readiness check：`missing required channel/runtime env`" in updated
+    assert "env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete`" in updated
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
+    assert "env_path=Path('.env')" in updated
     assert "- local smoke evidence snapshot：`no in-window evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert "find logs -maxdepth 1 -type f -printf" in updated
+
+
+def test_update_status_text_migrates_legacy_env_snapshot_label() -> None:
+    original = (
+        "## Latest verification\n\n"
+        "- current shell env readiness check：`old result`（2026-04-10，`old env command`）\n"
+    )
+    runs = [
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["env_readiness"],
+            date_text="2026-04-11",
+            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
+        ),
+    ]
+
+    updated = update_status_text(original, runs)
+
+    assert (
+        "- env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete`"
+    ) in updated
 
 
 def test_update_window_text_replaces_custom_snapshot_entries() -> None:
@@ -123,7 +144,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
-            result_text="missing required channel/runtime env",
+            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
@@ -134,9 +155,13 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
 
     updated = update_window_text(original, runs)
 
-    assert "- 当前环境就绪快照：2026-04-11，`missing required channel/runtime env`" in updated
+    assert (
+        "- 当前环境就绪快照：2026-04-11，"
+        "`local runtime/import env ready; four-channel cleanup smoke env incomplete`"
+    ) in updated
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
+    assert "env_path=Path('.env')" in updated
     assert "- 当前仓库证据快照：2026-04-11，`no in-window evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert "find logs -maxdepth 1 -type f -printf" in updated
@@ -159,7 +184,46 @@ def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypat
     ):
         monkeypatch.delenv(key, raising=False)
 
-    assert _run_env_readiness_snapshot(tmp_path) == "missing required channel/runtime env"
+    assert _run_env_readiness_snapshot(tmp_path) == "missing local runtime env"
+
+
+def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    for key in (
+        "TELEGRAM_BOT_TOKEN",
+        "PROWLARR_BASE_URL",
+        "PROWLARR_API_KEY",
+        "TRANSMISSION_BASE_URL",
+        "EMBY_BASE_URL",
+        "EMBY_API_KEY",
+        "FEISHU_APP_ID",
+        "FEISHU_APP_SECRET",
+        "FEISHU_ENCRYPT_KEY",
+        "WECOM_TOKEN",
+        "WECOM_ENCODING_AES_KEY",
+        "WECOM_RECEIVE_ID",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "TELEGRAM_BOT_TOKEN=token",
+                "PROWLARR_BASE_URL=http://127.0.0.1:9696",
+                "PROWLARR_API_KEY=prowlarr-key",
+                "TRANSMISSION_BASE_URL=http://127.0.0.1:19091",
+                "EMBY_BASE_URL=http://127.0.0.1:18096",
+                "EMBY_API_KEY=emby-key",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        _run_env_readiness_snapshot(tmp_path)
+        == "local runtime/import env ready; four-channel cleanup smoke env incomplete"
+    )
 
 
 def test_run_local_smoke_evidence_snapshot_returns_missing_when_repo_has_no_window_evidence(tmp_path: Path) -> None:
