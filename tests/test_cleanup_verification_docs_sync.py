@@ -9,8 +9,10 @@ from app.maintenance.cleanup_verification_docs import (
     CleanupVerificationDocsSyncError,
     SNAPSHOT_SPECS,
     SnapshotRun,
+    _has_running_luminarr_process,
     _run_env_readiness_snapshot,
     _run_local_smoke_evidence_snapshot,
+    _run_runtime_process_snapshot,
     parse_pytest_result,
     update_status_text,
     update_window_text,
@@ -89,6 +91,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
         "## Latest verification\n\n"
         "- env readiness snapshot：`old result`（2026-04-10，`old env command`）\n"
         "- local smoke evidence snapshot：`old evidence`（2026-04-10，`old evidence command`）\n"
+        "- runtime process snapshot：`old process result`（2026-04-10，`old process command`）\n"
     )
     runs = [
         SnapshotRun(
@@ -101,6 +104,11 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
             date_text="2026-04-11",
             result_text="no in-window cleanup smoke evidence in repo",
         ),
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["runtime_process"],
+            date_text="2026-04-11",
+            result_text="no luminarr process running",
+        ),
     ]
 
     updated = update_status_text(original, runs)
@@ -112,6 +120,8 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
+    assert "- runtime process snapshot：`no luminarr process running`" in updated
+    assert "proc_root=Path('/proc')" in updated
 
 
 def test_update_status_text_migrates_legacy_env_snapshot_label() -> None:
@@ -139,6 +149,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
         "## Verification evidence\n\n"
         "- 当前环境就绪快照：2026-04-10，`old env result`（`old env command`）\n"
         "- 当前仓库证据快照：2026-04-10，`old evidence result`（`old evidence command`）\n"
+        "- 当前运行进程快照：2026-04-10，`old process result`（`old process command`）\n"
     )
     runs = [
         SnapshotRun(
@@ -150,6 +161,11 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
             date_text="2026-04-11",
             result_text="no in-window cleanup smoke evidence in repo",
+        ),
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["runtime_process"],
+            date_text="2026-04-11",
+            result_text="no luminarr process running",
         ),
     ]
 
@@ -165,6 +181,8 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
+    assert "- 当前运行进程快照：2026-04-11，`no luminarr process running`" in updated
+    assert "proc_root=Path('/proc')" in updated
 
 
 def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -291,6 +309,42 @@ def test_run_local_smoke_evidence_snapshot_returns_found_when_repo_has_window_cl
     (logs_dir / "run.log").write_text(f"{smoke_log_line}\n", encoding="utf-8")
 
     assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo"
+
+
+def test_has_running_luminarr_process_returns_false_when_app_main_is_absent(tmp_path: Path) -> None:
+    proc_root = tmp_path / "proc"
+    proc_root.mkdir()
+    pid_dir = proc_root / "101"
+    pid_dir.mkdir()
+    (pid_dir / "cmdline").write_bytes(b"/usr/bin/bash\0-l\0")
+
+    assert not _has_running_luminarr_process(proc_root)
+
+
+def test_has_running_luminarr_process_returns_true_when_app_main_process_exists(tmp_path: Path) -> None:
+    proc_root = tmp_path / "proc"
+    proc_root.mkdir()
+    pid_dir = proc_root / "202"
+    pid_dir.mkdir()
+    (pid_dir / "cmdline").write_bytes(b"/usr/bin/python3\0-m\0app.main\0")
+
+    assert _has_running_luminarr_process(proc_root)
+
+
+def test_run_runtime_process_snapshot_returns_no_process_when_proc_has_no_app_main(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs._has_running_luminarr_process", lambda _: False)
+
+    assert _run_runtime_process_snapshot(Path(".")) == "no luminarr process running"
+
+
+def test_run_runtime_process_snapshot_returns_running_when_proc_has_app_main(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs._has_running_luminarr_process", lambda _: True)
+
+    assert _run_runtime_process_snapshot(Path(".")) == "luminarr process running"
 
 
 def test_update_status_text_raises_when_label_is_missing() -> None:

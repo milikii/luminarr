@@ -101,6 +101,17 @@ LOCAL_SMOKE_EVIDENCE_COMMAND_DISPLAY = (
     "select max(created_at) as max_created_at, count(*) as rows from telegram_updates;\" ; "
     "rg -n \"\\[cleanup 私聊 smoke\\]\" logs"
 )
+RUNTIME_PROCESS_COMMAND_DISPLAY = (
+    "python3 -c \"from pathlib import Path; proc_root=Path('/proc'); matches=[]; "
+    "pid_dirs=sorted((path for path in proc_root.iterdir() if path.is_dir() and path.name.isdigit()), key=lambda path: int(path.name)); "
+    "for pid_dir in pid_dirs: "
+    " cmdline_path=pid_dir/'cmdline'; "
+    " raw=cmdline_path.read_bytes() if cmdline_path.exists() else b''; "
+    " tokens=[token.decode('utf-8', errors='ignore') for token in raw.split(b'\\\\0') if token]; "
+    " if tokens and 'python' in Path(tokens[0]).name and any(tokens[index] == '-m' and tokens[index + 1] == 'app.main' for index in range(len(tokens) - 1)): "
+    "  matches.append(f'{pid_dir.name} ' + ' '.join(tokens)); "
+    "print('\\\\n'.join(matches))\""
+)
 
 
 def _read_current_shell_env_status() -> dict[str, bool]:
@@ -218,6 +229,39 @@ def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
         if window_start_date <= evidence_date <= window_end_date:
             return "found in-window cleanup smoke evidence in repo"
     return "no in-window cleanup smoke evidence in repo"
+
+
+def _has_running_luminarr_process(proc_root: Path) -> bool:
+    if not proc_root.exists():
+        raise CleanupVerificationDocsSyncError(
+            "无法访问进程信息目录。",
+            fix_hint="检查当前环境是否提供 `/proc`，并确认同步脚本运行账户有读取 `cmdline` 的权限。",
+        )
+    for pid_dir in proc_root.iterdir():
+        if not pid_dir.is_dir() or not pid_dir.name.isdigit():
+            continue
+        cmdline_path = pid_dir / "cmdline"
+        if not cmdline_path.exists():
+            continue
+        try:
+            raw_cmdline = cmdline_path.read_bytes()
+        except OSError:
+            continue
+        tokens = [token.decode("utf-8", errors="ignore") for token in raw_cmdline.split(b"\0") if token]
+        if not tokens:
+            continue
+        if "python" not in Path(tokens[0]).name:
+            continue
+        for index in range(len(tokens) - 1):
+            if tokens[index] == "-m" and tokens[index + 1] == "app.main":
+                return True
+    return False
+
+
+def _run_runtime_process_snapshot(_: Path) -> str:
+    if _has_running_luminarr_process(Path("/proc")):
+        return "luminarr process running"
+    return "no luminarr process running"
 
 
 SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {
@@ -356,6 +400,15 @@ SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {
         status_label="local smoke evidence snapshot",
         status_style="result_first",
         window_label="当前仓库证据快照",
+    ),
+    "runtime_process": SnapshotSpec(
+        key="runtime_process",
+        result_kind="custom",
+        runner=_run_runtime_process_snapshot,
+        command_display=RUNTIME_PROCESS_COMMAND_DISPLAY,
+        status_label="runtime process snapshot",
+        status_style="result_first",
+        window_label="当前运行进程快照",
     ),
 }
 

@@ -175,6 +175,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         window_text,
         "当前仓库证据快照",
     )
+    window_runtime_process_date, window_runtime_process_result, window_runtime_process_command = _extract_verification_evidence(
+        window_text,
+        "当前运行进程快照",
+    )
     window_status = _extract_window_status(window_text)
     full_suite_date, full_suite_result, full_suite_command = _extract_status_full_suite_snapshot(status_text)
     cleanup_service_date, cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
@@ -205,6 +209,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     )
     local_smoke_evidence_result, local_smoke_evidence_date, local_smoke_evidence_command = (
         _extract_status_named_verification_entry(status_text, "local smoke evidence snapshot")
+    )
+    runtime_process_result, runtime_process_date, runtime_process_command = _extract_status_named_verification_entry(
+        status_text,
+        "runtime process snapshot",
     )
     cleanup_smoke_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-smoke")
     cleanup_service_not_ready_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-service-not-ready")
@@ -255,6 +263,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert local_smoke_evidence_result == window_local_evidence_result
     assert local_smoke_evidence_date == window_local_evidence_date
     assert local_smoke_evidence_command == window_local_evidence_command
+    assert runtime_process_result == "no luminarr process running"
+    assert runtime_process_date == docs_gate_date
+    assert runtime_process_result == window_runtime_process_result
+    assert runtime_process_date == window_runtime_process_date
+    assert runtime_process_command == window_runtime_process_command
     assert focused_config_date == docs_gate_date
     assert focused_config_result == "4 passed, 17 deselected"
     assert (
@@ -322,6 +335,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "four-channel cleanup smoke tests" in text
             assert "env readiness snapshot" in text
             assert "local smoke evidence snapshot" in text
+            assert "runtime process snapshot" in text
             assert "当前结论" in text
             assert "窗口活性" in text
             assert "focused cleanup tests" in text
@@ -366,6 +380,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Dockerfile" in readme_text
     assert "当前环境就绪快照" in window_text
     assert "当前仓库证据快照" in window_text
+    assert "当前运行进程快照" in window_text
     assert "context_token" in readme_text
     assert "pt_min_seed_hours" in readme_text
     assert ".ass" in readme_text
@@ -565,7 +580,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         "$(MAKE) test-cleanup-docs-gate",
     ]
     assert sync_cleanup_doc_snapshots_target_commands == [
-        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness local_smoke_evidence"
+        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness local_smoke_evidence runtime_process"
     ]
     assert cleanup_window_fallback_command == " && ".join(
         [
