@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import json
+from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
 
@@ -12,6 +13,8 @@ from app.services.cleanup_downloaded_source import parse_cleanup_inspect_query, 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 CLEANUP_PRIVATE_CHAT_SMOKE_LOG_LABEL = "[cleanup 私聊 smoke]"
+DEFAULT_CLEANUP_PRIVATE_CHAT_SMOKE_LOG_FILE = "cleanup-private-chat-smoke.log"
+_cleanup_private_chat_smoke_log_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +26,28 @@ class CleanupPrivateChatSmokeLogEntry:
     user_id: int
     query: str
     reply_head: str
+
+
+def configure_cleanup_private_chat_smoke_log_file(
+    *,
+    log_dir: Path,
+    file_name: str = DEFAULT_CLEANUP_PRIVATE_CHAT_SMOKE_LOG_FILE,
+) -> Path:
+    global _cleanup_private_chat_smoke_log_path
+    log_path = log_dir / file_name
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        _cleanup_private_chat_smoke_log_path = None
+        print(
+            f"\033[31m[cleanup 私聊 smoke 日志目录不可写]\033[0m 路径={log_path.parent} 错误={error}\n"
+            "\033[33m[处理建议]\033[0m 检查当前工作目录和 logs 目录权限；确认 `make run` / `.venv/bin/python -m app.main` "
+            "是从仓库根目录启动，或手动创建可写的 logs 目录。",
+            flush=True,
+        )
+        return log_path
+    _cleanup_private_chat_smoke_log_path = log_path
+    return log_path
 
 
 def resolve_cleanup_private_chat_action(query: str) -> str | None:
@@ -76,6 +101,7 @@ def log_cleanup_private_chat_smoke(
     if log_line is None:
         return
     print(log_line, flush=True)
+    _append_cleanup_private_chat_smoke_log_line(log_line)
 
 
 def parse_cleanup_private_chat_smoke_log_line(line: str) -> CleanupPrivateChatSmokeLogEntry | None:
@@ -116,3 +142,19 @@ def _summarize_reply_head(reply_text: str) -> str:
             return cleaned_line
     return "-"
 
+
+def _append_cleanup_private_chat_smoke_log_line(log_line: str) -> None:
+    if _cleanup_private_chat_smoke_log_path is None:
+        return
+    cleaned_line = ANSI_ESCAPE_RE.sub("", log_line)
+    try:
+        _cleanup_private_chat_smoke_log_path.parent.mkdir(parents=True, exist_ok=True)
+        with _cleanup_private_chat_smoke_log_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{cleaned_line}\n")
+    except OSError as error:
+        print(
+            f"\033[31m[cleanup 私聊 smoke 日志落盘失败]\033[0m 路径={_cleanup_private_chat_smoke_log_path} 错误={error}\n"
+            "\033[33m[处理建议]\033[0m 检查 logs 目录是否可写，确认没有把同名路径占成文件或只读挂载；"
+            "修复后重新运行真实私聊 smoke。",
+            flush=True,
+        )

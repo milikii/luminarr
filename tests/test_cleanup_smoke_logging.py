@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import app.bot.cleanup_smoke_logging as cleanup_smoke_logging
 from app.bot.cleanup_smoke_logging import (
     CleanupPrivateChatSmokeLogEntry,
     build_cleanup_private_chat_smoke_log_line,
+    configure_cleanup_private_chat_smoke_log_file,
+    log_cleanup_private_chat_smoke,
     parse_cleanup_private_chat_smoke_log_line,
     resolve_cleanup_private_chat_action,
 )
@@ -56,3 +61,57 @@ def test_parse_cleanup_private_chat_smoke_log_line_returns_structured_entry() ->
         query="cleanup cleanup-shortcut",
         reply_head="已清理下载源资产。",
     )
+
+
+def test_log_cleanup_private_chat_smoke_appends_plain_line_to_configured_log_file(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    log_path = configure_cleanup_private_chat_smoke_log_file(log_dir=tmp_path / "logs")
+
+    try:
+        log_cleanup_private_chat_smoke(
+            channel="telegram",
+            query="cleanup inspect cleanup-shortcut",
+            reply_text="清理预检结果：\n任务 ID: 87",
+            chat_id=1001,
+            user_id=2001,
+        )
+    finally:
+        monkeypatch.setattr(cleanup_smoke_logging, "_cleanup_private_chat_smoke_log_path", None)
+
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke]" in captured.out
+    written_text = log_path.read_text(encoding="utf-8")
+    assert "\033[" not in written_text
+    assert "[cleanup 私聊 smoke]" in written_text
+    assert 'query="cleanup inspect cleanup-shortcut"' in written_text
+    assert 'reply_head="清理预检结果："' in written_text
+
+
+def test_log_cleanup_private_chat_smoke_prints_fix_hint_when_log_file_is_not_writable(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    blocked_parent = tmp_path / "blocked-parent"
+    blocked_parent.write_text("occupied", encoding="utf-8")
+    monkeypatch.setattr(
+        cleanup_smoke_logging,
+        "_cleanup_private_chat_smoke_log_path",
+        blocked_parent / "cleanup-private-chat-smoke.log",
+    )
+
+    log_cleanup_private_chat_smoke(
+        channel="telegram",
+        query="cleanup cleanup-shortcut",
+        reply_text="已清理下载源资产。",
+        chat_id=1001,
+        user_id=2001,
+    )
+
+    monkeypatch.setattr(cleanup_smoke_logging, "_cleanup_private_chat_smoke_log_path", None)
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke 日志落盘失败]" in captured.out
+    assert "[处理建议]" in captured.out

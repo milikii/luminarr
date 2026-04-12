@@ -217,6 +217,7 @@ make help
 - `make test-cleanup-docs-gate`：跑 cleanup verification docs gate
 - `make test-cleanup-window`：连续跑当前 cleanup 验证窗口需要的 smoke gate、cleanup 聚合回归和 verification docs gate
 - `make sync-cleanup-doc-snapshots`：顺序执行固定的 cleanup 验证命令，并把 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 里的固定快照行同步到最新结果；现在也会一起刷新环境就绪、当前运行进程和仓库内真实 smoke 证据快照
+- 应用通过 `make run` 或 `.venv/bin/python -m app.main` 启动后，真实私聊里的 `cleanup` / `cleanup inspect` 回复会自动把 `[cleanup 私聊 smoke]` 追加到 `logs/cleanup-private-chat-smoke.log`，`make sync-cleanup-doc-snapshots` 就靠这份日志识别窗口内真实 smoke 证据
 - 没有 `make` 时，`make test-cleanup-service-not-ready` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`
 - 没有 `make` 时，`make test-cleanup-telegram` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`
 - 没有 `make` 时，`make test-cleanup-personal-wechat` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup`
