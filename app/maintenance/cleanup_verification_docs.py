@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from argparse import ArgumentParser
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+import os
 from pathlib import Path
 import re
+import sqlite3
 import subprocess
 from zoneinfo import ZoneInfo
 
@@ -18,12 +21,16 @@ class CleanupVerificationDocsSyncError(RuntimeError):
         self.fix_hint = fix_hint
 
 
+SnapshotRunner = Callable[[Path], str]
+
+
 @dataclass(frozen=True, slots=True)
 class SnapshotSpec:
     key: str
-    command: tuple[str, ...]
-    command_display: str
     result_kind: str
+    command: tuple[str, ...] = ()
+    command_display: str = ""
+    runner: SnapshotRunner | None = None
     status_label: str | None = None
     status_style: str | None = None
     window_label: str | None = None
@@ -34,6 +41,122 @@ class SnapshotRun:
     spec: SnapshotSpec
     date_text: str
     result_text: str
+
+
+REQUIRED_CHANNEL_RUNTIME_ENV_KEYS = (
+    "TELEGRAM_BOT_TOKEN",
+    "PROWLARR_BASE_URL",
+    "PROWLARR_API_KEY",
+    "TRANSMISSION_BASE_URL",
+    "EMBY_BASE_URL",
+    "EMBY_API_KEY",
+    "FEISHU_APP_ID",
+    "FEISHU_APP_SECRET",
+    "FEISHU_ENCRYPT_KEY",
+    "WECOM_TOKEN",
+    "WECOM_ENCODING_AES_KEY",
+    "WECOM_RECEIVE_ID",
+)
+
+ENV_READINESS_COMMAND_DISPLAY = (
+    "bash -lc 'source ~/.bashrc >/dev/null 2>&1; python3 -c "
+    "\"import os; keys=[\\\"TELEGRAM_BOT_TOKEN\\\",\\\"PROWLARR_BASE_URL\\\",\\\"PROWLARR_API_KEY\\\","
+    "\\\"TRANSMISSION_BASE_URL\\\",\\\"EMBY_BASE_URL\\\",\\\"EMBY_API_KEY\\\",\\\"FEISHU_APP_ID\\\","
+    "\\\"FEISHU_APP_SECRET\\\",\\\"FEISHU_ENCRYPT_KEY\\\",\\\"WECOM_TOKEN\\\",\\\"WECOM_ENCODING_AES_KEY\\\","
+    "\\\"WECOM_RECEIVE_ID\\\"]; print(\\\"\\\\n\\\".join(f\\\"{k}=\\\" + "
+    "(\\\"set\\\" if os.getenv(k) else \\\"missing\\\") for k in keys))\"' ; "
+    "python3 -c \"import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
+    "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
+    "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
+    "out=subprocess.run(['cmd.exe','/c','set'], capture_output=True, text=True).stdout.lower(); "
+    "print('\\\\n'.join(f'{k}=' + ('set' if f'{k.lower()}=' in out else 'missing') for k in keys))\""
+)
+
+LOCAL_SMOKE_EVIDENCE_COMMAND_DISPLAY = (
+    "sqlite3 -header -column data/luminarr.db "
+    "\"select max(created_at) as max_created_at from jobs; "
+    "select max(created_at) as max_created_at from job_event; "
+    "select max(created_at) as max_created_at, count(*) as rows from telegram_updates;\" ; "
+    "find logs -maxdepth 1 -type f -printf '%f\\n' | sort"
+)
+
+
+def _read_current_shell_env_status() -> dict[str, bool]:
+    return {key: bool(os.getenv(key, "").strip()) for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+
+
+def _read_windows_env_status() -> dict[str, bool]:
+    try:
+        completed = subprocess.run(
+            ("cmd.exe", "/c", "set"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return {key: False for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    if completed.returncode != 0:
+        return {key: False for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    windows_env_lines = completed.stdout.lower()
+    return {
+        key: f"{key.lower()}=" in windows_env_lines
+        for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS
+    }
+
+
+def _run_env_readiness_snapshot(_: Path) -> str:
+    current_shell_status = _read_current_shell_env_status()
+    windows_env_status = _read_windows_env_status()
+    if all(current_shell_status.values()) and all(windows_env_status.values()):
+        return "required channel/runtime env ready"
+    return "missing required channel/runtime env"
+
+
+def _load_window_start_date(cwd: Path) -> str:
+    window_text = (cwd / "docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
+    match = re.search(r"- 开始日期：(\d{4}-\d{2}-\d{2})", window_text)
+    if match is None:
+        raise CleanupVerificationDocsSyncError(
+            "无法从 cleanup 验证窗口文档提取开始日期。",
+            fix_hint="检查 docs/CLEANUP_VERIFICATION_WINDOW.md 是否仍保留 `- 开始日期：YYYY-MM-DD` 这一行。",
+        )
+    return match.group(1)
+
+
+def _latest_repo_evidence_date(cwd: Path) -> str:
+    latest_dates: list[str] = []
+    database_path = cwd / "data" / "luminarr.db"
+    if database_path.exists():
+        with sqlite3.connect(database_path) as connection:
+            for table_name in ("jobs", "job_event", "telegram_updates"):
+                row = connection.execute(f"select max(created_at) from {table_name}").fetchone()
+                value = (row[0] or "").strip() if row else ""
+                if value:
+                    latest_dates.append(value[:10])
+    logs_dir = cwd / "logs"
+    if logs_dir.exists():
+        for log_file in logs_dir.iterdir():
+            if not log_file.is_file():
+                continue
+            log_name = log_file.name
+            log_date_match = re.search(r"(20\d{2})[-_]?(\d{2})[-_]?(\d{2})", log_name)
+            if log_date_match is not None:
+                latest_dates.append(
+                    f"{log_date_match.group(1)}-{log_date_match.group(2)}-{log_date_match.group(3)}"
+                )
+                continue
+            latest_dates.append(datetime.fromtimestamp(log_file.stat().st_mtime, tz=SHANGHAI_TZ).date().isoformat())
+    if not latest_dates:
+        return ""
+    return max(latest_dates)
+
+
+def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
+    window_start_date = _load_window_start_date(cwd)
+    latest_evidence_date = _latest_repo_evidence_date(cwd)
+    if latest_evidence_date and latest_evidence_date >= window_start_date:
+        return "found in-window evidence in repo"
+    return "no in-window evidence in repo"
 
 
 SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {
@@ -154,6 +277,24 @@ SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {
         status_label="docs consistency check",
         status_style="date_first",
     ),
+    "env_readiness": SnapshotSpec(
+        key="env_readiness",
+        result_kind="custom",
+        runner=_run_env_readiness_snapshot,
+        command_display=ENV_READINESS_COMMAND_DISPLAY,
+        status_label="current shell env readiness check",
+        status_style="result_first",
+        window_label="当前环境就绪快照",
+    ),
+    "local_smoke_evidence": SnapshotSpec(
+        key="local_smoke_evidence",
+        result_kind="custom",
+        runner=_run_local_smoke_evidence_snapshot,
+        command_display=LOCAL_SMOKE_EVIDENCE_COMMAND_DISPLAY,
+        status_label="local smoke evidence snapshot",
+        status_style="result_first",
+        window_label="当前仓库证据快照",
+    ),
 }
 
 
@@ -175,34 +316,37 @@ def parse_pytest_result(stdout: str) -> str:
 
 
 def run_snapshot(spec: SnapshotSpec, *, cwd: Path) -> SnapshotRun:
-    completed = subprocess.run(
-        spec.command,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if completed.returncode != 0:
-        command_output = "\n".join(
-            part
-            for part in (completed.stdout.strip(), completed.stderr.strip())
-            if part
-        ).strip()
-        raise CleanupVerificationDocsSyncError(
-            f"{spec.key} 执行失败：{spec.command_display}\n{command_output}",
-            fix_hint="先修复对应测试或命令失败，再重新执行同步脚本；不要把失败结果写回 docs。",
-        )
-    if spec.result_kind == "pytest":
-        result_text = parse_pytest_result(completed.stdout)
-    elif spec.result_kind == "pass_fail":
-        result_text = "passed"
-    elif spec.result_kind == "compile":
-        result_text = "passed"
+    if spec.runner is not None:
+        result_text = spec.runner(cwd)
     else:
-        raise CleanupVerificationDocsSyncError(
-            f"未知结果类型：{spec.result_kind}",
-            fix_hint="检查 SNAPSHOT_SPECS 配置。",
+        completed = subprocess.run(
+            spec.command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=False,
         )
+        if completed.returncode != 0:
+            command_output = "\n".join(
+                part
+                for part in (completed.stdout.strip(), completed.stderr.strip())
+                if part
+            ).strip()
+            raise CleanupVerificationDocsSyncError(
+                f"{spec.key} 执行失败：{spec.command_display}\n{command_output}",
+                fix_hint="先修复对应测试或命令失败，再重新执行同步脚本；不要把失败结果写回 docs。",
+            )
+        if spec.result_kind == "pytest":
+            result_text = parse_pytest_result(completed.stdout)
+        elif spec.result_kind == "pass_fail":
+            result_text = "passed"
+        elif spec.result_kind == "compile":
+            result_text = "passed"
+        else:
+            raise CleanupVerificationDocsSyncError(
+                f"未知结果类型：{spec.result_kind}",
+                fix_hint="检查 SNAPSHOT_SPECS 配置。",
+            )
     return SnapshotRun(
         spec=spec,
         date_text=datetime.now(tz=SHANGHAI_TZ).date().isoformat(),
@@ -263,7 +407,7 @@ def _replace_window_entry(text: str, run: SnapshotRun) -> str:
 
 
 def _replace_single_line(text: str, *, pattern: str, replacement: str, missing_message: str) -> str:
-    updated, replaced_count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+    updated, replaced_count = re.subn(pattern, lambda _: replacement, text, count=1, flags=re.MULTILINE)
     if replaced_count != 1:
         raise CleanupVerificationDocsSyncError(
             missing_message,

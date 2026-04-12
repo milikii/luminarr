@@ -167,6 +167,14 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         window_text,
         "最近一次 verification docs gate",
     )
+    window_env_readiness_date, window_env_readiness_result, window_env_readiness_command = _extract_verification_evidence(
+        window_text,
+        "当前环境就绪快照",
+    )
+    window_local_evidence_date, window_local_evidence_result, window_local_evidence_command = _extract_verification_evidence(
+        window_text,
+        "当前仓库证据快照",
+    )
     window_status = _extract_window_status(window_text)
     full_suite_date, full_suite_result, full_suite_command = _extract_status_full_suite_snapshot(status_text)
     cleanup_service_date, cleanup_service_result, cleanup_service_command = _extract_status_cleanup_service_snapshot(status_text)
@@ -190,6 +198,13 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     )
     wecom_service_latest_result, wecom_service_latest_date, wecom_service_latest_command = (
         _extract_status_named_verification_entry(status_text, "WeCom cleanup service-not-ready tests")
+    )
+    env_readiness_result, env_readiness_date, env_readiness_command = _extract_status_named_verification_entry(
+        status_text,
+        "current shell env readiness check",
+    )
+    local_smoke_evidence_result, local_smoke_evidence_date, local_smoke_evidence_command = (
+        _extract_status_named_verification_entry(status_text, "local smoke evidence snapshot")
     )
     cleanup_smoke_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-smoke")
     cleanup_service_not_ready_target_commands = _extract_makefile_target_commands(makefile_text, "test-cleanup-service-not-ready")
@@ -219,7 +234,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert next_step_start_date == start_date
     assert next_step_end_date == end_date
     assert full_suite_date == docs_gate_date
-    assert full_suite_result == "790 passed, 2 skipped"
+    assert full_suite_result == "794 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_date == docs_gate_date
     assert cleanup_service_result == "38 passed"
@@ -230,6 +245,16 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
+    assert env_readiness_result == "missing required channel/runtime env"
+    assert env_readiness_date == docs_gate_date
+    assert env_readiness_result == window_env_readiness_result
+    assert env_readiness_date == window_env_readiness_date
+    assert env_readiness_command == window_env_readiness_command
+    assert local_smoke_evidence_result == "no in-window evidence in repo"
+    assert local_smoke_evidence_date == docs_gate_date
+    assert local_smoke_evidence_result == window_local_evidence_result
+    assert local_smoke_evidence_date == window_local_evidence_date
+    assert local_smoke_evidence_command == window_local_evidence_command
     assert focused_config_date == docs_gate_date
     assert focused_config_result == "4 passed, 17 deselected"
     assert (
@@ -295,6 +320,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "只记录风险，不扩 cleanup 行为" in text
         if text is status_text:
             assert "four-channel cleanup smoke tests" in text
+            assert "current shell env readiness check" in text
+            assert "local smoke evidence snapshot" in text
             assert "当前结论" in text
             assert "窗口活性" in text
             assert "focused cleanup tests" in text
@@ -337,6 +364,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Makefile" in readme_text
     assert "docker-compose.yml" in readme_text
     assert "Dockerfile" in readme_text
+    assert "当前环境就绪快照" in window_text
+    assert "当前仓库证据快照" in window_text
     assert "context_token" in readme_text
     assert "pt_min_seed_hours" in readme_text
     assert ".ass" in readme_text
@@ -536,7 +565,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         "$(MAKE) test-cleanup-docs-gate",
     ]
     assert sync_cleanup_doc_snapshots_target_commands == [
-        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency"
+        "$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness local_smoke_evidence"
     ]
     assert cleanup_window_fallback_command == " && ".join(
         [

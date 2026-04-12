@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -8,6 +9,8 @@ from app.maintenance.cleanup_verification_docs import (
     CleanupVerificationDocsSyncError,
     SNAPSHOT_SPECS,
     SnapshotRun,
+    _run_env_readiness_snapshot,
+    _run_local_smoke_evidence_snapshot,
     parse_pytest_result,
     update_status_text,
     update_window_text,
@@ -79,6 +82,110 @@ def test_update_window_text_replaces_verification_evidence_entry() -> None:
         "- 最近一次聚合 smoke gate：2026-04-11，`376 passed`"
         "（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）"
     ) in updated
+
+
+def test_update_status_text_replaces_custom_snapshot_entries() -> None:
+    original = (
+        "## Latest verification\n\n"
+        "- current shell env readiness check：`old result`（2026-04-10，`old env command`）\n"
+        "- local smoke evidence snapshot：`old evidence`（2026-04-10，`old evidence command`）\n"
+    )
+    runs = [
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["env_readiness"],
+            date_text="2026-04-11",
+            result_text="missing required channel/runtime env",
+        ),
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["local_smoke_evidence"],
+            date_text="2026-04-11",
+            result_text="no in-window evidence in repo",
+        ),
+    ]
+
+    updated = update_status_text(original, runs)
+
+    assert "- current shell env readiness check：`missing required channel/runtime env`" in updated
+    assert "source ~/.bashrc >/dev/null 2>&1" in updated
+    assert "cmd.exe','/c','set" in updated
+    assert "- local smoke evidence snapshot：`no in-window evidence in repo`" in updated
+    assert "sqlite3 -header -column data/luminarr.db" in updated
+    assert "find logs -maxdepth 1 -type f -printf" in updated
+
+
+def test_update_window_text_replaces_custom_snapshot_entries() -> None:
+    original = (
+        "## Verification evidence\n\n"
+        "- 当前环境就绪快照：2026-04-10，`old env result`（`old env command`）\n"
+        "- 当前仓库证据快照：2026-04-10，`old evidence result`（`old evidence command`）\n"
+    )
+    runs = [
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["env_readiness"],
+            date_text="2026-04-11",
+            result_text="missing required channel/runtime env",
+        ),
+        SnapshotRun(
+            spec=SNAPSHOT_SPECS["local_smoke_evidence"],
+            date_text="2026-04-11",
+            result_text="no in-window evidence in repo",
+        ),
+    ]
+
+    updated = update_window_text(original, runs)
+
+    assert "- 当前环境就绪快照：2026-04-11，`missing required channel/runtime env`" in updated
+    assert "source ~/.bashrc >/dev/null 2>&1" in updated
+    assert "cmd.exe','/c','set" in updated
+    assert "- 当前仓库证据快照：2026-04-11，`no in-window evidence in repo`" in updated
+    assert "sqlite3 -header -column data/luminarr.db" in updated
+    assert "find logs -maxdepth 1 -type f -printf" in updated
+
+
+def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for key in (
+        "TELEGRAM_BOT_TOKEN",
+        "PROWLARR_BASE_URL",
+        "PROWLARR_API_KEY",
+        "TRANSMISSION_BASE_URL",
+        "EMBY_BASE_URL",
+        "EMBY_API_KEY",
+        "FEISHU_APP_ID",
+        "FEISHU_APP_SECRET",
+        "FEISHU_ENCRYPT_KEY",
+        "WECOM_TOKEN",
+        "WECOM_ENCODING_AES_KEY",
+        "WECOM_RECEIVE_ID",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    assert _run_env_readiness_snapshot(tmp_path) == "missing required channel/runtime env"
+
+
+def test_run_local_smoke_evidence_snapshot_returns_missing_when_repo_has_no_window_evidence(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
+        "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n"
+        "- 开始日期：2026-04-05\n",
+        encoding="utf-8",
+    )
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    with sqlite3.connect(data_dir / "luminarr.db") as connection:
+        connection.execute("create table jobs (created_at text)")
+        connection.execute("create table job_event (created_at text)")
+        connection.execute("create table telegram_updates (created_at text)")
+        connection.execute("insert into jobs(created_at) values ('2026-04-02 16:23:18')")
+        connection.execute("insert into job_event(created_at) values ('2026-04-02 16:23:18')")
+        connection.execute("insert into telegram_updates(created_at) values ('2026-04-02 16:41:18')")
+        connection.commit()
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    old_log = logs_dir / "run_2026-04-02_132239.log"
+    old_log.write_text("old log\n", encoding="utf-8")
+
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window evidence in repo"
 
 
 def test_update_status_text_raises_when_label_is_missing() -> None:

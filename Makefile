@@ -50,7 +50,7 @@ test-cleanup-window:
 	$(MAKE) test-cleanup-docs-gate
 
 sync-cleanup-doc-snapshots:
-	$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency
+	$(PYTHON) -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness local_smoke_evidence
 
 compile:
 	python3 -m compileall app tests
