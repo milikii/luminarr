@@ -250,7 +250,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert env_readiness_result == window_env_readiness_result
     assert env_readiness_date == window_env_readiness_date
     assert env_readiness_command == window_env_readiness_command
-    assert local_smoke_evidence_result == "no in-window evidence in repo"
+    assert local_smoke_evidence_result == "no in-window cleanup smoke evidence in repo"
     assert local_smoke_evidence_date == docs_gate_date
     assert local_smoke_evidence_result == window_local_evidence_result
     assert local_smoke_evidence_date == window_local_evidence_date

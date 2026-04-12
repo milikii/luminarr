@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sqlite3
 
 import pytest
 
+from app.bot.cleanup_smoke_logging import build_cleanup_private_chat_smoke_log_line
 from app.maintenance.cleanup_verification_docs import (
     CleanupVerificationDocsSyncError,
     SNAPSHOT_SPECS,
@@ -99,7 +99,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
             date_text="2026-04-11",
-            result_text="no in-window evidence in repo",
+            result_text="no in-window cleanup smoke evidence in repo",
         ),
     ]
 
@@ -109,9 +109,9 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
     assert "env_path=Path('.env')" in updated
-    assert "- local smoke evidence snapshot：`no in-window evidence in repo`" in updated
+    assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
-    assert "find logs -maxdepth 1 -type f -printf" in updated
+    assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
 
 
 def test_update_status_text_migrates_legacy_env_snapshot_label() -> None:
@@ -149,7 +149,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
             date_text="2026-04-11",
-            result_text="no in-window evidence in repo",
+            result_text="no in-window cleanup smoke evidence in repo",
         ),
     ]
 
@@ -162,9 +162,9 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
     assert "env_path=Path('.env')" in updated
-    assert "- 当前仓库证据快照：2026-04-11，`no in-window evidence in repo`" in updated
+    assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
-    assert "find logs -maxdepth 1 -type f -printf" in updated
+    assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
 
 
 def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -231,25 +231,66 @@ def test_run_local_smoke_evidence_snapshot_returns_missing_when_repo_has_no_wind
     docs_dir.mkdir()
     (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
         "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n"
-        "- 开始日期：2026-04-05\n",
+        "- 开始日期：2026-04-05\n"
+        "- 最早可结束日期：2026-04-12\n",
         encoding="utf-8",
     )
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-    with sqlite3.connect(data_dir / "luminarr.db") as connection:
-        connection.execute("create table jobs (created_at text)")
-        connection.execute("create table job_event (created_at text)")
-        connection.execute("create table telegram_updates (created_at text)")
-        connection.execute("insert into jobs(created_at) values ('2026-04-02 16:23:18')")
-        connection.execute("insert into job_event(created_at) values ('2026-04-02 16:23:18')")
-        connection.execute("insert into telegram_updates(created_at) values ('2026-04-02 16:41:18')")
-        connection.commit()
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir()
-    old_log = logs_dir / "run_2026-04-02_132239.log"
-    old_log.write_text("old log\n", encoding="utf-8")
+    old_log = logs_dir / "run_2026-04-12_132239.log"
+    old_log.write_text("not a cleanup smoke log\n", encoding="utf-8")
 
-    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window evidence in repo"
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo"
+
+
+def test_run_local_smoke_evidence_snapshot_returns_missing_when_log_date_is_outside_window(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
+        "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n"
+        "- 开始日期：2026-04-05\n"
+        "- 最早可结束日期：2026-04-12\n",
+        encoding="utf-8",
+    )
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    smoke_log_line = build_cleanup_private_chat_smoke_log_line(
+        channel="telegram",
+        query="cleanup inspect abc123",
+        reply_text="已完成检查",
+        chat_id=1,
+        user_id=1,
+        date_text="2026-04-03",
+    )
+    assert smoke_log_line is not None
+    (logs_dir / "run_2026-04-12.log").write_text(f"{smoke_log_line}\n", encoding="utf-8")
+
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo"
+
+
+def test_run_local_smoke_evidence_snapshot_returns_found_when_repo_has_window_cleanup_smoke_log(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
+        "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n"
+        "- 开始日期：2026-04-05\n"
+        "- 最早可结束日期：2026-04-12\n",
+        encoding="utf-8",
+    )
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    smoke_log_line = build_cleanup_private_chat_smoke_log_line(
+        channel="telegram",
+        query="cleanup inspect abc123",
+        reply_text="已完成检查",
+        chat_id=1,
+        user_id=1,
+        date_text="2026-04-06",
+    )
+    assert smoke_log_line is not None
+    (logs_dir / "run.log").write_text(f"{smoke_log_line}\n", encoding="utf-8")
+
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo"
 
 
 def test_update_status_text_raises_when_label_is_missing() -> None:

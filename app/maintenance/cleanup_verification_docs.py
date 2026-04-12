@@ -7,9 +7,10 @@ from datetime import datetime
 import os
 from pathlib import Path
 import re
-import sqlite3
 import subprocess
 from zoneinfo import ZoneInfo
+
+from app.bot.cleanup_smoke_logging import parse_cleanup_private_chat_smoke_log_line
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
@@ -98,7 +99,7 @@ LOCAL_SMOKE_EVIDENCE_COMMAND_DISPLAY = (
     "\"select max(created_at) as max_created_at from jobs; "
     "select max(created_at) as max_created_at from job_event; "
     "select max(created_at) as max_created_at, count(*) as rows from telegram_updates;\" ; "
-    "find logs -maxdepth 1 -type f -printf '%f\\n' | sort"
+    "rg -n \"\\[cleanup 私聊 smoke\\]\" logs"
 )
 
 
@@ -182,40 +183,41 @@ def _load_window_start_date(cwd: Path) -> str:
     return match.group(1)
 
 
-def _latest_repo_evidence_date(cwd: Path) -> str:
-    latest_dates: list[str] = []
-    database_path = cwd / "data" / "luminarr.db"
-    if database_path.exists():
-        with sqlite3.connect(database_path) as connection:
-            for table_name in ("jobs", "job_event", "telegram_updates"):
-                row = connection.execute(f"select max(created_at) from {table_name}").fetchone()
-                value = (row[0] or "").strip() if row else ""
-                if value:
-                    latest_dates.append(value[:10])
+def _load_window_end_date(cwd: Path) -> str:
+    window_text = (cwd / "docs/CLEANUP_VERIFICATION_WINDOW.md").read_text(encoding="utf-8")
+    match = re.search(r"- 最早可结束日期：(\d{4}-\d{2}-\d{2})", window_text)
+    if match is None:
+        raise CleanupVerificationDocsSyncError(
+            "无法从 cleanup 验证窗口文档提取结束日期。",
+            fix_hint="检查 docs/CLEANUP_VERIFICATION_WINDOW.md 是否仍保留 `- 最早可结束日期：YYYY-MM-DD` 这一行。",
+        )
+    return match.group(1)
+
+
+def _iter_cleanup_smoke_log_dates(cwd: Path) -> tuple[str, ...]:
     logs_dir = cwd / "logs"
-    if logs_dir.exists():
-        for log_file in logs_dir.iterdir():
-            if not log_file.is_file():
-                continue
-            log_name = log_file.name
-            log_date_match = re.search(r"(20\d{2})[-_]?(\d{2})[-_]?(\d{2})", log_name)
-            if log_date_match is not None:
-                latest_dates.append(
-                    f"{log_date_match.group(1)}-{log_date_match.group(2)}-{log_date_match.group(3)}"
-                )
-                continue
-            latest_dates.append(datetime.fromtimestamp(log_file.stat().st_mtime, tz=SHANGHAI_TZ).date().isoformat())
-    if not latest_dates:
-        return ""
-    return max(latest_dates)
+    if not logs_dir.exists():
+        return ()
+    dates: list[str] = []
+    for log_file in sorted(logs_dir.rglob("*")):
+        if not log_file.is_file():
+            continue
+        with log_file.open("r", encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                entry = parse_cleanup_private_chat_smoke_log_line(line)
+                if entry is None:
+                    continue
+                dates.append(entry.date_text)
+    return tuple(dates)
 
 
 def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
     window_start_date = _load_window_start_date(cwd)
-    latest_evidence_date = _latest_repo_evidence_date(cwd)
-    if latest_evidence_date and latest_evidence_date >= window_start_date:
-        return "found in-window evidence in repo"
-    return "no in-window evidence in repo"
+    window_end_date = _load_window_end_date(cwd)
+    for evidence_date in _iter_cleanup_smoke_log_dates(cwd):
+        if window_start_date <= evidence_date <= window_end_date:
+            return "found in-window cleanup smoke evidence in repo"
+    return "no in-window cleanup smoke evidence in repo"
 
 
 SNAPSHOT_SPECS: dict[str, SnapshotSpec] = {

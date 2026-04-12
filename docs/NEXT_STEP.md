@@ -50,6 +50,7 @@
 - 保持四渠道真实私聊 cleanup smoke 证据后续统一落到同一套 `cleanup 私聊 smoke` 日志协议里，至少固定 `date/channel/action/query/reply_head` 这组字段，避免 Telegram / personal WeChat / Feishu / WeCom 各自打印不同格式、后面无法稳定回填窗口台账。
 - 保持 verification docs gate 继续显式校验 `sync-cleanup-doc-snapshots` 这条新同步入口在 `Makefile` 和 `docs/GETTING_STARTED.md` 里保持一致，避免刚加的 docs 维护路径下一轮又重新分叉。
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
+- 保持 verification docs gate 继续显式校验 `local_smoke_evidence` 只认窗口期 `[cleanup 私聊 smoke]` 日志协议，不把任意 `jobs` / `job_event` / `telegram_updates` 时间戳或普通日志文件日期误算成真实私聊 smoke 证据，避免窗口台账把普通运行痕迹写成退出条件。
 - 保持 `docs/STATUS.md` 把配置真相回归（`tests/test_config.py` 里和当前文档变更直接相关的 focused config checks）也写成带绝对日期的快照，避免配置入口更新后状态页看不到对应验证证据。
 - 保持 `docs/STATUS.md` 对本机 Transmission / Emby 测试栈的当前 shell 健康检查结果、Docker 权限 blocker，以及“仓库 `.env` 已具备哪些本地最小运行键、四渠道真实 smoke 还缺哪些 Feishu / WeCom 凭据”写成显式快照，避免把“用户说已经启动 / token 已准备好”误写成当前 shell 已具备完整四渠道真实 smoke 条件。
 - 保持 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 显式写出“仓库根目录与本地测试目录是否存在可直接启动 Luminarr 的 `.env`、当前是否有运行中的 Luminarr 进程、SQLite / logs 里是否已有窗口期真实私聊 smoke 证据”，避免把“本机服务已启动”误写成“当前仓库里已有可回填的四渠道真实 smoke 记录”。
