@@ -1351,7 +1351,10 @@ def test_handle_message_import_formats_import_approval_for_telegram() -> None:
     import_service.import_by_task_ref.assert_awaited_once_with("hash-87", chat_id=1001, user_id=2001)
 
 
-def test_handle_message_cleanup_routes_to_cleanup_service(tmp_path: Path) -> None:
+def test_handle_message_cleanup_routes_to_cleanup_service(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     update, reply_text = _build_update("cleanup hash-87")
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
@@ -1375,9 +1378,18 @@ def test_handle_message_cleanup_routes_to_cleanup_service(tmp_path: Path) -> Non
 
     reply_text.assert_awaited_once_with("已清理下载源资产。")
     cleanup_service.cleanup_by_task_ref.assert_called_once_with("hash-87", chat_id=1001)
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke]" in captured.out
+    assert "channel=telegram" in captured.out
+    assert "action=cleanup" in captured.out
+    assert 'query="cleanup hash-87"' in captured.out
+    assert 'reply_head="已清理下载源资产。"' in captured.out
 
 
-def test_handle_message_cleanup_inspect_routes_to_cleanup_service(tmp_path: Path) -> None:
+def test_handle_message_cleanup_inspect_routes_to_cleanup_service(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     update, reply_text = _build_update("cleanup inspect hash-87")
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
@@ -1401,6 +1413,12 @@ def test_handle_message_cleanup_inspect_routes_to_cleanup_service(tmp_path: Path
 
     reply_text.assert_awaited_once_with("清理预检结果。")
     cleanup_service.inspect_by_task_ref.assert_called_once_with("hash-87", chat_id=1001)
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke]" in captured.out
+    assert "channel=telegram" in captured.out
+    assert "action=cleanup_inspect" in captured.out
+    assert 'query="cleanup inspect hash-87"' in captured.out
+    assert 'reply_head="清理预检结果。"' in captured.out
 
 
 def test_handle_message_cleanup_inspect_routes_chat_scoped_shortcut_into_shared_runtime(tmp_path: Path) -> None:

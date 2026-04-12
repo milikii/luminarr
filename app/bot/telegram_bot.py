@@ -17,6 +17,7 @@ from app.bot.feishu_webhook_server import (
     start_feishu_webhook_server,
     stop_feishu_webhook_server,
 )
+from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
     PersonalWeChatLoginService,
@@ -2005,6 +2006,13 @@ async def handle_private_chat_query_text(
             ),
         )
         await reply_func(reply)
+        log_cleanup_private_chat_smoke(
+            channel="telegram",
+            query=query,
+            reply_text=reply,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
         return
 
     cleanup_ref = parse_cleanup_query(query)
@@ -2023,6 +2031,13 @@ async def handle_private_chat_query_text(
             ),
         )
         await reply_func(reply)
+        log_cleanup_private_chat_smoke(
+            channel="telegram",
+            query=query,
+            reply_text=reply,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
         return
 
     confirm_ref = parse_confirm_query(query)

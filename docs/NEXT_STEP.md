@@ -56,6 +56,7 @@
 - 保持 cleanup 验证窗口仍在进行中时，`docs/CLEANUP_VERIFICATION_WINDOW.md` 的 smoke gate / cleanup 协议回归 / verification docs gate 日期，与 `docs/STATUS.md` 的 tests / cleanup service / compile check / docs consistency check 一起滚动到当天绝对日期，避免只更新半套快照。
 - 保持 `tests/test_cleanup_cross_channel_smoke.py` 稳定，继续作为四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case english cleanup protocol / `chat-scoped task_ref -> jobs -> import correlation` / correlation-query-failure identity retention / missing-structured-import-correlation identity retention 的聚合 smoke gate。
 - 保持 `tests/test_telegram_bot.py -k cleanup` 单独覆盖 Telegram cleanup mixed-case 英文 `cleanup / cleanup inspect` 入口路由，避免 Telegram 渠道胶水大小写回退只能等聚合 smoke 才暴露。
+- 保持 Telegram cleanup 入口在文本成功回出后继续复用统一的 `[cleanup 私聊 smoke]` 日志协议，并至少带上 `date/channel/action/query/reply_head`，避免第一个接入完成后下一轮又改成 Telegram 专属格式。
 - 保持 `tests/test_telegram_bot.py` 单独覆盖 Telegram 入口里的 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免主入口把 shortcut 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 README / STATUS 对 cleanup 聚合 smoke gate 的入口描述也同步覆盖 mixed-case 英文 `cleanup / cleanup inspect` 输入、`job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention / rejection guidance，以及 `guard-rejected` rejection guidance，避免入口文档落后于当前 gate。
 - 保持 verification docs gate 继续显式校验 `mixed-case english cleanup protocol` 命名观察，避免窗口台账把英文字母大小写输入边界写丢。
