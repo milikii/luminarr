@@ -234,6 +234,7 @@ def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
 
 def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_runtime(
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
     reply_text_func = AsyncMock()
@@ -254,6 +255,12 @@ def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_run
     assert "cleanup hash-87 / 清理 hash-87：实际清理下载源资产" in reply_text
     assert source_file.exists()
     assert target_file.exists()
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke]" in captured.out
+    assert "channel=feishu" in captured.out
+    assert "action=cleanup_inspect" in captured.out
+    assert 'query="cleanup inspect 87"' in captured.out
+    assert 'reply_head="清理预检结果："' in captured.out
 
 
 def test_handle_feishu_private_text_event_routes_chat_scoped_cleanup_shortcut_into_shared_runtime(
@@ -283,6 +290,7 @@ def test_handle_feishu_private_text_event_routes_chat_scoped_cleanup_shortcut_in
 
 def test_handle_feishu_private_text_event_routes_cleanup_execution_into_shared_runtime(
     tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     cleanup_service, source_file, target_file = _build_cleanup_service(tmp_path)
     reply_text_func = AsyncMock()
@@ -302,6 +310,12 @@ def test_handle_feishu_private_text_event_routes_cleanup_execution_into_shared_r
     assert "cleanup inspect hash-87 / 清理检查 hash-87：只读预检，不删除任何文件" in reply_text
     assert not source_file.exists()
     assert target_file.exists()
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke]" in captured.out
+    assert "channel=feishu" in captured.out
+    assert "action=cleanup" in captured.out
+    assert 'query="cleanup 87"' in captured.out
+    assert 'reply_head="已清理下载源资产。"' in captured.out
 
 
 def test_handle_feishu_private_text_event_routes_bare_cleanup_usage_into_shared_runtime(

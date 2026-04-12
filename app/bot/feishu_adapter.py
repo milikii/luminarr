@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
+from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import dispatch_private_chat_text
 from app.clients.feishu import FeishuClient
 
@@ -98,14 +99,25 @@ async def handle_feishu_private_text_event(
     if event is None:
         return None
 
+    chat_id = project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id=event.chat_id)
+    user_id = project_channel_user_id(channel=FEISHU_CHANNEL, external_user_id=event.user_open_id)
+
     async def reply_with_event(reply_text: str) -> object:
-        return await reply_text_func(event, reply_text)
+        result = await reply_text_func(event, reply_text)
+        log_cleanup_private_chat_smoke(
+            channel=FEISHU_CHANNEL,
+            query=event.text,
+            reply_text=reply_text,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        return result
 
     await dispatch_private_chat_text(
         query=event.text,
         reply_func=reply_with_event,
-        chat_id=project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id=event.chat_id),
-        user_id=project_channel_user_id(channel=FEISHU_CHANNEL, external_user_id=event.user_open_id),
+        chat_id=chat_id,
+        user_id=user_id,
         bot_data=bot_data,
     )
     return None

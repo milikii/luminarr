@@ -83,6 +83,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - personal WeChat cleanup smoke 日志快照：personal WeChat 私聊入口现在也会在 cleanup / cleanup inspect 文本成功回出后，复用同一条绿色 `[cleanup 私聊 smoke]` 日志协议，并继续带上 `date/channel/action/query/reply_head`，方便后续窗口台账按同一规则识别这个渠道的真实 smoke 证据。
 - personal WeChat chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 personal WeChat 文本入口后仍能解析出真实 `task_id/task_hash`，避免这个私聊入口把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
 - Feishu 私聊 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 Feishu 私聊入口只对英文带任务引用路径保留日志可观测性。
+- Feishu cleanup smoke 日志快照：Feishu 私聊入口现在也会在 cleanup / cleanup inspect 文本成功回出后，复用同一条绿色 `[cleanup 私聊 smoke]` 日志协议，并继续带上 `date/channel/action/query/reply_head`，方便后续窗口台账按同一规则识别这个渠道的真实 smoke 证据。
 - Feishu 私聊 chat-scoped shortcut 门禁快照：现在也单独锁住 `cleanup inspect cleanup-shortcut` 经过 Feishu adapter 后仍能解析出真实 `task_id/task_hash`，避免这个渠道把 `cleanup-shortcut` 当成普通字符串传给 cleanup service。
 - Feishu webhook service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 Feishu 加密 HTTP 入口只对英文带任务引用路径保留日志可观测性。
 - WeCom 私聊 service-not-ready 门禁快照：现在也单独锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`，避免 WeCom 私聊入口只对英文带任务引用路径保留日志可观测性。

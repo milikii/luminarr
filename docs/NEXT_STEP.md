@@ -72,6 +72,7 @@
 - 保持 personal WeChat cleanup 入口在文本成功回出后继续复用统一的 `[cleanup 私聊 smoke]` 日志协议，并至少带上 `date/channel/action/query/reply_head`，避免第二个接入渠道又长出 personal WeChat 专属日志格式。
 - 保持 `tests/test_personal_wechat_text.py` 单独覆盖 personal WeChat 入口里的 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个私聊入口把 shortcut 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `tests/test_feishu_adapter.py` 单独覆盖 Feishu 私聊入口 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个渠道的私聊入站链路只能靠聚合 smoke 或英文带任务引用路径间接兜底。
+- 保持 Feishu cleanup 入口在文本成功回出后继续复用统一的 `[cleanup 私聊 smoke]` 日志协议，并至少带上 `date/channel/action/query/reply_head`，避免第三个接入渠道又长出 Feishu 专属日志格式。
 - 保持 `tests/test_feishu_adapter.py` 单独覆盖 Feishu 私聊入口 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个渠道把 `cleanup-shortcut` 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"` 单独覆盖 Feishu webhook cleanup 路由和 service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个加密 webhook 入口只有正常路径回归、缺少未注入服务时的可观测性保护。
 - 保持 `tests/test_wecom_adapter.py` 单独覆盖 WeCom 私聊入口 cleanup service-not-ready observability，并锁住 bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查` 入口变体，避免这个渠道的解密入站和加密回包路径只能靠聚合 smoke 或英文带任务引用路径间接兜底。
