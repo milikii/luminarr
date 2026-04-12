@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -11,6 +12,7 @@ from app.maintenance.cleanup_verification_docs import (
     SNAPSHOT_SPECS,
     SnapshotRun,
     _has_running_luminarr_process,
+    _read_windows_env_values,
     _run_env_readiness_snapshot,
     _run_local_smoke_evidence_snapshot,
     _run_runtime_process_snapshot,
@@ -223,6 +225,17 @@ def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypat
         monkeypatch.delenv(key, raising=False)
 
     assert _run_env_readiness_snapshot(tmp_path) == "missing local runtime env"
+
+
+def test_read_windows_env_values_tolerates_non_utf8_cmd_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    stdout = "用作当前目录不受支持。\r\nTELEGRAM_BOT_TOKEN=token\r\n".encode("gbk")
+
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=args[0], returncode=0, stdout=stdout, stderr=b""),
+    )
+
+    assert _read_windows_env_values()["TELEGRAM_BOT_TOKEN"] == "token"
 
 
 def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_absent(

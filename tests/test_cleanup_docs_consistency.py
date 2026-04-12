@@ -251,7 +251,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert next_step_start_date == start_date
     assert next_step_end_date == end_date
     assert full_suite_date == docs_gate_date
-    assert full_suite_result == "794 passed, 2 skipped"
+    assert full_suite_result == "811 passed, 2 skipped"
     assert full_suite_command == ".venv/bin/python -m pytest -q"
     assert cleanup_service_date == docs_gate_date
     assert cleanup_service_result == "38 passed"

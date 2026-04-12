@@ -85,7 +85,7 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "python3 -c \"import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
     "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
-    "out=subprocess.run(['cmd.exe','/c','set'], capture_output=True, text=True).stdout.lower(); "
+    "out=subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').lower(); "
     "print('\\\\n'.join(f'{k}=' + ('set' if f'{k.lower()}=' in out else 'missing') for k in keys))\" ; "
     "python3 -c \"from pathlib import Path; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
@@ -122,13 +122,25 @@ TELEGRAM_BOT_API_COMMAND_DISPLAY = (
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
     "env_map.update(((key.removeprefix('export ').strip()), value.strip()) for key, _, value in pairs); "
     "token=token or env_map.get('TELEGRAM_BOT_TOKEN','').strip(); "
-    "token=token or next((line.partition('=')[2].strip() for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True, text=True).stdout.splitlines() if line.startswith('TELEGRAM_BOT_TOKEN=')), ''); "
+    "token=token or next((line.partition('=')[2].strip() for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.startswith('TELEGRAM_BOT_TOKEN=')), ''); "
     "print('telegram bot token missing' if not token else ('telegram bot api ready' if json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=5)).get('ok') else 'telegram bot api rejected token'))\""
 )
 
 
+WINDOWS_ENV_OUTPUT_ENCODINGS = ("utf-8", "utf-8-sig", "gbk", "cp936", "cp950")
+
+
 def _read_current_shell_env_values() -> dict[str, str]:
     return {key: os.getenv(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+
+
+def _decode_windows_env_output(raw_output: bytes) -> str:
+    for encoding in WINDOWS_ENV_OUTPUT_ENCODINGS:
+        try:
+            return raw_output.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw_output.decode("utf-8", errors="ignore")
 
 
 def _read_windows_env_values() -> dict[str, str]:
@@ -136,7 +148,6 @@ def _read_windows_env_values() -> dict[str, str]:
         completed = subprocess.run(
             ("cmd.exe", "/c", "set"),
             capture_output=True,
-            text=True,
             check=False,
         )
     except FileNotFoundError:
@@ -144,7 +155,8 @@ def _read_windows_env_values() -> dict[str, str]:
     if completed.returncode != 0:
         return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
     windows_env_values: dict[str, str] = {}
-    for raw_line in completed.stdout.splitlines():
+    stdout_text = _decode_windows_env_output(completed.stdout)
+    for raw_line in stdout_text.splitlines():
         if "=" not in raw_line:
             continue
         key, _, value = raw_line.partition("=")
