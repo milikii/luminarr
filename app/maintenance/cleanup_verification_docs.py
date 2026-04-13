@@ -128,6 +128,7 @@ TELEGRAM_BOT_API_COMMAND_DISPLAY = (
 
 
 WINDOWS_ENV_OUTPUT_ENCODINGS = ("utf-8", "utf-8-sig", "gbk", "cp936", "cp950")
+EXPECTED_CLEANUP_SMOKE_CHANNELS = ("telegram", "personal_wechat", "feishu", "wecom")
 
 
 def _read_current_shell_env_values() -> dict[str, str]:
@@ -280,10 +281,10 @@ def _iter_cleanup_smoke_log_dates(cwd: Path) -> tuple[str, ...]:
 def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
     window_start_date = _load_window_start_date(cwd)
     window_end_date = _load_window_end_date(cwd)
-    channels = sorted({entry.partition(":")[2] for entry in _iter_cleanup_smoke_log_dates(cwd) if window_start_date <= entry.partition(":")[0] <= window_end_date})
+    channels = tuple(channel for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel in {entry.partition(":")[2] for entry in _iter_cleanup_smoke_log_dates(cwd) if window_start_date <= entry.partition(":")[0] <= window_end_date})
     if channels:
         return "found in-window cleanup smoke evidence in repo: " + ",".join(channels)
-    return "no in-window cleanup smoke evidence in repo"
+    return "no in-window cleanup smoke evidence in repo; missing channels: " + ",".join(EXPECTED_CLEANUP_SMOKE_CHANNELS)
 
 
 def _has_running_luminarr_process(proc_root: Path) -> bool:

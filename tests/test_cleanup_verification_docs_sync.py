@@ -112,7 +112,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
             date_text="2026-04-11",
-            result_text="no in-window cleanup smoke evidence in repo",
+            result_text="no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["runtime_process"],
@@ -130,7 +130,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "- telegram bot api snapshot：`telegram bot api ready`" in updated
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
-    assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo`" in updated
+    assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
     assert "- runtime process snapshot：`no luminarr process running`" in updated
@@ -179,7 +179,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["local_smoke_evidence"],
             date_text="2026-04-11",
-            result_text="no in-window cleanup smoke evidence in repo",
+            result_text="no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["runtime_process"],
@@ -200,7 +200,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "- 当前 Telegram Bot API 就绪快照：2026-04-11，`telegram bot api ready`" in updated
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
-    assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo`" in updated
+    assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
     assert "- 当前运行进程快照：2026-04-11，`no luminarr process running`" in updated
@@ -345,7 +345,7 @@ def test_run_local_smoke_evidence_snapshot_returns_missing_when_repo_has_no_wind
     old_log = logs_dir / "run_2026-04-12_132239.log"
     old_log.write_text("not a cleanup smoke log\n", encoding="utf-8")
 
-    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo"
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
 
 
 def test_run_local_smoke_evidence_snapshot_returns_missing_when_log_date_is_outside_window(tmp_path: Path) -> None:
@@ -370,7 +370,7 @@ def test_run_local_smoke_evidence_snapshot_returns_missing_when_log_date_is_outs
     assert smoke_log_line is not None
     (logs_dir / "run_2026-04-12.log").write_text(f"{smoke_log_line}\n", encoding="utf-8")
 
-    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo"
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
 
 
 def test_run_local_smoke_evidence_snapshot_returns_found_when_repo_has_window_cleanup_smoke_log(tmp_path: Path) -> None:

@@ -274,7 +274,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert telegram_bot_api_command == window_telegram_bot_api_command
     assert "api.telegram.org/bot" in telegram_bot_api_command
     assert "getMe" in telegram_bot_api_command
-    assert local_smoke_evidence_result == "no in-window cleanup smoke evidence in repo"
+    assert local_smoke_evidence_result == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
     assert local_smoke_evidence_date == docs_gate_date
     assert local_smoke_evidence_result == window_local_evidence_result
     assert local_smoke_evidence_date == window_local_evidence_date
