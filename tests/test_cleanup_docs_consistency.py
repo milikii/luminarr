@@ -268,6 +268,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert env_readiness_date == window_env_readiness_date
     assert env_readiness_command == window_env_readiness_command
     assert "os.getenv(k,\\\"\\\").strip().strip" in env_readiness_command
+    assert "rows=dict(line.split('=', 1)" in env_readiness_command
+    assert "lookup.get(k.lower(), '')" in env_readiness_command
     assert telegram_bot_api_result == "telegram bot api ready"
     assert telegram_bot_api_date == docs_gate_date
     assert telegram_bot_api_result == window_telegram_bot_api_result

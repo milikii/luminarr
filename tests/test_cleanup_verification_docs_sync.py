@@ -131,7 +131,8 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete`" in updated
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "os.getenv(k,\\\"\\\").strip().strip" in updated
-    assert "cmd.exe','/c','set" in updated
+    assert "rows=dict(line.split('=', 1)" in updated
+    assert "lookup.get(k.lower(), '')" in updated
     assert "env_path=Path('.env')" in updated
     assert "value.strip().strip" in updated
     assert "- telegram bot api snapshot：`telegram bot api ready`" in updated
@@ -166,6 +167,8 @@ def test_update_status_text_migrates_legacy_env_snapshot_label() -> None:
         "- env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete`"
     ) in updated
     assert "os.getenv(k,\\\"\\\").strip().strip" in updated
+    assert "rows=dict(line.split('=', 1)" in updated
+    assert "lookup.get(k.lower(), '')" in updated
 
 
 def test_update_window_text_replaces_custom_snapshot_entries() -> None:
