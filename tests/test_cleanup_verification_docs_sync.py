@@ -528,6 +528,27 @@ def test_sync_documents_keeps_latest_channel_date_when_window_logs_repeat_channe
     assert "| Telegram | 已完成 | 2026-04-08 | 2026-04-08 已完成真实私聊 smoke |" in window_file.read_text(encoding="utf-8")
 
 
+def test_sync_documents_keeps_pending_channel_anchor_when_only_one_channel_completes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "STATUS.md").write_text("## Latest verification\n\n- local smoke evidence snapshot：`old evidence`（2026-04-10，`old evidence command`）\n", encoding="utf-8")
+    window_file = docs_dir / "CLEANUP_VERIFICATION_WINDOW.md"
+    window_file.write_text("# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n- 开始日期：2026-04-05\n- 最早可结束日期：2026-04-12\n\n## Channel progress\n\n| 渠道 | 状态 | 最近一次日期 | 备注 |\n| --- | --- | --- | --- |\n| Telegram | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n| personal WeChat | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n| Feishu | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n| WeCom | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n\n## Verification evidence\n\n- 当前仓库证据快照：2026-04-10，`old evidence result`（`old evidence command`）\n", encoding="utf-8")
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    line = build_cleanup_private_chat_smoke_log_line(channel="telegram", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-06")
+    assert line is not None
+    (logs_dir / "run.log").write_text(f"{line}\n", encoding="utf-8")
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.run_snapshot", lambda spec, cwd: SnapshotRun(spec=spec, date_text="2026-04-11", result_text="found in-window cleanup smoke evidence in repo: telegram; missing channels: personal_wechat,feishu,wecom"))
+
+    sync_documents(status_file=docs_dir / "STATUS.md", window_file=window_file, snapshot_keys=["local_smoke_evidence"], cwd=tmp_path)
+
+    updated = window_file.read_text(encoding="utf-8")
+    assert "| personal WeChat | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |" in updated and "| Feishu | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |" in updated and "| WeCom | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |" in updated
+
+
 def test_has_running_luminarr_process_returns_false_when_app_main_is_absent(tmp_path: Path) -> None:
     proc_root = tmp_path / "proc"
     proc_root.mkdir()

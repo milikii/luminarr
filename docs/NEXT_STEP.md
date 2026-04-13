@@ -60,6 +60,7 @@
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续直接跑最小 `sync_documents()` 回写样例，锁住整条文档同步路径在重写 `Channel progress` 后仍保留三段章节标题，避免 helper 通过但真实写回路径继续漂移。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续直接锁住 `sync_documents()` 在日志乱序时仍按 Telegram / personal WeChat / Feishu / WeCom 固定顺序重写 `Channel progress`，避免窗口台账每次回写都按日志发现顺序抖动。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续直接锁住 `sync_documents()` 在同一渠道命中多条窗口期真实 smoke 日志时取最近绝对日期，避免 `Channel progress` 把旧日期写回已完成渠道。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续直接锁住 `sync_documents()` 在只有部分渠道完成时，未命中渠道仍保留 `待验证`、`-` 和窗口开始日锚点备注，避免窗口台账把剩余缺口写成空白或旧格式。
 - 保持 cleanup verification docs sync 在 WSL 调用 Windows `cmd.exe /c set` 时兼容非 UTF-8 输出，避免当天环境快照因为编码异常停摆。
 - 保持 verification docs gate 继续显式校验 `local_smoke_evidence` 只认窗口期 `[cleanup 私聊 smoke]` 日志协议，不把任意 `jobs` / `job_event` / `telegram_updates` 时间戳或普通日志文件日期误算成真实私聊 smoke 证据，避免窗口台账把普通运行痕迹写成退出条件。
 - 保持 verification docs gate 继续显式校验 `runtime_process` 已接进 `sync-cleanup-doc-snapshots`、`Makefile` 和 `docs/GETTING_STARTED.md`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的运行进程快照保持一致，避免“当前有没有运行中的 Luminarr 进程”继续靠手工抄写。
