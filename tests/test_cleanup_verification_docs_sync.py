@@ -332,6 +332,13 @@ def test_run_env_readiness_snapshot_lists_only_missing_channel_groups(monkeypatc
     assert _run_env_readiness_snapshot(tmp_path) == "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: wecom; personal_wechat login state not checked"
 
 
+def test_run_env_readiness_snapshot_returns_ready_when_all_channel_groups_are_configured(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+        monkeypatch.delenv(key, raising=False)
+    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\nEMBY_BASE_URL=http://127.0.0.1:18096\nEMBY_API_KEY=emby-key\nFEISHU_APP_ID=id\nFEISHU_APP_SECRET=secret\nFEISHU_ENCRYPT_KEY=key\nWECOM_TOKEN=token\nWECOM_ENCODING_AES_KEY=aes\nWECOM_RECEIVE_ID=wxid\n", encoding="utf-8")
+    assert _run_env_readiness_snapshot(tmp_path) == "four-channel cleanup smoke env ready"
+
+
 def test_run_telegram_bot_api_snapshot_reads_quoted_env_file_token(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
