@@ -100,6 +100,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 验证快照维护快照：仓库里现在有 `make sync-cleanup-doc-snapshots` / `.venv/bin/python -m app.maintenance.cleanup_verification_docs ...`，会顺序执行固定验证命令，并把 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的固定快照行连同环境就绪、Telegram Bot API 就绪、仓库内真实 smoke 证据快照一起改到最新结果，减少 cleanup 窗口期间手工抄写验证结果的漂移。
 - 仓库证据快照能力快照：`local_smoke_evidence` 现在在命中窗口期 `[cleanup 私聊 smoke]` 日志时会直接带出 `found channels + missing channels`，四渠道齐全后会改成 `all channels covered`，没命中时也会显式列出缺失渠道；当前结果是 `no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`，说明四个渠道的窗口内仓库证据都还没落下。
 - 仓库证据坏日志容错快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `local_smoke_evidence` 遇到单个不可读日志文件时会跳过该文件、继续保留其余可读 smoke 证据，避免 cleanup 文档同步被一个坏日志直接打断。
+- 仓库证据 non-UTF8 脏字节容错快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `local_smoke_evidence` 在日志文件混入 non-UTF8 脏字节时，仍能保留同文件中的有效 cleanup smoke 行，避免脏日志字节把仓库证据统计打断。
 - 仓库证据未来日期门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住“晚于当前快照日期的 cleanup smoke 日志不会被算进 `local_smoke_evidence`”，避免未来日期日志被误回填成当前窗口证据。
 - 仓库证据日期聚合快照：cleanup 文档同步工具现在也会按渠道保留“窗口内最近一次真实 smoke 日期”，后续要把日志证据接到 `Channel progress` 表时不需要重新解析一遍原始日志。
 - Channel progress 同步快照：`docs/CLEANUP_VERIFICATION_WINDOW.md` 里的四渠道进度表现在也会由同步工具按固定顺序自动重写；由于当前仓库仍无窗口内真实 smoke 证据，表格状态继续保持四个 `待验证`。
