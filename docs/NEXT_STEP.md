@@ -82,6 +82,7 @@
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。
 - 保持 cleanup verification docs sync 在遇到单个不可读的 smoke 日志文件时跳过该文件，并继续统计其余可读证据，避免一个坏日志把整个窗口文档同步链打断。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `local_smoke_evidence` 在同一日志文件夹里遇到 non-UTF8 脏字节时，仍能保留同文件中有效的 `[cleanup 私聊 smoke]` 行，避免脏日志字节把仓库证据统计打断。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `local_smoke_evidence` 在同一日志文件里遇到损坏的 `[cleanup 私聊 smoke]` payload 行时，仍会忽略坏行并保留同文件中的合法协议行，避免单条坏 payload 污染仓库证据统计。
 - 保持 cleanup 窗口仍标记为进行中时，`local_smoke_evidence` / `Channel progress` 继续接受“开始日期之后、当前快照日期之前”的真实 smoke 证据，不把 `最早可结束日期` 误当成后续补证的硬截止线。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“晚于当前快照日期的 cleanup smoke 日志不会被算进 `local_smoke_evidence`”这条门禁，避免未来日期日志被误回填成当前窗口证据。
 - 保持 `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Update rule` 也直接写明“进行中窗口的补证上界跟随当前结论快照日期”，避免实现已放开补证、但窗口规则文字仍停留在旧理解。
