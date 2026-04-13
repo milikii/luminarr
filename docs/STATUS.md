@@ -82,6 +82,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram Bot API 错误分类快照：`sync-cleanup-doc-snapshots` 现在也把 Telegram `getMe` 的 401/403 稳定归类为 `telegram bot api rejected token`，不再和网络不可达混写成 `unreachable`，避免 cleanup 窗口快照误判凭据状态。
 - Telegram Bot API 网络门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `telegram bot api unreachable` 分支，避免 Telegram 网络故障被误写成坏 token。
 - Telegram Bot API 5xx 门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住非 401/403 HTTPError 会归成 `telegram bot api unreachable`，避免 5xx / 网关异常被误写成坏 token。
+- Telegram Bot API 坏 JSON 门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住坏 JSON 响应会归成 `telegram bot api unreachable`，避免异常响应体被误写成坏 token 或 ready。
 - Telegram Bot API 缺失态门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `telegram bot token missing` 分支，避免最基础的凭据缺失态从快照门禁里漂走。
 - 窗口活性快照：已到最早可结束日期，待补退出条件
 - 当前状态快照：进行中
