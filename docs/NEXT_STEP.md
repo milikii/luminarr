@@ -151,6 +151,7 @@
   - `docs/GETTING_STARTED.md`
 - 保持 `make run` 在 `ENV_FILE` 缺失时先打印红色中文 `[环境文件缺失]` 日志和 `[处理建议]`，并支持 `ENV_FILE=/绝对路径 make run`，避免当前 Telegram bring-up 还没进入 runtime 就掉进 shell 原始报错。
 - 保持 Telegram-only bring-up 在缺少 BT 下载器角色绑定时只打印 `[BT 订阅后台扫描未启动]` 警告、不把 `app.main` 卡死在启动前，避免最小私聊验证被非主线 BT 配置误拦截。
+- 保持 Telegram 启动在网络 / DNS 失败时也打印红色中文 `[Telegram 启动失败]` 和 `[处理建议]`，避免当前主线 bring-up 还停留在英文 traceback。
 
 ## Do not do
 

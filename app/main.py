@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from telegram.error import NetworkError
 
 from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
 from app.bot.cleanup_smoke_logging import configure_cleanup_private_chat_smoke_log_file
@@ -56,6 +57,14 @@ def _build_downloader_instances_by_name(
     instances: tuple[DownloaderInstanceConfig, ...],
 ) -> dict[str, DownloaderInstanceConfig]:
     return {instance.name: instance for instance in instances}
+
+
+def _run_application_polling(application) -> None:
+    try:
+        application.run_polling(drop_pending_updates=True)
+    except NetworkError as error:
+        print(f"\033[31m[Telegram 启动失败]\033[0m 错误={error}\n\033[33m[处理建议]\033[0m 检查当前网络、DNS 和 `TELEGRAM_BOT_TOKEN` 是否可访问 Telegram Bot API 后重试。", flush=True)
+        raise
 
 
 def _build_transmission_clients_by_name(
@@ -327,7 +336,7 @@ def main() -> None:
             port=settings.wecom_webhook_port,
             path=settings.wecom_webhook_path,
         )
-    application.run_polling(drop_pending_updates=True)
+    _run_application_polling(application)
 
 
 if __name__ == "__main__":
