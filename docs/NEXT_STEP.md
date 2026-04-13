@@ -55,6 +55,8 @@
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。
 - 保持 cleanup 文档同步工具继续按渠道收集“窗口内最近一次真实 smoke 日期”，为后续 `Channel progress` 自动同步提供稳定输入，避免接表格时又回头重复扫描原始日志。
+- 保持 `sync-cleanup-doc-snapshots` 继续按固定四渠道顺序自动重写 `Channel progress` 表：命中渠道写 `已完成 + 最近日期`，未命中渠道保持 `待验证` 和窗口开始日锚点，避免真实 smoke 一补完又要手工回填表格。
+- 保持 verification docs gate 继续显式校验 `Channel progress` 自动同步不会吞掉 `Verification evidence`、`PT 做种 guardrail 评估` 和 `Update rule` 后续章节，避免窗口台账被错误截断成只剩进度表。
 - 保持 cleanup verification docs sync 在 WSL 调用 Windows `cmd.exe /c set` 时兼容非 UTF-8 输出，避免当天环境快照因为编码异常停摆。
 - 保持 verification docs gate 继续显式校验 `local_smoke_evidence` 只认窗口期 `[cleanup 私聊 smoke]` 日志协议，不把任意 `jobs` / `job_event` / `telegram_updates` 时间戳或普通日志文件日期误算成真实私聊 smoke 证据，避免窗口台账把普通运行痕迹写成退出条件。
 - 保持 verification docs gate 继续显式校验 `runtime_process` 已接进 `sync-cleanup-doc-snapshots`、`Makefile` 和 `docs/GETTING_STARTED.md`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的运行进程快照保持一致，避免“当前有没有运行中的 Luminarr 进程”继续靠手工抄写。

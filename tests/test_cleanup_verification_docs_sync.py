@@ -14,6 +14,7 @@ from app.maintenance.cleanup_verification_docs import (
     _collect_in_window_cleanup_smoke_channel_dates,
     _has_running_luminarr_process,
     _read_windows_env_values,
+    _replace_window_channel_progress_table,
     _run_env_readiness_snapshot,
     _run_local_smoke_evidence_snapshot,
     _run_runtime_process_snapshot,
@@ -434,6 +435,32 @@ def test_collect_in_window_cleanup_smoke_channel_dates_keeps_latest_date_per_cha
     (logs_dir / "run.log").write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
 
     assert _collect_in_window_cleanup_smoke_channel_dates(tmp_path) == {"telegram": "2026-04-08", "feishu": "2026-04-05"}
+
+
+def test_replace_window_channel_progress_table_updates_completed_and_pending_rows() -> None:
+    original = (
+        "## Channel progress\n\n"
+        "| 渠道 | 状态 | 最近一次日期 | 备注 |\n"
+        "| --- | --- | --- | --- |\n"
+        "| Telegram | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n"
+        "| personal WeChat | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n"
+        "| Feishu | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n"
+        "| WeCom | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n"
+        "\n## Verification evidence\n\n"
+        "- keep me\n"
+    )
+
+    updated = _replace_window_channel_progress_table(
+        original,
+        channel_dates={"telegram": "2026-04-08", "feishu": "2026-04-06"},
+        window_start_date="2026-04-05",
+    )
+
+    assert "| Telegram | 已完成 | 2026-04-08 | 2026-04-08 已完成真实私聊 smoke |" in updated
+    assert "| personal WeChat | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |" in updated
+    assert "| Feishu | 已完成 | 2026-04-06 | 2026-04-06 已完成真实私聊 smoke |" in updated
+    assert "| WeCom | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |" in updated
+    assert "\n## Verification evidence" in updated
 
 
 def test_has_running_luminarr_process_returns_false_when_app_main_is_absent(tmp_path: Path) -> None:

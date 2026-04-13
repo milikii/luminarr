@@ -129,6 +129,7 @@ TELEGRAM_BOT_API_COMMAND_DISPLAY = (
 
 WINDOWS_ENV_OUTPUT_ENCODINGS = ("utf-8", "utf-8-sig", "gbk", "cp936", "cp950")
 EXPECTED_CLEANUP_SMOKE_CHANNELS = ("telegram", "personal_wechat", "feishu", "wecom")
+WINDOW_CHANNEL_PROGRESS_ROWS = (("telegram", "Telegram"), ("personal_wechat", "personal WeChat"), ("feishu", "Feishu"), ("wecom", "WeCom"))
 
 
 def _read_current_shell_env_values() -> dict[str, str]:
@@ -597,6 +598,14 @@ def _replace_window_entry(text: str, run: SnapshotRun) -> str:
     )
 
 
+def _replace_window_channel_progress_table(text: str, *, channel_dates: dict[str, str], window_start_date: str) -> str:
+    rows = ["| 渠道 | 状态 | 最近一次日期 | 备注 |", "| --- | --- | --- | --- |"] + [f"| {label} | 已完成 | {channel_dates[channel]} | {channel_dates[channel]} 已完成真实私聊 smoke |" if channel in channel_dates else f"| {label} | 待验证 | - | {window_start_date} 启动验证窗口，待补真实私聊 smoke 记录 |" for channel, label in WINDOW_CHANNEL_PROGRESS_ROWS]
+    updated, replaced_count = re.subn(r"(?m)^\| 渠道 \| 状态 \| 最近一次日期 \| 备注 \|\n\| --- \| --- \| --- \| --- \|\n(?:\| [^\n]+\n){4}", "\n".join(rows) + "\n", text, count=1)
+    if replaced_count != 1:
+        raise CleanupVerificationDocsSyncError("docs/CLEANUP_VERIFICATION_WINDOW.md 里缺少 Channel progress 表。", fix_hint="检查 Channel progress 表头和四个渠道行是否仍保留当前固定格式。")
+    return updated
+
+
 def _replace_single_line(text: str, *, pattern: str, replacement: str, missing_message: str) -> str:
     updated, replaced_count = re.subn(pattern, lambda _: replacement, text, count=1, flags=re.MULTILINE)
     if replaced_count != 1:
@@ -618,7 +627,9 @@ def sync_documents(
     status_text = status_file.read_text(encoding="utf-8")
     window_text = window_file.read_text(encoding="utf-8")
     status_file.write_text(update_status_text(status_text, runs), encoding="utf-8")
-    window_file.write_text(update_window_text(window_text, runs), encoding="utf-8")
+    window_text = update_window_text(window_text, runs)
+    window_text = _replace_window_channel_progress_table(window_text, channel_dates=_collect_in_window_cleanup_smoke_channel_dates(cwd), window_start_date=_load_window_start_date(cwd))
+    window_file.write_text(window_text, encoding="utf-8")
     return runs
 
 
