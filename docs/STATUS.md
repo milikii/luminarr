@@ -81,6 +81,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram Bot API 就绪快照：2026-04-13 提权 `getMe` 已确认当前仓库 `.env` 里的 `TELEGRAM_BOT_TOKEN` 可用；当前 Telegram 渠道剩余缺口不是 bot 凭据不可用，而是窗口内真实私聊 cleanup 输入和回复证据仍未落仓库。
 - Telegram Bot API 错误分类快照：`sync-cleanup-doc-snapshots` 现在也把 Telegram `getMe` 的 401/403 稳定归类为 `telegram bot api rejected token`，不再和网络不可达混写成 `unreachable`，避免 cleanup 窗口快照误判凭据状态。
 - Telegram Bot API 网络门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `telegram bot api unreachable` 分支，避免 Telegram 网络故障被误写成坏 token。
+- Telegram Bot API 缺失态门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `telegram bot token missing` 分支，避免最基础的凭据缺失态从快照门禁里漂走。
 - 窗口活性快照：已到最早可结束日期，待补退出条件
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-13，已到最早可结束日期 2026-04-12，但四个渠道真实私聊 cleanup smoke 记录仍待补，当前仓库内也还没有可回填的窗口期真实 smoke 证据，暂未满足退出条件。
