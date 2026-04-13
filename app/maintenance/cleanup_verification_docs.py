@@ -153,7 +153,7 @@ def _read_windows_env_values() -> dict[str, str]:
             capture_output=True,
             check=False,
         )
-    except FileNotFoundError:
+    except OSError:
         return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
     if completed.returncode != 0:
         return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
