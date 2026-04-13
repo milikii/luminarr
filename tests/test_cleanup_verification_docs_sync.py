@@ -426,6 +426,12 @@ def test_run_telegram_bot_api_snapshot_treats_http_unauthorized_as_rejected(
     assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api rejected token"
 
 
+def test_run_telegram_bot_api_snapshot_treats_urlerror_as_unreachable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.urllib.request.urlopen", lambda url, timeout: (_ for _ in ()).throw(urllib.error.URLError("offline")))
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api unreachable"
+
+
 def test_run_local_smoke_evidence_snapshot_returns_missing_when_repo_has_no_window_evidence(tmp_path: Path) -> None:
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
