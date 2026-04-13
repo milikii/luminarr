@@ -93,7 +93,7 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "env_path=Path('.env'); text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
     "lines=(line.strip() for line in text.splitlines()); "
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
-    "data.update(((key.removeprefix('export ').strip()), value.strip()) for key, _, value in pairs); "
+    "data.update(((key.removeprefix('export ').strip()), value.strip().strip(\\\"\\\"'\\\")) for key, _, value in pairs); "
     "print('\\\\n'.join(f'{k}=' + ('set' if data.get(k, '').strip() else 'missing') for k in keys))\""
 )
 
@@ -120,9 +120,9 @@ TELEGRAM_BOT_API_COMMAND_DISPLAY = (
     "env_path=Path('.env'); env_map={}; text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
     "lines=(line.strip() for line in text.splitlines()); "
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
-    "env_map.update(((key.removeprefix('export ').strip()), value.strip()) for key, _, value in pairs); "
+    "env_map.update(((key.removeprefix('export ').strip()), value.strip().strip(\\\"\\\"'\\\")) for key, _, value in pairs); "
     "token=token or env_map.get('TELEGRAM_BOT_TOKEN','').strip(); "
-    "token=token or next((line.partition('=')[2].strip() for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.startswith('TELEGRAM_BOT_TOKEN=')), ''); "
+    "token=token or next((line.partition('=')[2].strip() for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.partition('=')[0].strip().lower() == 'telegram_bot_token'), ''); "
     "print('telegram bot token missing' if not token else ('telegram bot api ready' if json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=5)).get('ok') else 'telegram bot api rejected token'))\""
 )
 
