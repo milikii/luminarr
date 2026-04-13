@@ -54,6 +54,7 @@
 - 保持 verification docs gate 继续显式校验 `telegram_bot_api` 已接进 `sync-cleanup-doc-snapshots`、`docs/STATUS.md` 和 `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 Telegram 真实 smoke 的外部可用性快照重新退回手工说明。
 - 保持 `sync-cleanup-doc-snapshots` 在 Telegram `getMe` 返回 401/403 时稳定写成 `telegram bot api rejected token`，不要和网络不可达混写成 `unreachable`，避免窗口快照把坏 token 误记成网络波动。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 Telegram Bot API 的 `rejected token` / `unreachable` 分类，避免后续把坏 token 和网络不可达重新混写成同一类 blocker。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住非 401/403 的 Telegram Bot API HTTP 错误会归成 `unreachable`，避免 5xx / 网关异常被误写成坏 token。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `telegram bot token missing` 分支，避免最基础的凭据缺失态从 Telegram Bot API 快照门禁里漂走。
 - 保持 `sync-cleanup-doc-snapshots` 读取仓库 `.env` 时先去掉首尾成对引号，再参与 `telegram_bot_api` / `env_readiness` 快照判断，避免 `"token"` 这类配置被当成带引号字面量发出去。
 - 保持 `sync-cleanup-doc-snapshots` 读取当前 shell 环境变量值时也先去掉首尾成对引号，避免 `export TELEGRAM_BOT_TOKEN='"token"'` 这类当前会话配置直接盖过后面的正确值。
