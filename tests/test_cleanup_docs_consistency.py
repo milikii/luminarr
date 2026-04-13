@@ -273,8 +273,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert telegram_bot_api_result == window_telegram_bot_api_result
     assert telegram_bot_api_date == window_telegram_bot_api_date
     assert telegram_bot_api_command == window_telegram_bot_api_command
+    assert "os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip" in telegram_bot_api_command
     assert "api.telegram.org/bot" in telegram_bot_api_command
     assert "getMe" in telegram_bot_api_command
+    assert "value.strip().strip" in telegram_bot_api_command
+    assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in telegram_bot_api_command
+    assert "line.partition('=')[2].strip().strip" in telegram_bot_api_command
     assert local_smoke_evidence_result == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
     assert local_smoke_evidence_date == docs_gate_date
     assert local_smoke_evidence_result == window_local_evidence_result
