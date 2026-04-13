@@ -247,6 +247,13 @@ def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypat
     assert _run_env_readiness_snapshot(tmp_path) == "missing local runtime env"
 
 
+def test_run_env_readiness_snapshot_returns_runtime_ready_when_import_env_is_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+        monkeypatch.delenv(key, raising=False)
+    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\n", encoding="utf-8")
+    assert _run_env_readiness_snapshot(tmp_path) == "local runtime env ready; import/refresh env incomplete"
+
+
 def test_read_current_shell_env_values_strips_matching_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", '"token"')
 
