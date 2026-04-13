@@ -11,6 +11,7 @@ from app.maintenance.cleanup_verification_docs import (
     CleanupVerificationDocsSyncError,
     SNAPSHOT_SPECS,
     SnapshotRun,
+    _collect_in_window_cleanup_smoke_channel_dates,
     _has_running_luminarr_process,
     _read_windows_env_values,
     _run_env_readiness_snapshot,
@@ -412,6 +413,27 @@ def test_run_local_smoke_evidence_snapshot_returns_all_channels_covered_when_win
     (logs_dir / "run.log").write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
 
     assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo: telegram,personal_wechat,feishu,wecom; all channels covered"
+
+
+def test_collect_in_window_cleanup_smoke_channel_dates_keeps_latest_date_per_channel(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
+        "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n- 开始日期：2026-04-05\n- 最早可结束日期：2026-04-12\n",
+        encoding="utf-8",
+    )
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    lines = [
+        build_cleanup_private_chat_smoke_log_line(channel="telegram", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-06"),
+        build_cleanup_private_chat_smoke_log_line(channel="telegram", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-08"),
+        build_cleanup_private_chat_smoke_log_line(channel="feishu", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-05"),
+        build_cleanup_private_chat_smoke_log_line(channel="wecom", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-03"),
+    ]
+    assert all(line is not None for line in lines)
+    (logs_dir / "run.log").write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
+
+    assert _collect_in_window_cleanup_smoke_channel_dates(tmp_path) == {"telegram": "2026-04-08", "feishu": "2026-04-05"}
 
 
 def test_has_running_luminarr_process_returns_false_when_app_main_is_absent(tmp_path: Path) -> None:

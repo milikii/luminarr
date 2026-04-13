@@ -278,10 +278,19 @@ def _iter_cleanup_smoke_log_dates(cwd: Path) -> tuple[str, ...]:
     return tuple(dates)
 
 
-def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
+def _collect_in_window_cleanup_smoke_channel_dates(cwd: Path) -> dict[str, str]:
     window_start_date = _load_window_start_date(cwd)
     window_end_date = _load_window_end_date(cwd)
-    channels = tuple(channel for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel in {entry.partition(":")[2] for entry in _iter_cleanup_smoke_log_dates(cwd) if window_start_date <= entry.partition(":")[0] <= window_end_date})
+    latest_dates: dict[str, str] = {}
+    for entry in _iter_cleanup_smoke_log_dates(cwd):
+        evidence_date, _, channel = entry.partition(":")
+        if window_start_date <= evidence_date <= window_end_date and channel in EXPECTED_CLEANUP_SMOKE_CHANNELS:
+            latest_dates[channel] = max(latest_dates.get(channel, ""), evidence_date)
+    return {channel: latest_dates[channel] for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel in latest_dates}
+
+
+def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
+    channels = tuple(_collect_in_window_cleanup_smoke_channel_dates(cwd))
     missing_channels = tuple(channel for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel not in channels)
     if channels:
         return "found in-window cleanup smoke evidence in repo: " + ",".join(channels) + (f"; missing channels: {','.join(missing_channels)}" if missing_channels else "; all channels covered")
