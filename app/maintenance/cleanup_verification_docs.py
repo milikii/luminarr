@@ -162,8 +162,8 @@ def _read_windows_env_values() -> dict[str, str]:
         if "=" not in raw_line:
             continue
         key, _, value = raw_line.partition("=")
-        windows_env_values[key.strip()] = value.strip()
-    return {key: windows_env_values.get(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+        windows_env_values[key.strip().lower()] = value.strip()
+    return {key: windows_env_values.get(key.lower(), "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 
 def _read_env_file_values(cwd: Path) -> dict[str, str]:

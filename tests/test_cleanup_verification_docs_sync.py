@@ -242,6 +242,17 @@ def test_read_windows_env_values_tolerates_non_utf8_cmd_output(monkeypatch: pyte
     assert _read_windows_env_values()["TELEGRAM_BOT_TOKEN"] == "token"
 
 
+def test_read_windows_env_values_treats_keys_case_insensitively(monkeypatch: pytest.MonkeyPatch) -> None:
+    stdout = b"telegram_bot_token=token\r\n"
+
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=args[0], returncode=0, stdout=stdout, stderr=b""),
+    )
+
+    assert _read_windows_env_values()["TELEGRAM_BOT_TOKEN"] == "token"
+
+
 def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_absent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
