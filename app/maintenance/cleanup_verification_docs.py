@@ -243,7 +243,7 @@ def _run_telegram_bot_api_snapshot(cwd: Path) -> str:
             payload = json.load(response)
     except urllib.error.HTTPError as error:
         return "telegram bot api rejected token" if error.code in {401, 403} else "telegram bot api unreachable"
-    except (TimeoutError, urllib.error.URLError, json.JSONDecodeError):
+    except (TimeoutError, urllib.error.URLError, json.JSONDecodeError, OSError):
         return "telegram bot api unreachable"
     if not isinstance(payload, dict) or payload.get("ok") is not True:
         return "telegram bot api rejected token"
