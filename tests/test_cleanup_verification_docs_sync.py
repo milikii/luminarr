@@ -371,6 +371,12 @@ def test_run_telegram_bot_api_snapshot_reads_quoted_env_file_token(
     assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api ready"
 
 
+def test_run_telegram_bot_api_snapshot_reads_quoted_current_shell_token(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", '"test-token"')
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.urllib.request.urlopen", lambda url, timeout: (('"test-token"' not in url and "test-token" in url and timeout == 5) and type("R", (io.BytesIO,), {"__enter__": lambda self: self, "__exit__": lambda self, *args: self.close()})(b'{"ok": true}')) or None)
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api ready"
+
+
 def test_run_telegram_bot_api_snapshot_returns_missing_when_token_is_absent(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

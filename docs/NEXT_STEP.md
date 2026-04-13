@@ -56,6 +56,7 @@
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 Telegram Bot API 的 `rejected token` / `unreachable` 分类，避免后续把坏 token 和网络不可达重新混写成同一类 blocker。
 - 保持 `sync-cleanup-doc-snapshots` 读取仓库 `.env` 时先去掉首尾成对引号，再参与 `telegram_bot_api` / `env_readiness` 快照判断，避免 `"token"` 这类配置被当成带引号字面量发出去。
 - 保持 `sync-cleanup-doc-snapshots` 读取当前 shell 环境变量值时也先去掉首尾成对引号，避免 `export TELEGRAM_BOT_TOKEN='"token"'` 这类当前会话配置直接盖过后面的正确值。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“当前 shell 里的带引号 `TELEGRAM_BOT_TOKEN` 会先去引号再请求 Telegram Bot API”这条快照路径，避免 shell token 去引号逻辑只停在 helper 单测。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时按大小写不敏感匹配键名，避免 `telegram_bot_token=...` 这类输出被误判成缺失环境变量。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时也先去掉值首尾成对引号，避免 `TELEGRAM_BOT_TOKEN=\"token\"` 这类配置被当成带引号字面量继续写进快照。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` / `telegram_bot_api` command display 也同步反映“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前真相，避免状态页展示仍停在旧逻辑。
