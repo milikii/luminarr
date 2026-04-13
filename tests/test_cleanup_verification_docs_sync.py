@@ -14,6 +14,7 @@ from app.maintenance.cleanup_verification_docs import (
     SnapshotRun,
     _collect_in_window_cleanup_smoke_channel_dates,
     _has_running_luminarr_process,
+    _read_current_shell_env_values,
     _read_windows_env_values,
     _replace_window_channel_progress_table,
     _run_env_readiness_snapshot,
@@ -135,6 +136,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "- telegram bot api snapshot：`telegram bot api ready`" in updated
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
+    assert "os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip" in updated
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in updated
     assert "line.partition('=')[2].strip().strip" in updated
     assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated
@@ -208,6 +210,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "- 当前 Telegram Bot API 就绪快照：2026-04-11，`telegram bot api ready`" in updated
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
+    assert "os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip" in updated
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in updated
     assert "line.partition('=')[2].strip().strip" in updated
     assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated
@@ -235,6 +238,12 @@ def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypat
         monkeypatch.delenv(key, raising=False)
 
     assert _run_env_readiness_snapshot(tmp_path) == "missing local runtime env"
+
+
+def test_read_current_shell_env_values_strips_matching_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", '"token"')
+
+    assert _read_current_shell_env_values()["TELEGRAM_BOT_TOKEN"] == "token"
 
 
 def test_read_windows_env_values_tolerates_non_utf8_cmd_output(monkeypatch: pytest.MonkeyPatch) -> None:

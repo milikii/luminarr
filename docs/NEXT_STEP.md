@@ -54,6 +54,7 @@
 - 保持 verification docs gate 继续显式校验 `telegram_bot_api` 已接进 `sync-cleanup-doc-snapshots`、`docs/STATUS.md` 和 `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 Telegram 真实 smoke 的外部可用性快照重新退回手工说明。
 - 保持 `sync-cleanup-doc-snapshots` 在 Telegram `getMe` 返回 401/403 时稳定写成 `telegram bot api rejected token`，不要和网络不可达混写成 `unreachable`，避免窗口快照把坏 token 误记成网络波动。
 - 保持 `sync-cleanup-doc-snapshots` 读取仓库 `.env` 时先去掉首尾成对引号，再参与 `telegram_bot_api` / `env_readiness` 快照判断，避免 `"token"` 这类配置被当成带引号字面量发出去。
+- 保持 `sync-cleanup-doc-snapshots` 读取当前 shell 环境变量值时也先去掉首尾成对引号，避免 `export TELEGRAM_BOT_TOKEN='"token"'` 这类当前会话配置直接盖过后面的正确值。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时按大小写不敏感匹配键名，避免 `telegram_bot_token=...` 这类输出被误判成缺失环境变量。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时也先去掉值首尾成对引号，避免 `TELEGRAM_BOT_TOKEN=\"token\"` 这类配置被当成带引号字面量继续写进快照。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` / `telegram_bot_api` command display 也同步反映“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前真相，避免状态页展示仍停在旧逻辑。

@@ -116,7 +116,7 @@ RUNTIME_PROCESS_COMMAND_DISPLAY = (
     "print('\\\\n'.join(matches))\""
 )
 TELEGRAM_BOT_API_COMMAND_DISPLAY = (
-    "python3 -c \"import json, os, subprocess, urllib.request; from pathlib import Path; token=os.getenv('TELEGRAM_BOT_TOKEN','').strip(); "
+    "python3 -c \"import json, os, subprocess, urllib.request; from pathlib import Path; token=os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip(\\\"\\\"'\\\"); "
     "env_path=Path('.env'); env_map={}; text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
     "lines=(line.strip() for line in text.splitlines()); "
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
@@ -133,7 +133,7 @@ WINDOW_CHANNEL_PROGRESS_ROWS = (("telegram", "Telegram"), ("personal_wechat", "p
 
 
 def _read_current_shell_env_values() -> dict[str, str]:
-    return {key: os.getenv(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    return {key: os.getenv(key, "").strip().strip("\"'") for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 
 def _decode_windows_env_output(raw_output: bytes) -> str:

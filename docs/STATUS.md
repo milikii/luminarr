@@ -63,6 +63,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 知识入口快照：历史单体主文档 `Luminarr_v15.md` 已移除，当前只保留 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口，避免过期总纲继续和当前主线并行。
 - 环境就绪快照：2026-04-13 当前 shell、提权 shell 和 Windows 环境变量仍没有直接加载 `TELEGRAM_BOT_TOKEN` / `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` / `TRANSMISSION_BASE_URL` / `EMBY_BASE_URL` / `EMBY_API_KEY` / `FEISHU_*` / `WECOM_*`；但仓库根目录已经有可直接 `make run` 的 `.env`，其中 `TELEGRAM_BOT_TOKEN` / `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` / `TRANSMISSION_BASE_URL` / `EMBY_BASE_URL` / `EMBY_API_KEY` / `TMDB_API_KEY` / `FANART_API_KEY` 已就位，`/home/alex/luminarr-test` 下没有额外的 Luminarr `.env`；Feishu / WeCom 三元组仍缺，当前也没有运行中的 Luminarr 进程；`logs/` 里仍没有窗口期 `[cleanup 私聊 smoke]` 行，`data/luminarr.db` 的最新记录也还停在 2026-04-02，所以当前仓库内没有可回填的窗口期真实私聊 smoke 证据。
 - `.env` 取值归一化快照：`sync-cleanup-doc-snapshots` 现在会先去掉仓库 `.env` 值首尾成对的单/双引号，再参与 `telegram_bot_api` 和 `env_readiness` 判断，避免 `"token"` 这类配置被误当成带引号字面量。
+- 当前 shell env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉当前 shell 环境变量值首尾成对的单/双引号，避免当前会话里的 `\"token\"` 直接盖过后面的 `.env` / Windows env 真值。
 - Windows env 读取归一化快照：`sync-cleanup-doc-snapshots` 现在会按大小写不敏感读取 `cmd.exe /c set` 输出里的键名，避免 `telegram_bot_token=...` 这类 Windows 环境变量被误写成缺失。
 - Windows env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉 `cmd.exe /c set` 输出值首尾成对的单/双引号，避免 `\"token\"` 这类 Windows 环境变量继续被误当成带引号字面量。
 - docs command display 同步快照：`sync-cleanup-doc-snapshots` 现在写回 `env readiness snapshot` / `telegram bot api snapshot` 时，也会展示“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前实现真相，避免状态页命令示例落后于真实逻辑。
