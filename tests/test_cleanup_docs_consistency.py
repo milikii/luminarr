@@ -532,6 +532,13 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "personal WeChat chat-scoped shortcut 门禁快照" in status_text
     assert "Feishu 私聊 chat-scoped shortcut 门禁快照" in status_text
     assert "WeCom callback chat-scoped shortcut 门禁快照" in status_text
+    assert "Telegram-only bring-up 在缺少 BT 下载器角色绑定时只打印 `[BT 订阅后台扫描未启动]`" in next_step_text
+    assert "Telegram 启动在网络 / DNS 失败时也打印红色中文 `[Telegram 启动失败]`" in next_step_text
+    assert "`runtime_process snapshot` 继续如实反映" in next_step_text
+    assert "Telegram-only bring-up 快照" in status_text
+    assert "BT 订阅后台扫描 warning 门禁快照" in status_text
+    assert "Telegram 启动失败可观测性快照" in status_text
+    assert "runtime process 门禁快照" in status_text
     assert "tests/test_cleanup_cross_channel_smoke.py -k service_not_ready" in next_step_text
     assert "四渠道聚合 service-not-ready 门禁快照" in status_text
     assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
