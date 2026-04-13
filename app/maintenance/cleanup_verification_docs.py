@@ -81,7 +81,7 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "\\\"TRANSMISSION_BASE_URL\\\",\\\"EMBY_BASE_URL\\\",\\\"EMBY_API_KEY\\\",\\\"FEISHU_APP_ID\\\","
     "\\\"FEISHU_APP_SECRET\\\",\\\"FEISHU_ENCRYPT_KEY\\\",\\\"WECOM_TOKEN\\\",\\\"WECOM_ENCODING_AES_KEY\\\","
     "\\\"WECOM_RECEIVE_ID\\\"]; print(\\\"\\\\n\\\".join(f\\\"{k}=\\\" + "
-    "(\\\"set\\\" if os.getenv(k) else \\\"missing\\\") for k in keys))\"' ; "
+    "(\\\"set\\\" if os.getenv(k,\\\"\\\").strip().strip(\\\"\\\"'\\\") else \\\"missing\\\") for k in keys))\"' ; "
     "python3 -c \"import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
     "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
