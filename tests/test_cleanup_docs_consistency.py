@@ -360,6 +360,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "telegram bot api snapshot" in text
             assert "local smoke evidence snapshot" in text
             assert "runtime process snapshot" in text
+            assert "当前 shell env 值归一化快照" in text
+            assert "Windows env 值归一化快照" in text
+            assert "env readiness Windows 判定快照" in text
             assert "当前结论" in text
             assert "窗口活性" in text
             assert "focused cleanup tests" in text

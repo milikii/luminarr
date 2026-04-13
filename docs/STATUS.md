@@ -66,7 +66,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前 shell env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉当前 shell 环境变量值首尾成对的单/双引号，避免当前会话里的 `\"token\"` 直接盖过后面的 `.env` / Windows env 真值。
 - Windows env 读取归一化快照：`sync-cleanup-doc-snapshots` 现在会按大小写不敏感读取 `cmd.exe /c set` 输出里的键名，避免 `telegram_bot_token=...` 这类 Windows 环境变量被误写成缺失。
 - Windows env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉 `cmd.exe /c set` 输出值首尾成对的单/双引号，避免 `\"token\"` 这类 Windows 环境变量继续被误当成带引号字面量。
-- docs command display 同步快照：`sync-cleanup-doc-snapshots` 现在写回 `env readiness snapshot` / `telegram bot api snapshot` 时，也会展示“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前实现真相，避免状态页命令示例落后于真实逻辑。
+- docs command display 同步快照：`sync-cleanup-doc-snapshots` 现在写回 `env readiness snapshot` / `telegram bot api snapshot` 时，也会同步展示“当前 shell / .env / Windows env 值去首尾引号、Windows env 键名大小写不敏感、env readiness 里的 Windows 值级判定”这组当前实现真相，避免状态页命令示例和总述快照落后于真实逻辑。
 - telegram bot api command display 快照：`sync-cleanup-doc-snapshots` 现在写回 `telegram bot api snapshot` 时，也会展示“当前 shell / .env / Windows env 值去首尾引号 + Windows env 键名大小写不敏感”这整条 token 解析真相，避免状态页仍显示旧的 token 读取路径。
 - env readiness command display 快照：`sync-cleanup-doc-snapshots` 现在写回 `env readiness snapshot` 时，也会显式展示“当前 shell 环境变量值先去首尾引号再判空”这条实现真相，避免状态页仍显示旧的 shell 判空逻辑。
 - env readiness Windows 判定快照：`sync-cleanup-doc-snapshots` 现在写回 `env readiness snapshot` 时，也会把 Windows env 这段展示成“大小写不敏感键名 + 去首尾引号后的非空值才算 set”，避免状态页把空值环境变量误读成已就绪。

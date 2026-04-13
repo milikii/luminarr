@@ -58,6 +58,7 @@
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时按大小写不敏感匹配键名，避免 `telegram_bot_token=...` 这类输出被误判成缺失环境变量。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时也先去掉值首尾成对引号，避免 `TELEGRAM_BOT_TOKEN=\"token\"` 这类配置被当成带引号字面量继续写进快照。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` / `telegram_bot_api` command display 也同步反映“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前真相，避免状态页展示仍停在旧逻辑。
+- 保持 `docs/STATUS.md` 里的 “docs command display 同步快照” 摘要文案也同步覆盖“当前 shell / .env / Windows env 值去首尾引号、Windows env 键名大小写不敏感、env readiness Windows 值级判定”这组当前真相，避免状态页总述快照落后于已落地行为。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` command display 里，Windows env 这一段也按“大小写不敏感键名 + 去首尾引号后的非空值”判定 `set/missing`，避免状态页把空值 Windows 环境变量误读成已就绪。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `telegram_bot_api` command display 也同步反映“当前 shell / .env / Windows env 值去首尾引号 + Windows env 键名大小写不敏感”这整条当前真相，避免状态页继续展示旧的 token 解析路径。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` command display 也显式反映“当前 shell 环境变量值先去首尾引号再判空”这条当前真相，避免状态页继续展示旧的 shell 判空逻辑。
