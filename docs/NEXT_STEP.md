@@ -52,6 +52,7 @@
 - 保持 `sync-cleanup-doc-snapshots` 把 Telegram `getMe` 就绪快照一起写回 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 bot token 可用性继续停留在口头说明、无法区分“凭据不可用”和“真实私聊证据待补”。
 - 保持 verification docs gate 继续显式校验 `sync-cleanup-doc-snapshots` 这条新同步入口在 `Makefile` 和 `docs/GETTING_STARTED.md` 里保持一致，避免刚加的 docs 维护路径下一轮又重新分叉。
 - 保持 verification docs gate 继续显式校验 `telegram_bot_api` 已接进 `sync-cleanup-doc-snapshots`、`docs/STATUS.md` 和 `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 Telegram 真实 smoke 的外部可用性快照重新退回手工说明。
+- 保持 `sync-cleanup-doc-snapshots` 在 Telegram `getMe` 返回 401/403 时稳定写成 `telegram bot api rejected token`，不要和网络不可达混写成 `unreachable`，避免窗口快照把坏 token 误记成网络波动。
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。
 - 保持 cleanup 文档同步工具继续按渠道收集“窗口内最近一次真实 smoke 日期”，为后续 `Channel progress` 自动同步提供稳定输入，避免接表格时又回头重复扫描原始日志。

@@ -233,6 +233,8 @@ def _run_telegram_bot_api_snapshot(cwd: Path) -> str:
     try:
         with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=5) as response:
             payload = json.load(response)
+    except urllib.error.HTTPError as error:
+        return "telegram bot api rejected token" if error.code in {401, 403} else "telegram bot api unreachable"
     except (TimeoutError, urllib.error.URLError, json.JSONDecodeError):
         return "telegram bot api unreachable"
     if not isinstance(payload, dict) or payload.get("ok") is not True:

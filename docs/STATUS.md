@@ -63,6 +63,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 知识入口快照：历史单体主文档 `Luminarr_v15.md` 已移除，当前只保留 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口，避免过期总纲继续和当前主线并行。
 - 环境就绪快照：2026-04-13 当前 shell、提权 shell 和 Windows 环境变量仍没有直接加载 `TELEGRAM_BOT_TOKEN` / `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` / `TRANSMISSION_BASE_URL` / `EMBY_BASE_URL` / `EMBY_API_KEY` / `FEISHU_*` / `WECOM_*`；但仓库根目录已经有可直接 `make run` 的 `.env`，其中 `TELEGRAM_BOT_TOKEN` / `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` / `TRANSMISSION_BASE_URL` / `EMBY_BASE_URL` / `EMBY_API_KEY` / `TMDB_API_KEY` / `FANART_API_KEY` 已就位，`/home/alex/luminarr-test` 下没有额外的 Luminarr `.env`；Feishu / WeCom 三元组仍缺，当前也没有运行中的 Luminarr 进程；`logs/` 里仍没有窗口期 `[cleanup 私聊 smoke]` 行，`data/luminarr.db` 的最新记录也还停在 2026-04-02，所以当前仓库内没有可回填的窗口期真实私聊 smoke 证据。
 - Telegram Bot API 就绪快照：2026-04-13 提权 `getMe` 已确认当前仓库 `.env` 里的 `TELEGRAM_BOT_TOKEN` 可用；当前 Telegram 渠道剩余缺口不是 bot 凭据不可用，而是窗口内真实私聊 cleanup 输入和回复证据仍未落仓库。
+- Telegram Bot API 错误分类快照：`sync-cleanup-doc-snapshots` 现在也把 Telegram `getMe` 的 401/403 稳定归类为 `telegram bot api rejected token`，不再和网络不可达混写成 `unreachable`，避免 cleanup 窗口快照误判凭据状态。
 - 窗口活性快照：已到最早可结束日期，待补退出条件
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-13，已到最早可结束日期 2026-04-12，但四个渠道真实私聊 cleanup smoke 记录仍待补，当前仓库内也还没有可回填的窗口期真实 smoke 证据，暂未满足退出条件。

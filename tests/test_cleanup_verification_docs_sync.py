@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 import subprocess
+import urllib.error
 
 import pytest
 
@@ -329,6 +330,21 @@ def test_run_telegram_bot_api_snapshot_returns_rejected_when_api_says_not_ok(
     monkeypatch.setattr(
         "app.maintenance.cleanup_verification_docs.urllib.request.urlopen",
         lambda url, timeout: _FakeResponse(b'{"ok": false, "description": "unauthorized"}'),
+    )
+
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api rejected token"
+
+
+def test_run_telegram_bot_api_snapshot_treats_http_unauthorized_as_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.urllib.request.urlopen",
+        lambda url, timeout: (_ for _ in ()).throw(
+            urllib.error.HTTPError(url, 401, "Unauthorized", hdrs=None, fp=None)
+        ),
     )
 
     assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api rejected token"
