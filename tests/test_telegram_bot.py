@@ -48,6 +48,7 @@ from app.bot.telegram_bot import (
     build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
+    _log_bt_subscription_scheduler_config_error,
 )
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalRepo
@@ -2337,6 +2338,16 @@ def test_build_application_registers_services() -> None:
         for handlers in application.handlers.values()
         for handler in handlers
     )
+
+
+def test_log_bt_subscription_scheduler_config_error_prints_fix_hint(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _log_bt_subscription_scheduler_config_error(reason="未配置 BT 下载器角色绑定，后台自动扫描不会启动。")
+
+    captured = capsys.readouterr()
+    assert "[BT 订阅后台扫描未启动]" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def test_handle_message_routes_personal_wechat_login_and_sends_qr_result(

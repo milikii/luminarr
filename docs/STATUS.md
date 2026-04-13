@@ -168,6 +168,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - cleanup 窗口规则同步快照：`docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Update rule` 现在也明确写出“进行中窗口的补证上界跟随当前结论快照日期”，避免台账文字和 docs sync 行为继续分叉。
 - runtime process snapshot：`no luminarr process running`（2026-04-13，`python3 -c "from pathlib import Path; proc_root=Path('/proc'); matches=[]; pid_dirs=sorted((path for path in proc_root.iterdir() if path.is_dir() and path.name.isdigit()), key=lambda path: int(path.name)); for pid_dir in pid_dirs:  cmdline_path=pid_dir/'cmdline';  raw=cmdline_path.read_bytes() if cmdline_path.exists() else b'';  tokens=[token.decode('utf-8', errors='ignore') for token in raw.split(b'\\0') if token];  if tokens and 'python' in Path(tokens[0]).name and any(tokens[index] == '-m' and tokens[index + 1] == 'app.main' for index in range(len(tokens) - 1)):   matches.append(f'{pid_dir.name} ' + ' '.join(tokens)); print('\\n'.join(matches))"`）
 - Telegram-only bring-up 快照：2026-04-13 提权启动 `.venv/bin/python -m app.main` 后，当前进程已进入运行态；缺少 BT 下载器角色绑定时会打印 `[BT 订阅后台扫描未启动]` 红色警告，但不会阻断最小 Telegram 入口启动。
+- BT 订阅后台扫描 warning 门禁快照：`tests/test_telegram_bot.py` 现在也单独锁住 `[BT 订阅后台扫描未启动]` 和 `[处理建议]` 这组日志，避免 BT 角色绑定缺失时只剩无提示 return。
 - Telegram 启动失败可观测性快照：当前 Telegram bootstrap 遇到网络 / DNS 问题时，也会先打印红色中文 `[Telegram 启动失败]` 和 `[处理建议]`，再把异常继续抛出，避免纯英文 traceback 直接淹没修复线索。
 - compile check：2026-04-13，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-13，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
