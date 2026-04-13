@@ -291,6 +291,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert runtime_process_result == window_runtime_process_result
     assert runtime_process_date == window_runtime_process_date
     assert runtime_process_command == window_runtime_process_command
+    assert "print('luminarr process running' if matches else 'no luminarr process running')" in runtime_process_command
     assert focused_config_date == docs_gate_date
     assert focused_config_result == "4 passed, 17 deselected"
     assert (

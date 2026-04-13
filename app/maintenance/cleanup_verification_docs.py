@@ -114,7 +114,7 @@ RUNTIME_PROCESS_COMMAND_DISPLAY = (
     " tokens=[token.decode('utf-8', errors='ignore') for token in raw.split(b'\\\\0') if token]; "
     " if tokens and 'python' in Path(tokens[0]).name and any(tokens[index] == '-m' and tokens[index + 1] == 'app.main' for index in range(len(tokens) - 1)): "
     "  matches.append(f'{pid_dir.name} ' + ' '.join(tokens)); "
-    "print('\\\\n'.join(matches))\""
+    "print('luminarr process running' if matches else 'no luminarr process running')\""
 )
 TELEGRAM_BOT_API_COMMAND_DISPLAY = (
     "python3 -c \"import json, os, subprocess, urllib.request; from pathlib import Path; token=os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip('\\\"\\''); "

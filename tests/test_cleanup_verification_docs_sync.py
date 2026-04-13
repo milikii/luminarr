@@ -146,6 +146,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
     assert "- runtime process snapshot：`no luminarr process running`" in updated
     assert "proc_root=Path('/proc')" in updated
+    assert "print('luminarr process running' if matches else 'no luminarr process running')" in updated
 
 
 def test_update_status_text_migrates_legacy_env_snapshot_label() -> None:
