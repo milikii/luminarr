@@ -262,7 +262,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
-    assert env_readiness_result == "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom; personal_wechat login state not checked"
+    assert env_readiness_result == "four-channel cleanup smoke env ready"
     assert env_readiness_date == docs_gate_date
     assert env_readiness_result == window_env_readiness_result
     assert env_readiness_date == window_env_readiness_date
@@ -281,7 +281,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "value.strip().strip" in telegram_bot_api_command
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in telegram_bot_api_command
     assert "line.partition('=')[2].strip().strip" in telegram_bot_api_command
-    assert local_smoke_evidence_result == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
+    assert local_smoke_evidence_result == "found in-window cleanup smoke evidence in repo: telegram,personal_wechat,feishu; missing channels: wecom"
     assert local_smoke_evidence_date == docs_gate_date
     assert local_smoke_evidence_result == window_local_evidence_result
     assert local_smoke_evidence_date == window_local_evidence_date
@@ -310,7 +310,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert f"- 当前状态快照：{window_status}" in status_text
     assert f"- 当前结论快照：{current_conclusion}" in status_text
     assert f"- four-channel cleanup smoke tests：`{smoke_gate_result}`（{smoke_gate_date}，`{smoke_gate_command}`）" in status_text
-    assert focused_cleanup_result == "526 passed, 91 deselected"
+    assert focused_cleanup_result == "526 passed, 93 deselected"
     assert (
         f"- focused cleanup tests：`{focused_cleanup_result}`（{focused_cleanup_date}，"
         f"`{focused_cleanup_command}`）"
