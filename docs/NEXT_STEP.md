@@ -75,6 +75,7 @@
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `env_readiness` 的 `four-channel cleanup smoke env ready` 完成态分支，避免四渠道键已齐时状态页仍误报成 incomplete。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `env_readiness` 的 `local runtime env ready; import/refresh env incomplete` 中间态分支，避免 Emby/import 缺口被误写成别的 blocker。
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。
+- 保持 cleanup verification docs sync 在遇到单个不可读的 smoke 日志文件时跳过该文件，并继续统计其余可读证据，避免一个坏日志把整个窗口文档同步链打断。
 - 保持 cleanup 窗口仍标记为进行中时，`local_smoke_evidence` / `Channel progress` 继续接受“开始日期之后、当前快照日期之前”的真实 smoke 证据，不把 `最早可结束日期` 误当成后续补证的硬截止线。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“晚于当前快照日期的 cleanup smoke 日志不会被算进 `local_smoke_evidence`”这条门禁，避免未来日期日志被误回填成当前窗口证据。
 - 保持 `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Update rule` 也直接写明“进行中窗口的补证上界跟随当前结论快照日期”，避免实现已放开补证、但窗口规则文字仍停留在旧理解。

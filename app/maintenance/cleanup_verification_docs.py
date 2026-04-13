@@ -276,12 +276,14 @@ def _iter_cleanup_smoke_log_dates(cwd: Path) -> tuple[str, ...]:
     for log_file in sorted(logs_dir.rglob("*")):
         if not log_file.is_file():
             continue
-        with log_file.open("r", encoding="utf-8", errors="ignore") as handle:
-            for line in handle:
-                entry = parse_cleanup_private_chat_smoke_log_line(line)
-                if entry is None:
-                    continue
-                dates.append(f"{entry.date_text}:{entry.channel}")
+        try:
+            with log_file.open("r", encoding="utf-8", errors="ignore") as handle:
+                for line in handle:
+                    entry = parse_cleanup_private_chat_smoke_log_line(line)
+                    if entry is not None:
+                        dates.append(f"{entry.date_text}:{entry.channel}")
+        except OSError:
+            continue
     return tuple(dates)
 
 
