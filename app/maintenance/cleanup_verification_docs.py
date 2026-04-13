@@ -211,7 +211,10 @@ def _run_env_readiness_snapshot(cwd: Path) -> str:
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS) and _all_env_keys_ready(
         merged_status, IMPORT_REFRESH_ENV_KEYS
     ):
-        return "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom; personal_wechat login state not checked"
+        missing_channels = ("feishu",) * (not _all_env_keys_ready(merged_status, FOUR_CHANNEL_SMOKE_ENV_KEYS[:3])) + (
+            "wecom",
+        ) * (not _all_env_keys_ready(merged_status, FOUR_CHANNEL_SMOKE_ENV_KEYS[3:]))
+        return f"local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: {','.join(missing_channels)}; personal_wechat login state not checked"
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS):
         return "local runtime env ready; import/refresh env incomplete"
     return "missing local runtime env"
