@@ -515,6 +515,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert cleanup_target_fallback_command in readme_text
     assert cleanup_docs_gate_fallback_command in readme_text
     assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
+    assert "curl -si http://127.0.0.1:18889/wecom/callback" in readme_text
+    assert "400 missing echostr" in readme_text
     assert "[环境文件缺失]" in next_step_text
     assert "ENV_FILE=/绝对路径 make run" in next_step_text
     assert "[环境文件缺失]" in status_text

@@ -63,6 +63,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 知识入口快照：历史单体主文档 `Luminarr_v15.md` 已移除，当前只保留 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口，避免过期总纲继续和当前主线并行。
 - 环境就绪快照：2026-04-14 当前仓库根目录 `.env` 已补齐四渠道 cleanup smoke 所需环境键；提权启动的 `app.main` 已实际拉起 Feishu SDK 长连接、personal WeChat 文本轮询和 WeCom callback 监听，本地 `curl http://127.0.0.1:18889/wecom/callback` 也已返回 `400 missing echostr`。当前剩余 blocker 已收缩到 WeCom 真实私聊 smoke 证据仍未补齐。
 - WeCom 本地入口快照：`docs/GETTING_STARTED.md` 已显式写出 `curl -si http://127.0.0.1:18889/wecom/callback -> 400 missing echostr` 这条本地 readiness 探针，并继续强调它不能替代真实私聊 smoke 证据。
+- README 入口快照：仓库首页 `README.md` 也已同步同一条 WeCom 本地 readiness 探针，避免只看仓库入口时继续把“本地 callback 已就绪”和“真实私聊 smoke 已完成”混成一个结论。
 - `.env` 取值归一化快照：`sync-cleanup-doc-snapshots` 现在会先去掉仓库 `.env` 值首尾成对的单/双引号，再参与 `telegram_bot_api` 和 `env_readiness` 判断，避免 `"token"` 这类配置被误当成带引号字面量。
 - 当前 shell env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉当前 shell 环境变量值首尾成对的单/双引号，避免当前会话里的 `\"token\"` 直接盖过后面的 `.env` / Windows env 真值。
 - Telegram shell token 门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住当前 shell 带引号 `TELEGRAM_BOT_TOKEN` 的 end-to-end 快照路径，避免带引号 token 重新混进 Telegram Bot API URL。
