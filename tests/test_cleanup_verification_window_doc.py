@@ -584,6 +584,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     assert "不得早于最早可结束日期" in text
     assert "不得早于窗口开始日期" in text
     assert "不得晚于当前结论快照日期" in text
+    assert "不要把 `最早可结束日期` 误当成后续补证的硬截止线" in text
     assert "## Verification evidence" in text
     assert "## PT 做种 guardrail 评估" in text
     assert "## Update rule" in text
