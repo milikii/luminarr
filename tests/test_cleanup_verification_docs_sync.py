@@ -513,6 +513,12 @@ def test_run_local_smoke_evidence_snapshot_returns_missing_when_log_date_is_outs
     assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
 
 
+def test_run_local_smoke_evidence_snapshot_ignores_future_dated_logs(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"; docs_dir.mkdir(); (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text("# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n- 开始日期：2026-04-05\n- 最早可结束日期：2026-04-12\n", encoding="utf-8")
+    logs_dir = tmp_path / "logs"; logs_dir.mkdir(); (logs_dir / "cleanup-private-chat-smoke.log").write_text(build_cleanup_private_chat_smoke_log_line(channel="telegram", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=2, date_text="2099-01-01") + "\n", encoding="utf-8")
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom"
+
+
 def test_run_local_smoke_evidence_snapshot_returns_found_when_repo_has_window_cleanup_smoke_log(tmp_path: Path) -> None:
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
