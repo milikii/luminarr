@@ -136,6 +136,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in updated
+    assert "line.partition('=')[2].strip().strip" in updated
     assert "- local smoke evidence snapshot：`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
@@ -208,6 +209,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in updated
+    assert "line.partition('=')[2].strip().strip" in updated
     assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated
     assert "sqlite3 -header -column data/luminarr.db" in updated
     assert 'rg -n "\\[cleanup 私聊 smoke\\]" logs' in updated
@@ -248,6 +250,17 @@ def test_read_windows_env_values_tolerates_non_utf8_cmd_output(monkeypatch: pyte
 
 def test_read_windows_env_values_treats_keys_case_insensitively(monkeypatch: pytest.MonkeyPatch) -> None:
     stdout = b"telegram_bot_token=token\r\n"
+
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=args[0], returncode=0, stdout=stdout, stderr=b""),
+    )
+
+    assert _read_windows_env_values()["TELEGRAM_BOT_TOKEN"] == "token"
+
+
+def test_read_windows_env_values_strips_matching_quotes_from_values(monkeypatch: pytest.MonkeyPatch) -> None:
+    stdout = b'TELEGRAM_BOT_TOKEN="token"\r\n'
 
     monkeypatch.setattr(
         "app.maintenance.cleanup_verification_docs.subprocess.run",

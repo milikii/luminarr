@@ -122,7 +122,7 @@ TELEGRAM_BOT_API_COMMAND_DISPLAY = (
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
     "env_map.update(((key.removeprefix('export ').strip()), value.strip().strip(\\\"\\\"'\\\")) for key, _, value in pairs); "
     "token=token or env_map.get('TELEGRAM_BOT_TOKEN','').strip(); "
-    "token=token or next((line.partition('=')[2].strip() for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.partition('=')[0].strip().lower() == 'telegram_bot_token'), ''); "
+    "token=token or next((line.partition('=')[2].strip().strip(\\\"\\\"'\\\") for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.partition('=')[0].strip().lower() == 'telegram_bot_token'), ''); "
     "print('telegram bot token missing' if not token else ('telegram bot api ready' if json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=5)).get('ok') else 'telegram bot api rejected token'))\""
 )
 
@@ -162,7 +162,7 @@ def _read_windows_env_values() -> dict[str, str]:
         if "=" not in raw_line:
             continue
         key, _, value = raw_line.partition("=")
-        windows_env_values[key.strip().lower()] = value.strip()
+        windows_env_values[key.strip().lower()] = value.strip().strip("\"'")
     return {key: windows_env_values.get(key.lower(), "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 

@@ -55,6 +55,7 @@
 - 保持 `sync-cleanup-doc-snapshots` 在 Telegram `getMe` 返回 401/403 时稳定写成 `telegram bot api rejected token`，不要和网络不可达混写成 `unreachable`，避免窗口快照把坏 token 误记成网络波动。
 - 保持 `sync-cleanup-doc-snapshots` 读取仓库 `.env` 时先去掉首尾成对引号，再参与 `telegram_bot_api` / `env_readiness` 快照判断，避免 `"token"` 这类配置被当成带引号字面量发出去。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时按大小写不敏感匹配键名，避免 `telegram_bot_token=...` 这类输出被误判成缺失环境变量。
+- 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时也先去掉值首尾成对引号，避免 `TELEGRAM_BOT_TOKEN=\"token\"` 这类配置被当成带引号字面量继续写进快照。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` / `telegram_bot_api` command display 也同步反映“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前真相，避免状态页展示仍停在旧逻辑。
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。
