@@ -603,6 +603,7 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
     )
     assert len(progress_rows) == 4
     assert len(progress_rows_with_notes) == 4
+    assert [channel for channel, _, _ in progress_rows] == ["Telegram", "personal WeChat", "Feishu", "WeCom"]
     assert {channel for channel, _, _ in progress_rows} == {
         "Telegram",
         "personal WeChat",

@@ -80,6 +80,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Channel progress 固定顺序门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在日志乱序时仍按 Telegram / personal WeChat / Feishu / WeCom 的固定顺序输出完成行，避免窗口台账顺序随日志抖动。
 - Channel progress 最近日期门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在同一渠道命中多条窗口期真实 smoke 日志时会把该渠道更新为最近绝对日期，避免已完成渠道回填旧日期。
 - Channel progress 待验证锚点门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在只有部分渠道完成时仍保留其他渠道的 `待验证`、`-` 和窗口开始日锚点备注，避免窗口台账把剩余缺口写成空白或漂移文案。
+- Channel progress 文档顺序门禁快照：`tests/test_cleanup_verification_window_doc.py` 现在也直接校验窗口台账里的四渠道行顺序固定为 Telegram / personal WeChat / Feishu / WeCom，避免手工编辑文档时绕过同步器顺序保护。
 - cleanup 私聊 smoke 日志协议快照：仓库里现在也有统一的 `app/bot/cleanup_smoke_logging.py`，先把 `date/channel/action/query/reply_head` 这组最小日志格式锁住；`app/main.py` 启动后也会把真实私聊 cleanup smoke 自动追加到 `logs/cleanup-private-chat-smoke.log`，让 `sync-cleanup-doc-snapshots` 能直接从仓库日志回填窗口证据，避免窗口证据重新分叉或只留在 stdout。
 - shared runtime cleanup service-not-ready 快照：`6 passed, 10 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k service_not_ready`）
 - Telegram cleanup service-not-ready 快照：`8 passed, 74 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup and service_not_ready"`）
