@@ -281,6 +281,31 @@ def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_abs
     )
 
 
+def test_run_telegram_bot_api_snapshot_reads_quoted_env_file_token(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    (tmp_path / ".env").write_text('TELEGRAM_BOT_TOKEN="test-token"\n', encoding="utf-8")
+
+    class _FakeResponse(io.BytesIO):
+        def __enter__(self) -> "_FakeResponse":
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self.close()
+
+    def _fake_urlopen(url: str, timeout: int):
+        assert '"test-token"' not in url
+        assert "test-token" in url
+        assert timeout == 5
+        return _FakeResponse(b'{"ok": true, "result": {"username": "demo_bot"}}')
+
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.urllib.request.urlopen", _fake_urlopen)
+
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot api ready"
+
+
 def test_run_telegram_bot_api_snapshot_returns_missing_when_token_is_absent(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

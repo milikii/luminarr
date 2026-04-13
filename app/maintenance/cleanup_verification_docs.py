@@ -177,7 +177,7 @@ def _read_env_file_values(cwd: Path) -> dict[str, str]:
             continue
         key, _, value = line.partition("=")
         normalized_key = key.removeprefix("export ").strip()
-        env_values[normalized_key] = value.strip()
+        env_values[normalized_key] = value.strip().strip("\"'")
     return {key: env_values.get(key, "").strip() for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
 
 
