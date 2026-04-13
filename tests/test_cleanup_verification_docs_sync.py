@@ -395,7 +395,23 @@ def test_run_local_smoke_evidence_snapshot_returns_found_when_repo_has_window_cl
     assert smoke_log_line is not None
     (logs_dir / "run.log").write_text(f"{smoke_log_line}\n", encoding="utf-8")
 
-    assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo: telegram"
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo: telegram; missing channels: personal_wechat,feishu,wecom"
+
+
+def test_run_local_smoke_evidence_snapshot_returns_all_channels_covered_when_window_has_all_channel_logs(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
+        "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n- 开始日期：2026-04-05\n- 最早可结束日期：2026-04-12\n",
+        encoding="utf-8",
+    )
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    lines = [build_cleanup_private_chat_smoke_log_line(channel=channel, query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-06") for channel in ("telegram", "personal_wechat", "feishu", "wecom")]
+    assert all(line is not None for line in lines)
+    (logs_dir / "run.log").write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
+
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo: telegram,personal_wechat,feishu,wecom; all channels covered"
 
 
 def test_has_running_luminarr_process_returns_false_when_app_main_is_absent(tmp_path: Path) -> None:

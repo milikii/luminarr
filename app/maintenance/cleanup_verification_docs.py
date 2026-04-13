@@ -282,8 +282,9 @@ def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
     window_start_date = _load_window_start_date(cwd)
     window_end_date = _load_window_end_date(cwd)
     channels = tuple(channel for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel in {entry.partition(":")[2] for entry in _iter_cleanup_smoke_log_dates(cwd) if window_start_date <= entry.partition(":")[0] <= window_end_date})
+    missing_channels = tuple(channel for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel not in channels)
     if channels:
-        return "found in-window cleanup smoke evidence in repo: " + ",".join(channels)
+        return "found in-window cleanup smoke evidence in repo: " + ",".join(channels) + (f"; missing channels: {','.join(missing_channels)}" if missing_channels else "; all channels covered")
     return "no in-window cleanup smoke evidence in repo; missing channels: " + ",".join(EXPECTED_CLEANUP_SMOKE_CHANNELS)
 
 
