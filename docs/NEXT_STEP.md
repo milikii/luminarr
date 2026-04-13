@@ -84,6 +84,7 @@
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `local_smoke_evidence` 在同一日志文件夹里遇到 non-UTF8 脏字节时，仍能保留同文件中有效的 `[cleanup 私聊 smoke]` 行，避免脏日志字节把仓库证据统计打断。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续直接锁住 `sync_documents()` 在 non-UTF8 脏字节日志下仍能把命中渠道写进 `Channel progress`，避免 helper 级通过但真实文档回写链丢证据。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `local_smoke_evidence` 在同一日志文件里遇到损坏的 `[cleanup 私聊 smoke]` payload 行时，仍会忽略坏行并保留同文件中的合法协议行，避免单条坏 payload 污染仓库证据统计。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续直接锁住 `sync_documents()` 在同一日志文件混入损坏 cleanup smoke payload 行时，仍会忽略坏行并把合法渠道写进 `Channel progress`，避免 helper 级通过但真实文档回写链丢证据。
 - 保持 cleanup 窗口仍标记为进行中时，`local_smoke_evidence` / `Channel progress` 继续接受“开始日期之后、当前快照日期之前”的真实 smoke 证据，不把 `最早可结束日期` 误当成后续补证的硬截止线。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“晚于当前快照日期的 cleanup smoke 日志不会被算进 `local_smoke_evidence`”这条门禁，避免未来日期日志被误回填成当前窗口证据。
 - 保持 `docs/CLEANUP_VERIFICATION_WINDOW.md` 的 `Update rule` 也直接写明“进行中窗口的补证上界跟随当前结论快照日期”，避免实现已放开补证、但窗口规则文字仍停留在旧理解。

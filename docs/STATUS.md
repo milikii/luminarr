@@ -103,6 +103,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 仓库证据 non-UTF8 脏字节容错快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `local_smoke_evidence` 在日志文件混入 non-UTF8 脏字节时，仍能保留同文件中的有效 cleanup smoke 行，避免脏日志字节把仓库证据统计打断。
 - Channel progress non-UTF8 整链路门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在 non-UTF8 脏字节日志下仍会把命中渠道写进 `Channel progress`，避免 helper 级通过但真实文档回写链丢证据。
 - 仓库证据坏 payload 行容错快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `local_smoke_evidence` 在同一日志文件里遇到损坏的 `[cleanup 私聊 smoke]` payload 行时，会忽略坏行并保留同文件中的合法协议行，避免单条坏 payload 污染仓库证据统计。
+- Channel progress 坏 payload 整链路门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在同一日志文件混入损坏 cleanup smoke payload 行时，会忽略坏行并把合法渠道写进 `Channel progress`，避免 helper 级通过但真实文档回写链丢证据。
 - 仓库证据未来日期门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住“晚于当前快照日期的 cleanup smoke 日志不会被算进 `local_smoke_evidence`”，避免未来日期日志被误回填成当前窗口证据。
 - 仓库证据日期聚合快照：cleanup 文档同步工具现在也会按渠道保留“窗口内最近一次真实 smoke 日期”，后续要把日志证据接到 `Channel progress` 表时不需要重新解析一遍原始日志。
 - Channel progress 同步快照：`docs/CLEANUP_VERIFICATION_WINDOW.md` 里的四渠道进度表现在也会由同步工具按固定顺序自动重写；由于当前仓库仍无窗口内真实 smoke 证据，表格状态继续保持四个 `待验证`。

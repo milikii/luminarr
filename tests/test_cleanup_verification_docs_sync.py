@@ -711,6 +711,12 @@ def test_sync_documents_keeps_valid_channel_progress_when_log_contains_non_utf8_
     sync_documents(status_file=docs_dir / "STATUS.md", window_file=window_file, snapshot_keys=["local_smoke_evidence"], cwd=tmp_path); assert "| Telegram | 已完成 | 2026-04-06 | 2026-04-06 已完成真实私聊 smoke |" in window_file.read_text(encoding="utf-8")
 
 
+def test_sync_documents_keeps_valid_channel_progress_when_log_contains_malformed_cleanup_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"; docs_dir.mkdir(); (docs_dir / "STATUS.md").write_text("## Latest verification\n\n- local smoke evidence snapshot：`old evidence`（2026-04-10，`old evidence command`）\n", encoding="utf-8"); window_file = docs_dir / "CLEANUP_VERIFICATION_WINDOW.md"; window_file.write_text("# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n- 开始日期：2026-04-05\n- 最早可结束日期：2026-04-12\n\n## Channel progress\n\n| 渠道 | 状态 | 最近一次日期 | 备注 |\n| --- | --- | --- | --- |\n| Telegram | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n| personal WeChat | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n| Feishu | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n| WeCom | 待验证 | - | 2026-04-05 启动验证窗口，待补真实私聊 smoke 记录 |\n\n## Verification evidence\n\n- 当前仓库证据快照：2026-04-10，`old evidence result`（`old evidence command`）\n", encoding="utf-8")
+    logs_dir = tmp_path / "logs"; logs_dir.mkdir(); line = build_cleanup_private_chat_smoke_log_line(channel="telegram", query="cleanup inspect abc123", reply_text="已完成检查", chat_id=1, user_id=1, date_text="2026-04-06"); assert line is not None; (logs_dir / "run.log").write_text('[cleanup 私聊 smoke] date=2026-04-06 channel=telegram action=cleanup_inspect chat_id=1 user_id=1 query=\"oops\" reply_head={oops}\n' + line + '\n', encoding="utf-8"); monkeypatch.setattr("app.maintenance.cleanup_verification_docs.run_snapshot", lambda spec, cwd: SnapshotRun(spec=spec, date_text="2026-04-11", result_text="found in-window cleanup smoke evidence in repo: telegram; missing channels: personal_wechat,feishu,wecom"))
+    sync_documents(status_file=docs_dir / "STATUS.md", window_file=window_file, snapshot_keys=["local_smoke_evidence"], cwd=tmp_path); assert "| Telegram | 已完成 | 2026-04-06 | 2026-04-06 已完成真实私聊 smoke |" in window_file.read_text(encoding="utf-8")
+
+
 def test_sync_documents_keeps_fixed_channel_order_when_logs_are_out_of_order(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
