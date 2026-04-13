@@ -212,10 +212,12 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
     assert "cmd.exe','/c','set" in updated
     assert "env_path=Path('.env')" in updated
     assert "value.strip().strip" in updated
+    assert "strip('\\\"\\'')" in updated
     assert "- 当前 Telegram Bot API 就绪快照：2026-04-11，`telegram bot api ready`" in updated
     assert "api.telegram.org/bot" in updated
     assert "getMe" in updated
     assert "os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip" in updated
+    assert "token=os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip('\\\"\\'')" in updated
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in updated
     assert "line.partition('=')[2].strip().strip" in updated
     assert "- 当前仓库证据快照：2026-04-11，`no in-window cleanup smoke evidence in repo; missing channels: telegram,personal_wechat,feishu,wecom`" in updated

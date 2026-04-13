@@ -61,6 +61,7 @@
 - 保持 `docs/STATUS.md` 里的 “docs command display 同步快照” 摘要文案也同步覆盖“当前 shell / .env / Windows env 值去首尾引号、Windows env 键名大小写不敏感、env readiness Windows 值级判定”这组当前真相，避免状态页总述快照落后于已落地行为。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` command display 里，Windows env 这一段也按“大小写不敏感键名 + 去首尾引号后的非空值”判定 `set/missing`，避免状态页把空值 Windows 环境变量误读成已就绪。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `telegram_bot_api` command display 也同步反映“当前 shell / .env / Windows env 值去首尾引号 + Windows env 键名大小写不敏感”这整条当前真相，避免状态页继续展示旧的 token 解析路径。
+- 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` / `telegram_bot_api` command display 继续保留可执行的 `strip('\"\'')` 转义片段，避免状态页命令示例被写坏成不可运行的引号拼接。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` command display 也显式反映“当前 shell 环境变量值先去首尾引号再判空”这条当前真相，避免状态页继续展示旧的 shell 判空逻辑。
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。

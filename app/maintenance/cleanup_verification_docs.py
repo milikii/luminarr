@@ -81,7 +81,7 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "\\\"TRANSMISSION_BASE_URL\\\",\\\"EMBY_BASE_URL\\\",\\\"EMBY_API_KEY\\\",\\\"FEISHU_APP_ID\\\","
     "\\\"FEISHU_APP_SECRET\\\",\\\"FEISHU_ENCRYPT_KEY\\\",\\\"WECOM_TOKEN\\\",\\\"WECOM_ENCODING_AES_KEY\\\","
     "\\\"WECOM_RECEIVE_ID\\\"]; print(\\\"\\\\n\\\".join(f\\\"{k}=\\\" + "
-    "(\\\"set\\\" if os.getenv(k,\\\"\\\").strip().strip(\\\"\\\"'\\\") else \\\"missing\\\") for k in keys))\"' ; "
+    "(\\\"set\\\" if os.getenv(k,\\\"\\\").strip().strip('\\\"\\'') else \\\"missing\\\") for k in keys))\"' ; "
     "python3 -c \"import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
     "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
@@ -94,7 +94,7 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "env_path=Path('.env'); text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
     "lines=(line.strip() for line in text.splitlines()); "
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
-    "data.update(((key.removeprefix('export ').strip()), value.strip().strip(\\\"\\\"'\\\")) for key, _, value in pairs); "
+    "data.update(((key.removeprefix('export ').strip()), value.strip().strip('\\\"\\'')) for key, _, value in pairs); "
     "print('\\\\n'.join(f'{k}=' + ('set' if data.get(k, '').strip() else 'missing') for k in keys))\""
 )
 
@@ -117,13 +117,13 @@ RUNTIME_PROCESS_COMMAND_DISPLAY = (
     "print('\\\\n'.join(matches))\""
 )
 TELEGRAM_BOT_API_COMMAND_DISPLAY = (
-    "python3 -c \"import json, os, subprocess, urllib.request; from pathlib import Path; token=os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip(\\\"\\\"'\\\"); "
+    "python3 -c \"import json, os, subprocess, urllib.request; from pathlib import Path; token=os.getenv('TELEGRAM_BOT_TOKEN','').strip().strip('\\\"\\''); "
     "env_path=Path('.env'); env_map={}; text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
     "lines=(line.strip() for line in text.splitlines()); "
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
-    "env_map.update(((key.removeprefix('export ').strip()), value.strip().strip(\\\"\\\"'\\\")) for key, _, value in pairs); "
+    "env_map.update(((key.removeprefix('export ').strip()), value.strip().strip('\\\"\\'')) for key, _, value in pairs); "
     "token=token or env_map.get('TELEGRAM_BOT_TOKEN','').strip(); "
-    "token=token or next((line.partition('=')[2].strip().strip(\\\"\\\"'\\\") for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.partition('=')[0].strip().lower() == 'telegram_bot_token'), ''); "
+    "token=token or next((line.partition('=')[2].strip().strip('\\\"\\'') for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if line.partition('=')[0].strip().lower() == 'telegram_bot_token'), ''); "
     "print('telegram bot token missing' if not token else ('telegram bot api ready' if json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{token}/getMe', timeout=5)).get('ok') else 'telegram bot api rejected token'))\""
 )
 
