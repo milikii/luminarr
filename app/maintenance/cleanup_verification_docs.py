@@ -284,11 +284,11 @@ def _iter_cleanup_smoke_log_dates(cwd: Path) -> tuple[str, ...]:
 
 def _collect_in_window_cleanup_smoke_channel_dates(cwd: Path) -> dict[str, str]:
     window_start_date = _load_window_start_date(cwd)
-    window_end_date = _load_window_end_date(cwd)
+    window_latest_date = datetime.now(tz=SHANGHAI_TZ).date().isoformat()
     latest_dates: dict[str, str] = {}
     for entry in _iter_cleanup_smoke_log_dates(cwd):
         evidence_date, _, channel = entry.partition(":")
-        if window_start_date <= evidence_date <= window_end_date and channel in EXPECTED_CLEANUP_SMOKE_CHANNELS:
+        if window_start_date <= evidence_date <= window_latest_date and channel in EXPECTED_CLEANUP_SMOKE_CHANNELS:
             latest_dates[channel] = max(latest_dates.get(channel, ""), evidence_date)
     return {channel: latest_dates[channel] for channel in EXPECTED_CLEANUP_SMOKE_CHANNELS if channel in latest_dates}
 

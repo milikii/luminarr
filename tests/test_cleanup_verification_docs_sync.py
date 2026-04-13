@@ -523,6 +523,32 @@ def test_collect_in_window_cleanup_smoke_channel_dates_keeps_latest_date_per_cha
     assert _collect_in_window_cleanup_smoke_channel_dates(tmp_path) == {"telegram": "2026-04-08", "feishu": "2026-04-05"}
 
 
+def test_collect_in_window_cleanup_smoke_channel_dates_accepts_post_window_evidence_until_today(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "CLEANUP_VERIFICATION_WINDOW.md").write_text(
+        "# Cleanup verification window (2026-04-05 to 2026-04-12) (v1)\n\n- 开始日期：2026-04-05\n- 最早可结束日期：2026-04-12\n",
+        encoding="utf-8",
+    )
+    logs_dir = tmp_path / "logs"
+    logs_dir.mkdir()
+    line = build_cleanup_private_chat_smoke_log_line(
+        channel="telegram",
+        query="cleanup inspect abc123",
+        reply_text="已完成检查",
+        chat_id=1,
+        user_id=1,
+        date_text="2026-04-13",
+    )
+    assert line is not None
+    (logs_dir / "run.log").write_text(f"{line}\n", encoding="utf-8")
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.datetime", type("FrozenDateTime", (), {"now": staticmethod(lambda tz=None: __import__("datetime").datetime(2026, 4, 13, tzinfo=tz))}))
+
+    assert _collect_in_window_cleanup_smoke_channel_dates(tmp_path) == {"telegram": "2026-04-13"}
+
+
 def test_replace_window_channel_progress_table_updates_completed_and_pending_rows() -> None:
     original = (
         "## Channel progress\n\n"
