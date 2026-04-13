@@ -405,6 +405,12 @@ def test_run_telegram_bot_api_snapshot_returns_missing_when_token_is_absent(
     assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot token missing"
 
 
+def test_run_telegram_bot_api_snapshot_treats_unreadable_env_file_token_as_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    env_path = tmp_path / ".env"; env_path.write_text("TELEGRAM_BOT_TOKEN=test-token\n", encoding="utf-8"); original_read_text = Path.read_text; monkeypatch.setattr(Path, "read_text", lambda self, *args, **kwargs: (_ for _ in ()).throw(PermissionError("blocked")) if self == env_path else original_read_text(self, *args, **kwargs))
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot token missing"
+
+
 def test_run_telegram_bot_api_snapshot_reads_env_file_and_returns_ready(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
