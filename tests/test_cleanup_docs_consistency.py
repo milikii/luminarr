@@ -286,7 +286,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert local_smoke_evidence_result == window_local_evidence_result
     assert local_smoke_evidence_date == window_local_evidence_date
     assert local_smoke_evidence_command == window_local_evidence_command
-    assert runtime_process_result == "no luminarr process running"
+    assert runtime_process_result in {"no luminarr process running", "luminarr process running"}
     assert runtime_process_date == docs_gate_date
     assert runtime_process_result == window_runtime_process_result
     assert runtime_process_date == window_runtime_process_date

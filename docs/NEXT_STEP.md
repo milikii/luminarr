@@ -153,6 +153,7 @@
 - 保持 Telegram-only bring-up 在缺少 BT 下载器角色绑定时只打印 `[BT 订阅后台扫描未启动]` 警告、不把 `app.main` 卡死在启动前，避免最小私聊验证被非主线 BT 配置误拦截。
 - 保持 `tests/test_telegram_bot.py` 继续单独锁住 `[BT 订阅后台扫描未启动]` + `[处理建议]` 这组日志，避免这条 bring-up warning 下一轮又悄悄退回成无提示状态。
 - 保持 Telegram 启动在网络 / DNS 失败时也打印红色中文 `[Telegram 启动失败]` 和 `[处理建议]`，避免当前主线 bring-up 还停留在英文 traceback。
+- 保持 `runtime_process snapshot` 继续如实反映“当前有没有运行中的 `app.main`”，docs gate 只要求 `docs/STATUS.md` 和窗口台账一致，不把它硬编码成固定停止态。
 
 ## Do not do
 
