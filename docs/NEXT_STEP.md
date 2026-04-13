@@ -53,6 +53,7 @@
 - 保持 verification docs gate 继续显式校验 `sync-cleanup-doc-snapshots` 这条新同步入口在 `Makefile` 和 `docs/GETTING_STARTED.md` 里保持一致，避免刚加的 docs 维护路径下一轮又重新分叉。
 - 保持 verification docs gate 继续显式校验 `telegram_bot_api` 已接进 `sync-cleanup-doc-snapshots`、`docs/STATUS.md` 和 `docs/CLEANUP_VERIFICATION_WINDOW.md`，避免 Telegram 真实 smoke 的外部可用性快照重新退回手工说明。
 - 保持 verification docs gate 继续显式校验 `env_readiness` / `local_smoke_evidence` 两条新同步键已经接进 `sync-cleanup-doc-snapshots`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的对应快照行保持一致，避免环境 blocker 快照重新退回手工抄写。
+- 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时直接按 `channel` 汇总，避免仓库证据快照只能判断“有证据”却不能直接定位还差哪个渠道。
 - 保持 cleanup verification docs sync 在 WSL 调用 Windows `cmd.exe /c set` 时兼容非 UTF-8 输出，避免当天环境快照因为编码异常停摆。
 - 保持 verification docs gate 继续显式校验 `local_smoke_evidence` 只认窗口期 `[cleanup 私聊 smoke]` 日志协议，不把任意 `jobs` / `job_event` / `telegram_updates` 时间戳或普通日志文件日期误算成真实私聊 smoke 证据，避免窗口台账把普通运行痕迹写成退出条件。
 - 保持 verification docs gate 继续显式校验 `runtime_process` 已接进 `sync-cleanup-doc-snapshots`、`Makefile` 和 `docs/GETTING_STARTED.md`，并和 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 的运行进程快照保持一致，避免“当前有没有运行中的 Luminarr 进程”继续靠手工抄写。

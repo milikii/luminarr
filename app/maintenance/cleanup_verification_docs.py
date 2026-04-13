@@ -273,16 +273,16 @@ def _iter_cleanup_smoke_log_dates(cwd: Path) -> tuple[str, ...]:
                 entry = parse_cleanup_private_chat_smoke_log_line(line)
                 if entry is None:
                     continue
-                dates.append(entry.date_text)
+                dates.append(f"{entry.date_text}:{entry.channel}")
     return tuple(dates)
 
 
 def _run_local_smoke_evidence_snapshot(cwd: Path) -> str:
     window_start_date = _load_window_start_date(cwd)
     window_end_date = _load_window_end_date(cwd)
-    for evidence_date in _iter_cleanup_smoke_log_dates(cwd):
-        if window_start_date <= evidence_date <= window_end_date:
-            return "found in-window cleanup smoke evidence in repo"
+    channels = sorted({entry.partition(":")[2] for entry in _iter_cleanup_smoke_log_dates(cwd) if window_start_date <= entry.partition(":")[0] <= window_end_date})
+    if channels:
+        return "found in-window cleanup smoke evidence in repo: " + ",".join(channels)
     return "no in-window cleanup smoke evidence in repo"
 
 

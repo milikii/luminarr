@@ -395,7 +395,7 @@ def test_run_local_smoke_evidence_snapshot_returns_found_when_repo_has_window_cl
     assert smoke_log_line is not None
     (logs_dir / "run.log").write_text(f"{smoke_log_line}\n", encoding="utf-8")
 
-    assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo"
+    assert _run_local_smoke_evidence_snapshot(tmp_path) == "found in-window cleanup smoke evidence in repo: telegram"
 
 
 def test_has_running_luminarr_process_returns_false_when_app_main_is_absent(tmp_path: Path) -> None:
