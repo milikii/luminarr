@@ -172,7 +172,11 @@ def _read_env_file_values(cwd: Path) -> dict[str, str]:
     if not env_file_path.exists():
         return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
     env_values: dict[str, str] = {}
-    for raw_line in env_file_path.read_text(encoding="utf-8").splitlines():
+    try:
+        env_lines = env_file_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {key: "" for key in REQUIRED_CHANNEL_RUNTIME_ENV_KEYS}
+    for raw_line in env_lines:
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue

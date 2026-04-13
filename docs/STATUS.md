@@ -75,6 +75,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - env readiness Windows 判定快照：`sync-cleanup-doc-snapshots` 现在写回 `env readiness snapshot` 时，也会把 Windows env 这段展示成“大小写不敏感键名 + 去首尾引号后的非空值才算 set”，避免状态页把空值环境变量误读成已就绪。
 - env readiness 缺口展示快照：`sync-cleanup-doc-snapshots` 现在在 local runtime/import 已就绪但四渠道 smoke 环境未齐时，会直接写出 `missing channels: ...`，避免状态页只留 `four-channel cleanup smoke env incomplete` 这种笼统 blocker。
 - env readiness 动态缺口快照：`sync-cleanup-doc-snapshots` 现在会按 Feishu / WeCom 当前真实缺口动态拼出 `missing channels: ...`，不会再把只缺一侧渠道组的环境误写成固定缺 `feishu,wecom`。
+- `.env` 不可读容错快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住仓库 `.env` 存在但不可读时，`env_readiness` 会按“该来源缺失”继续降级，而不是直接抛异常打断 cleanup 文档同步。
 - env readiness 完成态门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `four-channel cleanup smoke env ready` 分支，避免四渠道键已齐后状态页还停在 incomplete。
 - env readiness import 缺口门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `local runtime env ready; import/refresh env incomplete` 分支，避免 Emby/import 缺口被误写成别的 blocker。
 - env readiness personal WeChat 边界快照：`sync-cleanup-doc-snapshots` 现在也会显式写出 `personal_wechat login state not checked`，提醒当前 env readiness 不会把 personal WeChat 本地登录态误记成已验证。

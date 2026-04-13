@@ -332,6 +332,13 @@ def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_abs
     )
 
 
+def test_run_env_readiness_snapshot_treats_unreadable_env_file_as_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+        monkeypatch.delenv(key, raising=False)
+    env_path = tmp_path / ".env"; env_path.write_text("TELEGRAM_BOT_TOKEN=token\n", encoding="utf-8"); original_read_text = Path.read_text; monkeypatch.setattr(Path, "read_text", lambda self, *args, **kwargs: (_ for _ in ()).throw(PermissionError("blocked")) if self == env_path else original_read_text(self, *args, **kwargs))
+    assert _run_env_readiness_snapshot(tmp_path) == "missing local runtime env"
+
+
 def test_run_env_readiness_snapshot_lists_only_missing_channel_groups(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
         monkeypatch.delenv(key, raising=False)

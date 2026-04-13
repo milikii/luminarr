@@ -74,6 +74,7 @@
 - 保持 `env_readiness` 在四渠道 smoke 环境不完整时按真实缺失渠道组动态写出 `missing channels: ...`，并继续显式写明 `personal_wechat login state not checked`，避免把 personal WeChat 误判成已经由 `.env` 覆盖就绪。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `env_readiness` 的 `four-channel cleanup smoke env ready` 完成态分支，避免四渠道键已齐时状态页仍误报成 incomplete。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `env_readiness` 的 `local runtime env ready; import/refresh env incomplete` 中间态分支，避免 Emby/import 缺口被误写成别的 blocker。
+- 保持 cleanup verification docs sync 在仓库 `.env` 存在但不可读时按“该来源缺失”继续降级，不让单个 `.env` 权限问题直接打断 `env_readiness` / `telegram_bot_api` 快照链。
 - 保持 `local_smoke_evidence` 在命中窗口期 `[cleanup 私聊 smoke]` 日志时同时给出 `found channels + missing channels`，四渠道齐全后改成 `all channels covered`，没命中时显式列出缺失渠道，避免仓库证据快照不能直接说明当前窗口还差什么。
 - 保持 cleanup verification docs sync 在遇到单个不可读的 smoke 日志文件时跳过该文件，并继续统计其余可读证据，避免一个坏日志把整个窗口文档同步链打断。
 - 保持 cleanup 窗口仍标记为进行中时，`local_smoke_evidence` / `Channel progress` 继续接受“开始日期之后、当前快照日期之前”的真实 smoke 证据，不把 `最早可结束日期` 误当成后续补证的硬截止线。
