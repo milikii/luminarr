@@ -59,6 +59,7 @@
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“当前 shell 里的带引号 `TELEGRAM_BOT_TOKEN` 会先去引号再请求 Telegram Bot API”这条快照路径，避免 shell token 去引号逻辑只停在 helper 单测。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时按大小写不敏感匹配键名，避免 `telegram_bot_token=...` 这类输出被误判成缺失环境变量。
 - 保持 `sync-cleanup-doc-snapshots` 读取 Windows `cmd.exe /c set` 输出时也先去掉值首尾成对引号，避免 `TELEGRAM_BOT_TOKEN=\"token\"` 这类配置被当成带引号字面量继续写进快照。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“Windows env 小写键名 + 带引号 `TELEGRAM_BOT_TOKEN` 会先归一化再请求 Telegram Bot API”这条快照路径，避免 Windows token 去引号逻辑只停在 helper 单测。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` / `telegram_bot_api` command display 也同步反映“.env 去首尾引号 + Windows env 键名大小写不敏感”这两条当前真相，避免状态页展示仍停在旧逻辑。
 - 保持 `docs/STATUS.md` 里的 “docs command display 同步快照” 摘要文案也同步覆盖“当前 shell / .env / Windows env 值去首尾引号、Windows env 键名大小写不敏感、env readiness Windows 值级判定”这组当前真相，避免状态页总述快照落后于已落地行为。
 - 保持 `sync-cleanup-doc-snapshots` 写回 docs 的 `env_readiness` command display 里，Windows env 这一段也按“大小写不敏感键名 + 去首尾引号后的非空值”判定 `set/missing`，避免状态页把空值 Windows 环境变量误读成已就绪。
