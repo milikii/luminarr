@@ -411,6 +411,12 @@ def test_run_telegram_bot_api_snapshot_treats_unreadable_env_file_token_as_missi
     assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot token missing"
 
 
+def test_run_telegram_bot_api_snapshot_treats_windows_env_oserror_as_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
+    monkeypatch.setattr("app.maintenance.cleanup_verification_docs.subprocess.run", lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError("blocked")))
+    assert _run_telegram_bot_api_snapshot(tmp_path) == "telegram bot token missing"
+
+
 def test_run_telegram_bot_api_snapshot_reads_env_file_and_returns_ready(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

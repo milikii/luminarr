@@ -88,6 +88,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram Bot API OSError 门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住底层 `OSError` 会归成 `telegram bot api unreachable`，避免 socket/SSL 级网络异常直接打断 cleanup 文档快照同步。
 - Telegram Bot API 缺失态门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 `telegram bot token missing` 分支，避免最基础的凭据缺失态从快照门禁里漂走。
 - Telegram `.env` 不可读缺失态门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住仓库 `.env` 不可读且无其他 token 来源时，`telegram_bot_api` 仍返回 `telegram bot token missing`，避免 `.env` 读取容错只停在 helper 层。
+- Telegram Windows env OSError 缺失态门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住 Windows env 探测抛 `OSError` 且无其他 token 来源时，`telegram_bot_api` 仍返回 `telegram bot token missing`，避免 Windows env 调用异常容错只停在 helper 层。
 - 窗口活性快照：已到最早可结束日期，待补退出条件
 - 当前状态快照：进行中
 - 当前结论快照：验证窗口仍在进行中；截至 2026-04-13，已到最早可结束日期 2026-04-12，但四个渠道真实私聊 cleanup smoke 记录仍待补，当前仓库内也还没有可回填的窗口期真实 smoke 证据，暂未满足退出条件。

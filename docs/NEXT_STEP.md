@@ -59,6 +59,7 @@
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 Telegram Bot API 底层 `OSError` 会归成 `unreachable`，避免 socket/SSL 级网络异常直接打断 cleanup 文档快照同步。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住 `telegram bot token missing` 分支，避免最基础的凭据缺失态从 Telegram Bot API 快照门禁里漂走。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“仓库 `.env` 不可读且无其他 token 来源时，`telegram_bot_api` 仍返回 `telegram bot token missing`”这条 end-to-end 路径，避免 `.env` 读取容错只停在 helper 层。
+- 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“Windows env 探测抛 `OSError` 且无其他 token 来源时，`telegram_bot_api` 仍返回 `telegram bot token missing`”这条 end-to-end 路径，避免 Windows env 调用异常容错只停在 helper 层。
 - 保持 `sync-cleanup-doc-snapshots` 读取仓库 `.env` 时先去掉首尾成对引号，再参与 `telegram_bot_api` / `env_readiness` 快照判断，避免 `"token"` 这类配置被当成带引号字面量发出去。
 - 保持 `sync-cleanup-doc-snapshots` 读取当前 shell 环境变量值时也先去掉首尾成对引号，避免 `export TELEGRAM_BOT_TOKEN='"token"'` 这类当前会话配置直接盖过后面的正确值。
 - 保持 `tests/test_cleanup_verification_docs_sync.py` 继续单独锁住“当前 shell 里的带引号 `TELEGRAM_BOT_TOKEN` 会先去引号再请求 Telegram Bot API”这条快照路径，避免 shell token 去引号逻辑只停在 helper 单测。
