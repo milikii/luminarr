@@ -211,7 +211,7 @@ def _run_env_readiness_snapshot(cwd: Path) -> str:
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS) and _all_env_keys_ready(
         merged_status, IMPORT_REFRESH_ENV_KEYS
     ):
-        return "local runtime/import env ready; four-channel cleanup smoke env incomplete"
+        return "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom"
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS):
         return "local runtime env ready; import/refresh env incomplete"
     return "missing local runtime env"

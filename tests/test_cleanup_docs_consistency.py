@@ -262,7 +262,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert docs_consistency_date == docs_gate_date
     assert docs_consistency_result == "passed"
     assert docs_consistency_command == ".venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py"
-    assert env_readiness_result == "local runtime/import env ready; four-channel cleanup smoke env incomplete"
+    assert env_readiness_result == "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom"
     assert env_readiness_date == docs_gate_date
     assert env_readiness_result == window_env_readiness_result
     assert env_readiness_date == window_env_readiness_date

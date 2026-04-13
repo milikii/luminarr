@@ -107,7 +107,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
-            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
+            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["telegram_bot_api"],
@@ -128,7 +128,7 @@ def test_update_status_text_replaces_custom_snapshot_entries() -> None:
 
     updated = update_status_text(original, runs)
 
-    assert "env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete`" in updated
+    assert "env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom`" in updated
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "os.getenv(k,\\\"\\\").strip().strip" in updated
     assert "rows=dict(line.split('=', 1)" in updated
@@ -157,14 +157,14 @@ def test_update_status_text_migrates_legacy_env_snapshot_label() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
-            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
+            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom",
         ),
     ]
 
     updated = update_status_text(original, runs)
 
     assert (
-        "- env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete`"
+        "- env readiness snapshot：`local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom`"
     ) in updated
     assert "os.getenv(k,\\\"\\\").strip().strip" in updated
     assert "rows=dict(line.split('=', 1)" in updated
@@ -183,7 +183,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
         SnapshotRun(
             spec=SNAPSHOT_SPECS["env_readiness"],
             date_text="2026-04-11",
-            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete",
+            result_text="local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom",
         ),
         SnapshotRun(
             spec=SNAPSHOT_SPECS["telegram_bot_api"],
@@ -206,7 +206,7 @@ def test_update_window_text_replaces_custom_snapshot_entries() -> None:
 
     assert (
         "- 当前环境就绪快照：2026-04-11，"
-        "`local runtime/import env ready; four-channel cleanup smoke env incomplete`"
+        "`local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom`"
     ) in updated
     assert "source ~/.bashrc >/dev/null 2>&1" in updated
     assert "cmd.exe','/c','set" in updated
@@ -321,7 +321,7 @@ def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_abs
 
     assert (
         _run_env_readiness_snapshot(tmp_path)
-        == "local runtime/import env ready; four-channel cleanup smoke env incomplete"
+        == "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: feishu,wecom"
     )
 
 
