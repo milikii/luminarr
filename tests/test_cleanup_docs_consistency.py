@@ -394,6 +394,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "personal WeChat 二维码载体快照" in text
             assert "本地测试栈快照" in text
             assert "双 Transmission 测试栈配置虽然已落地" in text
+            assert "/var/run/docker.sock" in text
+            assert "`19092` 端口和 `/data/downloads/tr-bt` 路径因此还没完成本机复验" in text
             assert "proxy / Feishu 长连接 / PNG 二维码 tests" in text
             assert "PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`" in text
             assert "pt_min_seed_hours" in text
