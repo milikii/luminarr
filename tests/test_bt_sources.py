@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import httpx
 
-from app.clients.web_source import NYAA_RULE, parse_web_source_html
+from app.clients.web_source import NYAA_RULE, WebSourceClient, parse_web_source_html
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, build_bt_candidate_dedupe_key
 
 
@@ -106,3 +107,29 @@ def test_parse_web_source_html_extracts_size_and_seeders_for_nyaa() -> None:
     assert first["indexerName"] == "nyaa"
     assert first["seeders"] == 88
     assert first["size"] == int(1.5 * 1024 * 1024 * 1024)
+
+
+def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
+    client_kwargs: list[dict[str, object]] = []
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            client_kwargs.append(dict(kwargs))
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str) -> httpx.Response:
+            return httpx.Response(200, text="<html></html>", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = WebSourceClient(rule=NYAA_RULE, proxy_url="http://192.168.2.110:7890")
+    result = asyncio.run(client.search("frieren"))
+
+    assert result == []
+    assert client_kwargs
+    assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
