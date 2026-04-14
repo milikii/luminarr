@@ -2406,6 +2406,25 @@ def test_download_completion_polling_loop_runs_once_and_stops() -> None:
     repo.list_pending_completion.assert_called_once_with()
 
 
+def test_download_completion_polling_loop_logs_fix_hint_on_error(capsys: pytest.CaptureFixture[str]) -> None:
+    stop_event = asyncio.Event()
+
+    def list_pending_completion():
+        stop_event.set()
+        raise RuntimeError("boom")
+
+    asyncio.run(
+        _download_completion_polling_loop(
+            download_monitor_repo=SimpleNamespace(list_pending_completion=Mock(side_effect=list_pending_completion)),
+            status_service=SimpleNamespace(get_status_text=AsyncMock()),
+            stop_event=stop_event,
+        )
+    )
+    captured = capsys.readouterr()
+    assert "[下载完成状态轮询失败]" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_start_post_download_auto_import_scheduler_also_starts_download_completion_polling() -> None:
     database = SqliteDatabase(":memory:")
     database.initialize()

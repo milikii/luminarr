@@ -41,6 +41,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `download_monitor` 的待完成下载列表现在已支持限流读取，便于后续独立后台轮询按批次推进下载完成观察
   - 待完成下载现在已有“单次轮询 helper”，会逐条复用现有 `GetDownloadStatusService` 状态观察链，而不是另起一套下载器查询逻辑
   - 独立下载完成轮询现在已接入应用启动/停止链，应用运行时会周期轮询待完成下载并复用现有状态观察链
+  - 下载完成轮询 loop 抛异常时，现在也会打印红色中文 `[下载完成状态轮询失败]` 日志和 `[处理建议]`
   - cleanup 最小闭环：inspect / cleanup / discoverability / rejection guidance / success follow-up / failure observability / `chat-scoped task_ref`
   - `chat-scoped task_ref` 命中 jobs 但 import 关联缺失时，inspect / cleanup 会继续回显解析出的 `task_id/task_hash`
   - 普通 correlation-missing inspect 在没有真实解析结果时继续显示 `任务 ID/Hash: -`，不把用户原始输入伪装成真实身份
