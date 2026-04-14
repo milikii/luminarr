@@ -553,7 +553,10 @@ def test_cleanup_verification_window_doc_tracks_dates_channels_and_gate() -> Non
         "tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py"
     )
     assert "未见协议回退" in protocol_observation_text
-    assert "真实私聊 smoke 证据" in protocol_observation_text
+    if window_status == "进行中":
+        assert "真实私聊 smoke 证据" in protocol_observation_text
+    else:
+        assert "真实私聊 smoke 证据" not in protocol_observation_text
 
     smoke_gate_checklist_match = re.search(
         r"- \[( |x)\] `tests/test_cleanup_cross_channel_smoke\.py` 持续通过",

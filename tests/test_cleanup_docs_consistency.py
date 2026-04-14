@@ -281,7 +281,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "value.strip().strip" in telegram_bot_api_command
     assert "line.partition('=')[0].strip().lower() == 'telegram_bot_token'" in telegram_bot_api_command
     assert "line.partition('=')[2].strip().strip" in telegram_bot_api_command
-    assert local_smoke_evidence_result == "found in-window cleanup smoke evidence in repo: telegram,personal_wechat,feishu; missing channels: wecom"
+    assert local_smoke_evidence_result == "found in-window cleanup smoke evidence in repo: telegram,personal_wechat,feishu,wecom; all channels covered"
     assert local_smoke_evidence_date == docs_gate_date
     assert local_smoke_evidence_result == window_local_evidence_result
     assert local_smoke_evidence_date == window_local_evidence_date
@@ -557,8 +557,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "curl -si http://127.0.0.1:18889/wecom/callback" in readme_text
     assert "不是 `.env.example` 的默认端口/路径" in readme_text
     assert "400 missing echostr" in readme_text
-    assert "剩余唯一待补缺口只剩 WeCom" in readme_text
-    assert "当前四渠道里只剩 WeCom 真实私聊 smoke 待补" in next_step_text
+    assert "cleanup 四渠道验证窗口已完成" in readme_text
+    assert "cleanup 四渠道验证窗口已完成" in next_step_text
     assert "[环境文件缺失]" in next_step_text
     assert "ENV_FILE=/绝对路径 make run" in next_step_text
     assert "[环境文件缺失]" in status_text

@@ -2,7 +2,7 @@
 
 ## Current goal
 
-- 当前唯一主线：**four-channel cleanup verification baseline**
+- 当前唯一主线：**four-channel cleanup verification baseline（已完成）**
 - 当前窗口：`2026-04-05 to 2026-04-12`
 - 详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
 
@@ -20,14 +20,14 @@
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四个渠道都可用，且继续共用同一套 shared runtime、workflow、approval、`jobs` 和 SQLite 真相。
 - 持续记录窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 到 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 保持仍在进行中的 cleanup 验证窗口快照和最近一次验证日期同步到当天绝对日期，避免窗口台账和 `docs/STATUS.md` 停留旧日期。
-- 保持 cleanup 文档快照继续反映“当前 `.env` 已满足四渠道 smoke 环境键、且在 `app.main` 已运行时本地 `18889/wecom/callback` 已可达、剩余缺口只剩 WeCom 真实私聊证据”这条最新真相，避免环境 blocker、进程未启动和真实 smoke blocker 重新混写。
+- 保持 cleanup 文档快照继续反映“当前 `.env` 已满足四渠道 smoke 环境键、且在 `app.main` 已运行时本地 `18889/wecom/callback` 已可达、四渠道真实私聊 smoke 已全部补齐”这条最新真相，避免环境 blocker、进程未启动和已完成窗口真相重新混写。
 - 保持 cleanup 文档快照也显式写出当前 WeCom tunnel 环境 blocker：`docker` 虽已安装但当前 shell 仍无 `/var/run/docker.sock` 访问权限，且 `cloudflared` 命令尚未安装，避免把 tunnel 失败继续误记成业务代码回归。
 - 保持 `docs/GETTING_STARTED.md` 显式区分“WeCom 本地 callback readiness 已就绪”和“WeCom 真实私聊 smoke 证据已完成”，避免把 `400 missing echostr` 探针误读成窗口退出证据。
 - 保持 `README.md` 也显式区分“WeCom 本地 callback readiness 已就绪”和“WeCom 真实私聊 smoke 证据已完成”，避免用户只看仓库入口时继续把 readiness 探针误读成退出证据。
 - 保持 `README.md` / `docs/GETTING_STARTED.md` 也显式写出 `18889/wecom/callback` 是当前本地已验证 `.env` 的地址，不要让入口文档把它误写成模板默认值。
 - 保持 `README.md` / `docs/GETTING_STARTED.md` 也显式写出“若本地改了 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，WeCom readiness 探针地址也必须跟着当前 `.env` 走”，避免用户把当前样例地址误抄成固定值。
-- 保持 `README.md` 当前 next step 段也显式写出“当前四渠道里只剩 WeCom 真实私聊 smoke 待补”，避免入口文档落回只列退出条件、不写当前实际缺口。
-- 保持 verification docs gate 继续显式校验 `docs/NEXT_STEP.md` 里的“当前四渠道里只剩 WeCom 真实私聊 smoke 待补”这句当前缺口文案，避免主线目标页回退成只列退出条件、不写当前实际缺口。
+- 保持 `README.md` 当前 next step 段也显式写出 cleanup 四渠道验证窗口已完成，避免入口文档继续停留在“只剩 WeCom 待补”的旧结论。
+- 保持 verification docs gate 继续显式校验 `docs/NEXT_STEP.md` 里的 cleanup 完成态文案，避免主线目标页回退成只列退出条件、不写当前完成结论。
 - 保持 verification docs gate 继续显式校验 `docs/STATUS.md` 里的 `WeCom 本地入口快照` 文案，避免状态页把本地 readiness 探针写丢。
 - 保持 verification docs gate 继续显式校验 `docs/STATUS.md` 里的 `WeCom 探针来源快照` 文案，避免状态页把“当前本地已验证 `.env`”和“.env.example 默认值”的边界写丢。
 - 保持 verification docs gate 继续显式校验 `docs/STATUS.md` 里的 `README 缺口快照` 文案，避免状态页把入口页“当前只剩 WeCom 缺口”这句当前总结写丢。
