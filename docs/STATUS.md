@@ -70,6 +70,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - README 缺口快照：仓库首页 `README.md` 现在也已显式写出“当前只剩 WeCom 真实私聊 smoke 缺口”，避免用户只看入口时还以为四个渠道都待补。
 - README 缺口门禁快照：verification docs gate 现在也显式锁住这条 `README 缺口快照` 文案，避免状态页把入口页的当前缺口总结写丢。
 - NEXT_STEP 缺口快照：`docs/NEXT_STEP.md` 现在也已显式写出“当前四渠道里只剩 WeCom 真实私聊 smoke 待补”，并已纳入 docs gate 断言，避免当前主线目标页回退成只列退出条件、不写当前实际缺口。
+- NEXT_STEP 缺口门禁快照：verification docs gate 现在也显式锁住这条 `NEXT_STEP 缺口快照` 文案，避免状态页把主线目标页的当前缺口总结写丢。
 - `.env` 取值归一化快照：`sync-cleanup-doc-snapshots` 现在会先去掉仓库 `.env` 值首尾成对的单/双引号，再参与 `telegram_bot_api` 和 `env_readiness` 判断，避免 `"token"` 这类配置被误当成带引号字面量。
 - 当前 shell env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉当前 shell 环境变量值首尾成对的单/双引号，避免当前会话里的 `\"token\"` 直接盖过后面的 `.env` / Windows env 真值。
 - Telegram shell token 门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住当前 shell 带引号 `TELEGRAM_BOT_TOKEN` 的 end-to-end 快照路径，避免带引号 token 重新混进 Telegram Bot API URL。
