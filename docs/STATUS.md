@@ -66,7 +66,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - WeCom 本地入口快照：`docs/GETTING_STARTED.md` 已显式写出“先起 `app.main`，再执行 `curl -si http://127.0.0.1:18889/wecom/callback -> 400 missing echostr`”这条本地 readiness 探针，并继续强调它不能替代真实私聊 smoke 证据。
 - WeCom 本地入口门禁快照：verification docs gate 现在也显式锁住这条 `WeCom 本地入口快照` 文案，避免状态页把本地 readiness 探针写丢。
 - README 入口快照：仓库首页 `README.md` 也已同步同一条 WeCom 本地 readiness 探针，避免只看仓库入口时继续把“本地 callback 已就绪”和“真实私聊 smoke 已完成”混成一个结论。
-- WeCom 探针来源快照：`README.md` / `docs/GETTING_STARTED.md` 现在也显式写明 `18889/wecom/callback` 来自当前本地已验证 `.env`，不是 `.env.example` 默认值，避免把模板默认端口误读成当前联调真相。
+- WeCom 探针来源快照：`README.md` / `docs/GETTING_STARTED.md` 现在也显式写明 `18889/wecom/callback` 来自当前本地已验证 `.env`，不是 `.env.example` 默认值；如果本地改了 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也必须跟着当前 `.env` 走，避免把样例地址误读成固定真相。
 - WeCom 探针来源门禁快照：verification docs gate 现在也显式锁住这条 `WeCom 探针来源快照` 文案，避免状态页把“当前本地已验证 `.env`”和“.env.example 默认值”的边界写丢。
 - README 缺口快照：仓库首页 `README.md` 现在也已显式写出“当前只剩 WeCom 真实私聊 smoke 缺口”，避免用户只看入口时还以为四个渠道都待补。
 - README 缺口门禁快照：verification docs gate 现在也显式锁住这条 `README 缺口快照` 文案，避免状态页把入口页的当前缺口总结写丢。
