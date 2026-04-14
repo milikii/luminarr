@@ -400,6 +400,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "config/transmission-bt-stack" in text
             assert "19092/transmission/rpc" in text
             assert "`/data/downloads/tr-bt`" in text
+            assert "PT / BT 两台 Transmission 都返回 `409 Conflict + X-Transmission-Session-Id`" in text
+            assert "本 CLI shell 直打 `19092` 仍失败" in text
             assert "ConnectionClosedOK" in text
             assert "Event loop is closed" in text
             assert "pending-task warning" in text
@@ -446,6 +448,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "verification docs gate 持续通过" in readme_text
     assert "FEISHU_INBOUND_MODE=long_connection" in status_text
     assert "/data/downloads/tr-bt" in status_text
+    assert "PT TR up / BT TR up / Emby up" in status_text
     assert "context_token" in decisions_text
     assert "pt_min_seed_hours" in decisions_text
     assert ".ass" in decisions_text
