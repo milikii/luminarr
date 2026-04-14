@@ -168,6 +168,12 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
+- 2026-04-14 代码审查确认：`shared private-chat runtime` 仍通过 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py) 伪造 Telegram `context` 去调用 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py)；这不是抽象味道问题，而是当前真实结构债，因为 `微信登录` 分支已经会读取 `context.application.bot`。
+- 2026-04-14 代码审查确认：下载器路由当前仍存在静默回退默认 Transmission 的风险；`downloader_name` / 任务身份解析失败时，状态查询和导入源查询都可能查错下载器却不报错。
+- 2026-04-14 代码审查确认：搜索候选、澄清态和下载器路由等路径里仍有多处 `except Exception: pass/return None`，会把“SQLite/配置异常”和“业务上真的没数据”混成同一个返回结果。
+- 2026-04-14 代码审查确认：`cleanup_smoke_logging` 仍使用模块级 `_cleanup_private_chat_smoke_log_path` 全局状态；目录创建失败时会把全局状态清空，但仍向调用方返回一个看起来像成功的路径。
+- 2026-04-14 代码审查确认：Feishu 长连接当前仍直接依赖 `lark_oapi` 私有 API 和模块级变量 patch；版本升级前必须重新验证 `_auto_reconnect`、`_disconnect()`、`_cache._cron` 与 `lark_oapi.ws.client.loop` 这几处内部实现。
+- 2026-04-14 代码审查确认：`get_download_status` 当前会写 `download_monitor`、补 `downloader.completed_observed`，并可能接到 auto-import，所以它不是只读动作；不要把它误放进 `READ_ONLY_ACTIONS`。
 - `series / anime` 独立名称解析还没实现；当前最稳的是 movie-first。
 - 当前“给别人用”的体验还偏工程向：私聊返回仍缺更美观的图片/信息卡片/字符排版。
 - 当前虽然已经有最小 `Dockerfile` / `docker-compose.yml`，但还没有把 Transmission / Emby / Prowlarr 整套依赖一起内置到主 compose。

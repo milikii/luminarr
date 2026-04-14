@@ -216,12 +216,17 @@
 
 ## After this step
 
-1. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露、和 auto-import service 的启动条件解耦、启动配置缺口日志，以及停机失败日志也已补齐。后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台）。
-2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
-3. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
-4. `shared private-chat runtime` 最小抽离：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，改成显式 runtime context / injected capability；保留 `微信登录` 的 Telegram 二维码回传能力为注入项，不做多渠道平台化。
-5. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
-6. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
-7. BT 共享确定性评分器。
-8. Jellyfin / Plex 支持（后续）。
-9. plugin 体系继续后置。
+1. `shared private-chat runtime` 最小抽离：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，去掉非 Telegram 渠道伪造 `SimpleNamespace` Telegram context 的做法；`微信登录` 这类 Telegram-only 媒资回传能力改成显式注入，不做多渠道平台化。
+2. 下载器路由 fail-closed：`downloader_name` / 任务身份解析失败时显式报错并打印中文日志，不再静默回退默认 Transmission；同一轮一起收口 `channel_identity` 空输入返回 `0` 的失败折叠。
+3. 持久化吞错收口：把搜索候选、澄清态、下载器路由等路径里 `except Exception: pass/return None` 的静默降级改成“区分真缺数据和 SQLite / 配置异常”，并补显式中文日志。
+4. `cleanup_smoke_logging` 去模块级全局状态：把 `_cleanup_private_chat_smoke_log_path` 收口成显式 logger 或显式传参，避免测试互相污染，以及“返回路径但实际未落盘”的语义歧义。
+5. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
+6. Feishu 私聊事件解析器去重：`dict payload` 和 `SDK object payload` 两条路径先抽成同一套字段提取和构造逻辑，避免同一事件结构改两处。
+7. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露、和 auto-import service 的启动条件解耦、启动配置缺口日志，以及停机失败日志也已补齐。后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台）。
+8. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
+9. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
+10. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
+11. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
+12. BT 共享确定性评分器。
+13. Jellyfin / Plex 支持（后续）。
+14. plugin 体系继续后置。

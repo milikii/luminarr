@@ -612,3 +612,28 @@
   - 当前不把 Web UI / 桌面端当成主交付方向；需要提升可用性时，先把私聊 bot 体验和人类可读文档补好。
 - **原因**：
   这个项目的核心价值是“人在私聊里发一句话就能完成任务”。若为了解决体验问题而转去做另一套 UI 主线，会打散当前已经建立起来的 shared runtime 和审批边界。
+
+## D-036 shared private-chat runtime 必须真正 channel-agnostic，不再反向依赖 Telegram context
+- **状态**：已决定
+- **日期**：2026-04-14
+- **结论**：
+  - shared runtime 必须是独立的通用入口，不再通过伪造 `SimpleNamespace(application.bot_data=...)` 去调用 Telegram 专用函数。
+  - Telegram / personal WeChat / Feishu / WeCom 四个渠道都只能把：
+    - `query`
+    - `reply_func`
+    - `chat_id / user_id`
+    - shared services / bot_data / injected capability
+    这些通用参数传进 shared runtime。
+  - `微信登录`、Telegram 图片/文件发送这类渠道专属能力，必须改成显式注入项；不能继续靠 shared runtime 反向读取 `context.application.bot`。
+- **原因**：
+  共享 runtime 的目标是“四渠道共用一套业务真相”，不是“让非 Telegram 渠道伪装成 Telegram”。继续反向依赖 Telegram context，会把一个渠道改动放大成四渠道同时回归。
+
+## D-037 下载器路由与状态查询必须 fail-closed，不允许静默回退默认下载器
+- **状态**：已决定
+- **日期**：2026-04-14
+- **结论**：
+  - `downloader_name`、任务身份或渠道身份解析失败时，必须显式报错并打印中文日志；不得静默回退到默认 Transmission、默认实例名或共享整数 `0`。
+  - `project_channel_chat_id` / `project_channel_user_id` 这类渠道身份投影 helper，遇到空输入时必须 fail-closed，而不是返回看起来合法的共享 ID。
+  - `get_download_status` 当前会写 `download_monitor`、补 `downloader.completed_observed`，并可能接到 auto-import；因此它不是只读动作，不得放进 `READ_ONLY_ACTIONS` 绕过副作用串行边界。
+- **原因**：
+  “解析失败后偷偷走默认值”会把真实错误伪装成“查不到资源”或“查错下载器”，最难排查。状态查询既然会写真相，就必须继续按 stateful path 对待。
