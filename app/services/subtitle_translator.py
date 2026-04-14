@@ -41,12 +41,14 @@ class SubtitleTranslatorService:
         base_url: str = "",
         model: str = "",
         timeout_seconds: float = 60.0,
+        proxy_url: str = "",
         request_chat_completion_func: Callable[[str, dict[str, object]], str] | None = None,
     ) -> None:
         self._api_key = api_key.strip()
         self._base_url = (base_url.strip() or "https://api.openai.com/v1").rstrip("/")
         self._model = model.strip() or "gpt-5.4"
         self._timeout_seconds = max(10.0, timeout_seconds)
+        self._proxy_url = proxy_url.strip()
         self._request_chat_completion_func = request_chat_completion_func
 
     def translate_for_import(self, translate_input: SubtitleTranslateInput) -> SubtitleTranslateResult:
@@ -215,7 +217,7 @@ class SubtitleTranslatorService:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        with httpx.Client(timeout=self._timeout_seconds) as client:
+        with httpx.Client(timeout=self._timeout_seconds, proxy=self._proxy_url or None) as client:
             response = client.post(url, headers=headers, json=payload)
         if response.status_code >= 400:
             raise RuntimeError(f"HTTP {response.status_code}: {response.text[:300]}")

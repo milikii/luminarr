@@ -23,6 +23,31 @@ services:
       - "15141:51413/udp"
     restart: unless-stopped
 
+  transmission-bt:
+    image: lscr.io/linuxserver/transmission:latest
+    container_name: luminarr-test-transmission-bt
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Asia/Shanghai}
+      - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=false
+      - TRANSMISSION_RPC_WHITELIST_ENABLED=false
+      - TRANSMISSION_DOWNLOAD_DIR=/data/downloads/tr-bt
+      - TRANSMISSION_INCOMPLETE_DIR_ENABLED=true
+      - TRANSMISSION_INCOMPLETE_DIR=/data/downloads/incomplete-bt
+      - TRANSMISSION_WATCH_DIR_ENABLED=true
+      - TRANSMISSION_WATCH_DIR=/data/downloads/watch-bt
+      - TRANSMISSION_WEB_HOME=/config/webui/trguing-zh
+    volumes:
+      - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission-bt:/config
+      - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission/webui/trguing-zh:/config/webui/trguing-zh:ro
+      - /data:/data
+    ports:
+      - "19092:9091"
+      - "15142:51413"
+      - "15142:51413/udp"
+    restart: unless-stopped
+
   emby:
     image: lscr.io/linuxserver/emby:latest
     container_name: luminarr-test-emby

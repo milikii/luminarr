@@ -19,10 +19,12 @@ class FanartClient:
         api_key: str,
         base_url: str = "https://webservice.fanart.tv/v3",
         timeout_seconds: float = 10.0,
+        proxy_url: str = "",
     ) -> None:
         self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._proxy_url = proxy_url.strip()
 
     async def get_movie_images(self, tmdb_id: str) -> FanartMovieImages | None:
         cleaned_tmdb_id = tmdb_id.strip()
@@ -47,7 +49,7 @@ class FanartClient:
 
     async def _get(self, path: str, params: Mapping[str, str]) -> httpx.Response:
         url = f"{self._base_url}{path}"
-        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=self._timeout_seconds, proxy=self._proxy_url or None) as client:
             response = await client.get(url, params=params)
         response.raise_for_status()
         return response

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable
 from typing import Any
+
+import httpx
 
 from app.clients.fanart import FanartClient
 
@@ -59,6 +62,40 @@ def test_get_movie_images_returns_none_without_urls() -> None:
     client._get = fake_get  # type: ignore[method-assign]
     result = _run(client.get_movie_images("157336"))
     assert result is None
+
+
+def test_fanart_client_passes_proxy_to_httpx(monkeypatch) -> None:
+    client_kwargs: list[dict[str, object]] = []
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            client_kwargs.append(dict(kwargs))
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str, params: dict[str, str]) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={},
+                request=httpx.Request("GET", url, params=params),
+            )
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = FanartClient(
+        api_key="fanart-key",
+        base_url="https://fanart.example",
+        proxy_url="http://192.168.2.110:7890",
+    )
+    result = asyncio.run(client.get_movie_images("157336"))
+
+    assert result is None
+    assert client_kwargs
+    assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
 
 
 def _run(coroutine: Awaitable[Any]) -> Any:

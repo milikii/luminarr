@@ -54,7 +54,9 @@ from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.bt_subscription_repo import BtSubscriptionRepo
+from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -2350,6 +2352,64 @@ def test_log_bt_subscription_scheduler_config_error_prints_fix_hint(
     assert "[处理建议]" in captured.out
 
 
+def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
+    search_db = SqliteDatabase(":memory:")
+    search_db.initialize()
+    search_service = SearchMediaService(
+        _fake_search,
+        _fake_search,
+        candidate_repo=CandidateMappingRepo(search_db),
+    )
+    add_db = SqliteDatabase(":memory:")
+    add_db.initialize()
+    add_service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=lambda source, downloader_name="", download_dir="": (_ for _ in ()).throw(
+            AssertionError(f"unexpected add_torrent call: {source} {downloader_name} {download_dir}")
+        ),
+        approval_repo=ApprovalRepo(add_db),
+        job_repo=JobRepo(add_db),
+        job_event_repo=JobEventRepo(add_db),
+        download_monitor_repo=DownloadMonitorRepo(add_db),
+    )
+    import_db = SqliteDatabase(":memory:")
+    import_db.initialize()
+    import_service = ImportToLibraryService(
+        get_import_source_func=lambda *_args, **_kwargs: None,
+        library_target_dir="/data/library/movies",
+        job_event_repo=JobEventRepo(import_db),
+        approval_repo=ApprovalRepo(import_db),
+        job_repo=JobRepo(import_db),
+    )
+    cleanup_service = CleanupDownloadedSourceService(job_event_repo=JobEventRepo(import_db), job_repo=JobRepo(import_db))
+    status_service = GetDownloadStatusService(lambda *_args, **_kwargs: None)
+    watchlist_db = SqliteDatabase(":memory:")
+    watchlist_db.initialize()
+    watchlist_service = ManageWatchlistService(WatchlistRepo(watchlist_db))
+    bt_subscription_db = SqliteDatabase(":memory:")
+    bt_subscription_db.initialize()
+    bt_subscription_service = ManageBtSubscriptionService(
+        BtSubscriptionRepo(bt_subscription_db),
+        _fake_search,
+        add_service,
+    )
+
+    application = build_application(
+        "token",
+        search_service,
+        add_service,
+        status_service,
+        import_service,
+        cleanup_service,
+        watchlist_service,
+        bt_subscription_service,
+        outbound_proxy_url="http://192.168.2.110:7890",
+    )
+
+    assert application.bot._request[0]._client_kwargs["proxy"] == "http://192.168.2.110:7890"
+    assert application.bot._request[1]._client_kwargs["proxy"] == "http://192.168.2.110:7890"
+
+
 def test_handle_message_routes_personal_wechat_login_and_sends_qr_result(
     tmp_path: Path,
 ) -> None:
@@ -2375,8 +2435,8 @@ def test_handle_message_routes_personal_wechat_login_and_sends_qr_result(
     def build_qr_artifact(_: str):
         qr_dir = tmp_path / "telegram-qr"
         qr_dir.mkdir()
-        file_path = qr_dir / "wechat-login.svg"
-        file_path.write_text("<svg />", encoding="utf-8")
+        file_path = qr_dir / "wechat-login.png"
+        file_path.write_bytes(b"png")
         return SimpleNamespace(dir_path=qr_dir, file_path=file_path)
 
     async def close_client() -> None:

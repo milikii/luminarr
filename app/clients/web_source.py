@@ -48,9 +48,11 @@ class WebSourceClient:
         self,
         rule: WebSourceRule,
         timeout_seconds: float = 10.0,
+        proxy_url: str = "",
     ) -> None:
         self._rule = rule
         self._timeout_seconds = timeout_seconds
+        self._proxy_url = proxy_url.strip()
 
     @property
     def name(self) -> str:
@@ -75,7 +77,11 @@ class WebSourceClient:
         return f"{self._rule.base_url}{path}"
 
     async def _get(self, url: str) -> httpx.Response:
-        async with httpx.AsyncClient(timeout=self._timeout_seconds, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=self._timeout_seconds,
+            follow_redirects=True,
+            proxy=self._proxy_url or None,
+        ) as client:
             response = await client.get(url)
         response.raise_for_status()
         return response

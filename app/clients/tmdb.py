@@ -23,10 +23,12 @@ class TmdbClient:
         api_key: str,
         base_url: str = "https://api.themoviedb.org",
         timeout_seconds: float = 10.0,
+        proxy_url: str = "",
     ) -> None:
         self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
         self._timeout_seconds = timeout_seconds
+        self._proxy_url = proxy_url.strip()
 
     async def search_movie(self, title: str, year: str = "") -> TmdbMovie | None:
         results = await self.search_movie_candidates(title, year=year, limit=1)
@@ -124,7 +126,7 @@ class TmdbClient:
 
     async def _get(self, path: str, params: Mapping[str, str]) -> httpx.Response:
         url = f"{self._base_url}{path}"
-        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+        async with httpx.AsyncClient(timeout=self._timeout_seconds, proxy=self._proxy_url or None) as client:
             response = await client.get(url, params=params)
         response.raise_for_status()
         return response

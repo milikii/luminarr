@@ -45,6 +45,11 @@
 - 保持 `.env.example` 对 `DOWNLOADER_INSTANCES` / `PT_DOWNLOADER` / `BT_DOWNLOADER` / `RAW_BT_DESTINATIONS` / `BT_WEB_SOURCES` / `FEISHU_*` / `WECOM_*` 继续写清中文作用、取值格式和默认语义，避免用户拿到 token 后仍不知道其他必需字段该填什么。
 - 保持 verification docs gate 继续显式校验 `.env.example` 里的 `PROWLARR_API_KEY` / `TMDB_API_KEY` / `DOWNLOADER_INSTANCES` / `FEISHU_APP_ID` / `FEISHU_APP_SECRET` / `FEISHU_ENCRYPT_KEY` / `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID`，避免最小 bring-up 必填键和四渠道真实 smoke 键从模板说明里漂走。
 - 保持 `.env.example` / `docs/GETTING_STARTED.md` 对 `TELEGRAM_BOT_TOKEN`、`TMDB_API_KEY`、`TRANSMISSION_BASE_URL`、`DOWNLOADER_INSTANCES`、`PT_DOWNLOADER` / `BT_DOWNLOADER` 默认语义，以及 Feishu / WeCom 三元组 all-or-none 约束的中文说明与 `app/config.py` 当前真相一致，避免用户按旧文档配出启动失败的 `.env`。
+- 保持 `.env.example` / `docs/GETTING_STARTED.md` / `README.md` 也显式写出 `OUTBOUND_PROXY_URL` 的使用边界：Telegram / TMDB / Fanart / BT 外站 / 字幕翻译走代理，Transmission / Emby / Prowlarr 继续直连，避免把代理错误扩到本地联调链路。
+- 保持 `docs/STATUS.md` / `README.md` 继续显式写出 Feishu 当前已支持 `FEISHU_INBOUND_MODE=long_connection`，且该模式只要求 `FEISHU_APP_ID + FEISHU_APP_SECRET`，避免入口文档仍停在“Feishu 永远必须三元组齐全”的旧真相。
+- 保持 Feishu 长连接在正常停机时不要把关闭过程误报成 `[Feishu 长连接启动失败]`，避免 bring-up/cleanup 验证证据把正常 shutdown 误记成启动回归。
+- 保持 `docs/TEST_ENV.md` / `README.md` / `docs/STATUS.md` 对本地双 Transmission 测试栈保持一致，显式反映 BT Transmission `http://127.0.0.1:19092` 和 `/data/downloads/tr-bt`，避免 PT / BT 本地联调入口继续分叉。
+- 保持 `docs/STATUS.md` / `README.md` 继续显式写出 personal WeChat `微信登录` 当前回传的是 PNG 二维码图片，不再是 SVG 文件，避免用户入口和 Telegram 发送行为重新分叉。
 - 保持 `Makefile` 同时提供独立的四渠道 cleanup smoke gate 入口和当前 cleanup 验证窗口的一键 gate 入口，避免把 smoke gate、cleanup 聚合回归和 docs gate 混成一条不透明命令。
 - 保持 `Makefile` 明确暴露 `test-cleanup-docs-gate`，让 cleanup verification docs gate 和普通 `test-docs` 分开，避免把 docs consistency gate 误当成当前 cleanup 窗口的完整文档 gate。
 - 保持 `Makefile` 明确暴露 `test-cleanup-service-not-ready`，让 cleanup service-not-ready observability 有独立 gate，避免这条专项 smoke 只能从 `docs/STATUS.md` 里的底层 pytest 命令回推。

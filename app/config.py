@@ -35,6 +35,7 @@ class DownloaderRoleBinding:
 @dataclass(frozen=True, slots=True)
 class Settings:
     telegram_bot_token: str
+    outbound_proxy_url: str
     prowlarr_base_url: str
     prowlarr_api_key: str
     tmdb_base_url: str
@@ -59,6 +60,7 @@ class Settings:
     feishu_app_id: str
     feishu_app_secret: str
     feishu_encrypt_key: str
+    feishu_inbound_mode: str
     feishu_base_url: str
     feishu_webhook_host: str
     feishu_webhook_port: int
@@ -76,6 +78,25 @@ def _read_required(env: Mapping[str, str], key: str) -> str:
     if not value:
         raise ConfigError(f"{key} is required")
     return value
+
+
+def _normalize_proxy_url(raw_value: str) -> str:
+    cleaned_value = raw_value.strip()
+    if not cleaned_value:
+        return ""
+    lowered_value = cleaned_value.lower()
+    if lowered_value.startswith(("http://", "https://", "socks5://")):
+        return cleaned_value
+    raise ConfigError("OUTBOUND_PROXY_URL must start with http://, https:// or socks5://")
+
+
+def _read_feishu_inbound_mode(env: Mapping[str, str]) -> str:
+    raw_value = _read_optional(env, "FEISHU_INBOUND_MODE").strip().lower()
+    if not raw_value:
+        return "webhook"
+    if raw_value not in {"webhook", "long_connection"}:
+        raise ConfigError("FEISHU_INBOUND_MODE must be webhook or long_connection")
+    return raw_value
 
 
 def _read_optional(env: Mapping[str, str], key: str) -> str:
@@ -271,10 +292,15 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     feishu_app_id = _read_optional(env, "FEISHU_APP_ID")
     feishu_app_secret = _read_optional(env, "FEISHU_APP_SECRET")
     feishu_encrypt_key = _read_optional(env, "FEISHU_ENCRYPT_KEY")
+    feishu_inbound_mode = _read_feishu_inbound_mode(env)
     has_any_feishu_credential = bool(feishu_app_id or feishu_app_secret or feishu_encrypt_key)
-    has_all_feishu_credentials = bool(feishu_app_id and feishu_app_secret and feishu_encrypt_key)
-    if has_any_feishu_credential and not has_all_feishu_credentials:
-        raise ConfigError("FEISHU_APP_ID, FEISHU_APP_SECRET and FEISHU_ENCRYPT_KEY must be set together")
+    has_feishu_app_credentials = bool(feishu_app_id and feishu_app_secret)
+    has_all_feishu_credentials = bool(has_feishu_app_credentials and feishu_encrypt_key)
+    if feishu_inbound_mode == "webhook":
+        if has_any_feishu_credential and not has_all_feishu_credentials:
+            raise ConfigError("FEISHU_APP_ID, FEISHU_APP_SECRET and FEISHU_ENCRYPT_KEY must be set together")
+    elif has_any_feishu_credential and not has_feishu_app_credentials:
+        raise ConfigError("FEISHU_APP_ID and FEISHU_APP_SECRET must be set together")
     wecom_token = _read_optional(env, "WECOM_TOKEN")
     wecom_encoding_aes_key = _read_optional(env, "WECOM_ENCODING_AES_KEY")
     wecom_receive_id = _read_optional(env, "WECOM_RECEIVE_ID")
@@ -285,6 +311,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     downloader_instances = _read_downloader_instances(env)
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
+        outbound_proxy_url=_normalize_proxy_url(_read_optional(env, "OUTBOUND_PROXY_URL")),
         prowlarr_base_url=_read_required(env, "PROWLARR_BASE_URL").rstrip("/"),
         prowlarr_api_key=_read_required(env, "PROWLARR_API_KEY"),
         tmdb_base_url=tmdb_base_url or "https://api.themoviedb.org",
@@ -309,6 +336,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         feishu_app_id=feishu_app_id,
         feishu_app_secret=feishu_app_secret,
         feishu_encrypt_key=feishu_encrypt_key,
+        feishu_inbound_mode=feishu_inbound_mode,
         feishu_base_url=feishu_base_url or "https://open.feishu.cn",
         feishu_webhook_host=_read_optional(env, "FEISHU_WEBHOOK_HOST") or "0.0.0.0",
         feishu_webhook_port=_read_optional_int(env, "FEISHU_WEBHOOK_PORT", 18095),

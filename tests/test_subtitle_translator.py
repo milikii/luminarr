@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import Mock
+
+import httpx
 
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslatorService
 
@@ -121,3 +124,26 @@ def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> No
     assert result.success is False
     assert result.skipped is False
     assert "读取字幕文件失败" in result.message
+
+
+def test_subtitle_translator_passes_proxy_to_httpx(monkeypatch) -> None:
+    client_ctor = Mock()
+    post = Mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "{\"translations\": [\"ok\"]}"}}]},
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"),
+        )
+    )
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        proxy_url="http://192.168.2.110:7890",
+    )
+    result = service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
+
+    assert result == "{\"translations\": [\"ok\"]}"
+    client_ctor.assert_called_once_with(timeout=60.0, proxy="http://192.168.2.110:7890")

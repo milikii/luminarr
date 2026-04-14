@@ -21,6 +21,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 当前最小启动真相：
 
 - `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL` 是当前启动硬必填
+- 如果 WSL 机器不能直连公网，可额外填写 `OUTBOUND_PROXY_URL` 给 Telegram / TMDB / Fanart / BT 外站 / 字幕翻译出站请求复用；Transmission / Emby / Prowlarr 这类本地地址仍直连
 - `TMDB_API_KEY` 当前不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
 - `DOWNLOADER_INSTANCES` 当前只是多实例路由补充配置，不能替代 `TRANSMISSION_BASE_URL`
 - `make run` 现在会先检查 `ENV_FILE` 指向的环境文件是否存在；缺失时会打印红色中文 `[环境文件缺失]` 和 `[处理建议]`
@@ -59,8 +60,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - 控制层：
   - Telegram runtime + 最小图片/文件发送 + 搜索结果/下载审批/导入审批文本 polish
-  - personal WeChat 二维码登录入口 + 单账号私聊文本轮询
+  - personal WeChat 二维码登录入口 + PNG 二维码回传 + 单账号私聊文本轮询
   - Feishu 私聊文本 webhook + 文本回消息 + 事件验签
+  - Feishu 可选 `long_connection` 入站模式
   - WeCom callback URL 校验 + 验签解密入站 + 加密被动文本回包
   - `telegram_updates` 去重、`jobs` 执行所有权、approval timeout、confirm wake rebuild
 - 媒体主链：
@@ -156,6 +158,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 涉及真实 downloader / import / refresh 联调时，使用 WSL Docker 本地测试栈：
 
 - Transmission：`http://127.0.0.1:19091`
+- BT Transmission：`http://127.0.0.1:19092`
 - Emby：`http://127.0.0.1:18096`
 
 详细路径、健康检查、配置占位见 `docs/TEST_ENV.md`。

@@ -17,6 +17,7 @@ def test_load_settings_reads_token() -> None:
         }
     )
     assert settings.telegram_bot_token == "token-value"
+    assert settings.outbound_proxy_url == ""
     assert settings.prowlarr_base_url == "http://prowlarr:9696"
     assert settings.prowlarr_api_key == "api-key"
     assert settings.tmdb_base_url == "https://api.themoviedb.org"
@@ -37,6 +38,7 @@ def test_load_settings_reads_token() -> None:
     assert settings.feishu_app_id == ""
     assert settings.feishu_app_secret == ""
     assert settings.feishu_encrypt_key == ""
+    assert settings.feishu_inbound_mode == "webhook"
     assert settings.feishu_base_url == "https://open.feishu.cn"
     assert settings.feishu_webhook_host == "0.0.0.0"
     assert settings.feishu_webhook_port == 18095
@@ -47,6 +49,32 @@ def test_load_settings_reads_token() -> None:
     assert settings.wecom_webhook_host == "0.0.0.0"
     assert settings.wecom_webhook_port == 18097
     assert settings.wecom_webhook_path == "/wecom/webhook"
+
+
+def test_load_settings_reads_outbound_proxy_url() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "OUTBOUND_PROXY_URL": "http://192.168.2.110:7890",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+        }
+    )
+    assert settings.outbound_proxy_url == "http://192.168.2.110:7890"
+
+
+def test_load_settings_rejects_proxy_without_supported_scheme() -> None:
+    with pytest.raises(ConfigError, match="OUTBOUND_PROXY_URL"):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "OUTBOUND_PROXY_URL": "192.168.2.110:7890",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            }
+        )
 
 
 def test_load_settings_reads_library_target_dir() -> None:
@@ -187,6 +215,38 @@ def test_load_settings_reads_wecom_settings() -> None:
     assert settings.wecom_webhook_host == "127.0.0.1"
     assert settings.wecom_webhook_port == 18101
     assert settings.wecom_webhook_path == "/hooks/wecom"
+
+
+def test_load_settings_reads_feishu_long_connection_mode_without_encrypt_key() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "FEISHU_APP_ID": "cli_a",
+            "FEISHU_APP_SECRET": "sec_b",
+            "FEISHU_INBOUND_MODE": "long_connection",
+        }
+    )
+
+    assert settings.feishu_inbound_mode == "long_connection"
+    assert settings.feishu_app_id == "cli_a"
+    assert settings.feishu_app_secret == "sec_b"
+    assert settings.feishu_encrypt_key == ""
+
+
+def test_load_settings_rejects_invalid_feishu_inbound_mode() -> None:
+    with pytest.raises(ConfigError, match="FEISHU_INBOUND_MODE"):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "FEISHU_INBOUND_MODE": "sdk",
+            }
+        )
 
 
 def test_load_settings_reads_raw_bt_destinations() -> None:

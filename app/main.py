@@ -5,6 +5,11 @@ from pathlib import Path
 from telegram.error import NetworkError
 
 from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
+from app.bot.feishu_long_connection import (
+    FEISHU_LONG_CONNECTION_SERVICE_KEY,
+    FeishuLongConnectionConfig,
+    FeishuLongConnectionService,
+)
 from app.bot.cleanup_smoke_logging import configure_cleanup_private_chat_smoke_log_file
 from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
@@ -131,6 +136,7 @@ def _build_bt_source_providers(
     *,
     prowlarr_client: ProwlarrClient,
     bt_web_sources: tuple[str, ...],
+    outbound_proxy_url: str = "",
 ) -> tuple[BtSourceProvider, ...]:
     providers: list[BtSourceProvider] = [
         BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search),
@@ -143,7 +149,7 @@ def _build_bt_source_providers(
                 "\033[33m[处理建议]\033[0m 检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。"
             )
             continue
-        client = WebSourceClient(rule=rule)
+        client = WebSourceClient(rule=rule, proxy_url=outbound_proxy_url)
         providers.append(BtSourceProvider(name=rule.name, search_func=client.search))
     return tuple(providers)
 
@@ -172,16 +178,25 @@ def main() -> None:
         _build_bt_source_providers(
             prowlarr_client=prowlarr_client,
             bt_web_sources=settings.bt_web_sources,
+            outbound_proxy_url=settings.outbound_proxy_url,
         )
     )
     tmdb_lookup_movie_func = None
     scrape_metadata_func = None
     if settings.tmdb_api_key:
-        tmdb_client = TmdbClient(api_key=settings.tmdb_api_key, base_url=settings.tmdb_base_url)
+        tmdb_client = TmdbClient(
+            api_key=settings.tmdb_api_key,
+            base_url=settings.tmdb_base_url,
+            proxy_url=settings.outbound_proxy_url,
+        )
         tmdb_lookup_movie_func = tmdb_client.search_movie
         get_movie_images_func = _skip_fanart_images
         if settings.fanart_api_key:
-            fanart_client = FanartClient(api_key=settings.fanart_api_key, base_url=settings.fanart_base_url)
+            fanart_client = FanartClient(
+                api_key=settings.fanart_api_key,
+                base_url=settings.fanart_base_url,
+                proxy_url=settings.outbound_proxy_url,
+            )
             get_movie_images_func = fanart_client.get_movie_images
         metadata_scraper_service = MetadataScraperService(
             lookup_movie_func=tmdb_client.search_movie,
@@ -265,6 +280,7 @@ def main() -> None:
             base_url=settings.subtitle_translation_base_url,
             model=settings.subtitle_translation_model,
             timeout_seconds=settings.subtitle_translation_timeout_seconds,
+            proxy_url=settings.outbound_proxy_url,
         ).translate_for_import,
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,
@@ -312,6 +328,7 @@ def main() -> None:
         raw_bt_destination_options=settings.raw_bt_destination_options,
         downloader_instances=settings.downloader_instances,
         downloader_role_binding=settings.downloader_role_binding,
+        outbound_proxy_url=settings.outbound_proxy_url,
     )
     application.bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()
     if settings.feishu_app_id and settings.feishu_app_secret:
@@ -320,13 +337,22 @@ def main() -> None:
             app_secret=settings.feishu_app_secret,
             base_url=settings.feishu_base_url,
         )
-        application.bot_data[FEISHU_ENCRYPT_KEY_BOT_DATA_KEY] = settings.feishu_encrypt_key
-        application.bot_data["feishu_webhook_reply_text_func"] = build_feishu_reply_text_func(feishu_client)
-        application.bot_data["feishu_webhook_server_config"] = FeishuWebhookServerConfig(
-            host=settings.feishu_webhook_host,
-            port=settings.feishu_webhook_port,
-            path=settings.feishu_webhook_path,
-        )
+        if settings.feishu_inbound_mode == "long_connection":
+            application.bot_data[FEISHU_LONG_CONNECTION_SERVICE_KEY] = FeishuLongConnectionService(
+                config=FeishuLongConnectionConfig(
+                    app_id=settings.feishu_app_id,
+                    app_secret=settings.feishu_app_secret,
+                ),
+                feishu_client=feishu_client,
+            )
+        else:
+            application.bot_data[FEISHU_ENCRYPT_KEY_BOT_DATA_KEY] = settings.feishu_encrypt_key
+            application.bot_data["feishu_webhook_reply_text_func"] = build_feishu_reply_text_func(feishu_client)
+            application.bot_data["feishu_webhook_server_config"] = FeishuWebhookServerConfig(
+                host=settings.feishu_webhook_host,
+                port=settings.feishu_webhook_port,
+                path=settings.feishu_webhook_path,
+            )
     if settings.wecom_token and settings.wecom_encoding_aes_key and settings.wecom_receive_id:
         application.bot_data[WECOM_TOKEN_BOT_DATA_KEY] = settings.wecom_token
         application.bot_data[WECOM_ENCODING_AES_KEY_BOT_DATA_KEY] = settings.wecom_encoding_aes_key

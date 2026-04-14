@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable
 from typing import Any
+
+import httpx
 
 from app.clients.tmdb import TmdbClient
 
@@ -106,6 +109,40 @@ def test_search_tv_candidates_returns_valid_results() -> None:
     assert result[0].year == "2023"
     assert result[0].tmdb_id == "1001"
     assert result[0].media_type == "tv"
+
+
+def test_tmdb_client_passes_proxy_to_httpx(monkeypatch) -> None:
+    client_kwargs: list[dict[str, object]] = []
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs: object) -> None:
+            client_kwargs.append(dict(kwargs))
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str, params: dict[str, str]) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={"results": []},
+                request=httpx.Request("GET", url, params=params),
+            )
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = TmdbClient(
+        api_key="tmdb-key",
+        base_url="https://tmdb.example",
+        proxy_url="http://192.168.2.110:7890",
+    )
+    result = asyncio.run(client.search_movie_candidates("Dune", limit=1))
+
+    assert result == []
+    assert client_kwargs
+    assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
 
 
 def _run(coroutine: Awaitable[Any]) -> Any:

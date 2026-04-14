@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PERSONAL_WECHAT_LOGIN_SERVICE_KEY = "personal_wechat_login_service"
-PERSONAL_WECHAT_LOGIN_QR_CAPTION = "微信登录二维码（SVG 文件）"
+PERSONAL_WECHAT_LOGIN_QR_CAPTION = "微信登录二维码（PNG 图片）"
 PERSONAL_WECHAT_LOGIN_STARTED_TEXT = (
     "已发起 personal WeChat 登录。\n"
     "二维码文件已回传到当前 Telegram 私聊，请直接打开并扫码。\n"
@@ -34,7 +34,6 @@ PERSONAL_WECHAT_LOGIN_QUERY_ALIASES = frozenset({"微信登录"})
 
 try:
     import qrcode
-    from qrcode.image.svg import SvgImage
     from wechat_clawbot.api.client import close_shared_client
     from wechat_clawbot.auth.accounts import (
         DEFAULT_BASE_URL as DEFAULT_WECHAT_API_BASE_URL,
@@ -45,7 +44,6 @@ try:
     from wechat_clawbot.auth.login_qr import start_weixin_login_with_qr, wait_for_weixin_login
 except ImportError as import_error:  # pragma: no cover - exercised via availability checks
     qrcode = None
-    SvgImage = None
     DEFAULT_WECHAT_API_BASE_URL = "https://ilinkai.weixin.qq.com"
     start_weixin_login_with_qr = None
     wait_for_weixin_login = None
@@ -71,15 +69,15 @@ def parse_personal_wechat_login_query(query: str) -> bool:
     return query.strip() in PERSONAL_WECHAT_LOGIN_QUERY_ALIASES
 
 
-def _build_qr_svg_artifact(qr_content: str) -> QrArtifact:
-    if qrcode is None or SvgImage is None:
-        raise RuntimeError("qrcode svg support is unavailable")
+def _build_qr_png_artifact(qr_content: str) -> QrArtifact:
+    if qrcode is None:
+        raise RuntimeError("qrcode png support is unavailable")
     qr_dir = Path(tempfile.mkdtemp(prefix="luminarr-wechat-login-"))
-    qr_file_path = qr_dir / "wechat-login.svg"
+    qr_file_path = qr_dir / "wechat-login.png"
     qr_code = qrcode.QRCode(border=2, box_size=8)
     qr_code.add_data(qr_content)
     qr_code.make(fit=True)
-    image = qr_code.make_image(image_factory=SvgImage)
+    image = qr_code.make_image(fill_color="black", back_color="white")
     image.save(qr_file_path)
     return QrArtifact(dir_path=qr_dir, file_path=qr_file_path)
 
@@ -104,7 +102,7 @@ class PersonalWeChatLoginService:
         register_account_func: Callable[[str], None] | None = register_weixin_account_id,
         clear_stale_accounts_func: Callable[[str, str], None] | None = clear_stale_accounts_for_user_id,
         close_client_func: Callable[[], Awaitable[None]] | None = close_shared_client,
-        qr_artifact_builder: Callable[[str], QrArtifact] = _build_qr_svg_artifact,
+        qr_artifact_builder: Callable[[str], QrArtifact] = _build_qr_png_artifact,
     ) -> None:
         self._api_base_url = api_base_url.rstrip("/") or DEFAULT_WECHAT_API_BASE_URL
         self._start_login_func = start_login_func
@@ -144,7 +142,7 @@ class PersonalWeChatLoginService:
             reason = _PERSONAL_WECHAT_IMPORT_ERROR or "wechat-clawbot dependency is missing"
             print(
                 f"\033[31m[personal WeChat 登录未就绪]\033[0m 原因={reason}\n"
-                "\033[33m[处理建议]\033[0m 安装 wechat-clawbot，并确认 qrcode SVG 依赖可用。"
+                "\033[33m[处理建议]\033[0m 安装 wechat-clawbot，并确认 qrcode PNG 依赖可用。"
             )
             return PERSONAL_WECHAT_LOGIN_NOT_READY_TEXT
 
@@ -197,7 +195,7 @@ class PersonalWeChatLoginService:
             except Exception as error:
                 print(
                     f"\033[31m[personal WeChat 二维码生成失败]\033[0m 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 qrcode SVG 依赖，并确认 /tmp 可写。"
+                    "\033[33m[处理建议]\033[0m 检查 qrcode PNG 依赖，并确认 /tmp 可写。"
                 )
                 return PERSONAL_WECHAT_LOGIN_START_FAILED_TEMPLATE.format(reason="二维码文件生成失败，请查看日志")
 

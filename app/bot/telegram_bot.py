@@ -17,6 +17,10 @@ from app.bot.feishu_webhook_server import (
     start_feishu_webhook_server,
     stop_feishu_webhook_server,
 )
+from app.bot.feishu_long_connection import (
+    FEISHU_LONG_CONNECTION_SERVICE_KEY,
+    FeishuLongConnectionService,
+)
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
@@ -360,14 +364,18 @@ def build_application(
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...] = (),
     downloader_instances: tuple[DownloaderInstanceConfig, ...] = (),
     downloader_role_binding: DownloaderRoleBinding | None = None,
+    outbound_proxy_url: str = "",
 ) -> Application:
-    application = (
+    builder = (
         Application.builder()
         .token(token)
         .post_init(_start_bt_subscription_scheduler)
         .post_shutdown(_stop_bt_subscription_scheduler)
-        .build()
     )
+    cleaned_proxy_url = outbound_proxy_url.strip()
+    if cleaned_proxy_url:
+        builder = builder.proxy(cleaned_proxy_url).get_updates_proxy(cleaned_proxy_url)
+    application = builder.build()
     application.bot_data[SEARCH_SERVICE_KEY] = search_service
     application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
     application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
@@ -476,6 +484,7 @@ def _resolve_execution_gate_for_application(application: Application) -> Executi
 async def _start_bt_subscription_scheduler(application: Application) -> None:
     _start_feishu_webhook_server_if_configured(application)
     _start_wecom_webhook_server_if_configured(application)
+    await _start_feishu_long_connection_if_configured(application)
     await _start_personal_wechat_text_service_if_available(application)
 
     existing_task = application.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
@@ -518,6 +527,7 @@ async def _start_bt_subscription_scheduler(application: Application) -> None:
 async def _stop_bt_subscription_scheduler(application: Application) -> None:
     _stop_feishu_webhook_server_if_running(application)
     _stop_wecom_webhook_server_if_running(application)
+    await _shutdown_feishu_long_connection_if_running(application)
     await _shutdown_personal_wechat_text_service_if_running(application)
     await _shutdown_personal_wechat_login_service_if_running(application)
 
@@ -569,6 +579,20 @@ def _stop_feishu_webhook_server_if_running(application: Application) -> None:
     if not isinstance(runtime, FeishuWebhookServerRuntime):
         return
     stop_feishu_webhook_server(runtime)
+
+
+async def _start_feishu_long_connection_if_configured(application: Application) -> None:
+    service = application.bot_data.get(FEISHU_LONG_CONNECTION_SERVICE_KEY)
+    if not isinstance(service, FeishuLongConnectionService):
+        return
+    await service.start(bot_data=application.bot_data)
+
+
+async def _shutdown_feishu_long_connection_if_running(application: Application) -> None:
+    service = application.bot_data.get(FEISHU_LONG_CONNECTION_SERVICE_KEY)
+    if not isinstance(service, FeishuLongConnectionService):
+        return
+    await service.shutdown()
 
 
 def _start_wecom_webhook_server_if_configured(application: Application) -> None:

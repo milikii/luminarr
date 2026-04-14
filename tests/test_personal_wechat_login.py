@@ -45,7 +45,7 @@ def test_personal_wechat_login_service_starts_login_sends_qr_and_notifies_succes
         assert chat_id == 1001
         assert caption == PERSONAL_WECHAT_LOGIN_QR_CAPTION
         assert resolved_path.is_file()
-        assert resolved_path.suffix == ".svg"
+        assert resolved_path.suffix == ".png"
         captured_paths.append(resolved_path)
         return "document-ok"
 
@@ -57,8 +57,8 @@ def test_personal_wechat_login_service_starts_login_sends_qr_and_notifies_succes
     def build_qr_artifact(_: str):
         qr_dir = tmp_path / "qr-artifact"
         qr_dir.mkdir()
-        file_path = qr_dir / "wechat-login.svg"
-        file_path.write_text("<svg />", encoding="utf-8")
+        file_path = qr_dir / "wechat-login.png"
+        file_path.write_bytes(b"png")
         return SimpleNamespace(dir_path=qr_dir, file_path=file_path)
 
     async def close_client() -> None:
@@ -128,8 +128,8 @@ def test_personal_wechat_login_service_reuses_active_qr_for_same_chat(tmp_path: 
     def build_qr_artifact(_: str):
         qr_dir = tmp_path / "reuse-qr"
         qr_dir.mkdir(exist_ok=True)
-        file_path = qr_dir / "wechat-login.svg"
-        file_path.write_text("<svg />", encoding="utf-8")
+        file_path = qr_dir / "wechat-login.png"
+        file_path.write_bytes(b"png")
         return SimpleNamespace(dir_path=qr_dir, file_path=file_path)
 
     async def close_client() -> None:
