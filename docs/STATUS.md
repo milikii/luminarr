@@ -34,6 +34,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `telegram_updates` 去重、`jobs` 执行所有权、approval timeout、confirm wake rebuild
   - `channel_identity` 空输入现在会 fail-closed 返回 `None`，不再把缺失渠道身份折叠成共享整数 `0`
   - 状态查询和导入源查询在查不到 `downloader_name` 时现在会直接停路返回 `None`，不再把空下载器名继续喂给默认 Transmission
+  - 状态查询和导入源查询在 `downloader_name` 指向不存在实例时现在也会 fail-closed 返回 `None`，不再静默回退默认 Transmission
   - cleanup service 未注入时，`cleanup` / `cleanup inspect` 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=cleanup/cleanup_inspect`、`查询=` 和 `[处理建议]` 修复提示
 - 媒体主链：
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
@@ -171,7 +172,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 2026-04-14 代码审查确认：`shared private-chat runtime` 仍通过 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py) 伪造 Telegram `context` 去调用 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py)；这不是抽象味道问题，而是当前真实结构债，因为 `微信登录` 分支已经会读取 `context.application.bot`。
-- 2026-04-15 代码审查确认：`channel_identity` 空输入返回 `0` 的失败折叠、以及“查不到 `downloader_name` 仍继续查默认 Transmission”的缺口都已修掉；当前下载器路由剩余风险收口为“解析出不存在的实例名时，路由层仍可能静默回退默认下载器”。
+- 2026-04-15 代码审查确认：lookup 路径上的 `channel_identity` 空输入返回 `0`、缺少 `downloader_name`、以及未知实例名回退默认 Transmission 这三处失败折叠都已修掉；当前下载器路由剩余风险收口为“下载投递 path 里若传入非法显式实例名，路由层仍可能静默回退默认下载器”。
 - 2026-04-14 代码审查确认：搜索候选、澄清态和下载器路由等路径里仍有多处 `except Exception: pass/return None`，会把“SQLite/配置异常”和“业务上真的没数据”混成同一个返回结果。
 - 2026-04-15 代码审查确认：`cleanup_smoke_logging` 仍使用模块级 `_cleanup_private_chat_smoke_log_path` 全局状态；但目录创建失败时已经 fail-closed 返回 `None`，当前剩余风险只在全局状态本身仍会污染测试边界。
 - 2026-04-14 代码审查确认：Feishu 长连接当前仍直接依赖 `lark_oapi` 私有 API 和模块级变量 patch；版本升级前必须重新验证 `_auto_reconnect`、`_disconnect()`、`_cache._cron` 与 `lark_oapi.ws.client.loop` 这几处内部实现。
@@ -229,7 +230,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram 启动失败可观测性快照：当前 Telegram bootstrap 遇到网络 / DNS 问题时，也会先打印红色中文 `[Telegram 启动失败]` 和 `[处理建议]`，再把异常继续抛出，避免纯英文 traceback 直接淹没修复线索。
 - cleanup smoke logging tests：2026-04-15，`6 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_smoke_logging.py`）
 - channel identity fail-closed tests：2026-04-15，`1 passed, 38 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k project_channel_identity`）
-- downloader name fail-closed tests：2026-04-15，`2 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）
+- downloader lookup fail-closed tests：2026-04-15，`3 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-14，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - cleanup service-not-ready smoke tests：`24 passed, 352 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`）

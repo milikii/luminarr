@@ -102,6 +102,22 @@ def _build_qbittorrent_clients_by_name(
     return clients
 
 
+def _resolve_downloader_client_for_lookup(
+    *,
+    downloader_name: str,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> TransmissionClient | QbittorrentClient | None:
+    cleaned_name = downloader_name.strip()
+    instance = downloader_instances_by_name.get(cleaned_name)
+    if instance is None:
+        return None
+    if instance.downloader_type == "qbittorrent":
+        return qbittorrent_clients_by_name.get(cleaned_name)
+    return transmission_clients_by_name.get(cleaned_name)
+
+
 def _resolve_downloader_payload_value(payload_json: str, key: str) -> str:
     cleaned_payload = payload_json.strip()
     if not cleaned_payload:
@@ -242,9 +258,14 @@ def main() -> None:
             chat_id=chat_id,
             job_repo=job_repo,
         )
-        if not downloader_name:
+        client = _resolve_downloader_client_for_lookup(
+            downloader_name=downloader_name or "",
+            downloader_instances_by_name=downloader_instances_by_name,
+            transmission_clients_by_name=transmission_clients_by_name,
+            qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        )
+        if client is None:
             return None
-        client = resolve_downloader_client_by_name(downloader_name)
         return await client.get_torrent_status(task_ref)
 
     async def get_torrent_import_source_with_routing(
@@ -256,9 +277,14 @@ def main() -> None:
             chat_id=chat_id,
             job_repo=job_repo,
         )
-        if not downloader_name:
+        client = _resolve_downloader_client_for_lookup(
+            downloader_name=downloader_name or "",
+            downloader_instances_by_name=downloader_instances_by_name,
+            transmission_clients_by_name=transmission_clients_by_name,
+            qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        )
+        if client is None:
             return None
-        client = resolve_downloader_client_by_name(downloader_name)
         return await client.get_torrent_import_source(task_ref)
 
     add_to_downloader_service = AddToDownloaderService(
