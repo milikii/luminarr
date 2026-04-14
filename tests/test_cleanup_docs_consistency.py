@@ -456,6 +456,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
     assert "curl -si http://127.0.0.1:18889/wecom/callback" in getting_started_text
     assert "来自当前本地已验证 `.env`" in getting_started_text
+    assert "不是 `.env.example` 里的默认端口/路径" in getting_started_text
     assert "400 missing echostr" in getting_started_text
     assert "Transmission 已在 `http://127.0.0.1:19091` 跑着" in getting_started_text
     assert "Emby 已在 `http://127.0.0.1:18096` 跑着" in getting_started_text
@@ -565,6 +566,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "WECOM_TOKEN=" in env_example_text
     assert "WECOM_ENCODING_AES_KEY=" in env_example_text
     assert "WECOM_RECEIVE_ID=" in env_example_text
+    assert "WECOM_WEBHOOK_PORT=18097" in env_example_text
+    assert "WECOM_WEBHOOK_PATH=/wecom/webhook" in env_example_text
     assert "type 目前写 transmission 或 qbittorrent" in env_example_text
     assert "值必须和 DOWNLOADER_INSTANCES 里的 name 完全一致" in env_example_text
     assert "key 是用户回复时选用的短键" in env_example_text
