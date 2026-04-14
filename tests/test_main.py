@@ -38,7 +38,9 @@ def test_resolve_downloader_name_for_task_fails_closed_when_lookup_is_missing(
     assert "[处理建议]" in captured.out
 
 
-def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance() -> None:
+def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     known_client = object()
     assert _resolve_downloader_client_for_lookup(
         downloader_name="missing",
@@ -46,6 +48,9 @@ def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance(
         transmission_clients_by_name={},
         qbittorrent_clients_by_name={},
     ) is None
+    captured = capsys.readouterr()
+    assert "[下载器实例不存在]" in captured.out
+    assert "[处理建议]" in captured.out
     assert _resolve_downloader_client_for_lookup(
         downloader_name="pt-main",
         downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},

@@ -36,6 +36,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 状态查询和导入源查询在查不到 `downloader_name` 时现在会直接停路返回 `None`，不再把空下载器名继续喂给默认 Transmission
   - 状态查询和导入源查询在 `downloader_name` 指向不存在实例时现在也会 fail-closed 返回 `None`，不再静默回退默认 Transmission
   - 下载器名 lookup 在 task/job 未命中或 payload 缺 `downloader_name` 时，现在也会打印红色中文 `[下载器路由未命中]` 日志和 `[处理建议]`
+  - 下载器名 lookup 在 `downloader_name` 指向不存在实例时，现在也会打印红色中文 `[下载器实例不存在]` 日志和 `[处理建议]`
   - cleanup service 未注入时，`cleanup` / `cleanup inspect` 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=cleanup/cleanup_inspect`、`查询=` 和 `[处理建议]` 修复提示
 - 媒体主链：
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
@@ -173,7 +174,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 2026-04-14 代码审查确认：`shared private-chat runtime` 仍通过 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py) 伪造 Telegram `context` 去调用 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py)；这不是抽象味道问题，而是当前真实结构债，因为 `微信登录` 分支已经会读取 `context.application.bot`。
-- 2026-04-15 代码审查确认：lookup 路径上的 `channel_identity` 空输入返回 `0`、缺少 `downloader_name`、以及下载投递 path 里的非法显式实例名回退默认下载器都已 fail-closed，且 lookup 未命中现在也会打印中文日志；当前下载器路由剩余风险收口为“lookup 路径里命中未知实例名时仍缺显式中文日志”。
+- 2026-04-15 代码审查确认：lookup 路径上的缺少 `downloader_name`、未知实例名，以及下载投递 path 里的非法显式实例名都已 fail-closed，并补上中文日志；当前下载器路由剩余风险收口为“`channel_identity` 空输入虽已 fail-closed，但还没有显式中文日志提示是谁把渠道身份传空了”。
 - 2026-04-14 代码审查确认：搜索候选、澄清态和下载器路由等路径里仍有多处 `except Exception: pass/return None`，会把“SQLite/配置异常”和“业务上真的没数据”混成同一个返回结果。
 - 2026-04-15 代码审查确认：`cleanup_smoke_logging` 已支持显式 `log_path` 传参，目录创建失败也已 fail-closed 返回 `None`；当前剩余风险收口为“默认运行路径仍回退到模块级 `_cleanup_private_chat_smoke_log_path` 全局状态”。
 - 2026-04-14 代码审查确认：Feishu 长连接当前仍直接依赖 `lark_oapi` 私有 API 和模块级变量 patch；版本升级前必须重新验证 `_auto_reconnect`、`_disconnect()`、`_cache._cron` 与 `lark_oapi.ws.client.loop` 这几处内部实现。

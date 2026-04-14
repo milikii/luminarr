@@ -102,6 +102,15 @@ def _build_qbittorrent_clients_by_name(
     return clients
 
 
+def _log_downloader_instance_missing(*, downloader_name: str) -> None:
+    print(
+        f"\033[31m[下载器实例不存在]\033[0m downloader_name={downloader_name}\n"
+        "\033[33m[处理建议]\033[0m 检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，"
+        "并确认角色绑定或历史任务没有引用已删除的实例名。",
+        flush=True,
+    )
+
+
 def _resolve_downloader_client_for_lookup(
     *,
     downloader_name: str,
@@ -112,6 +121,7 @@ def _resolve_downloader_client_for_lookup(
     cleaned_name = downloader_name.strip()
     instance = downloader_instances_by_name.get(cleaned_name)
     if instance is None:
+        _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
         return None
     if instance.downloader_type == "qbittorrent":
         return qbittorrent_clients_by_name.get(cleaned_name)
