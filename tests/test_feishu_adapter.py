@@ -166,7 +166,9 @@ def _build_feishu_private_text_payload(text: str) -> dict[str, object]:
     }
 
 
-def test_project_channel_identity_is_stable_and_channel_scoped() -> None:
+def test_project_channel_identity_is_stable_and_channel_scoped(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     projected_chat_id = project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="oc_feishu_chat_1")
     projected_chat_id_again = project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="oc_feishu_chat_1")
     projected_user_id = project_channel_user_id(channel=FEISHU_CHANNEL, external_user_id="ou_feishu_user_1")
@@ -179,6 +181,9 @@ def test_project_channel_identity_is_stable_and_channel_scoped() -> None:
     assert projected_chat_id != telegram_like_chat_id
     assert project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="") is None
     assert project_channel_user_id(channel="", external_user_id="ou_feishu_user_1") is None
+    captured = capsys.readouterr()
+    assert "[渠道身份缺失]" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def test_get_feishu_url_verification_challenge_reads_challenge() -> None:
