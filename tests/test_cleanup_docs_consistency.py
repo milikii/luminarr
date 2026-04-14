@@ -521,6 +521,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "不是 `.env.example` 的默认端口/路径" in readme_text
     assert "400 missing echostr" in readme_text
     assert "剩余唯一待补缺口只剩 WeCom" in readme_text
+    assert "当前四渠道里只剩 WeCom 真实私聊 smoke 待补" in next_step_text
     assert "[环境文件缺失]" in next_step_text
     assert "ENV_FILE=/绝对路径 make run" in next_step_text
     assert "[环境文件缺失]" in status_text
