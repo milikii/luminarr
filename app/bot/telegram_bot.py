@@ -567,13 +567,19 @@ def _start_post_download_auto_import_scheduler(application: Application) -> None
         application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY] = application.create_task(
             _post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event),
             name="post_download_auto_import_scheduler",
-        )
+    )
     status_service = application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
     download_monitor_repo = getattr(status_service, "download_monitor_repo", None)
     existing_task = application.bot_data.get(DOWNLOAD_COMPLETION_POLLING_TASK_KEY)
-    if isinstance(status_service, GetDownloadStatusService) and isinstance(download_monitor_repo, DownloadMonitorRepo) and not (
-        isinstance(existing_task, asyncio.Task) and not existing_task.done()
-    ):
+    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
+        return
+    if not isinstance(status_service, GetDownloadStatusService):
+        _log_download_completion_polling_config_error(reason="未注入有效的 get_download_status_service。")
+        return
+    if not isinstance(download_monitor_repo, DownloadMonitorRepo):
+        _log_download_completion_polling_config_error(reason="get_download_status_service 未暴露有效的 download_monitor_repo。")
+        return
+    if not (isinstance(existing_task, asyncio.Task) and not existing_task.done()):
         stop_event = asyncio.Event()
         application.bot_data[DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY] = stop_event
         application.bot_data[DOWNLOAD_COMPLETION_POLLING_TASK_KEY] = application.create_task(
@@ -1762,6 +1768,13 @@ def _log_download_completion_polling_loop_error(*, error: Exception) -> None:
     print(
         f"\033[31m[下载完成状态轮询失败]\033[0m 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查下载器状态查询、download_monitor 和 SQLite 后等待下一轮自动轮询。"
+    )
+
+
+def _log_download_completion_polling_config_error(*, reason: str) -> None:
+    print(
+        f"\033[31m[下载完成状态轮询未启动]\033[0m 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 get_download_status_service，并确认它携带有效的 download_monitor_repo。"
     )
 
 

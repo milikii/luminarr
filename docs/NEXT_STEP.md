@@ -216,7 +216,7 @@
 
 ## After this step
 
-1. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露，以及和 auto-import service 的启动条件解耦也已补齐，后续只继续收口这条链路的更细回归与验证，不扩成通用 scheduler 平台）。
+1. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露、和 auto-import service 的启动条件解耦，以及启动配置缺口日志也已补齐，后续只继续收口这条链路的更细回归与验证，不扩成通用 scheduler 平台）。
 2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
 3. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
 4. `shared private-chat runtime` 最小抽离：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，改成显式 runtime context / injected capability；保留 `微信登录` 的 Telegram 二维码回传能力为注入项，不做多渠道平台化。

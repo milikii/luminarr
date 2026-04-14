@@ -2459,6 +2459,19 @@ def test_start_post_download_auto_import_scheduler_starts_completion_polling_wit
     app.create_task.call_args_list[0].args[0].close()
 
 
+def test_start_post_download_auto_import_scheduler_logs_fix_hint_when_completion_polling_missing_repo(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    app = SimpleNamespace(
+        bot_data={GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock())},
+        create_task=Mock(return_value=SimpleNamespace()),
+    )
+    _start_post_download_auto_import_scheduler(app)
+    captured = capsys.readouterr()
+    assert "[下载完成状态轮询未启动]" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_stop_post_download_auto_import_scheduler_stops_download_completion_polling_task() -> None:
     async def run() -> None:
         first_stop_event = asyncio.Event()
