@@ -43,6 +43,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 独立下载完成轮询现在已接入应用启动/停止链，应用运行时会周期轮询待完成下载并复用现有状态观察链
   - 下载完成轮询 loop 抛异常时，现在也会打印红色中文 `[下载完成状态轮询失败]` 日志和 `[处理建议]`
   - 下载完成轮询启动接线现在改用 `GetDownloadStatusService` 的显式 `download_monitor_repo` 能力，不再直接依赖私有字段名
+  - 下载完成轮询现在已经和 auto-import service 启动条件解耦；即使未注入 auto-import service，也能独立启动下载完成状态轮询
   - cleanup 最小闭环：inspect / cleanup / discoverability / rejection guidance / success follow-up / failure observability / `chat-scoped task_ref`
   - `chat-scoped task_ref` 命中 jobs 但 import 关联缺失时，inspect / cleanup 会继续回显解析出的 `task_id/task_hash`
   - 普通 correlation-missing inspect 在没有真实解析结果时继续显示 `任务 ID/Hash: -`，不把用户原始输入伪装成真实身份

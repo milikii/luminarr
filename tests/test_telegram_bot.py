@@ -2446,6 +2446,19 @@ def test_start_post_download_auto_import_scheduler_also_starts_download_completi
         item.args[0].close()
 
 
+def test_start_post_download_auto_import_scheduler_starts_completion_polling_without_auto_import_service() -> None:
+    database = SqliteDatabase(":memory:")
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    app = SimpleNamespace(
+        bot_data={GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)},
+        create_task=Mock(return_value=SimpleNamespace()),
+    )
+    _start_post_download_auto_import_scheduler(app)
+    assert [item.kwargs["name"] for item in app.create_task.call_args_list] == ["download_completion_polling_scheduler"]
+    app.create_task.call_args_list[0].args[0].close()
+
+
 def test_stop_post_download_auto_import_scheduler_stops_download_completion_polling_task() -> None:
     async def run() -> None:
         first_stop_event = asyncio.Event()

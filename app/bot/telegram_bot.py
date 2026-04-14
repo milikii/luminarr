@@ -557,21 +557,23 @@ async def _stop_bt_subscription_scheduler(application: Application) -> None:
 
 
 def _start_post_download_auto_import_scheduler(application: Application) -> None:
-    existing_task = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY)
-    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
-        return
     service = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY)
-    if not isinstance(service, PostDownloadAutoImportService):
-        return
-    stop_event = asyncio.Event()
-    application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY] = stop_event
-    application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY] = application.create_task(
-        _post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event),
-        name="post_download_auto_import_scheduler",
-    )
+    existing_task = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY)
+    if isinstance(service, PostDownloadAutoImportService) and not (
+        isinstance(existing_task, asyncio.Task) and not existing_task.done()
+    ):
+        stop_event = asyncio.Event()
+        application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY] = stop_event
+        application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY] = application.create_task(
+            _post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event),
+            name="post_download_auto_import_scheduler",
+        )
     status_service = application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
     download_monitor_repo = getattr(status_service, "download_monitor_repo", None)
-    if isinstance(status_service, GetDownloadStatusService) and isinstance(download_monitor_repo, DownloadMonitorRepo):
+    existing_task = application.bot_data.get(DOWNLOAD_COMPLETION_POLLING_TASK_KEY)
+    if isinstance(status_service, GetDownloadStatusService) and isinstance(download_monitor_repo, DownloadMonitorRepo) and not (
+        isinstance(existing_task, asyncio.Task) and not existing_task.done()
+    ):
         stop_event = asyncio.Event()
         application.bot_data[DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY] = stop_event
         application.bot_data[DOWNLOAD_COMPLETION_POLLING_TASK_KEY] = application.create_task(
