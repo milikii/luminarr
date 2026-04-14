@@ -570,7 +570,7 @@ def _start_post_download_auto_import_scheduler(application: Application) -> None
         name="post_download_auto_import_scheduler",
     )
     status_service = application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
-    download_monitor_repo = getattr(status_service, "_download_monitor_repo", None)
+    download_monitor_repo = getattr(status_service, "download_monitor_repo", None)
     if isinstance(status_service, GetDownloadStatusService) and isinstance(download_monitor_repo, DownloadMonitorRepo):
         stop_event = asyncio.Event()
         application.bot_data[DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY] = stop_event

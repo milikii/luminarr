@@ -127,6 +127,14 @@ def test_get_status_text_updates_download_monitor_truth_and_completion_event(tmp
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
 
 
+def test_get_download_status_service_exposes_download_monitor_repo(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    service = GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)
+    assert service.download_monitor_repo is monitor_repo
+
+
 def test_get_status_text_progresses_completed_download_to_auto_import_pending(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

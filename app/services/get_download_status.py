@@ -38,6 +38,10 @@ class GetDownloadStatusService:
         self._job_event_repo = job_event_repo
         self._post_download_auto_import_service = post_download_auto_import_service
 
+    @property
+    def download_monitor_repo(self) -> DownloadMonitorRepo | None:
+        return self._download_monitor_repo
+
     async def get_status_text(self, task_ref: str, *, chat_id: int | None = None) -> str:
         cleaned_ref = task_ref.strip()
         if not cleaned_ref:
