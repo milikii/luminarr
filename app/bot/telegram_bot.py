@@ -727,6 +727,17 @@ async def _poll_pending_download_completion_once(
         await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
 
 
+async def _download_completion_polling_loop(
+    *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService, stop_event: asyncio.Event
+) -> None:
+    while not stop_event.is_set():
+        await _poll_pending_download_completion_once(download_monitor_repo=download_monitor_repo, status_service=status_service)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS)
+        except asyncio.TimeoutError:
+            continue
+
+
 async def _bt_subscription_scheduler_loop(
     *,
     application: Application,

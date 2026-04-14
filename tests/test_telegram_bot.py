@@ -48,6 +48,7 @@ from app.bot.telegram_bot import (
     build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
+    _download_completion_polling_loop,
     _poll_pending_download_completion_once,
     _post_download_auto_import_scheduler_loop,
     _log_bt_subscription_scheduler_config_error,
@@ -2378,6 +2379,24 @@ def test_poll_pending_download_completion_once_reuses_status_service() -> None:
     status_service = SimpleNamespace(get_status_text=AsyncMock())
     asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
     assert status_service.get_status_text.await_args_list == [call("hash-41", chat_id=1001), call("hash-42", chat_id=1002)]
+
+
+def test_download_completion_polling_loop_runs_once_and_stops() -> None:
+    stop_event = asyncio.Event()
+
+    def list_pending_completion():
+        stop_event.set()
+        return ()
+
+    repo = SimpleNamespace(list_pending_completion=Mock(side_effect=list_pending_completion))
+    asyncio.run(
+        _download_completion_polling_loop(
+            download_monitor_repo=repo,
+            status_service=SimpleNamespace(get_status_text=AsyncMock()),
+            stop_event=stop_event,
+        )
+    )
+    repo.list_pending_completion.assert_called_once_with()
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
