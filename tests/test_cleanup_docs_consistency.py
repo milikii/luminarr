@@ -355,6 +355,11 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "bring-up 入口稳定" in text
             assert "pt_min_seed_hours" in text
             assert "只记录风险，不扩 cleanup 行为" in text
+            assert "OUTBOUND_PROXY_URL" in text
+            assert "FEISHU_INBOUND_MODE=long_connection" in text
+            assert "正常停机时不要把关闭过程误报成 `[Feishu 长连接启动失败]`" in text
+            assert "BT Transmission `http://127.0.0.1:19092`" in text
+            assert "PNG 二维码图片" in text
         if text is status_text:
             assert "four-channel cleanup smoke tests" in text
             assert "env readiness snapshot" in text
@@ -384,6 +389,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "Latest verification" in text
             assert "local test stack endpoint health checks" in text
             assert "local test stack path device check" in text
+            assert "代理配置快照" in text
+            assert "Feishu 入站模式快照" in text
+            assert "personal WeChat 二维码载体快照" in text
+            assert "本地测试栈快照" in text
+            assert "双 Transmission 测试栈配置虽然已落地" in text
+            assert "proxy / Feishu 长连接 / PNG 二维码 tests" in text
             assert "PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`" in text
             assert "pt_min_seed_hours" in text
             assert "job_event` 关联查询失败" in text
@@ -406,6 +417,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "Makefile" in readme_text
     assert "docker-compose.yml" in readme_text
     assert "Dockerfile" in readme_text
+    assert "OUTBOUND_PROXY_URL" in readme_text
+    assert "Feishu 可选 `long_connection` 入站模式" in readme_text
+    assert "PNG 二维码回传" in readme_text
+    assert "BT Transmission：`http://127.0.0.1:19092`" in readme_text
     assert "当前环境就绪快照" in window_text
     assert "当前 Telegram Bot API 就绪快照" in window_text
     assert "当前仓库证据快照" in window_text
@@ -420,6 +435,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "mixed-case 英文 `cleanup / cleanup inspect` 输入" in readme_text
     assert "guard-rejected` rejection guidance" in readme_text
     assert "verification docs gate 持续通过" in readme_text
+    assert "FEISHU_INBOUND_MODE=long_connection" in status_text
+    assert "/data/downloads/tr-bt" in status_text
     assert "context_token" in decisions_text
     assert "pt_min_seed_hours" in decisions_text
     assert ".ass" in decisions_text
