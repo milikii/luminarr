@@ -320,6 +320,12 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
         f"- cleanup verification docs gate：`{docs_gate_result}`（{docs_gate_date}，"
         f"`{docs_gate_command}`）"
     ) in status_text
+    assert (
+        "- proxy / Feishu 长连接 / PNG 二维码 tests：`135 passed`"
+        "（2026-04-14，`.venv/bin/python -m pytest -q tests/test_config.py tests/test_tmdb_client.py "
+        "tests/test_fanart_client.py tests/test_personal_wechat_login.py tests/test_telegram_bot.py "
+        "tests/test_feishu_long_connection.py tests/test_subtitle_translator.py tests/test_bt_sources.py`）"
+    ) in status_text
 
     for text in (next_step_text, status_text):
         assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in text
