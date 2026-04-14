@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+import app.bot.feishu_long_connection as feishu_long_connection_module
 from app.bot.feishu_adapter import FeishuPrivateTextEvent, parse_feishu_sdk_private_text_event
 from app.bot.feishu_long_connection import FeishuLongConnectionConfig, FeishuLongConnectionService
 
@@ -73,3 +74,48 @@ def test_feishu_long_connection_service_suppresses_expected_shutdown_error() -> 
 
     assert service._is_expected_shutdown_error(RuntimeError("Event loop stopped before Future completed."), None) is True
     assert service._is_expected_shutdown_error(RuntimeError("network down"), None) is False
+
+
+def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_shutdown(
+    monkeypatch,
+    capsys,
+) -> None:
+    class FakeDispatcherBuilder:
+        def register_p2_im_message_receive_v1(self, handler):
+            _ = handler
+            return self
+
+        def build(self) -> object:
+            return object()
+
+    class FakeEventDispatcherHandler:
+        @staticmethod
+        def builder(*_args: object) -> FakeDispatcherBuilder:
+            return FakeDispatcherBuilder()
+
+    class FakeWsClient:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def start(self) -> None:
+            raise RuntimeError("Event loop stopped before Future completed.")
+
+    monkeypatch.setattr(
+        feishu_long_connection_module,
+        "lark_oapi",
+        SimpleNamespace(
+            EventDispatcherHandler=FakeEventDispatcherHandler,
+            ws=SimpleNamespace(Client=FakeWsClient),
+        ),
+    )
+    monkeypatch.setattr(feishu_long_connection_module, "lark_ws_client_module", SimpleNamespace(loop=None))
+
+    service = FeishuLongConnectionService(
+        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
+        feishu_client=SimpleNamespace(),
+    )
+
+    service._run_client_thread()
+
+    captured = capsys.readouterr()
+    assert "[Feishu 长连接启动失败]" not in captured.out
