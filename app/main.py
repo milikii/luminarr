@@ -120,15 +120,15 @@ def _resolve_downloader_name_for_task(
     task_ref: str,
     chat_id: int | None,
     job_repo: JobRepo,
-) -> str:
+) -> str | None:
     if chat_id is None or chat_id <= 0:
-        return ""
+        return None
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
     except Exception:
-        return ""
+        return None
     if downloader_job is None:
-        return ""
+        return None
     return _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
 
 
@@ -242,6 +242,8 @@ def main() -> None:
             chat_id=chat_id,
             job_repo=job_repo,
         )
+        if not downloader_name:
+            return None
         client = resolve_downloader_client_by_name(downloader_name)
         return await client.get_torrent_status(task_ref)
 
@@ -254,6 +256,8 @@ def main() -> None:
             chat_id=chat_id,
             job_repo=job_repo,
         )
+        if not downloader_name:
+            return None
         client = resolve_downloader_client_by_name(downloader_name)
         return await client.get_torrent_import_source(task_ref)
 
