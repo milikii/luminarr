@@ -38,7 +38,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 - BT Transmission 配置目录：`/home/alex/luminarr-test/config/transmission-bt-stack`
 - Emby 配置目录：`/home/alex/luminarr-test/config/emby`
 - 三个容器都运行在 WSL 本机 Docker 中，通过宿主机端口映射给应用访问
-- 两个 Transmission 都使用整块 `/data:/data` 挂载；Emby 使用 `/data/library:/data/library` 挂载
+- 两个 Transmission 都按 LinuxServer 官方约定分别挂载 `/downloads/complete`、`/downloads/incomplete` 和 `/watch`；Emby 使用 `/data/library:/data/library` 挂载
 - BT Transmission 会把 PT Transmission 已有的 `trguing-zh` 自定义 WebUI 只读挂进自己的 `/config/webui/trguing-zh`，所以两台 TR 的 WebUI 保持同一套界面资源，但运行状态仍各自独立
 - 当前 compose 文件在仓库里，实际容器配置和状态仍落在 `/home/alex/luminarr-test`
 
@@ -52,9 +52,11 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 | RPC 路径 | `/transmission/rpc` |
 | RPC 认证 | 当前测试栈已关闭认证（`TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=false`） |
 | 下载目录（宿主机） | `/data/downloads/tr` |
-| 下载目录（容器内） | `/data/downloads/tr` |
+| 下载目录（容器内） | `/downloads/complete` |
 | incomplete 目录（宿主机） | `/data/downloads/incomplete` |
+| incomplete 目录（容器内） | `/downloads/incomplete` |
 | watch 目录（宿主机） | `/data/downloads/watch` |
+| watch 目录（容器内） | `/watch` |
 
 健康检查：
 
@@ -72,9 +74,11 @@ curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Sessi
 | RPC 路径 | `/transmission/rpc` |
 | RPC 认证 | 当前测试栈已关闭认证（`TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=false`） |
 | 下载目录（宿主机） | `/data/downloads/tr-bt` |
-| 下载目录（容器内） | `/data/downloads/tr-bt` |
+| 下载目录（容器内） | `/downloads/complete` |
 | incomplete 目录（宿主机） | `/data/downloads/incomplete-bt` |
+| incomplete 目录（容器内） | `/downloads/incomplete` |
 | watch 目录（宿主机） | `/data/downloads/watch-bt` |
+| watch 目录（容器内） | `/watch` |
 | 配置目录（宿主机） | `/home/alex/luminarr-test/config/transmission-bt-stack` |
 | 自定义 WebUI | 继续复用 PT Transmission 的 `trguing-zh`（只读挂载） |
 

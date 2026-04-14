@@ -8,15 +8,12 @@ services:
       - TZ=${TZ:-Asia/Shanghai}
       - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=false
       - TRANSMISSION_RPC_WHITELIST_ENABLED=false
-      - TRANSMISSION_DOWNLOAD_DIR=/data/downloads/tr
-      - TRANSMISSION_INCOMPLETE_DIR_ENABLED=true
-      - TRANSMISSION_INCOMPLETE_DIR=/data/downloads/incomplete
-      - TRANSMISSION_WATCH_DIR_ENABLED=true
-      - TRANSMISSION_WATCH_DIR=/data/downloads/watch
       - TRANSMISSION_WEB_HOME=/config/webui/trguing-zh
     volumes:
       - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission:/config
-      - /data:/data
+      - /data/downloads/tr:/downloads/complete
+      - /data/downloads/incomplete:/downloads/incomplete
+      - /data/downloads/watch:/watch
     ports:
       - "19091:9091"
       - "15141:51413"
@@ -32,16 +29,13 @@ services:
       - TZ=${TZ:-Asia/Shanghai}
       - TRANSMISSION_RPC_AUTHENTICATION_REQUIRED=false
       - TRANSMISSION_RPC_WHITELIST_ENABLED=false
-      - TRANSMISSION_DOWNLOAD_DIR=/data/downloads/tr-bt
-      - TRANSMISSION_INCOMPLETE_DIR_ENABLED=true
-      - TRANSMISSION_INCOMPLETE_DIR=/data/downloads/incomplete-bt
-      - TRANSMISSION_WATCH_DIR_ENABLED=true
-      - TRANSMISSION_WATCH_DIR=/data/downloads/watch-bt
       - TRANSMISSION_WEB_HOME=/config/webui/trguing-zh
     volumes:
       - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission-bt-stack:/config
       - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission/webui/trguing-zh:/config/webui/trguing-zh:ro
-      - /data:/data
+      - /data/downloads/tr-bt:/downloads/complete
+      - /data/downloads/incomplete-bt:/downloads/incomplete
+      - /data/downloads/watch-bt:/watch
     ports:
       - "19092:9091"
       - "15142:51413"
