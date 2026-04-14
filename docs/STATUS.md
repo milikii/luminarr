@@ -176,7 +176,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 通用 plugin / skill / MCP 平台化仍然继续后置，不是当前收口目标。
 - 2026-04-14 当前仓库根目录 `.env` 已补齐 Telegram / downloader / import / Feishu / WeCom 所需的最小配置，并且提权启动的 `app.main` 已在运行；本地 `18889/wecom/callback` 也已确认可达。当前四渠道里只剩 WeCom 真实私聊 smoke 还没收口。
 - 2026-04-14 本地仓库内已经有可回填的窗口期真实 smoke 证据：`logs/cleanup-private-chat-smoke.log` 已命中 Telegram / personal WeChat / Feishu 三个渠道的窗口内 `[cleanup 私聊 smoke]` 行；当前缺失的不是仓库证据能力，而是 WeCom 渠道仍未打到本机。
-- 2026-04-13 `curl` 已确认 Transmission 返回 `409 Conflict + X-Transmission-Session-Id`、Emby `/System/Info/Public` 正常返回 JSON，`stat -c "%d %n" /data/downloads/tr /data/library/movies` 也确认两条路径仍在同一设备上；当前剩余环境 blocker 还包括 Docker socket 访问仍被拒绝，且 sandbox 下本地随机端口监听会返回 `Operation not permitted`，所以 Feishu / WeCom 两条 webhook server HTTP 测试在全量 pytest 中会 skip。
+- 2026-04-14 宿主机侧 `curl` 已确认 PT / BT 两台 Transmission 都返回 `409 Conflict + X-Transmission-Session-Id`、Emby `/System/Info/Public` 正常返回 JSON，`stat -c "%d %n" /data/downloads/tr /data/downloads/tr-bt /data/library/movies` 也确认三条路径仍在同一设备上；当前剩余环境差异主要是本 CLI shell 直打 `19092` 仍失败，以及 sandbox 下本地随机端口监听会返回 `Operation not permitted`，所以 Feishu / WeCom 两条 webhook server HTTP 测试在全量 pytest 中会 skip。
 - 2026-04-14 当前仓库里的双 Transmission 测试栈配置已经在宿主机 sudo shell 侧复验通过：`luminarr-test-transmission-bt` 已处于 `Up`，宿主机侧 `curl -si http://127.0.0.1:19092/transmission/rpc` 已返回 `409 Conflict + X-Transmission-Session-Id`，`config/transmission-bt-stack/settings.json` 也已按新挂载方式初始化为 `/downloads/complete` / `/downloads/incomplete` / `/watch`；当前剩余差异只是本 CLI shell 直打 `19092` 仍失败，这更像本地 CLI 连通性差异，不再视为测试栈配置 blocker。
 
 ## Latest verification
