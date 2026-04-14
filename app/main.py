@@ -154,6 +154,15 @@ def _resolve_downloader_payload_value(payload_json: str, key: str) -> str:
     return str(payload.get(key, "")).strip()
 
 
+def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
+    print(
+        f"\033[31m[下载器路由未命中]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，"
+        "并确认状态/导入查询使用的是同一私聊会话。",
+        flush=True,
+    )
+
+
 def _resolve_downloader_name_for_task(
     *,
     task_ref: str,
@@ -161,14 +170,21 @@ def _resolve_downloader_name_for_task(
     job_repo: JobRepo,
 ) -> str | None:
     if chat_id is None or chat_id <= 0:
+        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="chat_id missing")
         return None
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
     except Exception:
+        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job lookup failed")
         return None
     if downloader_job is None:
+        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
         return None
-    return _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
+    downloader_name = _resolve_downloader_payload_value(downloader_job.payload_json, "downloader_name")
+    if downloader_name:
+        return downloader_name
+    _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
+    return None
 
 
 def _build_bt_source_providers(

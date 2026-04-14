@@ -217,7 +217,7 @@
 ## After this step
 
 1. `shared private-chat runtime` 最小抽离：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，去掉非 Telegram 渠道伪造 `SimpleNamespace` Telegram context 的做法；`微信登录` 这类 Telegram-only 媒资回传能力改成显式注入，不做多渠道平台化。
-2. 下载器路由 fail-closed：`channel_identity` 空输入返回 `0`、缺少 `downloader_name`、未知实例名回退默认 Transmission，以及下载投递 path 里的非法显式实例名回退默认下载器都已修掉；当前剩余的是“这些失败已 fail-closed，但还缺显式中文日志把失败原因和修复提示打出来”。
+2. 下载器路由 fail-closed：`channel_identity` 空输入返回 `0`、缺少 `downloader_name`、以及下载投递 path 里的非法显式实例名回退默认下载器都已修掉，lookup 未命中现在也会打印中文日志；当前剩余的是“lookup 路径里命中未知实例名时仍缺显式中文日志”。
 3. 持久化吞错收口：把搜索候选、澄清态、下载器路由等路径里 `except Exception: pass/return None` 的静默降级改成“区分真缺数据和 SQLite / 配置异常”，并补显式中文日志。
 4. `cleanup_smoke_logging` 去模块级全局状态：目录创建失败返回伪成功路径的问题已修掉，`log_cleanup_private_chat_smoke()` 也已支持显式 `log_path` 传参；当前剩余的是默认运行路径仍回退到模块级 `_cleanup_private_chat_smoke_log_path` 全局状态。
 5. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
