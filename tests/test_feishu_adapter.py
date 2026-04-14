@@ -177,6 +177,8 @@ def test_project_channel_identity_is_stable_and_channel_scoped() -> None:
     assert projected_chat_id == projected_chat_id_again
     assert projected_chat_id != projected_user_id
     assert projected_chat_id != telegram_like_chat_id
+    assert project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="") is None
+    assert project_channel_user_id(channel="", external_user_id="ou_feishu_user_1") is None
 
 
 def test_get_feishu_url_verification_challenge_reads_challenge() -> None:
