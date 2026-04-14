@@ -600,7 +600,11 @@ async def _stop_post_download_auto_import_scheduler(application: Application) ->
     if isinstance(stop_event, asyncio.Event):
         stop_event.set()
     if isinstance(task, asyncio.Task):
-        await task
+        try:
+            await task
+        except Exception as error:
+            _log_download_completion_polling_stop_error(error=error)
+            raise
 
 
 def _start_feishu_webhook_server_if_configured(application: Application) -> None:
@@ -1775,6 +1779,13 @@ def _log_download_completion_polling_config_error(*, reason: str) -> None:
     print(
         f"\033[31m[下载完成状态轮询未启动]\033[0m 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 get_download_status_service，并确认它携带有效的 download_monitor_repo。"
+    )
+
+
+def _log_download_completion_polling_stop_error(*, error: Exception) -> None:
+    print(
+        f"\033[31m[下载完成状态轮询停止失败]\033[0m 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查下载完成轮询 task 的退出路径、SQLite 连接状态，以及 stop_event 触发后的清理逻辑。"
     )
 
 

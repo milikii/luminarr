@@ -2493,6 +2493,29 @@ def test_stop_post_download_auto_import_scheduler_stops_download_completion_poll
     asyncio.run(run())
 
 
+def test_stop_post_download_auto_import_scheduler_logs_fix_hint_when_completion_polling_task_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def boom() -> None:
+        raise RuntimeError("boom")
+
+    async def run() -> None:
+        failing_task = asyncio.create_task(boom())
+        application = SimpleNamespace(
+            bot_data={
+                DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY: asyncio.Event(),
+                DOWNLOAD_COMPLETION_POLLING_TASK_KEY: failing_task,
+            }
+        )
+        with pytest.raises(RuntimeError, match="boom"):
+            await _stop_post_download_auto_import_scheduler(application)
+
+    asyncio.run(run())
+    captured = capsys.readouterr()
+    assert "[下载完成状态轮询停止失败]" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
     search_db = SqliteDatabase(":memory:")
     search_db.initialize()
