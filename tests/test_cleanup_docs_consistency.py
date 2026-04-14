@@ -553,6 +553,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "WeCom 探针来源快照" in status_text
     assert "README 缺口快照" in status_text
     assert "NEXT_STEP 缺口快照" in status_text
+    assert "Cloudflare Tunnel 环境 blocker 快照" in status_text
     assert "WeCom 入口门禁收口快照" in status_text
     assert "tests/test_cleanup_cross_channel_smoke.py -k service_not_ready" in next_step_text
     assert "四渠道聚合 service-not-ready 门禁快照" in status_text
