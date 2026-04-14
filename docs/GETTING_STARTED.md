@@ -110,6 +110,12 @@ personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动。
 docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
 ```
 
+如果当前 WSL shell 直接报 `/var/run/docker.sock` `permission denied`，就在宿主机可用的 sudo 环境里改用：
+
+```bash
+sudo docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
+```
+
 启动后先做健康检查：
 
 ```bash

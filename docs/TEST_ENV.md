@@ -27,6 +27,12 @@ Docker Compose 文件：
 docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
 ```
 
+如果当前 WSL shell 直接报 `/var/run/docker.sock` `permission denied`，就在宿主机可用的 sudo 环境里改用：
+
+```bash
+sudo docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
+```
+
 停止测试栈：
 
 ```bash
