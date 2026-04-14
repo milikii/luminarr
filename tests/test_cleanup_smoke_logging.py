@@ -115,3 +115,15 @@ def test_log_cleanup_private_chat_smoke_prints_fix_hint_when_log_file_is_not_wri
     captured = capsys.readouterr()
     assert "[cleanup 私聊 smoke 日志落盘失败]" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_configure_cleanup_private_chat_smoke_log_file_returns_none_when_log_dir_is_not_writable(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    blocked_parent = tmp_path / "blocked-parent"
+    blocked_parent.write_text("occupied", encoding="utf-8")
+    assert configure_cleanup_private_chat_smoke_log_file(log_dir=blocked_parent / "logs") is None
+    captured = capsys.readouterr()
+    assert "[cleanup 私聊 smoke 日志目录不可写]" in captured.out
+    assert "[处理建议]" in captured.out

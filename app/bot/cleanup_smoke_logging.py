@@ -32,7 +32,7 @@ def configure_cleanup_private_chat_smoke_log_file(
     *,
     log_dir: Path,
     file_name: str = DEFAULT_CLEANUP_PRIVATE_CHAT_SMOKE_LOG_FILE,
-) -> Path:
+) -> Path | None:
     global _cleanup_private_chat_smoke_log_path
     log_path = log_dir / file_name
     try:
@@ -45,7 +45,7 @@ def configure_cleanup_private_chat_smoke_log_file(
             "是从仓库根目录启动，或手动创建可写的 logs 目录。",
             flush=True,
         )
-        return log_path
+        return None
     _cleanup_private_chat_smoke_log_path = log_path
     return log_path
 
