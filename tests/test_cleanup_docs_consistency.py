@@ -395,10 +395,10 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "Feishu 入站模式快照" in text
             assert "personal WeChat 二维码载体快照" in text
             assert "本地测试栈快照" in text
-            assert "双 Transmission 测试栈配置虽然已落地" in text
+            assert "双 Transmission 测试栈配置已经在宿主机 sudo shell 侧复验通过" in text
             assert "/var/run/docker.sock" in text
             assert "config/transmission-bt-stack" in text
-            assert "`19092` 端口" in text
+            assert "19092/transmission/rpc" in text
             assert "`/data/downloads/tr-bt`" in text
             assert "ConnectionClosedOK" in text
             assert "Event loop is closed" in text
