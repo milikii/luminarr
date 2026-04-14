@@ -68,6 +68,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - WeCom 探针来源快照：`README.md` / `docs/GETTING_STARTED.md` 现在也显式写明 `18889/wecom/callback` 来自当前本地已验证 `.env`，不是 `.env.example` 默认值，避免把模板默认端口误读成当前联调真相。
 - WeCom 探针来源门禁快照：verification docs gate 现在也显式锁住这条 `WeCom 探针来源快照` 文案，避免状态页把“当前本地已验证 `.env`”和“.env.example 默认值”的边界写丢。
 - README 缺口快照：仓库首页 `README.md` 现在也已显式写出“当前只剩 WeCom 真实私聊 smoke 缺口”，避免用户只看入口时还以为四个渠道都待补。
+- README 缺口门禁快照：verification docs gate 现在也显式锁住这条 `README 缺口快照` 文案，避免状态页把入口页的当前缺口总结写丢。
 - NEXT_STEP 缺口快照：`docs/NEXT_STEP.md` 现在也已显式写出“当前四渠道里只剩 WeCom 真实私聊 smoke 待补”，并已纳入 docs gate 断言，避免当前主线目标页回退成只列退出条件、不写当前实际缺口。
 - `.env` 取值归一化快照：`sync-cleanup-doc-snapshots` 现在会先去掉仓库 `.env` 值首尾成对的单/双引号，再参与 `telegram_bot_api` 和 `env_readiness` 判断，避免 `"token"` 这类配置被误当成带引号字面量。
 - 当前 shell env 值归一化快照：`sync-cleanup-doc-snapshots` 现在也会先去掉当前 shell 环境变量值首尾成对的单/双引号，避免当前会话里的 `\"token\"` 直接盖过后面的 `.env` / Windows env 真值。

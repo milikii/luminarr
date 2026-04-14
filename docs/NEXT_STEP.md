@@ -28,6 +28,7 @@
 - 保持 verification docs gate 继续显式校验 `docs/NEXT_STEP.md` 里的“当前四渠道里只剩 WeCom 真实私聊 smoke 待补”这句当前缺口文案，避免主线目标页回退成只列退出条件、不写当前实际缺口。
 - 保持 verification docs gate 继续显式校验 `docs/STATUS.md` 里的 `WeCom 本地入口快照` 文案，避免状态页把本地 readiness 探针写丢。
 - 保持 verification docs gate 继续显式校验 `docs/STATUS.md` 里的 `WeCom 探针来源快照` 文案，避免状态页把“当前本地已验证 `.env`”和“.env.example 默认值”的边界写丢。
+- 保持 verification docs gate 继续显式校验 `docs/STATUS.md` 里的 `README 缺口快照` 文案，避免状态页把入口页“当前只剩 WeCom 缺口”这句当前总结写丢。
 - 保持 `docs/STATUS.md` 只保留快照，不把窗口详细规则和备注明细抄回去。
 - 保持 `README.md` 只同步仓库入口需要知道的当前边界、cleanup 风险和后续路线；窗口逐项证据继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md`。
 - 保持 `README.md` 当前 next step 的退出条件也显式覆盖 `verification docs gate`，避免用户只看仓库入口时误以为 docs gate 不是 cleanup 验证窗口的正式退出条件。
