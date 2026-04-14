@@ -21,6 +21,8 @@ from app.bot.telegram_bot import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
     BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
     BT_PROCESSING_PATH_PROMPT_TEXT,
+    DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
+    DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
     RAW_BT_DESTINATION_OPTIONS_KEY,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
@@ -40,6 +42,9 @@ from app.bot.telegram_bot import (
     LLM_PHYSICAL_FAILURE_SAFE_TEXT,
     MANAGE_BT_SUBSCRIPTION_SERVICE_KEY,
     MANAGE_WATCHLIST_SERVICE_KEY,
+    POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
+    POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
+    POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_UPDATE_REPO_KEY,
@@ -51,6 +56,8 @@ from app.bot.telegram_bot import (
     _download_completion_polling_loop,
     _poll_pending_download_completion_once,
     _post_download_auto_import_scheduler_loop,
+    _start_post_download_auto_import_scheduler,
+    _stop_post_download_auto_import_scheduler,
     _log_bt_subscription_scheduler_config_error,
 )
 from app.clients.transmission import TransmissionImportSource
@@ -71,7 +78,7 @@ from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
 from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
-from app.services.post_download_auto_import import AutoImportRunResult
+from app.services.post_download_auto_import import AutoImportRunResult, PostDownloadAutoImportService
 from app.services.search_media import SearchMediaService
 
 _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
@@ -2397,6 +2404,48 @@ def test_download_completion_polling_loop_runs_once_and_stops() -> None:
         )
     )
     repo.list_pending_completion.assert_called_once_with()
+
+
+def test_start_post_download_auto_import_scheduler_also_starts_download_completion_polling() -> None:
+    database = SqliteDatabase(":memory:")
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    status_service = GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)
+    app = SimpleNamespace(
+        bot_data={
+            GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+            POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY: PostDownloadAutoImportService(monitor_repo, JobEventRepo(database), AsyncMock()),
+        },
+        create_task=Mock(return_value=SimpleNamespace()),
+    )
+    _start_post_download_auto_import_scheduler(app)
+    assert [item.kwargs["name"] for item in app.create_task.call_args_list] == [
+        "post_download_auto_import_scheduler",
+        "download_completion_polling_scheduler",
+    ]
+    for item in app.create_task.call_args_list:
+        item.args[0].close()
+
+
+def test_stop_post_download_auto_import_scheduler_stops_download_completion_polling_task() -> None:
+    async def run() -> None:
+        first_stop_event = asyncio.Event()
+        first_task = asyncio.create_task(first_stop_event.wait())
+        second_stop_event = asyncio.Event()
+        second_task = asyncio.create_task(second_stop_event.wait())
+        application = SimpleNamespace(
+            bot_data={
+                POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY: first_stop_event,
+                POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY: first_task,
+                DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY: second_stop_event,
+                DOWNLOAD_COMPLETION_POLLING_TASK_KEY: second_task,
+            }
+        )
+        await _stop_post_download_auto_import_scheduler(application)
+        assert first_stop_event.is_set() and second_stop_event.is_set()
+        assert first_task.done() and second_task.done()
+
+    asyncio.run(run())
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:

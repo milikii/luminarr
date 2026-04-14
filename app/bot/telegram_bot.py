@@ -221,6 +221,8 @@ BT_SUBSCRIPTION_SCHEDULER_TASK_KEY = "bt_subscription_scheduler_task"
 BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY = "bt_subscription_scheduler_stop_event"
 POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY = "post_download_auto_import_task"
 POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY = "post_download_auto_import_stop_event"
+DOWNLOAD_COMPLETION_POLLING_TASK_KEY = "download_completion_polling_task"
+DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY = "download_completion_polling_stop_event"
 FEISHU_WEBHOOK_SERVER_CONFIG_KEY = "feishu_webhook_server_config"
 FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY = "feishu_webhook_reply_text_func"
 FEISHU_WEBHOOK_SERVER_RUNTIME_KEY = "feishu_webhook_server_runtime"
@@ -567,11 +569,26 @@ def _start_post_download_auto_import_scheduler(application: Application) -> None
         _post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event),
         name="post_download_auto_import_scheduler",
     )
+    status_service = application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
+    download_monitor_repo = getattr(status_service, "_download_monitor_repo", None)
+    if isinstance(status_service, GetDownloadStatusService) and isinstance(download_monitor_repo, DownloadMonitorRepo):
+        stop_event = asyncio.Event()
+        application.bot_data[DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY] = stop_event
+        application.bot_data[DOWNLOAD_COMPLETION_POLLING_TASK_KEY] = application.create_task(
+            _download_completion_polling_loop(download_monitor_repo=download_monitor_repo, status_service=status_service, stop_event=stop_event),
+            name="download_completion_polling_scheduler",
+        )
 
 
 async def _stop_post_download_auto_import_scheduler(application: Application) -> None:
     stop_event = application.bot_data.pop(POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY, None)
     task = application.bot_data.pop(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY, None)
+    if isinstance(stop_event, asyncio.Event):
+        stop_event.set()
+    if isinstance(task, asyncio.Task):
+        await task
+    stop_event = application.bot_data.pop(DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY, None)
+    task = application.bot_data.pop(DOWNLOAD_COMPLETION_POLLING_TASK_KEY, None)
     if isinstance(stop_event, asyncio.Event):
         stop_event.set()
     if isinstance(task, asyncio.Task):
