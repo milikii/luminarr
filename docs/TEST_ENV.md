@@ -35,7 +35,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 
 说明：
 - PT Transmission 配置目录：`/home/alex/luminarr-test/config/transmission`
-- BT Transmission 配置目录：`/home/alex/luminarr-test/config/transmission-bt`
+- BT Transmission 配置目录：`/home/alex/luminarr-test/config/transmission-bt-stack`
 - Emby 配置目录：`/home/alex/luminarr-test/config/emby`
 - 三个容器都运行在 WSL 本机 Docker 中，通过宿主机端口映射给应用访问
 - 两个 Transmission 都使用整块 `/data:/data` 挂载；Emby 使用 `/data/library:/data/library` 挂载
@@ -75,7 +75,7 @@ curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Sessi
 | 下载目录（容器内） | `/data/downloads/tr-bt` |
 | incomplete 目录（宿主机） | `/data/downloads/incomplete-bt` |
 | watch 目录（宿主机） | `/data/downloads/watch-bt` |
-| 配置目录（宿主机） | `/home/alex/luminarr-test/config/transmission-bt` |
+| 配置目录（宿主机） | `/home/alex/luminarr-test/config/transmission-bt-stack` |
 | 自定义 WebUI | 继续复用 PT Transmission 的 `trguing-zh`（只读挂载） |
 
 健康检查：

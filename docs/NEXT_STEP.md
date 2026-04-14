@@ -49,6 +49,7 @@
 - 保持 `docs/STATUS.md` / `README.md` 继续显式写出 Feishu 当前已支持 `FEISHU_INBOUND_MODE=long_connection`，且该模式只要求 `FEISHU_APP_ID + FEISHU_APP_SECRET`，避免入口文档仍停在“Feishu 永远必须三元组齐全”的旧真相。
 - 保持 Feishu 长连接在正常停机时不要把关闭过程误报成 `[Feishu 长连接启动失败]`、`ConnectionClosedOK` traceback 或 `Event loop is closed` traceback，避免 bring-up/cleanup 验证证据把正常 shutdown 误记成启动回归。
 - 保持 `docs/TEST_ENV.md` / `README.md` / `docs/STATUS.md` 对本地双 Transmission 测试栈保持一致，显式反映 BT Transmission `http://127.0.0.1:19092` 和 `/data/downloads/tr-bt`，避免 PT / BT 本地联调入口继续分叉。
+- 保持 BT Transmission 测试栈继续绑定新的 `config/transmission-bt-stack` 配置目录，避免复用旧 `config/transmission-bt` 里已写入默认 `/downloads/...` 的脏 `settings.json`，导致 `19092` 端口起不来却被误判成 compose 配置回退。
 - 保持 `docs/STATUS.md` / `README.md` 继续显式写出 personal WeChat `微信登录` 当前回传的是 PNG 二维码图片，不再是 SVG 文件，避免用户入口和 Telegram 发送行为重新分叉。
 - 保持 `Makefile` 同时提供独立的四渠道 cleanup smoke gate 入口和当前 cleanup 验证窗口的一键 gate 入口，避免把 smoke gate、cleanup 聚合回归和 docs gate 混成一条不透明命令。
 - 保持 `Makefile` 明确暴露 `test-cleanup-docs-gate`，让 cleanup verification docs gate 和普通 `test-docs` 分开，避免把 docs consistency gate 误当成当前 cleanup 窗口的完整文档 gate。

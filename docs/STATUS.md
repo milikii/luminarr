@@ -63,6 +63,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Feishu 入站模式快照：当前配置已支持 `FEISHU_INBOUND_MODE=long_connection`；此模式下只要求 `FEISHU_APP_ID + FEISHU_APP_SECRET`，不再强制 `FEISHU_ENCRYPT_KEY`。Feishu 长连接收到私聊事件后仍复用 shared runtime 文本链。
 - personal WeChat 二维码载体快照：当前 `微信登录` 回传已从 SVG 文件收口为 PNG 图片，Telegram 发送侧会按图片路径走 `send_photo`，避免用户拿到 SVG 后还要额外找查看器。
 - 本地测试栈快照：`docker-compose.test.yml` / `docs/TEST_ENV.md` 现在都已补齐 BT Transmission（`http://127.0.0.1:19092`）和 `/data/downloads/tr-bt` 路径，PT / BT 双下载器本地联调不再只能复用同一台 TR。
+- BT Transmission 配置目录切换快照：2026-04-14 已把 BT Transmission 的测试栈配置目录从旧的 `config/transmission-bt` 切到新的 `config/transmission-bt-stack`，避免复用先前已写入默认 `/downloads/...` 目录的脏 `settings.json`，让 sudo 重启后能按 compose 里的 `/data/downloads/tr-bt` 初始化。
 - bring-up 入口快照：`Makefile` 的 `make run` 现在会先检查 `ENV_FILE` 指向的环境文件；缺失时打印红色中文 `[环境文件缺失]` 日志和 `[处理建议]`，并支持 `ENV_FILE=/绝对路径 make run`，避免当前工作区没有 `.env` 时直接掉进 shell 原始 `source` 报错。
 - 知识入口快照：历史单体主文档 `Luminarr_v15.md` 已移除，当前只保留 `README.md -> docs/INDEX.md -> docs/GETTING_STARTED.md -> docs/ARCHITECTURE.md` 这条正式入口，避免过期总纲继续和当前主线并行。
 - 环境就绪快照：2026-04-14 当前仓库根目录 `.env` 已补齐四渠道 cleanup smoke 所需环境键；提权启动的 `app.main` 已实际拉起 Feishu SDK 长连接、personal WeChat 文本轮询和 WeCom callback 监听，本地 `curl http://127.0.0.1:18889/wecom/callback` 也已返回 `400 missing echostr`。当前仓库文档也已显式写清这条探针只在 `app.main` 运行时成立；如果直接拿到 `connection refused`，先回查应用进程，再区分是不是真正的 WeCom 代码回归。当前剩余 blocker 已收缩到 WeCom 真实私聊 smoke 证据仍未补齐。
@@ -176,7 +177,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-14 当前仓库根目录 `.env` 已补齐 Telegram / downloader / import / Feishu / WeCom 所需的最小配置，并且提权启动的 `app.main` 已在运行；本地 `18889/wecom/callback` 也已确认可达。当前四渠道里只剩 WeCom 真实私聊 smoke 还没收口。
 - 2026-04-14 本地仓库内已经有可回填的窗口期真实 smoke 证据：`logs/cleanup-private-chat-smoke.log` 已命中 Telegram / personal WeChat / Feishu 三个渠道的窗口内 `[cleanup 私聊 smoke]` 行；当前缺失的不是仓库证据能力，而是 WeCom 渠道仍未打到本机。
 - 2026-04-13 `curl` 已确认 Transmission 返回 `409 Conflict + X-Transmission-Session-Id`、Emby `/System/Info/Public` 正常返回 JSON，`stat -c "%d %n" /data/downloads/tr /data/library/movies` 也确认两条路径仍在同一设备上；当前剩余环境 blocker 还包括 Docker socket 访问仍被拒绝，且 sandbox 下本地随机端口监听会返回 `Operation not permitted`，所以 Feishu / WeCom 两条 webhook server HTTP 测试在全量 pytest 中会 skip。
-- 2026-04-14 当前仓库里的双 Transmission 测试栈配置虽然已落地到 `docker-compose.test.yml` / `docs/TEST_ENV.md`，但这台机器上 `docker compose -f docker-compose.test.yml up -d` 仍被 `/var/run/docker.sock` 权限拦住，`19092` 端口和 `/data/downloads/tr-bt` 路径因此还没完成本机复验；这属于宿主机权限 blocker，不是配置格式回退。
+- 2026-04-14 当前仓库里的双 Transmission 测试栈配置虽然已落地到 `docker-compose.test.yml` / `docs/TEST_ENV.md`，但这台机器上即使用户用 sudo 拉起过一次，旧 `config/transmission-bt/settings.json` 仍保留镜像默认 `/downloads/...` 目录；当前已把 compose 切到全新的 `config/transmission-bt-stack` 目录，等待用户在 sudo 环境里重启后再做 `19092` 端口和 `/data/downloads/tr-bt` 路径复验。
 
 ## Latest verification
 

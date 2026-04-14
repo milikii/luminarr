@@ -39,7 +39,7 @@ services:
       - TRANSMISSION_WATCH_DIR=/data/downloads/watch-bt
       - TRANSMISSION_WEB_HOME=/config/webui/trguing-zh
     volumes:
-      - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission-bt:/config
+      - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission-bt-stack:/config
       - ${LUMINARR_TEST_ROOT:-/home/alex/luminarr-test}/config/transmission/webui/trguing-zh:/config/webui/trguing-zh:ro
       - /data:/data
     ports:

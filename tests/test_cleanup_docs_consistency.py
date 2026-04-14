@@ -397,7 +397,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "本地测试栈快照" in text
             assert "双 Transmission 测试栈配置虽然已落地" in text
             assert "/var/run/docker.sock" in text
-            assert "`19092` 端口和 `/data/downloads/tr-bt` 路径因此还没完成本机复验" in text
+            assert "config/transmission-bt-stack" in text
+            assert "`19092` 端口" in text
+            assert "`/data/downloads/tr-bt`" in text
             assert "ConnectionClosedOK" in text
             assert "Event loop is closed" in text
             assert "pending-task warning" in text
