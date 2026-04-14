@@ -118,6 +118,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退
   - verification docs gate 持续通过
 - 这一步只允许修 shared runtime 回归、渠道胶水回归和显式日志缺口，不新增自动 cleanup、批量 cleanup 或删种。
+- 截至 2026-04-14，当前四渠道真实私聊 smoke 已补齐 Telegram / personal WeChat / Feishu，剩余唯一待补缺口只剩 WeCom。
 - `tests/test_cleanup_cross_channel_smoke.py` 继续保障四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case 英文 `cleanup / cleanup inspect` 输入 / chat-scoped `task_ref` -> jobs -> import correlation，且已把 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention，以及 `guard-rejected` rejection guidance 验证进来。
 - 当前 cleanup 窗口的本地 gate 入口有十条：`make test-cleanup-smoke` 只跑四渠道 smoke gate，`make test-cleanup-service-not-ready` 单独盯 service-not-ready observability，`make test-cleanup-telegram` 跑 Telegram cleanup 入口回归，`make test-cleanup-personal-wechat` 跑 personal WeChat cleanup 入口回归，`make test-cleanup-feishu` 跑 Feishu cleanup 入口回归，`make test-cleanup-wecom` 跑 WeCom cleanup 入口回归，`make test-cleanup-feishu-webhook` 跑 Feishu webhook cleanup 入口回归，`make test-cleanup` 跑 cleanup 聚合回归，`make test-cleanup-docs-gate` 跑 cleanup verification docs gate，`make test-cleanup-window` 会连续跑 smoke gate、cleanup 聚合回归和 verification docs gate；它们都不能替代四渠道真实私聊 smoke 证据。
 - 如果当前只想确认 WeCom 本地 callback 已就绪，可以先跑 `curl -si http://127.0.0.1:18889/wecom/callback`；当前无校验参数时返回 `400 missing echostr` 属于本地入口可达，不等于 WeCom 真实私聊 smoke 已完成。
