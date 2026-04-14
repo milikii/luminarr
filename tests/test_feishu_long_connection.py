@@ -74,6 +74,7 @@ def test_feishu_long_connection_service_suppresses_expected_shutdown_error() -> 
 
     assert service._is_expected_shutdown_error(RuntimeError("Event loop stopped before Future completed."), None) is True
     assert service._is_expected_shutdown_error(RuntimeError("network down"), None) is False
+    assert service._is_expected_shutdown_cancel(asyncio.CancelledError(), None) is True
 
 
 def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_shutdown(

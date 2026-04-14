@@ -89,12 +89,27 @@ class FeishuLongConnectionService:
             future.result(timeout=5.0)
         except Exception:
             pass
-        loop.call_soon_threadsafe(loop.stop)
+        cron = getattr(getattr(client, "_cache", None), "_cron", None)
+        if cron is not None and not loop.is_closed():
+            loop.call_soon_threadsafe(cron.cancel)
+        if not loop.is_closed():
+            loop.call_soon_threadsafe(loop.stop)
         thread.join(timeout=5.0)
 
     @staticmethod
     def _is_expected_shutdown_error(error: Exception, thread: threading.Thread | None) -> bool:
         return thread is None and "Event loop stopped before Future completed" in str(error)
+
+    @staticmethod
+    def _is_expected_shutdown_cancel(error: BaseException, thread: threading.Thread | None) -> bool:
+        return thread is None and isinstance(error, asyncio.CancelledError)
+
+    def _handle_loop_exception(self, loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
+        exception = context.get("exception")
+        if self._thread is None and context.get("message") == "Task exception was never retrieved":
+            if exception is not None and exception.__class__.__name__ == "ConnectionClosedOK":
+                return
+        loop.default_exception_handler(context)
 
     def _run_client_thread(self) -> None:
         assert lark_oapi is not None
@@ -102,6 +117,7 @@ class FeishuLongConnectionService:
         thread_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(thread_loop)
         lark_ws_client_module.loop = thread_loop
+        thread_loop.set_exception_handler(self._handle_loop_exception)
         self._thread_loop = thread_loop
 
         event_handler = (
@@ -117,9 +133,13 @@ class FeishuLongConnectionService:
         self._ws_client = client
         try:
             client.start()
-        except Exception as error:
+        except BaseException as error:
             if self._is_expected_shutdown_error(error, self._thread):
                 return
+            if self._is_expected_shutdown_cancel(error, self._thread):
+                return
+            if not isinstance(error, Exception):
+                raise
             print(
                 f"\033[31m[Feishu 长连接启动失败]\033[0m 原因={error}\n"
                 "\033[33m[处理建议]\033[0m 检查 FEISHU_APP_ID/FEISHU_APP_SECRET，以及当前网络是否可访问 Feishu 长连接服务。"

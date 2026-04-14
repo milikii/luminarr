@@ -165,7 +165,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `shared private-chat runtime` 入口当前仍通过 `app/bot/private_chat_runtime.py -> app/bot/telegram_bot.py.handle_private_chat_query_text` 反向依赖 Telegram；大多数文本路径虽然已经可以在无 Telegram update 的前提下直跑，但 `微信登录` 仍直接依赖 Telegram 的二维码/文本回传能力。这条结构债已记录为 cleanup 窗口后的最小抽离项：把 shared runtime 入口从 `telegram_bot.py` 独立出来，并把 Telegram-only 媒资回传收口成显式注入能力，不在当前 cleanup 验证窗口内展开。
 - personal WeChat 仍然仅限单账号私聊文本，每次回复依赖最新消息里的 `context_token`；一旦用户长时间不发言旧 token 会过期，当前没有可靠的 personal WeChat 主动推送闭环；登录成功后仍需下次启动才能开始轮询。
 - Feishu / WeCom 当前只支持最小私聊文本，不支持群聊、图片、卡片、按钮回调；Feishu 入站现已切到官方 SDK 长连接，WeCom 仍通过 callback 被动回包，且还没有主动发消息客户端。
-- Feishu 长连接当前正常停机时，业务侧不应再把关闭过程误报成 `[Feishu 长连接启动失败]`；剩余 `lark_oapi` 关闭噪声仍是上游 SDK 行为，不是当前主线要扩的 cleanup 能力。
+- Feishu 长连接当前正常停机时，业务侧已经不再误打 `[Feishu 长连接启动失败]`、`ConnectionClosedOK` traceback 或 `Event loop is closed` traceback；当前剩余 `lark_oapi` 关闭噪声只剩 pending-task warning，仍属于上游 SDK 行为，不是当前主线要扩的 cleanup 能力。
 - cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早历史任务仍需人工甄别。
 - PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前 cleanup guardrail 还没读取下载器 seeding 状态，`pt_min_seed_hours` 也未进入 cleanup 阻断判断，因此删源前仍无法确认 PT 任务是否仍在做种。
 - completion truth 仍主要依赖当前 runtime 观察，不是完整独立后台轮询平台。
