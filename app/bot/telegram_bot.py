@@ -42,6 +42,7 @@ from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
     BtPendingRepo,
 )
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
@@ -717,6 +718,13 @@ async def _post_download_auto_import_scheduler_loop(
             await asyncio.wait_for(stop_event.wait(), timeout=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS)
         except asyncio.TimeoutError:
             continue
+
+
+async def _poll_pending_download_completion_once(
+    *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService
+) -> None:
+    for record in download_monitor_repo.list_pending_completion():
+        await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
 
 
 async def _bt_subscription_scheduler_loop(

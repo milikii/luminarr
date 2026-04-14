@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Awaitable
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 from telegram.ext import CallbackQueryHandler
@@ -48,6 +48,7 @@ from app.bot.telegram_bot import (
     build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
+    _poll_pending_download_completion_once,
     _post_download_auto_import_scheduler_loop,
     _log_bt_subscription_scheduler_config_error,
 )
@@ -2366,6 +2367,17 @@ def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
     asyncio.run(_post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event))
 
     service.run_once.assert_awaited_once()
+
+
+def test_poll_pending_download_completion_once_reuses_status_service() -> None:
+    repo = SimpleNamespace(
+        list_pending_completion=Mock(
+            return_value=(SimpleNamespace(task_hash="hash-41", chat_id=1001), SimpleNamespace(task_hash="hash-42", chat_id=1002))
+        )
+    )
+    status_service = SimpleNamespace(get_status_text=AsyncMock())
+    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
+    assert status_service.get_status_text.await_args_list == [call("hash-41", chat_id=1001), call("hash-42", chat_id=1002)]
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
