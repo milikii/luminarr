@@ -10,7 +10,6 @@ from app.bot.feishu_long_connection import (
     FeishuLongConnectionConfig,
     FeishuLongConnectionService,
 )
-from app.bot.cleanup_smoke_logging import configure_cleanup_private_chat_smoke_log_file
 from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.bot.wecom_adapter import (
@@ -220,7 +219,6 @@ def _build_bt_source_providers(
 
 
 def main() -> None:
-    configure_cleanup_private_chat_smoke_log_file(log_dir=Path("logs"))
     settings = load_settings()
     database = SqliteDatabase(settings.sqlite_db_path)
     database.initialize()
