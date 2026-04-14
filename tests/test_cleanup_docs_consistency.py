@@ -293,7 +293,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert runtime_process_command == window_runtime_process_command
     assert "print('luminarr process running' if matches else 'no luminarr process running')" in runtime_process_command
     assert focused_config_date == docs_gate_date
-    assert focused_config_result == "4 passed, 17 deselected"
+    assert focused_config_result == "4 passed, 21 deselected"
     assert (
         focused_config_command
         == '.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"'
