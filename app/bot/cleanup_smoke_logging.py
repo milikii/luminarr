@@ -46,7 +46,6 @@ def configure_cleanup_private_chat_smoke_log_file(
             flush=True,
         )
         return None
-    _cleanup_private_chat_smoke_log_path = log_path
     return log_path
 
 
