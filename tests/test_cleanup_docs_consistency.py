@@ -455,6 +455,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "只跑 `pytest` 只能证明 shared runtime 协议没回退" in getting_started_text
     assert "不能替代四渠道真实私聊 smoke 证据" in getting_started_text
     assert "curl -si http://127.0.0.1:18889/wecom/callback" in getting_started_text
+    assert "来自当前本地已验证 `.env`" in getting_started_text
     assert "400 missing echostr" in getting_started_text
     assert "Transmission 已在 `http://127.0.0.1:19091` 跑着" in getting_started_text
     assert "Emby 已在 `http://127.0.0.1:18096` 跑着" in getting_started_text
@@ -516,6 +517,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert cleanup_docs_gate_fallback_command in readme_text
     assert "它们都不能替代四渠道真实私聊 smoke 证据" in readme_text
     assert "curl -si http://127.0.0.1:18889/wecom/callback" in readme_text
+    assert "不是 `.env.example` 的默认端口/路径" in readme_text
     assert "400 missing echostr" in readme_text
     assert "剩余唯一待补缺口只剩 WeCom" in readme_text
     assert "[环境文件缺失]" in next_step_text
