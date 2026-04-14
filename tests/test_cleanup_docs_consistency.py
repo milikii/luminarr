@@ -549,6 +549,7 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
     assert "BT 订阅后台扫描 warning 门禁快照" in status_text
     assert "Telegram 启动失败可观测性快照" in status_text
     assert "runtime process 门禁快照" in status_text
+    assert "WeCom 本地入口快照" in status_text
     assert "tests/test_cleanup_cross_channel_smoke.py -k service_not_ready" in next_step_text
     assert "四渠道聚合 service-not-ready 门禁快照" in status_text
     assert "bare `cleanup` / bare `cleanup inspect` / `清理` / `清理检查`" in next_step_text
