@@ -228,7 +228,7 @@ class DownloadMonitorRepo:
             return None
         return _to_download_monitor_record(row)
 
-    def list_pending_completion(self) -> list[DownloadMonitorRecord]:
+    def list_pending_completion(self, *, limit: int = 100) -> list[DownloadMonitorRecord]:
         with self._database.connect() as connection:
             rows = connection.execute(
                 """
@@ -248,7 +248,9 @@ class DownloadMonitorRepo:
                 FROM download_monitor
                 WHERE is_complete = 0
                 ORDER BY created_at ASC, updated_at ASC
-                """
+                LIMIT ?
+                """,
+                (max(1, limit),),
             ).fetchall()
         return [_to_download_monitor_record(row) for row in rows]
 

@@ -134,6 +134,15 @@ def test_download_monitor_truth_persists_for_restart_and_completion_observation(
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
 
 
+def test_download_monitor_pending_completion_limit_is_stable(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+    repo.register_download(task_id="41", task_hash="hash-41", name="first")
+    repo.register_download(task_id="42", task_hash="hash-42", name="second")
+    assert [record.task_id for record in repo.list_pending_completion(limit=1)] == ["41"]
+
+
 def test_completed_download_truth_after_restart_can_progress_to_import_pending(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
