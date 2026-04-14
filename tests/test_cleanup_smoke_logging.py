@@ -94,11 +94,7 @@ def test_log_cleanup_private_chat_smoke_prints_fix_hint_when_log_file_is_not_wri
 ) -> None:
     blocked_parent = tmp_path / "blocked-parent"
     blocked_parent.write_text("occupied", encoding="utf-8")
-    monkeypatch.setattr(
-        cleanup_smoke_logging,
-        "_cleanup_private_chat_smoke_log_path",
-        blocked_parent / "cleanup-private-chat-smoke.log",
-    )
+    log_path = blocked_parent / "cleanup-private-chat-smoke.log"
 
     log_cleanup_private_chat_smoke(
         channel="telegram",
@@ -106,9 +102,9 @@ def test_log_cleanup_private_chat_smoke_prints_fix_hint_when_log_file_is_not_wri
         reply_text="已清理下载源资产。",
         chat_id=1001,
         user_id=2001,
+        log_path=log_path,
     )
 
-    reset_cleanup_private_chat_smoke_log_file()
     captured = capsys.readouterr()
     assert "[cleanup 私聊 smoke 日志落盘失败]" in captured.out
     assert "[处理建议]" in captured.out
