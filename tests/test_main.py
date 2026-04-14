@@ -5,7 +5,12 @@ from types import SimpleNamespace
 import pytest
 from telegram.error import NetworkError
 
-from app.main import _resolve_downloader_client_for_lookup, _resolve_downloader_name_for_task, _run_application_polling
+from app.main import (
+    _resolve_downloader_client_for_dispatch,
+    _resolve_downloader_client_for_lookup,
+    _resolve_downloader_name_for_task,
+    _run_application_polling,
+)
 
 
 def test_run_application_polling_prints_colored_fix_hint_on_network_error(
@@ -42,3 +47,22 @@ def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance(
         transmission_clients_by_name={"pt-main": known_client},
         qbittorrent_clients_by_name={},
     ) is known_client
+
+
+def test_resolve_downloader_client_for_dispatch_rejects_unknown_explicit_instance() -> None:
+    default_client = object()
+    assert _resolve_downloader_client_for_dispatch(
+        downloader_name="",
+        transmission_client=default_client,
+        downloader_instances_by_name={},
+        transmission_clients_by_name={},
+        qbittorrent_clients_by_name={},
+    ) is default_client
+    with pytest.raises(ValueError):
+        _resolve_downloader_client_for_dispatch(
+            downloader_name="missing",
+            transmission_client=default_client,
+            downloader_instances_by_name={},
+            transmission_clients_by_name={},
+            qbittorrent_clients_by_name={},
+        )

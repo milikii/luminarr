@@ -118,6 +118,29 @@ def _resolve_downloader_client_for_lookup(
     return transmission_clients_by_name.get(cleaned_name)
 
 
+def _resolve_downloader_client_for_dispatch(
+    *,
+    downloader_name: str,
+    transmission_client: TransmissionClient,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> TransmissionClient | QbittorrentClient:
+    cleaned_name = downloader_name.strip()
+    if not cleaned_name:
+        return transmission_client
+    instance = downloader_instances_by_name.get(cleaned_name)
+    if instance is None:
+        raise ValueError(f"unknown downloader instance: {cleaned_name}")
+    if instance.downloader_type == "qbittorrent":
+        client = qbittorrent_clients_by_name.get(cleaned_name)
+    else:
+        client = transmission_clients_by_name.get(cleaned_name)
+    if client is None:
+        raise ValueError(f"downloader client not configured: {cleaned_name}")
+    return client
+
+
 def _resolve_downloader_payload_value(payload_json: str, key: str) -> str:
     cleaned_payload = payload_json.strip()
     if not cleaned_payload:
@@ -249,7 +272,13 @@ def main() -> None:
         return transmission_clients_by_name.get(cleaned_name, transmission_client)
 
     async def add_torrent_with_routing(source: str, downloader_name: str = "", download_dir: str = "") -> TransmissionTask:
-        client = resolve_downloader_client_by_name(downloader_name)
+        client = _resolve_downloader_client_for_dispatch(
+            downloader_name=downloader_name,
+            transmission_client=transmission_client,
+            downloader_instances_by_name=downloader_instances_by_name,
+            transmission_clients_by_name=transmission_clients_by_name,
+            qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        )
         return await client.add_torrent(source, download_dir=download_dir)
 
     async def get_torrent_status_with_routing(task_ref: str, chat_id: int | None = None) -> TransmissionTaskStatus | None:
