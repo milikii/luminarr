@@ -178,7 +178,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Feishu 长连接当前正常停机时，业务侧已经不再误打 `[Feishu 长连接启动失败]`、`ConnectionClosedOK` traceback 或 `Event loop is closed` traceback；当前剩余 `lark_oapi` 关闭噪声只剩 pending-task warning，仍属于上游 SDK 行为，不是当前主线要扩的 cleanup 能力。
 - cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早历史任务仍需人工甄别。
 - PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前 cleanup guardrail 还没读取下载器 seeding 状态，`pt_min_seed_hours` 也未进入 cleanup 阻断判断，因此删源前仍无法确认 PT 任务是否仍在做种。
-- completion truth 现在已经有最小后台 auto-import tick，但仍不是完整独立后台轮询平台；下载完成真相目前还没做到独立 downloader status polling。
+- completion truth 现在已经有独立 downloader status polling 最小闭环；当前剩余工作只在更细的回归与可观测性收口，不再是“有没有独立后台轮询本体”。
 - metadata scraping、subtitle auto-translation（当前仅 `.srt`）、Emby refresh 失败时不会回滚 import success；缺配置时会显式失败。
 - BT shared source adapter、BT external web-source、pure BT ranking、`btsub` 选源都已可用，但还不是共享确定性评分器。
 - 当前主线只支持 Emby；Jellyfin / Plex 仍是后续扩展，不在 cleanup 窗口这一步混入。
