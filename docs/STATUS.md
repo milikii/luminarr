@@ -141,7 +141,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Channel progress 最近日期门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在同一渠道命中多条窗口期真实 smoke 日志时会把该渠道更新为最近绝对日期，避免已完成渠道回填旧日期。
 - Channel progress 待验证锚点门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在只有部分渠道完成时仍保留其他渠道的 `待验证`、`-` 和窗口开始日锚点备注，避免窗口台账把剩余缺口写成空白或漂移文案。
 - Channel progress 文档顺序门禁快照：`tests/test_cleanup_verification_window_doc.py` 现在也直接校验窗口台账里的四渠道行顺序固定为 Telegram / personal WeChat / Feishu / WeCom，避免手工编辑文档时绕过同步器顺序保护。
-- cleanup 私聊 smoke 日志协议快照：仓库里现在也有统一的 `app/bot/cleanup_smoke_logging.py`，先把 `date/channel/action/query/reply_head` 这组最小日志格式锁住；`app/main.py` 启动后也会把真实私聊 cleanup smoke 自动追加到 `logs/cleanup-private-chat-smoke.log`，让 `sync-cleanup-doc-snapshots` 能直接从仓库日志回填窗口证据，避免窗口证据重新分叉或只留在 stdout。2026-04-15 这条日志配置函数在目录创建失败时也已改成 fail-closed 返回 `None`，不再把未配置成功的路径伪装成成功。
+- cleanup 私聊 smoke 日志协议快照：仓库里现在也有统一的 `app/bot/cleanup_smoke_logging.py`，先把 `date/channel/action/query/reply_head` 这组最小日志格式锁住；`app/main.py` 启动后也会把真实私聊 cleanup smoke 自动追加到 `logs/cleanup-private-chat-smoke.log`，让 `sync-cleanup-doc-snapshots` 能直接从仓库日志回填窗口证据，避免窗口证据重新分叉或只留在 stdout。2026-04-15 这条日志配置函数在目录创建失败时也已改成 fail-closed 返回 `None`，并开始支持显式 `log_path` 传参，测试路径不再必须改模块级全局变量。
 - shared runtime cleanup service-not-ready 快照：`6 passed, 10 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k service_not_ready`）
 - Telegram cleanup service-not-ready 快照：`8 passed, 74 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup and service_not_ready"`）
 - personal WeChat cleanup service-not-ready 快照：`12 passed, 21 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k service_not_ready`）
@@ -174,7 +174,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-14 代码审查确认：`shared private-chat runtime` 仍通过 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py) 伪造 Telegram `context` 去调用 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py)；这不是抽象味道问题，而是当前真实结构债，因为 `微信登录` 分支已经会读取 `context.application.bot`。
 - 2026-04-15 代码审查确认：lookup 路径上的 `channel_identity` 空输入返回 `0`、缺少 `downloader_name`、以及未知实例名回退默认 Transmission 这三处失败折叠都已修掉；当前下载器路由剩余风险收口为“下载投递 path 里若传入非法显式实例名，路由层仍可能静默回退默认下载器”。
 - 2026-04-14 代码审查确认：搜索候选、澄清态和下载器路由等路径里仍有多处 `except Exception: pass/return None`，会把“SQLite/配置异常”和“业务上真的没数据”混成同一个返回结果。
-- 2026-04-15 代码审查确认：`cleanup_smoke_logging` 仍使用模块级 `_cleanup_private_chat_smoke_log_path` 全局状态；但目录创建失败时已经 fail-closed 返回 `None`，当前剩余风险只在全局状态本身仍会污染测试边界。
+- 2026-04-15 代码审查确认：`cleanup_smoke_logging` 已支持显式 `log_path` 传参，目录创建失败也已 fail-closed 返回 `None`；当前剩余风险收口为“默认运行路径仍回退到模块级 `_cleanup_private_chat_smoke_log_path` 全局状态”。
 - 2026-04-14 代码审查确认：Feishu 长连接当前仍直接依赖 `lark_oapi` 私有 API 和模块级变量 patch；版本升级前必须重新验证 `_auto_reconnect`、`_disconnect()`、`_cache._cron` 与 `lark_oapi.ws.client.loop` 这几处内部实现。
 - 2026-04-14 代码审查确认：`get_download_status` 当前会写 `download_monitor`、补 `downloader.completed_observed`，并可能接到 auto-import，所以它不是只读动作；不要把它误放进 `READ_ONLY_ACTIONS`。
 - `series / anime` 独立名称解析还没实现；当前最稳的是 movie-first。

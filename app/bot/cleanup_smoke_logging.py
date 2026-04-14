@@ -90,6 +90,7 @@ def log_cleanup_private_chat_smoke(
     reply_text: str,
     chat_id: int | None,
     user_id: int | None,
+    log_path: Path | None = None,
 ) -> None:
     log_line = build_cleanup_private_chat_smoke_log_line(
         channel=channel,
@@ -101,7 +102,7 @@ def log_cleanup_private_chat_smoke(
     if log_line is None:
         return
     print(log_line, flush=True)
-    _append_cleanup_private_chat_smoke_log_line(log_line)
+    _append_cleanup_private_chat_smoke_log_line(log_line, log_path=log_path)
 
 
 def parse_cleanup_private_chat_smoke_log_line(line: str) -> CleanupPrivateChatSmokeLogEntry | None:
@@ -143,17 +144,18 @@ def _summarize_reply_head(reply_text: str) -> str:
     return "-"
 
 
-def _append_cleanup_private_chat_smoke_log_line(log_line: str) -> None:
-    if _cleanup_private_chat_smoke_log_path is None:
+def _append_cleanup_private_chat_smoke_log_line(log_line: str, *, log_path: Path | None = None) -> None:
+    resolved_log_path = log_path or _cleanup_private_chat_smoke_log_path
+    if resolved_log_path is None:
         return
     cleaned_line = ANSI_ESCAPE_RE.sub("", log_line)
     try:
-        _cleanup_private_chat_smoke_log_path.parent.mkdir(parents=True, exist_ok=True)
-        with _cleanup_private_chat_smoke_log_path.open("a", encoding="utf-8") as handle:
+        resolved_log_path.parent.mkdir(parents=True, exist_ok=True)
+        with resolved_log_path.open("a", encoding="utf-8") as handle:
             handle.write(f"{cleaned_line}\n")
     except OSError as error:
         print(
-            f"\033[31m[cleanup 私聊 smoke 日志落盘失败]\033[0m 路径={_cleanup_private_chat_smoke_log_path} 错误={error}\n"
+            f"\033[31m[cleanup 私聊 smoke 日志落盘失败]\033[0m 路径={resolved_log_path} 错误={error}\n"
             "\033[33m[处理建议]\033[0m 检查 logs 目录是否可写，确认没有把同名路径占成文件或只读挂载；"
             "修复后重新运行真实私聊 smoke。",
             flush=True,

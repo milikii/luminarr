@@ -65,21 +65,17 @@ def test_parse_cleanup_private_chat_smoke_log_line_returns_structured_entry() ->
 
 def test_log_cleanup_private_chat_smoke_appends_plain_line_to_configured_log_file(
     tmp_path: Path,
-    monkeypatch,
     capsys,
 ) -> None:
     log_path = configure_cleanup_private_chat_smoke_log_file(log_dir=tmp_path / "logs")
-
-    try:
-        log_cleanup_private_chat_smoke(
-            channel="telegram",
-            query="cleanup inspect cleanup-shortcut",
-            reply_text="清理预检结果：\n任务 ID: 87",
-            chat_id=1001,
-            user_id=2001,
-        )
-    finally:
-        monkeypatch.setattr(cleanup_smoke_logging, "_cleanup_private_chat_smoke_log_path", None)
+    log_cleanup_private_chat_smoke(
+        channel="telegram",
+        query="cleanup inspect cleanup-shortcut",
+        reply_text="清理预检结果：\n任务 ID: 87",
+        chat_id=1001,
+        user_id=2001,
+        log_path=log_path,
+    )
 
     captured = capsys.readouterr()
     assert "[cleanup 私聊 smoke]" in captured.out
