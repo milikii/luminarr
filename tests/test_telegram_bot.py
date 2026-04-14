@@ -48,6 +48,7 @@ from app.bot.telegram_bot import (
     build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
+    _post_download_auto_import_scheduler_loop,
     _log_bt_subscription_scheduler_config_error,
 )
 from app.clients.transmission import TransmissionImportSource
@@ -68,6 +69,7 @@ from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
 from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
+from app.services.post_download_auto_import import AutoImportRunResult
 from app.services.search_media import SearchMediaService
 
 _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
@@ -2350,6 +2352,20 @@ def test_log_bt_subscription_scheduler_config_error_prints_fix_hint(
     captured = capsys.readouterr()
     assert "[BT 订阅后台扫描未启动]" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
+    stop_event = asyncio.Event()
+
+    async def run_once() -> AutoImportRunResult:
+        stop_event.set()
+        return AutoImportRunResult(scanned=1, progressed=1, replies=("导入待确认",))
+
+    service = SimpleNamespace(run_once=AsyncMock(side_effect=run_once))
+
+    asyncio.run(_post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event))
+
+    service.run_once.assert_awaited_once()
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:

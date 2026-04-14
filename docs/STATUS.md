@@ -37,6 +37,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
   - `import approval -> confirm -> hardlink import`
   - copy fallback、completion-monitor、post-download auto import
+  - `post_download_auto_import` 最小后台 tick 已接入应用启动/停止链，完成态 `download_monitor` 不再只能靠用户手动 `status` 才推进一次
   - cleanup 最小闭环：inspect / cleanup / discoverability / rejection guidance / success follow-up / failure observability / `chat-scoped task_ref`
   - `chat-scoped task_ref` 命中 jobs 但 import 关联缺失时，inspect / cleanup 会继续回显解析出的 `task_id/task_hash`
   - 普通 correlation-missing inspect 在没有真实解析结果时继续显示 `任务 ID/Hash: -`，不把用户原始输入伪装成真实身份
@@ -169,7 +170,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Feishu 长连接当前正常停机时，业务侧已经不再误打 `[Feishu 长连接启动失败]`、`ConnectionClosedOK` traceback 或 `Event loop is closed` traceback；当前剩余 `lark_oapi` 关闭噪声只剩 pending-task warning，仍属于上游 SDK 行为，不是当前主线要扩的 cleanup 能力。
 - cleanup inspect / execution 当前只对带结构化 `source_path + target_path` 的导入任务可用；更早历史任务仍需人工甄别。
 - PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前 cleanup guardrail 还没读取下载器 seeding 状态，`pt_min_seed_hours` 也未进入 cleanup 阻断判断，因此删源前仍无法确认 PT 任务是否仍在做种。
-- completion truth 仍主要依赖当前 runtime 观察，不是完整独立后台轮询平台。
+- completion truth 现在已经有最小后台 auto-import tick，但仍不是完整独立后台轮询平台；下载完成真相目前还没做到独立 downloader status polling。
 - metadata scraping、subtitle auto-translation（当前仅 `.srt`）、Emby refresh 失败时不会回滚 import success；缺配置时会显式失败。
 - BT shared source adapter、BT external web-source、pure BT ranking、`btsub` 选源都已可用，但还不是共享确定性评分器。
 - 当前主线只支持 Emby；Jellyfin / Plex 仍是后续扩展，不在 cleanup 窗口这一步混入。

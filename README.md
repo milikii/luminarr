@@ -69,7 +69,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
   - `import approval -> confirm -> hardlink import`
   - cross-filesystem copy-fallback approval
-  - completion-monitor + post-download auto import
+  - completion-monitor + post-download auto import + 最小后台 auto-import tick
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）

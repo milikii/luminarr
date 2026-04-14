@@ -320,6 +320,7 @@ def main() -> None:
         cleanup_downloaded_source_service,
         manage_watchlist_service,
         manage_bt_subscription_service,
+        post_download_auto_import_service=post_download_auto_import_service,
         telegram_update_repo=telegram_update_repo,
         job_repo=job_repo,
         bt_pending_repo=bt_pending_repo,

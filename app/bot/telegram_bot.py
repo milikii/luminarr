@@ -89,6 +89,7 @@ from app.services.import_to_library import (
     parse_import_query,
 )
 from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
+from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.pure_bt import extract_bt_search_query, pick_single_item_candidate
 from app.services.search_media import SearchMediaService, parse_movie_query
 
@@ -217,13 +218,17 @@ DOWNLOADER_INSTANCES_KEY = "downloader_instances"
 DOWNLOADER_ROLE_BINDING_KEY = "downloader_role_binding"
 BT_SUBSCRIPTION_SCHEDULER_TASK_KEY = "bt_subscription_scheduler_task"
 BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY = "bt_subscription_scheduler_stop_event"
+POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY = "post_download_auto_import_task"
+POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY = "post_download_auto_import_stop_event"
 FEISHU_WEBHOOK_SERVER_CONFIG_KEY = "feishu_webhook_server_config"
 FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY = "feishu_webhook_reply_text_func"
 FEISHU_WEBHOOK_SERVER_RUNTIME_KEY = "feishu_webhook_server_runtime"
 WECOM_WEBHOOK_SERVER_CONFIG_KEY = "wecom_webhook_server_config"
 WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
+POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
+POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
@@ -355,6 +360,7 @@ def build_application(
     cleanup_downloaded_source_service: CleanupDownloadedSourceService,
     manage_watchlist_service: ManageWatchlistService,
     manage_bt_subscription_service: ManageBtSubscriptionService,
+    post_download_auto_import_service: PostDownloadAutoImportService | None = None,
     telegram_update_repo: TelegramUpdateRepo | None = None,
     job_repo: JobRepo | None = None,
     execution_gate: ExecutionGate | None = None,
@@ -380,6 +386,8 @@ def build_application(
     application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
     application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
     application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
+    if post_download_auto_import_service is not None:
+        application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY] = post_download_auto_import_service
     application.bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_downloaded_source_service
     application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
     application.bot_data[MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] = manage_bt_subscription_service
@@ -486,6 +494,7 @@ async def _start_bt_subscription_scheduler(application: Application) -> None:
     _start_wecom_webhook_server_if_configured(application)
     await _start_feishu_long_connection_if_configured(application)
     await _start_personal_wechat_text_service_if_available(application)
+    _start_post_download_auto_import_scheduler(application)
 
     existing_task = application.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
     if isinstance(existing_task, asyncio.Task) and not existing_task.done():
@@ -530,6 +539,7 @@ async def _stop_bt_subscription_scheduler(application: Application) -> None:
     await _shutdown_feishu_long_connection_if_running(application)
     await _shutdown_personal_wechat_text_service_if_running(application)
     await _shutdown_personal_wechat_login_service_if_running(application)
+    await _stop_post_download_auto_import_scheduler(application)
 
     stop_event = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
     task = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
@@ -541,6 +551,30 @@ async def _stop_bt_subscription_scheduler(application: Application) -> None:
         await task
     except Exception as error:
         _log_bt_subscription_scheduler_loop_error(error=error)
+
+
+def _start_post_download_auto_import_scheduler(application: Application) -> None:
+    existing_task = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY)
+    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
+        return
+    service = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY)
+    if not isinstance(service, PostDownloadAutoImportService):
+        return
+    stop_event = asyncio.Event()
+    application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY] = stop_event
+    application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY] = application.create_task(
+        _post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event),
+        name="post_download_auto_import_scheduler",
+    )
+
+
+async def _stop_post_download_auto_import_scheduler(application: Application) -> None:
+    stop_event = application.bot_data.pop(POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY, None)
+    task = application.bot_data.pop(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY, None)
+    if isinstance(stop_event, asyncio.Event):
+        stop_event.set()
+    if isinstance(task, asyncio.Task):
+        await task
 
 
 def _start_feishu_webhook_server_if_configured(application: Application) -> None:
@@ -667,6 +701,22 @@ async def _shutdown_personal_wechat_login_service_if_running(application: Applic
     if not isinstance(service, PersonalWeChatLoginService):
         return
     await service.shutdown()
+
+
+async def _post_download_auto_import_scheduler_loop(
+    *,
+    service: PostDownloadAutoImportService,
+    stop_event: asyncio.Event,
+) -> None:
+    while not stop_event.is_set():
+        try:
+            await service.run_once()
+        except Exception as error:
+            _log_post_download_auto_import_scheduler_error(error=error)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS)
+        except asyncio.TimeoutError:
+            continue
 
 
 async def _bt_subscription_scheduler_loop(
@@ -1657,6 +1707,13 @@ def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception)
     print(
         f"\033[31m[BT 订阅后台通知失败]\033[0m chat_id={chat_id} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Telegram Bot Token、聊天可达性和网络连通性后等待下一轮自动扫描。"
+    )
+
+
+def _log_post_download_auto_import_scheduler_error(*, error: Exception) -> None:
+    print(
+        f"\033[31m[下载完成后台轮询失败]\033[0m 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor、SQLite 和导入审批链路后等待下一轮自动轮询。"
     )
 
 
