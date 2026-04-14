@@ -358,6 +358,8 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "OUTBOUND_PROXY_URL" in text
             assert "FEISHU_INBOUND_MODE=long_connection" in text
             assert "正常停机时不要把关闭过程误报成 `[Feishu 长连接启动失败]`" in text
+            assert "ConnectionClosedOK" in text
+            assert "Event loop is closed" in text
             assert "BT Transmission `http://127.0.0.1:19092`" in text
             assert "PNG 二维码图片" in text
         if text is status_text:
@@ -396,6 +398,9 @@ def test_cleanup_verification_window_docs_stay_in_sync() -> None:
             assert "双 Transmission 测试栈配置虽然已落地" in text
             assert "/var/run/docker.sock" in text
             assert "`19092` 端口和 `/data/downloads/tr-bt` 路径因此还没完成本机复验" in text
+            assert "ConnectionClosedOK" in text
+            assert "Event loop is closed" in text
+            assert "pending-task warning" in text
             assert "proxy / Feishu 长连接 / PNG 二维码 tests" in text
             assert "PT 做种 guardrail 评估已记录到 `docs/CLEANUP_VERIFICATION_WINDOW.md`" in text
             assert "pt_min_seed_hours" in text
