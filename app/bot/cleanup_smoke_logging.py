@@ -50,6 +50,11 @@ def configure_cleanup_private_chat_smoke_log_file(
     return log_path
 
 
+def reset_cleanup_private_chat_smoke_log_file() -> None:
+    global _cleanup_private_chat_smoke_log_path
+    _cleanup_private_chat_smoke_log_path = None
+
+
 def resolve_cleanup_private_chat_action(query: str) -> str | None:
     if parse_cleanup_inspect_query(query) is not None:
         return "cleanup_inspect"

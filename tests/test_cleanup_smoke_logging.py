@@ -9,6 +9,7 @@ from app.bot.cleanup_smoke_logging import (
     configure_cleanup_private_chat_smoke_log_file,
     log_cleanup_private_chat_smoke,
     parse_cleanup_private_chat_smoke_log_line,
+    reset_cleanup_private_chat_smoke_log_file,
     resolve_cleanup_private_chat_action,
 )
 
@@ -107,7 +108,7 @@ def test_log_cleanup_private_chat_smoke_prints_fix_hint_when_log_file_is_not_wri
         user_id=2001,
     )
 
-    monkeypatch.setattr(cleanup_smoke_logging, "_cleanup_private_chat_smoke_log_path", None)
+    reset_cleanup_private_chat_smoke_log_file()
     captured = capsys.readouterr()
     assert "[cleanup 私聊 smoke 日志落盘失败]" in captured.out
     assert "[处理建议]" in captured.out
