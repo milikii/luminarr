@@ -180,3 +180,111 @@ def test_feishu_long_connection_shutdown_suppresses_expected_disconnect_error(
 
     captured = capsys.readouterr()
     assert "[Feishu 长连接关闭失败]" not in captured.out
+
+
+def test_feishu_long_connection_logs_unexpected_loop_stop_failure(
+    monkeypatch,
+    capsys,
+) -> None:
+    class FakeDispatcherBuilder:
+        def register_p2_im_message_receive_v1(self, handler):
+            _ = handler
+            return self
+
+        def build(self) -> object:
+            return object()
+
+    class FakeEventDispatcherHandler:
+        @staticmethod
+        def builder(*_args: object) -> FakeDispatcherBuilder:
+            return FakeDispatcherBuilder()
+
+    class FakeWsClient:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def start(self) -> None:
+            return None
+
+    fake_loop = SimpleNamespace(
+        set_exception_handler=lambda handler: None,
+        stop=lambda: (_ for _ in ()).throw(RuntimeError("loop stop failed")),
+        close=lambda: None,
+    )
+
+    monkeypatch.setattr(
+        feishu_long_connection_module,
+        "lark_oapi",
+        SimpleNamespace(
+            EventDispatcherHandler=FakeEventDispatcherHandler,
+            ws=SimpleNamespace(Client=FakeWsClient),
+        ),
+    )
+    monkeypatch.setattr(feishu_long_connection_module, "lark_ws_client_module", SimpleNamespace(loop=None))
+    monkeypatch.setattr(feishu_long_connection_module.asyncio, "new_event_loop", lambda: fake_loop)
+    monkeypatch.setattr(feishu_long_connection_module.asyncio, "set_event_loop", lambda loop: None)
+
+    service = FeishuLongConnectionService(
+        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
+        feishu_client=SimpleNamespace(),
+    )
+
+    service._run_client_thread()
+
+    captured = capsys.readouterr()
+    assert "[Feishu 长连接停止失败]" in captured.out
+    assert "loop stop failed" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_feishu_long_connection_suppresses_expected_loop_stop_error(
+    monkeypatch,
+    capsys,
+) -> None:
+    class FakeDispatcherBuilder:
+        def register_p2_im_message_receive_v1(self, handler):
+            _ = handler
+            return self
+
+        def build(self) -> object:
+            return object()
+
+    class FakeEventDispatcherHandler:
+        @staticmethod
+        def builder(*_args: object) -> FakeDispatcherBuilder:
+            return FakeDispatcherBuilder()
+
+    class FakeWsClient:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            return None
+
+        def start(self) -> None:
+            return None
+
+    fake_loop = SimpleNamespace(
+        set_exception_handler=lambda handler: None,
+        stop=lambda: (_ for _ in ()).throw(RuntimeError("Event loop is closed")),
+        close=lambda: None,
+    )
+
+    monkeypatch.setattr(
+        feishu_long_connection_module,
+        "lark_oapi",
+        SimpleNamespace(
+            EventDispatcherHandler=FakeEventDispatcherHandler,
+            ws=SimpleNamespace(Client=FakeWsClient),
+        ),
+    )
+    monkeypatch.setattr(feishu_long_connection_module, "lark_ws_client_module", SimpleNamespace(loop=None))
+    monkeypatch.setattr(feishu_long_connection_module.asyncio, "new_event_loop", lambda: fake_loop)
+    monkeypatch.setattr(feishu_long_connection_module.asyncio, "set_event_loop", lambda loop: None)
+
+    service = FeishuLongConnectionService(
+        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
+        feishu_client=SimpleNamespace(),
+    )
+
+    service._run_client_thread()
+
+    captured = capsys.readouterr()
+    assert "[Feishu 长连接停止失败]" not in captured.out

@@ -119,6 +119,10 @@ class FeishuLongConnectionService:
             or "Event loop stopped before Future completed" in error_text
         )
 
+    @staticmethod
+    def _is_expected_loop_stop_error(error: Exception) -> bool:
+        return "Event loop is closed" in str(error)
+
     def _handle_loop_exception(self, loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
         exception = context.get("exception")
         if self._thread is None and context.get("message") == "Task exception was never retrieved":
@@ -162,8 +166,14 @@ class FeishuLongConnectionService:
         finally:
             try:
                 thread_loop.stop()
-            except Exception:
-                pass
+            except Exception as error:
+                if not self._is_expected_loop_stop_error(error):
+                    print(
+                        f"\033[31m[Feishu 长连接停止失败]\033[0m 原因={error}\n"
+                        "\033[33m[处理建议]\033[0m 检查 Feishu 线程事件循环是否仍可停止；"
+                        "如当前进程还在运行，可稍后重试停机或检查上游 SDK 状态。",
+                        flush=True,
+                    )
             thread_loop.close()
 
     def _handle_sdk_event(self, payload: object) -> None:
