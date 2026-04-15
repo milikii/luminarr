@@ -1,10 +1,12 @@
-# Next step (v198)
+# Next step (v199)
 
 ## Current goal
 
-- 当前唯一主线：**four-channel cleanup verification baseline（已完成）**
-- 当前窗口：`2026-04-05 to 2026-04-12`
+- 当前唯一主线：**shared private-chat runtime 最小抽离**
+- 上一条主线完成态：**cleanup 四渠道验证窗口已完成**
+- 当前窗口：`2026-04-05 to 2026-04-12`（上一条 cleanup 主线的完成窗口）
 - 详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
+- 当前最小闭环：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，去掉非 Telegram 渠道伪造 `SimpleNamespace` Telegram context 的做法；`微信登录` 这类 Telegram-only 媒资回传能力改成显式注入，不做多渠道平台化。
 
 ## Source of truth
 
@@ -16,10 +18,11 @@
 
 ## Only do
 
-- 完成一个 7 天真实使用验证窗口，不新增任何 cleanup 行为。
-- 保持 Telegram / personal WeChat / Feishu / WeCom 四个渠道都可用，且继续共用同一套 shared runtime、workflow、approval、`jobs` 和 SQLite 真相。
-- 持续记录窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 到 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- 保持仍在进行中的 cleanup 验证窗口快照和最近一次验证日期同步到当天绝对日期，避免窗口台账和 `docs/STATUS.md` 停留旧日期。
+- cleanup 四渠道验证窗口已完成；当前只把这条能力当成完成态基线，不再继续把它当进行中窗口施工。
+- 把 shared runtime 入口从 Telegram handler 里抽离出来，让 Telegram / personal WeChat / Feishu / WeCom 都直接调同一个 channel-agnostic runtime。
+- 把 `微信登录`、Telegram 图片/文件回传这类 Telegram-only 能力收口成显式注入项，不再让 shared runtime 反向读取 `context.application.bot`。
+- 保持 Telegram / personal WeChat / Feishu / WeCom 四个渠道都可用，且继续共用同一套 workflow、approval、`jobs` 和 SQLite 真相。
+- 保持已完成的 cleanup 验证窗口快照、窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 继续和 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md` 对齐。
 - 保持 cleanup 文档快照继续反映“当前 `.env` 已满足四渠道 smoke 环境键、且在 `app.main` 已运行时本地 `18889/wecom/callback` 已可达、四渠道真实私聊 smoke 已全部补齐”这条最新真相，避免环境 blocker、进程未启动和已完成窗口真相重新混写。
 - 保持 cleanup 文档快照也显式写出当前 WeCom tunnel 环境 blocker：`docker` 虽已安装但当前 shell 仍无 `/var/run/docker.sock` 访问权限，且 `cloudflared` 命令尚未安装，避免把 tunnel 失败继续误记成业务代码回归。
 - 保持 `docs/GETTING_STARTED.md` 显式区分“WeCom 本地 callback readiness 已就绪”和“WeCom 真实私聊 smoke 证据已完成”，避免把 `400 missing echostr` 探针误读成窗口退出证据。
@@ -207,26 +210,22 @@
 
 ## Done when
 
-- 已完成 7 天验证窗口。
-- 四个渠道各至少完成 1 次真实私聊 shared-runtime smoke。
-- `tests/test_cleanup_cross_channel_smoke.py` 持续通过。
-- cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 已完整记录窗口起止日期、证据、当前状态和当前结论。
-- `docs/STATUS.md` 快照、`docs/NEXT_STEP.md` 目标和窗口台账保持一致。
+- `app/bot/private_chat_runtime.py` 不再伪造 Telegram `context` 或 `SimpleNamespace` 去调用 `app/bot/telegram_bot.py`。
+- `handle_private_chat_query_text` 或等价 shared private-chat 入口已经从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，并由四个渠道共同调用。
+- `微信登录`、Telegram 图片/文件回传这类 Telegram-only 能力改成显式注入；shared runtime 不再直接读取 `context.application.bot`。
+- `tests/test_cleanup_cross_channel_smoke.py` 与 shared runtime / 四渠道适配相关回归持续通过，cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 继续保留 cleanup 已完成证据，`docs/STATUS.md` / `docs/NEXT_STEP.md` / `README.md` 对“cleanup 已完成、当前主线切到 shared runtime 最小抽离”保持一致。
 
 ## After this step
 
-1. `shared private-chat runtime` 最小抽离：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，去掉非 Telegram 渠道伪造 `SimpleNamespace` Telegram context 的做法；`微信登录` 这类 Telegram-only 媒资回传能力改成显式注入，不做多渠道平台化。
-2. 下载器路由 fail-closed：`channel_identity` 空输入、缺少 `downloader_name`、未知实例名，以及下载投递 path 里的非法显式实例名回退默认下载器都已修掉，并补上中文日志；这条 after-cleanup 风险已收口，后续只保留回归门禁，不再作为独立施工项。
-3. 持久化吞错收口：`search_media` 里的搜索候选持久化失败、澄清态 `upsert_pending()` / `clear_pending()` / `get_pending_query()` 失败、候选读取 `get_candidate()` 失败，`add_to_downloader.has_pending_add()` / `cancel_pending_add()` / `_rebuild_confirm_context()` / `_record_pending_approval()` / `_record_downloader_approval()` / `_cancel_pending_approval()` / `_record_executed_lease_version()` / `_record_event()` / `_register_download_monitor()` / `_record_pending_job()` / `_claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` / `_restore_pending_approval()` / `_resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` / `_handle_expired_pending_confirm()` 里的 `get_downloader_job_for_chat_ref()` / `get_latest_pending_downloader_job()` / `get_downloader_approval()` / `request_downloader_approval()` / `approve_downloader()` / `cancel_downloader()` / `mark_downloader_executed()` / `append_event()` / `register_download()` / `upsert_downloader_job_pending()` / `claim_lease()` / `release_lease_to_pending()` / `mark_downloader_completed()` / `restore_downloader_pending()` / `is_downloader_pending_expired()` / `cancel_pending_job()` 查询或写入失败，以及 `import_to_library.cancel_pending_import()` / `_rebuild_confirm_context()` / `_claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` / `_record_pending_approval()` / `_record_import_approval()` / `_record_executed_lease_version()` / `_record_pending_job()` / `_restore_pending_approval()` / `_resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` / `_handle_expired_pending_confirm()` / `_prepare_import()` / `_is_raw_bt_task()` / `_resolve_normalized_naming_truth()` / `_execute_import()` 里的 `approval_repo.cancel_import()` / `job_repo.get_import_job_for_chat_ref()` / `approval_repo.get_import_approval()` / `job_repo.claim_lease()` / `job_repo.release_lease_to_pending()` / `job_repo.mark_completed()` / `approval_repo.request_import_approval()` / `approval_repo.approve_import()` / `approval_repo.mark_import_executed()` / `job_repo.upsert_import_job_pending()` / `approval_repo.restore_import_pending()` / `approval_repo.is_import_pending_expired()` / 导入源查询 / downloader job 查询 / `job_event` 查询 / 媒体库刷新异常，都已经补上显式中文日志与 `[处理建议]`；`manage_bt_subscription._run_for_item()` 里的 `bt_subscription_repo.update_last_seen()` 回写失败现在也会打印红色中文日志、带 `[处理建议]`，并在回复里显式提示“最近资源真相未更新、下次可能重复命中”；`manage_bt_subscription._clear_text()` 里的 `bt_subscription_repo.clear_items()` 抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“BT 订阅清单清空失败”，不再让这条清空异常直接冒成上层泛化失败；`manage_bt_subscription._remove_text()` 里的 `bt_subscription_repo.remove_item()` 抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“BT 订阅删除失败”，不再让这条删除异常直接冒成上层泛化失败；`manage_bt_subscription._list_text()` 里的 `bt_subscription_repo.list_items()` 抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“BT 订阅清单读取失败”，不再让这条订阅清单读取异常直接冒成上层泛化失败；`manage_bt_subscription._add_text()` 里的 `bt_subscription_repo.add_item()` 返回 `None` 或抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“BT 订阅写入失败”，不再误报成添加格式错误；`manage_watchlist._clear_text()` 里的 `watchlist_repo.clear_items()` 抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“想看清单清空失败”，不再让这条清空异常直接冒成上层泛化失败；`manage_watchlist._remove_text()` 里的 `watchlist_repo.remove_item()` 抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“想看删除失败”，不再让这条删除异常直接冒成上层泛化失败；`manage_watchlist._list_text()` 里的 `watchlist_repo.list_items()` 抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“想看清单读取失败”，不再让这条清单读取异常直接冒成上层泛化失败；`manage_watchlist._add_text()` 里的 `watchlist_repo.add_item()` 返回 `None` 或抛异常时，现在也会打印红色中文日志、带 `[处理建议]`，并明确回“想看写入失败”，不再误报成命令格式错误；当前剩余的是其他持久化路径里的 `except Exception: pass/return None` 或 `None/False` 异常态混写，仍需继续改成“区分真缺数据和 SQLite / 配置异常”的显式日志。
-4. `cleanup_smoke_logging` 去模块级全局状态：这条风险已收口；`log_cleanup_private_chat_smoke()` 已支持显式 `log_path`，默认落盘路径走调用时本地解析，append/configure/reset 全部不再依赖模块级状态，兼容 API 壳子和死变量也已删除；后续只保留 `tests/test_cleanup_smoke_logging.py` 回归门禁，不再作为独立施工项。
-5. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
-6. Feishu 私聊事件解析器去重：`dict payload` 和 `SDK object payload` 两条路径先抽成同一套字段提取和构造逻辑，避免同一事件结构改两处。
-7. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露、和 auto-import service 的启动条件解耦、启动配置缺口日志、`download_monitor.record_status()` 写入失败日志、`downloader.completed_observed` 事件写入失败日志、status 查询触发的 auto-import follow-up 失败日志、auto-import 终态 `job_event` 查询失败日志、`auto_import.skipped_by_rule` 写入失败日志，以及停机失败日志也已补齐。后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台）。
-8. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
-9. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
-10. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
-11. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
-12. BT 共享确定性评分器。
-13. Jellyfin / Plex 支持（后续）。
-14. plugin 体系继续后置。
+1. 持久化吞错收口：`search_media`、`add_to_downloader`、`import_to_library`、`manage_watchlist`、`manage_bt_subscription` 剩余的 `except Exception: pass/return None` 或 `None/False` 混写异常态，继续改成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`。
+2. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
+3. Feishu 私聊事件解析器去重：`dict payload` 和 `SDK object payload` 两条路径先抽成同一套字段提取和构造逻辑，避免同一事件结构改两处。
+4. 独立后台下载完成轮询剩余少量回归与验证收口：当前最小闭环已接入应用启动/停止链，后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台。
+5. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
+6. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
+7. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
+8. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
+9. BT 共享确定性评分器。
+10. Jellyfin / Plex 支持（后续）。
+11. plugin 体系继续后置。
