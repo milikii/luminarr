@@ -9,7 +9,6 @@ from app.bot.cleanup_smoke_logging import (
     configure_cleanup_private_chat_smoke_log_file,
     log_cleanup_private_chat_smoke,
     parse_cleanup_private_chat_smoke_log_line,
-    reset_cleanup_private_chat_smoke_log_file,
     resolve_cleanup_private_chat_action,
 )
 
