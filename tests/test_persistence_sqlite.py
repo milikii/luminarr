@@ -184,6 +184,49 @@ def test_download_monitor_repo_rejects_missing_task_identity(tmp_path: Path) -> 
         repo.register_download(task_id="42", task_hash="", name="Dune: Part Two")
 
 
+def test_download_monitor_repo_rejects_missing_identity_for_status_record(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing"):
+        repo.record_status(
+            TransmissionTaskStatus(
+                task_id="",
+                task_hash="hash-42",
+                name="Dune: Part Two",
+                status_code=4,
+                percent_done=0.5,
+                rate_download=1024,
+                eta_seconds=60,
+            )
+        )
+
+
+def test_download_monitor_repo_raises_when_status_row_missing_after_upsert(tmp_path: Path) -> None:
+    class MissingRowDownloadMonitorRepo(DownloadMonitorRepo):
+        def _get_record_by_identity(self, *, task_id: str, task_hash: str):
+            _ = (task_id, task_hash)
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowDownloadMonitorRepo(database)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor state missing after status upsert"):
+        repo.record_status(
+            TransmissionTaskStatus(
+                task_id="42",
+                task_hash="hash-42",
+                name="Dune: Part Two",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        )
+
+
 def test_download_monitor_pending_completion_limit_is_stable(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

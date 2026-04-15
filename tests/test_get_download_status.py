@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionTaskStatus
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.get_download_status import (
@@ -137,6 +137,39 @@ def test_get_status_text_updates_download_monitor_truth_and_completion_event(tmp
     assert monitor_repo.list_pending_completion() == []
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
+
+
+def test_get_status_text_logs_download_monitor_persistence_failure(capsys) -> None:
+    monitor_repo = type(
+        "BoomRepo",
+        (),
+        {
+            "record_status": lambda self, task_status: (_ for _ in ()).throw(
+                DownloadMonitorPersistenceError("download monitor task identity missing")
+            )
+        },
+    )()
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=4,
+                percent_done=0.5,
+                rate_download=1024,
+                eta_seconds=30,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 下载中" in text
+    output = capsys.readouterr().out
+    assert "[下载状态观察落盘失败]" in output
+    assert "download monitor task identity missing" in output
 
 
 def test_get_download_status_service_exposes_download_monitor_repo(tmp_path: Path) -> None:

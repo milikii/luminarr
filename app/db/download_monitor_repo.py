@@ -95,7 +95,7 @@ class DownloadMonitorRepo:
         cleaned_task_id = task_status.task_id.strip()
         cleaned_task_hash = task_status.task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
-            raise ValueError("task id/hash is required")
+            raise DownloadMonitorPersistenceError("download monitor task identity missing")
 
         completed = _is_download_completed(task_status)
         with self._database.connect() as connection:
@@ -170,33 +170,11 @@ class DownloadMonitorRepo:
                     completed,
                 ),
             )
-            row = connection.execute(
-                """
-                SELECT
-                    task_id,
-                    task_hash,
-                    name,
-                    chat_id,
-                    user_id,
-                    status_code,
-                    percent_done,
-                    is_complete,
-                    completion_observed_at,
-                    last_observed_at,
-                    created_at,
-                    updated_at
-                FROM download_monitor
-                WHERE task_id = ? AND task_hash = ?
-                LIMIT 1
-                """,
-                (cleaned_task_id, cleaned_task_hash),
-            ).fetchone()
             connection.commit()
 
-        if row is None:
-            raise RuntimeError("failed to persist download monitor state")
-
-        record = _to_download_monitor_record(row)
+        record = self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
+        if record is None:
+            raise DownloadMonitorPersistenceError("download monitor state missing after status upsert")
         newly_completed = completed and not previous_completion and bool(record.completion_observed_at)
         return DownloadMonitorUpdate(record=record, newly_completed=newly_completed)
 
@@ -205,32 +183,7 @@ class DownloadMonitorRepo:
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
             return None
-
-        with self._database.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT
-                    task_id,
-                    task_hash,
-                    name,
-                    chat_id,
-                    user_id,
-                    status_code,
-                    percent_done,
-                    is_complete,
-                    completion_observed_at,
-                    last_observed_at,
-                    created_at,
-                    updated_at
-                FROM download_monitor
-                WHERE task_id = ? AND task_hash = ?
-                LIMIT 1
-                """,
-                (cleaned_task_id, cleaned_task_hash),
-            ).fetchone()
-        if row is None:
-            return None
-        return _to_download_monitor_record(row)
+        return self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
 
     def list_pending_completion(self, *, limit: int = 100) -> list[DownloadMonitorRecord]:
         with self._database.connect() as connection:
@@ -283,6 +236,33 @@ class DownloadMonitorRepo:
                 (max(1, limit),),
             ).fetchall()
         return [_to_download_monitor_record(row) for row in rows]
+
+    def _get_record_by_identity(self, *, task_id: str, task_hash: str) -> DownloadMonitorRecord | None:
+        with self._database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    task_id,
+                    task_hash,
+                    name,
+                    chat_id,
+                    user_id,
+                    status_code,
+                    percent_done,
+                    is_complete,
+                    completion_observed_at,
+                    last_observed_at,
+                    created_at,
+                    updated_at
+                FROM download_monitor
+                WHERE task_id = ? AND task_hash = ?
+                LIMIT 1
+                """,
+                (task_id, task_hash),
+            ).fetchone()
+        if row is None:
+            return None
+        return _to_download_monitor_record(row)
 
 
 def _is_download_completed(task_status: TransmissionTaskStatus) -> bool:
