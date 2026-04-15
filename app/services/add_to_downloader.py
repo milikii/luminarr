@@ -34,6 +34,7 @@ ADD_APPROVAL_PENDING_TEXT = (
 ADD_CANCELLED_TEXT = "已取消当前下载确认。请重新发送序号。"
 ADD_CONFIRM_NOT_PENDING_TEXT = "没有待确认的下载请求，请先重新发送序号。"
 ADD_CONFIRM_EXPIRED_TEXT = "下载确认已超时，请重新发送序号。"
+ADD_CONFIRM_STATE_UNAVAILABLE_TEXT = "下载确认状态读取失败，请稍后重试。"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
@@ -64,6 +65,7 @@ class ConfirmExecutionContext:
     job: JobRecord
     approval_record: ApprovalRecord | None
     pending_add: PendingAddContext
+    approval_lookup_failed: bool = False
 
 
 class AddToDownloaderService:
@@ -224,6 +226,8 @@ class AddToDownloaderService:
             if in_memory_pending is None:
                 return ADD_CONFIRM_NOT_PENDING_TEXT
         else:
+            if confirm_context.approval_lookup_failed:
+                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
             if confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
                 stale_text = self._find_version_stale_rejection_text(
                     task_id=confirm_context.pending_add.task_id,
@@ -716,6 +720,7 @@ class AddToDownloaderService:
             return None
 
         approval_record: ApprovalRecord | None = None
+        approval_lookup_failed = False
         if self._approval_repo is not None:
             try:
                 approval_record = self._approval_repo.get_downloader_approval(
@@ -728,7 +733,13 @@ class AddToDownloaderService:
                     flush=True,
                 )
                 approval_record = None
-        return ConfirmExecutionContext(job=job, approval_record=approval_record, pending_add=pending_add)
+                approval_lookup_failed = True
+        return ConfirmExecutionContext(
+            job=job,
+            approval_record=approval_record,
+            pending_add=pending_add,
+            approval_lookup_failed=approval_lookup_failed,
+        )
 
     def _get_in_memory_pending(self, *, chat_id: int | None, task_ref: str) -> PendingAddContext | None:
         if chat_id is None or chat_id <= 0:
@@ -849,10 +860,10 @@ class AddToDownloaderService:
             approval_record = self._approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
         except Exception as error:
             print(
-                f"\033[31m[下载确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会继续按普通 not pending 处理，但可能丢失“已执行”的明确拒绝文本。",
+                f"\033[31m[下载确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认下载。",
                 flush=True,
             )
-            return None
+            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         if approval_record is None:
             return None
         if approval_record.lease_version <= 0:
@@ -871,11 +882,14 @@ class AddToDownloaderService:
         approval_record = context.approval_record
         if approval_record is None:
             return None
-        if not self._is_pending_approval_expired(
+        approval_expired = self._is_pending_approval_expired(
             task_id=context.pending_add.task_id,
             task_hash=context.pending_add.task_hash,
             expected_lease_version=approval_record.lease_version,
-        ):
+        )
+        if approval_expired is None:
+            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if not approval_expired:
             return None
         self._cancel_pending_approval(
             task_ref=task_ref,
@@ -917,7 +931,7 @@ class AddToDownloaderService:
         task_id: str,
         task_hash: str,
         expected_lease_version: int,
-    ) -> bool:
+    ) -> bool | None:
         if self._approval_repo is None:
             return False
         try:
@@ -928,10 +942,10 @@ class AddToDownloaderService:
             )
         except Exception as error:
             print(
-                f"\033[31m[下载确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前会按“未过期”继续处理，但这可能掩盖真实超时。",
+                f"\033[31m[下载确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
                 flush=True,
             )
-            return False
+            return None
 
     def _record_event(
         self,
