@@ -548,6 +548,42 @@ def test_job_repo_rejects_missing_identity_for_state_transitions(tmp_path: Path)
         )
 
 
+def test_job_repo_rejects_missing_identity_for_lease_and_cancel(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobRepo(database)
+
+    with pytest.raises(JobPersistenceError, match="job lease identity missing"):
+        repo.claim_lease(
+            job_id="",
+            expected_version=1,
+            lease_owner="owner-1",
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        )
+
+    with pytest.raises(JobPersistenceError, match="job lease expected version missing"):
+        repo.claim_lease(
+            job_id="job-1",
+            expected_version=0,
+            lease_owner="owner-1",
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        )
+
+    with pytest.raises(JobPersistenceError, match="job cancel identity missing"):
+        repo.cancel_pending_job(
+            job_id="",
+            expected_version=1,
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        )
+
+    with pytest.raises(JobPersistenceError, match="job cancel expected version missing"):
+        repo.cancel_pending_job(
+            job_id="job-1",
+            expected_version=0,
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        )
+
+
 def test_import_persists_minimal_events(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

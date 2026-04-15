@@ -217,8 +217,10 @@ class JobRepo:
         cleaned_job_id = job_id.strip()
         cleaned_owner = lease_owner.strip()
         cleaned_workflow = workflow_type.strip()
-        if not cleaned_job_id or not cleaned_owner or not cleaned_workflow or expected_version <= 0:
-            return False
+        if not cleaned_job_id or not cleaned_owner or not cleaned_workflow:
+            raise JobPersistenceError("job lease identity missing")
+        if expected_version <= 0:
+            raise JobPersistenceError("job lease expected version missing")
 
         current_time = _utcnow()
         lease_until = _format_utc(current_time + timedelta(seconds=LEASE_SECONDS))
@@ -338,8 +340,10 @@ class JobRepo:
     def cancel_pending_job(self, *, job_id: str, expected_version: int, workflow_type: str) -> bool:
         cleaned_job_id = job_id.strip()
         cleaned_workflow = workflow_type.strip()
-        if not cleaned_job_id or not cleaned_workflow or expected_version <= 0:
-            return False
+        if not cleaned_job_id or not cleaned_workflow:
+            raise JobPersistenceError("job cancel identity missing")
+        if expected_version <= 0:
+            raise JobPersistenceError("job cancel expected version missing")
 
         current_time_text = _format_utc(_utcnow())
         with self._database.connect() as connection:
