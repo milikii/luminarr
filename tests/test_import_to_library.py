@@ -949,6 +949,43 @@ def test_execute_import_logs_copy_failure(tmp_path: Path, monkeypatch, capsys) -
     assert "[处理建议]" in output
 
 
+def test_confirm_import_logs_target_exists_during_execute(tmp_path: Path, monkeypatch, capsys) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_path = tmp_path / "library" / "Dune (2021).mkv"
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+    )
+
+    _run(service.import_by_task_ref("87"))
+
+    def _raise_target_exists(src: str | Path, dst: str | Path) -> None:
+        raise FileExistsError(str(dst))
+
+    monkeypatch.setattr(import_module.os, "link", _raise_target_exists)
+
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert text == f"目标已存在，已拒绝覆盖：{target_path}"
+    output = capsys.readouterr().out
+    assert "[导入目标已存在]" in output
+    assert "task_id=87" in output
+    assert str(target_path) in output
+    assert "[处理建议]" in output
+
+
 def test_confirm_import_by_task_ref_rejects_expired_pending(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

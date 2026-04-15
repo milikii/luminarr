@@ -68,6 +68,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._prepare_import()` 在下载源已缺失时，现在也会打印红色中文 `[导入源文件缺失]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在目标路径已存在时，现在也会打印红色中文 `[导入目标已存在]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在也会打印红色中文 `[导入目标目录创建失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
+  - `import_to_library._execute_import()` 在执行阶段撞到已存在目标时，现在也会打印红色中文 `[导入目标已存在]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在也会打印红色中文 `[导入硬链接失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._execute_import()` 在 copy 模式失败时，现在也会打印红色中文 `[导入复制失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在查询导入源抛异常时，现在也会打印红色中文 `[导入源查询失败]` 日志和 `[处理建议]`，不再只写 `import.query_failed` 事件却没有运维可见日志
@@ -237,6 +238,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在下载源已缺失时，现在会打印红色中文 `[导入源文件缺失]` 和 `[处理建议]`，不再只回用户文本和 `import.source_missing` 事件，让下载目录已被清理/移动的问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在目标路径已存在时，现在会打印红色中文 `[导入目标已存在]` 和 `[处理建议]`，不再只回用户文本和 `import.target_exists` 事件，让库目录冲突能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在会打印红色中文 `[导入目标目录创建失败]` 和 `[处理建议]`，不再只回用户文本和 `import.prepare_target_failed` 事件，让目录权限/路径配置问题能直接被终端日志看见。
+- 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在执行阶段撞到已存在目标时，现在会打印红色中文 `[导入目标已存在]` 和 `[处理建议]`，不再只回用户文本和 `import.target_exists` 事件，让并发/历史残留导致的目标冲突也能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在会打印红色中文 `[导入硬链接失败]` 和 `[处理建议]`，不再只回用户文本和 `import.hardlink_failed` 事件，让权限/路径占用问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 copy 模式失败时，现在会打印红色中文 `[导入复制失败]` 和 `[处理建议]`，不再只回用户文本和 `import.copy_failed` 事件，让磁盘空间/权限问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_name_for_task()` 在读取 downloader job 失败时，现在会打印红色中文 `[下载器路由查询失败]` 和 `[处理建议]`，不再把 SQLite/jobs 读取异常混写成普通 `downloader job missing`。
@@ -367,6 +369,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import source-missing observability tests：2026-04-15，`1 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_source_missing`）
 - import target-exists observability tests：2026-04-15，`1 passed, 56 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_exists`）
 - import target-dir create observability tests：2026-04-15，`1 passed, 52 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_dir_create_failure`）
+- import execute target-exists observability tests：2026-04-15，`1 passed, 57 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k confirm_import_logs_target_exists_during_execute`）
 - import hardlink failure observability tests：2026-04-15，`1 passed, 53 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k confirm_import_logs_hardlink_failure`）
 - import copy failure observability tests：2026-04-15，`1 passed, 54 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k execute_import_logs_copy_failure`）
 - import write-path observability tests：2026-04-15，`4 passed, 40 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_pending_approval_logs_persistence_failure or record_import_approval_logs_persistence_failure or record_executed_lease_version_logs_persistence_failure or record_pending_job_logs_persistence_failure"`）

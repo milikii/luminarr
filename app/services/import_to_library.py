@@ -689,6 +689,10 @@ class ImportToLibraryService:
                 _hardlink_import(source_path, target_path)
         except FileExistsError:
             message = IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
+            print(
+                f"\033[31m[导入目标已存在]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_path}\n\033[33m[处理建议]\033[0m 检查导入执行期间是否已有并发写入或历史文件落到相同目标；确认目标文件可复用或清理后再重试。",
+                flush=True,
+            )
             self._record_event(
                 task_ref=task_ref,
                 task_id=import_source.task_id,
