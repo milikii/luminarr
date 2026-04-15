@@ -14,7 +14,6 @@ SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 CLEANUP_PRIVATE_CHAT_SMOKE_LOG_LABEL = "[cleanup 私聊 smoke]"
 DEFAULT_CLEANUP_PRIVATE_CHAT_SMOKE_LOG_FILE = "cleanup-private-chat-smoke.log"
-_cleanup_private_chat_smoke_log_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,7 +32,6 @@ def configure_cleanup_private_chat_smoke_log_file(
     log_dir: Path,
     file_name: str = DEFAULT_CLEANUP_PRIVATE_CHAT_SMOKE_LOG_FILE,
 ) -> Path | None:
-    global _cleanup_private_chat_smoke_log_path
     log_path = log_dir / file_name
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
