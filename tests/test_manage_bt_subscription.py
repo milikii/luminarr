@@ -176,6 +176,40 @@ def test_bt_subscription_run_once_prefers_new_ranked_candidate(tmp_path: Path) -
     assert item.last_seen_title == "Frieren S01E01 1080p"
 
 
+def test_bt_subscription_run_once_warns_when_last_seen_truth_is_not_updated(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    created = repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    assert created is not None
+
+    def _fail_update_last_seen(**_: object) -> bool:
+        return False
+
+    repo.update_last_seen = _fail_update_last_seen  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert "下载待确认：" in reply
+    assert "最近资源真相未更新" in reply
+    assert repo.list_items(chat_id=1001)[0].last_seen_source == ""
+    captured = capsys.readouterr()
+    assert "[BT 订阅最近资源回写失败]" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_path: Path) -> None:
     async def _scheduler_search(_: str) -> list[dict[str, object]]:
         return [
@@ -214,6 +248,40 @@ def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_pa
     chat_id, reply = notifications[0]
     assert chat_id == 1001
     assert "命中资源: Frieren S01E01 720p" in reply
+
+
+def test_bt_subscription_scheduler_tick_warns_when_last_seen_update_raises(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    created = repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    assert created is not None
+
+    def _crash_update_last_seen(**_: object) -> bool:
+        raise RuntimeError("db down")
+
+    repo.update_last_seen = _crash_update_last_seen  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications
+    chat_id, reply = notifications[0]
+    assert chat_id == 1001
+    assert "下载待确认：" in reply
+    assert "最近资源真相未更新" in reply
+    captured = capsys.readouterr()
+    assert "[BT 订阅最近资源回写失败]" in captured.out
+    assert "db down" in captured.out
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:

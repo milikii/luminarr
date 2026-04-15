@@ -27,6 +27,10 @@ BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
 BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
 BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
 BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。"
+BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT = (
+    "注意：BT 订阅最近资源真相未更新，下次扫描可能重复命中同一资源。\n"
+    "请检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
+)
 MEDIA_KIND_ALIASES = {
     "movie": "movie",
     "film": "movie",
@@ -246,19 +250,21 @@ class ManageBtSubscriptionService:
         if "下载待确认：" not in pending_text:
             return None
 
-        self._bt_subscription_repo.update_last_seen(
-            chat_id=chat_id,
-            item_id=item.item_id,
-            source=selected_source,
-            title=candidate_title,
-        )
         year_text = item.year if item.year else "-"
-        return (
+        reply = (
             f"BT 订阅命中新资源：{item.title} ({year_text})\n"
             f"类型: {_media_kind_label(item.media_kind)}\n"
             f"命中资源: {candidate_title}\n\n"
             f"{pending_text}"
         )
+        if self._update_last_seen(
+            item=item,
+            chat_id=chat_id,
+            source=selected_source,
+            title=candidate_title,
+        ):
+            return reply
+        return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT}"
 
     async def _scan_chat_once(
         self,
@@ -285,6 +291,41 @@ class ManageBtSubscriptionService:
             matched += 1
             replies.append(reply)
         return BtSubscriptionRunResult(scanned=len(items), matched=matched, replies=tuple(replies))
+
+    def _update_last_seen(
+        self,
+        *,
+        item: BtSubscriptionItem,
+        chat_id: int,
+        source: str,
+        title: str,
+    ) -> bool:
+        try:
+            updated = self._bt_subscription_repo.update_last_seen(
+                chat_id=chat_id,
+                item_id=item.item_id,
+                source=source,
+                title=title,
+            )
+        except Exception as error:
+            _log_bt_subscription_last_seen_update_failed(
+                item=item,
+                chat_id=chat_id,
+                source=source,
+                title=title,
+                reason=str(error),
+            )
+            return False
+        if updated:
+            return True
+        _log_bt_subscription_last_seen_update_failed(
+            item=item,
+            chat_id=chat_id,
+            source=source,
+            title=title,
+            reason="bt_subscription_repo.update_last_seen returned False",
+        )
+        return False
 
 
 def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
@@ -453,6 +494,21 @@ def _log_bt_subscription_scan_error(
     print(
         f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+    )
+
+
+def _log_bt_subscription_last_seen_update_failed(
+    *,
+    item: BtSubscriptionItem,
+    chat_id: int,
+    source: str,
+    title: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅最近资源回写失败]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
+        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
     )
 
 
