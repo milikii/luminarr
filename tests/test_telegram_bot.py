@@ -1088,6 +1088,25 @@ def test_bt_tmdb_association_pending_logs_payload_corruption_after_restart(
     assert "payload_json invalid json" in output
 
 
+def test_bt_tmdb_association_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def get_pending(self, *, chat_id: int):
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))}
+        )
+    )
+
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理读取失败]" in output
+    assert "stage=tmdb_association" in output
+    assert "db down" in output
+
+
 def test_clear_bt_tmdb_association_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:

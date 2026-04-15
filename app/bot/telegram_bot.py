@@ -1052,6 +1052,14 @@ def _log_bt_pending_clear_failed(*, chat_id: int | None, stage: str, reason: str
     )
 
 
+def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理读取失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表读取是否正常；当前会按“没有待处理状态”继续处理，但这可能是 SQLite 读取异常，不是用户真的没有待处理步骤。",
+        flush=True,
+    )
+
+
 def _set_bt_processing_path_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
@@ -1319,7 +1327,15 @@ def _get_bt_tmdb_association_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return None
-    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    try:
+        pending_state = pending_repo.get_pending(chat_id=chat_id)
+    except Exception as error:
+        _log_bt_pending_read_failed(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            reason=str(error),
+        )
+        return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
         return None
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
