@@ -633,7 +633,11 @@ class AddToDownloaderService:
                 task_hash=task_hash,
                 executed_lease_version=executed_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
+                flush=True,
+            )
             return
 
     def _record_pending_context(self, *, chat_id: int, pending_add: PendingAddContext) -> None:
