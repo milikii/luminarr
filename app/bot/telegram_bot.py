@@ -1489,23 +1489,30 @@ def _set_raw_bt_destination_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return
-    pending_repo.upsert_pending(
-        chat_id=chat_id,
-        stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
-        payload_json=_serialize_bt_pending_payload(
-            {
-                "options": [
-                    {
-                        "key": option.key,
-                        "label": option.label,
-                        "target_dir": option.target_dir,
-                    }
-                    for option in options
-                ],
-                "source": source.strip(),
-            }
-        ),
-    )
+    try:
+        pending_repo.upsert_pending(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+            payload_json=_serialize_bt_pending_payload(
+                {
+                    "options": [
+                        {
+                            "key": option.key,
+                            "label": option.label,
+                            "target_dir": option.target_dir,
+                        }
+                        for option in options
+                    ],
+                    "source": source.strip(),
+                }
+            ),
+        )
+    except Exception as error:
+        _log_bt_pending_persist_failed(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+            reason=str(error),
+        )
 
 
 def _get_raw_bt_destination_pending(
