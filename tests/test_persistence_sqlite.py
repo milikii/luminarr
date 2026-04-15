@@ -107,6 +107,24 @@ def test_candidate_mapping_repo_rejects_missing_chat_identity(tmp_path: Path) ->
         repo.save_candidates(0, [{"title": "Dune"}])
 
 
+def test_candidate_mapping_repo_rejects_missing_chat_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = CandidateMappingRepo(database)
+
+    with pytest.raises(CandidatePersistenceError, match="candidate_mapping chat identity missing for query"):
+        repo.get_candidate(0, 1)
+
+
+def test_candidate_mapping_repo_rejects_missing_chat_identity_for_clear(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = CandidateMappingRepo(database)
+
+    with pytest.raises(CandidatePersistenceError, match="candidate_mapping chat identity missing for clear"):
+        repo.clear_candidates(0)
+
+
 def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

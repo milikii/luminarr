@@ -43,12 +43,16 @@ class CandidateMappingRepo:
             raise CandidatePersistenceError("candidate_mapping count mismatch after save")
 
     def clear_candidates(self, chat_id: int) -> bool:
+        if chat_id <= 0:
+            raise CandidatePersistenceError("candidate_mapping chat identity missing for clear")
         with self._database.connect() as connection:
             cursor = connection.execute("DELETE FROM candidate_mapping WHERE chat_id = ?", (chat_id,))
             connection.commit()
         return cursor.rowcount > 0
 
     def get_candidate(self, chat_id: int, selection_index: int) -> Mapping[str, Any] | None:
+        if chat_id <= 0:
+            raise CandidatePersistenceError("candidate_mapping chat identity missing for query")
         if selection_index < 1:
             return None
         with self._database.connect() as connection:
