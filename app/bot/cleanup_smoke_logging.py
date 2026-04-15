@@ -38,7 +38,6 @@ def configure_cleanup_private_chat_smoke_log_file(
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as error:
-        _cleanup_private_chat_smoke_log_path = None
         print(
             f"\033[31m[cleanup 私聊 smoke 日志目录不可写]\033[0m 路径={log_path.parent} 错误={error}\n"
             "\033[33m[处理建议]\033[0m 检查当前工作目录和 logs 目录权限；确认 `make run` / `.venv/bin/python -m app.main` "
