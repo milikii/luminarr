@@ -415,7 +415,11 @@ class AddToDownloaderService:
         if self._job_repo is not None:
             try:
                 pending_job = self._job_repo.get_latest_pending_downloader_job(chat_id=chat_id)
-            except Exception:
+            except Exception as error:
+                print(
+                    f"\033[31m[下载取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前请求会按“无待确认下载”继续处理，但实际待取消状态可能被误判。",
+                    flush=True,
+                )
                 pending_job = None
 
         if pending_job is None:
