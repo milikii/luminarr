@@ -555,6 +555,18 @@ def test_approval_repo_raises_when_pending_request_row_missing(tmp_path: Path) -
         repo.request_downloader_approval(task_id="88", task_hash="hash-88", task_ref="88")
 
 
+def test_approval_repo_raises_when_mark_executed_row_missing(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing during executed version update"):
+        repo.mark_import_executed(task_id="87", task_hash="hash-87", executed_lease_version=1)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing during executed version update"):
+        repo.mark_downloader_executed(task_id="88", task_hash="hash-88", executed_lease_version=1)
+
+
 def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

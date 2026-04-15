@@ -501,7 +501,7 @@ class ApprovalRepo:
             return
 
         with self._database.connect() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 UPDATE approval_record
                 SET
@@ -521,6 +521,8 @@ class ApprovalRepo:
                 ),
             )
             connection.commit()
+        if cursor.rowcount != 1:
+            raise ApprovalPersistenceError("approval_record missing during executed version update")
 
     def _get_approval(
         self,
