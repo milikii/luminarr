@@ -147,6 +147,43 @@ def _build_callback_update(
     return update, reply_text, answer
 
 
+def test_handle_message_routes_through_dispatch_private_chat_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    update, _ = _build_update("dune")
+    context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+
+    asyncio.run(handle_message(update, context))
+
+    dispatch_private_chat_text.assert_awaited_once()
+    kwargs = dispatch_private_chat_text.await_args.kwargs
+    assert kwargs["query"] == "dune"
+    assert kwargs["chat_id"] == 1001
+    assert kwargs["user_id"] == 2001
+    assert kwargs["bot_data"] is context.application.bot_data
+    assert callable(kwargs["reply_func"])
+
+
+def test_handle_callback_query_routes_through_dispatch_private_chat_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    update, _, answer = _build_callback_update("confirm 87")
+    context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    dispatch_private_chat_text.assert_awaited_once()
+    kwargs = dispatch_private_chat_text.await_args.kwargs
+    assert kwargs["query"] == "confirm 87"
+    assert kwargs["chat_id"] == 1001
+    assert kwargs["user_id"] == 2001
+    assert kwargs["bot_data"] is context.application.bot_data
+    assert callable(kwargs["reply_func"])
+
+
 def test_handle_message_replies_search_result() -> None:
     reply_text = AsyncMock()
     message = SimpleNamespace(text="dune", reply_text=reply_text)

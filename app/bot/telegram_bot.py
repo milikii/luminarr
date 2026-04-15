@@ -301,6 +301,8 @@ class ResolvedDownloaderExecution:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from app.bot.private_chat_runtime import dispatch_private_chat_text
+
     message = update.effective_message
     if message is None:
         return
@@ -310,16 +312,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not _record_message_update(update=update, context=context):
         return
 
-    await handle_private_chat_query_text(
+    await dispatch_private_chat_text(
         query=(message.text or "").strip(),
         reply_func=_build_telegram_reply_func(message.reply_text),
         chat_id=chat_id,
         user_id=user_id,
-        context=context,
+        bot_data=context.application.bot_data,
     )
 
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from app.bot.private_chat_runtime import dispatch_private_chat_text
+
     callback_query = getattr(update, "callback_query", None)
     if callback_query is None:
         return
@@ -347,12 +351,12 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     if not query:
         return
 
-    await handle_private_chat_query_text(
+    await dispatch_private_chat_text(
         query=query,
         reply_func=_build_telegram_reply_func(message.reply_text),
         chat_id=chat_id,
         user_id=user_id,
-        context=context,
+        bot_data=context.application.bot_data,
     )
 
 
