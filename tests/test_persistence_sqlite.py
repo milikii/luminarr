@@ -814,6 +814,18 @@ def test_watchlist_repo_rejects_missing_identity_for_id_lookup(tmp_path: Path) -
         repo.get_item_by_id(chat_id=1001, item_id=0)
 
 
+def test_watchlist_repo_rejects_missing_identity_for_exact_lookup(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = WatchlistRepo(database)
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item identity missing for exact lookup"):
+        repo.get_item_by_identity(chat_id=0, title="Dune", year="2021", media_kind="movie")
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item title missing for exact lookup"):
+        repo.get_item_by_identity(chat_id=1001, title="   ", year="2021", media_kind="movie")
+
+
 def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
