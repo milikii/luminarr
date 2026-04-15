@@ -155,6 +155,24 @@ def test_job_event_repo_raises_when_appended_row_missing(tmp_path: Path) -> None
         repo.append_event(task_ref="87", event_type="import.succeeded", message="/data/library/movies/demo.mkv")
 
 
+def test_job_event_repo_rejects_missing_task_ref(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    with pytest.raises(JobEventPersistenceError, match="job_event task_ref missing"):
+        repo.append_event(task_ref="   ", event_type="import.succeeded")
+
+
+def test_job_event_repo_rejects_missing_event_type(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    with pytest.raises(JobEventPersistenceError, match="job_event event_type missing"):
+        repo.append_event(task_ref="87", event_type="   ")
+
+
 def test_download_monitor_truth_persists_for_restart_and_completion_observation(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

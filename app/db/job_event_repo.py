@@ -38,6 +38,12 @@ class JobEventRepo:
         source_path: str = "",
         target_path: str = "",
     ) -> None:
+        cleaned_task_ref = task_ref.strip()
+        cleaned_event_type = event_type.strip()
+        if not cleaned_task_ref:
+            raise JobEventPersistenceError("job_event task_ref missing")
+        if not cleaned_event_type:
+            raise JobEventPersistenceError("job_event event_type missing")
         with self._database.connect() as connection:
             cursor = connection.execute(
                 """
@@ -51,7 +57,7 @@ class JobEventRepo:
                     target_path
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (task_ref, task_id, task_hash, event_type, message, source_path, target_path),
+                (cleaned_task_ref, task_id, task_hash, cleaned_event_type, message, source_path, target_path),
             )
             connection.commit()
             event_id = int(cursor.lastrowid)
