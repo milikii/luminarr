@@ -13,7 +13,7 @@ class ClarificationRepo:
 
     def upsert_pending(self, *, chat_id: int, query: str) -> None:
         if chat_id <= 0:
-            return
+            raise ClarificationPersistenceError("clarification_state chat identity missing")
         cleaned_query = query.strip()
         if not cleaned_query:
             raise ClarificationPersistenceError("clarification_state query missing")
@@ -38,7 +38,7 @@ class ClarificationRepo:
 
     def get_pending_query(self, *, chat_id: int) -> str | None:
         if chat_id <= 0:
-            return None
+            raise ClarificationPersistenceError("clarification_state chat identity missing for query")
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -54,7 +54,7 @@ class ClarificationRepo:
 
     def clear_pending(self, *, chat_id: int) -> bool:
         if chat_id <= 0:
-            return False
+            raise ClarificationPersistenceError("clarification_state chat identity missing for clear")
         with self._database.connect() as connection:
             cursor = connection.execute(
                 "DELETE FROM clarification_state WHERE chat_id = ?",

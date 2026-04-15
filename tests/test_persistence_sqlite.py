@@ -390,6 +390,33 @@ def test_clarification_repo_rejects_missing_query(tmp_path: Path) -> None:
         repo.upsert_pending(chat_id=1001, query="   ")
 
 
+def test_clarification_repo_rejects_missing_chat_identity_for_upsert(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ClarificationRepo(database)
+
+    with pytest.raises(ClarificationPersistenceError, match="clarification_state chat identity missing"):
+        repo.upsert_pending(chat_id=0, query="Dune")
+
+
+def test_clarification_repo_rejects_missing_chat_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ClarificationRepo(database)
+
+    with pytest.raises(ClarificationPersistenceError, match="clarification_state chat identity missing for query"):
+        repo.get_pending_query(chat_id=0)
+
+
+def test_clarification_repo_rejects_missing_chat_identity_for_clear(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ClarificationRepo(database)
+
+    with pytest.raises(ClarificationPersistenceError, match="clarification_state chat identity missing for clear"):
+        repo.clear_pending(chat_id=0)
+
+
 def test_bt_pending_repo_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

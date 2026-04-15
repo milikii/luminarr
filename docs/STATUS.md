@@ -267,6 +267,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`bt_pending_repo.upsert_pending()` 遇到空 `stage` 时，现在也会显式抛出 `BtPendingPersistenceError`；Telegram BT 多步问询入口会继续复用现有红色中文 `[BT 待处理持久化失败]` 和 `[处理建议]`，不再把坏待处理阶段静默折叠成“没有待处理状态”。
 - 2026-04-15 代码审查确认：`clarification_repo.upsert_pending()` 在 `clarification_state` 写入成功后如果回读不到刚写入的 query，现在会显式抛出 `clarification_state missing after upsert`；`search_media` 会继续复用现有红色中文 `[搜索澄清态持久化失败]` 和 `[处理建议]`，不再把这类澄清真相缺口静默吞成“当前轮有澄清提示、重启后却找不到待澄清状态”。
 - 2026-04-15 代码审查确认：`clarification_repo.upsert_pending()` 遇到空 `query` 时，现在也会显式抛出 `ClarificationPersistenceError`；`search_media` 会继续复用现有红色中文 `[搜索澄清态持久化失败]` 和 `[处理建议]`，不再把空澄清查询静默折叠成一条合法待澄清状态。
+- 2026-04-16 代码审查确认：`clarification_repo.upsert_pending()` / `get_pending_query()` / `clear_pending()` 遇到空 `chat_id` 时，现在也会显式抛出 `ClarificationPersistenceError`；澄清真相层不再把坏会话身份静默折叠成普通“没有待澄清状态”或清理成功。
 - 2026-04-15 代码审查确认：`candidate_repo.save_candidates()` 在 `candidate_mapping` 写入后如果计数对不上，现在会显式抛出 `candidate_mapping count mismatch after save`；`search_media` 会继续复用现有红色中文 `[搜索候选持久化失败]` 和 `[处理建议]`，不再把这类候选真相缺口静默吞成“搜索文本已返回、但重启后按序号选不到同一批候选”。
 - 2026-04-15 代码审查确认：`candidate_repo.save_candidates()` 遇到空 `chat_id` 时，现在也会显式抛出 `CandidatePersistenceError`；`search_media` 会继续复用现有红色中文 `[搜索候选持久化失败]` 和 `[处理建议]`，不再把坏 chat 候选缓存静默折叠成普通保存成功。
 - 2026-04-15 代码审查确认：`watchlist_repo.add_item()` 遇到空 `chat_id` 或空 `title` 时，现在也会显式抛出 `WatchlistPersistenceError`；`manage_watchlist` 会继续复用现有红色中文 `[想看写入失败]` 和 `[处理建议]`，不再把坏想看身份静默折叠成普通 `repo returned None`。
