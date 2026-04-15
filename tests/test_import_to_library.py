@@ -26,6 +26,7 @@ from app.services.import_to_library import (
     IMPORT_COPY_FAILED_TEXT,
     IMPORT_CONFIRM_EXPIRED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
+    IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
     IMPORT_HARDLINK_FAILED_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
@@ -199,7 +200,10 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
     approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo, approval_repo=approval_repo)
-    assert service._rebuild_confirm_context(task_ref="87", chat_id=1001).approval_record is None
+    context = service._rebuild_confirm_context(task_ref="87", chat_id=1001)
+    assert context is not None
+    assert context.approval_record is None
+    assert context.approval_lookup_failed is True
     assert "[导入确认审批查询失败]" in capsys.readouterr().out
 
 
@@ -349,7 +353,7 @@ def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> N
 def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
-    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") is None
+    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
     assert "[导入确认执行版号查询失败]" in output
     assert "task_id=87" in output
@@ -473,7 +477,85 @@ def test_prepare_import_logs_target_exists(
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
-    assert service._is_pending_approval_expired(task_id="87", task_hash="hash-87", expected_lease_version=2) is False
+    assert service._is_pending_approval_expired(task_id="87", task_hash="hash-87", expected_lease_version=2) is None
+    output = capsys.readouterr().out
+    assert "[导入确认过期判断失败]" in output
+    assert "lease_version=2" in output
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_lookup_fails(capsys) -> None:
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    get_import_source = AsyncMock(return_value=None)
+    service = ImportToLibraryService(
+        get_import_source,
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_not_awaited()
+    assert "[导入确认审批查询失败]" in capsys.readouterr().out
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_expiry_lookup_fails(capsys) -> None:
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type("ApprovalRecord", (), {"status": "pending", "lease_version": 2})()
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: approval_record,
+            "is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+        },
+    )()
+    get_import_source = AsyncMock(return_value=None)
+    service = ImportToLibraryService(
+        get_import_source,
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_not_awaited()
     output = capsys.readouterr().out
     assert "[导入确认过期判断失败]" in output
     assert "lease_version=2" in output

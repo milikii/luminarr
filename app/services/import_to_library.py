@@ -52,6 +52,7 @@ IMPORT_RAW_BT_UNSUPPORTED_TEXT = "当前任务属于 raw_bt 资源，不走媒�
 IMPORT_CANCELLED_TEXT = "已取消当前导入确认。请重新发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_NOT_PENDING_TEXT = "没有待确认的导入请求，请先发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_EXPIRED_TEXT = "导入确认已超时，请重新发送 import <任务ID或Hash>。"
+IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT = "导入确认状态读取失败，请稍后重试。"
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
 JOB_LEASE_OWNER = "import_confirm"
@@ -70,6 +71,7 @@ class PreparedImport:
 class ConfirmExecutionContext:
     job: JobRecord
     approval_record: ApprovalRecord | None
+    approval_lookup_failed: bool = False
 
     @property
     def lookup_task_ref(self) -> str:
@@ -170,6 +172,8 @@ class ImportToLibraryService:
             return CONFIRM_QUERY_USAGE_TEXT
 
         confirm_context = self._rebuild_confirm_context(task_ref=cleaned_ref, chat_id=chat_id)
+        if confirm_context is not None and confirm_context.approval_lookup_failed:
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if confirm_context is not None and confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
             stale_text = self._find_version_stale_rejection_text(
                 task_id=confirm_context.job.task_id,
@@ -1160,6 +1164,7 @@ class ImportToLibraryService:
             return None
 
         approval_record: ApprovalRecord | None = None
+        approval_lookup_failed = False
         if self._approval_repo is not None:
             try:
                 approval_record = self._approval_repo.get_import_approval(
@@ -1172,7 +1177,12 @@ class ImportToLibraryService:
                     flush=True,
                 )
                 approval_record = None
-        return ConfirmExecutionContext(job=job, approval_record=approval_record)
+                approval_lookup_failed = True
+        return ConfirmExecutionContext(
+            job=job,
+            approval_record=approval_record,
+            approval_lookup_failed=approval_lookup_failed,
+        )
 
     def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool:
         if self._job_repo is None:
@@ -1277,10 +1287,10 @@ class ImportToLibraryService:
             approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
         except Exception as error:
             print(
-                f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会继续按普通 not pending 处理，但可能丢失“已执行”的明确拒绝文本。",
+                f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
                 flush=True,
             )
-            return None
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if approval_record is None:
             return None
         if approval_record.lease_version <= 0:
@@ -1318,11 +1328,14 @@ class ImportToLibraryService:
         approval_record = context.approval_record
         if approval_record is None:
             return None
-        if not self._is_pending_approval_expired(
+        approval_expired = self._is_pending_approval_expired(
             task_id=context.job.task_id,
             task_hash=context.job.task_hash,
             expected_lease_version=approval_record.lease_version,
-        ):
+        )
+        if approval_expired is None:
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if not approval_expired:
             return None
         if self._approval_repo is not None:
             try:
@@ -1374,7 +1387,7 @@ class ImportToLibraryService:
         task_id: str,
         task_hash: str,
         expected_lease_version: int,
-    ) -> bool:
+    ) -> bool | None:
         if self._approval_repo is None:
             return False
         try:
@@ -1385,10 +1398,10 @@ class ImportToLibraryService:
             )
         except Exception as error:
             print(
-                f"\033[31m[导入确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前会按“未过期”继续处理，但这可能掩盖真实超时。",
+                f"\033[31m[导入确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
                 flush=True,
             )
-            return False
+            return None
 
     def _record_event(
         self,
