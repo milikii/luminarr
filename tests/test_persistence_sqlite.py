@@ -527,6 +527,26 @@ def test_approval_repo_persists_for_restart(tmp_path: Path) -> None:
     assert record.last_task_ref == "87"
 
 
+def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
+    class MissingRowApprovalRepo(ApprovalRepo):
+        def _get_exact_approval_record(
+            self,
+            *,
+            action_type: str,
+            task_id: str,
+            task_hash: str,
+        ):
+            _ = (action_type, task_id, task_hash)
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing after upsert"):
+        repo.upsert_import_approval(task_id="87", task_hash="hash-87", task_ref="87")
+
+
 def test_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

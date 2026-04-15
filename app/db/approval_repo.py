@@ -302,6 +302,13 @@ class ApprovalRepo:
                 ),
             )
             connection.commit()
+        approval_record = self._get_exact_approval_record(
+            action_type=action_type,
+            task_id=cleaned_task_id,
+            task_hash=cleaned_task_hash,
+        )
+        if approval_record is None:
+            raise ApprovalPersistenceError("approval_record missing after upsert")
 
     def _request_approval(
         self,
@@ -576,6 +583,37 @@ class ApprovalRepo:
                     """,
                     (action_type, cleaned_task_id),
                 ).fetchone()
+        if row is None:
+            return None
+        return _to_approval_record(row)
+
+    def _get_exact_approval_record(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+    ) -> ApprovalRecord | None:
+        with self._database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    action_type,
+                    task_id,
+                    task_hash,
+                    status,
+                    lease_version,
+                    executed_version,
+                    expires_at,
+                    last_task_ref,
+                    created_at,
+                    updated_at
+                FROM approval_record
+                WHERE action_type = ? AND task_id = ? AND task_hash = ?
+                LIMIT 1
+                """,
+                (action_type, task_id, task_hash),
+            ).fetchone()
         if row is None:
             return None
         return _to_approval_record(row)
