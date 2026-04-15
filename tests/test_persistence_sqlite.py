@@ -19,6 +19,7 @@ from app.db.approval_repo import (
     ApprovalPersistenceError,
     ApprovalRepo,
 )
+from app.db.bt_subscription_repo import BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
@@ -711,6 +712,21 @@ def test_watchlist_repo_rejects_missing_identity_for_add(tmp_path: Path) -> None
 
     with pytest.raises(WatchlistPersistenceError, match="watchlist_item title missing"):
         repo.add_item(chat_id=1001, title="   ", year="2021", media_kind="movie")
+
+
+def test_bt_subscription_repo_rejects_missing_identity_for_add(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtSubscriptionRepo(database)
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item chat identity missing"):
+        repo.add_item(chat_id=0, title="Frieren", year="2023", media_kind="anime")
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item title missing"):
+        repo.add_item(chat_id=1001, title="   ", year="2023", media_kind="anime")
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item media kind missing"):
+        repo.add_item(chat_id=1001, title="Frieren", year="2023", media_kind="   ")
 
 
 def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:

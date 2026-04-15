@@ -38,8 +38,12 @@ class BtSubscriptionRepo:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
         cleaned_kind = media_kind.strip().lower()
-        if chat_id <= 0 or not cleaned_title or not cleaned_kind:
-            return None
+        if chat_id <= 0:
+            raise BtSubscriptionPersistenceError("bt_subscription_item chat identity missing")
+        if not cleaned_title:
+            raise BtSubscriptionPersistenceError("bt_subscription_item title missing")
+        if not cleaned_kind:
+            raise BtSubscriptionPersistenceError("bt_subscription_item media kind missing")
 
         with self._database.connect() as connection:
             cursor = connection.execute(
