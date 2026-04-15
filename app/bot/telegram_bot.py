@@ -965,6 +965,24 @@ def _extract_bt_read_only_query(text: str) -> str:
     return ""
 
 
+def _log_telegram_update_record_failed(
+    *,
+    source_type: str,
+    source_id: str,
+    chat_id: int | None,
+    user_id: int | None,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[Telegram 更新去重落盘失败]\033[0m source_type={source_type} "
+        f"source_id={source_id.strip() or '-'} chat_id={chat_id if chat_id is not None else '-'} "
+        f"user_id={user_id if user_id is not None else '-'} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/telegram_updates 表写入是否正常；"
+        "当前 update 会停止继续处理，避免在去重真相缺失时重复执行副作用。",
+        flush=True,
+    )
+
+
 def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
     if not isinstance(update_repo, TelegramUpdateRepo):
@@ -976,11 +994,23 @@ def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     chat = getattr(update, "effective_chat", None)
     user = getattr(update, "effective_user", None)
-    return update_repo.record_message_update(
-        update_id=update_id,
-        chat_id=chat.id if chat is not None else None,
-        user_id=user.id if user is not None else None,
-    )
+    chat_id = chat.id if chat is not None else None
+    user_id = user.id if user is not None else None
+    try:
+        return update_repo.record_message_update(
+            update_id=update_id,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+    except Exception as error:
+        _log_telegram_update_record_failed(
+            source_type="message",
+            source_id=str(update_id),
+            chat_id=chat_id,
+            user_id=user_id,
+            reason=str(error),
+        )
+        return False
 
 
 def _record_callback_update(
@@ -994,11 +1024,21 @@ def _record_callback_update(
     if not isinstance(update_repo, TelegramUpdateRepo):
         return True
 
-    return update_repo.record_callback_update(
-        callback_query_id=callback_query_id,
-        chat_id=chat_id,
-        user_id=user_id,
-    )
+    try:
+        return update_repo.record_callback_update(
+            callback_query_id=callback_query_id,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+    except Exception as error:
+        _log_telegram_update_record_failed(
+            source_type="callback",
+            source_id=callback_query_id,
+            chat_id=chat_id,
+            user_id=user_id,
+            reason=str(error),
+        )
+        return False
 
 
 def _resolve_bt_processing_path_pending_by_chat(context: ContextTypes.DEFAULT_TYPE) -> dict[int, str]:
