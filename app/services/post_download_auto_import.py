@@ -105,8 +105,11 @@ class PostDownloadAutoImportService:
                 event_type=AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
                 message=reason,
             )
-        except Exception:
-            return
+        except Exception as error:
+            print(
+                f"\033[31m[自动导入跳过事件落盘失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前请求仍会返回“已跳过自动导入”，但这次跳过原因可能没有落盘。",
+                flush=True,
+            )
 
 
 def _match_low_quality_reason(name: str) -> str | None:
