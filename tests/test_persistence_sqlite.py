@@ -707,6 +707,27 @@ def test_job_repo_rejects_missing_identity_for_lease_and_cancel(tmp_path: Path) 
         )
 
 
+def test_job_repo_rejects_missing_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobRepo(database)
+
+    with pytest.raises(JobPersistenceError, match="job chat identity missing for query"):
+        repo.get_pending_job_for_chat_ref(chat_id=0, task_ref="87")
+
+    with pytest.raises(JobPersistenceError, match="job task ref missing for query"):
+        repo.get_job_for_chat_ref(chat_id=1001, task_ref="   ")
+
+    with pytest.raises(JobPersistenceError, match="job chat identity missing for pending query"):
+        repo.get_latest_pending_job(chat_id=0)
+
+    with pytest.raises(JobPersistenceError, match="job workflow missing for query"):
+        repo._get_job_for_chat_ref(workflow_type="   ", chat_id=1001, task_ref="87")
+
+    with pytest.raises(JobPersistenceError, match="job workflow missing for pending query"):
+        repo._get_latest_pending_job_for_workflow(workflow_type="   ", chat_id=1001)
+
+
 def test_import_persists_minimal_events(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

@@ -96,8 +96,10 @@ class JobRepo:
 
     def get_pending_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
         cleaned_task_ref = task_ref.strip()
-        if chat_id <= 0 or not cleaned_task_ref:
-            return None
+        if chat_id <= 0:
+            raise JobPersistenceError("job chat identity missing for query")
+        if not cleaned_task_ref:
+            raise JobPersistenceError("job task ref missing for query")
         return self._select_one(
             """
             SELECT
@@ -133,8 +135,10 @@ class JobRepo:
 
     def get_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
         cleaned_task_ref = task_ref.strip()
-        if chat_id <= 0 or not cleaned_task_ref:
-            return None
+        if chat_id <= 0:
+            raise JobPersistenceError("job chat identity missing for query")
+        if not cleaned_task_ref:
+            raise JobPersistenceError("job task ref missing for query")
         return self._select_one(
             """
             SELECT
@@ -180,7 +184,7 @@ class JobRepo:
 
     def get_latest_pending_job(self, *, chat_id: int) -> JobRecord | None:
         if chat_id <= 0:
-            return None
+            raise JobPersistenceError("job chat identity missing for pending query")
         return self._select_one(
             """
             SELECT
@@ -477,8 +481,12 @@ class JobRepo:
     ) -> JobRecord | None:
         cleaned_task_ref = task_ref.strip()
         cleaned_workflow = workflow_type.strip()
-        if chat_id <= 0 or not cleaned_task_ref or not cleaned_workflow:
-            return None
+        if chat_id <= 0:
+            raise JobPersistenceError("job chat identity missing for query")
+        if not cleaned_task_ref:
+            raise JobPersistenceError("job task ref missing for query")
+        if not cleaned_workflow:
+            raise JobPersistenceError("job workflow missing for query")
         return self._select_one(
             """
             SELECT
@@ -519,10 +527,10 @@ class JobRepo:
         chat_id: int,
     ) -> JobRecord | None:
         if chat_id <= 0:
-            return None
+            raise JobPersistenceError("job chat identity missing for pending query")
         cleaned_workflow = workflow_type.strip()
         if not cleaned_workflow:
-            return None
+            raise JobPersistenceError("job workflow missing for pending query")
         return self._select_one(
             """
             SELECT
