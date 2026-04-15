@@ -999,6 +999,31 @@ def test_bt_processing_path_pending_logs_read_failure(capsys: pytest.CaptureFixt
     assert "db down" in output
 
 
+def test_pop_bt_processing_path_pending_logs_missing_source_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_PROCESSING_PATH,
+        payload_json='{}',
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _pop_bt_processing_path_pending(context=context, chat_id=1001) is None
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=processing_path" in output
+    assert "payload.source missing" in output
+
+
 def test_set_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
