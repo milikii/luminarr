@@ -1240,6 +1240,55 @@ def test_approval_repo_rejects_task_hash_mismatch_for_query(tmp_path: Path) -> N
         repo.get_import_approval(task_id="87", task_hash="hash-other")
 
 
+@pytest.mark.parametrize(
+    ("status", "lease_version", "expected_message"),
+    [
+        ("", 1, "approval row identity corrupted after read"),
+        (APPROVAL_STATUS_PENDING, 0, "approval row lease version corrupted after read"),
+    ],
+)
+def test_approval_repo_rejects_corrupted_row_after_read(
+    tmp_path: Path,
+    status: str,
+    lease_version: int,
+    expected_message: str,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO approval_record (
+                action_type,
+                task_id,
+                task_hash,
+                status,
+                lease_version,
+                executed_version,
+                expires_at,
+                last_task_ref,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, '', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                ACTION_IMPORT_TO_LIBRARY,
+                "87",
+                "hash-87",
+                status,
+                lease_version,
+                0,
+                "87",
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(ApprovalPersistenceError, match=expected_message):
+        repo.get_import_approval(task_id="87", task_hash="hash-87")
+
+
 def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

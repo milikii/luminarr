@@ -685,17 +685,34 @@ class ApprovalRepo:
             ).fetchone()
         if row is None:
             return None
-        return int(row["lease_version"])
+        lease_version = int(row["lease_version"])
+        if lease_version <= 0:
+            raise ApprovalPersistenceError("approval lease version corrupted after read")
+        return lease_version
 
 
 def _to_approval_record(row: Mapping[str, object]) -> ApprovalRecord:
+    action_type = str(row["action_type"]).strip()
+    task_id = str(row["task_id"]).strip()
+    task_hash = str(row["task_hash"]).strip()
+    status = str(row["status"]).strip()
+    lease_version = int(row["lease_version"])
+    executed_version = int(row["executed_version"])
+
+    if not action_type or not task_id or not task_hash or not status:
+        raise ApprovalPersistenceError("approval row identity corrupted after read")
+    if lease_version <= 0:
+        raise ApprovalPersistenceError("approval row lease version corrupted after read")
+    if executed_version < 0:
+        raise ApprovalPersistenceError("approval row executed version corrupted after read")
+
     return ApprovalRecord(
-        action_type=str(row["action_type"]),
-        task_id=str(row["task_id"]),
-        task_hash=str(row["task_hash"]),
-        status=str(row["status"]),
-        lease_version=int(row["lease_version"]),
-        executed_version=int(row["executed_version"]),
+        action_type=action_type,
+        task_id=task_id,
+        task_hash=task_hash,
+        status=status,
+        lease_version=lease_version,
+        executed_version=executed_version,
         expires_at=str(row["expires_at"]),
         last_task_ref=str(row["last_task_ref"]),
         created_at=str(row["created_at"]),
