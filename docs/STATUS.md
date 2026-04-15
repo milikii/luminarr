@@ -1,4 +1,4 @@
-# Current status (v227)
+# Current status (v228)
 
 ## Project position
 
@@ -251,6 +251,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`clarification_repo.upsert_pending()` 在 `clarification_state` 写入成功后如果回读不到刚写入的 query，现在会显式抛出 `clarification_state missing after upsert`；`search_media` 会继续复用现有红色中文 `[搜索澄清态持久化失败]` 和 `[处理建议]`，不再把这类澄清真相缺口静默吞成“当前轮有澄清提示、重启后却找不到待澄清状态”。
 - 2026-04-15 代码审查确认：`candidate_repo.save_candidates()` 在 `candidate_mapping` 写入后如果计数对不上，现在会显式抛出 `candidate_mapping count mismatch after save`；`search_media` 会继续复用现有红色中文 `[搜索候选持久化失败]` 和 `[处理建议]`，不再把这类候选真相缺口静默吞成“搜索文本已返回、但重启后按序号选不到同一批候选”。
 - 2026-04-15 代码审查确认：`approval_repo.mark_import_executed()` / `mark_downloader_executed()` 在 `approval_record.executed_version` 回写时如果审批行已缺失，现在会显式抛出 `approval_record missing during executed version update`；导入/下载服务会继续复用现有红色中文 `[导入执行版号回写失败]` / `[下载执行版号回写失败]` 和 `[处理建议]`，不再把这类执行版号真相缺口静默吞成“进程内版号前进了，但 SQLite 里没落下”。
+- 2026-04-15 代码审查确认：`job_event_repo.append_event()` 在 `job_event` 写入成功后如果回读不到刚写入的事件行，现在会显式抛出 `job_event missing after append`；下载/导入/自动导入等服务会继续复用现有红色中文 `[下载事件落盘失败]` / `[导入事件落盘失败]` / `[自动导入跳过事件落盘失败]` 和 `[处理建议]`，不再把这类事件真相缺口静默吞成“文本已回了，但事件账本其实没记上”。
 - 2026-04-15 代码审查确认：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 删除失败时，现在会恢复当前进程内候选并返回 `False`，Telegram 私聊入口也不会再回 `已清除当前候选，请重新搜索。`，避免把 SQLite/候选表删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：`search_media.clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 删除失败时，现在会恢复当前进程内待澄清状态并返回 `False`；Telegram 私聊入口也不会再回 `已重置当前澄清，请重新描述。` 之类的重置文本，避免把 SQLite/clarification 删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：frustration/reset 入口在候选清理失败时，现在会直接结束这次“算了/取消”处理，不再把这类 frustration 文本继续当普通搜索请求往下走，避免候选表删除失败后又返回一条和用户意图无关的搜索结果。

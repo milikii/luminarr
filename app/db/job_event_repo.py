@@ -19,6 +19,10 @@ class JobEvent:
     created_at: str
 
 
+class JobEventPersistenceError(RuntimeError):
+    pass
+
+
 class JobEventRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -35,7 +39,7 @@ class JobEventRepo:
         target_path: str = "",
     ) -> None:
         with self._database.connect() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
                 INSERT INTO job_event (
                     task_ref,
@@ -50,6 +54,9 @@ class JobEventRepo:
                 (task_ref, task_id, task_hash, event_type, message, source_path, target_path),
             )
             connection.commit()
+            event_id = int(cursor.lastrowid)
+        if self._get_event_by_id(event_id) is None:
+            raise JobEventPersistenceError("job_event missing after append")
 
     def list_events_for_task_ref(self, task_ref: str) -> list[JobEvent]:
         with self._database.connect() as connection:
@@ -119,6 +126,23 @@ class JobEventRepo:
                 return event
             return replace(event, target_path=target_path)
         return None
+
+    def _get_event_by_id(self, event_id: int) -> JobEvent | None:
+        if event_id <= 0:
+            return None
+        with self._database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id, task_ref, task_id, task_hash, event_type, message, source_path, target_path, created_at
+                FROM job_event
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (event_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _to_job_event(row)
 
 
 def _to_job_event(row: Mapping[str, object]) -> JobEvent:

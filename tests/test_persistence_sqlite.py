@@ -28,7 +28,7 @@ from app.db.bt_pending_repo import (
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import (
     JOB_STATE_COMPLETED,
     JOB_STATE_PENDING_APPROVAL,
@@ -110,6 +110,20 @@ def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:
     assert events[0].source_path == ""
     assert events[0].target_path == ""
     assert events[1].message == "媒体库刷新成功。"
+
+
+def test_job_event_repo_raises_when_appended_row_missing(tmp_path: Path) -> None:
+    class MissingRowJobEventRepo(JobEventRepo):
+        def _get_event_by_id(self, event_id: int):
+            _ = event_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowJobEventRepo(database)
+
+    with pytest.raises(JobEventPersistenceError, match="job_event missing after append"):
+        repo.append_event(task_ref="87", event_type="import.succeeded", message="/data/library/movies/demo.mkv")
 
 
 def test_download_monitor_truth_persists_for_restart_and_completion_observation(tmp_path: Path) -> None:
