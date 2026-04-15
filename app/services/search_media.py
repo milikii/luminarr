@@ -155,7 +155,11 @@ class SearchMediaService:
             return None
         try:
             persisted_candidate = self._candidate_repo.get_candidate(chat_id, index)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前会按无候选返回，但这可能不是用户真的没搜过。",
+                flush=True,
+            )
             return None
         if persisted_candidate is None:
             return None
