@@ -140,6 +140,36 @@ def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:
     assert "[下载执行版号回写失败]" in capsys.readouterr().out
 
 
+def test_record_event_logs_persistence_failure(capsys) -> None:
+    job_event_repo = type("JobEventRepo", (), {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_event_repo=job_event_repo)
+    service._record_event(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        event_type="downloader.approval_pending",
+        message="Dune: Part Two",
+    )
+    output = capsys.readouterr().out
+    assert "[下载事件落盘失败]" in output
+    assert "event_type=downloader.approval_pending" in output
+
+
+def test_register_download_monitor_logs_persistence_failure(capsys) -> None:
+    download_monitor_repo = type("DownloadMonitorRepo", (), {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)
+    service._register_download_monitor(
+        task_id="42",
+        task_hash="abc123",
+        title="Dune: Part Two",
+        chat_id=1001,
+        user_id=2001,
+    )
+    output = capsys.readouterr().out
+    assert "[下载监控登记失败]" in output
+    assert "task_id=42" in output
+
+
 def test_add_by_selection_without_cached_candidates() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     add_torrent = AsyncMock()

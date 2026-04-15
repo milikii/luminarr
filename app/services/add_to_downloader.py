@@ -895,7 +895,11 @@ class AddToDownloaderService:
                 event_type=event_type,
                 message=message,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
+                flush=True,
+            )
             return
 
     def _register_download_monitor(
@@ -917,7 +921,11 @@ class AddToDownloaderService:
                 chat_id=chat_id,
                 user_id=user_id,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
+                flush=True,
+            )
             return
 
     async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
