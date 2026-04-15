@@ -209,8 +209,11 @@ class SearchMediaService:
             return
         try:
             self._clarification_repo.upsert_pending(chat_id=chat_id, query=query)
-        except Exception:
-            pass
+        except Exception as error:
+            print(
+                f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",
+                flush=True,
+            )
 
     def _clear_clarification_pending(self, *, chat_id: int) -> bool:
         cleared = False
