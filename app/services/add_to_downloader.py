@@ -453,10 +453,10 @@ class AddToDownloaderService:
             )
             return ADD_CANCELLED_TEXT
 
-        pending_add = _pending_add_from_json(pending_job.payload_json)
+        pending_add, payload_problem = _pending_add_from_json(pending_job.payload_json)
         if pending_add is None:
             print(
-                f"\033[31m[下载取消载荷损坏]\033[0m chat_id={chat_id} task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前取消会按“没有待取消下载”继续处理，但这可能是持久化状态损坏。",
+                f"\033[31m[下载取消载荷损坏]\033[0m chat_id={chat_id} task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前取消会按“没有待取消下载”继续处理，但这可能是持久化状态损坏。",
                 flush=True,
             )
             return None
@@ -707,10 +707,10 @@ class AddToDownloaderService:
         if job is None:
             return None
 
-        pending_add = _pending_add_from_json(job.payload_json)
+        pending_add, payload_problem = _pending_add_from_json(job.payload_json)
         if pending_add is None:
             print(
-                f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前 confirm 会按“没有待确认下载”继续处理，但这可能是持久化状态损坏。",
+                f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前 confirm 会按“没有待确认下载”继续处理，但这可能是持久化状态损坏。",
                 flush=True,
             )
             return None
@@ -1084,16 +1084,16 @@ def _pending_add_to_json(pending_add: PendingAddContext) -> str:
     )
 
 
-def _pending_add_from_json(payload_json: str) -> PendingAddContext | None:
+def _pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None, str | None]:
     cleaned_payload = payload_json.strip()
     if not cleaned_payload:
-        return None
+        return None, "payload_json empty"
     try:
         payload = json.loads(cleaned_payload)
     except json.JSONDecodeError:
-        return None
+        return None, "payload_json invalid json"
     if not isinstance(payload, dict):
-        return None
+        return None, "payload_json not object"
 
     task_ref = str(payload.get("task_ref", "")).strip()
     task_id = str(payload.get("task_id", "")).strip()
@@ -1105,15 +1105,29 @@ def _pending_add_from_json(payload_json: str) -> PendingAddContext | None:
     download_dir = str(payload.get("download_dir", "")).strip()
     auto_import_enabled = payload.get("auto_import_enabled", True)
     if not task_ref or not task_id or not task_hash or not title or not source:
-        return None
-    return PendingAddContext(
-        task_ref=task_ref,
-        task_id=task_id,
-        task_hash=task_hash,
-        title=title,
-        source=source,
-        downloader_name=downloader_name,
-        downloader_type=downloader_type,
-        download_dir=download_dir,
-        auto_import_enabled=bool(auto_import_enabled),
+        missing_fields = [
+            field_name
+            for field_name, value in (
+                ("task_ref", task_ref),
+                ("task_id", task_id),
+                ("task_hash", task_hash),
+                ("title", title),
+                ("source", source),
+            )
+            if not value
+        ]
+        return None, "missing required fields: " + ",".join(missing_fields)
+    return (
+        PendingAddContext(
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            title=title,
+            source=source,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=bool(auto_import_enabled),
+        ),
+        None,
     )

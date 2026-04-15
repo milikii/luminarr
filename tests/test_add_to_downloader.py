@@ -120,6 +120,7 @@ def test_cancel_pending_add_logs_payload_corruption(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载取消载荷损坏]" in output
     assert "job_id=job-1" in output
+    assert "missing required fields: task_ref,task_id,task_hash,title,source" in output
 
 
 def test_rebuild_confirm_context_logs_job_lookup_failure(capsys) -> None:
@@ -148,6 +149,7 @@ def test_rebuild_confirm_context_logs_payload_corruption(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载确认上下文载荷损坏]" in output
     assert "task_hash=abc123" in output
+    assert "missing required fields: task_ref,task_id,task_hash,title,source" in output
 
 
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
