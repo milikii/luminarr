@@ -124,7 +124,7 @@ class BtSubscriptionRepo:
 
     def remove_item(self, *, chat_id: int, item_id: int) -> bool:
         if chat_id <= 0 or item_id <= 0:
-            return False
+            raise BtSubscriptionPersistenceError("bt_subscription_item identity missing for remove")
         with self._database.connect() as connection:
             cursor = connection.execute(
                 "DELETE FROM bt_subscription_item WHERE chat_id = ? AND id = ?",

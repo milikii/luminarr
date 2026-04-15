@@ -751,6 +751,18 @@ def test_bt_subscription_repo_rejects_missing_identity_for_last_seen_update(tmp_
         )
 
 
+def test_bt_subscription_repo_rejects_missing_identity_for_remove(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtSubscriptionRepo(database)
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item identity missing for remove"):
+        repo.remove_item(chat_id=0, item_id=1)
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item identity missing for remove"):
+        repo.remove_item(chat_id=1001, item_id=0)
+
+
 def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
     class MissingRowApprovalRepo(ApprovalRepo):
         def _get_exact_approval_record(
