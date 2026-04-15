@@ -462,6 +462,25 @@ def test_clarification_repo_raises_when_upsert_row_missing(tmp_path: Path) -> No
         repo.upsert_pending(chat_id=1001, query="Dune")
 
 
+def test_clarification_repo_rejects_empty_query_after_read(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO clarification_state (chat_id, query, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            """,
+            (1001, "   "),
+        )
+        connection.commit()
+
+    repo = ClarificationRepo(SqliteDatabase(str(tmp_path / "state.sqlite3")))
+
+    with pytest.raises(ClarificationPersistenceError, match="clarification_state query empty after read"):
+        repo.get_pending_query(chat_id=1001)
+
+
 def test_clarification_repo_rejects_missing_query(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

@@ -50,7 +50,10 @@ class ClarificationRepo:
             ).fetchone()
         if row is None:
             return None
-        return str(row["query"]).strip()
+        cleaned_query = str(row["query"]).strip()
+        if not cleaned_query:
+            raise ClarificationPersistenceError("clarification_state query empty after read")
+        return cleaned_query
 
     def clear_pending(self, *, chat_id: int) -> bool:
         if chat_id <= 0:
