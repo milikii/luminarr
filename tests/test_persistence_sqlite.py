@@ -173,6 +173,18 @@ def test_job_event_repo_rejects_missing_event_type(tmp_path: Path) -> None:
         repo.append_event(task_ref="87", event_type="   ")
 
 
+def test_job_event_repo_rejects_missing_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    with pytest.raises(JobEventPersistenceError, match="job_event task_ref missing for query"):
+        repo.list_events_for_task_ref("   ")
+
+    with pytest.raises(JobEventPersistenceError, match="job_event task identity missing for query"):
+        repo.list_events_for_task_identity(task_id="   ", task_hash="   ")
+
+
 def test_download_monitor_truth_persists_for_restart_and_completion_observation(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

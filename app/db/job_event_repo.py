@@ -65,6 +65,9 @@ class JobEventRepo:
             raise JobEventPersistenceError("job_event missing after append")
 
     def list_events_for_task_ref(self, task_ref: str) -> list[JobEvent]:
+        cleaned_task_ref = task_ref.strip()
+        if not cleaned_task_ref:
+            raise JobEventPersistenceError("job_event task_ref missing for query")
         with self._database.connect() as connection:
             rows = connection.execute(
                 """
@@ -73,7 +76,7 @@ class JobEventRepo:
                 WHERE task_ref = ?
                 ORDER BY id ASC
                 """,
-                (task_ref,),
+                (cleaned_task_ref,),
             ).fetchall()
         return [_to_job_event(row) for row in rows]
 
@@ -81,7 +84,7 @@ class JobEventRepo:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id and not cleaned_task_hash:
-            return []
+            raise JobEventPersistenceError("job_event task identity missing for query")
 
         statement = """
             SELECT id, task_ref, task_id, task_hash, event_type, message, source_path, target_path, created_at
