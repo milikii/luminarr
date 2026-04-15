@@ -25,6 +25,7 @@ from app.services.import_to_library import (
     IMPORT_COPY_APPROVAL_PENDING_TEXT,
     IMPORT_CONFIRM_EXPIRED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
+    IMPORT_HARDLINK_FAILED_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
     IMPORT_REFRESH_FAILED_TEXT,
@@ -800,6 +801,42 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     assert succeeded_record.status == APPROVAL_STATUS_APPROVED
     assert succeeded_record.lease_version == 1
     assert succeeded_record.executed_version == 1
+
+
+def test_confirm_import_logs_hardlink_failure(tmp_path: Path, monkeypatch, capsys) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+    )
+
+    _run(service.import_by_task_ref("87"))
+
+    def _raise_hardlink_failure(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.EPERM, "permission denied")
+
+    monkeypatch.setattr(import_module.os, "link", _raise_hardlink_failure)
+
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert text == IMPORT_HARDLINK_FAILED_TEXT.format(reason="[Errno 1] permission denied")
+    output = capsys.readouterr().out
+    assert "[导入硬链接失败]" in output
+    assert "task_id=87" in output
+    assert "permission denied" in output
+    assert "[处理建议]" in output
 
 
 def test_confirm_import_by_task_ref_rejects_expired_pending(tmp_path: Path) -> None:

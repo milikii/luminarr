@@ -709,6 +709,11 @@ class ImportToLibraryService:
                 if execution_mode == IMPORT_EXECUTION_MODE_COPY
                 else IMPORT_HARDLINK_FAILED_TEXT.format(reason=str(exc))
             )
+            if execution_mode != IMPORT_EXECUTION_MODE_COPY:
+                print(
+                    f"\033[31m[导入硬链接失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path} target_path={target_path} 错误={exc}\n\033[33m[处理建议]\033[0m 检查下载目录与库目录权限、目标路径占用情况，以及跨文件系统场景是否应改走 copy fallback 后重试。",
+                    flush=True,
+                )
             self._record_event(
                 task_ref=task_ref,
                 task_id=import_source.task_id,
