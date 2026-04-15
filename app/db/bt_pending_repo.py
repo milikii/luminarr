@@ -17,6 +17,10 @@ class BtPendingState:
     payload_json: str
 
 
+class BtPendingPersistenceError(RuntimeError):
+    pass
+
+
 class BtPendingRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -43,6 +47,9 @@ class BtPendingRepo:
                 (chat_id, cleaned_stage, cleaned_payload),
             )
             connection.commit()
+        pending_state = self.get_pending(chat_id=chat_id)
+        if pending_state is None:
+            raise BtPendingPersistenceError("bt_pending_state missing after upsert")
 
     def get_pending(self, *, chat_id: int) -> BtPendingState | None:
         if chat_id <= 0:

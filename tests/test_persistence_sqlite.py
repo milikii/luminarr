@@ -22,6 +22,7 @@ from app.db.approval_repo import (
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingPersistenceError,
     BtPendingRepo,
 )
 from app.db.candidate_repo import CandidateMappingRepo
@@ -303,6 +304,24 @@ def test_bt_pending_repo_persists_for_restart(tmp_path: Path) -> None:
     assert pending.payload_json == '{"media_kind":"movie"}'
     assert after_restart_repo.clear_pending(chat_id=1001, expected_stage=BT_PENDING_STAGE_RAW_BT_DESTINATION) is False
     assert after_restart_repo.clear_pending(chat_id=1001, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION) is True
+
+
+def test_bt_pending_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
+    class MissingRowBtPendingRepo(BtPendingRepo):
+        def get_pending(self, *, chat_id: int):
+            _ = chat_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowBtPendingRepo(database)
+
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state missing after upsert"):
+        repo.upsert_pending(
+            chat_id=1001,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            payload_json='{"media_kind":"movie"}',
+        )
 
 
 def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None:
