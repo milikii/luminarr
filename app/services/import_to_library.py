@@ -89,6 +89,12 @@ class ImportExecutionResult:
     pending_copy_approval: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class ImportTargetLookupResult:
+    target_path: str | None = None
+    lookup_failed: bool = False
+
+
 class ImportToLibraryService:
     def __init__(
         self,
@@ -1298,14 +1304,16 @@ class ImportToLibraryService:
         if approval_record.executed_version < approval_record.lease_version:
             return None
 
-        stale_target_path = self._find_latest_import_target_path(task_id=task_id, task_hash=task_hash)
-        if stale_target_path:
-            return IMPORT_TARGET_EXISTS_TEXT.format(target_path=stale_target_path)
+        stale_target_lookup = self._find_latest_import_target_path(task_id=task_id, task_hash=task_hash)
+        if stale_target_lookup.lookup_failed:
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if stale_target_lookup.target_path:
+            return IMPORT_TARGET_EXISTS_TEXT.format(target_path=stale_target_lookup.target_path)
         return IMPORT_CONFIRM_NOT_PENDING_TEXT
 
-    def _find_latest_import_target_path(self, *, task_id: str, task_hash: str) -> str | None:
+    def _find_latest_import_target_path(self, *, task_id: str, task_hash: str) -> ImportTargetLookupResult:
         if self._job_event_repo is None:
-            return None
+            return ImportTargetLookupResult()
         try:
             correlation = self._job_event_repo.find_latest_import_correlation(
                 task_id=task_id,
@@ -1313,16 +1321,16 @@ class ImportToLibraryService:
             )
         except Exception as error:
             print(
-                f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会按“无导入目标路径”继续处理，但可能丢失目标已存在的明确提示。",
+                f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
                 flush=True,
             )
-            return None
+            return ImportTargetLookupResult(lookup_failed=True)
         if correlation is None:
-            return None
+            return ImportTargetLookupResult()
         target_path = correlation.target_path.strip() or correlation.message.strip()
         if target_path:
-            return target_path
-        return None
+            return ImportTargetLookupResult(target_path=target_path)
+        return ImportTargetLookupResult()
 
     def _handle_expired_pending_confirm(self, *, task_ref: str, context: ConfirmExecutionContext) -> str | None:
         approval_record = context.approval_record
