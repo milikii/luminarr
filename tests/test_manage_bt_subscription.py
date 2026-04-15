@@ -7,6 +7,7 @@ from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.manage_bt_subscription import (
+    BT_SUBSCRIPTION_ADD_FAILED_TEXT,
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
     parse_bt_subscription_query,
@@ -74,6 +75,44 @@ def test_manage_bt_subscription_add_list_remove_clear_and_restart(tmp_path: Path
     assert remove_text == "已删除 BT 订阅条目：1"
     clear_text = restarted_service.handle(parse_bt_subscription_query("btsub clear"), chat_id=1001)
     assert clear_text == "BT 订阅清单本来就是空的。"
+
+
+def test_manage_bt_subscription_add_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _fail_add_item(**_: object) -> None:
+        return None
+
+    repo.add_item = _fail_add_item  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_ADD_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅写入失败]" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_manage_bt_subscription_add_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _crash_add_item(**_: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.add_item = _crash_add_item  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_ADD_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅写入失败]" in captured.out
+    assert "db down" in captured.out
 
 
 def test_bt_subscription_run_once_enqueues_new_candidate_and_skips_seen_source(tmp_path: Path) -> None:

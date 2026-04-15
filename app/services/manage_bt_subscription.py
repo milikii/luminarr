@@ -22,6 +22,7 @@ BT_SUBSCRIPTION_USAGE_TEXT = (
 )
 BT_SUBSCRIPTION_EMPTY_TEXT = "BT 订阅清单为空。"
 BT_SUBSCRIPTION_ADD_USAGE_TEXT = "添加格式：btsub add <movie|series|anime> <片名 [年份]>"
+BT_SUBSCRIPTION_ADD_FAILED_TEXT = "BT 订阅写入失败，请稍后重试。"
 BT_SUBSCRIPTION_REMOVE_USAGE_TEXT = "删除格式：btsub remove <条目ID>"
 BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
 BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
@@ -170,14 +171,14 @@ class ManageBtSubscriptionService:
         if not title:
             return BT_SUBSCRIPTION_ADD_USAGE_TEXT
 
-        created = self._bt_subscription_repo.add_item(
+        created = self._add_item(
             chat_id=chat_id,
             title=title,
             year=year,
             media_kind=media_kind,
         )
         if created is None:
-            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
+            return BT_SUBSCRIPTION_ADD_FAILED_TEXT
         item, is_created = created
         year_text = item.year if item.year else "-"
         if is_created:
@@ -209,6 +210,41 @@ class ManageBtSubscriptionService:
         if deleted <= 0:
             return BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT
         return f"已清空 BT 订阅清单，共删除 {deleted} 条。"
+
+    def _add_item(
+        self,
+        *,
+        chat_id: int,
+        title: str,
+        year: str,
+        media_kind: str,
+    ):
+        try:
+            created = self._bt_subscription_repo.add_item(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+            )
+        except Exception as error:
+            _log_bt_subscription_add_failed(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+                reason=str(error),
+            )
+            return None
+        if created is not None:
+            return created
+        _log_bt_subscription_add_failed(
+            chat_id=chat_id,
+            title=title,
+            year=year,
+            media_kind=media_kind,
+            reason="bt_subscription_repo.add_item returned None",
+        )
+        return None
 
     async def _run_for_item(
         self,
@@ -494,6 +530,21 @@ def _log_bt_subscription_scan_error(
     print(
         f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+    )
+
+
+def _log_bt_subscription_add_failed(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。"
     )
 
 
