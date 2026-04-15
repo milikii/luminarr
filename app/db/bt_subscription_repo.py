@@ -135,7 +135,7 @@ class BtSubscriptionRepo:
 
     def clear_items(self, *, chat_id: int) -> int:
         if chat_id <= 0:
-            return 0
+            raise BtSubscriptionPersistenceError("bt_subscription_item chat identity missing for clear")
         with self._database.connect() as connection:
             cursor = connection.execute(
                 "DELETE FROM bt_subscription_item WHERE chat_id = ?",
