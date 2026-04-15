@@ -578,7 +578,11 @@ class ImportToLibraryService:
             return False
         try:
             downloader_job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会按“不是 raw_bt”继续判断，但原本应被阻断的 raw_bt 任务可能继续进入入库链。",
+                flush=True,
+            )
             return False
         if downloader_job is None:
             return False
