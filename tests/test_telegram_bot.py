@@ -1269,6 +1269,31 @@ def test_bt_tmdb_association_pending_logs_missing_media_kind_after_restart(
     assert "payload.media_kind missing" in output
 
 
+def test_bt_tmdb_association_pending_logs_missing_source_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+        payload_json='{"media_kind":"movie"}',
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=tmdb_association" in output
+    assert "payload.source missing" in output
+
+
 def test_bt_tmdb_association_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):

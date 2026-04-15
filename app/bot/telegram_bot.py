@@ -1454,6 +1454,13 @@ def _get_bt_tmdb_association_pending(
             reason="payload.media_kind missing",
         )
         return None
+    if not source:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.source missing",
+        )
+        return None
     resolved_pending = BtTmdbAssociationPending(media_kind=media_kind, source=source)
     pending_by_chat[chat_id] = resolved_pending
     return resolved_pending
