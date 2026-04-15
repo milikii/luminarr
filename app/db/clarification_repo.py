@@ -15,6 +15,8 @@ class ClarificationRepo:
         if chat_id <= 0:
             return
         cleaned_query = query.strip()
+        if not cleaned_query:
+            raise ClarificationPersistenceError("clarification_state query missing")
         with self._database.connect() as connection:
             connection.execute(
                 """

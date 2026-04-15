@@ -370,6 +370,15 @@ def test_clarification_repo_raises_when_upsert_row_missing(tmp_path: Path) -> No
         repo.upsert_pending(chat_id=1001, query="Dune")
 
 
+def test_clarification_repo_rejects_missing_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ClarificationRepo(database)
+
+    with pytest.raises(ClarificationPersistenceError, match="clarification_state query missing"):
+        repo.upsert_pending(chat_id=1001, query="   ")
+
+
 def test_bt_pending_repo_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
