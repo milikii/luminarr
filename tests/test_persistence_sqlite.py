@@ -802,6 +802,15 @@ def test_watchlist_repo_rejects_missing_chat_identity_for_list(tmp_path: Path) -
         repo.list_items(chat_id=0)
 
 
+def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtSubscriptionRepo(database)
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item chat identity missing for list"):
+        repo.list_items(chat_id=0)
+
+
 def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
     class MissingRowApprovalRepo(ApprovalRepo):
         def _get_exact_approval_record(

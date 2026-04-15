@@ -88,7 +88,7 @@ class BtSubscriptionRepo:
 
     def list_items(self, *, chat_id: int) -> list[BtSubscriptionItem]:
         if chat_id <= 0:
-            return []
+            raise BtSubscriptionPersistenceError("bt_subscription_item chat identity missing for list")
         with self._database.connect() as connection:
             rows = connection.execute(
                 """
