@@ -22,6 +22,7 @@ WATCHLIST_ADD_USAGE_TEXT = (
 )
 WATCHLIST_ADD_FAILED_TEXT = "想看写入失败，请稍后重试。"
 WATCHLIST_REMOVE_USAGE_TEXT = "删除格式：watchlist remove <条目ID>"
+WATCHLIST_REMOVE_FAILED_TEXT = "想看删除失败，请稍后重试。"
 WATCHLIST_CLEAR_EMPTY_TEXT = "想看清单本来就是空的。"
 MEDIA_KIND_ALIASES = {
     "movie": "movie",
@@ -116,7 +117,9 @@ class ManageWatchlistService:
         item_id = int(cleaned_ref)
         if item_id <= 0:
             return WATCHLIST_REMOVE_USAGE_TEXT
-        removed = self._watchlist_repo.remove_item(chat_id=chat_id, item_id=item_id)
+        removed = self._remove_item(chat_id=chat_id, item_id=item_id)
+        if removed is None:
+            return WATCHLIST_REMOVE_FAILED_TEXT
         if not removed:
             return "未找到对应想看条目。"
         return f"已删除想看条目：{item_id}"
@@ -167,6 +170,13 @@ class ManageWatchlistService:
             return self._watchlist_repo.list_items(chat_id=chat_id)
         except Exception as error:
             _log_watchlist_list_failed(chat_id=chat_id, reason=str(error))
+            return None
+
+    def _remove_item(self, *, chat_id: int, item_id: int):
+        try:
+            return self._watchlist_repo.remove_item(chat_id=chat_id, item_id=item_id)
+        except Exception as error:
+            _log_watchlist_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
             return None
 
 
@@ -244,4 +254,11 @@ def _log_watchlist_list_failed(*, chat_id: int, reason: str) -> None:
     print(
         f"\033[31m[想看清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 watchlist_item 表是否正常。"
+    )
+
+
+def _log_watchlist_remove_failed(*, chat_id: int, item_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[想看删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
     )

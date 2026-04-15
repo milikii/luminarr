@@ -10,6 +10,7 @@ from app.services.manage_watchlist import (
     WATCHLIST_ADD_USAGE_TEXT,
     WATCHLIST_EMPTY_TEXT,
     WATCHLIST_LIST_FAILED_TEXT,
+    WATCHLIST_REMOVE_FAILED_TEXT,
     WATCHLIST_REMOVE_USAGE_TEXT,
     ManageWatchlistService,
     parse_watchlist_query,
@@ -142,6 +143,23 @@ def test_manage_watchlist_add_returns_failure_text_when_repo_raises(tmp_path: Pa
     assert reply == WATCHLIST_ADD_FAILED_TEXT
     captured = capsys.readouterr()
     assert "[想看写入失败]" in captured.out
+    assert "db down" in captured.out
+
+
+def test_manage_watchlist_remove_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _crash_remove_item(**_: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.remove_item = _crash_remove_item  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist remove 7"), chat_id=1001)
+
+    assert reply == WATCHLIST_REMOVE_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看删除失败]" in captured.out
     assert "db down" in captured.out
 
 
