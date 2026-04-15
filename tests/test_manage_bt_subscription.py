@@ -11,6 +11,7 @@ from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_CLEAR_FAILED_TEXT,
     BT_SUBSCRIPTION_LIST_FAILED_TEXT,
     BT_SUBSCRIPTION_REMOVE_FAILED_TEXT,
+    BT_SUBSCRIPTION_RUN_FAILED_TEXT,
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
     parse_bt_subscription_query,
@@ -309,6 +310,38 @@ def test_bt_subscription_run_once_warns_when_last_seen_truth_is_not_updated(tmp_
     assert "[处理建议]" in captured.out
 
 
+def test_bt_subscription_run_once_returns_failure_text_when_scan_items_raise(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _crash_list_items(**_: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.list_items = _crash_list_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert reply == BT_SUBSCRIPTION_RUN_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_path: Path) -> None:
     async def _scheduler_search(_: str) -> list[dict[str, object]]:
         return [
@@ -347,6 +380,36 @@ def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_pa
     chat_id, reply = notifications[0]
     assert chat_id == 1001
     assert "命中资源: Frieren S01E01 720p" in reply
+
+
+def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_raise(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+
+    def _crash_list_items(*, chat_id: int) -> None:
+        raise RuntimeError(f"db down for {chat_id}")
+
+    repo.list_items = _crash_list_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications == ()
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down for 1001" in captured.out
 
 
 def test_bt_subscription_scheduler_tick_warns_when_last_seen_update_raises(tmp_path: Path, capsys) -> None:

@@ -29,6 +29,7 @@ BT_SUBSCRIPTION_REMOVE_FAILED_TEXT = "BT 订阅删除失败，请稍后重试。
 BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
 BT_SUBSCRIPTION_CLEAR_FAILED_TEXT = "BT 订阅清单清空失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
+BT_SUBSCRIPTION_RUN_FAILED_TEXT = "BT 订阅扫描失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
 BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。"
 BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT = (
@@ -125,6 +126,8 @@ class ManageBtSubscriptionService:
             user_id=user_id,
             dispatch_context=dispatch_context,
         )
+        if result is None:
+            return BT_SUBSCRIPTION_RUN_FAILED_TEXT
         if result.scanned <= 0:
             return BT_SUBSCRIPTION_RUN_EMPTY_TEXT
         return _format_bt_subscription_run_result(result)
@@ -141,6 +144,8 @@ class ManageBtSubscriptionService:
                 user_id=None,
                 dispatch_context=dispatch_context,
             )
+            if result is None:
+                continue
             if result.matched <= 0:
                 continue
             notifications.append((chat_id, _format_bt_subscription_run_result(result)))
@@ -338,8 +343,12 @@ class ManageBtSubscriptionService:
         chat_id: int,
         user_id: int | None,
         dispatch_context: BtSubscriptionDispatchContext,
-    ) -> BtSubscriptionRunResult:
-        items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+    ) -> BtSubscriptionRunResult | None:
+        try:
+            items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+        except Exception as error:
+            _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=str(error))
+            return None
         if not items:
             return BtSubscriptionRunResult(scanned=0, matched=0, replies=())
 
@@ -560,6 +569,13 @@ def _log_bt_subscription_scan_error(
     print(
         f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+    )
+
+
+def _log_bt_subscription_scan_items_failed(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅扫描读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
     )
 
 
