@@ -388,8 +388,10 @@ class JobRepo:
         cleaned_workflow = workflow_type.strip()
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_workflow or not cleaned_task_id or not cleaned_task_hash:
-            return None
+        if not cleaned_workflow:
+            raise JobPersistenceError("job workflow missing for pending upsert")
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise JobPersistenceError("job task identity missing for pending upsert")
 
         job_id = _build_job_id(cleaned_workflow, cleaned_task_hash)
         with self._database.connect() as connection:

@@ -438,6 +438,31 @@ def test_job_repo_raises_when_pending_upsert_row_missing(tmp_path: Path) -> None
         )
 
 
+def test_job_repo_rejects_missing_identity_for_pending_upsert(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobRepo(database)
+
+    with pytest.raises(JobPersistenceError, match="job task identity missing for pending upsert"):
+        repo.upsert_import_job_pending(
+            chat_id=1001,
+            user_id=2001,
+            task_ref="87",
+            task_id="",
+            task_hash="hash-87",
+        )
+
+    with pytest.raises(JobPersistenceError, match="job task identity missing for pending upsert"):
+        repo.upsert_downloader_job_pending(
+            chat_id=1001,
+            user_id=2001,
+            task_ref="88",
+            task_id="88",
+            task_hash="",
+            payload_json='{"source":"https://example.com/demo.torrent"}',
+        )
+
+
 def test_import_persists_minimal_events(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
