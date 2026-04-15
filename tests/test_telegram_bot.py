@@ -1111,6 +1111,31 @@ def test_bt_classification_pending_logs_payload_corruption_after_restart(
     assert "payload_json invalid json" in output
 
 
+def test_bt_classification_pending_logs_missing_query_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_CLASSIFICATION,
+        payload_json='{}',
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _is_bt_classification_pending(context=context, chat_id=1001) is False
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=classification" in output
+    assert "payload.query missing" in output
+
+
 def test_bt_classification_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):

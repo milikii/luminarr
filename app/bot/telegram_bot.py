@@ -1310,7 +1310,15 @@ def _is_bt_classification_pending(
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
         return False
-    pending_by_chat[chat_id] = str(payload.get("query", "")).strip()
+    pending_query = str(payload.get("query", "")).strip()
+    if not pending_query:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.query missing",
+        )
+        return False
+    pending_by_chat[chat_id] = pending_query
     return True
 
 
@@ -1375,11 +1383,19 @@ def _pop_bt_classification_pending(
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
         return None
+    pending_query = str(payload.get("query", "")).strip()
+    if not pending_query:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.query missing",
+        )
+        return None
     try:
         pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
     except Exception as error:
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
-    return str(payload.get("query", "")).strip() or None
+    return pending_query
 
 
 def _resolve_bt_tmdb_association_pending_by_chat(
