@@ -905,7 +905,11 @@ class ImportToLibraryService:
             )
             if requested_lease > 0:
                 lease_version = requested_lease
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会退回进程内待确认身份判断，重启后审批状态可能不一致。",
+                flush=True,
+            )
             lease_version = in_memory_next_lease
 
         self._pending_import_lease_versions[identity] = lease_version
@@ -941,7 +945,11 @@ class ImportToLibraryService:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前请求会退回进程内待确认身份判断，重启后审批状态可能不一致。",
+                flush=True,
+            )
             current_lease = self._pending_import_lease_versions.get(identity, 0)
             approved = identity in self._pending_import_identities and current_lease == expected_lease_version
 
@@ -1000,7 +1008,11 @@ class ImportToLibraryService:
                 task_hash=task_hash,
                 executed_lease_version=executed_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
+                flush=True,
+            )
             return
 
     def _record_pending_job(
@@ -1024,7 +1036,11 @@ class ImportToLibraryService:
                 task_hash=task_hash,
                 payload_json=payload_json,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入待确认任务落盘失败]\033[0m chat_id={chat_id} user_id={user_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表写入是否正常；当前请求会继续返回待确认文本，但重启后 confirm 上下文可能无法重建。",
+                flush=True,
+            )
             return False
         return True
 
