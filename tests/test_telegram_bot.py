@@ -2989,8 +2989,7 @@ def test_handle_message_frustration_does_not_reply_when_candidate_clear_fails(ca
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_awaited_once()
-    assert reply_text.await_args.args[0] != FRUSTRATION_RESET_TEXT
+    reply_text.assert_not_awaited()
     assert search_service.get_cached_candidate(1001, 1) is not None
     output = capsys.readouterr().out
     assert "[搜索候选清理失败]" in output

@@ -128,12 +128,14 @@ async def handle_private_chat_query_text(
                 if clarification_cleared:
                     await reply_func(tg.CLARIFICATION_RESET_TEXT)
                 return
-            if await tg._run_sync_with_policy(
-                execution_gate,
-                tg.ACTION_RESET_CANDIDATES,
-                lambda: search_service.clear_cached_candidates(chat_id),
-            ):
-                await reply_func(tg.FRUSTRATION_RESET_TEXT)
+            if search_service.has_cached_candidates(chat_id):
+                candidates_cleared = await tg._run_sync_with_policy(
+                    execution_gate,
+                    tg.ACTION_RESET_CANDIDATES,
+                    lambda: search_service.clear_cached_candidates(chat_id),
+                )
+                if candidates_cleared:
+                    await reply_func(tg.FRUSTRATION_RESET_TEXT)
                 return
         if tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id):
             await reply_func(tg.RAW_BT_DESTINATION_CANCELLED_TEXT)
