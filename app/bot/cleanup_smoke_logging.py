@@ -49,8 +49,7 @@ def configure_cleanup_private_chat_smoke_log_file(
 
 
 def reset_cleanup_private_chat_smoke_log_file() -> None:
-    global _cleanup_private_chat_smoke_log_path
-    _cleanup_private_chat_smoke_log_path = None
+    return None
 
 
 def resolve_cleanup_private_chat_action(query: str) -> str | None:
