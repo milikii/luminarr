@@ -17,6 +17,21 @@ class _PrivateChatRuntimeContext:
     application: _PrivateChatRuntimeApplication
 
 
+def _log_pending_job_lookup_failed(*, chat_id: int | None, reason: str) -> None:
+    print(
+        f"\033[31m[待处理任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前待处理任务记录是否正常。"
+    )
+
+
+def _log_confirm_job_lookup_failed(*, chat_id: int | None, task_ref: str, reason: str) -> None:
+    print(
+        f"\033[31m[确认关联任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} "
+        f"task_ref={task_ref.strip() or '-'} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前确认任务关联记录是否正常。"
+    )
+
+
 async def dispatch_private_chat_text(
     *,
     query: str,
@@ -53,7 +68,8 @@ async def handle_private_chat_query_text(
             if isinstance(job_repo, tg.JobRepo):
                 try:
                     pending_job = job_repo.get_latest_pending_job(chat_id=chat_id)
-                except Exception:
+                except Exception as error:
+                    _log_pending_job_lookup_failed(chat_id=chat_id, reason=str(error))
                     pending_job = None
                 if pending_job is not None:
                     if pending_job.workflow_type == tg.WORKFLOW_IMPORT_TO_LIBRARY:
@@ -390,7 +406,12 @@ async def handle_private_chat_query_text(
             if isinstance(job_repo, tg.JobRepo):
                 try:
                     matched_job = job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=confirm_ref)
-                except Exception:
+                except Exception as error:
+                    _log_confirm_job_lookup_failed(
+                        chat_id=chat_id,
+                        task_ref=confirm_ref,
+                        reason=str(error),
+                    )
                     matched_job = None
                 if matched_job is not None and matched_job.workflow_type == tg.WORKFLOW_ADD_TO_DOWNLOADER:
                     add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)

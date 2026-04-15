@@ -19,12 +19,14 @@ from app.bot.telegram_bot import (
     CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
+    JOB_REPO_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
     TELEGRAM_SEND_TEXT_FUNC_KEY,
 )
 from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
@@ -162,6 +164,59 @@ def test_dispatch_private_chat_text_routes_personal_wechat_login_without_telegra
         chat_id=1001,
         text="personal WeChat 登录成功。\n账号 ID: wx-account-runtime\n用户 ID: wx-user-runtime",
     )
+
+
+def test_dispatch_private_chat_text_logs_pending_job_lookup_failure(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    job_repo = JobRepo(_make_database(tmp_path))
+    job_repo.get_latest_pending_job = Mock(side_effect=RuntimeError("sqlite busy"))  # type: ignore[method-assign]
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={JOB_REPO_KEY: job_repo},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[待处理任务查询失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "sqlite busy" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_dispatch_private_chat_text_logs_confirm_job_lookup_failure(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    job_repo = JobRepo(_make_database(tmp_path))
+    job_repo.get_job_for_chat_ref = Mock(side_effect=RuntimeError("disk i/o error"))  # type: ignore[method-assign]
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="confirm 87",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={JOB_REPO_KEY: job_repo},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[确认关联任务查询失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "disk i/o error" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def test_dispatch_private_chat_text_routes_cleanup_inspect_without_telegram_update(
