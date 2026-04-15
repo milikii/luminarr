@@ -134,8 +134,11 @@ class SearchMediaService:
             if self._candidate_repo is not None:
                 try:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
-                except Exception:
-                    pass
+                except Exception as error:
+                    print(
+                        f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；本次搜索文本已返回，但后续按序号选择可能缺少这批候选。",
+                        flush=True,
+                    )
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
         return format_movie_query_reply(cleaned_query, parsed_query, tmdb_movie, candidates)
