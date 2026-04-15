@@ -1075,8 +1075,12 @@ class ImportToLibraryService:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
             return IMPORT_EXECUTION_MODE_HARDLINK
-        if confirm_context is not None and _is_copy_fallback_pending_payload(confirm_context.job.payload_json):
-            return IMPORT_EXECUTION_MODE_COPY
+        if confirm_context is not None:
+            copy_fallback_pending = _parse_copy_fallback_pending_payload(confirm_context.job.payload_json)
+            if copy_fallback_pending is True:
+                return IMPORT_EXECUTION_MODE_COPY
+            if copy_fallback_pending is None:
+                self._log_copy_fallback_payload_corrupted(task_id=task_id, task_hash=task_hash)
         if identity in self._pending_copy_fallback_identities:
             return IMPORT_EXECUTION_MODE_COPY
         return IMPORT_EXECUTION_MODE_HARDLINK
@@ -1092,6 +1096,12 @@ class ImportToLibraryService:
         if not identity[0] or not identity[1]:
             return
         self._pending_copy_fallback_identities.discard(identity)
+
+    def _log_copy_fallback_payload_corrupted(self, *, task_id: str, task_hash: str) -> None:
+        print(
+            f"\033[31m[导入执行模式载荷损坏]\033[0m task_id={task_id} task_hash={task_hash}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整 copy-fallback 待确认上下文；当前 confirm 会按硬链接继续判断，但原本应进入复制导入确认的任务可能被误判。",
+            flush=True,
+        )
 
     def _rebuild_confirm_context(
         self,
@@ -1463,16 +1473,16 @@ def _copy_fallback_pending_to_json() -> str:
     return json.dumps({"mode": IMPORT_EXECUTION_MODE_COPY}, ensure_ascii=False)
 
 
-def _is_copy_fallback_pending_payload(payload_json: str) -> bool:
+def _parse_copy_fallback_pending_payload(payload_json: str) -> bool | None:
     cleaned_payload = payload_json.strip()
     if not cleaned_payload:
         return False
     try:
         payload = json.loads(cleaned_payload)
     except json.JSONDecodeError:
-        return False
+        return None
     if not isinstance(payload, dict):
-        return False
+        return None
     return str(payload.get("mode", "")).strip() == IMPORT_EXECUTION_MODE_COPY
 
 
