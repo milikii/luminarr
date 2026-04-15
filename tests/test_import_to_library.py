@@ -410,6 +410,23 @@ def test_cancel_pending_import_logs_job_cancel_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_cancel_pending_import_logs_job_lookup_failure(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {"get_latest_pending_import_job": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+
+    assert service.cancel_pending_import(1001) is None
+
+    output = capsys.readouterr().out
+    assert "[导入取消查询失败]" in output
+    assert "chat_id=1001" in output
+    assert "db down" in output
+    assert "[处理建议]" in output
+
+
 def test_handle_expired_pending_confirm_logs_approval_cancel_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

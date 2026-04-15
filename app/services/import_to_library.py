@@ -422,7 +422,14 @@ class ImportToLibraryService:
         if self._job_repo is None:
             return None
 
-        pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
+        try:
+            pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
+        except Exception as error:
+            print(
+                f"\033[31m[导入取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前取消请求会直接失败返回，避免把查询异常误判成“没有待取消导入”。",
+                flush=True,
+            )
+            return None
         if pending_job is None:
             return None
 
