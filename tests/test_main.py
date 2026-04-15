@@ -38,6 +38,31 @@ def test_resolve_downloader_name_for_task_fails_closed_when_lookup_is_missing(
     assert "[处理建议]" in captured.out
 
 
+@pytest.mark.parametrize(
+    ("payload_json", "expected_reason"),
+    [
+        ("", "payload_json empty"),
+        ("{", "payload_json invalid json"),
+        ("[]", "payload_json not object"),
+    ],
+)
+def test_resolve_downloader_name_for_task_logs_payload_corruption(
+    payload_json: str,
+    expected_reason: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json=payload_json),
+    )
+
+    assert _resolve_downloader_name_for_task(task_ref="87", chat_id=1001, job_repo=job_repo) is None
+
+    captured = capsys.readouterr()
+    assert "[下载器路由载荷损坏]" in captured.out
+    assert expected_reason in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
