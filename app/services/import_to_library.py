@@ -554,8 +554,12 @@ class ImportToLibraryService:
         target_root = self._library_target_dir
         try:
             target_root.mkdir(parents=True, exist_ok=True)
-        except OSError:
+        except OSError as error:
             message = IMPORT_PREPARE_TARGET_FAILED_TEXT.format(target_path=str(target_root))
+            print(
+                f"\033[31m[导入目标目录创建失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_root} 错误={error}\n\033[33m[处理建议]\033[0m 检查 LIBRARY_TARGET_DIR 是否存在、是否可写，以及当前进程对目标目录是否有创建权限；当前请求会直接失败返回。",
+                flush=True,
+            )
             self._record_event(
                 task_ref=task_ref,
                 task_id=import_source.task_id,

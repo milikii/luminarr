@@ -367,6 +367,45 @@ def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> Non
     assert "task_hash=hash-87" in output
 
 
+def test_prepare_import_logs_target_dir_create_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(AsyncMock(return_value=import_source), str(target_dir))
+    original_mkdir = Path.mkdir
+
+    def _crash_mkdir(self: Path, parents: bool = False, exist_ok: bool = False) -> None:
+        if self == target_dir:
+            raise OSError("permission denied")
+        original_mkdir(self, parents=parents, exist_ok=exist_ok)
+
+    monkeypatch.setattr(Path, "mkdir", _crash_mkdir)
+
+    prepared, message = _run(service._prepare_import("87"))
+
+    assert prepared is None
+    assert message == "创建目标目录失败：" + str(target_dir)
+    output = capsys.readouterr().out
+    assert "[导入目标目录创建失败]" in output
+    assert "task_id=87" in output
+    assert "permission denied" in output
+    assert "[处理建议]" in output
+
+
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

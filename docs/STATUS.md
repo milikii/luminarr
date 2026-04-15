@@ -65,6 +65,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import approval -> confirm -> hardlink import`
   - `import_to_library.cancel_pending_import()` 在 `approval_repo.cancel_import()` 抛异常时，现在也会打印红色中文 `[导入取消审批更新失败]` 日志和 `[处理建议]`，不再把审批真相更新异常静默吞成“取消直接失败”
   - `import_to_library.cancel_pending_import()` 在 `job_repo.get_latest_pending_import_job()` 查询异常时，现在也会打印红色中文 `[导入取消查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待取消导入”
+  - `import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在也会打印红色中文 `[导入目标目录创建失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在查询导入源抛异常时，现在也会打印红色中文 `[导入源查询失败]` 日志和 `[处理建议]`，不再只写 `import.query_failed` 事件却没有运维可见日志
   - `import_to_library._is_raw_bt_task()` 在读取 downloader job 判定 raw_bt 失败时，现在也会打印红色中文 `[导入 raw_bt 判定查询失败]` 日志和 `[处理建议]`，不再把 SQLite/jobs 读取异常静默吞成“不是 raw_bt”
   - `import_to_library._resolve_normalized_naming_truth()` 在读取 `downloader.succeeded` 命名真相失败时，现在也会打印红色中文 `[导入命名真相查询失败]` 日志和 `[处理建议]`，不再把 `job_event` 读取异常静默吞成“直接退回源名称”
@@ -229,6 +230,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`private_chat_runtime` 里 frustration / confirm 两条 `job_repo` 查询失败路径现在也会打印红色中文 `[待处理任务查询失败]` / `[确认关联任务查询失败]` 和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“当前没有待处理任务 / 没匹配到确认任务”。
 - 2026-04-15 代码审查确认：`telegram_bot._record_message_update()` / `_record_callback_update()` 在写 `telegram_updates` 失败时，现在会打印红色中文 `[Telegram 更新去重落盘失败]` 和 `[处理建议]`，并 fail-closed 停止当前 update，避免 SQLite 去重真相缺失时把同一条消息继续推进到共享 runtime。
 - 2026-04-15 代码审查确认：`import_to_library.cancel_pending_import()` 在读取 `get_latest_pending_import_job()` 失败时，现在会打印红色中文 `[导入取消查询失败]` 和 `[处理建议]`，并直接失败返回，避免把 SQLite/jobs 查询异常误判成“没有待取消导入”。
+- 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在会打印红色中文 `[导入目标目录创建失败]` 和 `[处理建议]`，不再只回用户文本和 `import.prepare_target_failed` 事件，让目录权限/路径配置问题能直接被终端日志看见。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_name_for_task()` 在读取 downloader job 失败时，现在会打印红色中文 `[下载器路由查询失败]` 和 `[处理建议]`，不再把 SQLite/jobs 读取异常混写成普通 `downloader job missing`。
 - 2026-04-15 代码审查确认：`app.main` 里 `_resolve_downloader_name_for_task()` 读取 `jobs.payload_json` 时，现在会把空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[下载器路由载荷损坏]` 和 `[处理建议]`，不再把这些持久化坏数据统一混写成普通 `downloader_name missing`。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_client_for_lookup()` 在实例名命中但对应下载器 client 没装好时，现在会打印红色中文 `[下载器客户端未配置]` 和 `[处理建议]`，不再静默返回 `None` 让状态/导入查询只表现成普通未命中。
@@ -354,6 +356,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import target-path lookup observability tests：2026-04-15，`1 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k find_latest_import_target_path_logs_event_lookup_failure`）
 - import cancel-path observability tests：2026-04-15，`3 passed, 37 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import_logs_job_cancel_failure or handle_expired_pending_confirm_logs_approval_cancel_failure or handle_expired_pending_confirm_logs_job_cancel_failure"`）
 - import cancel lookup observability tests：2026-04-15，`1 passed, 51 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k cancel_pending_import_logs_job_lookup_failure`）
+- import target-dir create observability tests：2026-04-15，`1 passed, 52 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_dir_create_failure`）
 - import write-path observability tests：2026-04-15，`4 passed, 40 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_pending_approval_logs_persistence_failure or record_import_approval_logs_persistence_failure or record_executed_lease_version_logs_persistence_failure or record_pending_job_logs_persistence_failure"`）
 - import event-write observability tests：2026-04-15，`1 passed, 44 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k record_event_logs_persistence_failure`）
 - get download status query-error observability tests：2026-04-15，`1 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k get_status_text_logs_query_error`）
