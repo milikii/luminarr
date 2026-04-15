@@ -1216,7 +1216,11 @@ def _clear_bt_classification_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return cleared
-    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION) or cleared
+    try:
+        return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION) or cleared
+    except Exception as error:
+        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
+        return cleared
 
 
 def _pop_bt_classification_pending(
@@ -1231,7 +1235,14 @@ def _pop_bt_classification_pending(
     if isinstance(pending_query, str):
         pending_repo = _resolve_bt_pending_repo(context)
         if pending_repo is not None:
-            pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+            try:
+                pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+            except Exception as error:
+                _log_bt_pending_clear_failed(
+                    chat_id=chat_id,
+                    stage=BT_PENDING_STAGE_CLASSIFICATION,
+                    reason=str(error),
+                )
         return pending_query
 
     pending_repo = _resolve_bt_pending_repo(context)
@@ -1244,7 +1255,10 @@ def _pop_bt_classification_pending(
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
         return None
-    pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+    try:
+        pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+    except Exception as error:
+        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
     return str(payload.get("query", "")).strip() or None
 
 

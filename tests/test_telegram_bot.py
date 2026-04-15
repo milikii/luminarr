@@ -56,9 +56,11 @@ from app.bot.telegram_bot import (
     handle_message,
     _get_bt_tmdb_association_pending,
     _get_raw_bt_destination_pending,
+    _clear_bt_classification_pending,
     _clear_bt_processing_path_pending,
     _is_bt_classification_pending,
     _is_bt_processing_path_pending,
+    _pop_bt_classification_pending,
     _pop_bt_processing_path_pending,
     _download_completion_polling_loop,
     _poll_pending_download_completion_once,
@@ -1013,6 +1015,50 @@ def test_bt_classification_pending_logs_payload_corruption_after_restart(
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=classification" in output
     assert "payload_json invalid json" in output
+
+
+def test_clear_bt_classification_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                "bt_classification_pending_by_chat": {1001: "magnet:?xt=urn:btih:abc"},
+            }
+        )
+    )
+
+    assert _clear_bt_classification_pending(context=context, chat_id=1001) is True
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理清理失败]" in output
+    assert "stage=classification" in output
+    assert "db down" in output
+
+
+def test_pop_bt_classification_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                "bt_classification_pending_by_chat": {1001: "magnet:?xt=urn:btih:abc"},
+            }
+        )
+    )
+
+    assert _pop_bt_classification_pending(context=context, chat_id=1001) == "magnet:?xt=urn:btih:abc"
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理清理失败]" in output
+    assert "stage=classification" in output
+    assert "db down" in output
 
 
 def test_bt_tmdb_association_pending_logs_payload_corruption_after_restart(
