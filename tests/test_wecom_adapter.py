@@ -212,6 +212,27 @@ def test_wecom_webhook_handler_logs_response_write_failure(capsys) -> None:
     assert "[处理建议]" in output
 
 
+def test_start_wecom_webhook_server_logs_bind_failure(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        wecom_webhook_server_module,
+        "HTTPServer",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("address already in use")),
+    )
+
+    with pytest.raises(OSError):
+        wecom_webhook_server_module.start_wecom_webhook_server(
+            loop=asyncio.new_event_loop(),
+            config=WeComWebhookServerConfig(host="127.0.0.1", port=18889, path="/wecom/callback"),
+            bot_data={},
+        )
+
+    output = capsys.readouterr().out
+    assert "[WeCom webhook 启动失败]" in output
+    assert "127.0.0.1:18889/wecom/callback" in output
+    assert "address already in use" in output
+    assert "[处理建议]" in output
+
+
 def test_parse_wecom_private_text_event_ignores_non_text_or_missing_content() -> None:
     image_xml = _build_wecom_private_text_xml("dune").replace("><![CDATA[text]]>", "><![CDATA[image]]>")
     empty_content_xml = _build_wecom_private_text_xml("").replace("<Content><![CDATA[]]></Content>", "<Content></Content>")

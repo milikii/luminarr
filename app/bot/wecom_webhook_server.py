@@ -45,7 +45,15 @@ def start_wecom_webhook_server(
         path=config.path,
         bot_data=bot_data,
     )
-    server = HTTPServer((config.host, config.port), handler_class)
+    try:
+        server = HTTPServer((config.host, config.port), handler_class)
+    except OSError as error:
+        print(
+            f"\033[31m[WeCom webhook 启动失败]\033[0m 地址=http://{config.host}:{config.port}{config.path} 原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查监听地址/端口是否被占用，并确认当前进程有权限绑定该端口。",
+            flush=True,
+        )
+        raise
     thread = threading.Thread(target=server.serve_forever, name="wecom-webhook-server", daemon=True)
     thread.start()
     print(f"\033[32m[WeCom webhook 已启动]\033[0m 地址=http://{config.host}:{server.server_address[1]}{config.path}")
