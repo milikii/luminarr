@@ -543,7 +543,7 @@ class ApprovalRepo:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
-            return None
+            raise ApprovalPersistenceError("approval task identity missing for query")
         with self._database.connect() as connection:
             row = connection.execute(
                 """

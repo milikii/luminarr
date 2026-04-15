@@ -1047,6 +1047,18 @@ def test_approval_repo_rejects_missing_identity_for_pending_expiry_check(tmp_pat
         )
 
 
+def test_approval_repo_rejects_missing_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for query"):
+        repo.get_import_approval(task_id="", task_hash="hash-87")
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for query"):
+        repo.get_downloader_approval(task_id="88", task_hash="")
+
+
 def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
