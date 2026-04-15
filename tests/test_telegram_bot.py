@@ -2962,6 +2962,42 @@ def test_handle_message_frustration_clears_candidates() -> None:
     assert search_service.get_cached_candidate(1001, 1) is None
 
 
+def test_handle_message_frustration_does_not_reply_when_candidate_clear_fails(capsys) -> None:
+    class BoomRepo:
+        def save_candidates(self, chat_id: int, candidates: object) -> None:
+            _ = (chat_id, candidates)
+
+        def clear_candidates(self, chat_id: int) -> bool:
+            raise RuntimeError("db down")
+
+    update, reply_text = _build_update("算了")
+    search_service = SearchMediaService(_fake_search, candidate_repo=BoomRepo())
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    assert reply_text.await_args.args[0] != FRUSTRATION_RESET_TEXT
+    assert search_service.get_cached_candidate(1001, 1) is not None
+    output = capsys.readouterr().out
+    assert "[搜索候选清理失败]" in output
+    assert "chat_id=1001" in output
+    assert "db down" in output
+
+
 def test_handle_message_frustration_resets_pending_clarification() -> None:
     update, reply_text = _build_update("重来")
     search_service = SearchMediaService(_fake_search_empty)

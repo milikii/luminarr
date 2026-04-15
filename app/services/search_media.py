@@ -206,7 +206,9 @@ class SearchMediaService:
             return False
 
         cleared = False
+        previous_candidates: Sequence[Mapping[str, Any]] | None = None
         if chat_id in self._recent_candidates_by_chat:
+            previous_candidates = tuple(self._recent_candidates_by_chat[chat_id])
             self._recent_candidates_by_chat.pop(chat_id, None)
             cleared = True
         cleared = self._clear_clarification_pending(chat_id=chat_id) or cleared
@@ -220,7 +222,9 @@ class SearchMediaService:
                 f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前进程内候选已清掉，但重启后旧候选可能仍残留。",
                 flush=True,
             )
-            return cleared
+            if previous_candidates is not None:
+                self._recent_candidates_by_chat[chat_id] = list(previous_candidates)
+            return False
 
     def is_clarification_pending(self, chat_id: int) -> bool:
         if chat_id <= 0:

@@ -227,8 +227,8 @@ def test_clear_cached_candidates_logs_candidate_persistence_failure(capsys) -> N
     service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)
     service._recent_candidates_by_chat[1001] = [{"title": "Dune"}]
 
-    assert service.clear_cached_candidates(1001) is True
-    assert 1001 not in service._recent_candidates_by_chat
+    assert service.clear_cached_candidates(1001) is False
+    assert service._recent_candidates_by_chat[1001] == [{"title": "Dune"}]
     assert "[搜索候选清理失败]" in capsys.readouterr().out
 
 
