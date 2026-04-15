@@ -85,7 +85,11 @@ class PostDownloadAutoImportService:
                 task_id=candidate.task_id,
                 task_hash=candidate.task_hash,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[自动导入终态查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前请求会按“没有终态事件”继续判断，但同一任务可能被重复推进自动导入。",
+                flush=True,
+            )
             return False
         return any(
             event.event_type.startswith("import.") or event.event_type == AUTO_IMPORT_SKIPPED_BY_RULE_EVENT
