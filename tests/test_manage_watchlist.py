@@ -9,6 +9,7 @@ from app.services.manage_watchlist import (
     WATCHLIST_ADD_FAILED_TEXT,
     WATCHLIST_ADD_USAGE_TEXT,
     WATCHLIST_EMPTY_TEXT,
+    WATCHLIST_LIST_FAILED_TEXT,
     WATCHLIST_REMOVE_USAGE_TEXT,
     ManageWatchlistService,
     parse_watchlist_query,
@@ -91,6 +92,23 @@ def test_manage_watchlist_validation_errors(tmp_path: Path) -> None:
     assert service.handle(parse_watchlist_query("watchlist add series"), chat_id=1001) == WATCHLIST_ADD_USAGE_TEXT
     assert service.handle(parse_watchlist_query("watchlist remove"), chat_id=1001) == WATCHLIST_REMOVE_USAGE_TEXT
     assert service.handle(parse_watchlist_query("watchlist remove x"), chat_id=1001) == WATCHLIST_REMOVE_USAGE_TEXT
+
+
+def test_manage_watchlist_list_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _crash_list_items(**_: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.list_items = _crash_list_items  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist list"), chat_id=1001)
+
+    assert reply == WATCHLIST_LIST_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看清单读取失败]" in captured.out
+    assert "db down" in captured.out
 
 
 def test_manage_watchlist_add_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:

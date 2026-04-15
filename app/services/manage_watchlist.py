@@ -15,6 +15,7 @@ WATCHLIST_USAGE_TEXT = (
     "watchlist clear"
 )
 WATCHLIST_EMPTY_TEXT = "想看清单为空。"
+WATCHLIST_LIST_FAILED_TEXT = "想看清单读取失败，请稍后重试。"
 WATCHLIST_ADD_USAGE_TEXT = (
     "添加格式：watchlist add <片名 [年份]>\n"
     "或：watchlist add <movie|series|anime> <片名 [年份]>"
@@ -67,7 +68,9 @@ class ManageWatchlistService:
         return WATCHLIST_USAGE_TEXT
 
     def _list_text(self, *, chat_id: int) -> str:
-        items = self._watchlist_repo.list_items(chat_id=chat_id)
+        items = self._list_items(chat_id=chat_id)
+        if items is None:
+            return WATCHLIST_LIST_FAILED_TEXT
         if not items:
             return WATCHLIST_EMPTY_TEXT
 
@@ -159,6 +162,13 @@ class ManageWatchlistService:
         )
         return None
 
+    def _list_items(self, *, chat_id: int):
+        try:
+            return self._watchlist_repo.list_items(chat_id=chat_id)
+        except Exception as error:
+            _log_watchlist_list_failed(chat_id=chat_id, reason=str(error))
+            return None
+
 
 def parse_watchlist_query(text: str) -> WatchlistCommand | None:
     cleaned_text = text.strip()
@@ -227,4 +237,11 @@ def _log_watchlist_add_failed(
         f"\033[31m[想看写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
         f"media_kind={media_kind} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
+    )
+
+
+def _log_watchlist_list_failed(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[想看清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 watchlist_item 表是否正常。"
     )
