@@ -252,6 +252,18 @@ def test_download_monitor_repo_rejects_missing_task_identity(tmp_path: Path) -> 
         repo.register_download(task_id="42", task_hash="", name="Dune: Part Two")
 
 
+def test_download_monitor_repo_rejects_non_positive_explicit_chat_or_user_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor chat identity missing"):
+        repo.register_download(task_id="42", task_hash="hash-42", name="Dune: Part Two", chat_id=0, user_id=2001)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor user identity missing"):
+        repo.register_download(task_id="42", task_hash="hash-42", name="Dune: Part Two", chat_id=1001, user_id=0)
+
+
 def test_download_monitor_repo_rejects_missing_identity_for_status_record(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

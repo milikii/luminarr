@@ -50,6 +50,10 @@ class DownloadMonitorRepo:
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
             raise DownloadMonitorPersistenceError("download monitor task identity missing")
+        if chat_id is not None and chat_id <= 0:
+            raise DownloadMonitorPersistenceError("download monitor chat identity missing")
+        if user_id is not None and user_id <= 0:
+            raise DownloadMonitorPersistenceError("download monitor user identity missing")
 
         with self._database.connect() as connection:
             connection.execute(
