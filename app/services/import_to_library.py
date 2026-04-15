@@ -1233,7 +1233,11 @@ class ImportToLibraryService:
                 task_id=task_id,
                 task_hash=task_hash,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会按“无导入目标路径”继续处理，但可能丢失目标已存在的明确提示。",
+                flush=True,
+            )
             return None
         if correlation is None:
             return None

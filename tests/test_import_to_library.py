@@ -324,6 +324,21 @@ def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) 
     assert "task_id=87" in output
 
 
+def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> None:
+    event_repo = type(
+        "EventRepo",
+        (),
+        {"find_latest_import_correlation": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
+
+    assert service._find_latest_import_target_path(task_id="87", task_hash="hash-87") is None
+
+    output = capsys.readouterr().out
+    assert "[导入目标路径查询失败]" in output
+    assert "task_hash=hash-87" in output
+
+
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
