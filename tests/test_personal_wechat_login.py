@@ -171,3 +171,67 @@ def test_personal_wechat_login_service_reuses_active_qr_for_same_chat(tmp_path: 
         await service._wait_task
 
     asyncio.run(run_case())
+
+
+def test_personal_wechat_login_logs_qr_cleanup_failure(tmp_path: Path, monkeypatch, capsys) -> None:
+    async def start_login_func(**_: object) -> object:
+        return SimpleNamespace(
+            qrcode_url="https://login.example/qr/cleanup",
+            session_key="session-cleanup",
+            message="ok",
+        )
+
+    async def wait_login_func(**_: object) -> object:
+        return SimpleNamespace(
+            connected=True,
+            account_id="wx-account-cleanup",
+            bot_token="bot-token-cleanup",
+            base_url="https://ilinkai.weixin.qq.com",
+            user_id="wx-user-cleanup",
+        )
+
+    qr_dir = tmp_path / "cleanup-qr"
+    qr_dir.mkdir()
+    qr_file = qr_dir / "wechat-login.png"
+    qr_file.write_bytes(b"png")
+
+    def build_qr_artifact(_: str):
+        return SimpleNamespace(dir_path=qr_dir, file_path=qr_file)
+
+    original_unlink = type(qr_file).unlink
+
+    def _raise_cleanup_failure(self: Path, *args, **kwargs) -> None:
+        if self == qr_file:
+            raise OSError("file busy")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(type(qr_file), "unlink", _raise_cleanup_failure)
+
+    async def run_case() -> None:
+        service = PersonalWeChatLoginService(
+            start_login_func=start_login_func,
+            wait_login_func=wait_login_func,
+            save_account_func=Mock(),
+            register_account_func=Mock(),
+            clear_stale_accounts_func=Mock(),
+            close_client_func=AsyncMock(),
+            qr_artifact_builder=build_qr_artifact,
+        )
+
+        reply = await service.start_login(
+            chat_id=1001,
+            send_media_func=AsyncMock(return_value="document-ok"),
+            send_text_func=AsyncMock(),
+        )
+
+        assert reply == PERSONAL_WECHAT_LOGIN_STARTED_TEXT
+        assert service._wait_task is not None
+        await service._wait_task
+
+    asyncio.run(run_case())
+
+    output = capsys.readouterr().out
+    assert "[personal WeChat 二维码清理失败]" in output
+    assert str(qr_file) in output
+    assert "file busy" in output
+    assert "[处理建议]" in output

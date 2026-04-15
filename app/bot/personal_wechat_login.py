@@ -85,10 +85,26 @@ def _build_qr_png_artifact(qr_content: str) -> QrArtifact:
 def _cleanup_qr_artifact(artifact: QrArtifact | None) -> None:
     if artifact is None:
         return
-    with contextlib.suppress(FileNotFoundError):
+    try:
         artifact.file_path.unlink()
-    with contextlib.suppress(FileNotFoundError):
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        print(
+            f"\033[31m[personal WeChat 二维码清理失败]\033[0m 路径={artifact.file_path} 原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查临时二维码文件是否被占用，并在需要时手动清理遗留 PNG 文件。",
+            flush=True,
+        )
+    try:
         shutil.rmtree(artifact.dir_path)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        print(
+            f"\033[31m[personal WeChat 二维码清理失败]\033[0m 路径={artifact.dir_path} 原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查临时二维码目录是否被占用，并在需要时手动清理遗留目录。",
+            flush=True,
+        )
 
 
 class PersonalWeChatLoginService:
