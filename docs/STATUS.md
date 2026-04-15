@@ -76,6 +76,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._is_raw_bt_task()` 在读取 downloader job 判定 raw_bt 失败时，现在也会打印红色中文 `[导入 raw_bt 判定查询失败]` 日志和 `[处理建议]`，不再把 SQLite/jobs 读取异常静默吞成“不是 raw_bt”
   - `import_to_library._resolve_normalized_naming_truth()` 在读取 `downloader.succeeded` 命名真相失败时，现在也会打印红色中文 `[导入命名真相查询失败]` 日志和 `[处理建议]`，不再把 `job_event` 读取异常静默吞成“直接退回源名称”
   - `import_to_library._execute_import()` 在媒体库刷新抛异常时，现在也会打印红色中文 `[媒体库刷新失败]` 日志和 `[处理建议]`，不再只写 `refresh.failed` 事件和失败文本却没有运维可见日志
+  - `RefreshMediaServerService.refresh_text()` 在 Emby 刷新异常被转成失败文本时，现在也会打印红色中文 `[媒体库刷新失败]` 日志和 `[处理建议]`，不再把真实刷新异常只折叠成一行失败文本
   - `subtitle_translator._read_metadata_title()` 在 metadata JSON 根结构损坏或 `tmdb` 字段不是对象时，现在也会打印红色中文 `[字幕翻译失败]` 日志和 `[处理建议]`，不再把持久化坏 metadata 静默混写成普通空标题
   - `import_to_library._rebuild_confirm_context()` 在 `jobs` / `approval_record` 查询异常时，现在也会打印红色中文 `[导入确认上下文查询失败]` / `[导入确认审批查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认导入 / 审批状态缺失”
   - `import_to_library._claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` 在 `jobs` lease/完成态更新异常时，现在也会打印红色中文 `[导入确认任务抢占失败]` / `[导入确认任务回退失败]` / `[导入确认任务完结失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成普通冲突或无事发生
@@ -244,6 +245,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在会打印红色中文 `[导入硬链接失败]` 和 `[处理建议]`，不再只回用户文本和 `import.hardlink_failed` 事件，让权限/路径占用问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 copy 模式失败时，现在会打印红色中文 `[导入复制失败]` 和 `[处理建议]`，不再只回用户文本和 `import.copy_failed` 事件，让磁盘空间/权限问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._cleanup_partial_target()` 在复制导入失败后清理半成品目标再失败时，现在也会打印红色中文 `[导入残留清理失败]` 和 `[处理建议]`，不再把目标路径占用或残留文件静默吞掉。
+- 2026-04-15 代码审查确认：`RefreshMediaServerService.refresh_text()` 在 Emby 刷新异常被转成失败文本时，现在也会打印红色中文 `[媒体库刷新失败]` 和 `[处理建议]`，不再让正常接线下的真实刷新异常只剩一行失败文本。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_name_for_task()` 在读取 downloader job 失败时，现在会打印红色中文 `[下载器路由查询失败]` 和 `[处理建议]`，不再把 SQLite/jobs 读取异常混写成普通 `downloader job missing`。
 - 2026-04-15 代码审查确认：`app.main` 里 `_resolve_downloader_name_for_task()` 读取 `jobs.payload_json` 时，现在会把空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[下载器路由载荷损坏]` 和 `[处理建议]`，不再把这些持久化坏数据统一混写成普通 `downloader_name missing`。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_client_for_lookup()` 在实例名命中但对应下载器 client 没装好时，现在会打印红色中文 `[下载器客户端未配置]` 和 `[处理建议]`，不再静默返回 `None` 让状态/导入查询只表现成普通未命中。
@@ -305,6 +307,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - proxy / Feishu 长连接 / PNG 二维码 tests：`135 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_config.py tests/test_tmdb_client.py tests/test_fanart_client.py tests/test_personal_wechat_login.py tests/test_telegram_bot.py tests/test_feishu_long_connection.py tests/test_subtitle_translator.py tests/test_bt_sources.py`）
 - subtitle metadata-structure observability tests：2026-04-15，`3 passed, 5 deselected`（`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py -k "metadata_read_failure or non_object_root_payload or non_object_tmdb_block"`）
 - subtitle metadata-structure observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr .venv/bin/python -c "from pathlib import Path; import app.services.subtitle_translator as m; path=Path('/tmp/luminarr-subtitle-metadata-structure.json'); path.write_text('{\"tmdb\": []}', encoding='utf-8'); print(m._read_metadata_title(path))"`）
+- refresh media server observability tests：2026-04-15，`3 passed`（`.venv/bin/python -m pytest -q tests/test_refresh_media_server.py`）
+- refresh media server observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr .venv/bin/python -c "import asyncio; from unittest.mock import AsyncMock; from app.services.refresh_media_server import RefreshMediaServerService; service=RefreshMediaServerService(AsyncMock(side_effect=RuntimeError('emby down'))); print(asyncio.run(service.refresh_text()))"`）
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - shared runtime cleanup service-not-ready tests：`6 passed, 10 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k service_not_ready`）
 - Telegram cleanup service-not-ready tests：`8 passed, 74 deselected`（2026-04-11，`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "cleanup and service_not_ready"`）
