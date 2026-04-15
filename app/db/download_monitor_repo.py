@@ -29,6 +29,10 @@ class DownloadMonitorUpdate:
     newly_completed: bool
 
 
+class DownloadMonitorPersistenceError(RuntimeError):
+    pass
+
+
 class DownloadMonitorRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -45,7 +49,7 @@ class DownloadMonitorRepo:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
-            return
+            raise DownloadMonitorPersistenceError("download monitor task identity missing")
 
         with self._database.connect() as connection:
             connection.execute(

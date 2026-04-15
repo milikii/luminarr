@@ -26,7 +26,7 @@ from app.db.bt_pending_repo import (
 )
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import (
     JOB_STATE_COMPLETED,
@@ -141,6 +141,18 @@ def test_download_monitor_truth_persists_for_restart_and_completion_observation(
         task_hash="hash-42",
     )
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
+
+
+def test_download_monitor_repo_rejects_missing_task_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing"):
+        repo.register_download(task_id="", task_hash="hash-42", name="Dune: Part Two")
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing"):
+        repo.register_download(task_id="42", task_hash="", name="Dune: Part Two")
 
 
 def test_download_monitor_pending_completion_limit_is_stable(tmp_path: Path) -> None:
