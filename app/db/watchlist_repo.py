@@ -76,7 +76,7 @@ class WatchlistRepo:
 
     def list_items(self, *, chat_id: int) -> list[WatchlistItem]:
         if chat_id <= 0:
-            return []
+            raise WatchlistPersistenceError("watchlist_item chat identity missing for list")
         with self._database.connect() as connection:
             rows = connection.execute(
                 """
