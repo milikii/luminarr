@@ -3023,6 +3023,42 @@ def test_handle_message_frustration_resets_pending_clarification() -> None:
     assert not search_service.is_clarification_pending(1001)
 
 
+def test_handle_message_frustration_does_not_reply_when_clarification_clear_fails(capsys) -> None:
+    class BoomRepo:
+        def upsert_pending(self, *, chat_id: int, query: str) -> None:
+            _ = (chat_id, query)
+
+        def clear_pending(self, chat_id: int) -> bool:
+            raise RuntimeError("db down")
+
+    update, reply_text = _build_update("重来")
+    search_service = SearchMediaService(_fake_search_empty, clarification_repo=BoomRepo())
+    _run(search_service.search_and_format("unknown", chat_id=1001))
+    assert search_service.is_clarification_pending(1001)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_not_awaited()
+    assert search_service.is_clarification_pending(1001)
+    output = capsys.readouterr().out
+    assert "[搜索澄清态清理失败]" in output
+    assert "chat_id=1001" in output
+    assert "db down" in output
+
+
 def test_handle_message_frustration_without_state_still_routes_to_search() -> None:
     update, reply_text = _build_update("算了")
     search_service = SearchMediaService(_fake_search)

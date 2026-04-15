@@ -1,4 +1,4 @@
-# Current status (v215)
+# Current status (v216)
 
 ## Project position
 
@@ -242,6 +242,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在已执行导入的 stale-check 里，如果读取 `job_event` 目标路径失败，现在也会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/job_event 读取异常误判成普通“无导入目标路径/没有待确认导入”。
 - 2026-04-15 代码审查确认：`watchlist_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `watchlist_item missing after insert`，并由 `manage_watchlist` 继续打印红色中文 `[想看写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
 - 2026-04-15 代码审查确认：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 删除失败时，现在会恢复当前进程内候选并返回 `False`，Telegram 私聊入口也不会再回 `已清除当前候选，请重新搜索。`，避免把 SQLite/候选表删除失败误判成成功重置。
+- 2026-04-15 代码审查确认：`search_media.clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 删除失败时，现在会恢复当前进程内待澄清状态并返回 `False`；Telegram 私聊入口也不会再回 `已重置当前澄清，请重新描述。` 之类的重置文本，避免把 SQLite/clarification 删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：`telegram_bot._record_message_update()` / `_record_callback_update()` 在写 `telegram_updates` 失败时，现在会打印红色中文 `[Telegram 更新去重落盘失败]` 和 `[处理建议]`，并 fail-closed 停止当前 update，避免 SQLite 去重真相缺失时把同一条消息继续推进到共享 runtime。
 - 2026-04-15 代码审查确认：`import_to_library.cancel_pending_import()` 在读取 `get_latest_pending_import_job()` 失败时，现在会打印红色中文 `[导入取消查询失败]` 和 `[处理建议]`，并直接失败返回，避免把 SQLite/jobs 查询异常误判成“没有待取消导入”。
 - 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在下载源已缺失时，现在会打印红色中文 `[导入源文件缺失]` 和 `[处理建议]`，不再只回用户文本和 `import.source_missing` 事件，让下载目录已被清理/移动的问题能直接从终端定位。

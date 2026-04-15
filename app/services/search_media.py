@@ -258,7 +258,9 @@ class SearchMediaService:
 
     def _clear_clarification_pending(self, *, chat_id: int) -> bool:
         cleared = False
+        previous_query = ""
         if chat_id in self._clarification_pending_by_chat:
+            previous_query = self._clarification_pending_by_chat[chat_id]
             self._clarification_pending_by_chat.pop(chat_id, None)
             cleared = True
         if self._clarification_repo is None:
@@ -270,7 +272,9 @@ class SearchMediaService:
                 f"\033[31m[搜索澄清态清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表删除是否正常；当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
                 flush=True,
             )
-            return cleared
+            if previous_query:
+                self._clarification_pending_by_chat[chat_id] = previous_query
+            return False
 
     def _load_persisted_clarification_query(self, *, chat_id: int) -> str | None:
         if self._clarification_repo is None:

@@ -120,12 +120,13 @@ async def handle_private_chat_query_text(
         search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
         if isinstance(search_service, tg.SearchMediaService) and chat_id is not None:
             if search_service.is_clarification_pending(chat_id):
-                await tg._run_sync_with_policy(
+                clarification_cleared = await tg._run_sync_with_policy(
                     execution_gate,
                     tg.ACTION_RESET_CLARIFICATION,
                     lambda: search_service.clear_clarification_pending(chat_id),
                 )
-                await reply_func(tg.CLARIFICATION_RESET_TEXT)
+                if clarification_cleared:
+                    await reply_func(tg.CLARIFICATION_RESET_TEXT)
                 return
             if await tg._run_sync_with_policy(
                 execution_gate,
