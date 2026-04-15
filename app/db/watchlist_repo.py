@@ -117,7 +117,7 @@ class WatchlistRepo:
 
     def get_item_by_id(self, *, chat_id: int, item_id: int) -> WatchlistItem | None:
         if chat_id <= 0 or item_id <= 0:
-            return None
+            raise WatchlistPersistenceError("watchlist_item identity missing for id lookup")
         with self._database.connect() as connection:
             row = connection.execute(
                 """

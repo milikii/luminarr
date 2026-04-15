@@ -802,6 +802,18 @@ def test_watchlist_repo_rejects_missing_chat_identity_for_list(tmp_path: Path) -
         repo.list_items(chat_id=0)
 
 
+def test_watchlist_repo_rejects_missing_identity_for_id_lookup(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = WatchlistRepo(database)
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item identity missing for id lookup"):
+        repo.get_item_by_id(chat_id=0, item_id=1)
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item identity missing for id lookup"):
+        repo.get_item_by_id(chat_id=1001, item_id=0)
+
+
 def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
