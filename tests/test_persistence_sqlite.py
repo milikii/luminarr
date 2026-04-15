@@ -832,6 +832,52 @@ def test_job_repo_rejects_missing_identity_for_query(tmp_path: Path) -> None:
         repo._get_latest_pending_job_for_workflow(workflow_type="   ", chat_id=1001)
 
 
+def test_job_repo_rejects_corrupted_row_after_read(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO jobs (
+                job_id,
+                chat_id,
+                user_id,
+                workflow_type,
+                state,
+                task_ref,
+                task_id,
+                task_hash,
+                payload_json,
+                version,
+                lease_owner,
+                lease_until,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                "import_to_library:hash-87",
+                1001,
+                2001,
+                WORKFLOW_ADD_TO_DOWNLOADER,
+                JOB_STATE_PENDING_APPROVAL,
+                "87",
+                "87",
+                "",
+                "{}",
+                1,
+                "",
+                "",
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(JobPersistenceError, match="job row identity corrupted after read"):
+        repo.get_job_for_chat_ref(chat_id=1001, task_ref="87")
+
+
 def test_import_persists_minimal_events(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

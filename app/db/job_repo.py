@@ -617,17 +617,32 @@ def _build_job_id(workflow_type: str, task_hash: str) -> str:
 
 
 def _to_job_record(row: Mapping[str, object]) -> JobRecord:
+    job_id = str(row["job_id"]).strip()
+    workflow_type = str(row["workflow_type"]).strip()
+    state = str(row["state"]).strip()
+    task_id = str(row["task_id"]).strip()
+    task_hash = str(row["task_hash"]).strip()
+    version = int(row["version"])
+    chat_id = int(row["chat_id"])
+
+    if not job_id or not workflow_type or not state or not task_id or not task_hash:
+        raise JobPersistenceError("job row identity corrupted after read")
+    if chat_id <= 0:
+        raise JobPersistenceError("job row chat identity corrupted after read")
+    if version <= 0:
+        raise JobPersistenceError("job row version corrupted after read")
+
     return JobRecord(
-        job_id=str(row["job_id"]),
-        chat_id=int(row["chat_id"]),
+        job_id=job_id,
+        chat_id=chat_id,
         user_id=int(row["user_id"]),
-        workflow_type=str(row["workflow_type"]),
-        state=str(row["state"]),
+        workflow_type=workflow_type,
+        state=state,
         task_ref=str(row["task_ref"]),
-        task_id=str(row["task_id"]),
-        task_hash=str(row["task_hash"]),
+        task_id=task_id,
+        task_hash=task_hash,
         payload_json=str(row["payload_json"]),
-        version=int(row["version"]),
+        version=version,
         lease_owner=str(row["lease_owner"]),
         lease_until=str(row["lease_until"]),
         created_at=str(row["created_at"]),
