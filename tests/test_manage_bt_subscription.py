@@ -8,6 +8,7 @@ from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_ADD_FAILED_TEXT,
+    BT_SUBSCRIPTION_CLEAR_FAILED_TEXT,
     BT_SUBSCRIPTION_LIST_FAILED_TEXT,
     BT_SUBSCRIPTION_REMOVE_FAILED_TEXT,
     BtSubscriptionDispatchContext,
@@ -152,6 +153,25 @@ def test_manage_bt_subscription_remove_returns_failure_text_when_repo_raises(tmp
     assert reply == BT_SUBSCRIPTION_REMOVE_FAILED_TEXT
     captured = capsys.readouterr()
     assert "[BT 订阅删除失败]" in captured.out
+    assert "db down" in captured.out
+
+
+def test_manage_bt_subscription_clear_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _crash_clear_items(**_: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.clear_items = _crash_clear_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub clear"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_CLEAR_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅清单清空失败]" in captured.out
     assert "db down" in captured.out
 
 
