@@ -630,8 +630,10 @@ class ApprovalRepo:
     ) -> bool:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash or expected_lease_version <= 0:
-            return False
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise ApprovalPersistenceError("approval task identity missing for pending expiry check")
+        if expected_lease_version <= 0:
+            raise ApprovalPersistenceError("approval expected lease version missing for pending expiry check")
         with self._database.connect() as connection:
             row = connection.execute(
                 """

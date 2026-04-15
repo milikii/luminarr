@@ -771,6 +771,26 @@ def test_approval_repo_raises_when_mark_executed_row_missing(tmp_path: Path) -> 
         repo.mark_downloader_executed(task_id="88", task_hash="hash-88", executed_lease_version=1)
 
 
+def test_approval_repo_rejects_missing_identity_for_pending_expiry_check(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for pending expiry check"):
+        repo.is_import_pending_expired(
+            task_id="",
+            task_hash="hash-87",
+            expected_lease_version=1,
+        )
+
+    with pytest.raises(ApprovalPersistenceError, match="approval expected lease version missing for pending expiry check"):
+        repo.is_downloader_pending_expired(
+            task_id="88",
+            task_hash="hash-88",
+            expected_lease_version=0,
+        )
+
+
 def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
