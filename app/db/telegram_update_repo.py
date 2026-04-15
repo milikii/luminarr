@@ -6,6 +6,10 @@ SOURCE_TYPE_CALLBACK = "callback"
 SOURCE_TYPE_MESSAGE = "message"
 
 
+class TelegramUpdatePersistenceError(RuntimeError):
+    pass
+
+
 class TelegramUpdateRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -18,7 +22,7 @@ class TelegramUpdateRepo:
         user_id: int | None = None,
     ) -> bool:
         if update_id <= 0:
-            return True
+            raise TelegramUpdatePersistenceError("message update_id missing or invalid")
         return self._record_update(
             source_type=SOURCE_TYPE_MESSAGE,
             source_id=str(update_id),
@@ -35,7 +39,7 @@ class TelegramUpdateRepo:
     ) -> bool:
         cleaned_id = callback_query_id.strip()
         if not cleaned_id:
-            return True
+            raise TelegramUpdatePersistenceError("callback_query_id missing")
         return self._record_update(
             source_type=SOURCE_TYPE_CALLBACK,
             source_id=cleaned_id,
@@ -54,7 +58,7 @@ class TelegramUpdateRepo:
         cleaned_type = source_type.strip()
         cleaned_id = source_id.strip()
         if not cleaned_type or not cleaned_id:
-            return True
+            raise TelegramUpdatePersistenceError("telegram update identity missing")
 
         update_key = f"{cleaned_type}:{cleaned_id}"
         with self._database.connect() as connection:

@@ -2938,6 +2938,69 @@ def test_handle_callback_query_stops_when_update_dedup_persist_fails(tmp_path: P
     assert "[处理建议]" in output
 
 
+def test_handle_message_stops_when_update_id_invalid(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    update_repo = TelegramUpdateRepo(database)
+    update, reply_text = _build_update("dune", update_id=0)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                TELEGRAM_UPDATE_REPO_KEY: update_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[Telegram 更新去重落盘失败]" in output
+    assert "source_type=message" in output
+    assert "source_id=0" in output
+    assert "message update_id missing or invalid" in output
+
+
+def test_handle_callback_query_stops_when_callback_id_missing(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    update_repo = TelegramUpdateRepo(database)
+    update, reply_text, answer = _build_callback_update("dune", callback_query_id="")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                TELEGRAM_UPDATE_REPO_KEY: update_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_not_awaited()
+    reply_text.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[Telegram 更新去重落盘失败]" in output
+    assert "source_type=callback" in output
+    assert "source_id=-" in output
+    assert "callback_query_id missing" in output
+
+
 def test_handle_message_frustration_clears_candidates() -> None:
     update, reply_text = _build_update("算了")
     search_service = SearchMediaService(_fake_search)

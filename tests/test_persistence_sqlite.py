@@ -36,7 +36,7 @@ from app.db.job_repo import (
     WORKFLOW_ADD_TO_DOWNLOADER,
 )
 from app.db.sqlite import SqliteDatabase
-from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.db.telegram_update_repo import TelegramUpdatePersistenceError, TelegramUpdateRepo
 from app.services.add_to_downloader import (
     ADD_CANCELLED_TEXT,
     ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -242,6 +242,18 @@ def test_telegram_update_repo_rejects_duplicate_message_after_restart(tmp_path: 
 
     after_restart_repo = TelegramUpdateRepo(SqliteDatabase(str(db_path)))
     assert after_restart_repo.record_message_update(update_id=1001, chat_id=2001, user_id=3001) is False
+
+
+def test_telegram_update_repo_rejects_invalid_update_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = TelegramUpdateRepo(database)
+
+    with pytest.raises(TelegramUpdatePersistenceError, match="message update_id missing or invalid"):
+        repo.record_message_update(update_id=0, chat_id=2001, user_id=3001)
+
+    with pytest.raises(TelegramUpdatePersistenceError, match="callback_query_id missing"):
+        repo.record_callback_update(callback_query_id="", chat_id=2001, user_id=3001)
 
 
 def test_clarification_repo_persists_for_restart(tmp_path: Path) -> None:
