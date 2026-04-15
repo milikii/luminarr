@@ -38,6 +38,22 @@ def test_resolve_downloader_name_for_task_fails_closed_when_lookup_is_missing(
     assert "[处理建议]" in captured.out
 
 
+def test_resolve_downloader_name_for_task_logs_lookup_error(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+
+    assert _resolve_downloader_name_for_task(task_ref="87", chat_id=1001, job_repo=job_repo) is None
+
+    captured = capsys.readouterr()
+    assert "[下载器路由查询失败]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "db down" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 @pytest.mark.parametrize(
     ("payload_json", "expected_reason"),
     [

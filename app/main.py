@@ -172,6 +172,14 @@ def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, 
     )
 
 
+def _log_downloader_route_lookup_error(*, task_ref: str, chat_id: int | None, error: Exception) -> None:
+    print(
+        f"\033[31m[下载器路由查询失败]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} 错误={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
+        flush=True,
+    )
+
+
 def _log_downloader_route_payload_corruption(
     *,
     task_ref: str,
@@ -196,8 +204,8 @@ def _resolve_downloader_name_for_task(
         return None
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-    except Exception:
-        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job lookup failed")
+    except Exception as error:
+        _log_downloader_route_lookup_error(task_ref=task_ref, chat_id=chat_id, error=error)
         return None
     if downloader_job is None:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
