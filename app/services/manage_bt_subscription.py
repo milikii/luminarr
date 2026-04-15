@@ -25,6 +25,7 @@ BT_SUBSCRIPTION_LIST_FAILED_TEXT = "BT 订阅清单读取失败，请稍后重�
 BT_SUBSCRIPTION_ADD_USAGE_TEXT = "添加格式：btsub add <movie|series|anime> <片名 [年份]>"
 BT_SUBSCRIPTION_ADD_FAILED_TEXT = "BT 订阅写入失败，请稍后重试。"
 BT_SUBSCRIPTION_REMOVE_USAGE_TEXT = "删除格式：btsub remove <条目ID>"
+BT_SUBSCRIPTION_REMOVE_FAILED_TEXT = "BT 订阅删除失败，请稍后重试。"
 BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
 BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
 BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
@@ -203,7 +204,9 @@ class ManageBtSubscriptionService:
         item_id = int(cleaned_ref)
         if item_id <= 0:
             return BT_SUBSCRIPTION_REMOVE_USAGE_TEXT
-        removed = self._bt_subscription_repo.remove_item(chat_id=chat_id, item_id=item_id)
+        removed = self._remove_item(chat_id=chat_id, item_id=item_id)
+        if removed is None:
+            return BT_SUBSCRIPTION_REMOVE_FAILED_TEXT
         if not removed:
             return "未找到对应 BT 订阅条目。"
         return f"已删除 BT 订阅条目：{item_id}"
@@ -254,6 +257,13 @@ class ManageBtSubscriptionService:
             return self._bt_subscription_repo.list_items(chat_id=chat_id)
         except Exception as error:
             _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
+            return None
+
+    def _remove_item(self, *, chat_id: int, item_id: int):
+        try:
+            return self._bt_subscription_repo.remove_item(chat_id=chat_id, item_id=item_id)
+        except Exception as error:
+            _log_bt_subscription_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
             return None
 
     async def _run_for_item(
@@ -547,6 +557,13 @@ def _log_bt_subscription_list_failed(*, chat_id: int, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
+    )
+
+
+def _log_bt_subscription_remove_failed(*, chat_id: int, item_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。"
     )
 
 
