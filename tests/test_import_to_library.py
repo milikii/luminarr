@@ -275,6 +275,26 @@ def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     assert "task_ref=87" in output
 
 
+def test_record_event_logs_persistence_failure(capsys) -> None:
+    event_repo = type("EventRepo", (), {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
+
+    service._record_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.approval_pending",
+        message="87",
+        source_path="/downloads/Dune.2021.mkv",
+        target_path="/library/Dune (2021).mkv",
+    )
+
+    output = capsys.readouterr().out
+    assert "[导入事件落盘失败]" in output
+    assert "event_type=import.approval_pending" in output
+    assert "task_ref=87" in output
+
+
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

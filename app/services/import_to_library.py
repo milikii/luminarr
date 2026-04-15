@@ -1341,8 +1341,11 @@ class ImportToLibraryService:
                 source_path=source_path,
                 target_path=target_path,
             )
-        except Exception:
-            pass
+        except Exception as error:
+            print(
+                f"\033[31m[导入事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
+                flush=True,
+            )
 
 
 def parse_import_query(text: str) -> str | None:
