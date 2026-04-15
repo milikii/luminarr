@@ -394,6 +394,8 @@ class JobRepo:
         cleaned_task_hash = task_hash.strip()
         if not cleaned_workflow:
             raise JobPersistenceError("job workflow missing for pending upsert")
+        if chat_id is None or chat_id <= 0:
+            raise JobPersistenceError("job chat identity missing for pending upsert")
         if not cleaned_task_id or not cleaned_task_hash:
             raise JobPersistenceError("job task identity missing for pending upsert")
 

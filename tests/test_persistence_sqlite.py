@@ -609,6 +609,15 @@ def test_job_repo_rejects_missing_identity_for_pending_upsert(tmp_path: Path) ->
     database.initialize()
     repo = JobRepo(database)
 
+    with pytest.raises(JobPersistenceError, match="job chat identity missing for pending upsert"):
+        repo.upsert_import_job_pending(
+            chat_id=0,
+            user_id=2001,
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+        )
+
     with pytest.raises(JobPersistenceError, match="job task identity missing for pending upsert"):
         repo.upsert_import_job_pending(
             chat_id=1001,
