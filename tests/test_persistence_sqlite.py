@@ -729,6 +729,28 @@ def test_bt_subscription_repo_rejects_missing_identity_for_add(tmp_path: Path) -
         repo.add_item(chat_id=1001, title="Frieren", year="2023", media_kind="   ")
 
 
+def test_bt_subscription_repo_rejects_missing_identity_for_last_seen_update(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtSubscriptionRepo(database)
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item identity missing for last_seen update"):
+        repo.update_last_seen(
+            chat_id=0,
+            item_id=1,
+            source="https://example.com/frieren.torrent",
+            title="Frieren S01E01 1080p",
+        )
+
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item source missing for last_seen update"):
+        repo.update_last_seen(
+            chat_id=1001,
+            item_id=1,
+            source="   ",
+            title="Frieren S01E01 1080p",
+        )
+
+
 def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
     class MissingRowApprovalRepo(ApprovalRepo):
         def _get_exact_approval_record(

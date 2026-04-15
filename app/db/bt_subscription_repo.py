@@ -154,8 +154,10 @@ class BtSubscriptionRepo:
     ) -> bool:
         cleaned_source = source.strip()
         cleaned_title = title.strip()
-        if chat_id <= 0 or item_id <= 0 or not cleaned_source:
-            return False
+        if chat_id <= 0 or item_id <= 0:
+            raise BtSubscriptionPersistenceError("bt_subscription_item identity missing for last_seen update")
+        if not cleaned_source:
+            raise BtSubscriptionPersistenceError("bt_subscription_item source missing for last_seen update")
         with self._database.connect() as connection:
             cursor = connection.execute(
                 """
