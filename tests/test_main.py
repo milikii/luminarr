@@ -100,6 +100,21 @@ def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance(
     ) is known_client
 
 
+def test_resolve_downloader_client_for_lookup_logs_missing_client(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _resolve_downloader_client_for_lookup(
+        downloader_name="pt-main",
+        downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+        transmission_clients_by_name={},
+        qbittorrent_clients_by_name={},
+    ) is None
+
+    captured = capsys.readouterr()
+    assert "[下载器客户端未配置]" in captured.out
+    assert "downloader_name=pt-main" in captured.out
+    assert "downloader_type=transmission" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_resolve_downloader_client_for_dispatch_rejects_unknown_explicit_instance() -> None:
     default_client = object()
     assert _resolve_downloader_client_for_dispatch(

@@ -110,6 +110,15 @@ def _log_downloader_instance_missing(*, downloader_name: str) -> None:
     )
 
 
+def _log_downloader_client_not_configured(*, downloader_name: str, downloader_type: str) -> None:
+    print(
+        f"\033[31m[下载器客户端未配置]\033[0m downloader_name={downloader_name} downloader_type={downloader_type}\n"
+        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，"
+        "并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
+        flush=True,
+    )
+
+
 def _resolve_downloader_client_for_lookup(
     *,
     downloader_name: str,
@@ -123,8 +132,16 @@ def _resolve_downloader_client_for_lookup(
         _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
         return None
     if instance.downloader_type == "qbittorrent":
-        return qbittorrent_clients_by_name.get(cleaned_name)
-    return transmission_clients_by_name.get(cleaned_name)
+        client = qbittorrent_clients_by_name.get(cleaned_name)
+    else:
+        client = transmission_clients_by_name.get(cleaned_name)
+    if client is None:
+        _log_downloader_client_not_configured(
+            downloader_name=cleaned_name or "-",
+            downloader_type=instance.downloader_type,
+        )
+        return None
+    return client
 
 
 def _resolve_downloader_client_for_dispatch(
