@@ -1362,11 +1362,18 @@ def _set_bt_tmdb_association_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return
-    pending_repo.upsert_pending(
-        chat_id=chat_id,
-        stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-        payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
-    )
+    try:
+        pending_repo.upsert_pending(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
+        )
+    except Exception as error:
+        _log_bt_pending_persist_failed(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            reason=str(error),
+        )
 
 
 def _get_bt_tmdb_association_pending(

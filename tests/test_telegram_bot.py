@@ -65,6 +65,7 @@ from app.bot.telegram_bot import (
     _pop_bt_processing_path_pending,
     _set_bt_classification_pending,
     _set_bt_processing_path_pending,
+    _set_bt_tmdb_association_pending,
     _clear_raw_bt_destination_pending,
     _download_completion_polling_loop,
     _poll_pending_download_completion_once,
@@ -1187,6 +1188,33 @@ def test_pop_bt_classification_pending_logs_read_failure(capsys: pytest.CaptureF
     output = capsys.readouterr().out
     assert "[BT 待处理读取失败]" in output
     assert "stage=classification" in output
+    assert "db down" in output
+
+
+def test_set_bt_tmdb_association_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))}
+        )
+    )
+
+    _set_bt_tmdb_association_pending(
+        context=context,
+        chat_id=1001,
+        media_kind="movie",
+        source="magnet:?xt=urn:btih:abc",
+    )
+
+    pending = context.application.bot_data["bt_tmdb_association_pending_by_chat"][1001]
+    assert pending.media_kind == "movie"
+    assert pending.source == "magnet:?xt=urn:btih:abc"
+    output = capsys.readouterr().out
+    assert "[BT 待处理持久化失败]" in output
+    assert "stage=tmdb_association" in output
     assert "db down" in output
 
 
