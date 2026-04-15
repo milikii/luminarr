@@ -21,6 +21,7 @@ BT_SUBSCRIPTION_USAGE_TEXT = (
     "btsub run"
 )
 BT_SUBSCRIPTION_EMPTY_TEXT = "BT 订阅清单为空。"
+BT_SUBSCRIPTION_LIST_FAILED_TEXT = "BT 订阅清单读取失败，请稍后重试。"
 BT_SUBSCRIPTION_ADD_USAGE_TEXT = "添加格式：btsub add <movie|series|anime> <片名 [年份]>"
 BT_SUBSCRIPTION_ADD_FAILED_TEXT = "BT 订阅写入失败，请稍后重试。"
 BT_SUBSCRIPTION_REMOVE_USAGE_TEXT = "删除格式：btsub remove <条目ID>"
@@ -144,7 +145,9 @@ class ManageBtSubscriptionService:
         return tuple(notifications)
 
     def _list_text(self, *, chat_id: int) -> str:
-        items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+        items = self._list_items(chat_id=chat_id)
+        if items is None:
+            return BT_SUBSCRIPTION_LIST_FAILED_TEXT
         if not items:
             return BT_SUBSCRIPTION_EMPTY_TEXT
 
@@ -245,6 +248,13 @@ class ManageBtSubscriptionService:
             reason="bt_subscription_repo.add_item returned None",
         )
         return None
+
+    def _list_items(self, *, chat_id: int):
+        try:
+            return self._bt_subscription_repo.list_items(chat_id=chat_id)
+        except Exception as error:
+            _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
+            return None
 
     async def _run_for_item(
         self,
@@ -530,6 +540,13 @@ def _log_bt_subscription_scan_error(
     print(
         f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+    )
+
+
+def _log_bt_subscription_list_failed(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
     )
 
 
