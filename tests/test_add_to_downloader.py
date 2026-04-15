@@ -8,7 +8,7 @@ from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
-from app.db.job_repo import JOB_STATE_CANCELLED, JobRepo
+from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
     ADD_APPROVAL_PENDING_TEXT,
@@ -20,6 +20,7 @@ from app.services.add_to_downloader import (
     SELECT_OUT_OF_RANGE_TEXT,
     SELECT_USAGE_TEXT,
     AddToDownloaderService,
+    PendingAddContext,
 )
 from app.services.search_media import SearchMediaService
 
@@ -168,6 +169,79 @@ def test_register_download_monitor_logs_persistence_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载监控登记失败]" in output
     assert "task_id=42" in output
+
+
+def test_record_pending_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    service._record_pending_job(
+        chat_id=1001,
+        user_id=2001,
+        pending_add=PendingAddContext(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            title="Dune: Part Two",
+            source="https://example.com/dune.torrent",
+        ),
+    )
+    output = capsys.readouterr().out
+    assert "[下载待确认任务落盘失败]" in output
+    assert "task_ref=1" in output
+
+
+def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    assert service._claim_pending_job(job=job, lease_owner="downloader_confirm:1") is False
+    output = capsys.readouterr().out
+    assert "[下载确认任务抢占失败]" in output
+    assert "job_id=job-1" in output
+
+
+def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    service._restore_pending_job(job_id="job-1", expected_version=3, lease_owner="downloader_confirm:1")
+    output = capsys.readouterr().out
+    assert "[下载确认任务回退失败]" in output
+    assert "job_id=job-1" in output
+
+
+def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"mark_downloader_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    service._mark_completed_job(
+        job_id="job-1",
+        expected_version=3,
+        lease_owner="downloader_confirm:1",
+        completed_add=PendingAddContext(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            title="Dune: Part Two",
+            source="https://example.com/dune.torrent",
+        ),
+    )
+    output = capsys.readouterr().out
+    assert "[下载确认任务完结失败]" in output
+    assert "job_id=job-1" in output
 
 
 def test_add_by_selection_without_cached_candidates() -> None:

@@ -665,7 +665,11 @@ class AddToDownloaderService:
                 task_hash=pending_add.task_hash,
                 payload_json=_pending_add_to_json(pending_add),
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载待确认任务落盘失败]\033[0m chat_id={chat_id} user_id={user_id} task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表写入是否正常；当前请求会继续返回待确认文本，但重启后 confirm 上下文可能无法重建。",
+                flush=True,
+            )
             return
 
     def _rebuild_confirm_context(
@@ -729,7 +733,11 @@ class AddToDownloaderService:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 更新是否正常；当前 confirm 会按未持有执行权处理，但这次失败也可能不是业务真的冲突。",
+                flush=True,
+            )
             return False
 
     def _restore_pending_job(
@@ -748,7 +756,11 @@ class AddToDownloaderService:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
+                flush=True,
+            )
             return
 
     def _mark_completed_job(
@@ -770,7 +782,11 @@ class AddToDownloaderService:
                 task_hash=completed_add.task_hash,
                 payload_json=_pending_add_to_json(completed_add),
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载确认任务完结失败]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前下载结果已返回，但任务真相可能仍停留在待确认或执行中。",
+                flush=True,
+            )
             return
 
     def _build_job_lease_owner(self, task_ref: str) -> str:
