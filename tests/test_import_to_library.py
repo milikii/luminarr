@@ -241,6 +241,44 @@ def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    service._restore_pending_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2)
+    output = capsys.readouterr().out
+    assert "[导入审批回退失败]" in output
+    assert "lease_version=2" in output
+
+
+def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    service._pending_import_identities.add(("87", "hash-87"))
+    service._pending_import_lease_versions[("87", "hash-87")] = 3
+    assert service._resolve_pending_lease_version(task_id="87", task_hash="hash-87") == 3
+    output = capsys.readouterr().out
+    assert "[导入待确认版号查询失败]" in output
+    assert "task_hash=hash-87" in output
+
+
+def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") is None
+    output = capsys.readouterr().out
+    assert "[导入确认执行版号查询失败]" in output
+    assert "task_id=87" in output
+
+
+def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    assert service._is_pending_approval_expired(task_id="87", task_hash="hash-87", expected_lease_version=2) is False
+    output = capsys.readouterr().out
+    assert "[导入确认过期判断失败]" in output
+    assert "lease_version=2" in output
+
+
 def test_confirm_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
