@@ -1212,11 +1212,18 @@ def _set_bt_classification_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return
-    pending_repo.upsert_pending(
-        chat_id=chat_id,
-        stage=BT_PENDING_STAGE_CLASSIFICATION,
-        payload_json=_serialize_bt_pending_payload({"query": cleaned_query}),
-    )
+    try:
+        pending_repo.upsert_pending(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_CLASSIFICATION,
+            payload_json=_serialize_bt_pending_payload({"query": cleaned_query}),
+        )
+    except Exception as error:
+        _log_bt_pending_persist_failed(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_CLASSIFICATION,
+            reason=str(error),
+        )
 
 
 def _is_bt_classification_pending(
