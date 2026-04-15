@@ -949,6 +949,64 @@ def test_execute_import_logs_copy_failure(tmp_path: Path, monkeypatch, capsys) -
     assert "[处理建议]" in output
 
 
+def test_execute_import_logs_partial_target_cleanup_failure(tmp_path: Path, monkeypatch, capsys) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_path = tmp_path / "library" / "Dune (2021).mkv"
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    prepared = PreparedImport(
+        import_source=import_source,
+        source_path=source_file,
+        target_path=target_path,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+    )
+
+    def _raise_copy_failure_with_partial_target(src: str | Path, dst: str | Path) -> None:
+        dst_path = Path(dst)
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        dst_path.write_bytes(b"partial")
+        raise OSError(errno.ENOSPC, "no space left on device")
+
+    original_unlink = type(target_path).unlink
+
+    def _raise_cleanup_failure(self: Path, *args, **kwargs) -> None:
+        if self == target_path:
+            raise OSError(errno.EBUSY, "device or resource busy")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(import_module.shutil, "copy2", _raise_copy_failure_with_partial_target)
+    monkeypatch.setattr(type(target_path), "unlink", _raise_cleanup_failure)
+
+    result = _run(
+        service._execute_import(
+            "87",
+            prepared,
+            execution_mode=import_module.IMPORT_EXECUTION_MODE_COPY,
+        )
+    )
+
+    assert result.reply == IMPORT_COPY_FAILED_TEXT.format(reason="[Errno 28] no space left on device")
+    assert result.imported is False
+    output = capsys.readouterr().out
+    assert "[导入残留清理失败]" in output
+    assert str(target_path) in output
+    assert "device or resource busy" in output
+    assert "[处理建议]" in output
+
+
 def test_confirm_import_logs_target_exists_during_execute(tmp_path: Path, monkeypatch, capsys) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

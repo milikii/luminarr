@@ -1502,7 +1502,13 @@ def _cleanup_partial_target(target_path: Path) -> None:
             shutil.rmtree(target_path)
         elif target_path.exists() or target_path.is_symlink():
             target_path.unlink()
-    except OSError:
+    except OSError as error:
+        print(
+            f"\033[31m[导入残留清理失败]\033[0m target={target_path} 错误={error}\n"
+            "\033[33m[处理建议]\033[0m 检查目标路径是否被占用、是否仍有写权限，"
+            "并手动清理这次失败导入留下的半成品文件或目录。",
+            flush=True,
+        )
         return
 
 

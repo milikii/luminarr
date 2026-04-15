@@ -71,6 +71,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._execute_import()` 在执行阶段撞到已存在目标时，现在也会打印红色中文 `[导入目标已存在]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在也会打印红色中文 `[导入硬链接失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._execute_import()` 在 copy 模式失败时，现在也会打印红色中文 `[导入复制失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
+  - `import_to_library._cleanup_partial_target()` 在复制导入失败后的半成品目标清理再失败时，现在也会打印红色中文 `[导入残留清理失败]` 日志和 `[处理建议]`，不再把目标残留问题静默吞掉
   - `import_to_library._prepare_import()` 在查询导入源抛异常时，现在也会打印红色中文 `[导入源查询失败]` 日志和 `[处理建议]`，不再只写 `import.query_failed` 事件却没有运维可见日志
   - `import_to_library._is_raw_bt_task()` 在读取 downloader job 判定 raw_bt 失败时，现在也会打印红色中文 `[导入 raw_bt 判定查询失败]` 日志和 `[处理建议]`，不再把 SQLite/jobs 读取异常静默吞成“不是 raw_bt”
   - `import_to_library._resolve_normalized_naming_truth()` 在读取 `downloader.succeeded` 命名真相失败时，现在也会打印红色中文 `[导入命名真相查询失败]` 日志和 `[处理建议]`，不再把 `job_event` 读取异常静默吞成“直接退回源名称”
@@ -241,6 +242,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在执行阶段撞到已存在目标时，现在会打印红色中文 `[导入目标已存在]` 和 `[处理建议]`，不再只回用户文本和 `import.target_exists` 事件，让并发/历史残留导致的目标冲突也能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在会打印红色中文 `[导入硬链接失败]` 和 `[处理建议]`，不再只回用户文本和 `import.hardlink_failed` 事件，让权限/路径占用问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 copy 模式失败时，现在会打印红色中文 `[导入复制失败]` 和 `[处理建议]`，不再只回用户文本和 `import.copy_failed` 事件，让磁盘空间/权限问题能直接从终端定位。
+- 2026-04-15 代码审查确认：`import_to_library._cleanup_partial_target()` 在复制导入失败后清理半成品目标再失败时，现在也会打印红色中文 `[导入残留清理失败]` 和 `[处理建议]`，不再把目标路径占用或残留文件静默吞掉。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_name_for_task()` 在读取 downloader job 失败时，现在会打印红色中文 `[下载器路由查询失败]` 和 `[处理建议]`，不再把 SQLite/jobs 读取异常混写成普通 `downloader job missing`。
 - 2026-04-15 代码审查确认：`app.main` 里 `_resolve_downloader_name_for_task()` 读取 `jobs.payload_json` 时，现在会把空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[下载器路由载荷损坏]` 和 `[处理建议]`，不再把这些持久化坏数据统一混写成普通 `downloader_name missing`。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_client_for_lookup()` 在实例名命中但对应下载器 client 没装好时，现在会打印红色中文 `[下载器客户端未配置]` 和 `[处理建议]`，不再静默返回 `None` 让状态/导入查询只表现成普通未命中。
@@ -371,7 +373,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import target-dir create observability tests：2026-04-15，`1 passed, 52 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_dir_create_failure`）
 - import execute target-exists observability tests：2026-04-15，`1 passed, 57 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k confirm_import_logs_target_exists_during_execute`）
 - import hardlink failure observability tests：2026-04-15，`1 passed, 53 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k confirm_import_logs_hardlink_failure`）
-- import copy failure observability tests：2026-04-15，`1 passed, 54 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k execute_import_logs_copy_failure`）
+- import copy failure observability tests：2026-04-15，`2 passed, 57 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "copy_failure or partial_target_cleanup_failure"`）
+- import partial-target cleanup observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr .venv/bin/python -c "import errno; from pathlib import Path; import app.services.import_to_library as m; target=Path('/tmp/luminarr-import-partial-test.mkv'); target.write_text('partial', encoding='utf-8'); original=type(target).unlink; type(target).unlink=lambda self,*a,**k: (_ for _ in ()).throw(OSError(errno.EBUSY, 'device or resource busy')) if self==target else original(self,*a,**k); m._cleanup_partial_target(target)"`）
 - import write-path observability tests：2026-04-15，`4 passed, 40 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_pending_approval_logs_persistence_failure or record_import_approval_logs_persistence_failure or record_executed_lease_version_logs_persistence_failure or record_pending_job_logs_persistence_failure"`）
 - import event-write observability tests：2026-04-15，`1 passed, 44 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k record_event_logs_persistence_failure`）
 - get download status query-error observability tests：2026-04-15，`1 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k get_status_text_logs_query_error`）
