@@ -4,11 +4,13 @@ import asyncio
 import hashlib
 import json
 import urllib.request
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 
+import app.bot.feishu_webhook_server as feishu_webhook_server_module
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.feishu_adapter import (
     FEISHU_CHANNEL,
@@ -237,6 +239,36 @@ def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
     assert event.chat_id == "oc_feishu_chat_1"
     assert "搜索结果：dune" in reply_text
     assert "title-dune" in reply_text
+
+
+def test_feishu_webhook_handler_logs_response_write_failure(capsys) -> None:
+    handler_class = feishu_webhook_server_module._build_handler_class(
+        loop=asyncio.new_event_loop(),
+        path="/feishu/callback",
+        bot_data={},
+        reply_text_func=AsyncMock(),
+    )
+    handler = object.__new__(handler_class)
+    handler.path = "/feishu/callback"
+    handler.send_response = lambda status_code: None
+    handler.send_header = lambda name, value: None
+    handler.end_headers = lambda: None
+    handler.wfile = SimpleNamespace(write=lambda body: (_ for _ in ()).throw(BrokenPipeError("pipe closed")))
+
+    handler_class._write_json_response(
+        handler,
+        SimpleNamespace(
+            status_code=200,
+            body=b"{\"code\":0}",
+            content_type="application/json; charset=utf-8",
+        ),
+    )
+
+    output = capsys.readouterr().out
+    assert "[Feishu webhook 回包失败]" in output
+    assert "/feishu/callback" in output
+    assert "pipe closed" in output
+    assert "[处理建议]" in output
 
 
 def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_runtime(

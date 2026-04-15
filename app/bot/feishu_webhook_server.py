@@ -120,12 +120,19 @@ def _build_handler_class(
             return
 
         def _write_json_response(self, response: Any) -> None:
-            self.send_response(response.status_code)
-            self.send_header("Content-Type", response.content_type)
-            self.send_header("Content-Length", str(len(response.body)))
-            self.end_headers()
-            if response.body:
-                self.wfile.write(response.body)
+            try:
+                self.send_response(response.status_code)
+                self.send_header("Content-Type", response.content_type)
+                self.send_header("Content-Length", str(len(response.body)))
+                self.end_headers()
+                if response.body:
+                    self.wfile.write(response.body)
+            except OSError as error:
+                print(
+                    f"\033[31m[Feishu webhook 回包失败]\033[0m 路径={self.path} 原因={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查回调对端是否提前断开连接，并确认当前 webhook 回包链仍可写 socket。",
+                    flush=True,
+                )
 
     return FeishuWebhookHandler
 
