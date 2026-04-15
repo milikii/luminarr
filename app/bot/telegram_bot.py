@@ -1421,7 +1421,15 @@ def _get_raw_bt_destination_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return None
-    pending_state = pending_repo.get_pending(chat_id=chat_id)
+    try:
+        pending_state = pending_repo.get_pending(chat_id=chat_id)
+    except Exception as error:
+        _log_bt_pending_read_failed(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+            reason=str(error),
+        )
+        return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_RAW_BT_DESTINATION:
         return None
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
