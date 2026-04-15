@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import app.services.import_to_library as import_module
+import pytest
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import (
     APPROVAL_STATUS_APPROVED,
@@ -197,6 +198,33 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo, approval_repo=approval_repo)
     assert service._rebuild_confirm_context(task_ref="87", chat_id=1001).approval_record is None
     assert "[导入确认审批查询失败]" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("payload_json", "expected_summary"),
+    [
+        ("", "payload_json empty"),
+        ("{", "payload_json invalid json"),
+        ("[]", "payload_json not object"),
+    ],
+)
+def test_is_raw_bt_task_logs_payload_corruption(
+    payload_json: str,
+    expected_summary: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job = type("Job", (), {"payload_json": payload_json})()
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+
+    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is False
+
+    output = capsys.readouterr().out
+    assert "[导入 raw_bt 判定载荷损坏]" in output
+    assert "chat_id=1001" in output
+    assert "task_ref=87" in output
+    assert expected_summary in output
+    assert "[处理建议]" in output
 
 
 def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
