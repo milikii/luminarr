@@ -340,9 +340,17 @@ def _read_metadata_title(metadata_path: Path) -> str:
         )
         return ""
     if not isinstance(payload, dict):
+        _print_colored_error(
+            problem=f"读取字幕元数据失败：{metadata_path}，原因=metadata JSON 根不是对象",
+            fix="检查 metadata JSON 文件是否仍是对象结构，并确认 tmdb 字段保持对象。",
+        )
         return ""
     tmdb_block = payload.get("tmdb")
     if not isinstance(tmdb_block, dict):
+        _print_colored_error(
+            problem=f"读取字幕元数据失败：{metadata_path}，原因=tmdb 字段不是对象",
+            fix="检查 metadata JSON 里的 tmdb 字段是否仍保留对象结构，并确认 title/original_title 仍在该对象下。",
+        )
         return ""
     title = str(tmdb_block.get("title", "")).strip()
     if title:

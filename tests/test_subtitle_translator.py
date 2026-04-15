@@ -143,6 +143,32 @@ def test_read_metadata_title_logs_metadata_read_failure(
     assert "[处理建议]" in output
 
 
+def test_read_metadata_title_logs_non_object_root_payload(tmp_path: Path, capsys) -> None:
+    metadata_path = tmp_path / "movie.metadata.json"
+    metadata_path.write_text('["not-an-object"]', encoding="utf-8")
+
+    assert subtitle_module._read_metadata_title(metadata_path) == ""
+
+    output = capsys.readouterr().out
+    assert "[字幕翻译失败]" in output
+    assert "metadata JSON 根不是对象" in output
+    assert str(metadata_path) in output
+    assert "[处理建议]" in output
+
+
+def test_read_metadata_title_logs_non_object_tmdb_block(tmp_path: Path, capsys) -> None:
+    metadata_path = tmp_path / "movie.metadata.json"
+    metadata_path.write_text('{"tmdb": ["not-an-object"]}', encoding="utf-8")
+
+    assert subtitle_module._read_metadata_title(metadata_path) == ""
+
+    output = capsys.readouterr().out
+    assert "[字幕翻译失败]" in output
+    assert "tmdb 字段不是对象" in output
+    assert str(metadata_path) in output
+    assert "[处理建议]" in output
+
+
 def test_subtitle_translator_passes_proxy_to_httpx(monkeypatch) -> None:
     client_ctor = Mock()
     post = Mock(
