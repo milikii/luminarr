@@ -542,6 +542,10 @@ class ImportToLibraryService:
 
         source_path = Path(import_source.download_dir) / import_source.name
         if not source_path.exists():
+            print(
+                f"\033[31m[导入源文件缺失]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path}\n\033[33m[处理建议]\033[0m 检查下载目录是否已被清理、移动或手工删除；确认下载源仍在后再重新执行导入。",
+                flush=True,
+            )
             self._record_event(
                 task_ref=task_ref,
                 task_id=import_source.task_id,

@@ -65,6 +65,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import approval -> confirm -> hardlink import`
   - `import_to_library.cancel_pending_import()` 在 `approval_repo.cancel_import()` 抛异常时，现在也会打印红色中文 `[导入取消审批更新失败]` 日志和 `[处理建议]`，不再把审批真相更新异常静默吞成“取消直接失败”
   - `import_to_library.cancel_pending_import()` 在 `job_repo.get_latest_pending_import_job()` 查询异常时，现在也会打印红色中文 `[导入取消查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待取消导入”
+  - `import_to_library._prepare_import()` 在下载源已缺失时，现在也会打印红色中文 `[导入源文件缺失]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在也会打印红色中文 `[导入目标目录创建失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在也会打印红色中文 `[导入硬链接失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._execute_import()` 在 copy 模式失败时，现在也会打印红色中文 `[导入复制失败]` 日志和 `[处理建议]`，不再只回用户文本和事件
@@ -232,6 +233,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`private_chat_runtime` 里 frustration / confirm 两条 `job_repo` 查询失败路径现在也会打印红色中文 `[待处理任务查询失败]` / `[确认关联任务查询失败]` 和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“当前没有待处理任务 / 没匹配到确认任务”。
 - 2026-04-15 代码审查确认：`telegram_bot._record_message_update()` / `_record_callback_update()` 在写 `telegram_updates` 失败时，现在会打印红色中文 `[Telegram 更新去重落盘失败]` 和 `[处理建议]`，并 fail-closed 停止当前 update，避免 SQLite 去重真相缺失时把同一条消息继续推进到共享 runtime。
 - 2026-04-15 代码审查确认：`import_to_library.cancel_pending_import()` 在读取 `get_latest_pending_import_job()` 失败时，现在会打印红色中文 `[导入取消查询失败]` 和 `[处理建议]`，并直接失败返回，避免把 SQLite/jobs 查询异常误判成“没有待取消导入”。
+- 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在下载源已缺失时，现在会打印红色中文 `[导入源文件缺失]` 和 `[处理建议]`，不再只回用户文本和 `import.source_missing` 事件，让下载目录已被清理/移动的问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在会打印红色中文 `[导入目标目录创建失败]` 和 `[处理建议]`，不再只回用户文本和 `import.prepare_target_failed` 事件，让目录权限/路径配置问题能直接被终端日志看见。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 hardlink 非 `EXDEV` 失败时，现在会打印红色中文 `[导入硬链接失败]` 和 `[处理建议]`，不再只回用户文本和 `import.hardlink_failed` 事件，让权限/路径占用问题能直接从终端定位。
 - 2026-04-15 代码审查确认：`import_to_library._execute_import()` 在 copy 模式失败时，现在会打印红色中文 `[导入复制失败]` 和 `[处理建议]`，不再只回用户文本和 `import.copy_failed` 事件，让磁盘空间/权限问题能直接从终端定位。
@@ -360,6 +362,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import target-path lookup observability tests：2026-04-15，`1 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k find_latest_import_target_path_logs_event_lookup_failure`）
 - import cancel-path observability tests：2026-04-15，`3 passed, 37 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import_logs_job_cancel_failure or handle_expired_pending_confirm_logs_approval_cancel_failure or handle_expired_pending_confirm_logs_job_cancel_failure"`）
 - import cancel lookup observability tests：2026-04-15，`1 passed, 51 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k cancel_pending_import_logs_job_lookup_failure`）
+- import source-missing observability tests：2026-04-15，`1 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_source_missing`）
 - import target-dir create observability tests：2026-04-15，`1 passed, 52 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_dir_create_failure`）
 - import hardlink failure observability tests：2026-04-15，`1 passed, 53 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k confirm_import_logs_hardlink_failure`）
 - import copy failure observability tests：2026-04-15，`1 passed, 54 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k execute_import_logs_copy_failure`）
