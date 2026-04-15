@@ -69,6 +69,17 @@ def test_get_status_text_handles_query_error() -> None:
     assert text == STATUS_QUERY_FAILED_TEXT
 
 
+def test_get_status_text_logs_query_error(capsys) -> None:
+    service = GetDownloadStatusService(AsyncMock(side_effect=RuntimeError("boom")))
+
+    text = _run(service.get_status_text("87", chat_id=1001))
+
+    assert text == STATUS_QUERY_FAILED_TEXT
+    output = capsys.readouterr().out
+    assert "[下载状态查询失败]" in output
+    assert "task_ref=87" in output
+
+
 def test_get_status_text_handles_empty_ref() -> None:
     service = GetDownloadStatusService(AsyncMock())
     text = _run(service.get_status_text("   "))

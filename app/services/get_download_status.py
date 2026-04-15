@@ -52,7 +52,11 @@ class GetDownloadStatusService:
                 task_status = await self._get_status_func(cleaned_ref, chat_id)
             else:
                 task_status = await self._get_status_func(cleaned_ref)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载状态查询失败]\033[0m task_ref={cleaned_ref} chat_id={chat_id or '-'} 错误={error}\n\033[33m[处理建议]\033[0m 检查下载器 RPC、下载器路由和网络连通性；当前请求会返回查询失败文本，但这次状态读取没有拿到真实结果。",
+                flush=True,
+            )
             return STATUS_QUERY_FAILED_TEXT
         if task_status is None:
             return STATUS_NOT_FOUND_TEXT
