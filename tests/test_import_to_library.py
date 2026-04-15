@@ -468,9 +468,16 @@ def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
-@pytest.mark.parametrize("payload_json", ["{", "[]"])
+@pytest.mark.parametrize(
+    ("payload_json", "expected_summary"),
+    [
+        ("{", "payload_json invalid json"),
+        ("[]", "payload_json not object"),
+    ],
+)
 def test_resolve_execution_mode_logs_copy_fallback_payload_corruption(
     payload_json: str,
+    expected_summary: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
@@ -507,6 +514,7 @@ def test_resolve_execution_mode_logs_copy_fallback_payload_corruption(
     assert "[导入执行模式载荷损坏]" in output
     assert "task_id=87" in output
     assert "task_hash=hash-87" in output
+    assert expected_summary in output
     assert "[处理建议]" in output
 
 
