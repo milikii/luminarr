@@ -1349,7 +1349,11 @@ def _clear_bt_tmdb_association_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return cleared
-    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION) or cleared
+    try:
+        return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION) or cleared
+    except Exception as error:
+        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_TMDB_ASSOCIATION, reason=str(error))
+        return cleared
 
 
 def _set_raw_bt_destination_pending(
@@ -1441,7 +1445,11 @@ def _clear_raw_bt_destination_pending(
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return cleared
-    return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_RAW_BT_DESTINATION) or cleared
+    try:
+        return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_RAW_BT_DESTINATION) or cleared
+    except Exception as error:
+        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_RAW_BT_DESTINATION, reason=str(error))
+        return cleared
 
 
 def _parse_bt_classification_choice(text: str) -> str | None:

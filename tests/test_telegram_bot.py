@@ -58,10 +58,12 @@ from app.bot.telegram_bot import (
     _get_raw_bt_destination_pending,
     _clear_bt_classification_pending,
     _clear_bt_processing_path_pending,
+    _clear_bt_tmdb_association_pending,
     _is_bt_classification_pending,
     _is_bt_processing_path_pending,
     _pop_bt_classification_pending,
     _pop_bt_processing_path_pending,
+    _clear_raw_bt_destination_pending,
     _download_completion_polling_loop,
     _poll_pending_download_completion_once,
     _post_download_auto_import_scheduler_loop,
@@ -1086,6 +1088,28 @@ def test_bt_tmdb_association_pending_logs_payload_corruption_after_restart(
     assert "payload_json invalid json" in output
 
 
+def test_clear_bt_tmdb_association_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                "bt_tmdb_association_pending_by_chat": {1001: SimpleNamespace(media_kind="movie", source="magnet:?xt=urn:btih:abc")},
+            }
+        )
+    )
+
+    assert _clear_bt_tmdb_association_pending(context=context, chat_id=1001) is True
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理清理失败]" in output
+    assert "stage=tmdb_association" in output
+    assert "db down" in output
+
+
 def test_raw_bt_destination_pending_logs_payload_corruption_after_restart(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1109,6 +1133,30 @@ def test_raw_bt_destination_pending_logs_payload_corruption_after_restart(
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=raw_bt_destination" in output
     assert "payload_json invalid json" in output
+
+
+def test_clear_raw_bt_destination_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                "raw_bt_destination_pending_by_chat": {
+                    1001: SimpleNamespace(options=(), source="magnet:?xt=urn:btih:abc")
+                },
+            }
+        )
+    )
+
+    assert _clear_raw_bt_destination_pending(context=context, chat_id=1001) is True
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理清理失败]" in output
+    assert "stage=raw_bt_destination" in output
+    assert "db down" in output
 
 
 def test_handle_message_replies_service_not_ready() -> None:
