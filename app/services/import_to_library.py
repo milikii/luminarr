@@ -452,11 +452,19 @@ class ImportToLibraryService:
         if not approval_cancelled:
             return None
 
-        if not self._job_repo.cancel_pending_job(
-            job_id=pending_job.job_id,
-            expected_version=pending_job.version,
-            workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
-        ):
+        try:
+            cancelled = self._job_repo.cancel_pending_job(
+                job_id=pending_job.job_id,
+                expected_version=pending_job.version,
+                workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
+            )
+        except Exception as error:
+            print(
+                f"\033[31m[导入取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
+                flush=True,
+            )
+            return None
+        if not cancelled:
             return None
         self._clear_pending_copy_fallback(
             task_id=pending_job.task_id,
@@ -1236,17 +1244,29 @@ class ImportToLibraryService:
                     task_ref=task_ref,
                     expected_lease_version=approval_record.lease_version,
                 )
-            except Exception:
-                pass
+            except Exception as error:
+                print(
+                    f"\033[31m[导入确认超时审批取消失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} lease_version={approval_record.lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前会继续返回超时文本，但审批真相可能仍残留在 pending。",
+                    flush=True,
+                )
         if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
             try:
-                self._job_repo.cancel_pending_job(
+                cancelled = self._job_repo.cancel_pending_job(
                     job_id=context.job.job_id,
                     expected_version=context.job.version,
                     workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
                 )
-            except Exception:
-                pass
+            except Exception as error:
+                print(
+                    f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前会继续返回超时文本，但任务真相可能仍残留在待确认状态。",
+                    flush=True,
+                )
+            else:
+                if not cancelled:
+                    print(
+                        f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误=jobs.cancel_pending_job returned False\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前会继续返回超时文本，但任务真相可能仍残留在待确认状态。",
+                        flush=True,
+                    )
         self._clear_pending_copy_fallback(
             task_id=context.job.task_id,
             task_hash=context.job.task_hash,
