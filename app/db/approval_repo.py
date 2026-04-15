@@ -571,7 +571,7 @@ class ApprovalRepo:
                 (action_type, cleaned_task_id, cleaned_task_hash),
             ).fetchone()
             if row is None:
-                row = connection.execute(
+                fallback_row = connection.execute(
                     """
                     SELECT
                         action_type,
@@ -591,6 +591,8 @@ class ApprovalRepo:
                     """,
                     (action_type, cleaned_task_id),
                 ).fetchone()
+                if fallback_row is not None:
+                    raise ApprovalPersistenceError("approval task hash mismatch for query")
         if row is None:
             return None
         return _to_approval_record(row)
