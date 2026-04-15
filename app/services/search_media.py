@@ -186,7 +186,11 @@ class SearchMediaService:
             return cleared
         try:
             return self._candidate_repo.clear_candidates(chat_id) or cleared
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前进程内候选已清掉，但重启后旧候选可能仍残留。",
+                flush=True,
+            )
             return cleared
 
     def is_clarification_pending(self, chat_id: int) -> bool:

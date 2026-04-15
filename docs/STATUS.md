@@ -1,4 +1,4 @@
-# Current status (v200)
+# Current status (v201)
 
 ## Project position
 
@@ -70,6 +70,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[导入取消任务更新失败]` / `[导入确认超时任务取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“取消/超时文本回了就算任务真相也收口”
   - `import_to_library._handle_expired_pending_confirm()` 在 `approval_repo.cancel_import()` 更新失败时，现在也会打印红色中文 `[导入确认超时审批取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“超时文本回了就算审批真相也收口”
   - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`，不再静默吞掉 SQLite 删除/读取异常
+  - `search_media.clear_cached_candidates()` 在 `candidate_mapping.clear_candidates()` 删除异常时，现在也会打印红色中文 `[搜索候选清理失败]` 日志和 `[处理建议]`，不再把 SQLite 删除异常静默吞成“候选本来就清空了”
   - copy fallback、completion-monitor、post-download auto import
   - `post_download_auto_import` 最小后台 tick 已接入应用启动/停止链，完成态 `download_monitor` 不再只能靠用户手动 `status` 才推进一次
   - `download_monitor` 的待完成下载列表现在已支持限流读取，便于后续独立后台轮询按批次推进下载完成观察
@@ -272,10 +273,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - cleanup smoke remove-dead-global-symbol manual check：2026-04-15，`passed`（`tmpdir=$(mktemp -d) && cd "$tmpdir" && PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import app.bot.cleanup_smoke_logging as m; from pathlib import Path; assert not hasattr(m, '_cleanup_private_chat_smoke_log_path'); m.log_cleanup_private_chat_smoke(channel='telegram', query='cleanup inspect cleanup-shortcut', reply_text='清理预检结果：\\n任务 ID: 87', chat_id=1, user_id=2)" && test -f \"$tmpdir/logs/cleanup-private-chat-smoke.log\"`）
 - cleanup smoke remove-reset-api-shell manual check：2026-04-15，`passed`（`tmpdir=$(mktemp -d) && cd "$tmpdir" && PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import app.bot.cleanup_smoke_logging as m; from pathlib import Path; assert not hasattr(m, 'reset_cleanup_private_chat_smoke_log_file'); m.log_cleanup_private_chat_smoke(channel='telegram', query='cleanup inspect cleanup-shortcut', reply_text='清理预检结果：\\n任务 ID: 87', chat_id=1, user_id=2)" && test -f \"$tmpdir/logs/cleanup-private-chat-smoke.log\"`）
 - search media candidate-save observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import asyncio; from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'save_candidates': lambda self, chat_id, items: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: asyncio.sleep(0, result=[{'title':'Dune','year':2021,'size':1,'indexerName':'IndexerA'}]), candidate_repo=BoomRepo()); asyncio.run(service.search_and_format('dune', chat_id=1001))"`）
-- search media tests：2026-04-15，`20 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
+- search media tests：2026-04-15，`23 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
 - search media clarification-upsert observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import asyncio; from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'upsert_pending': lambda self, chat_id, query: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: asyncio.sleep(0, result=[]), clarification_repo=BoomRepo()); asyncio.run(service.search_and_format('unknown', chat_id=1001))"`）
 - search media clarification-clear observability tests：2026-04-15，`4 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or clear_clarification_pending_logs_persistence_failure"`）
 - search media clarification-load observability tests：2026-04-15，`5 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or is_clarification_pending_logs_persistence_failure"`）
+- search media candidate-clear observability tests：2026-04-15，`1 passed, 22 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k clear_cached_candidates_logs_candidate_persistence_failure`）
 - search media candidate-load observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'get_candidate': lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: None, candidate_repo=BoomRepo()); service.get_cached_candidate(1001, 1)"`）
 - channel identity fail-closed tests：2026-04-15，`1 passed, 38 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k project_channel_identity`）
 - downloader routing fail-closed tests：2026-04-15，`4 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）

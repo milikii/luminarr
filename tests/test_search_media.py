@@ -205,6 +205,16 @@ def test_is_clarification_pending_logs_persistence_failure(capsys) -> None:
     assert "[搜索澄清态读取失败]" in capsys.readouterr().out
 
 
+def test_clear_cached_candidates_logs_candidate_persistence_failure(capsys) -> None:
+    repo = type("BoomRepo", (), {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)
+    service._recent_candidates_by_chat[1001] = [{"title": "Dune"}]
+
+    assert service.clear_cached_candidates(1001) is True
+    assert 1001 not in service._recent_candidates_by_chat
+    assert "[搜索候选清理失败]" in capsys.readouterr().out
+
+
 async def _fake_search_quality_from_title(query: str) -> list[dict[str, object]]:
     assert query == "dune"
     return [
