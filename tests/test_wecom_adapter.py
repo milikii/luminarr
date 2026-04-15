@@ -4,6 +4,7 @@ import asyncio
 import base64
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -41,6 +42,7 @@ from app.bot.wecom_webhook_server import (
     start_wecom_webhook_server,
     stop_wecom_webhook_server,
 )
+import app.bot.wecom_webhook_server as wecom_webhook_server_module
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.cleanup_downloaded_source import (
@@ -179,6 +181,35 @@ def test_parse_wecom_private_text_event_reads_private_text_xml() -> None:
         agent_id="1000002",
         text="dune",
     )
+
+
+def test_wecom_webhook_handler_logs_response_write_failure(capsys) -> None:
+    handler_class = wecom_webhook_server_module._build_handler_class(
+        loop=asyncio.new_event_loop(),
+        path="/wecom/callback",
+        bot_data={},
+    )
+    handler = object.__new__(handler_class)
+    handler.path = "/wecom/callback"
+    handler.send_response = lambda status_code: None
+    handler.send_header = lambda name, value: None
+    handler.end_headers = lambda: None
+    handler.wfile = SimpleNamespace(write=lambda body: (_ for _ in ()).throw(BrokenPipeError("pipe closed")))
+
+    handler_class._write_response(
+        handler,
+        SimpleNamespace(
+            status_code=200,
+            body=b"<xml></xml>",
+            content_type="application/xml; charset=utf-8",
+        ),
+    )
+
+    output = capsys.readouterr().out
+    assert "[WeCom webhook 回包失败]" in output
+    assert "/wecom/callback" in output
+    assert "pipe closed" in output
+    assert "[处理建议]" in output
 
 
 def test_parse_wecom_private_text_event_ignores_non_text_or_missing_content() -> None:
