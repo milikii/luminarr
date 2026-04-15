@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from app.db.sqlite import SqliteDatabase
 
 
+class BtSubscriptionPersistenceError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class BtSubscriptionItem:
     item_id: int
@@ -75,7 +79,7 @@ class BtSubscriptionRepo:
             ).fetchone()
             connection.commit()
         if row is None:
-            return None
+            raise BtSubscriptionPersistenceError("bt_subscription_item missing after insert")
         return _to_bt_subscription_item(row), cursor.rowcount == 1
 
     def list_items(self, *, chat_id: int) -> list[BtSubscriptionItem]:

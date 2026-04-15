@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from app.db.bt_subscription_repo import BtSubscriptionRepo
+from app.db.bt_subscription_repo import BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.manage_bt_subscription import (
@@ -98,6 +98,24 @@ def test_manage_bt_subscription_add_returns_failure_text_when_repo_returns_none(
     captured = capsys.readouterr()
     assert "[BT 订阅写入失败]" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_manage_bt_subscription_add_logs_missing_row_after_insert(tmp_path: Path, capsys) -> None:
+    class MissingRowBtSubscriptionRepo(BtSubscriptionRepo):
+        def add_item(self, *, chat_id: int, title: str, year: str, media_kind: str):
+            raise BtSubscriptionPersistenceError("bt_subscription_item missing after insert")
+
+    database = _make_database(tmp_path)
+    repo = MissingRowBtSubscriptionRepo(database)
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_ADD_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅写入失败]" in captured.out
+    assert "bt_subscription_item missing after insert" in captured.out
 
 
 def test_manage_bt_subscription_add_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
