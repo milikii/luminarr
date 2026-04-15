@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock
 
+import app.services.subtitle_translator as subtitle_module
 import httpx
 
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslatorService
@@ -124,6 +125,22 @@ def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> No
     assert result.success is False
     assert result.skipped is False
     assert "读取字幕文件失败" in result.message
+
+
+def test_read_metadata_title_logs_metadata_read_failure(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    metadata_path = tmp_path / "movie.metadata.json"
+    metadata_path.write_text("{", encoding="utf-8")
+
+    assert subtitle_module._read_metadata_title(metadata_path) == ""
+
+    output = capsys.readouterr().out
+    assert "[字幕翻译失败]" in output
+    assert "读取字幕元数据失败" in output
+    assert str(metadata_path) in output
+    assert "[处理建议]" in output
 
 
 def test_subtitle_translator_passes_proxy_to_httpx(monkeypatch) -> None:

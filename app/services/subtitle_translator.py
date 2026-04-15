@@ -333,7 +333,11 @@ def _read_metadata_title(metadata_path: Path) -> str:
         return ""
     try:
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as error:
+        _print_colored_error(
+            problem=f"读取字幕元数据失败：{metadata_path}，原因={error}",
+            fix="检查 metadata JSON 文件是否仍可读、编码是否为 UTF-8，以及 tmdb 字段结构是否完整。",
+        )
         return ""
     if not isinstance(payload, dict):
         return ""
