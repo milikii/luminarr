@@ -27,7 +27,7 @@ class BtPendingRepo:
 
     def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
         if chat_id <= 0:
-            return
+            raise BtPendingPersistenceError("bt_pending_state chat identity missing")
         cleaned_stage = stage.strip()
         if not cleaned_stage:
             raise BtPendingPersistenceError("bt_pending_state stage missing")
@@ -55,7 +55,7 @@ class BtPendingRepo:
 
     def get_pending(self, *, chat_id: int) -> BtPendingState | None:
         if chat_id <= 0:
-            return None
+            raise BtPendingPersistenceError("bt_pending_state chat identity missing for query")
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -74,7 +74,7 @@ class BtPendingRepo:
 
     def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
         if chat_id <= 0:
-            return False
+            raise BtPendingPersistenceError("bt_pending_state chat identity missing for clear")
         with self._database.connect() as connection:
             if expected_stage is None:
                 cursor = connection.execute(

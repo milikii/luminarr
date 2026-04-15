@@ -465,6 +465,37 @@ def test_bt_pending_repo_rejects_missing_stage(tmp_path: Path) -> None:
         repo.upsert_pending(chat_id=1001, stage="   ", payload_json='{"media_kind":"movie"}')
 
 
+def test_bt_pending_repo_rejects_missing_chat_identity_for_upsert(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtPendingRepo(database)
+
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state chat identity missing"):
+        repo.upsert_pending(
+            chat_id=0,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            payload_json='{"media_kind":"movie"}',
+        )
+
+
+def test_bt_pending_repo_rejects_missing_chat_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtPendingRepo(database)
+
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state chat identity missing for query"):
+        repo.get_pending(chat_id=0)
+
+
+def test_bt_pending_repo_rejects_missing_chat_identity_for_clear(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtPendingRepo(database)
+
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state chat identity missing for clear"):
+        repo.clear_pending(chat_id=0)
+
+
 def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
