@@ -499,6 +499,37 @@ def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: 
     auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
 
 
+def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(capsys) -> None:
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=None,
+        job_event_repo=type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: []})(),
+        auto_import_func=AsyncMock(return_value="AUTO IMPORT"),
+    )
+    record = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "Dune 2024 1080p WEB-DL",
+            "chat_id": 0,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15T00:00:00+00:00",
+            "last_observed_at": "2026-04-15T00:00:00+00:00",
+            "created_at": "2026-04-15T00:00:00+00:00",
+            "updated_at": "2026-04-15T00:00:00+00:00",
+        },
+    )()
+
+    assert asyncio.run(auto_import_service.run_for_record(record)) is None
+    output = capsys.readouterr().out
+    assert "[自动导入聊天身份无效]" in output
+    assert "chat_id=0" in output
+
+
 def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) -> None:
     monitor_repo = type(
         "BoomRepo",

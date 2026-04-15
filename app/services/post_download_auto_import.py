@@ -71,7 +71,13 @@ class PostDownloadAutoImportService:
         )
 
     async def run_for_record(self, candidate: DownloadMonitorRecord) -> str | None:
-        if not candidate.is_complete or candidate.chat_id <= 0:
+        if not candidate.is_complete:
+            return None
+        if candidate.chat_id <= 0:
+            print(
+                f"\033[31m[自动导入聊天身份无效]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} chat_id={candidate.chat_id} user_id={candidate.user_id}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表里的归属聊天身份是否完整；当前不会推进自动导入，避免把坏身份任务继续送入导入审批链。",
+                flush=True,
+            )
             return None
         has_terminal_activity = self._has_terminal_activity(candidate)
         if has_terminal_activity is None:
