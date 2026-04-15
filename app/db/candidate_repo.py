@@ -11,15 +11,20 @@ class CandidatePayloadCorruptionError(ValueError):
     pass
 
 
+class CandidatePersistenceError(RuntimeError):
+    pass
+
+
 class CandidateMappingRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
 
     def save_candidates(self, chat_id: int, candidates: Sequence[Mapping[str, Any]]) -> None:
+        normalized_candidates = [_normalize_payload(candidate) for candidate in candidates]
         with self._database.connect() as connection:
             connection.execute("DELETE FROM candidate_mapping WHERE chat_id = ?", (chat_id,))
-            for index, candidate in enumerate(candidates, start=1):
-                payload = json.dumps(_normalize_payload(candidate), ensure_ascii=False)
+            for index, candidate in enumerate(normalized_candidates, start=1):
+                payload = json.dumps(candidate, ensure_ascii=False)
                 connection.execute(
                     """
                     INSERT INTO candidate_mapping (
@@ -32,6 +37,8 @@ class CandidateMappingRepo:
                     (chat_id, index, payload),
                 )
             connection.commit()
+        if self._count_candidates(chat_id=chat_id) != len(normalized_candidates):
+            raise CandidatePersistenceError("candidate_mapping count mismatch after save")
 
     def clear_candidates(self, chat_id: int) -> bool:
         with self._database.connect() as connection:
@@ -61,6 +68,16 @@ class CandidateMappingRepo:
         if not isinstance(payload, dict):
             raise CandidatePayloadCorruptionError("candidate_json not object")
         return {str(key): value for key, value in payload.items()}
+
+    def _count_candidates(self, *, chat_id: int) -> int:
+        with self._database.connect() as connection:
+            row = connection.execute(
+                "SELECT COUNT(*) AS total FROM candidate_mapping WHERE chat_id = ?",
+                (chat_id,),
+            ).fetchone()
+        if row is None:
+            return 0
+        return int(row["total"])
 
 
 def _normalize_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:

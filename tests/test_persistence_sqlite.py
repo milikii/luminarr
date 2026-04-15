@@ -25,7 +25,7 @@ from app.db.bt_pending_repo import (
     BtPendingPersistenceError,
     BtPendingRepo,
 )
-from app.db.candidate_repo import CandidateMappingRepo
+from app.db.candidate_repo import CandidateMappingRepo, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
@@ -80,6 +80,20 @@ def test_candidate_mapping_persists_for_restart(tmp_path: Path) -> None:
     assert "任务 ID: 42" in confirm_reply
     assert "任务 Hash: hash-42" in confirm_reply
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
+
+
+def test_candidate_mapping_repo_raises_when_saved_count_mismatches(tmp_path: Path) -> None:
+    class MissingCandidateRowRepo(CandidateMappingRepo):
+        def _count_candidates(self, *, chat_id: int) -> int:
+            _ = chat_id
+            return 0
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingCandidateRowRepo(database)
+
+    with pytest.raises(CandidatePersistenceError, match="candidate_mapping count mismatch after save"):
+        repo.save_candidates(1001, [{"title": "Dune"}])
 
 
 def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:

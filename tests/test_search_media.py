@@ -229,6 +229,28 @@ def test_search_clarification_pending_logs_persistence_failure(tmp_path: Path, c
     assert "clarification_state missing after upsert" in output
 
 
+def test_search_candidate_persist_logs_persistence_failure(tmp_path: Path, capsys) -> None:
+    class MissingCandidateRowRepo(CandidateMappingRepo):
+        def _count_candidates(self, *, chat_id: int) -> int:
+            _ = chat_id
+            return 0
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    service = SearchMediaService(
+        _fake_search_with_results,
+        candidate_repo=MissingCandidateRowRepo(database),
+    )
+
+    text = _run(service.search_and_format("dune", chat_id=1001))
+
+    assert "搜索结果：dune" in text
+    assert service.get_cached_candidate(1001, 1) is not None
+    output = capsys.readouterr().out
+    assert "[搜索候选持久化失败]" in output
+    assert "candidate_mapping count mismatch after save" in output
+
+
 def test_clear_clarification_pending_logs_persistence_failure(capsys) -> None:
     repo = type("BoomRepo", (), {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)
