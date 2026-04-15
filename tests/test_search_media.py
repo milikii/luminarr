@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Awaitable
 from pathlib import Path
 
+import pytest
+
 from app.clients.tmdb import TmdbMovie
 from app.db.clarification_repo import ClarificationRepo
 from app.db.sqlite import SqliteDatabase
@@ -388,6 +390,20 @@ def test_search_and_format_logs_tmdb_failure(capsys) -> None:
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune 2021")
     output = capsys.readouterr().out
     assert "[TMDB 查询失败]" in output
+    assert "query=Dune 2021" in output
+
+
+def test_search_and_format_logs_search_backend_failure(capsys) -> None:
+    async def fake_search(_: str) -> list[dict[str, object]]:
+        raise RuntimeError("indexer unavailable")
+
+    service = SearchMediaService(fake_search)
+
+    with pytest.raises(RuntimeError, match="indexer unavailable"):
+        _run(service.search_and_format("Dune 2021"))
+
+    output = capsys.readouterr().out
+    assert "[搜索源查询失败]" in output
     assert "query=Dune 2021" in output
 
 

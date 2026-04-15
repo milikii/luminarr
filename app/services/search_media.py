@@ -112,11 +112,23 @@ class SearchMediaService:
                         _build_query(tmdb_movie.original_title, resolved_year),
                     ]
                 )
-                raw_results = await _search_first_non_empty(self._search_func, ordered_queries)
+                raw_results = await _search_candidates_with_logging(
+                    search_func=self._search_func,
+                    ordered_queries=ordered_queries,
+                    user_query=cleaned_query,
+                )
             else:
-                raw_results = await self._search_func(fallback_query)
+                raw_results = await _search_candidates_with_logging(
+                    search_func=self._search_func,
+                    ordered_queries=(fallback_query,),
+                    user_query=cleaned_query,
+                )
         else:
-            raw_results = await self._search_func(fallback_query)
+            raw_results = await _search_candidates_with_logging(
+                search_func=self._search_func,
+                ordered_queries=(fallback_query,),
+                user_query=cleaned_query,
+            )
 
         ambiguous_text = _format_ambiguous_clarification(
             query=cleaned_query,
@@ -510,6 +522,23 @@ async def _search_first_non_empty(search_func: SearchFunc, ordered_queries: Sequ
         if raw_results:
             return raw_results
     return ()
+
+
+async def _search_candidates_with_logging(
+    *,
+    search_func: SearchFunc,
+    ordered_queries: Sequence[str],
+    user_query: str,
+) -> Sequence[Mapping[str, Any]]:
+    try:
+        return await _search_first_non_empty(search_func, ordered_queries)
+    except Exception as error:
+        query_display = " | ".join(query for query in ordered_queries if query.strip()) or user_query
+        print(
+            f"\033[31m[搜索源查询失败]\033[0m query={user_query} ordered_queries={query_display} 错误={error}\n\033[33m[处理建议]\033[0m 检查 Prowlarr/BT 来源、代理和网络连通性；当前搜索未拿到结果，且这不是正常的“无候选”状态。",
+            flush=True,
+        )
+        raise
 
 
 def _unique_queries(candidates: Sequence[str]) -> list[str]:
