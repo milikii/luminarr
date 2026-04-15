@@ -1166,7 +1166,15 @@ def _is_bt_processing_path_pending(
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
         return False
-    pending_by_chat[chat_id] = str(payload.get("source", "")).strip()
+    pending_source = str(payload.get("source", "")).strip()
+    if not pending_source:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.source missing",
+        )
+        return False
+    pending_by_chat[chat_id] = pending_source
     return True
 
 
@@ -1231,11 +1239,19 @@ def _pop_bt_processing_path_pending(
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
         return None
+    pending_source = str(payload.get("source", "")).strip()
+    if not pending_source:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.source missing",
+        )
+        return None
     try:
         pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
     except Exception as error:
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
-    return str(payload.get("source", "")).strip() or None
+    return pending_source
 
 
 def _set_bt_classification_pending(
