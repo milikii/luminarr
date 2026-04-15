@@ -23,11 +23,13 @@ from app.services.import_to_library import (
     ConfirmExecutionContext,
     CONFIRM_QUERY_USAGE_TEXT,
     IMPORT_COPY_APPROVAL_PENDING_TEXT,
+    IMPORT_COPY_FAILED_TEXT,
     IMPORT_CONFIRM_EXPIRED_TEXT,
     IMPORT_CONFIRM_NOT_PENDING_TEXT,
     IMPORT_HARDLINK_FAILED_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
+    PreparedImport,
     IMPORT_REFRESH_FAILED_TEXT,
     IMPORT_SOURCE_MISSING_TEXT,
     ImportToLibraryService,
@@ -836,6 +838,53 @@ def test_confirm_import_logs_hardlink_failure(tmp_path: Path, monkeypatch, capsy
     assert "[导入硬链接失败]" in output
     assert "task_id=87" in output
     assert "permission denied" in output
+    assert "[处理建议]" in output
+
+
+def test_execute_import_logs_copy_failure(tmp_path: Path, monkeypatch, capsys) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_path = tmp_path / "library" / "Dune (2021).mkv"
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    prepared = PreparedImport(
+        import_source=import_source,
+        source_path=source_file,
+        target_path=target_path,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+    )
+
+    def _raise_copy_failure(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.ENOSPC, "no space left on device")
+
+    monkeypatch.setattr(import_module.shutil, "copy2", _raise_copy_failure)
+
+    result = _run(
+        service._execute_import(
+            "87",
+            prepared,
+            execution_mode=import_module.IMPORT_EXECUTION_MODE_COPY,
+        )
+    )
+
+    assert result.reply == IMPORT_COPY_FAILED_TEXT.format(reason="[Errno 28] no space left on device")
+    assert result.imported is False
+    output = capsys.readouterr().out
+    assert "[导入复制失败]" in output
+    assert "task_id=87" in output
+    assert "no space left on device" in output
     assert "[处理建议]" in output
 
 
