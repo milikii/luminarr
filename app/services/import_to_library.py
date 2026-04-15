@@ -1054,7 +1054,11 @@ class ImportToLibraryService:
             return None
         try:
             job = self._job_repo.get_import_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会按“没有待确认导入”继续处理，但实际待确认上下文可能未能重建。",
+                flush=True,
+            )
             return None
         if job is None:
             return None
@@ -1066,7 +1070,11 @@ class ImportToLibraryService:
                     task_id=job.task_id,
                     task_hash=job.task_hash,
                 )
-            except Exception:
+            except Exception as error:
+                print(
+                    f"\033[31m[导入确认审批查询失败]\033[0m task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 上下文会继续返回，但审批状态可能缺失。",
+                    flush=True,
+                )
                 approval_record = None
         return ConfirmExecutionContext(job=job, approval_record=approval_record)
 
@@ -1080,7 +1088,11 @@ class ImportToLibraryService:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 更新是否正常；当前 confirm 会按未持有执行权处理，但这次失败也可能不是业务真的冲突。",
+                flush=True,
+            )
             return False
 
     def _restore_pending_job(
@@ -1099,7 +1111,11 @@ class ImportToLibraryService:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
+                flush=True,
+            )
             return
 
     def _mark_completed_job(
@@ -1118,7 +1134,11 @@ class ImportToLibraryService:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[导入确认任务完结失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前导入结果已返回，但任务真相可能仍停留在待确认或执行中。",
+                flush=True,
+            )
             return
 
     def _build_job_lease_owner(self, task_ref: str) -> str:

@@ -16,7 +16,7 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_CANCELLED, JobRepo
+from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     CONFIRM_QUERY_USAGE_TEXT,
@@ -169,6 +169,76 @@ def test_confirm_import_by_task_ref_usage_when_empty() -> None:
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
     text = _run(service.confirm_import_by_task_ref("  "))
     assert text == CONFIRM_QUERY_USAGE_TEXT
+
+
+def test_rebuild_confirm_context_logs_job_lookup_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    assert service._rebuild_confirm_context(task_ref="87", chat_id=1001) is None
+    assert "[导入确认上下文查询失败]" in capsys.readouterr().out
+
+
+def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
+    job = type(
+        "Job",
+        (),
+        {
+            "job_id": "job-1",
+            "task_ref": "87",
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "version": 3,
+            "state": "pending_approval",
+        },
+    )()
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo, approval_repo=approval_repo)
+    assert service._rebuild_confirm_context(task_ref="87", chat_id=1001).approval_record is None
+    assert "[导入确认审批查询失败]" in capsys.readouterr().out
+
+
+def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    assert service._claim_pending_job(job=job, lease_owner="import_confirm:87") is False
+    output = capsys.readouterr().out
+    assert "[导入确认任务抢占失败]" in output
+    assert "job_id=job-1" in output
+
+
+def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    service._restore_pending_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87")
+    output = capsys.readouterr().out
+    assert "[导入确认任务回退失败]" in output
+    assert "job_id=job-1" in output
+
+
+def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
+    job_repo = type("JobRepo", (), {"mark_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    service._mark_completed_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87")
+    output = capsys.readouterr().out
+    assert "[导入确认任务完结失败]" in output
+    assert "job_id=job-1" in output
 
 
 def test_confirm_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:
