@@ -442,7 +442,11 @@ class ImportToLibraryService:
                     task_ref=pending_job.task_ref,
                     expected_lease_version=expected_lease_version,
                 )
-            except Exception:
+            except Exception as error:
+                print(
+                    f"\033[31m[导入取消审批更新失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认导入状态可能仍残留。",
+                    flush=True,
+                )
                 approval_cancelled = False
 
         if not approval_cancelled:
