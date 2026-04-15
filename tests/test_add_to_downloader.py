@@ -79,6 +79,13 @@ def test_confirm_add_by_task_ref_without_pending_request_returns_not_pending() -
     assert reply == ADD_CONFIRM_NOT_PENDING_TEXT
 
 
+def test_has_pending_add_logs_job_lookup_failure(capsys) -> None:
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    assert service.has_pending_add(1001, "1") is False
+    assert "[下载待确认查询失败]" in capsys.readouterr().out
+
+
 def test_add_by_selection_without_cached_candidates() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     add_torrent = AsyncMock()

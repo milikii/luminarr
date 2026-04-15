@@ -37,6 +37,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 状态查询和导入源查询在 `downloader_name` 指向不存在实例时现在也会 fail-closed 返回 `None`，不再静默回退默认 Transmission
   - 下载器名 lookup 在 task/job 未命中或 payload 缺 `downloader_name` 时，现在也会打印红色中文 `[下载器路由未命中]` 日志和 `[处理建议]`
   - 下载器名 lookup 在 `downloader_name` 指向不存在实例时，现在也会打印红色中文 `[下载器实例不存在]` 日志和 `[处理建议]`
+  - `add_to_downloader.has_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载待确认查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
   - `channel_identity` 空输入现在也会打印红色中文 `[渠道身份缺失]` 日志和 `[处理建议]`
   - cleanup service 未注入时，`cleanup` / `cleanup inspect` 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=cleanup/cleanup_inspect`、`查询=` 和 `[处理建议]` 修复提示
 - 媒体主链：
@@ -176,7 +177,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 2026-04-14 代码审查确认：`shared private-chat runtime` 仍通过 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py) 伪造 Telegram `context` 去调用 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py)；这不是抽象味道问题，而是当前真实结构债，因为 `微信登录` 分支已经会读取 `context.application.bot`。
-- 2026-04-15 代码审查确认：`search_media` 里搜索候选持久化失败、澄清态 `upsert_pending()` / `clear_pending()` / `get_pending_query()` 失败、以及候选读取 `get_candidate()` 失败都已补红色中文日志和 `[处理建议]`，不再静默吞掉 `candidate_repo.save_candidates()` / `clarification_repo.upsert_pending()` / `clarification_repo.clear_pending()` / `clarification_repo.get_pending_query()` / `candidate_repo.get_candidate()` 异常；当前剩余风险收口为“其他持久化路径仍有 `except Exception: pass/return None` 会把‘真没数据’和‘SQLite/配置异常’混写”。
+- 2026-04-15 代码审查确认：`search_media` 里搜索候选持久化失败、澄清态 `upsert_pending()` / `clear_pending()` / `get_pending_query()` 失败、以及候选读取 `get_candidate()` 失败都已补红色中文日志和 `[处理建议]`；`add_to_downloader.has_pending_add()` 里的 `job_repo.get_downloader_job_for_chat_ref()` 查询失败也已补红色中文日志和 `[处理建议]`，不再静默吞掉 `candidate_repo.save_candidates()` / `clarification_repo.upsert_pending()` / `clarification_repo.clear_pending()` / `clarification_repo.get_pending_query()` / `candidate_repo.get_candidate()` / `job_repo.get_downloader_job_for_chat_ref()` 异常；当前剩余风险收口为“其他持久化路径仍有 `except Exception: pass/return None` 会把‘真没数据’和‘SQLite/配置异常’混写”。
 - 2026-04-15 代码审查确认：`cleanup_smoke_logging` 去模块级全局状态已收口：追加链不再读取全局状态，configure helper 成功/失败态不再写状态，reset helper 和死变量也已删除；后续只保留 `tests/test_cleanup_smoke_logging.py` 回归门禁，不再把这条风险作为独立施工项。
 - 2026-04-14 代码审查确认：Feishu 长连接当前仍直接依赖 `lark_oapi` 私有 API 和模块级变量 patch；版本升级前必须重新验证 `_auto_reconnect`、`_disconnect()`、`_cache._cron` 与 `lark_oapi.ws.client.loop` 这几处内部实现。
 - 2026-04-14 代码审查确认：`get_download_status` 当前会写 `download_monitor`、补 `downloader.completed_observed`，并可能接到 auto-import，所以它不是只读动作；不要把它误放进 `READ_ONLY_ACTIONS`。
@@ -247,6 +248,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - search media candidate-load observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'get_candidate': lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: None, candidate_repo=BoomRepo()); service.get_cached_candidate(1001, 1)"`）
 - channel identity fail-closed tests：2026-04-15，`1 passed, 38 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k project_channel_identity`）
 - downloader routing fail-closed tests：2026-04-15，`4 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）
+- add to downloader pending-query observability tests：2026-04-15，`4 passed, 7 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or test_has_pending_add_logs_job_lookup_failure"`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - search media compile check：2026-04-15，`passed`（`python3 -m compileall app/services/search_media.py tests/test_search_media.py`）
 - docs consistency check：2026-04-14，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）

@@ -397,7 +397,11 @@ class AddToDownloaderService:
         if self._job_repo is not None:
             try:
                 job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=cleaned_ref)
-            except Exception:
+            except Exception as error:
+                print(
+                    f"\033[31m[下载待确认查询失败]\033[0m chat_id={chat_id} task_ref={cleaned_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前请求会按“无待确认下载”继续处理，但实际待确认状态可能被误判。",
+                    flush=True,
+                )
                 job = None
             if job is not None and job.state == JOB_STATE_PENDING_APPROVAL:
                 return True
