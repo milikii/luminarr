@@ -705,6 +705,10 @@ class AddToDownloaderService:
 
         pending_add = _pending_add_from_json(job.payload_json)
         if pending_add is None:
+            print(
+                f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前 confirm 会按“没有待确认下载”继续处理，但这可能是持久化状态损坏。",
+                flush=True,
+            )
             return None
 
         approval_record: ApprovalRecord | None = None

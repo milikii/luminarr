@@ -111,6 +111,18 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     assert "[下载确认审批查询失败]" in capsys.readouterr().out
 
 
+def test_rebuild_confirm_context_logs_payload_corruption(capsys) -> None:
+    job = type("Job", (), {"payload_json": "{}", "task_id": "selection:1", "task_hash": "abc123"})()
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+
+    assert service._rebuild_confirm_context(task_ref="1", chat_id=1001) is None
+
+    output = capsys.readouterr().out
+    assert "[下载确认上下文载荷损坏]" in output
+    assert "task_hash=abc123" in output
+
+
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
