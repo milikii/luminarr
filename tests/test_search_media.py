@@ -207,6 +207,28 @@ def test_search_success_clears_persisted_clarification_pending(tmp_path: Path) -
     assert not verify_service.is_clarification_pending(1001)
 
 
+def test_search_clarification_pending_logs_persistence_failure(tmp_path: Path, capsys) -> None:
+    class MissingRowClarificationRepo(ClarificationRepo):
+        def get_pending_query(self, *, chat_id: int) -> str | None:
+            _ = chat_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    service = SearchMediaService(
+        _fake_search_ambiguous,
+        clarification_repo=MissingRowClarificationRepo(database),
+    )
+
+    text = _run(service.search_and_format("Dune", chat_id=1001))
+
+    assert "片名可能有多个版本：Dune" in text
+    assert service.is_clarification_pending(1001)
+    output = capsys.readouterr().out
+    assert "[搜索澄清态持久化失败]" in output
+    assert "clarification_state missing after upsert" in output
+
+
 def test_clear_clarification_pending_logs_persistence_failure(capsys) -> None:
     repo = type("BoomRepo", (), {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)

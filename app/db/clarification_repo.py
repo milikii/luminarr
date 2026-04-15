@@ -3,6 +3,10 @@ from __future__ import annotations
 from app.db.sqlite import SqliteDatabase
 
 
+class ClarificationPersistenceError(RuntimeError):
+    pass
+
+
 class ClarificationRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -26,6 +30,9 @@ class ClarificationRepo:
                 (chat_id, cleaned_query),
             )
             connection.commit()
+        persisted_query = self.get_pending_query(chat_id=chat_id)
+        if persisted_query is None:
+            raise ClarificationPersistenceError("clarification_state missing after upsert")
 
     def get_pending_query(self, *, chat_id: int) -> str | None:
         if chat_id <= 0:

@@ -1,4 +1,4 @@
-# Current status (v224)
+# Current status (v225)
 
 ## Project position
 
@@ -248,6 +248,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`telegram_update_repo.record_message_update()` / `record_callback_update()` 遇到 `update_id<=0` 或空 `callback_query_id` 时，现在会显式抛出 `TelegramUpdatePersistenceError`，Telegram handler 会继续打印红色中文 `[Telegram 更新去重落盘失败]` 和 `[处理建议]` 并 fail-closed 停路，不再把坏去重 identity 伪装成“已成功落盘”的重复 update。
 - 2026-04-15 代码审查确认：`download_monitor_repo.register_download()` 遇到空 `task_id/task_hash` 时，现在会显式抛出 `DownloadMonitorPersistenceError`，`add_to_downloader` 会继续复用现有红色中文 `[下载监控登记失败]` 和 `[处理建议]`，不再把坏下载任务身份静默吞成“已登记成功但后续状态跟踪不会推进”。
 - 2026-04-15 代码审查确认：`bt_pending_repo.upsert_pending()` 在 `bt_pending_state` 写入成功后如果回读不到刚写入的阶段真相，现在会显式抛出 `bt_pending_state missing after upsert`；Telegram BT 多步问询入口会继续复用现有红色中文 `[BT 待处理持久化失败]` 和 `[处理建议]`，不再把这类待处理真相缺口静默吞成“进程内有状态、SQLite 里却没记录”。
+- 2026-04-15 代码审查确认：`clarification_repo.upsert_pending()` 在 `clarification_state` 写入成功后如果回读不到刚写入的 query，现在会显式抛出 `clarification_state missing after upsert`；`search_media` 会继续复用现有红色中文 `[搜索澄清态持久化失败]` 和 `[处理建议]`，不再把这类澄清真相缺口静默吞成“当前轮有澄清提示、重启后却找不到待澄清状态”。
 - 2026-04-15 代码审查确认：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 删除失败时，现在会恢复当前进程内候选并返回 `False`，Telegram 私聊入口也不会再回 `已清除当前候选，请重新搜索。`，避免把 SQLite/候选表删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：`search_media.clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 删除失败时，现在会恢复当前进程内待澄清状态并返回 `False`；Telegram 私聊入口也不会再回 `已重置当前澄清，请重新描述。` 之类的重置文本，避免把 SQLite/clarification 删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：frustration/reset 入口在候选清理失败时，现在会直接结束这次“算了/取消”处理，不再把这类 frustration 文本继续当普通搜索请求往下走，避免候选表删除失败后又返回一条和用户意图无关的搜索结果。

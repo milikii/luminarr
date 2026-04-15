@@ -26,7 +26,7 @@ from app.db.bt_pending_repo import (
     BtPendingRepo,
 )
 from app.db.candidate_repo import CandidateMappingRepo
-from app.db.clarification_repo import ClarificationRepo
+from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import (
@@ -283,6 +283,20 @@ def test_clarification_repo_persists_for_restart(tmp_path: Path) -> None:
 
     verify_repo = ClarificationRepo(SqliteDatabase(str(db_path)))
     assert verify_repo.get_pending_query(chat_id=1001) is None
+
+
+def test_clarification_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
+    class MissingRowClarificationRepo(ClarificationRepo):
+        def get_pending_query(self, *, chat_id: int) -> str | None:
+            _ = chat_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowClarificationRepo(database)
+
+    with pytest.raises(ClarificationPersistenceError, match="clarification_state missing after upsert"):
+        repo.upsert_pending(chat_id=1001, query="Dune")
 
 
 def test_bt_pending_repo_persists_for_restart(tmp_path: Path) -> None:
