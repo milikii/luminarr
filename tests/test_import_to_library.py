@@ -436,6 +436,40 @@ def test_prepare_import_logs_source_missing(
     assert "[处理建议]" in output
 
 
+def test_prepare_import_logs_target_exists(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_path = target_dir / "Dune (2021).mkv"
+    target_path.write_bytes(b"existing")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(AsyncMock(return_value=import_source), str(target_dir))
+
+    prepared, message = _run(service._prepare_import("87"))
+
+    assert prepared is None
+    assert message == f"目标已存在，已拒绝覆盖：{target_path}"
+    output = capsys.readouterr().out
+    assert "[导入目标已存在]" in output
+    assert "task_id=87" in output
+    assert str(target_path) in output
+    assert "[处理建议]" in output
+
+
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

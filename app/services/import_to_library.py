@@ -585,6 +585,10 @@ class ImportToLibraryService:
         target_path = target_root / normalized_target_name
         if target_path.exists():
             message = IMPORT_TARGET_EXISTS_TEXT.format(target_path=str(target_path))
+            print(
+                f"\033[31m[导入目标已存在]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_path}\n\033[33m[处理建议]\033[0m 检查库目录里是否已有同名文件或目录；若这是历史残留，请先确认是否可复用或手动清理后再重试导入。",
+                flush=True,
+            )
             self._record_event(
                 task_ref=task_ref,
                 task_id=import_source.task_id,
