@@ -54,7 +54,7 @@ class CandidateMappingRepo:
         if chat_id <= 0:
             raise CandidatePersistenceError("candidate_mapping chat identity missing for query")
         if selection_index < 1:
-            return None
+            raise CandidatePersistenceError("candidate selection index invalid")
         with self._database.connect() as connection:
             row = connection.execute(
                 """

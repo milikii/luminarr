@@ -116,6 +116,15 @@ def test_candidate_mapping_repo_rejects_missing_chat_identity_for_query(tmp_path
         repo.get_candidate(0, 1)
 
 
+def test_candidate_mapping_repo_rejects_invalid_selection_index(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = CandidateMappingRepo(database)
+
+    with pytest.raises(CandidatePersistenceError, match="candidate selection index invalid"):
+        repo.get_candidate(1001, 0)
+
+
 def test_candidate_mapping_repo_rejects_missing_chat_identity_for_clear(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
