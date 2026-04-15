@@ -581,7 +581,11 @@ class AddToDownloaderService:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
+                flush=True,
+            )
             return
 
     def _cancel_pending_approval(
@@ -806,7 +810,11 @@ class AddToDownloaderService:
 
         try:
             approval_record = self._approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前会退回进程内版号判断，但持久化真相可能已经变化。",
+                flush=True,
+            )
             if identity not in self._pending_add_identities:
                 return 0
             return self._pending_add_lease_versions.get(identity, 1)
@@ -823,7 +831,11 @@ class AddToDownloaderService:
             return None
         try:
             approval_record = self._approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会继续按普通 not pending 处理，但可能丢失“已执行”的明确拒绝文本。",
+                flush=True,
+            )
             return None
         if approval_record is None:
             return None
@@ -889,7 +901,11 @@ class AddToDownloaderService:
                 task_hash=task_hash,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前会按“未过期”继续处理，但这可能掩盖真实超时。",
+                flush=True,
+            )
             return False
 
     def _record_event(
