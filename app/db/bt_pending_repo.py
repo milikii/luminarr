@@ -29,6 +29,8 @@ class BtPendingRepo:
         if chat_id <= 0:
             return
         cleaned_stage = stage.strip()
+        if not cleaned_stage:
+            raise BtPendingPersistenceError("bt_pending_state stage missing")
         cleaned_payload = payload_json.strip()
         with self._database.connect() as connection:
             connection.execute(

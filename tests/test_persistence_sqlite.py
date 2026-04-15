@@ -409,6 +409,15 @@ def test_bt_pending_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
         )
 
 
+def test_bt_pending_repo_rejects_missing_stage(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtPendingRepo(database)
+
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state stage missing"):
+        repo.upsert_pending(chat_id=1001, stage="   ", payload_json='{"media_kind":"movie"}')
+
+
 def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
