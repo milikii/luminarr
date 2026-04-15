@@ -165,7 +165,9 @@ class BtSubscriptionRepo:
                 (cleaned_source, cleaned_title, chat_id, item_id),
             )
             connection.commit()
-        return cursor.rowcount == 1
+        if cursor.rowcount == 1:
+            return True
+        raise BtSubscriptionPersistenceError("bt_subscription_item missing during last_seen update")
 
 
 def _to_bt_subscription_item(row: Mapping[str, object]) -> BtSubscriptionItem:
