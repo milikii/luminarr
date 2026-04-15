@@ -298,14 +298,10 @@ class JobRepo:
         cleaned_owner = lease_owner.strip()
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if (
-            not cleaned_job_id
-            or not cleaned_owner
-            or not cleaned_task_id
-            or not cleaned_task_hash
-            or expected_version <= 0
-        ):
-            return False
+        if not cleaned_job_id or not cleaned_owner or not cleaned_task_id or not cleaned_task_hash:
+            raise JobPersistenceError("downloader completed job identity missing")
+        if expected_version <= 0:
+            raise JobPersistenceError("downloader completed job expected version missing")
 
         with self._database.connect() as connection:
             cursor = connection.execute(
@@ -562,14 +558,10 @@ class JobRepo:
         cleaned_owner = lease_owner.strip()
         cleaned_workflow = workflow_type.strip()
         cleaned_state = next_state.strip()
-        if (
-            not cleaned_job_id
-            or not cleaned_owner
-            or not cleaned_workflow
-            or not cleaned_state
-            or expected_version <= 0
-        ):
-            return False
+        if not cleaned_job_id or not cleaned_owner or not cleaned_workflow or not cleaned_state:
+            raise JobPersistenceError("job state transition identity missing")
+        if expected_version <= 0:
+            raise JobPersistenceError("job state transition expected version missing")
 
         version_sql = "version + 1" if bump_version else "version"
         with self._database.connect() as connection:
