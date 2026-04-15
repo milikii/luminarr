@@ -271,6 +271,28 @@ def test_feishu_webhook_handler_logs_response_write_failure(capsys) -> None:
     assert "[处理建议]" in output
 
 
+def test_start_feishu_webhook_server_logs_bind_failure(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        feishu_webhook_server_module,
+        "HTTPServer",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("address already in use")),
+    )
+
+    with pytest.raises(OSError):
+        feishu_webhook_server_module.start_feishu_webhook_server(
+            loop=asyncio.new_event_loop(),
+            config=FeishuWebhookServerConfig(host="127.0.0.1", port=18888, path="/feishu/callback"),
+            bot_data={},
+            reply_text_func=AsyncMock(),
+        )
+
+    output = capsys.readouterr().out
+    assert "[Feishu webhook 启动失败]" in output
+    assert "127.0.0.1:18888/feishu/callback" in output
+    assert "address already in use" in output
+    assert "[处理建议]" in output
+
+
 def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_runtime(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
