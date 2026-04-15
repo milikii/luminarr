@@ -182,7 +182,7 @@ class DownloadMonitorRepo:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
-            return None
+            raise DownloadMonitorPersistenceError("download monitor task identity missing for query")
         return self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
 
     def list_pending_completion(self, *, limit: int = 100) -> list[DownloadMonitorRecord]:

@@ -250,6 +250,18 @@ def test_download_monitor_repo_rejects_missing_identity_for_status_record(tmp_pa
         )
 
 
+def test_download_monitor_repo_rejects_missing_identity_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing for query"):
+        repo.get_record(task_id="", task_hash="hash-42")
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing for query"):
+        repo.get_record(task_id="42", task_hash="")
+
+
 def test_download_monitor_repo_raises_when_status_row_missing_after_upsert(tmp_path: Path) -> None:
     class MissingRowDownloadMonitorRepo(DownloadMonitorRepo):
         def _get_record_by_identity(self, *, task_id: str, task_hash: str):
