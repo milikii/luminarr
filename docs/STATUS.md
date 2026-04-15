@@ -1,4 +1,4 @@
-# Current status (v209)
+# Current status (v210)
 
 ## Project position
 
@@ -312,6 +312,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
+- cold-start consistency audit：`git log --oneline -20` 与 `docs/STATUS.md` 当前快照一致；最近 20 个提交未发现状态页漂移（2026-04-15，`git log --oneline -20`）
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-14，`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
