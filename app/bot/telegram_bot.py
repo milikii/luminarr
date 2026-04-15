@@ -1590,6 +1590,13 @@ def _get_raw_bt_destination_pending(
         return None
     raw_options = payload.get("options")
     source = str(payload.get("source", "")).strip()
+    if not source:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.source missing",
+        )
+        return None
     if not isinstance(raw_options, list):
         _log_bt_pending_payload_corruption(
             chat_id=chat_id,

@@ -1469,6 +1469,31 @@ def test_raw_bt_destination_pending_logs_options_structure_corruption_after_rest
     assert "payload.options missing or not list" in output
 
 
+def test_raw_bt_destination_pending_logs_missing_source_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+        payload_json='{"options":[{"key":"downloads","label":"下载目录","target_dir":"/downloads/raw"}]}',
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=raw_bt_destination" in output
+    assert "payload.source missing" in output
+
+
 def test_raw_bt_destination_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):
