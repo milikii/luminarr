@@ -6,6 +6,8 @@ import errno
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import pytest
+
 import app.services.import_to_library as import_module
 from app.clients.transmission import TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
 from app.db.approval_repo import (
@@ -25,7 +27,13 @@ from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_COMPLETED, JOB_STATE_PENDING_APPROVAL, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.db.job_repo import (
+    JOB_STATE_COMPLETED,
+    JOB_STATE_PENDING_APPROVAL,
+    JobPersistenceError,
+    JobRepo,
+    WORKFLOW_ADD_TO_DOWNLOADER,
+)
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.services.add_to_downloader import (
@@ -311,6 +319,37 @@ def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None
     assert restarted_job.version == 2
     assert restarted_job.lease_owner == "test-owner"
     assert restarted_job.lease_until
+
+
+def test_job_repo_raises_when_pending_upsert_row_missing(tmp_path: Path) -> None:
+    class MissingRowJobRepo(JobRepo):
+        def _select_one(self, query: str, params: tuple[object, ...]):
+            if "FROM jobs" in query and "WHERE job_id = ?" in query:
+                return None
+            return super()._select_one(query, params)
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowJobRepo(database)
+
+    with pytest.raises(JobPersistenceError, match="job missing after pending upsert"):
+        repo.upsert_import_job_pending(
+            chat_id=1001,
+            user_id=2001,
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+        )
+
+    with pytest.raises(JobPersistenceError, match="job missing after pending upsert"):
+        repo.upsert_downloader_job_pending(
+            chat_id=1001,
+            user_id=2001,
+            task_ref="88",
+            task_id="88",
+            task_hash="hash-88",
+            payload_json='{"source":"https://example.com/demo.torrent"}',
+        )
 
 
 def test_import_persists_minimal_events(tmp_path: Path) -> None:

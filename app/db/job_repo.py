@@ -32,6 +32,10 @@ class JobRecord:
     updated_at: str
 
 
+class JobPersistenceError(RuntimeError):
+    pass
+
+
 class JobRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -434,33 +438,33 @@ class JobRepo:
                     payload_json.strip(),
                 ),
             )
-            row = connection.execute(
-                """
-                SELECT
-                    job_id,
-                    chat_id,
-                    user_id,
-                    workflow_type,
-                    state,
-                    task_ref,
-                    task_id,
-                    task_hash,
-                    payload_json,
-                    version,
-                    lease_owner,
-                    lease_until,
-                    created_at,
-                    updated_at
-                FROM jobs
-                WHERE job_id = ?
-                LIMIT 1
-                """,
-                (job_id,),
-            ).fetchone()
             connection.commit()
-        if row is None:
-            return None
-        return _to_job_record(row)
+        job = self._select_one(
+            """
+            SELECT
+                job_id,
+                chat_id,
+                user_id,
+                workflow_type,
+                state,
+                task_ref,
+                task_id,
+                task_hash,
+                payload_json,
+                version,
+                lease_owner,
+                lease_until,
+                created_at,
+                updated_at
+            FROM jobs
+            WHERE job_id = ?
+            LIMIT 1
+            """,
+            (job_id,),
+        )
+        if job is None:
+            raise JobPersistenceError("job missing after pending upsert")
+        return job
 
     def _get_job_for_chat_ref(
         self,
