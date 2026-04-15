@@ -1,4 +1,4 @@
-# Current status (v220)
+# Current status (v221)
 
 ## Project position
 
@@ -244,6 +244,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`bt_subscription_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `bt_subscription_item missing after insert`，并由 `manage_bt_subscription` 继续打印红色中文 `[BT 订阅写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.update_last_seen()` 在回写最近资源真相时如果条目已不存在，现在会显式抛出 `bt_subscription_item missing during last_seen update`，并由 `manage_bt_subscription` 继续打印红色中文 `[BT 订阅最近资源回写失败]` 和 `[处理建议]`，不再把这类持久化缺失和普通 `returned False` 混成同一个模糊原因。
 - 2026-04-15 代码审查确认：`job_repo._upsert_job_pending()` 在 `jobs` 待确认任务写入成功后如果回读不到刚写入的记录，现在会显式抛出 `job missing after pending upsert`；`add_to_downloader` / `import_to_library` 会继续复用现有红色中文 `[下载待确认任务落盘失败]` / `[导入待确认任务落盘失败]` 和 `[处理建议]`，不再把这类持久化真相缺口静默吞成“待确认文本已返回但 SQLite 里其实没记录”。
+- 2026-04-15 代码审查确认：`approval_repo._request_approval()` 在 `approval_record` 待确认审批写入成功后如果回读不到 `lease_version`，现在会显式抛出 `approval_record missing after pending request`；`add_to_downloader` / `import_to_library` 会继续复用现有红色中文 `[下载待确认审批落盘失败]` / `[导入待确认审批落盘失败]` 和 `[处理建议]`，不再把这类审批真相缺口静默折叠成“退回进程内 lease 继续跑”。
 - 2026-04-15 代码审查确认：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 删除失败时，现在会恢复当前进程内候选并返回 `False`，Telegram 私聊入口也不会再回 `已清除当前候选，请重新搜索。`，避免把 SQLite/候选表删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：`search_media.clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 删除失败时，现在会恢复当前进程内待澄清状态并返回 `False`；Telegram 私聊入口也不会再回 `已重置当前澄清，请重新描述。` 之类的重置文本，避免把 SQLite/clarification 删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：frustration/reset 入口在候选清理失败时，现在会直接结束这次“算了/取消”处理，不再把这类 frustration 文本继续当普通搜索请求往下走，避免候选表删除失败后又返回一条和用户意图无关的搜索结果。

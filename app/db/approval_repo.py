@@ -28,6 +28,10 @@ class ApprovalRecord:
     updated_at: str
 
 
+class ApprovalPersistenceError(RuntimeError):
+    pass
+
+
 class ApprovalRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -346,19 +350,15 @@ class ApprovalRepo:
                     task_ref.strip(),
                 ),
             )
-            row = connection.execute(
-                """
-                SELECT lease_version
-                FROM approval_record
-                WHERE action_type = ? AND task_id = ? AND task_hash = ?
-                LIMIT 1
-                """,
-                (action_type, cleaned_task_id, cleaned_task_hash),
-            ).fetchone()
             connection.commit()
-        if row is None:
-            return 0
-        return int(row["lease_version"])
+        lease_version = self._get_requested_lease_version(
+            action_type=action_type,
+            task_id=cleaned_task_id,
+            task_hash=cleaned_task_hash,
+        )
+        if lease_version is None:
+            raise ApprovalPersistenceError("approval_record missing after pending request")
+        return lease_version
 
     def _approve(
         self,
@@ -613,6 +613,27 @@ class ApprovalRepo:
                 ),
             ).fetchone()
         return row is not None
+
+    def _get_requested_lease_version(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+    ) -> int | None:
+        with self._database.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT lease_version
+                FROM approval_record
+                WHERE action_type = ? AND task_id = ? AND task_hash = ?
+                LIMIT 1
+                """,
+                (action_type, task_id, task_hash),
+            ).fetchone()
+        if row is None:
+            return None
+        return int(row["lease_version"])
 
 
 def _to_approval_record(row: Mapping[str, object]) -> ApprovalRecord:

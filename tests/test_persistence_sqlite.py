@@ -16,6 +16,7 @@ from app.db.approval_repo import (
     APPROVAL_STATUS_APPROVED,
     APPROVAL_STATUS_CANCELLED,
     APPROVAL_STATUS_PENDING,
+    ApprovalPersistenceError,
     ApprovalRepo,
 )
 from app.db.bt_pending_repo import (
@@ -458,6 +459,29 @@ def test_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     assert record.lease_version == 1
     assert record.executed_version == 0
     assert record.last_task_ref == "87"
+
+
+def test_approval_repo_raises_when_pending_request_row_missing(tmp_path: Path) -> None:
+    class MissingRowApprovalRepo(ApprovalRepo):
+        def _get_requested_lease_version(
+            self,
+            *,
+            action_type: str,
+            task_id: str,
+            task_hash: str,
+        ) -> int | None:
+            _ = (action_type, task_id, task_hash)
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing after pending request"):
+        repo.request_import_approval(task_id="87", task_hash="hash-87", task_ref="87")
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing after pending request"):
+        repo.request_downloader_approval(task_id="88", task_hash="hash-88", task_ref="88")
 
 
 def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
