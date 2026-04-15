@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from app.clients.tmdb import TmdbMovie
+from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.search_media import (
@@ -229,6 +230,37 @@ def test_clear_cached_candidates_logs_candidate_persistence_failure(capsys) -> N
     assert service.clear_cached_candidates(1001) is True
     assert 1001 not in service._recent_candidates_by_chat
     assert "[搜索候选清理失败]" in capsys.readouterr().out
+
+
+def test_get_cached_candidate_logs_candidate_payload_corruption(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO candidate_mapping (
+                chat_id,
+                selection_index,
+                candidate_json,
+                updated_at
+            ) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (1001, 1, "{"),
+        )
+        connection.commit()
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        candidate_repo=CandidateMappingRepo(database),
+    )
+
+    assert service.get_cached_candidate(1001, 1) is None
+    output = capsys.readouterr().out
+    assert "[搜索候选载荷损坏]" in output
+    assert "chat_id=1001" in output
+    assert "index=1" in output
+    assert "candidate_json invalid json" in output
+    assert "[处理建议]" in output
 
 
 async def _fake_search_quality_from_title(query: str) -> list[dict[str, object]]:

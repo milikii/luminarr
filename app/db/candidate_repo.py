@@ -7,6 +7,10 @@ from typing import Any
 from app.db.sqlite import SqliteDatabase
 
 
+class CandidatePayloadCorruptionError(ValueError):
+    pass
+
+
 class CandidateMappingRepo:
     def __init__(self, database: SqliteDatabase) -> None:
         self._database = database
@@ -53,9 +57,9 @@ class CandidateMappingRepo:
         try:
             payload = json.loads(raw_payload)
         except json.JSONDecodeError:
-            return None
+            raise CandidatePayloadCorruptionError("candidate_json invalid json") from None
         if not isinstance(payload, dict):
-            return None
+            raise CandidatePayloadCorruptionError("candidate_json not object")
         return {str(key): value for key, value in payload.items()}
 
 

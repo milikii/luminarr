@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.clients.tmdb import TmdbMovie
-from app.db.candidate_repo import CandidateMappingRepo
+from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError
 from app.db.clarification_repo import ClarificationRepo
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -178,6 +178,12 @@ class SearchMediaService:
             return None
         try:
             persisted_candidate = self._candidate_repo.get_candidate(chat_id, index)
+        except CandidatePayloadCorruptionError as error:
+            print(
+                f"\033[31m[搜索候选载荷损坏]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 表里的 candidate_json 是否仍是合法 JSON；当前会按无候选返回，但这可能是持久化坏数据，不是用户真的没搜过。",
+                flush=True,
+            )
+            return None
         except Exception as error:
             print(
                 f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前会按无候选返回，但这可能不是用户真的没搜过。",

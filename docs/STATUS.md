@@ -78,6 +78,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media` 在 BT 只读探索搜索源异常时，现在也会打印红色中文 `[BT 只读搜索失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`，不再静默吞掉 SQLite 删除/读取异常
+  - `search_media.get_cached_candidate()` 在 `candidate_mapping.candidate_json` 为空、坏 JSON 或非对象时，现在也会打印红色中文 `[搜索候选载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏候选混写成普通缓存未命中
   - `search_media.clear_cached_candidates()` 在 `candidate_mapping.clear_candidates()` 删除异常时，现在也会打印红色中文 `[搜索候选清理失败]` 日志和 `[处理建议]`，不再把 SQLite 删除异常静默吞成“候选本来就清空了”
   - copy fallback、completion-monitor、post-download auto import
   - `post_download_auto_import` 最小后台 tick 已接入应用启动/停止链，完成态 `download_monitor` 不再只能靠用户手动 `status` 才推进一次
@@ -221,6 +222,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`handle_private_chat_query_text()` owner 已移到 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py)，`dispatch_private_chat_text()` 也不再伪造 `SimpleNamespace` 去反调 Telegram handler；Telegram / personal WeChat / Feishu / WeCom 四个渠道现在都先走同一个 shared wrapper，`微信登录` 的 Telegram 文本/媒资能力也已改成显式注入。当前剩余结构债是 shared runtime 正文仍复用一批 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py) helper 和 Telegram-shaped compatibility context，后续只在需要时继续收口，不再回到旧入口分叉。
 - 2026-04-15 代码审查确认：`private_chat_runtime` 里 frustration / confirm 两条 `job_repo` 查询失败路径现在也会打印红色中文 `[待处理任务查询失败]` / `[确认关联任务查询失败]` 和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“当前没有待处理任务 / 没匹配到确认任务”。
 - 2026-04-15 代码审查确认：`app.main` 里 `_resolve_downloader_name_for_task()` 读取 `jobs.payload_json` 时，现在会把空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[下载器路由载荷损坏]` 和 `[处理建议]`，不再把这些持久化坏数据统一混写成普通 `downloader_name missing`。
+- 2026-04-15 代码审查确认：`search_media.get_cached_candidate()` 读取 `candidate_mapping.candidate_json` 时，现在会把坏 JSON、非对象 payload 单独记成红色中文 `[搜索候选载荷损坏]` 和 `[处理建议]`，不再把这类持久化坏候选混写成普通缓存未命中。
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_once()` / `_scan_chat_once()` 在读取 `bt_subscription_repo.list_items()` 失败时，现在也会打印红色中文 `[BT 订阅扫描读取失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，避免把 SQLite 读取异常误报成“当前没有可扫描的 BT 订阅”或直接把后台扫描打崩。
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并安全返回空通知，避免后台 tick 因最外层 chat 列表读取失败直接中断。
 - 2026-04-15 代码审查确认：`import_to_library._is_raw_bt_task()` 在读取到坏 `payload_json` 时，现在也会打印红色中文 `[导入 raw_bt 判定载荷损坏]` 和 `[处理建议]`，不再把持久化坏数据静默混写成“不是 raw_bt”。
