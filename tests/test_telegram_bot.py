@@ -2537,6 +2537,19 @@ def test_poll_pending_download_completion_once_reuses_status_service() -> None:
     assert status_service.get_status_text.await_args_list == [call("hash-41", chat_id=1001), call("hash-42", chat_id=1002)]
 
 
+def test_poll_pending_download_completion_once_logs_pending_list_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    repo = SimpleNamespace(list_pending_completion=Mock(side_effect=RuntimeError("db down")))
+    status_service = SimpleNamespace(get_status_text=AsyncMock())
+
+    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
+
+    output = capsys.readouterr().out
+    assert "[下载完成待轮询列表读取失败]" in output
+    assert "db down" in output
+    assert "[处理建议]" in output
+    status_service.get_status_text.assert_not_awaited()
+
+
 def test_download_completion_polling_loop_runs_once_and_stops() -> None:
     stop_event = asyncio.Event()
 
@@ -2557,15 +2570,18 @@ def test_download_completion_polling_loop_runs_once_and_stops() -> None:
 
 def test_download_completion_polling_loop_logs_fix_hint_on_error(capsys: pytest.CaptureFixture[str]) -> None:
     stop_event = asyncio.Event()
+    repo = SimpleNamespace(
+        list_pending_completion=Mock(return_value=(SimpleNamespace(task_hash="hash-41", chat_id=1001),))
+    )
 
-    def list_pending_completion():
+    async def _boom(*args, **kwargs):
         stop_event.set()
         raise RuntimeError("boom")
 
     asyncio.run(
         _download_completion_polling_loop(
-            download_monitor_repo=SimpleNamespace(list_pending_completion=Mock(side_effect=list_pending_completion)),
-            status_service=SimpleNamespace(get_status_text=AsyncMock()),
+            download_monitor_repo=repo,
+            status_service=SimpleNamespace(get_status_text=AsyncMock(side_effect=_boom)),
             stop_event=stop_event,
         )
     )

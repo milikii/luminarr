@@ -765,7 +765,12 @@ async def _post_download_auto_import_scheduler_loop(
 async def _poll_pending_download_completion_once(
     *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService
 ) -> None:
-    for record in download_monitor_repo.list_pending_completion():
+    try:
+        pending_records = download_monitor_repo.list_pending_completion()
+    except Exception as error:
+        _log_download_completion_pending_list_error(error=error)
+        return
+    for record in pending_records:
         await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
 
 
@@ -1811,6 +1816,13 @@ def _log_download_completion_polling_loop_error(*, error: Exception) -> None:
     print(
         f"\033[31m[下载完成状态轮询失败]\033[0m 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查下载器状态查询、download_monitor 和 SQLite 后等待下一轮自动轮询。"
+    )
+
+
+def _log_download_completion_pending_list_error(*, error: Exception) -> None:
+    print(
+        f"\033[31m[下载完成待轮询列表读取失败]\033[0m 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor 表读取和 SQLite 连通性；当前这轮不会继续逐条查状态，但下一轮轮询仍会继续尝试。"
     )
 
 
