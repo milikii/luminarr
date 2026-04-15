@@ -716,7 +716,11 @@ class ImportToLibraryService:
 
         try:
             refresh_text = await self._refresh_media_server_func()
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[媒体库刷新失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查媒体服务器地址、API Key 和网络连通性；当前导入成功不会回滚，但刷新结果会按失败文本返回。",
+                flush=True,
+            )
             refresh_text = IMPORT_REFRESH_FAILED_TEXT
             self._record_event(
                 task_ref=task_ref,
