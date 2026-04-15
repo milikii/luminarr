@@ -67,8 +67,11 @@ class BtPendingRepo:
             ).fetchone()
         if row is None:
             return None
+        cleaned_stage = str(row["stage"]).strip()
+        if not cleaned_stage:
+            raise BtPendingPersistenceError("bt_pending_state stage empty after read")
         return BtPendingState(
-            stage=str(row["stage"]).strip(),
+            stage=cleaned_stage,
             payload_json=str(row["payload_json"]).strip(),
         )
 

@@ -556,6 +556,25 @@ def test_bt_pending_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
         )
 
 
+def test_bt_pending_repo_rejects_empty_stage_after_read(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_pending_state (chat_id, stage, payload_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (1001, "   ", '{"media_kind":"movie"}'),
+        )
+        connection.commit()
+
+    repo = BtPendingRepo(SqliteDatabase(str(tmp_path / "state.sqlite3")))
+
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state stage empty after read"):
+        repo.get_pending(chat_id=1001)
+
+
 def test_bt_pending_repo_rejects_missing_stage(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
