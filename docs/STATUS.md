@@ -42,7 +42,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 媒体主链：
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
   - `import approval -> confirm -> hardlink import`
-  - `search_media` 在澄清态 `clear_pending()` 删除失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` 日志和 `[处理建议]`，不再静默吞掉 SQLite 删除异常
+  - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`，不再静默吞掉 SQLite 删除/读取异常
   - copy fallback、completion-monitor、post-download auto import
   - `post_download_auto_import` 最小后台 tick 已接入应用启动/停止链，完成态 `download_monitor` 不再只能靠用户手动 `status` 才推进一次
   - `download_monitor` 的待完成下载列表现在已支持限流读取，便于后续独立后台轮询按批次推进下载完成观察
@@ -176,7 +176,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 2026-04-14 代码审查确认：`shared private-chat runtime` 仍通过 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py) 伪造 Telegram `context` 去调用 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py)；这不是抽象味道问题，而是当前真实结构债，因为 `微信登录` 分支已经会读取 `context.application.bot`。
-- 2026-04-15 代码审查确认：`search_media` 里搜索候选持久化失败、澄清态 `upsert_pending()` / `clear_pending()` 失败、以及候选读取 `get_candidate()` 失败都已补红色中文日志和 `[处理建议]`，不再静默吞掉 `candidate_repo.save_candidates()` / `clarification_repo.upsert_pending()` / `clarification_repo.clear_pending()` / `candidate_repo.get_candidate()` 异常；当前剩余风险收口为“澄清态 load 以及其他持久化路径仍有 `except Exception: pass/return None` 会把‘真没数据’和‘SQLite/配置异常’混写”。
+- 2026-04-15 代码审查确认：`search_media` 里搜索候选持久化失败、澄清态 `upsert_pending()` / `clear_pending()` / `get_pending_query()` 失败、以及候选读取 `get_candidate()` 失败都已补红色中文日志和 `[处理建议]`，不再静默吞掉 `candidate_repo.save_candidates()` / `clarification_repo.upsert_pending()` / `clarification_repo.clear_pending()` / `clarification_repo.get_pending_query()` / `candidate_repo.get_candidate()` 异常；当前剩余风险收口为“其他持久化路径仍有 `except Exception: pass/return None` 会把‘真没数据’和‘SQLite/配置异常’混写”。
 - 2026-04-15 代码审查确认：`cleanup_smoke_logging` 去模块级全局状态已收口：追加链不再读取全局状态，configure helper 成功/失败态不再写状态，reset helper 和死变量也已删除；后续只保留 `tests/test_cleanup_smoke_logging.py` 回归门禁，不再把这条风险作为独立施工项。
 - 2026-04-14 代码审查确认：Feishu 长连接当前仍直接依赖 `lark_oapi` 私有 API 和模块级变量 patch；版本升级前必须重新验证 `_auto_reconnect`、`_disconnect()`、`_cache._cron` 与 `lark_oapi.ws.client.loop` 这几处内部实现。
 - 2026-04-14 代码审查确认：`get_download_status` 当前会写 `download_monitor`、补 `downloader.completed_observed`，并可能接到 auto-import，所以它不是只读动作；不要把它误放进 `READ_ONLY_ACTIONS`。
@@ -243,6 +243,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - search media tests：2026-04-15，`20 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
 - search media clarification-upsert observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import asyncio; from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'upsert_pending': lambda self, chat_id, query: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: asyncio.sleep(0, result=[]), clarification_repo=BoomRepo()); asyncio.run(service.search_and_format('unknown', chat_id=1001))"`）
 - search media clarification-clear observability tests：2026-04-15，`4 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or clear_clarification_pending_logs_persistence_failure"`）
+- search media clarification-load observability tests：2026-04-15，`5 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or is_clarification_pending_logs_persistence_failure"`）
 - search media candidate-load observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'get_candidate': lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: None, candidate_repo=BoomRepo()); service.get_cached_candidate(1001, 1)"`）
 - channel identity fail-closed tests：2026-04-15，`1 passed, 38 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k project_channel_identity`）
 - downloader routing fail-closed tests：2026-04-15，`4 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）

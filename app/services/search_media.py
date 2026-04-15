@@ -240,7 +240,11 @@ class SearchMediaService:
             return None
         try:
             return self._clarification_repo.get_pending_query(chat_id=chat_id)
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[搜索澄清态读取失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表读取是否正常；当前请求会按“无待澄清记录”继续处理，但重启后的澄清状态可能被误判为已丢失。",
+                flush=True,
+            )
             return None
 
 
