@@ -119,6 +119,21 @@ def _log_downloader_client_not_configured(*, downloader_name: str, downloader_ty
     )
 
 
+def _log_downloader_dispatch_resolution_failed(
+    *,
+    downloader_name: str,
+    downloader_type: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载器投递路由失败]\033[0m downloader_name={downloader_name} "
+        f"downloader_type={downloader_type or '-'} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，"
+        "再重试当前下载投递。",
+        flush=True,
+    )
+
+
 def _resolve_downloader_client_for_lookup(
     *,
     downloader_name: str,
@@ -157,12 +172,22 @@ def _resolve_downloader_client_for_dispatch(
         return transmission_client
     instance = downloader_instances_by_name.get(cleaned_name)
     if instance is None:
+        _log_downloader_dispatch_resolution_failed(
+            downloader_name=cleaned_name,
+            downloader_type="-",
+            reason="instance missing",
+        )
         raise ValueError(f"unknown downloader instance: {cleaned_name}")
     if instance.downloader_type == "qbittorrent":
         client = qbittorrent_clients_by_name.get(cleaned_name)
     else:
         client = transmission_clients_by_name.get(cleaned_name)
     if client is None:
+        _log_downloader_dispatch_resolution_failed(
+            downloader_name=cleaned_name,
+            downloader_type=instance.downloader_type,
+            reason="client not configured",
+        )
         raise ValueError(f"downloader client not configured: {cleaned_name}")
     return client
 
