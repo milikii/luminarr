@@ -73,7 +73,10 @@ class PostDownloadAutoImportService:
     async def run_for_record(self, candidate: DownloadMonitorRecord) -> str | None:
         if not candidate.is_complete or candidate.chat_id <= 0:
             return None
-        if self._has_terminal_activity(candidate):
+        has_terminal_activity = self._has_terminal_activity(candidate)
+        if has_terminal_activity is None:
+            return None
+        if has_terminal_activity:
             return None
         blocked_reason = _match_low_quality_reason(candidate.name)
         if blocked_reason is not None:
@@ -86,7 +89,7 @@ class PostDownloadAutoImportService:
         user_id = candidate.user_id if candidate.user_id > 0 else None
         return await self._auto_import_func(candidate.task_hash, candidate.chat_id, user_id)
 
-    def _has_terminal_activity(self, candidate: DownloadMonitorRecord) -> bool:
+    def _has_terminal_activity(self, candidate: DownloadMonitorRecord) -> bool | None:
         try:
             events = self._job_event_repo.list_events_for_task_identity(
                 task_id=candidate.task_id,
@@ -94,10 +97,10 @@ class PostDownloadAutoImportService:
             )
         except Exception as error:
             print(
-                f"\033[31m[自动导入终态查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前请求会按“没有终态事件”继续判断，但同一任务可能被重复推进自动导入。",
+                f"\033[31m[自动导入终态查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前会停止这条任务的自动导入跟进，避免把读取异常误判成“还没有终态事件”。",
                 flush=True,
             )
-            return False
+            return None
         return any(
             event.event_type.startswith("import.") or event.event_type == AUTO_IMPORT_SKIPPED_BY_RULE_EVENT
             for event in events

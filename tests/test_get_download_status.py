@@ -249,6 +249,59 @@ def test_get_status_text_does_not_repeat_auto_import_when_import_activity_exists
     auto_import.assert_not_awaited()
 
 
+def test_get_status_text_stops_auto_import_when_terminal_lookup_fails(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 1984",
+        chat_id=1001,
+        user_id=2001,
+    )
+    event_repo = type(
+        "BoomEventRepo",
+        (),
+        {"list_events_for_task_identity": lambda self, *, task_id, task_hash: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        auto_import_func=auto_import,
+    )
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=None,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert "导入待确认" not in text
+    auto_import.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[自动导入终态查询失败]" in output
+    assert "task_id=87" in output
+    assert "db down" in output
+
+
 def test_get_status_text_skips_low_quality_resource_auto_import_and_records_event(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
