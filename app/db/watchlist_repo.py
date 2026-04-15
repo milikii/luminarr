@@ -109,7 +109,7 @@ class WatchlistRepo:
 
     def clear_items(self, *, chat_id: int) -> int:
         if chat_id <= 0:
-            return 0
+            raise WatchlistPersistenceError("watchlist_item chat identity missing for clear")
         with self._database.connect() as connection:
             cursor = connection.execute("DELETE FROM watchlist_item WHERE chat_id = ?", (chat_id,))
             connection.commit()
