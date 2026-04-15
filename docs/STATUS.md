@@ -223,6 +223,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`private_chat_runtime` 里 frustration / confirm 两条 `job_repo` 查询失败路径现在也会打印红色中文 `[待处理任务查询失败]` / `[确认关联任务查询失败]` 和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“当前没有待处理任务 / 没匹配到确认任务”。
 - 2026-04-15 代码审查确认：`app.main` 里 `_resolve_downloader_name_for_task()` 读取 `jobs.payload_json` 时，现在会把空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[下载器路由载荷损坏]` 和 `[处理建议]`，不再把这些持久化坏数据统一混写成普通 `downloader_name missing`。
 - 2026-04-15 代码审查确认：`search_media.get_cached_candidate()` 读取 `candidate_mapping.candidate_json` 时，现在会把坏 JSON、非对象 payload 单独记成红色中文 `[搜索候选载荷损坏]` 和 `[处理建议]`，不再把这类持久化坏候选混写成普通缓存未命中。
+- 2026-04-15 代码审查确认：`telegram_bot` 恢复 BT pending 状态时，现在会把 `bt_pending_state.payload_json` 的空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，并直接 fail-closed，不再把坏待处理状态当成正常 processing path / classification / tmdb association / raw_bt destination 上下文继续走。
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_once()` / `_scan_chat_once()` 在读取 `bt_subscription_repo.list_items()` 失败时，现在也会打印红色中文 `[BT 订阅扫描读取失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，避免把 SQLite 读取异常误报成“当前没有可扫描的 BT 订阅”或直接把后台扫描打崩。
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并安全返回空通知，避免后台 tick 因最外层 chat 列表读取失败直接中断。
 - 2026-04-15 代码审查确认：`import_to_library._is_raw_bt_task()` 在读取到坏 `payload_json` 时，现在也会打印红色中文 `[导入 raw_bt 判定载荷损坏]` 和 `[处理建议]`，不再把持久化坏数据静默混写成“不是 raw_bt”。

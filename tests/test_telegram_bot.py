@@ -54,6 +54,10 @@ from app.bot.telegram_bot import (
     build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
+    _get_bt_tmdb_association_pending,
+    _get_raw_bt_destination_pending,
+    _is_bt_classification_pending,
+    _is_bt_processing_path_pending,
     _download_completion_polling_loop,
     _poll_pending_download_completion_once,
     _post_download_auto_import_scheduler_loop,
@@ -63,7 +67,13 @@ from app.bot.telegram_bot import (
 )
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalRepo
-from app.db.bt_pending_repo import BtPendingRepo
+from app.db.bt_pending_repo import (
+    BT_PENDING_STAGE_CLASSIFICATION,
+    BT_PENDING_STAGE_PROCESSING_PATH,
+    BT_PENDING_STAGE_RAW_BT_DESTINATION,
+    BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingRepo,
+)
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
@@ -907,6 +917,106 @@ def test_handle_message_raw_bt_destination_pending_survives_restart(tmp_path: Pa
     assert "已记录 raw_bt 目标目录。" in selected_text
     assert "目录键: downloads" in selected_text
     assert "当前还缺少实际的磁力链接" in selected_text
+
+
+def test_bt_processing_path_pending_logs_payload_corruption_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_PROCESSING_PATH,
+        payload_json="{",
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _is_bt_processing_path_pending(context=context, chat_id=1001) is False
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=processing_path" in output
+    assert "payload_json invalid json" in output
+
+
+def test_bt_classification_pending_logs_payload_corruption_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_CLASSIFICATION,
+        payload_json="{",
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _is_bt_classification_pending(context=context, chat_id=1001) is False
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=classification" in output
+    assert "payload_json invalid json" in output
+
+
+def test_bt_tmdb_association_pending_logs_payload_corruption_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+        payload_json="{",
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=tmdb_association" in output
+    assert "payload_json invalid json" in output
+
+
+def test_raw_bt_destination_pending_logs_payload_corruption_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+        payload_json="{",
+    )
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    output = capsys.readouterr().out
+    assert "[BT 待处理载荷损坏]" in output
+    assert "stage=raw_bt_destination" in output
+    assert "payload_json invalid json" in output
 
 
 def test_handle_message_replies_service_not_ready() -> None:

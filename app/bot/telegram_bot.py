@@ -1019,16 +1019,24 @@ def _serialize_bt_pending_payload(payload: dict[str, object]) -> str:
         return "{}"
 
 
-def _deserialize_bt_pending_payload(payload_json: str) -> dict[str, object]:
+def _deserialize_bt_pending_payload(payload_json: str) -> tuple[dict[str, object], str | None]:
     if not payload_json.strip():
-        return {}
+        return {}, "payload_json empty"
     try:
         payload = json.loads(payload_json)
     except json.JSONDecodeError:
-        return {}
+        return {}, "payload_json invalid json"
     if not isinstance(payload, dict):
-        return {}
-    return payload
+        return {}, "payload_json not object"
+    return payload, None
+
+
+def _log_bt_pending_payload_corruption(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理载荷损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.payload_json 是否仍是合法 JSON，且包含当前 stage 需要的字段。",
+        flush=True,
+    )
 
 
 def _set_bt_processing_path_pending(
@@ -1068,7 +1076,10 @@ def _is_bt_processing_path_pending(
     pending_state = pending_repo.get_pending(chat_id=chat_id)
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
         return False
-    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return False
     pending_by_chat[chat_id] = str(payload.get("source", "")).strip()
     return True
 
@@ -1111,7 +1122,10 @@ def _pop_bt_processing_path_pending(
     pending_state = pending_repo.get_pending(chat_id=chat_id)
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
         return None
-    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return None
     pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
     return str(payload.get("source", "")).strip() or None
 
@@ -1153,7 +1167,10 @@ def _is_bt_classification_pending(
     pending_state = pending_repo.get_pending(chat_id=chat_id)
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
         return False
-    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return False
     pending_by_chat[chat_id] = str(payload.get("query", "")).strip()
     return True
 
@@ -1196,7 +1213,10 @@ def _pop_bt_classification_pending(
     pending_state = pending_repo.get_pending(chat_id=chat_id)
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
         return None
-    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return None
     pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
     return str(payload.get("query", "")).strip() or None
 
@@ -1261,7 +1281,10 @@ def _get_bt_tmdb_association_pending(
     pending_state = pending_repo.get_pending(chat_id=chat_id)
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
         return None
-    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return None
     media_kind = str(payload.get("media_kind", "")).strip()
     source = str(payload.get("source", "")).strip()
     if not media_kind:
@@ -1338,7 +1361,10 @@ def _get_raw_bt_destination_pending(
     pending_state = pending_repo.get_pending(chat_id=chat_id)
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_RAW_BT_DESTINATION:
         return None
-    payload = _deserialize_bt_pending_payload(pending_state.payload_json)
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return None
     raw_options = payload.get("options")
     source = str(payload.get("source", "")).strip()
     if not isinstance(raw_options, list):
