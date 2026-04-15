@@ -49,6 +49,7 @@ from app.bot.telegram_bot import (
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_UPDATE_REPO_KEY,
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
+    TELEGRAM_SEND_TEXT_FUNC_KEY,
     build_application,
     build_telegram_send_media_func,
     handle_callback_query,
@@ -2346,6 +2347,7 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[DOWNLOADER_INSTANCES_KEY] == downloader_instances
     assert application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] is downloader_role_binding
     assert callable(application.bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY])
+    assert callable(application.bot_data[TELEGRAM_SEND_TEXT_FUNC_KEY])
     assert any(
         isinstance(handler, CallbackQueryHandler)
         for handlers in application.handlers.values()
@@ -2623,13 +2625,13 @@ def test_handle_message_routes_personal_wechat_login_and_sends_qr_result(
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
     context = SimpleNamespace(
         application=SimpleNamespace(
-            bot=SimpleNamespace(send_message=send_message),
             bot_data={
                 SEARCH_SERVICE_KEY: search_service,
                 ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
                 GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
                 IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
                 TELEGRAM_SEND_MEDIA_FUNC_KEY: send_media,
+                TELEGRAM_SEND_TEXT_FUNC_KEY: send_message,
                 PERSONAL_WECHAT_LOGIN_SERVICE_KEY: service,
             },
         )

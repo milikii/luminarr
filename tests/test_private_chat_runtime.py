@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.bot.personal_wechat_login import (
+    PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
+    PERSONAL_WECHAT_LOGIN_STARTED_TEXT,
+    PersonalWeChatLoginService,
+)
 from app.bot.private_chat_runtime import dispatch_private_chat_text
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -15,6 +21,8 @@ from app.bot.telegram_bot import (
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
+    TELEGRAM_SEND_MEDIA_FUNC_KEY,
+    TELEGRAM_SEND_TEXT_FUNC_KEY,
 )
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -91,6 +99,69 @@ def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -
     )
 
     reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+
+
+def test_dispatch_private_chat_text_routes_personal_wechat_login_without_telegram_context(
+    tmp_path: Path,
+) -> None:
+    async def start_login_func(*, api_base_url: str, force: bool = False) -> object:
+        return SimpleNamespace(
+            qrcode_url="https://wx.example/qrcode.png",
+            session_key="session-1",
+            message="ok",
+        )
+
+    async def wait_login_func(*, session_key: str, api_base_url: str, verbose: bool) -> object:
+        return SimpleNamespace(
+            connected=True,
+            account_id="wx-account-runtime",
+            bot_token="bot-token-runtime",
+            base_url="https://ilinkai.weixin.qq.com",
+            user_id="wx-user-runtime",
+        )
+
+    def build_qr_artifact(_: str) -> object:
+        qr_dir = tmp_path / "runtime-login-qr"
+        qr_dir.mkdir()
+        file_path = qr_dir / "wechat-login.png"
+        file_path.write_bytes(b"png")
+        return SimpleNamespace(dir_path=qr_dir, file_path=file_path)
+
+    service = PersonalWeChatLoginService(
+        start_login_func=start_login_func,
+        wait_login_func=wait_login_func,
+        save_account_func=Mock(),
+        register_account_func=Mock(),
+        clear_stale_accounts_func=Mock(),
+        close_client_func=AsyncMock(),
+        qr_artifact_builder=build_qr_artifact,
+    )
+    reply_text = AsyncMock()
+    send_media = AsyncMock(return_value="document-ok")
+    send_text = AsyncMock(return_value="message-ok")
+    bot_data = _build_bot_data()
+    bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY] = send_media
+    bot_data[TELEGRAM_SEND_TEXT_FUNC_KEY] = send_text
+    bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = service
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="微信登录",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=bot_data,
+        )
+    )
+    if service._wait_task is not None:
+        asyncio.run(service._wait_task)
+
+    reply_text.assert_awaited_once_with(PERSONAL_WECHAT_LOGIN_STARTED_TEXT)
+    send_media.assert_awaited_once()
+    send_text.assert_awaited_once_with(
+        chat_id=1001,
+        text="personal WeChat 登录成功。\n账号 ID: wx-account-runtime\n用户 ID: wx-user-runtime",
+    )
 
 
 def test_dispatch_private_chat_text_routes_cleanup_inspect_without_telegram_update(

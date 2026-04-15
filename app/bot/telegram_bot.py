@@ -229,6 +229,7 @@ FEISHU_WEBHOOK_SERVER_RUNTIME_KEY = "feishu_webhook_server_runtime"
 WECOM_WEBHOOK_SERVER_CONFIG_KEY = "wecom_webhook_server_config"
 WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
+TELEGRAM_SEND_TEXT_FUNC_KEY = "telegram_send_text_func"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
@@ -236,6 +237,7 @@ TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
+TelegramSendTextFunc = Callable[..., Awaitable[object]]
 
 BT_PROCESSING_PATH_ALIASES = {
     "影视入库链": "media_import",
@@ -398,6 +400,7 @@ def build_application(
     application.bot_data[DOWNLOADER_INSTANCES_KEY] = downloader_instances
     application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
     application.bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
+    application.bot_data[TELEGRAM_SEND_TEXT_FUNC_KEY] = build_telegram_send_text_func(application)
     if bt_tmdb_movie_candidates_lookup_func is not None:
         application.bot_data[BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
     if bt_tmdb_tv_candidates_lookup_func is not None:
@@ -424,6 +427,13 @@ def build_telegram_send_media_func(application: Application) -> TelegramSendMedi
         )
 
     return send_media
+
+
+def build_telegram_send_text_func(application: Application) -> TelegramSendTextFunc:
+    async def send_text(*, chat_id: int, text: str) -> object:
+        return await application.bot.send_message(chat_id=chat_id, text=text)
+
+    return send_text
 
 
 def _build_telegram_reply_func(
@@ -1957,7 +1967,7 @@ async def handle_private_chat_query_text(
     if parse_personal_wechat_login_query(query):
         personal_wechat_login_service = context.application.bot_data.get(PERSONAL_WECHAT_LOGIN_SERVICE_KEY)
         telegram_send_media_func = context.application.bot_data.get(TELEGRAM_SEND_MEDIA_FUNC_KEY)
-        telegram_send_text_func = getattr(getattr(context.application, "bot", None), "send_message", None)
+        telegram_send_text_func = context.application.bot_data.get(TELEGRAM_SEND_TEXT_FUNC_KEY)
         if (
             not isinstance(personal_wechat_login_service, PersonalWeChatLoginService)
             or not callable(telegram_send_media_func)
