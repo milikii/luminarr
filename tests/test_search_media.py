@@ -267,6 +267,22 @@ def test_is_clarification_pending_logs_persistence_failure(capsys) -> None:
     assert "[搜索澄清态读取失败]" in capsys.readouterr().out
 
 
+def test_load_persisted_clarification_query_distinguishes_repo_failure_from_missing_state() -> None:
+    missing_repo = type("MissingRepo", (), {"get_pending_query": lambda self, chat_id: None})()
+    failed_repo = type("BoomRepo", (), {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
+
+    missing_service = SearchMediaService(_fake_search_with_results, clarification_repo=missing_repo)
+    failed_service = SearchMediaService(_fake_search_with_results, clarification_repo=failed_repo)
+
+    missing_result = missing_service._load_persisted_clarification_query(chat_id=1001)
+    failed_result = failed_service._load_persisted_clarification_query(chat_id=1001)
+
+    assert missing_result.query is None
+    assert missing_result.load_failed is False
+    assert failed_result.query is None
+    assert failed_result.load_failed is True
+
+
 def test_clear_cached_candidates_logs_candidate_persistence_failure(capsys) -> None:
     repo = type("BoomRepo", (), {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)

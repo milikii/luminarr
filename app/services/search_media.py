@@ -51,6 +51,12 @@ class AmbiguousOption:
     year: str
 
 
+@dataclass(frozen=True, slots=True)
+class ClarificationQueryLoadResult:
+    query: str | None = None
+    load_failed: bool = False
+
+
 class SearchMediaService:
     def __init__(
         self,
@@ -231,10 +237,10 @@ class SearchMediaService:
             return False
         if chat_id in self._clarification_pending_by_chat:
             return True
-        pending_query = self._load_persisted_clarification_query(chat_id=chat_id)
-        if pending_query is None:
+        load_result = self._load_persisted_clarification_query(chat_id=chat_id)
+        if load_result.load_failed or load_result.query is None:
             return False
-        self._clarification_pending_by_chat[chat_id] = pending_query
+        self._clarification_pending_by_chat[chat_id] = load_result.query
         return True
 
     def clear_clarification_pending(self, chat_id: int) -> bool:
@@ -276,17 +282,19 @@ class SearchMediaService:
                 self._clarification_pending_by_chat[chat_id] = previous_query
             return False
 
-    def _load_persisted_clarification_query(self, *, chat_id: int) -> str | None:
+    def _load_persisted_clarification_query(self, *, chat_id: int) -> ClarificationQueryLoadResult:
         if self._clarification_repo is None:
-            return None
+            return ClarificationQueryLoadResult()
         try:
-            return self._clarification_repo.get_pending_query(chat_id=chat_id)
+            return ClarificationQueryLoadResult(
+                query=self._clarification_repo.get_pending_query(chat_id=chat_id),
+            )
         except Exception as error:
             print(
                 f"\033[31m[搜索澄清态读取失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表读取是否正常；当前请求会按“无待澄清记录”继续处理，但重启后的澄清状态可能被误判为已丢失。",
                 flush=True,
             )
-            return None
+            return ClarificationQueryLoadResult(load_failed=True)
 
 
 def parse_movie_query(query: str) -> ParsedMovieQuery:
