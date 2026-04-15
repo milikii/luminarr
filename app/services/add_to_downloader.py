@@ -606,7 +606,11 @@ class AddToDownloaderService:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认状态可能仍残留。",
+                flush=True,
+            )
             return False
 
     def _record_executed_lease_version(
