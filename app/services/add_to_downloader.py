@@ -682,7 +682,11 @@ class AddToDownloaderService:
                     task_id=job.task_id,
                     task_hash=job.task_hash,
                 )
-            except Exception:
+            except Exception as error:
+                print(
+                    f"\033[31m[下载确认审批查询失败]\033[0m task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 上下文会继续返回，但审批状态可能缺失。",
+                    flush=True,
+                )
                 approval_record = None
         return ConfirmExecutionContext(job=job, approval_record=approval_record, pending_add=pending_add)
 
