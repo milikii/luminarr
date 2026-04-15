@@ -547,7 +547,11 @@ class AddToDownloaderService:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception:
+        except Exception as error:
+            print(
+                f"\033[31m[下载确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前请求会退回进程内待确认身份判断，重启后审批状态可能不一致。",
+                flush=True,
+            )
             current_lease = self._pending_add_lease_versions.get(identity, 0)
             approved = identity in self._pending_add_identities and current_lease == expected_lease_version
 
