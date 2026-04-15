@@ -140,6 +140,20 @@ def test_search_bt_read_only_and_format_no_result() -> None:
     assert text == BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
 
 
+def test_search_bt_read_only_and_format_logs_raw_search_failure(capsys) -> None:
+    async def fake_raw_search(_: str) -> list[dict[str, object]]:
+        raise RuntimeError("bt source unavailable")
+
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=fake_raw_search)
+
+    with pytest.raises(RuntimeError, match="bt source unavailable"):
+        _run(service.search_bt_read_only_and_format("dune bt"))
+
+    output = capsys.readouterr().out
+    assert "[BT 只读搜索失败]" in output
+    assert "query=dune bt" in output
+
+
 def test_search_and_format_returns_clarification_for_ambiguous_query() -> None:
     service = SearchMediaService(_fake_search_ambiguous)
     text = _run(service.search_and_format("Dune", chat_id=1001))

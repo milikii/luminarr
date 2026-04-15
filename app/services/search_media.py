@@ -74,7 +74,14 @@ class SearchMediaService:
         cleaned_query = query.strip()
         if not cleaned_query:
             return ()
-        return await self._raw_search_func(cleaned_query)
+        try:
+            return await self._raw_search_func(cleaned_query)
+        except Exception as error:
+            print(
+                f"\033[31m[BT 只读搜索失败]\033[0m query={cleaned_query} 错误={error}\n\033[33m[处理建议]\033[0m 检查 BT 搜索源、代理和网络连通性；当前只读探索没有拿到结果，且这不是正常的“无候选”状态。",
+                flush=True,
+            )
+            raise
 
     async def search_bt_read_only_and_format(self, query: str) -> str:
         cleaned_query = _normalize_spaces(query)

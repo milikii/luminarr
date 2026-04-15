@@ -1,4 +1,4 @@
-# Current status (v206)
+# Current status (v207)
 
 ## Project position
 
@@ -73,6 +73,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._handle_expired_pending_confirm()` 在 `approval_repo.cancel_import()` 更新失败时，现在也会打印红色中文 `[导入确认超时审批取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“超时文本回了就算审批真相也收口”
   - `search_media` 在 TMDB 归一化查询异常时，现在也会打印红色中文 `[TMDB 查询失败]` 日志和 `[处理建议]`，不再静默退回普通搜索
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
+  - `search_media` 在 BT 只读探索搜索源异常时，现在也会打印红色中文 `[BT 只读搜索失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`，不再静默吞掉 SQLite 删除/读取异常
   - `search_media.clear_cached_candidates()` 在 `candidate_mapping.clear_candidates()` 删除异常时，现在也会打印红色中文 `[搜索候选清理失败]` 日志和 `[处理建议]`，不再把 SQLite 删除异常静默吞成“候选本来就清空了”
   - copy fallback、completion-monitor、post-download auto import
@@ -278,9 +279,10 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - cleanup smoke remove-dead-global-symbol manual check：2026-04-15，`passed`（`tmpdir=$(mktemp -d) && cd "$tmpdir" && PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import app.bot.cleanup_smoke_logging as m; from pathlib import Path; assert not hasattr(m, '_cleanup_private_chat_smoke_log_path'); m.log_cleanup_private_chat_smoke(channel='telegram', query='cleanup inspect cleanup-shortcut', reply_text='清理预检结果：\\n任务 ID: 87', chat_id=1, user_id=2)" && test -f \"$tmpdir/logs/cleanup-private-chat-smoke.log\"`）
 - cleanup smoke remove-reset-api-shell manual check：2026-04-15，`passed`（`tmpdir=$(mktemp -d) && cd "$tmpdir" && PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import app.bot.cleanup_smoke_logging as m; from pathlib import Path; assert not hasattr(m, 'reset_cleanup_private_chat_smoke_log_file'); m.log_cleanup_private_chat_smoke(channel='telegram', query='cleanup inspect cleanup-shortcut', reply_text='清理预检结果：\\n任务 ID: 87', chat_id=1, user_id=2)" && test -f \"$tmpdir/logs/cleanup-private-chat-smoke.log\"`）
 - search media candidate-save observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import asyncio; from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'save_candidates': lambda self, chat_id, items: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: asyncio.sleep(0, result=[{'title':'Dune','year':2021,'size':1,'indexerName':'IndexerA'}]), candidate_repo=BoomRepo()); asyncio.run(service.search_and_format('dune', chat_id=1001))"`）
-- search media tests：2026-04-15，`25 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
+- search media tests：2026-04-15，`26 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
 - search media tmdb-failure observability tests：2026-04-15，`1 passed, 23 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k logs_tmdb_failure`）
 - search media backend-failure observability tests：2026-04-15，`1 passed, 24 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k logs_search_backend_failure`）
+- bt read-only search observability tests：2026-04-15，`1 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k raw_search_failure`）
 - search media clarification-upsert observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "import asyncio; from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'upsert_pending': lambda self, chat_id, query: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: asyncio.sleep(0, result=[]), clarification_repo=BoomRepo()); asyncio.run(service.search_and_format('unknown', chat_id=1001))"`）
 - search media clarification-clear observability tests：2026-04-15，`4 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or clear_clarification_pending_logs_persistence_failure"`）
 - search media clarification-load observability tests：2026-04-15，`5 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or is_clarification_pending_logs_persistence_failure"`）
