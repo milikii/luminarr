@@ -8,6 +8,10 @@ from app.db.sqlite import SqliteDatabase
 VALID_MEDIA_KINDS = frozenset({"movie", "series", "anime"})
 
 
+class WatchlistPersistenceError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class WatchlistItem:
     item_id: int
@@ -65,7 +69,7 @@ class WatchlistRepo:
 
         created_item = self.get_item_by_id(chat_id=chat_id, item_id=item_id)
         if created_item is None:
-            return None
+            raise WatchlistPersistenceError("watchlist_item missing after insert")
         return created_item, True
 
     def list_items(self, *, chat_id: int) -> list[WatchlistItem]:
