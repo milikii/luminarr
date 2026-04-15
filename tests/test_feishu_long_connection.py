@@ -120,3 +120,63 @@ def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_
 
     captured = capsys.readouterr()
     assert "[Feishu 长连接启动失败]" not in captured.out
+
+
+def test_feishu_long_connection_shutdown_logs_unexpected_disconnect_failure(
+    monkeypatch,
+    capsys,
+) -> None:
+    service = FeishuLongConnectionService(
+        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
+        feishu_client=SimpleNamespace(),
+    )
+    service._thread_loop = SimpleNamespace(is_closed=lambda: True)
+    service._ws_client = SimpleNamespace(_auto_reconnect=True, _disconnect=lambda: object(), _cache=None)
+    service._thread = SimpleNamespace(join=lambda timeout=0: None)
+
+    class FakeFuture:
+        def result(self, timeout: float | None = None) -> None:
+            _ = timeout
+            raise RuntimeError("network down")
+
+    monkeypatch.setattr(
+        feishu_long_connection_module.asyncio,
+        "run_coroutine_threadsafe",
+        lambda coroutine, loop: FakeFuture(),
+    )
+
+    asyncio.run(service.shutdown())
+
+    captured = capsys.readouterr()
+    assert "[Feishu 长连接关闭失败]" in captured.out
+    assert "network down" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_feishu_long_connection_shutdown_suppresses_expected_disconnect_error(
+    monkeypatch,
+    capsys,
+) -> None:
+    service = FeishuLongConnectionService(
+        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
+        feishu_client=SimpleNamespace(),
+    )
+    service._thread_loop = SimpleNamespace(is_closed=lambda: True)
+    service._ws_client = SimpleNamespace(_auto_reconnect=True, _disconnect=lambda: object(), _cache=None)
+    service._thread = SimpleNamespace(join=lambda timeout=0: None)
+
+    class FakeFuture:
+        def result(self, timeout: float | None = None) -> None:
+            _ = timeout
+            raise RuntimeError("Event loop is closed")
+
+    monkeypatch.setattr(
+        feishu_long_connection_module.asyncio,
+        "run_coroutine_threadsafe",
+        lambda coroutine, loop: FakeFuture(),
+    )
+
+    asyncio.run(service.shutdown())
+
+    captured = capsys.readouterr()
+    assert "[Feishu 长连接关闭失败]" not in captured.out

@@ -87,8 +87,14 @@ class FeishuLongConnectionService:
         future = asyncio.run_coroutine_threadsafe(client._disconnect(), loop)
         try:
             future.result(timeout=5.0)
-        except Exception:
-            pass
+        except Exception as error:
+            if not self._is_expected_disconnect_error(error):
+                print(
+                    f"\033[31m[Feishu 长连接关闭失败]\033[0m 原因={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 Feishu SDK 连接状态和事件循环是否已提前关闭；"
+                    "如服务仍在运行，可稍后重试停机。",
+                    flush=True,
+                )
         cron = getattr(getattr(client, "_cache", None), "_cron", None)
         if cron is not None and not loop.is_closed():
             loop.call_soon_threadsafe(cron.cancel)
@@ -103,6 +109,15 @@ class FeishuLongConnectionService:
     @staticmethod
     def _is_expected_shutdown_cancel(error: BaseException, thread: threading.Thread | None) -> bool:
         return thread is None and isinstance(error, asyncio.CancelledError)
+
+    @staticmethod
+    def _is_expected_disconnect_error(error: Exception) -> bool:
+        error_text = str(error)
+        return (
+            error.__class__.__name__ == "ConnectionClosedOK"
+            or "Event loop is closed" in error_text
+            or "Event loop stopped before Future completed" in error_text
+        )
 
     def _handle_loop_exception(self, loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
         exception = context.get("exception")
