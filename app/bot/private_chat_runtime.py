@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
-from types import SimpleNamespace
+from dataclasses import dataclass
 
-from app.bot.telegram_bot import handle_private_chat_query_text
+from app.bot import telegram_bot as telegram_runtime
+from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
+
+
+@dataclass(slots=True)
+class _PrivateChatRuntimeApplication:
+    bot_data: MutableMapping[str, object]
+
+
+@dataclass(slots=True)
+class _PrivateChatRuntimeContext:
+    application: _PrivateChatRuntimeApplication
 
 
 async def dispatch_private_chat_text(
@@ -14,15 +25,515 @@ async def dispatch_private_chat_text(
     user_id: int | None,
     bot_data: MutableMapping[str, object],
 ) -> None:
-    context = SimpleNamespace(
-        application=SimpleNamespace(
-            bot_data=bot_data,
-        )
-    )
     await handle_private_chat_query_text(
         query=query,
         reply_func=reply_func,
         chat_id=chat_id,
         user_id=user_id,
-        context=context,
+        bot_data=bot_data,
     )
+
+
+async def handle_private_chat_query_text(
+    *,
+    query: str,
+    reply_func: Callable[[str], Awaitable[object]],
+    chat_id: int | None,
+    user_id: int | None,
+    bot_data: MutableMapping[str, object],
+) -> None:
+    tg = telegram_runtime
+    context = _PrivateChatRuntimeContext(
+        application=_PrivateChatRuntimeApplication(bot_data=bot_data),
+    )
+    execution_gate = tg._resolve_execution_gate(context)
+    if tg._is_frustration_text(query):
+        if chat_id is not None:
+            job_repo = bot_data.get(tg.JOB_REPO_KEY)
+            if isinstance(job_repo, tg.JobRepo):
+                try:
+                    pending_job = job_repo.get_latest_pending_job(chat_id=chat_id)
+                except Exception:
+                    pending_job = None
+                if pending_job is not None:
+                    if pending_job.workflow_type == tg.WORKFLOW_IMPORT_TO_LIBRARY:
+                        import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
+                        if isinstance(import_service, tg.ImportToLibraryService):
+                            cancelled_text = await tg._run_sync_with_policy(
+                                execution_gate,
+                                tg.ACTION_CANCEL_PENDING_APPROVAL,
+                                lambda: import_service.cancel_pending_import(chat_id),
+                            )
+                            if cancelled_text == tg.IMPORT_CANCELLED_TEXT:
+                                await reply_func(cancelled_text)
+                                return
+                    if pending_job.workflow_type == tg.WORKFLOW_ADD_TO_DOWNLOADER:
+                        add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+                        if isinstance(add_service, tg.AddToDownloaderService):
+                            cancelled_text = await tg._run_sync_with_policy(
+                                execution_gate,
+                                tg.ACTION_CANCEL_PENDING_APPROVAL,
+                                lambda: add_service.cancel_pending_add(chat_id),
+                            )
+                            if cancelled_text == tg.ADD_CANCELLED_TEXT:
+                                await reply_func(cancelled_text)
+                                return
+
+        import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if isinstance(import_service, tg.ImportToLibraryService) and chat_id is not None:
+            cancelled_text = await tg._run_sync_with_policy(
+                execution_gate,
+                tg.ACTION_CANCEL_PENDING_APPROVAL,
+                lambda: import_service.cancel_pending_import(chat_id),
+            )
+            if cancelled_text == tg.IMPORT_CANCELLED_TEXT:
+                await reply_func(cancelled_text)
+                return
+
+        add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if isinstance(add_service, tg.AddToDownloaderService) and chat_id is not None:
+            cancelled_text = await tg._run_sync_with_policy(
+                execution_gate,
+                tg.ACTION_CANCEL_PENDING_APPROVAL,
+                lambda: add_service.cancel_pending_add(chat_id),
+            )
+            if cancelled_text == tg.ADD_CANCELLED_TEXT:
+                await reply_func(cancelled_text)
+                return
+
+        search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
+        if isinstance(search_service, tg.SearchMediaService) and chat_id is not None:
+            if search_service.is_clarification_pending(chat_id):
+                await tg._run_sync_with_policy(
+                    execution_gate,
+                    tg.ACTION_RESET_CLARIFICATION,
+                    lambda: search_service.clear_clarification_pending(chat_id),
+                )
+                await reply_func(tg.CLARIFICATION_RESET_TEXT)
+                return
+            if await tg._run_sync_with_policy(
+                execution_gate,
+                tg.ACTION_RESET_CANDIDATES,
+                lambda: search_service.clear_cached_candidates(chat_id),
+            ):
+                await reply_func(tg.FRUSTRATION_RESET_TEXT)
+                return
+        if tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id):
+            await reply_func(tg.RAW_BT_DESTINATION_CANCELLED_TEXT)
+            return
+        if tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id):
+            await reply_func(tg.BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
+            return
+        if tg._clear_bt_classification_pending(context=context, chat_id=chat_id):
+            await reply_func(tg.BT_CLASSIFICATION_CANCELLED_TEXT)
+            return
+        if tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id):
+            await reply_func(tg.BT_PROCESSING_PATH_CANCELLED_TEXT)
+            return
+
+    if tg._is_bt_direct_intent(query):
+        tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
+        tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
+        tg._set_bt_processing_path_pending(
+            context=context,
+            chat_id=chat_id,
+            source=query,
+        )
+        await reply_func(tg.BT_PROCESSING_PATH_PROMPT_TEXT)
+        return
+
+    if tg.parse_personal_wechat_login_query(query):
+        personal_wechat_login_service = bot_data.get(tg.PERSONAL_WECHAT_LOGIN_SERVICE_KEY)
+        telegram_send_media_func = bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY)
+        telegram_send_text_func = bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY)
+        if (
+            not isinstance(personal_wechat_login_service, tg.PersonalWeChatLoginService)
+            or not callable(telegram_send_media_func)
+            or chat_id is None
+        ):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            tg.ACTION_PERSONAL_WECHAT_LOGIN,
+            lambda: personal_wechat_login_service.start_login(
+                chat_id=chat_id,
+                send_media_func=telegram_send_media_func,
+                send_text_func=telegram_send_text_func if callable(telegram_send_text_func) else None,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    bt_read_only_query = tg._extract_bt_read_only_query(query)
+    if bt_read_only_query:
+        search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
+        if not isinstance(search_service, tg.SearchMediaService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        try:
+            reply = await execution_gate.run(
+                tg.ACTION_BT_READ_ONLY_HELPER,
+                lambda: search_service.search_bt_read_only_and_format(bt_read_only_query),
+            )
+        except Exception as error:
+            tg._log_bt_read_only_helper_error(query=bt_read_only_query, error=error)
+            await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
+            return
+        await reply_func(reply)
+        return
+
+    bt_classification = tg._parse_bt_classification_choice(query)
+    bt_processing_path = tg._parse_bt_processing_path_choice(query)
+    bt_processing_shortcut = tg._parse_bt_processing_path_legacy_shortcut(query)
+    if tg._is_bt_processing_path_pending(context=context, chat_id=chat_id) and (
+        bt_processing_path is not None or bt_processing_shortcut is not None
+    ):
+        bt_source = tg._pop_bt_processing_path_pending(context=context, chat_id=chat_id) or ""
+        tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
+        if bt_processing_path == "media_import":
+            await reply_func(
+                tg._enter_media_import_bt_flow(
+                    context=context,
+                    chat_id=chat_id,
+                    source=bt_source,
+                )
+            )
+            return
+        if bt_processing_path == "pure_bt":
+            await reply_func(
+                tg._enter_pure_bt_flow(
+                    context=context,
+                    chat_id=chat_id,
+                    source=bt_source,
+                )
+            )
+            return
+        if bt_processing_shortcut is not None:
+            shortcut_path, shortcut_media_kind = bt_processing_shortcut
+            if shortcut_path == "pure_bt":
+                await reply_func(
+                    tg._enter_pure_bt_flow(
+                        context=context,
+                        chat_id=chat_id,
+                        source=bt_source,
+                    )
+                )
+                return
+            await reply_func(
+                tg._enter_media_import_bt_flow(
+                    context=context,
+                    chat_id=chat_id,
+                    source=bt_source,
+                    media_kind=shortcut_media_kind,
+                )
+            )
+            return
+
+    if bt_classification is not None and tg._is_bt_classification_pending(context=context, chat_id=chat_id):
+        bt_source = tg._pop_bt_classification_pending(context=context, chat_id=chat_id) or ""
+        tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        await reply_func(
+            tg._enter_media_import_bt_flow(
+                context=context,
+                chat_id=chat_id,
+                source=bt_source,
+                media_kind=bt_classification,
+            )
+        )
+        return
+
+    task_ref = tg.parse_status_query(query)
+    if task_ref is not None:
+        status_service = bot_data.get(tg.GET_DOWNLOAD_STATUS_SERVICE_KEY)
+        if not isinstance(status_service, tg.GetDownloadStatusService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            tg.ACTION_GET_DOWNLOAD_STATUS,
+            lambda: status_service.get_status_text(task_ref, chat_id=chat_id),
+        )
+        await reply_func(reply)
+        return
+
+    watchlist_command = tg.parse_watchlist_query(query)
+    if watchlist_command is not None:
+        watchlist_service = bot_data.get(tg.MANAGE_WATCHLIST_SERVICE_KEY)
+        if not isinstance(watchlist_service, tg.ManageWatchlistService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await tg._run_sync_with_policy(
+            execution_gate,
+            tg._watchlist_policy_action(watchlist_command.action),
+            lambda: watchlist_service.handle(
+                watchlist_command,
+                chat_id=chat_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    bt_subscription_command = tg.parse_bt_subscription_query(query)
+    if bt_subscription_command is not None:
+        bt_subscription_service = bot_data.get(tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
+        if not isinstance(bt_subscription_service, tg.ManageBtSubscriptionService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        if bt_subscription_command.action == "run":
+            downloader_execution, resolution_error = tg._resolve_bound_downloader_execution(context=context, role="bt")
+            if resolution_error is not None:
+                await reply_func(resolution_error)
+                return
+            if downloader_execution is None:
+                await reply_func(tg.SERVICE_NOT_READY_TEXT)
+                return
+            reply = await execution_gate.run(
+                tg._bt_subscription_policy_action(bt_subscription_command),
+                lambda: bt_subscription_service.run_once(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    dispatch_context=tg.BtSubscriptionDispatchContext(
+                        downloader_name=downloader_execution.name,
+                        downloader_type=downloader_execution.downloader_type,
+                        download_dir=downloader_execution.download_dir,
+                    ),
+                ),
+            )
+            await reply_func(reply)
+            return
+        reply = await tg._run_sync_with_policy(
+            execution_gate,
+            tg._bt_subscription_policy_action(bt_subscription_command),
+            lambda: bt_subscription_service.handle(
+                bt_subscription_command,
+                chat_id=chat_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    import_ref = tg.parse_import_query(query)
+    if import_ref is not None:
+        import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if not isinstance(import_service, tg.ImportToLibraryService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            tg.ACTION_IMPORT_TO_LIBRARY,
+            lambda: import_service.import_by_task_ref(
+                import_ref,
+                chat_id=chat_id,
+                user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    cleanup_inspect_ref = tg.parse_cleanup_inspect_query(query)
+    if cleanup_inspect_ref is not None:
+        cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
+        if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
+            tg._log_cleanup_service_not_ready(action="cleanup_inspect", query=query)
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await tg._run_sync_with_policy(
+            execution_gate,
+            tg.ACTION_CLEANUP_INSPECT,
+            lambda: cleanup_service.inspect_by_task_ref(
+                cleanup_inspect_ref,
+                chat_id=chat_id,
+            ),
+        )
+        await reply_func(reply)
+        log_cleanup_private_chat_smoke(
+            channel="telegram",
+            query=query,
+            reply_text=reply,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        return
+
+    cleanup_ref = tg.parse_cleanup_query(query)
+    if cleanup_ref is not None:
+        cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
+        if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
+            tg._log_cleanup_service_not_ready(action="cleanup", query=query)
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await tg._run_sync_with_policy(
+            execution_gate,
+            tg.ACTION_CLEANUP_DOWNLOADER_SOURCE,
+            lambda: cleanup_service.cleanup_by_task_ref(
+                cleanup_ref,
+                chat_id=chat_id,
+            ),
+        )
+        await reply_func(reply)
+        log_cleanup_private_chat_smoke(
+            channel="telegram",
+            query=query,
+            reply_text=reply,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        return
+
+    confirm_ref = tg.parse_confirm_query(query)
+    if confirm_ref is not None:
+        if chat_id is not None and confirm_ref:
+            job_repo = bot_data.get(tg.JOB_REPO_KEY)
+            if isinstance(job_repo, tg.JobRepo):
+                try:
+                    matched_job = job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=confirm_ref)
+                except Exception:
+                    matched_job = None
+                if matched_job is not None and matched_job.workflow_type == tg.WORKFLOW_ADD_TO_DOWNLOADER:
+                    add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+                    if not isinstance(add_service, tg.AddToDownloaderService):
+                        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+                        return
+                    reply = await execution_gate.run(
+                        tg.ACTION_CONFIRM_ADD_TO_DOWNLOADER,
+                        lambda: add_service.confirm_add_by_task_ref(
+                            confirm_ref,
+                            chat_id=chat_id,
+                            user_id=user_id,
+                        ),
+                    )
+                    await reply_func(reply)
+                    return
+                if matched_job is not None and matched_job.workflow_type == tg.WORKFLOW_IMPORT_TO_LIBRARY:
+                    import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
+                    if not isinstance(import_service, tg.ImportToLibraryService):
+                        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+                        return
+                    reply = await execution_gate.run(
+                        tg.ACTION_CONFIRM_IMPORT_TO_LIBRARY,
+                        lambda: import_service.confirm_import_by_task_ref(
+                            confirm_ref,
+                            chat_id=chat_id,
+                            user_id=user_id,
+                        ),
+                    )
+                    await reply_func(reply)
+                    return
+
+        add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if (
+            isinstance(add_service, tg.AddToDownloaderService)
+            and chat_id is not None
+            and add_service.has_pending_add(chat_id, confirm_ref)
+        ):
+            reply = await execution_gate.run(
+                tg.ACTION_CONFIRM_ADD_TO_DOWNLOADER,
+                lambda: add_service.confirm_add_by_task_ref(
+                    confirm_ref,
+                    chat_id=chat_id,
+                    user_id=user_id,
+                ),
+            )
+            await reply_func(reply)
+            return
+
+        import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
+        if not isinstance(import_service, tg.ImportToLibraryService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        reply = await execution_gate.run(
+            tg.ACTION_CONFIRM_IMPORT_TO_LIBRARY,
+            lambda: import_service.confirm_import_by_task_ref(
+                confirm_ref,
+                chat_id=chat_id,
+                user_id=user_id,
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    bt_tmdb_pending = tg._get_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    if bt_tmdb_pending is not None:
+        reply = await tg._handle_bt_tmdb_association_query(
+            query=query,
+            pending=bt_tmdb_pending,
+            chat_id=chat_id,
+            user_id=user_id,
+            context=context,
+        )
+        await reply_func(reply)
+        return
+
+    raw_bt_destination_pending = tg._get_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    if raw_bt_destination_pending is not None:
+        reply = await tg._handle_raw_bt_destination_query(
+            query=query,
+            pending=raw_bt_destination_pending,
+            chat_id=chat_id,
+            user_id=user_id,
+            context=context,
+        )
+        await reply_func(reply)
+        return
+
+    if query.isdigit():
+        search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
+        if (
+            isinstance(search_service, tg.SearchMediaService)
+            and chat_id is not None
+            and search_service.is_clarification_pending(chat_id)
+        ):
+            await reply_func(tg.CLARIFICATION_SELECTION_BLOCKED_TEXT)
+            return
+
+        add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if not isinstance(add_service, tg.AddToDownloaderService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+
+        if chat_id is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        downloader_execution, resolution_error = tg._resolve_bound_downloader_execution(context=context, role="pt")
+        if resolution_error is not None:
+            await reply_func(resolution_error)
+            return
+        reply = await execution_gate.run(
+            tg.ACTION_ADD_TO_DOWNLOADER,
+            lambda: add_service.add_by_selection(
+                chat_id,
+                query,
+                user_id=user_id,
+                downloader_name=downloader_execution.name if downloader_execution is not None else "",
+                downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+                download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
+            ),
+        )
+        await reply_func(reply)
+        return
+
+    search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
+    if not isinstance(search_service, tg.SearchMediaService):
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return
+
+    if tg._is_bt_processing_path_pending(context=context, chat_id=chat_id):
+        await reply_func(tg.BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
+        return
+
+    if tg._is_bt_classification_pending(context=context, chat_id=chat_id):
+        await reply_func(tg.BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+        return
+
+    reply = await execution_gate.run(
+        tg.ACTION_SEARCH_MEDIA,
+        lambda: tg._search_with_reactive_recovery(
+            search_service=search_service,
+            query=query,
+            chat_id=chat_id,
+        ),
+    )
+    await reply_func(reply)

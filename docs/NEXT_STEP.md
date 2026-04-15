@@ -1,12 +1,13 @@
-# Next step (v199)
+# Next step (v200)
 
 ## Current goal
 
-- 当前唯一主线：**shared private-chat runtime 最小抽离**
-- 上一条主线完成态：**cleanup 四渠道验证窗口已完成**
+- 当前唯一主线：**持久化吞错收口**
+- 上一条主线完成态：**shared private-chat runtime 最小抽离已完成**
+- 更早完成态：**cleanup 四渠道验证窗口已完成**
 - 当前窗口：`2026-04-05 to 2026-04-12`（上一条 cleanup 主线的完成窗口）
 - 详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
-- 当前最小闭环：把 `handle_private_chat_query_text` 从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，去掉非 Telegram 渠道伪造 `SimpleNamespace` Telegram context 的做法；`微信登录` 这类 Telegram-only 媒资回传能力改成显式注入，不做多渠道平台化。
+- 当前最小闭环：把剩余 `except Exception: pass/return None`、`None/False` 混写异常态的持久化路径继续收口成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`，不改 workflow 真相和副作用边界。
 
 ## Source of truth
 
@@ -19,8 +20,8 @@
 ## Only do
 
 - cleanup 四渠道验证窗口已完成；当前只把这条能力当成完成态基线，不再继续把它当进行中窗口施工。
-- 把 shared runtime 入口从 Telegram handler 里抽离出来，让 Telegram / personal WeChat / Feishu / WeCom 都直接调同一个 channel-agnostic runtime。
-- 把 `微信登录`、Telegram 图片/文件回传这类 Telegram-only 能力收口成显式注入项，不再让 shared runtime 反向读取 `context.application.bot`。
+- shared private-chat runtime 最小抽离已完成；当前只把这条能力当成完成态基线，不再回退到 Telegram 独占入口。
+- 继续收口剩余持久化吞错路径，把“真没数据”和“SQLite / 配置异常”拆开，补齐显式中文日志与 `[处理建议]`。
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四个渠道都可用，且继续共用同一套 workflow、approval、`jobs` 和 SQLite 真相。
 - 保持已完成的 cleanup 验证窗口快照、窗口起止日期、四渠道真实私聊 smoke 进度、窗口活性、当前结论、最近一次 smoke gate / cleanup 协议回归 / verification docs gate 继续和 `docs/CLEANUP_VERIFICATION_WINDOW.md` / `docs/STATUS.md` 对齐。
 - 保持 cleanup 文档快照继续反映“当前 `.env` 已满足四渠道 smoke 环境键、且在 `app.main` 已运行时本地 `18889/wecom/callback` 已可达、四渠道真实私聊 smoke 已全部补齐”这条最新真相，避免环境 blocker、进程未启动和已完成窗口真相重新混写。
@@ -210,22 +211,19 @@
 
 ## Done when
 
-- `app/bot/private_chat_runtime.py` 不再伪造 Telegram `context` 或 `SimpleNamespace` 去调用 `app/bot/telegram_bot.py`。
-- `handle_private_chat_query_text` 或等价 shared private-chat 入口已经从 `app/bot/telegram_bot.py` 抽到独立 shared runtime 模块，并由四个渠道共同调用。
-- `微信登录`、Telegram 图片/文件回传这类 Telegram-only 能力改成显式注入；shared runtime 不再直接读取 `context.application.bot`。
-- `tests/test_cleanup_cross_channel_smoke.py` 与 shared runtime / 四渠道适配相关回归持续通过，cleanup discoverability / inspect / execution / rejection guidance / success follow-up / failure observability 没有协议回退。
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` 继续保留 cleanup 已完成证据，`docs/STATUS.md` / `docs/NEXT_STEP.md` / `README.md` 对“cleanup 已完成、当前主线切到 shared runtime 最小抽离”保持一致。
+- 剩余持久化路径里的 `except Exception: pass/return None`、`None/False` 混写异常态都已收口成显式中文日志与 `[处理建议]`。
+- shared runtime、approval、`jobs`、SQLite 真相和四渠道现有 cleanup / search / import / status / watchlist / btsub 协议没有回退。
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` 继续保留 cleanup 已完成证据，`docs/STATUS.md` / `docs/NEXT_STEP.md` / `README.md` 对“cleanup 已完成、shared runtime 抽离已完成、当前主线切到持久化吞错收口”保持一致。
 
 ## After this step
 
-1. 持久化吞错收口：`search_media`、`add_to_downloader`、`import_to_library`、`manage_watchlist`、`manage_bt_subscription` 剩余的 `except Exception: pass/return None` 或 `None/False` 混写异常态，继续改成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`。
-2. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
-3. Feishu 私聊事件解析器去重：`dict payload` 和 `SDK object payload` 两条路径先抽成同一套字段提取和构造逻辑，避免同一事件结构改两处。
-4. 独立后台下载完成轮询剩余少量回归与验证收口：当前最小闭环已接入应用启动/停止链，后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台。
-5. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
-6. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
-7. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
-8. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
-9. BT 共享确定性评分器。
-10. Jellyfin / Plex 支持（后续）。
-11. plugin 体系继续后置。
+1. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
+2. Feishu 私聊事件解析器去重：`dict payload` 和 `SDK object payload` 两条路径先抽成同一套字段提取和构造逻辑，避免同一事件结构改两处。
+3. 独立后台下载完成轮询剩余少量回归与验证收口：当前最小闭环已接入应用启动/停止链，后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台。
+4. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
+5. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
+6. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
+7. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
+8. BT 共享确定性评分器。
+9. Jellyfin / Plex 支持（后续）。
+10. plugin 体系继续后置。
