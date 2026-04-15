@@ -222,7 +222,7 @@
 4. `cleanup_smoke_logging` 去模块级全局状态：这条风险已收口；`log_cleanup_private_chat_smoke()` 已支持显式 `log_path`，默认落盘路径走调用时本地解析，append/configure/reset 全部不再依赖模块级状态，兼容 API 壳子和死变量也已删除；后续只保留 `tests/test_cleanup_smoke_logging.py` 回归门禁，不再作为独立施工项。
 5. Feishu 长连接私有 API 风险收口：锁定当前已验证的 `lark_oapi` 版本，并在代码里明确标注 `_auto_reconnect` / `_disconnect()` / `_cache._cron` / `lark_oapi.ws.client.loop` 这些内部 API 依赖。
 6. Feishu 私聊事件解析器去重：`dict payload` 和 `SDK object payload` 两条路径先抽成同一套字段提取和构造逻辑，避免同一事件结构改两处。
-7. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露、和 auto-import service 的启动条件解耦、启动配置缺口日志，以及停机失败日志也已补齐。后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台）。
+7. 独立后台下载完成轮询（当前已补上 `PostDownloadAutoImportService.run_once()` 的最小后台 tick，`download_monitor` 待完成列表已补齐限流读取，且独立 downloader status polling 最小闭环已接入应用启动/停止链；异常可观测性、service 显式能力暴露、和 auto-import service 的启动条件解耦、启动配置缺口日志、`download_monitor.record_status()` 写入失败日志，以及停机失败日志也已补齐。后续只继续收口这条链路最后少量的回归与验证，不扩成通用 scheduler 平台）。
 8. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置，parser-first，不做 DSL）。
 9. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
 10. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
