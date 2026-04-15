@@ -18,6 +18,7 @@ from app.services.get_download_status import (
 )
 from app.services.post_download_auto_import import (
     AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+    AutoImportRunResult,
     PostDownloadAutoImportService,
 )
 
@@ -410,6 +411,28 @@ def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: 
     assert result.progressed == 1
     assert len(result.replies) == 2
     auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
+
+
+def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) -> None:
+    monitor_repo = type(
+        "BoomRepo",
+        (),
+        {"list_completed_for_auto_import": lambda self, *, limit: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=type("EventRepo", (), {})(),
+        auto_import_func=AsyncMock(),
+    )
+
+    result = asyncio.run(auto_import_service.run_once(limit=5))
+
+    assert result == AutoImportRunResult(scanned=0, progressed=0, replies=())
+    output = capsys.readouterr().out
+    assert "[自动导入候选读取失败]" in output
+    assert "limit=5" in output
+    assert "db down" in output
+    assert "[处理建议]" in output
 
 
 def _run(coroutine: Awaitable[str]) -> str:

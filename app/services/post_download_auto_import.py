@@ -44,7 +44,14 @@ class PostDownloadAutoImportService:
         self._auto_import_func = auto_import_func
 
     async def run_once(self, *, limit: int = 20) -> AutoImportRunResult:
-        candidates = self._download_monitor_repo.list_completed_for_auto_import(limit=limit)
+        try:
+            candidates = self._download_monitor_repo.list_completed_for_auto_import(limit=limit)
+        except Exception as error:
+            print(
+                f"\033[31m[自动导入候选读取失败]\033[0m limit={limit} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
+                flush=True,
+            )
+            return AutoImportRunResult(scanned=0, progressed=0, replies=())
         replies: list[str] = []
         progressed = 0
 
