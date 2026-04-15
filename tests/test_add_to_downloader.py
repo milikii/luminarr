@@ -95,6 +95,33 @@ def test_cancel_pending_add_logs_job_lookup_failure(capsys) -> None:
     assert "[下载取消查询失败]" in capsys.readouterr().out
 
 
+def test_cancel_pending_add_logs_payload_corruption(capsys) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type("JobRepo", (), {"get_latest_pending_downloader_job": lambda self, **kwargs: pending_job})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+
+    assert service.cancel_pending_add(1001) is None
+
+    output = capsys.readouterr().out
+    assert "[下载取消载荷损坏]" in output
+    assert "job_id=job-1" in output
+
+
 def test_rebuild_confirm_context_logs_job_lookup_failure(capsys) -> None:
     job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)

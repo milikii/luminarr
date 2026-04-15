@@ -1,4 +1,4 @@
-# Current status (v208)
+# Current status (v209)
 
 ## Project position
 
@@ -39,6 +39,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 下载器名 lookup 在 `downloader_name` 指向不存在实例时，现在也会打印红色中文 `[下载器实例不存在]` 日志和 `[处理建议]`
   - `add_to_downloader.has_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载待确认查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
   - `add_to_downloader.cancel_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载取消查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待取消下载”
+  - `add_to_downloader.cancel_pending_add()` 在 `jobs.payload_json` 损坏时，现在也会打印红色中文 `[下载取消载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏数据静默吞成“没有待取消下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载确认上下文查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `jobs.payload_json` 损坏时，现在也会打印红色中文 `[下载确认上下文载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏数据静默吞成“没有待确认下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[下载确认审批查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“审批状态缺失”
@@ -293,6 +294,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - downloader routing fail-closed tests：2026-04-15，`4 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）
 - add to downloader pending-query observability tests：2026-04-15，`4 passed, 7 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or test_has_pending_add_logs_job_lookup_failure"`）
 - add to downloader cancel-query observability tests：2026-04-15，`5 passed, 7 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or cancel_pending_add_logs_job_lookup_failure"`）
+- add to downloader cancel payload observability tests：2026-04-15，`1 passed, 31 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k cancel_pending_add_logs_payload_corruption`）
 - add to downloader confirm-context job-query observability tests：2026-04-15，`6 passed, 7 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or rebuild_confirm_context_logs_job_lookup_failure"`）
 - add to downloader confirm-context payload observability tests：2026-04-15，`1 passed, 30 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k payload_corruption`）
 - add to downloader confirm-context approval-query observability tests：2026-04-15，`6 passed, 8 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or rebuild_confirm_context_logs_approval_lookup_failure"`）
