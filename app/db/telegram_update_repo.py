@@ -59,6 +59,10 @@ class TelegramUpdateRepo:
         cleaned_id = source_id.strip()
         if not cleaned_type or not cleaned_id:
             raise TelegramUpdatePersistenceError("telegram update identity missing")
+        if chat_id is not None and chat_id <= 0:
+            raise TelegramUpdatePersistenceError("telegram update chat identity missing")
+        if user_id is not None and user_id <= 0:
+            raise TelegramUpdatePersistenceError("telegram update user identity missing")
 
         update_key = f"{cleaned_type}:{cleaned_id}"
         with self._database.connect() as connection:

@@ -411,6 +411,18 @@ def test_telegram_update_repo_rejects_invalid_update_identity(tmp_path: Path) ->
         repo.record_callback_update(callback_query_id="", chat_id=2001, user_id=3001)
 
 
+def test_telegram_update_repo_rejects_non_positive_explicit_chat_or_user_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = TelegramUpdateRepo(database)
+
+    with pytest.raises(TelegramUpdatePersistenceError, match="telegram update chat identity missing"):
+        repo.record_message_update(update_id=1001, chat_id=0, user_id=3001)
+
+    with pytest.raises(TelegramUpdatePersistenceError, match="telegram update user identity missing"):
+        repo.record_callback_update(callback_query_id="cb-1", chat_id=2001, user_id=0)
+
+
 def test_clarification_repo_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
