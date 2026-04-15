@@ -637,3 +637,33 @@
   - `get_download_status` 当前会写 `download_monitor`、补 `downloader.completed_observed`，并可能接到 auto-import；因此它不是只读动作，不得放进 `READ_ONLY_ACTIONS` 绕过副作用串行边界。
 - **原因**：
   “解析失败后偷偷走默认值”会把真实错误伪装成“查不到资源”或“查错下载器”，最难排查。状态查询既然会写真相，就必须继续按 stateful path 对待。
+
+## D-038 主线兼容版 BT 批量任务只允许“确定性批量预览 + 显式批量确认”
+- **状态**：已决定
+- **日期**：2026-04-15
+- **结论**：
+  - 后续如果补 BT 批量任务，只允许走主线兼容版形状：
+    - 用户自然语言
+    - parser / routing 解析成结构化批量请求
+    - `WebSource` / BT source adapter 做确定性抓取
+    - 确定性代码完成编号范围过滤、去重、分页汇总、基础排序
+    - 系统回批量预览或批量待确认文本
+    - 用户显式执行批量 `confirm`
+    - 下载器 dispatch 继续复用既有 `approval -> confirm -> jobs -> job_event` 真相边界
+  - 这条能力只允许落在 BT 支线，且优先服务 `raw_bt` / 纯 BT 下载链；不得把 PT 主链、媒体型 BT 入库链或既有 `watchlist` / `btsub` 边界一起放宽。
+  - 站点接入仍必须是项目内确定性 `WebSource` 规则：
+    - 明确 allowlist 站点
+    - 明确页面类型，例如用户页、列表页、编号范围页
+    - 明确静态 HTML + 直接 magnet / torrent 链接边界
+    - 不允许让 LLM 临时决定“去哪个未知站点抓什么页面”
+  - LLM 在这条能力里最多只负责：
+    - 把自然语言解析成结构化批量请求
+    - 对批量预览结果做只读整理或摘要
+    不得负责：
+    - 自由抓站
+    - 写 workflow / approval / jobs / lease 真相
+    - 自动 `confirm`
+    - 直接 dispatch 下载器
+  - 这条能力也不得包装成通用 plugin / skill / MCP 平台；成人站点或其他 BT 站点若要接入，仍共用同一套主线兼容边界，不存在“题材专项豁免自动 confirm”。
+- **原因**：
+  纯 BT 后续确实需要支持“用户页 / 编号范围 / 批量补齐”这类更强的操作，但当前项目的核心仍是“自然语言入口 + 确定性执行 + 可恢复真相”。若把 BT 批量任务做成 LLM 自由抓取和自动投递，会直接破坏既有 approval、recoverability 和主线边界。

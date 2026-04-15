@@ -231,6 +231,7 @@
 5. `.ass` 字幕支持评估与最小实现（与 `series / anime` 同步收口）。
 6. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）。
 7. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
-8. BT 共享确定性评分器。
-9. Jellyfin / Plex 支持（后续）。
-10. plugin 体系继续后置。
+8. 主线兼容版 BT 批量预览 + 批量确认：自然语言解析成结构化批量请求，`WebSource` allowlist 站点继续走确定性页面抓取、编号范围过滤、去重和批量预览；最终仍复用既有 downloader approval -> `confirm` 边界，不做 LLM 自动抓站、自动 `confirm` 或通用 skill 平台。
+9. BT 共享确定性评分器。
+10. Jellyfin / Plex 支持（后续）。
+11. plugin 体系继续后置。
