@@ -19,6 +19,7 @@ WATCHLIST_ADD_USAGE_TEXT = (
     "添加格式：watchlist add <片名 [年份]>\n"
     "或：watchlist add <movie|series|anime> <片名 [年份]>"
 )
+WATCHLIST_ADD_FAILED_TEXT = "想看写入失败，请稍后重试。"
 WATCHLIST_REMOVE_USAGE_TEXT = "删除格式：watchlist remove <条目ID>"
 WATCHLIST_CLEAR_EMPTY_TEXT = "想看清单本来就是空的。"
 MEDIA_KIND_ALIASES = {
@@ -90,14 +91,14 @@ class ManageWatchlistService:
         if not title:
             return WATCHLIST_ADD_USAGE_TEXT
 
-        created = self._watchlist_repo.add_item(
+        created = self._add_item(
             chat_id=chat_id,
             title=title,
             year=year,
             media_kind=media_kind,
         )
         if created is None:
-            return WATCHLIST_ADD_USAGE_TEXT
+            return WATCHLIST_ADD_FAILED_TEXT
         item, is_created = created
         year_text = item.year if item.year else "-"
         kind_text = _media_kind_label(item.media_kind)
@@ -122,6 +123,41 @@ class ManageWatchlistService:
         if deleted <= 0:
             return WATCHLIST_CLEAR_EMPTY_TEXT
         return f"已清空想看清单，共删除 {deleted} 条。"
+
+    def _add_item(
+        self,
+        *,
+        chat_id: int,
+        title: str,
+        year: str,
+        media_kind: str,
+    ):
+        try:
+            created = self._watchlist_repo.add_item(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+            )
+        except Exception as error:
+            _log_watchlist_add_failed(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+                reason=str(error),
+            )
+            return None
+        if created is not None:
+            return created
+        _log_watchlist_add_failed(
+            chat_id=chat_id,
+            title=title,
+            year=year,
+            media_kind=media_kind,
+            reason="watchlist_repo.add_item returned None",
+        )
+        return None
 
 
 def parse_watchlist_query(text: str) -> WatchlistCommand | None:
@@ -177,3 +213,18 @@ def _parse_media_kind_prefix(raw_title: str) -> tuple[str, str]:
 def _media_kind_label(media_kind: str) -> str:
     cleaned_kind = media_kind.strip().lower()
     return MEDIA_KIND_LABELS.get(cleaned_kind, MEDIA_KIND_LABELS["movie"])
+
+
+def _log_watchlist_add_failed(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[想看写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
+    )

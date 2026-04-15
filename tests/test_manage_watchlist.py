@@ -6,6 +6,7 @@ from pathlib import Path
 from app.db.sqlite import SqliteDatabase
 from app.db.watchlist_repo import WatchlistRepo
 from app.services.manage_watchlist import (
+    WATCHLIST_ADD_FAILED_TEXT,
     WATCHLIST_ADD_USAGE_TEXT,
     WATCHLIST_EMPTY_TEXT,
     WATCHLIST_REMOVE_USAGE_TEXT,
@@ -90,6 +91,40 @@ def test_manage_watchlist_validation_errors(tmp_path: Path) -> None:
     assert service.handle(parse_watchlist_query("watchlist add series"), chat_id=1001) == WATCHLIST_ADD_USAGE_TEXT
     assert service.handle(parse_watchlist_query("watchlist remove"), chat_id=1001) == WATCHLIST_REMOVE_USAGE_TEXT
     assert service.handle(parse_watchlist_query("watchlist remove x"), chat_id=1001) == WATCHLIST_REMOVE_USAGE_TEXT
+
+
+def test_manage_watchlist_add_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _fail_add_item(**_: object) -> None:
+        return None
+
+    repo.add_item = _fail_add_item  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist add dune 2021"), chat_id=1001)
+
+    assert reply == WATCHLIST_ADD_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看写入失败]" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_manage_watchlist_add_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _crash_add_item(**_: object) -> None:
+        raise RuntimeError("db down")
+
+    repo.add_item = _crash_add_item  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist add dune 2021"), chat_id=1001)
+
+    assert reply == WATCHLIST_ADD_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看写入失败]" in captured.out
+    assert "db down" in captured.out
 
 
 def test_watchlist_repo_persists_for_restart(tmp_path: Path) -> None:
