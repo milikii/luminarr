@@ -98,7 +98,11 @@ class SearchMediaService:
         if self._lookup_movie_func is not None:
             try:
                 tmdb_movie = await self._lookup_movie_func(parsed_query.title, parsed_query.year)
-            except Exception:
+            except Exception as error:
+                print(
+                    f"\033[31m[TMDB 查询失败]\033[0m query={cleaned_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}\n\033[33m[处理建议]\033[0m 检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但海报卡片和标题归一化结果可能缺失。",
+                    flush=True,
+                )
                 tmdb_movie = None
             if tmdb_movie is not None:
                 resolved_year = tmdb_movie.year or parsed_query.year

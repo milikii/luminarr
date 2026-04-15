@@ -373,6 +373,24 @@ def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> N
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune 2021")
 
 
+def test_search_and_format_logs_tmdb_failure(capsys) -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune 2021"
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        raise RuntimeError("tmdb unavailable")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+
+    text = _run(service.search_and_format("Dune 2021"))
+
+    assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune 2021")
+    output = capsys.readouterr().out
+    assert "[TMDB 查询失败]" in output
+    assert "query=Dune 2021" in output
+
+
 def test_parse_movie_query_parentheses_year() -> None:
     parsed = parse_movie_query("Dune (2021)")
     assert parsed.title == "Dune"
