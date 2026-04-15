@@ -67,6 +67,7 @@ from app.bot.telegram_bot import (
     _download_completion_polling_loop,
     _poll_pending_download_completion_once,
     _post_download_auto_import_scheduler_loop,
+    _run_bt_subscription_scheduler_tick_once,
     _start_post_download_auto_import_scheduler,
     _stop_post_download_auto_import_scheduler,
     _log_bt_subscription_scheduler_config_error,
@@ -2669,6 +2670,23 @@ def test_log_bt_subscription_scheduler_config_error_prints_fix_hint(
     captured = capsys.readouterr()
     assert "[BT 订阅后台扫描未启动]" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_run_bt_subscription_scheduler_tick_once_skips_none_notifications() -> None:
+    execution_gate = SimpleNamespace(run=AsyncMock(return_value=None))
+    application = SimpleNamespace(bot=SimpleNamespace(send_message=AsyncMock()))
+    service = SimpleNamespace(run_scheduler_tick=AsyncMock(return_value=None))
+
+    asyncio.run(
+        _run_bt_subscription_scheduler_tick_once(
+            application=application,
+            bt_subscription_service=service,
+            execution_gate=execution_gate,
+            dispatch_context=SimpleNamespace(),
+        )
+    )
+
+    application.bot.send_message.assert_not_awaited()
 
 
 def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:

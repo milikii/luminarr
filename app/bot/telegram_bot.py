@@ -825,6 +825,8 @@ async def _run_bt_subscription_scheduler_tick_once(
             dispatch_context=dispatch_context,
         ),
     )
+    if notifications is None:
+        return
     for chat_id, reply_text in notifications:
         await _send_bt_subscription_scheduler_message(
             application=application,

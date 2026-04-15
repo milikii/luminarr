@@ -136,13 +136,13 @@ class ManageBtSubscriptionService:
         self,
         *,
         dispatch_context: BtSubscriptionDispatchContext,
-    ) -> tuple[tuple[int, str], ...]:
+    ) -> tuple[tuple[int, str], ...] | None:
         notifications: list[tuple[int, str]] = []
         try:
             chat_ids = self._bt_subscription_repo.list_chat_ids()
         except Exception as error:
             _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
-            return ()
+            return None
         for chat_id in chat_ids:
             result = await self._scan_chat_once(
                 chat_id=chat_id,

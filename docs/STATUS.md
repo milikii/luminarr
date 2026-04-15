@@ -226,6 +226,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_name_for_task()` 在读取 downloader job 失败时，现在会打印红色中文 `[下载器路由查询失败]` 和 `[处理建议]`，不再把 SQLite/jobs 读取异常混写成普通 `downloader job missing`。
 - 2026-04-15 代码审查确认：`app.main` 里 `_resolve_downloader_name_for_task()` 读取 `jobs.payload_json` 时，现在会把空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[下载器路由载荷损坏]` 和 `[处理建议]`，不再把这些持久化坏数据统一混写成普通 `downloader_name missing`。
 - 2026-04-15 代码审查确认：`search_media.get_cached_candidate()` 读取 `candidate_mapping.candidate_json` 时，现在会把坏 JSON、非对象 payload 单独记成红色中文 `[搜索候选载荷损坏]` 和 `[处理建议]`，不再把这类持久化坏候选混写成普通缓存未命中。
+- 2026-04-15 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_item` 的 chat 列表失败时，现在会返回显式失败态 `None`，并由 Telegram scheduler tick 接线直接跳过本轮，不再把 SQLite 读取异常混写成“当前没有任何通知”的空元组。
 - 2026-04-15 代码审查确认：`post_download_auto_import._has_terminal_activity()` 在读取 `job_event` 终态失败时，现在会打印红色中文 `[自动导入终态查询失败]` 和 `[处理建议]`，并停止这条任务的自动导入跟进，不再把 SQLite 读取异常混写成“还没有终态事件”继续推进自动导入。
 - 2026-04-15 代码审查确认：`telegram_bot._get_bt_tmdb_association_pending()` 在读取 `bt_pending_state` 失败时，现在也会打印红色中文 `[BT 待处理读取失败]` 和 `[处理建议]`，并按无待处理状态 fail-closed，不再把 SQLite 读取异常直接冒成上层泛化失败。
 - 2026-04-15 代码审查确认：`telegram_bot` 恢复 BT pending 状态时，现在会把 `bt_pending_state.payload_json` 的空载荷、坏 JSON、非对象 payload 单独记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，并直接 fail-closed，不再把坏待处理状态当成正常 processing path / classification / tmdb association / raw_bt destination 上下文继续走。
