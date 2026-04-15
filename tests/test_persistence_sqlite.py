@@ -96,6 +96,15 @@ def test_candidate_mapping_repo_raises_when_saved_count_mismatches(tmp_path: Pat
         repo.save_candidates(1001, [{"title": "Dune"}])
 
 
+def test_candidate_mapping_repo_rejects_missing_chat_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = CandidateMappingRepo(database)
+
+    with pytest.raises(CandidatePersistenceError, match="candidate_mapping chat identity missing"):
+        repo.save_candidates(0, [{"title": "Dune"}])
+
+
 def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

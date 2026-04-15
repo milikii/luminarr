@@ -20,6 +20,8 @@ class CandidateMappingRepo:
         self._database = database
 
     def save_candidates(self, chat_id: int, candidates: Sequence[Mapping[str, Any]]) -> None:
+        if chat_id <= 0:
+            raise CandidatePersistenceError("candidate_mapping chat identity missing")
         normalized_candidates = [_normalize_payload(candidate) for candidate in candidates]
         with self._database.connect() as connection:
             connection.execute("DELETE FROM candidate_mapping WHERE chat_id = ?", (chat_id,))
