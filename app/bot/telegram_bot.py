@@ -1547,6 +1547,11 @@ def _get_raw_bt_destination_pending(
     raw_options = payload.get("options")
     source = str(payload.get("source", "")).strip()
     if not isinstance(raw_options, list):
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.options missing or not list",
+        )
         return None
     options: list[RawBtDestinationOption] = []
     for raw_option in raw_options:
@@ -1559,6 +1564,11 @@ def _get_raw_bt_destination_pending(
             continue
         options.append(RawBtDestinationOption(key=key, label=label, target_dir=target_dir))
     if not options:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.options has no valid entries",
+        )
         return None
     resolved_pending = RawBtDestinationPending(options=tuple(options), source=source)
     pending_by_chat[chat_id] = resolved_pending
