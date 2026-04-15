@@ -1308,6 +1308,26 @@ def test_approve_import_requires_current_lease_version(tmp_path: Path) -> None:
     )
 
 
+def test_approval_repo_rejects_missing_identity_for_state_transition(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for state transition"):
+        repo.approve_import(task_id="", task_hash="hash-87", task_ref="87", expected_lease_version=1)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval expected lease version missing for state transition"):
+        repo.restore_import_pending(
+            task_id="87",
+            task_hash="hash-87",
+            task_ref="87",
+            expected_lease_version=0,
+        )
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for state transition"):
+        repo.cancel_downloader(task_id="88", task_hash="", task_ref="88", expected_lease_version=1)
+
+
 def test_import_stale_guard_blocks_duplicate_after_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

@@ -278,6 +278,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-16 代码审查确认：`job_event_repo.append_event()` 遇到空 `task_ref` 或空 `event_type` 时，现在也会显式抛出 `JobEventPersistenceError`；事件真相层不再把坏事件身份静默折叠成一条看似合法的事件记录。
 - 2026-04-15 代码审查确认：`approval_repo._upsert_approval()` 在 `approval_record` 写入成功后如果回读不到刚写入的审批行，现在会显式抛出 `approval_record missing after upsert`；审批真相层不再把这类基线记录缺口静默吞成“SQLite 里应该有记录、但实际空着”。
 - 2026-04-16 代码审查确认：`approval_repo.get_import_approval()` / `get_downloader_approval()` 遇到空 `task_id` 或空 `task_hash` 时，现在也会显式抛出 `ApprovalPersistenceError`；审批真相层不再把坏审批身份静默折叠成普通“没有审批记录”。
+- 2026-04-16 代码审查确认：`approval_repo.approve_*()` / `restore_*_pending()` / `cancel_*()` 遇到空 `task_id`、空 `task_hash` 或空 `expected_lease_version` 时，现在也会显式抛出 `ApprovalPersistenceError`；审批真相层不再把坏审批状态迁移身份静默折叠成普通 `False`。
 - 2026-04-15 代码审查确认：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 删除失败时，现在会恢复当前进程内候选并返回 `False`，Telegram 私聊入口也不会再回 `已清除当前候选，请重新搜索。`，避免把 SQLite/候选表删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：`search_media.clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 删除失败时，现在会恢复当前进程内待澄清状态并返回 `False`；Telegram 私聊入口也不会再回 `已重置当前澄清，请重新描述。` 之类的重置文本，避免把 SQLite/clarification 删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：frustration/reset 入口在候选清理失败时，现在会直接结束这次“算了/取消”处理，不再把这类 frustration 文本继续当普通搜索请求往下走，避免候选表删除失败后又返回一条和用户意图无关的搜索结果。
