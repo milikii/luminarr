@@ -138,7 +138,12 @@ class ManageBtSubscriptionService:
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> tuple[tuple[int, str], ...]:
         notifications: list[tuple[int, str]] = []
-        for chat_id in self._bt_subscription_repo.list_chat_ids():
+        try:
+            chat_ids = self._bt_subscription_repo.list_chat_ids()
+        except Exception as error:
+            _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
+            return ()
+        for chat_id in chat_ids:
             result = await self._scan_chat_once(
                 chat_id=chat_id,
                 user_id=None,
@@ -575,6 +580,13 @@ def _log_bt_subscription_scan_error(
 def _log_bt_subscription_scan_items_failed(*, chat_id: int, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅扫描读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
+    )
+
+
+def _log_bt_subscription_scan_chat_ids_failed(*, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅扫描 chat 列表读取失败]\033[0m 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
     )
 
