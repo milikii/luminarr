@@ -38,8 +38,10 @@ class WatchlistRepo:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
         cleaned_media_kind = _normalize_media_kind(media_kind)
-        if chat_id <= 0 or not cleaned_title:
-            return None
+        if chat_id <= 0:
+            raise WatchlistPersistenceError("watchlist_item chat identity missing")
+        if not cleaned_title:
+            raise WatchlistPersistenceError("watchlist_item title missing")
 
         existing = self.get_item_by_identity(
             chat_id=chat_id,

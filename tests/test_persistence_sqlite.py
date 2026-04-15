@@ -38,6 +38,7 @@ from app.db.job_repo import (
 )
 from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError, TelegramUpdateRepo
+from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.services.add_to_downloader import (
     ADD_CANCELLED_TEXT,
     ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -698,6 +699,18 @@ def test_approval_repo_persists_for_restart(tmp_path: Path) -> None:
     assert record.lease_version == 1
     assert record.executed_version == 1
     assert record.last_task_ref == "87"
+
+
+def test_watchlist_repo_rejects_missing_identity_for_add(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = WatchlistRepo(database)
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item chat identity missing"):
+        repo.add_item(chat_id=0, title="Dune", year="2021", media_kind="movie")
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item title missing"):
+        repo.add_item(chat_id=1001, title="   ", year="2021", media_kind="movie")
 
 
 def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
