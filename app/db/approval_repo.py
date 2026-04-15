@@ -256,10 +256,10 @@ class ApprovalRepo:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
-            return
+            raise ApprovalPersistenceError("approval task identity missing for upsert")
         cleaned_status = status.strip()
         if not cleaned_status:
-            return
+            raise ApprovalPersistenceError("approval status missing for upsert")
 
         initial_lease_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
         initial_executed_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
@@ -322,7 +322,7 @@ class ApprovalRepo:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
-            return 0
+            raise ApprovalPersistenceError("approval task identity missing for pending request")
         expires_at = _format_utc(_utcnow() + timedelta(seconds=max(0, timeout_seconds)))
 
         with self._database.connect() as connection:
@@ -504,8 +504,10 @@ class ApprovalRepo:
     ) -> None:
         cleaned_task_id = task_id.strip()
         cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash or executed_lease_version <= 0:
-            return
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise ApprovalPersistenceError("approval task identity missing for executed version update")
+        if executed_lease_version <= 0:
+            raise ApprovalPersistenceError("approval executed lease version missing")
 
         with self._database.connect() as connection:
             cursor = connection.execute(

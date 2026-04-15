@@ -547,6 +547,30 @@ def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
         repo.upsert_import_approval(task_id="87", task_hash="hash-87", task_ref="87")
 
 
+def test_approval_repo_rejects_missing_identity_for_write_paths(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for upsert"):
+        repo.upsert_import_approval(task_id="", task_hash="hash-87", task_ref="87")
+
+    with pytest.raises(ApprovalPersistenceError, match="approval status missing for upsert"):
+        repo.upsert_import_approval(task_id="87", task_hash="hash-87", task_ref="87", status="")
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for pending request"):
+        repo.request_import_approval(task_id="", task_hash="hash-87", task_ref="87")
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for pending request"):
+        repo.request_downloader_approval(task_id="88", task_hash="", task_ref="88")
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for executed version update"):
+        repo.mark_import_executed(task_id="", task_hash="hash-87", executed_lease_version=1)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval executed lease version missing"):
+        repo.mark_downloader_executed(task_id="88", task_hash="hash-88", executed_lease_version=0)
+
+
 def test_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
