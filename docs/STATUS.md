@@ -1,4 +1,4 @@
-# Current status (v239)
+# Current status (v240)
 
 ## Project position
 
@@ -263,6 +263,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-16 代码审查确认：`get_download_status._record_status_observation()` 在 `job_event.append_event()` 写 `downloader.completed_observed` 失败时，现在也会把“下载状态真实结果 + 完成观察事件 warning”一起返回；状态查询不再把这类事件落盘异常继续混成普通纯状态文本。
 - 2026-04-15 代码审查确认：`watchlist_repo.remove_item()` 遇到空 `chat_id` 或空 `item_id` 时，现在也会显式抛出 `WatchlistPersistenceError`；`manage_watchlist` 会继续复用现有红色中文 `[想看删除失败]` 和 `[处理建议]`，不再把坏删除身份静默折叠成普通 `False`。
 - 2026-04-15 代码审查确认：`watchlist_repo.clear_items()` 遇到空 `chat_id` 时，现在也会显式抛出 `WatchlistPersistenceError`；`manage_watchlist` 会继续复用现有红色中文 `[想看清单清空失败]` 和 `[处理建议]`，不再把坏清空身份静默折叠成普通 `0`。
+- 2026-04-16 代码审查确认：`manage_watchlist._list_items()` / `_remove_item()` / `_clear_items()` 现在也会把 `watchlist_repo.list_items()` / `remove_item()` / `clear_items()` 意外返回空结果显式记成 `watchlist list/remove/clear result missing`，并继续打印红色中文 `[想看清单读取失败]` / `[想看删除失败]` / `[想看清单清空失败]` 和 `[处理建议]`；想看入口不再把这类仓储契约破坏只混成用户侧失败文本却没有运维日志。
 - 2026-04-16 代码审查确认：`watchlist_repo._to_watchlist_item()` 读到坏 `watchlist_item` 行时，如果 `id/chat_id<=0`、`title` 为空或 `media_kind` 不是 `movie/series/anime`，现在也会显式抛出 `WatchlistPersistenceError`；想看清单真相层不再把损坏条目误包装成正常列表数据返回给 `watchlist list` / `watchlist add` 回读路径。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `bt_subscription_item missing after insert`，并由 `manage_bt_subscription` 继续打印红色中文 `[BT 订阅写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
 - 2026-04-16 代码审查确认：`manage_bt_subscription._add_item()` 现在会把 `bt_subscription_repo.add_item()` 意外返回空结果显式记成 `bt subscription add result missing`；BT 订阅入口不再把这类契约破坏继续混写成模糊的 `repo returned None`。
@@ -566,6 +567,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - watchlist remove identity fail-closed persistence tests：2026-04-15，`2 passed, 50 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "watchlist_repo_rejects_missing_identity_for_remove or watchlist_repo_rejects_missing_identity_for_add"`）
 - watchlist clear identity fail-closed persistence tests：2026-04-15，`3 passed, 50 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "watchlist_repo_rejects_missing_chat_identity_for_clear or watchlist_repo_rejects_missing_identity_for_remove or watchlist_repo_rejects_missing_identity_for_add"`）
 - watchlist list identity fail-closed persistence tests：2026-04-15，`4 passed, 50 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "watchlist_repo_rejects_missing_chat_identity_for_list or watchlist_repo_rejects_missing_chat_identity_for_clear or watchlist_repo_rejects_missing_identity_for_remove or watchlist_repo_rejects_missing_identity_for_add"`）
+- watchlist service missing-result observability tests：2026-04-16，`16 passed`（`.venv/bin/python -m pytest -q tests/test_manage_watchlist.py`）
 - bt subscription add identity fail-closed persistence tests：2026-04-15，`1 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "bt_subscription_repo_rejects_missing_identity_for_add"`）
 - bt subscription invalid-kind write guard tests：2026-04-16，`7 passed, 82 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "bt_subscription_repo_rejects_missing_identity_for_add or bt_subscription_repo_rejects_missing_identity_for_last_seen_update or bt_subscription_repo_rejects_missing_identity_for_remove or bt_subscription_repo_rejects_missing_chat_identity_for_clear or bt_subscription_repo_rejects_missing_chat_identity_for_list or bt_subscription_repo_rejects_corrupted_row_after_read"`）
 - bt subscription list identity fail-closed persistence tests：2026-04-15，`5 passed, 50 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "bt_subscription_repo_rejects_missing_chat_identity_for_list or bt_subscription_repo_rejects_missing_chat_identity_for_clear or bt_subscription_repo_rejects_missing_identity_for_remove or bt_subscription_repo_rejects_missing_identity_for_last_seen_update or bt_subscription_repo_rejects_missing_identity_for_add"`）

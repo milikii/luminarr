@@ -113,6 +113,24 @@ def test_manage_watchlist_list_returns_failure_text_when_repo_raises(tmp_path: P
     assert "db down" in captured.out
 
 
+def test_manage_watchlist_list_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _missing_list_items(**_: object) -> None:
+        return None
+
+    repo.list_items = _missing_list_items  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist list"), chat_id=1001)
+
+    assert reply == WATCHLIST_LIST_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看清单读取失败]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist list result missing" in captured.out
+
+
 def test_manage_watchlist_add_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
     repo = WatchlistRepo(_make_database(tmp_path))
 
@@ -180,6 +198,24 @@ def test_manage_watchlist_remove_returns_failure_text_when_repo_raises(tmp_path:
     assert "db down" in captured.out
 
 
+def test_manage_watchlist_remove_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _missing_remove_item(**_: object) -> None:
+        return None
+
+    repo.remove_item = _missing_remove_item  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist remove 7"), chat_id=1001)
+
+    assert reply == WATCHLIST_REMOVE_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看删除失败]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist remove result missing" in captured.out
+
+
 def test_manage_watchlist_clear_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     repo = WatchlistRepo(_make_database(tmp_path))
 
@@ -195,6 +231,24 @@ def test_manage_watchlist_clear_returns_failure_text_when_repo_raises(tmp_path: 
     captured = capsys.readouterr()
     assert "[想看清单清空失败]" in captured.out
     assert "db down" in captured.out
+
+
+def test_manage_watchlist_clear_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _missing_clear_items(**_: object) -> None:
+        return None
+
+    repo.clear_items = _missing_clear_items  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist clear"), chat_id=1001)
+
+    assert reply == WATCHLIST_CLEAR_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看清单清空失败]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist clear result missing" in captured.out
 
 
 def test_watchlist_repo_persists_for_restart(tmp_path: Path) -> None:

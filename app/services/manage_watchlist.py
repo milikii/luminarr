@@ -163,21 +163,30 @@ class ManageWatchlistService:
 
     def _list_items(self, *, chat_id: int):
         try:
-            return self._watchlist_repo.list_items(chat_id=chat_id)
+            items = self._watchlist_repo.list_items(chat_id=chat_id)
+            if items is None:
+                raise WatchlistPersistenceError("watchlist list result missing")
+            return items
         except Exception as error:
             _log_watchlist_list_failed(chat_id=chat_id, reason=str(error))
             return None
 
     def _remove_item(self, *, chat_id: int, item_id: int):
         try:
-            return self._watchlist_repo.remove_item(chat_id=chat_id, item_id=item_id)
+            removed = self._watchlist_repo.remove_item(chat_id=chat_id, item_id=item_id)
+            if removed is None:
+                raise WatchlistPersistenceError("watchlist remove result missing")
+            return removed
         except Exception as error:
             _log_watchlist_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
             return None
 
     def _clear_items(self, *, chat_id: int):
         try:
-            return self._watchlist_repo.clear_items(chat_id=chat_id)
+            deleted = self._watchlist_repo.clear_items(chat_id=chat_id)
+            if deleted is None:
+                raise WatchlistPersistenceError("watchlist clear result missing")
+            return deleted
         except Exception as error:
             _log_watchlist_clear_failed(chat_id=chat_id, reason=str(error))
             return None
