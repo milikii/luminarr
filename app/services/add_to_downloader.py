@@ -327,7 +327,16 @@ class AddToDownloaderService:
             expected_lease_version = self._resolve_pending_lease_version(
                 task_id=pending_add.task_id,
                 task_hash=pending_add.task_hash,
+                allow_in_memory_fallback_on_error=False,
             )
+        if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         if expected_lease_version <= 0:
             if claimed_job:
                 self._restore_pending_job(

@@ -781,6 +781,55 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_update_
     assert "lease_version=2" in output
 
 
+def test_confirm_add_by_task_ref_returns_state_unavailable_when_pending_lease_lookup_fails_after_stale_check(
+    capsys,
+) -> None:
+    approval_records = iter(
+        (
+            type("ApprovalRecord", (), {"lease_version": 0, "executed_version": 0})(),
+            RuntimeError("db down"),
+        )
+    )
+
+    def _get_downloader_approval(**_: object):
+        next_value = next(approval_records)
+        if isinstance(next_value, Exception):
+            raise next_value
+        return next_value
+
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_downloader_approval": lambda self, **kwargs: _get_downloader_approval(**kwargs),
+            "approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("approve_downloader should not be called")),
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+    service._pending_add_identities.add((pending_add.task_id, pending_add.task_hash))
+    service._pending_add_lease_versions[(pending_add.task_id, pending_add.task_hash)] = 2
+
+    reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert reply == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+    output = capsys.readouterr().out
+    assert "[下载待确认版号查询失败]" in output
+    assert "task_id=selection:1" in output
+    assert "db down" in output
+
+
 def test_cancel_pending_add_logs_job_cancel_failure(capsys) -> None:
     pending_job = JobRecord(
         job_id="job-1",
