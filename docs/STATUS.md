@@ -54,7 +54,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `add_to_downloader._record_executed_lease_version()` 在 `approval_record` 回写异常时，现在也会打印红色中文 `[下载执行版号回写失败]` 日志和 `[处理建议]`，不再把 SQLite 回写异常静默吞成“仅内存 lease 前进”
   - `add_to_downloader._record_event()` 在 `job_event` 写入异常时，现在也会打印红色中文 `[下载事件落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“事件没记下来但流程继续”
   - `add_to_downloader._register_download_monitor()` 在 `download_monitor` 写入异常时，现在也会打印红色中文 `[下载监控登记失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“下载已投递但后续状态跟踪没登记”
-  - `add_to_downloader._record_pending_job()` 在 `jobs` 写入异常时，现在也会打印红色中文 `[下载待确认任务落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“待确认文本返回了，但重启后上下文丢失”
+  - `add_to_downloader._record_pending_job()` 在 `jobs` 写入异常时，现在也会打印红色中文 `[下载待确认任务落盘失败]` 日志和 `[处理建议]`；当前请求会直接返回 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 写入异常静默吞成“待确认文本返回了，但真相未落盘”
   - `add_to_downloader._claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` 在 `jobs` lease/完成态更新异常时，现在也会打印红色中文 `[下载确认任务抢占失败]` / `[下载确认任务回退失败]` / `[下载确认任务完结失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成普通冲突或无事发生
   - `add_to_downloader._restore_pending_approval()` 在 `approval_record` 回退异常时，现在也会打印红色中文 `[下载审批回退失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“进程内回退了就算成功”
   - `add_to_downloader._resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[下载待确认版号查询失败]` / `[下载确认执行版号查询失败]` / `[下载确认过期判断失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默混写成普通 not pending 或未过期
