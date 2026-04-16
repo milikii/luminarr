@@ -539,6 +539,16 @@ def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_restore_pending_job_logs_rejected_current_state(capsys) -> None:
+    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: False})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    service._restore_pending_job(job_id="job-1", expected_version=3, lease_owner="downloader_confirm:1")
+    output = capsys.readouterr().out
+    assert "[下载确认任务回退失败]" in output
+    assert "jobs.release_lease_to_pending rejected current state" in output
+    assert "job_id=job-1" in output
+
+
 def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"mark_downloader_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)

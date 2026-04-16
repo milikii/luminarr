@@ -906,7 +906,7 @@ class AddToDownloaderService:
         if self._job_repo is None:
             return
         try:
-            self._job_repo.release_lease_to_pending(
+            restored = self._job_repo.release_lease_to_pending(
                 job_id=job_id,
                 expected_version=expected_version,
                 lease_owner=lease_owner,
@@ -918,6 +918,11 @@ class AddToDownloaderService:
                 flush=True,
             )
             return
+        if restored is False:
+            print(
+                f"\033[31m[下载确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误=jobs.release_lease_to_pending rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
+                flush=True,
+            )
 
     def _mark_completed_job(
         self,
