@@ -114,6 +114,10 @@ class PostDownloadAutoImportService:
                 task_id=candidate.task_id,
                 task_hash=candidate.task_hash,
             )
+            if events is None:
+                raise AutoImportStateUnavailableError(
+                    f"auto import terminal lookup result missing for {candidate.task_id}/{candidate.task_hash}"
+                )
         except Exception as error:
             print(
                 f"\033[31m[自动导入终态查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前会停止这条任务的自动导入跟进，避免把读取异常误判成“还没有终态事件”。",

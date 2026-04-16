@@ -509,6 +509,48 @@ def test_post_download_auto_import_run_once_skips_record_when_terminal_lookup_fa
     assert "db down" in output
 
 
+def test_post_download_auto_import_run_once_skips_record_when_terminal_lookup_returns_none(capsys) -> None:
+    candidate = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "Dune 2024 1080p WEB-DL",
+            "chat_id": 1001,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15T00:00:00+00:00",
+            "last_observed_at": "2026-04-15T00:00:00+00:00",
+            "created_at": "2026-04-15T00:00:00+00:00",
+            "updated_at": "2026-04-15T00:00:00+00:00",
+        },
+    )()
+    monitor_repo = type("MonitorRepo", (), {"list_completed_for_auto_import": lambda self, *, limit: [candidate]})()
+    event_repo = type(
+        "MissingEventRepo",
+        (),
+        {"list_events_for_task_identity": lambda self, *, task_id, task_hash: None},
+    )()
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        auto_import_func=auto_import,
+    )
+
+    result = asyncio.run(auto_import_service.run_once(limit=5))
+
+    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=(), state_unavailable=True)
+    auto_import.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[自动导入终态查询失败]" in output
+    assert "task_id=87" in output
+    assert "auto import terminal lookup result missing" in output
+
+
 def test_get_status_text_skips_low_quality_resource_auto_import_and_records_event(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
