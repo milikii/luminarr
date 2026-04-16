@@ -254,6 +254,39 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_processing_p
     assert "db down" in captured.out
 
 
+def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_processing_path_payload_corruption(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = Path("/tmp/luminarr-bt-processing-payload-corruption.sqlite3")
+    db_path.unlink(missing_ok=True)
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage="processing_path",
+        payload_json="{",
+    )
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="影视入库链",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理载荷损坏]" in captured.out
+    assert "stage=processing_path" in captured.out
+    assert "payload_json invalid json" in captured.out
+
+
 def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classification_lookup_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -286,6 +319,39 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classificati
     assert "[BT 待处理读取失败]" in captured.out
     assert "stage=classification" in captured.out
     assert "db down" in captured.out
+
+
+def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classification_payload_corruption(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = Path("/tmp/luminarr-bt-classification-payload-corruption.sqlite3")
+    db_path.unlink(missing_ok=True)
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    BtPendingRepo(database).upsert_pending(
+        chat_id=1001,
+        stage="classification",
+        payload_json="{",
+    )
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="movie",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理载荷损坏]" in captured.out
+    assert "stage=classification" in captured.out
+    assert "payload_json invalid json" in captured.out
 
 
 def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_tmdb_lookup_failure(

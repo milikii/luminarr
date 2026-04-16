@@ -151,8 +151,8 @@
 - 保持 WeCom cleanup 入口在文本成功回出后继续复用统一的 `[cleanup 私聊 smoke]` 日志协议，并至少带上 `date/channel/action/query/reply_head`，避免第四个接入渠道又长出 WeCom 专属日志格式。
 - 保持 `tests/test_wecom_adapter.py` 单独覆盖 WeCom callback 里的 `cleanup-shortcut` 这类 `chat-scoped task_ref -> jobs -> import correlation` 身份解析，避免这个加密入站链路把 shortcut 当成普通字符串传下去却绕过 shared runtime 的 chat-scoped lookup。
 - 保持 `telegram_bot._set_raw_bt_destination_pending()` 在写入 `bt_pending_state` 失败时继续打印红色中文 `[BT 待处理持久化失败]` 和 `[处理建议]`，并保留当前进程内 raw BT 目的地待处理状态，避免 SQLite 写入异常重新退回成上层泛化失败。
-- 保持 `telegram_bot._is_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在恢复 `processing_path` 待处理状态时继续把 `payload.source` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，避免空源磁力重新静默混写成“仍有待处理步骤”。
-- 保持 `telegram_bot._is_bt_classification_pending()` / `_pop_bt_classification_pending()` 在恢复 `classification` 待处理状态时继续把 `payload.query` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，避免空查询重新静默混写成“仍有待处理步骤”。
+- 保持 `telegram_bot._is_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在恢复 `processing_path` 待处理状态时继续把 `payload.source` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，并让 shared private-chat runtime 直接回 `SERVICE_NOT_READY_TEXT`，避免空源磁力重新静默混写成“仍有待处理步骤”或继续进入后续处理链。
+- 保持 `telegram_bot._is_bt_classification_pending()` / `_pop_bt_classification_pending()` 在恢复 `classification` 待处理状态时继续把 `payload.query` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，并让 shared private-chat runtime 直接回 `SERVICE_NOT_READY_TEXT`，避免空查询重新静默混写成“仍有待处理步骤”或继续进入 BT 分类 follow-up。
 - 保持 `telegram_bot._get_bt_tmdb_association_pending()` 在恢复 `tmdb_association` 待处理状态时继续把 `payload.media_kind` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，避免结构化坏数据重新静默混写成“没有待处理状态”。
 - 保持 `telegram_bot._get_bt_tmdb_association_pending()` 在恢复 `tmdb_association` 待处理状态时继续把 `payload.source` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，避免空源磁力重新静默混写成合法待处理上下文。
 - 保持 `telegram_bot._get_raw_bt_destination_pending()` 在恢复 `raw_bt_destination` 待处理状态时继续把 `payload.source` 缺失记成红色中文 `[BT 待处理载荷损坏]` 和 `[处理建议]`，避免空源磁力重新静默混写成合法待处理上下文。

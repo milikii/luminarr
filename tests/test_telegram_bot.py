@@ -948,7 +948,7 @@ def test_bt_processing_path_pending_logs_payload_corruption_after_restart(
         )
     )
 
-    assert _is_bt_processing_path_pending(context=context, chat_id=1001) is False
+    assert _is_bt_processing_path_pending(context=context, chat_id=1001) is None
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=processing_path" in output
@@ -973,7 +973,7 @@ def test_bt_processing_path_pending_logs_missing_source_after_restart(
         )
     )
 
-    assert _is_bt_processing_path_pending(context=context, chat_id=1001) is False
+    assert _is_bt_processing_path_pending(context=context, chat_id=1001) is None
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=processing_path" in output
@@ -1129,7 +1129,7 @@ def test_bt_classification_pending_logs_payload_corruption_after_restart(
         )
     )
 
-    assert _is_bt_classification_pending(context=context, chat_id=1001) is False
+    assert _is_bt_classification_pending(context=context, chat_id=1001) is None
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=classification" in output
@@ -1154,7 +1154,7 @@ def test_bt_classification_pending_logs_missing_query_after_restart(
         )
     )
 
-    assert _is_bt_classification_pending(context=context, chat_id=1001) is False
+    assert _is_bt_classification_pending(context=context, chat_id=1001) is None
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=classification" in output

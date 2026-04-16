@@ -1165,7 +1165,7 @@ def _is_bt_processing_path_pending(
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return False
+        return None
     pending_source = str(payload.get("source", "")).strip()
     if not pending_source:
         _log_bt_pending_payload_corruption(
@@ -1173,7 +1173,7 @@ def _is_bt_processing_path_pending(
             stage=pending_state.stage,
             reason="payload.source missing",
         )
-        return False
+        return None
     pending_by_chat[chat_id] = pending_source
     return True
 
@@ -1309,7 +1309,7 @@ def _is_bt_classification_pending(
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return False
+        return None
     pending_query = str(payload.get("query", "")).strip()
     if not pending_query:
         _log_bt_pending_payload_corruption(
@@ -1317,7 +1317,7 @@ def _is_bt_classification_pending(
             stage=pending_state.stage,
             reason="payload.query missing",
         )
-        return False
+        return None
     pending_by_chat[chat_id] = pending_query
     return True
 
