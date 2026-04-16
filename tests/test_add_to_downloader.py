@@ -559,6 +559,27 @@ def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_mark_completed_job_logs_rejected_current_state(capsys) -> None:
+    job_repo = type("JobRepo", (), {"mark_downloader_completed": lambda self, **kwargs: False})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    service._mark_completed_job(
+        job_id="job-1",
+        expected_version=3,
+        lease_owner="downloader_confirm:1",
+        completed_add=PendingAddContext(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            title="Dune: Part Two",
+            source="https://example.com/dune.torrent",
+        ),
+    )
+    output = capsys.readouterr().out
+    assert "[下载确认任务完结失败]" in output
+    assert "jobs.mark_downloader_completed rejected current state" in output
+    assert "job_id=job-1" in output
+
+
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)

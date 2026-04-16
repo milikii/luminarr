@@ -1,4 +1,4 @@
-# Current status (v253)
+# Current status (v254)
 
 ## Project position
 
@@ -55,7 +55,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `add_to_downloader._record_event()` 在 `job_event` 写入异常时，现在也会打印红色中文 `[下载事件落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“事件没记下来但流程继续”
   - `add_to_downloader._register_download_monitor()` 在 `download_monitor` 写入异常时，现在也会打印红色中文 `[下载监控登记失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“下载已投递但后续状态跟踪没登记”
   - `add_to_downloader._record_pending_job()` 在 `jobs` 写入异常时，现在也会打印红色中文 `[下载待确认任务落盘失败]` 日志和 `[处理建议]`；当前请求会直接返回 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 写入异常静默吞成“待确认文本返回了，但真相未落盘”
-  - `add_to_downloader._claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` 在 `jobs` lease/完成态更新异常时，现在也会打印红色中文 `[下载确认任务抢占失败]` / `[下载确认任务回退失败]` / `[下载确认任务完结失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成普通冲突或无事发生
+  - `add_to_downloader._claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` 在 `jobs` lease/完成态更新异常或状态拒绝时，现在也会打印红色中文 `[下载确认任务抢占失败]` / `[下载确认任务回退失败]` / `[下载确认任务完结失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常或状态拒绝静默吞成普通冲突或无事发生
   - `add_to_downloader._restore_pending_approval()` 在 `approval_record` 回退异常或返回 `False` 时，现在也会打印红色中文 `[下载审批回退失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常或状态拒绝静默吞成“进程内回退了就算成功”
   - `add_to_downloader._resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[下载待确认版号查询失败]` / `[下载确认执行版号查询失败]` / `[下载确认过期判断失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默混写成普通 not pending 或未过期
   - `add_to_downloader.cancel_pending_add()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[下载取消任务更新失败]` / `[下载确认超时任务取消失败]` 日志和 `[处理建议]`；其中 `_handle_expired_pending_confirm()` 会直接返回 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 更新异常静默吞成普通“下载确认已超时”
@@ -302,6 +302,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`job_repo._upsert_job_pending()` 遇到空 `workflow_type`、空 `task_id` 或空 `task_hash` 时，现在也会显式抛出 `JobPersistenceError`；下载/导入服务会继续复用现有红色中文待确认任务落盘失败日志和 `[处理建议]`，不再把坏任务身份静默折叠成“待确认任务已经写进 SQLite”。
 - 2026-04-16 代码审查确认：`job_repo._upsert_job_pending()` 遇到空 `chat_id` 或显式 `user_id<=0` 时，现在也会显式抛出 `JobPersistenceError`；任务真相层不再把缺失会话身份静默写成 `chat_id=0`，也不再把坏用户身份混写成缺省 `user_id=0` 的 pending job。
 - 2026-04-15 代码审查确认：`job_repo.release_lease_to_pending()` / `mark_completed()` / `mark_downloader_completed()` 遇到空 `job_id/workflow_type/lease_owner/task_id/task_hash` 或空 `expected_version` 时，现在也会显式抛出 `JobPersistenceError`；下载/导入服务会继续复用现有红色中文任务回退失败 / 任务完结失败日志和 `[处理建议]`，不再把坏任务状态迁移身份静默折叠成普通 `False`。
+- 2026-04-16 代码审查确认：`add_to_downloader._mark_completed_job()` 在 `job_repo.mark_downloader_completed()` 返回 `False` 时，现在也会打印红色中文 `[下载确认任务完结失败]` 和 `[处理建议]`；下载 confirm 不再把任务完结真相被当前状态拒绝混成“下载已投递、账本应该也写成完成了”。
 - 2026-04-16 代码审查确认：`job_repo.release_lease_to_pending()` / `mark_completed()` 在 UPDATE 未命中且任务行已缺失时，现在也会显式抛出 `job missing during state transition`；下载/导入确认链不再把缺失任务真相混成普通任务回退/完结冲突。
 - 2026-04-15 代码审查确认：`job_repo.claim_lease()` / `cancel_pending_job()` 遇到空 `job_id/workflow_type/lease_owner` 或空 `expected_version` 时，现在也会显式抛出 `JobPersistenceError`；下载/导入服务会继续复用现有红色中文任务抢占失败 / 超时任务取消失败 / 取消任务更新失败日志和 `[处理建议]`，不再把坏任务控制身份静默折叠成普通冲突或普通取消失败。
 - 2026-04-16 代码审查确认：`job_repo.claim_lease()` 在 UPDATE 未命中且任务行已缺失时，现在也会显式抛出 `job missing during lease claim`；下载/导入确认链不再把缺失任务真相混成普通并发抢占失败。
@@ -603,6 +604,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - add to downloader event-monitor observability tests：2026-04-15，`9 passed, 11 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or record_event_logs_persistence_failure or register_download_monitor_logs_persistence_failure"`）
 - downloader pending-creation fail-closed tests：2026-04-16，`11 passed, 39 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending_approval or pending_job or add_candidate_source_returns_state_unavailable"`）
 - add to downloader job-lifecycle observability tests：2026-04-15，`11 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or record_pending_job_logs_persistence_failure or claim_pending_job_logs_persistence_failure or restore_pending_job_logs_persistence_failure or mark_completed_job_logs_persistence_failure"`）
+- add to downloader job-complete rejected-state tests：2026-04-16，`2 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
 - add to downloader approval-fallback observability tests：2026-04-15，`14 passed, 14 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or restore_pending_approval_logs_persistence_failure or resolve_pending_lease_version_logs_approval_lookup_failure or find_version_stale_rejection_text_logs_approval_lookup_failure or is_pending_approval_expired_logs_approval_lookup_failure"`）
 - add to downloader approval-restore rejected-state tests：2026-04-16，`2 passed, 54 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_rejected_current_state"`）
 - downloader confirm-expiry fail-closed tests：2026-04-16，`3 passed, 44 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "handle_expired_pending_confirm"`）
