@@ -139,7 +139,7 @@ def test_cancel_pending_add_logs_payload_corruption(capsys) -> None:
     job_repo = type("JobRepo", (), {"get_latest_pending_downloader_job": lambda self, **kwargs: pending_job})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
 
-    assert service.cancel_pending_add(1001) is None
+    assert service.cancel_pending_add(1001) == ADD_CANCEL_STATE_UNAVAILABLE_TEXT
 
     output = capsys.readouterr().out
     assert "[下载取消载荷损坏]" in output

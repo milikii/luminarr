@@ -480,10 +480,10 @@ class AddToDownloaderService:
         pending_add, payload_problem = _pending_add_from_json(pending_job.payload_json)
         if pending_add is None:
             print(
-                f"\033[31m[下载取消载荷损坏]\033[0m chat_id={chat_id} task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前取消会按“没有待取消下载”继续处理，但这可能是持久化状态损坏。",
+                f"\033[31m[下载取消载荷损坏]\033[0m chat_id={chat_id} task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前取消会直接返回状态读取失败，避免把持久化坏数据误判成“没有待取消下载”。",
                 flush=True,
             )
-            return None
+            return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
 
         expected_lease_version = self._resolve_pending_lease_version(
             task_id=pending_job.task_id,
