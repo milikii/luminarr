@@ -74,6 +74,10 @@ class GetDownloadStatusService:
             return None
         try:
             update = self._download_monitor_repo.record_status(task_status)
+            if update is None:
+                raise RuntimeError("download monitor status result missing")
+            if getattr(update, "record", None) is None:
+                raise RuntimeError("download monitor observed record missing")
         except Exception as error:
             print(
                 f"\033[31m[下载状态观察落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前请求仍会返回下载状态文本，但下载完成观察和后续自动导入可能不会推进。",
