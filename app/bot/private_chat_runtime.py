@@ -119,7 +119,11 @@ async def handle_private_chat_query_text(
 
         search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
         if isinstance(search_service, tg.SearchMediaService) and chat_id is not None:
-            if search_service.is_clarification_pending(chat_id):
+            clarification_pending = search_service.is_clarification_pending(chat_id)
+            if clarification_pending is None:
+                await reply_func(tg.SERVICE_NOT_READY_TEXT)
+                return
+            if clarification_pending:
                 clarification_cleared = await tg._run_sync_with_policy(
                     execution_gate,
                     tg.ACTION_RESET_CLARIFICATION,
@@ -509,13 +513,14 @@ async def handle_private_chat_query_text(
 
     if query.isdigit():
         search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
-        if (
-            isinstance(search_service, tg.SearchMediaService)
-            and chat_id is not None
-            and search_service.is_clarification_pending(chat_id)
-        ):
-            await reply_func(tg.CLARIFICATION_SELECTION_BLOCKED_TEXT)
-            return
+        if isinstance(search_service, tg.SearchMediaService) and chat_id is not None:
+            clarification_pending = search_service.is_clarification_pending(chat_id)
+            if clarification_pending is None:
+                await reply_func(tg.SERVICE_NOT_READY_TEXT)
+                return
+            if clarification_pending:
+                await reply_func(tg.CLARIFICATION_SELECTION_BLOCKED_TEXT)
+                return
 
         add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
         if not isinstance(add_service, tg.AddToDownloaderService):

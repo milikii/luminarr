@@ -225,13 +225,15 @@ class SearchMediaService:
                 self._recent_candidates_by_chat[chat_id] = list(previous_candidates)
             return False
 
-    def is_clarification_pending(self, chat_id: int) -> bool:
+    def is_clarification_pending(self, chat_id: int) -> bool | None:
         if chat_id <= 0:
             return False
         if chat_id in self._clarification_pending_by_chat:
             return True
         load_result = self._load_persisted_clarification_query(chat_id=chat_id)
-        if load_result.load_failed or load_result.query is None:
+        if load_result.load_failed:
+            return None
+        if load_result.query is None:
             return False
         self._clarification_pending_by_chat[chat_id] = load_result.query
         return True

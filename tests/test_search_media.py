@@ -263,7 +263,7 @@ def test_clear_clarification_pending_logs_persistence_failure(capsys) -> None:
 def test_is_clarification_pending_logs_persistence_failure(capsys) -> None:
     repo = type("BoomRepo", (), {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)
-    assert service.is_clarification_pending(1001) is False
+    assert service.is_clarification_pending(1001) is None
     assert "[搜索澄清态读取失败]" in capsys.readouterr().out
 
 

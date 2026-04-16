@@ -218,6 +218,66 @@ def test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure(
     assert "index=1" in captured.out
 
 
+def test_dispatch_private_chat_text_stops_on_clarification_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    search_service = SearchMediaService(
+        _fake_search,
+        clarification_repo=type(
+            "BoomRepo",
+            (),
+            {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+    )
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={SEARCH_SERVICE_KEY: search_service},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[搜索澄清态读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down" in captured.out
+
+
+def test_dispatch_private_chat_text_digit_stops_on_clarification_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    search_service = SearchMediaService(
+        _fake_search,
+        clarification_repo=type(
+            "BoomRepo",
+            (),
+            {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+    )
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="1",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data() | {SEARCH_SERVICE_KEY: search_service},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[搜索澄清态读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down" in captured.out
+
+
 def test_dispatch_private_chat_text_logs_confirm_job_lookup_failure(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
