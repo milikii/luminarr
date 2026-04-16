@@ -192,6 +192,39 @@ def test_dispatch_private_chat_text_logs_pending_job_lookup_failure(
     assert "[处理建议]" in captured.out
 
 
+def test_dispatch_private_chat_text_stops_on_pending_job_lookup_failure_even_with_services(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    bot_data = _build_bot_data()
+    job_repo = JobRepo(_make_database(tmp_path))
+    job_repo.get_latest_pending_job = Mock(side_effect=RuntimeError("sqlite busy"))  # type: ignore[method-assign]
+    add_service = bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY]
+    import_service = bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY]
+    assert isinstance(add_service, AddToDownloaderService)
+    assert isinstance(import_service, ImportToLibraryService)
+    add_service.cancel_pending_add = Mock(return_value="已取消当前下载确认。请重新发送序号。")  # type: ignore[method-assign]
+    import_service.cancel_pending_import = Mock(return_value="已取消当前导入确认。请重新发送 import <任务ID或Hash>。")  # type: ignore[method-assign]
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=bot_data | {JOB_REPO_KEY: job_repo},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    add_service.cancel_pending_add.assert_not_called()
+    import_service.cancel_pending_import.assert_not_called()
+    assert "[待处理任务查询失败]" in captured.out
+    assert "sqlite busy" in captured.out
+
+
 def test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -463,6 +496,41 @@ def test_dispatch_private_chat_text_logs_confirm_job_lookup_failure(
     assert "task_ref=87" in captured.out
     assert "disk i/o error" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_dispatch_private_chat_text_stops_on_confirm_job_lookup_failure_even_with_services(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    bot_data = _build_bot_data()
+    job_repo = JobRepo(_make_database(tmp_path))
+    job_repo.get_job_for_chat_ref = Mock(side_effect=RuntimeError("disk i/o error"))  # type: ignore[method-assign]
+    add_service = bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY]
+    import_service = bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY]
+    assert isinstance(add_service, AddToDownloaderService)
+    assert isinstance(import_service, ImportToLibraryService)
+    add_service.has_pending_add = Mock(return_value=True)  # type: ignore[method-assign]
+    add_service.confirm_add_by_task_ref = AsyncMock(return_value="下载确认成功")  # type: ignore[method-assign]
+    import_service.confirm_import_by_task_ref = AsyncMock(return_value="导入确认成功")  # type: ignore[method-assign]
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="confirm 87",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=bot_data | {JOB_REPO_KEY: job_repo},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    add_service.has_pending_add.assert_not_called()
+    add_service.confirm_add_by_task_ref.assert_not_awaited()
+    import_service.confirm_import_by_task_ref.assert_not_awaited()
+    assert "[确认关联任务查询失败]" in captured.out
+    assert "disk i/o error" in captured.out
 
 
 def test_dispatch_private_chat_text_stops_on_downloader_pending_lookup_failure(

@@ -59,6 +59,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `add_to_downloader._resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[下载待确认版号查询失败]` / `[下载确认执行版号查询失败]` / `[下载确认过期判断失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默混写成普通 not pending 或未过期
   - `add_to_downloader.cancel_pending_add()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[下载取消任务更新失败]` / `[下载确认超时任务取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“取消/超时文本回了就算任务真相也收口”
   - `add_to_downloader.cancel_pending_add()` 在待确认版号缺失、`approval_record` 取消更新未命中、或 `jobs.cancel_pending_job()` 更新失败/拒绝时，现在都会直接返回 `ADD_CANCEL_STATE_UNAVAILABLE_TEXT`；shared private-chat runtime 也会立刻停止，不再把这类持久化异常继续混成普通“没有待取消下载”或重复走 frustration reset
+  - `private_chat_runtime` 在 frustration / confirm 顶层 `jobs` 查询失败时，现在会直接回 `SERVICE_NOT_READY_TEXT` 并停路；即使 add/import/search service 都已注入，也不再继续把 SQLite 读失败混成普通“没有待处理任务 / 没匹配到 confirm 任务”
   - `channel_identity` 空输入现在也会打印红色中文 `[渠道身份缺失]` 日志和 `[处理建议]`
   - cleanup service 未注入时，`cleanup` / `cleanup inspect` 现在也会打印红色中文 `[cleanup 服务未就绪]` 日志、`动作=cleanup/cleanup_inspect`、`查询=` 和 `[处理建议]` 修复提示
 - 媒体主链：
@@ -239,6 +240,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 文档对齐确认：cleanup 四渠道验证窗口已完成，`shared private-chat runtime` 最小抽离也已完成；当前唯一主线已切到持久化吞错收口。
 - 2026-04-15 代码审查确认：`handle_private_chat_query_text()` owner 已移到 [app/bot/private_chat_runtime.py](/home/alex/projects/luminarr/app/bot/private_chat_runtime.py)，`dispatch_private_chat_text()` 也不再伪造 `SimpleNamespace` 去反调 Telegram handler；Telegram / personal WeChat / Feishu / WeCom 四个渠道现在都先走同一个 shared wrapper，`微信登录` 的 Telegram 文本/媒资能力也已改成显式注入。当前剩余结构债是 shared runtime 正文仍复用一批 [app/bot/telegram_bot.py](/home/alex/projects/luminarr/app/bot/telegram_bot.py) helper 和 Telegram-shaped compatibility context，后续只在需要时继续收口，不再回到旧入口分叉。
 - 2026-04-15 代码审查确认：`private_chat_runtime` 里 frustration / confirm 两条 `job_repo` 查询失败路径现在也会打印红色中文 `[待处理任务查询失败]` / `[确认关联任务查询失败]` 和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“当前没有待处理任务 / 没匹配到确认任务”。
+- 2026-04-16 代码审查确认：`private_chat_runtime` 在 frustration / confirm 顶层 `jobs` 查询失败时，现在会直接停在 shared runtime 并回 `SERVICE_NOT_READY_TEXT`；即使 add/import/search service 都已经注入，也不再继续探测后续 fallback 分支。
 - 2026-04-15 代码审查确认：`add_to_downloader.confirm_add_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“下载确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的下载请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的导入请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在已执行导入的 stale-check 里，如果读取 `job_event` 目标路径失败，现在也会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/job_event 读取异常误判成普通“无导入目标路径/没有待确认导入”。
@@ -498,6 +500,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - search media candidate-presence observability tests：2026-04-16，`3 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clear_cached_candidates_logs_candidate_persistence_failure or test_get_cached_candidate_logs_candidate_payload_corruption or test_has_cached_candidates_distinguishes_lookup_failure"`）
 - search media candidate-load observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'get_candidate': lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: None, candidate_repo=BoomRepo()); service.get_cached_candidate(1001, 1)"`）
 - private runtime frustration fail-closed tests：2026-04-16，`2 passed, 18 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "pending_job_lookup_failure or test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure"`）
+- private runtime jobs-lookup fail-closed tests：2026-04-16，`4 passed, 26 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "pending_job_lookup_failure or confirm_job_lookup_failure"`）
 - channel identity fail-closed tests：2026-04-15，`1 passed, 38 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k project_channel_identity`）
 - downloader routing fail-closed tests：2026-04-15，`4 passed`（`.venv/bin/python -m pytest -q tests/test_main.py`）
 - add to downloader pending-query observability tests：2026-04-15，`4 passed, 7 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or test_has_pending_add_logs_job_lookup_failure"`）

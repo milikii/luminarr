@@ -66,11 +66,13 @@ async def handle_private_chat_query_text(
         if chat_id is not None:
             job_repo = bot_data.get(tg.JOB_REPO_KEY)
             if isinstance(job_repo, tg.JobRepo):
+                pending_job_lookup_failed = False
                 try:
                     pending_job = job_repo.get_latest_pending_job(chat_id=chat_id)
                 except Exception as error:
                     _log_pending_job_lookup_failed(chat_id=chat_id, reason=str(error))
                     pending_job = None
+                    pending_job_lookup_failed = True
                 if pending_job is not None:
                     if pending_job.workflow_type == tg.WORKFLOW_IMPORT_TO_LIBRARY:
                         import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
@@ -94,6 +96,9 @@ async def handle_private_chat_query_text(
                             if cancelled_text is not None:
                                 await reply_func(cancelled_text)
                                 return
+                if pending_job_lookup_failed:
+                    await reply_func(tg.SERVICE_NOT_READY_TEXT)
+                    return
 
         import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
         if isinstance(import_service, tg.ImportToLibraryService) and chat_id is not None:
@@ -419,6 +424,7 @@ async def handle_private_chat_query_text(
         if chat_id is not None and confirm_ref:
             job_repo = bot_data.get(tg.JOB_REPO_KEY)
             if isinstance(job_repo, tg.JobRepo):
+                matched_job_lookup_failed = False
                 try:
                     matched_job = job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=confirm_ref)
                 except Exception as error:
@@ -428,6 +434,7 @@ async def handle_private_chat_query_text(
                         reason=str(error),
                     )
                     matched_job = None
+                    matched_job_lookup_failed = True
                 if matched_job is not None and matched_job.workflow_type == tg.WORKFLOW_ADD_TO_DOWNLOADER:
                     add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
                     if not isinstance(add_service, tg.AddToDownloaderService):
@@ -455,8 +462,11 @@ async def handle_private_chat_query_text(
                             chat_id=chat_id,
                             user_id=user_id,
                         ),
-                    )
+                        )
                     await reply_func(reply)
+                    return
+                if matched_job_lookup_failed:
+                    await reply_func(tg.SERVICE_NOT_READY_TEXT)
                     return
 
         add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
