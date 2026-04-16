@@ -668,6 +668,10 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> int | None:
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise ApprovalPersistenceError("approval task identity missing for requested lease query")
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -676,7 +680,7 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (action_type, task_id, task_hash),
+                (action_type, cleaned_task_id, cleaned_task_hash),
             ).fetchone()
         if row is None:
             return None
