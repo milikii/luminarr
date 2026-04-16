@@ -47,7 +47,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `add_to_downloader._rebuild_confirm_context()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载确认上下文查询失败]` 日志和 `[处理建议]`；只要当前链路已配置 `job_repo` 且这一步查询失败，`confirm_add_by_task_ref()` 就会直接返回 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再继续靠进程内待确认上下文放行下载，把 SQLite 查询异常混成确认成功
   - `add_to_downloader._rebuild_confirm_context()` 在 `jobs.payload_json` 损坏时，现在也会打印红色中文 `[下载确认上下文载荷损坏]` 日志和 `[处理建议]`；若当前进程里也没有待确认上下文，`confirm_add_by_task_ref()` 会直接返回 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把持久化坏数据静默吞成“没有待确认下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[下载确认审批查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“审批状态缺失”
-  - `add_to_downloader._record_pending_approval()` 在 `approval_record` 写入异常时，现在也会打印红色中文 `[下载待确认审批落盘失败]` 日志和 `[处理建议]`，并明确提示当前请求会直接返回待确认状态写入失败，不再把 SQLite 写入异常静默吞成“仅内存 lease 降级”
+  - `add_to_downloader._record_pending_approval()` / `_record_pending_job()` 在 `approval_record` / `jobs` 写入异常时，现在也会打印红色中文 `[下载待确认审批落盘失败]` / `[下载待确认任务落盘失败]` 日志和 `[处理建议]`，并明确提示当前请求会直接返回待确认状态写入失败，不再把 SQLite 写入异常静默吞成“仅内存 lease 降级”或“待确认文本已回但真相未落盘”
   - `add_to_downloader.add_by_selection()` / `add_candidate_source()` 现在必须先把 pending approval 和 pending job 真相写稳，才会回 `ADD_APPROVAL_PENDING_TEXT`；审批或 jobs 落盘失败时会直接返回 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`
   - `add_to_downloader._record_downloader_approval()` 在 `approval_record` 更新异常时，现在也会打印红色中文 `[下载确认审批更新失败]` 日志和 `[处理建议]`，并直接让 `confirm_add_by_task_ref()` 返回 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`；下载确认链不再把 SQLite 更新异常静默吞成“仅内存审批回退后仍然确认成功”
   - `add_to_downloader._cancel_pending_approval()` 在 `approval_record` 更新异常时，现在也会打印红色中文 `[下载取消审批更新失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“取消直接失败”
