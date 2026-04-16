@@ -155,12 +155,19 @@ class JobEventRepo:
 
 
 def _to_job_event(row: Mapping[str, object]) -> JobEvent:
+    event_id = int(row["id"])
+    task_ref = str(row["task_ref"]).strip()
+    event_type = str(row["event_type"]).strip()
+    if event_id <= 0:
+        raise JobEventPersistenceError("job_event row id corrupted after read")
+    if not task_ref or not event_type:
+        raise JobEventPersistenceError("job_event row identity corrupted after read")
     return JobEvent(
-        id=int(row["id"]),
-        task_ref=str(row["task_ref"]),
+        id=event_id,
+        task_ref=task_ref,
         task_id=str(row["task_id"]),
         task_hash=str(row["task_hash"]),
-        event_type=str(row["event_type"]),
+        event_type=event_type,
         message=str(row["message"]),
         source_path=str(row["source_path"]),
         target_path=str(row["target_path"]),

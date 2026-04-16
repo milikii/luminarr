@@ -194,6 +194,41 @@ def test_job_event_repo_rejects_missing_identity_for_query(tmp_path: Path) -> No
         repo.list_events_for_task_identity(task_id="   ", task_hash="   ")
 
 
+def test_job_event_repo_rejects_corrupted_row_after_read(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO job_event (
+                task_ref,
+                task_id,
+                task_hash,
+                event_type,
+                message,
+                source_path,
+                target_path,
+                created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                "87",
+                "87",
+                "hash-87",
+                "",
+                "/data/library/movies/demo.mkv",
+                "",
+                "",
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(JobEventPersistenceError, match="job_event row identity corrupted after read"):
+        repo.list_events_for_task_ref("87")
+
+
 def test_download_monitor_truth_persists_for_restart_and_completion_observation(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
