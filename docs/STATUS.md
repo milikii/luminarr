@@ -44,7 +44,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `add_to_downloader.has_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载待确认查询失败]` 日志和 `[处理建议]`；若当前进程里也没有待确认上下文，就会显式返回异常态给 shared runtime，由 shared runtime 回 `SERVICE_NOT_READY_TEXT`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
   - `add_to_downloader.cancel_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载取消查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待取消下载”
   - `add_to_downloader.cancel_pending_add()` 在 `jobs.payload_json` 损坏时，现在也会打印红色中文 `[下载取消载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏数据静默吞成“没有待取消下载”
-  - `add_to_downloader._rebuild_confirm_context()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载确认上下文查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
+  - `add_to_downloader._rebuild_confirm_context()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载确认上下文查询失败]` 日志和 `[处理建议]`；若当前进程里也没有待确认上下文，`confirm_add_by_task_ref()` 会直接返回 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `jobs.payload_json` 损坏时，现在也会打印红色中文 `[下载确认上下文载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏数据静默吞成“没有待确认下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[下载确认审批查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“审批状态缺失”
   - `add_to_downloader._record_pending_approval()` 在 `approval_record` 写入异常时，现在也会打印红色中文 `[下载待确认审批落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“仅内存 lease 降级”
