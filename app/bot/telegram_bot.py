@@ -1476,7 +1476,7 @@ def _get_bt_tmdb_association_pending(
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return None
+        return False
     media_kind = str(payload.get("media_kind", "")).strip()
     source = str(payload.get("source", "")).strip()
     if not media_kind:
@@ -1485,14 +1485,14 @@ def _get_bt_tmdb_association_pending(
             stage=pending_state.stage,
             reason="payload.media_kind missing",
         )
-        return None
+        return False
     if not source:
         _log_bt_pending_payload_corruption(
             chat_id=chat_id,
             stage=pending_state.stage,
             reason="payload.source missing",
         )
-        return None
+        return False
     resolved_pending = BtTmdbAssociationPending(media_kind=media_kind, source=source)
     pending_by_chat[chat_id] = resolved_pending
     return resolved_pending
@@ -1587,7 +1587,7 @@ def _get_raw_bt_destination_pending(
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
     if payload_error is not None:
         _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return None
+        return False
     raw_options = payload.get("options")
     source = str(payload.get("source", "")).strip()
     if not source:
@@ -1596,14 +1596,14 @@ def _get_raw_bt_destination_pending(
             stage=pending_state.stage,
             reason="payload.source missing",
         )
-        return None
+        return False
     if not isinstance(raw_options, list):
         _log_bt_pending_payload_corruption(
             chat_id=chat_id,
             stage=pending_state.stage,
             reason="payload.options missing or not list",
         )
-        return None
+        return False
     options: list[RawBtDestinationOption] = []
     for raw_option in raw_options:
         if not isinstance(raw_option, dict):
@@ -1620,7 +1620,7 @@ def _get_raw_bt_destination_pending(
             stage=pending_state.stage,
             reason="payload.options has no valid entries",
         )
-        return None
+        return False
     resolved_pending = RawBtDestinationPending(options=tuple(options), source=source)
     pending_by_chat[chat_id] = resolved_pending
     return resolved_pending

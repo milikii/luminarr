@@ -1337,7 +1337,7 @@ def test_bt_tmdb_association_pending_logs_payload_corruption_after_restart(
         )
     )
 
-    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=tmdb_association" in output
@@ -1362,7 +1362,7 @@ def test_bt_tmdb_association_pending_logs_missing_media_kind_after_restart(
         )
     )
 
-    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=tmdb_association" in output
@@ -1387,7 +1387,7 @@ def test_bt_tmdb_association_pending_logs_missing_source_after_restart(
         )
     )
 
-    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=tmdb_association" in output
@@ -1487,7 +1487,7 @@ def test_raw_bt_destination_pending_logs_payload_corruption_after_restart(
         )
     )
 
-    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=raw_bt_destination" in output
@@ -1512,7 +1512,7 @@ def test_raw_bt_destination_pending_logs_options_structure_corruption_after_rest
         )
     )
 
-    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=raw_bt_destination" in output
@@ -1537,7 +1537,7 @@ def test_raw_bt_destination_pending_logs_missing_source_after_restart(
         )
     )
 
-    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=raw_bt_destination" in output
@@ -1562,7 +1562,7 @@ def test_raw_bt_destination_pending_logs_no_valid_options_after_restart(
         )
     )
 
-    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is False
     output = capsys.readouterr().out
     assert "[BT 待处理载荷损坏]" in output
     assert "stage=raw_bt_destination" in output
