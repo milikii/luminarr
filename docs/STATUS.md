@@ -89,6 +89,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[导入待确认版号查询失败]` / `[导入确认执行版号查询失败]` / `[导入确认过期判断失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默混写成普通 not pending 或未过期
   - `import_to_library._find_latest_import_target_path()` 在 `job_event` 关联查询异常时，现在也会打印红色中文 `[导入目标路径查询失败]` 日志和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“没有目标路径”
   - `import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[导入取消任务更新失败]` / `[导入确认超时任务取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“取消/超时文本回了就算任务真相也收口”
+  - `import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、或 `jobs.cancel_pending_job()` 更新失败/拒绝时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`，不再把这类持久化异常继续混成普通“没有待取消导入”
   - `import_to_library._handle_expired_pending_confirm()` 在 `approval_repo.cancel_import()` 更新失败时，现在也会打印红色中文 `[导入确认超时审批取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“超时文本回了就算审批真相也收口”
   - `search_media` 在 TMDB 归一化查询异常时，现在也会打印红色中文 `[TMDB 查询失败]` 日志和 `[处理建议]`，不再静默退回普通搜索
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
@@ -244,6 +245,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`add_to_downloader.confirm_add_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“下载确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的下载请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的导入请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在已执行导入的 stale-check 里，如果读取 `job_event` 目标路径失败，现在也会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/job_event 读取异常误判成普通“无导入目标路径/没有待确认导入”。
+- 2026-04-16 代码审查确认：`import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、`jobs.cancel_pending_job()` 异常或 `False` 时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`；导入手动取消入口不再把这类持久化异常混成普通“没有待取消导入”。
 - 2026-04-15 代码审查确认：`watchlist_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `watchlist_item missing after insert`，并由 `manage_watchlist` 继续打印红色中文 `[想看写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
 - 2026-04-16 代码审查确认：`manage_watchlist._add_item()` 现在会把 `watchlist_repo.add_item()` 意外返回空结果显式记成 `watchlist add result missing`；想看清单入口不再把这类契约破坏继续混写成模糊的 `repo returned None`。
 - 2026-04-15 代码审查确认：`watchlist_repo.get_item_by_id()` 遇到空 `chat_id` 或空 `item_id` 时，现在也会显式抛出 `WatchlistPersistenceError`；`watchlist_repo.add_item()` 在回读新条目时继续只把“真查不到条目”当成 `watchlist_item missing after insert`，不再把坏 ID 查询身份静默折叠成普通 `None`。
@@ -560,7 +562,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import confirm job-lifecycle observability tests：2026-04-15，`5 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "rebuild_confirm_context_logs or claim_pending_job_logs_persistence_failure or restore_pending_job_logs_persistence_failure or mark_completed_job_logs_persistence_failure"`）
 - import approval-fallback observability tests：2026-04-15，`4 passed, 33 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs_persistence_failure or resolve_pending_lease_version_logs_approval_lookup_failure or find_version_stale_rejection_text_logs_approval_lookup_failure or is_pending_approval_expired_logs_approval_lookup_failure"`）
 - import target-path lookup observability tests：2026-04-15，`1 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k find_latest_import_target_path_logs_event_lookup_failure`）
-- import cancel-path observability tests：2026-04-16，`5 passed, 60 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import_logs_job_cancel_failure or cancel_pending_import_logs_job_cancel_state_rejection or handle_expired_pending_confirm_logs_approval_cancel_failure or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_job_cancel_state_rejection"`）
+- import cancel-path fail-closed tests：2026-04-16，`5 passed, 68 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import"`）
 - import cancel lookup observability tests：2026-04-15，`1 passed, 51 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k cancel_pending_import_logs_job_lookup_failure`）
 - import source-missing observability tests：2026-04-15，`1 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_source_missing`）
 - import target-exists observability tests：2026-04-15，`1 passed, 56 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_exists`）
