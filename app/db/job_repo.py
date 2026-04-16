@@ -376,7 +376,11 @@ class JobRepo:
                 ),
             )
             connection.commit()
-        return cursor.rowcount == 1
+        if cursor.rowcount == 1:
+            return True
+        if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
+            raise JobPersistenceError("job missing during cancel")
+        return False
 
     def _upsert_job_pending(
         self,
@@ -603,6 +607,35 @@ class JobRepo:
             )
             connection.commit()
         return cursor.rowcount == 1
+
+    def _get_job_by_identity(self, *, job_id: str, workflow_type: str) -> JobRecord | None:
+        cleaned_job_id = job_id.strip()
+        cleaned_workflow = workflow_type.strip()
+        if not cleaned_job_id or not cleaned_workflow:
+            raise JobPersistenceError("job identity missing for internal query")
+        return self._select_one(
+            """
+            SELECT
+                job_id,
+                chat_id,
+                user_id,
+                workflow_type,
+                state,
+                task_ref,
+                task_id,
+                task_hash,
+                payload_json,
+                version,
+                lease_owner,
+                lease_until,
+                created_at,
+                updated_at
+            FROM jobs
+            WHERE job_id = ? AND workflow_type = ?
+            LIMIT 1
+            """,
+            (cleaned_job_id, cleaned_workflow),
+        )
 
     def _select_one(self, query: str, params: tuple[object, ...]) -> JobRecord | None:
         with self._database.connect() as connection:

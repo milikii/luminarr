@@ -1046,6 +1046,24 @@ def test_job_repo_rejects_missing_identity_for_query(tmp_path: Path) -> None:
     with pytest.raises(JobPersistenceError, match="job workflow missing for query"):
         repo._get_job_for_chat_ref(workflow_type="   ", chat_id=1001, task_ref="87")
 
+
+def test_job_repo_raises_when_cancel_target_missing_after_update(tmp_path: Path) -> None:
+    class MissingCancelTargetJobRepo(JobRepo):
+        def _get_job_by_identity(self, *, job_id: str, workflow_type: str):
+            _ = (job_id, workflow_type)
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingCancelTargetJobRepo(database)
+
+    with pytest.raises(JobPersistenceError, match="job missing during cancel"):
+        repo.cancel_pending_job(
+            job_id="job-1",
+            expected_version=1,
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        )
+
     with pytest.raises(JobPersistenceError, match="job workflow missing for pending query"):
         repo._get_latest_pending_job_for_workflow(workflow_type="   ", chat_id=1001)
 
