@@ -269,21 +269,30 @@ class ManageBtSubscriptionService:
 
     def _list_items(self, *, chat_id: int):
         try:
-            return self._bt_subscription_repo.list_items(chat_id=chat_id)
+            items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+            if items is None:
+                raise BtSubscriptionPersistenceError("bt subscription list result missing")
+            return items
         except Exception as error:
             _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
             return None
 
     def _remove_item(self, *, chat_id: int, item_id: int):
         try:
-            return self._bt_subscription_repo.remove_item(chat_id=chat_id, item_id=item_id)
+            removed = self._bt_subscription_repo.remove_item(chat_id=chat_id, item_id=item_id)
+            if removed is None:
+                raise BtSubscriptionPersistenceError("bt subscription remove result missing")
+            return removed
         except Exception as error:
             _log_bt_subscription_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
             return None
 
     def _clear_items(self, *, chat_id: int):
         try:
-            return self._bt_subscription_repo.clear_items(chat_id=chat_id)
+            deleted = self._bt_subscription_repo.clear_items(chat_id=chat_id)
+            if deleted is None:
+                raise BtSubscriptionPersistenceError("bt subscription clear result missing")
+            return deleted
         except Exception as error:
             _log_bt_subscription_clear_failed(chat_id=chat_id, reason=str(error))
             return None

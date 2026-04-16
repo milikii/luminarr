@@ -157,6 +157,26 @@ def test_manage_bt_subscription_list_returns_failure_text_when_repo_raises(tmp_p
     assert "db down" in captured.out
 
 
+def test_manage_bt_subscription_list_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _missing_list_items(**_: object) -> None:
+        return None
+
+    repo.list_items = _missing_list_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub list"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_LIST_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅清单读取失败]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt subscription list result missing" in captured.out
+
+
 def test_manage_bt_subscription_remove_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)
@@ -176,6 +196,26 @@ def test_manage_bt_subscription_remove_returns_failure_text_when_repo_raises(tmp
     assert "db down" in captured.out
 
 
+def test_manage_bt_subscription_remove_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _missing_remove_item(**_: object) -> None:
+        return None
+
+    repo.remove_item = _missing_remove_item  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub remove 7"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_REMOVE_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅删除失败]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt subscription remove result missing" in captured.out
+
+
 def test_manage_bt_subscription_clear_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)
@@ -193,6 +233,26 @@ def test_manage_bt_subscription_clear_returns_failure_text_when_repo_raises(tmp_
     captured = capsys.readouterr()
     assert "[BT 订阅清单清空失败]" in captured.out
     assert "db down" in captured.out
+
+
+def test_manage_bt_subscription_clear_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _missing_clear_items(**_: object) -> None:
+        return None
+
+    repo.clear_items = _missing_clear_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub clear"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_CLEAR_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅清单清空失败]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt subscription clear result missing" in captured.out
 
 
 def test_bt_subscription_run_once_enqueues_new_candidate_and_skips_seen_source(tmp_path: Path) -> None:
