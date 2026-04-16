@@ -636,6 +636,16 @@ def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     assert "lease_version=2" in output
 
 
+def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: False})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    service._restore_pending_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2)
+    output = capsys.readouterr().out
+    assert "[导入审批回退失败]" in output
+    assert "approval_record restore rejected current state" in output
+    assert "lease_version=2" in output
+
+
 def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

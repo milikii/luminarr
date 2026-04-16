@@ -1,4 +1,4 @@
-# Current status (v252)
+# Current status (v253)
 
 ## Project position
 
@@ -90,7 +90,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._record_pending_approval()` / `_record_import_approval()` / `_record_executed_lease_version()` / `_record_pending_job()` 在 `approval_record` / `jobs` 写入异常时，现在也会打印红色中文 `[导入待确认审批落盘失败]` / `[导入确认审批更新失败]` / `[导入执行版号回写失败]` / `[导入待确认任务落盘失败]` 日志和 `[处理建议]`；其中 `_record_pending_approval()` 和 `_record_pending_job()` 都会明确提示当前请求会直接返回待确认状态写入失败，`_record_import_approval()` 更新异常也会直接让 `confirm_import_by_task_ref()` 返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 写入异常静默吞成“只靠进程内状态兜底后仍然确认成功”
   - `import_to_library.import_by_task_ref()` 现在必须先把 pending approval 和 pending job 真相写稳，才会回 `IMPORT_APPROVAL_PENDING_TEXT`；审批或 jobs 落盘失败时会直接返回 `IMPORT_PENDING_STATE_UNAVAILABLE_TEXT`
   - `import_to_library._record_event()` 在 `job_event` 写入异常时，现在也会打印红色中文 `[导入事件落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“导入流程继续了，但事件没记下来”
-  - `import_to_library._restore_pending_approval()` 在 `approval_record` 回退异常时，现在也会打印红色中文 `[导入审批回退失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“进程内回退了就算成功”
+  - `import_to_library._restore_pending_approval()` 在 `approval_record` 回退异常或返回 `False` 时，现在也会打印红色中文 `[导入审批回退失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常或状态拒绝静默吞成“进程内回退了就算成功”
   - `import_to_library._resolve_pending_lease_version()` / `_find_version_stale_rejection_text()` / `_is_pending_approval_expired()` 在 `approval_record` 查询异常时，现在也会打印红色中文 `[导入待确认版号查询失败]` / `[导入确认执行版号查询失败]` / `[导入确认过期判断失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默混写成普通 not pending 或未过期
   - `import_to_library._find_latest_import_target_path()` 在 `job_event` 关联查询异常时，现在也会打印红色中文 `[导入目标路径查询失败]` 日志和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“没有目标路径”
   - `import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[导入取消任务更新失败]` / `[导入确认超时任务取消失败]` 日志和 `[处理建议]`；其中 `_handle_expired_pending_confirm()` 会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 更新异常静默吞成普通“导入确认已超时”
@@ -255,6 +255,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的导入请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在已执行导入的 stale-check 里，如果读取 `job_event` 目标路径失败，现在也会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/job_event 读取异常误判成普通“无导入目标路径/没有待确认导入”。
 - 2026-04-16 代码审查确认：`import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、`jobs.cancel_pending_job()` 异常或 `False` 时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`；导入手动取消入口不再把这类持久化异常混成普通“没有待取消导入”。
+- 2026-04-16 代码审查确认：`import_to_library._restore_pending_approval()` 在 `approval_repo.restore_import_pending()` 返回 `False` 时，现在也会打印红色中文 `[导入审批回退失败]` 和 `[处理建议]`；导入 confirm 不再把审批真相回退被当前状态拒绝混成“内存回退成功就算整体成功”。
 - 2026-04-16 代码审查确认：`import_to_library._resolve_normalized_naming_truth()` 现在也会把 `job_event_repo.list_events_for_task_identity()` 意外返回空结果显式记成 `import naming truth result missing`；导入命名真相读取不再把这类 repo 契约破坏滑成未捕获异常或模糊回退。
 - 2026-04-16 代码审查确认：`import_to_library._claim_pending_job()` 在 `jobs.claim_lease()` 抛异常时，现在也会把异常态继续向上抛成 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`；导入 confirm 不再把 SQLite/jobs lease 更新失败混成普通 stale/not pending。
 - 2026-04-16 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 stale-check 之后再次读取待确认版号失败时，现在也会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`；导入 confirm 不再把 `approval_record` 二次读取异常吃成进程内 lease 兜底或普通 not pending。
@@ -615,6 +616,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import pending-creation fail-closed tests：2026-04-16，`9 passed, 66 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "pending_approval or pending_job or pending_state_unavailable"`）
 - import confirm job-lifecycle observability tests：2026-04-15，`5 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "rebuild_confirm_context_logs or claim_pending_job_logs_persistence_failure or restore_pending_job_logs_persistence_failure or mark_completed_job_logs_persistence_failure"`）
 - import approval-fallback observability tests：2026-04-15，`4 passed, 33 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs_persistence_failure or resolve_pending_lease_version_logs_approval_lookup_failure or find_version_stale_rejection_text_logs_approval_lookup_failure or is_pending_approval_expired_logs_approval_lookup_failure"`）
+- import approval-restore rejected-state tests：2026-04-16，`2 passed, 81 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_rejected_current_state"`）
 - import target-path lookup observability tests：2026-04-15，`1 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k find_latest_import_target_path_logs_event_lookup_failure`）
 - import cancel-path fail-closed tests：2026-04-16，`5 passed, 68 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import"`）
 - import confirm-expiry fail-closed tests：2026-04-16，`3 passed, 70 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "handle_expired_pending_confirm"`）
