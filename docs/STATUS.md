@@ -336,7 +336,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_client_for_lookup()` 在实例名命中但对应下载器 client 没装好时，现在会打印红色中文 `[下载器客户端未配置]` 和 `[处理建议]`，不再静默返回 `None` 让状态/导入查询只表现成普通未命中。
 - 2026-04-15 代码审查确认：`app.main._resolve_downloader_client_for_dispatch()` 在显式 `downloader_name` 命中不存在实例或未装好 client 时，现在会先打印红色中文 `[下载器投递路由失败]` 和 `[处理建议]`，不再只抛英文 `ValueError` 让外层只看到泛化的下载投递失败。
 - 2026-04-15 代码审查确认：`search_media.get_cached_candidate()` 读取 `candidate_mapping.candidate_json` 时，现在会把坏 JSON、非对象 payload 单独记成红色中文 `[搜索候选载荷损坏]` 和 `[处理建议]`，不再把这类持久化坏候选混写成普通缓存未命中。
-- 2026-04-15 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_item` 的 chat 列表失败时，现在会返回显式失败态 `None`，并由 Telegram scheduler tick 接线直接跳过本轮，不再把 SQLite 读取异常混写成“当前没有任何通知”的空元组。
+- 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_item` 的 chat 列表失败时，现在会返回空通知元组 `()`，并由后台接线直接跳过本轮；BT 订阅后台 tick 不再把 SQLite 读取异常混写成 `None`/空通知两套失败语义。
 - 2026-04-15 代码审查确认：`post_download_auto_import._has_terminal_activity()` 在读取 `job_event` 终态失败时，现在会打印红色中文 `[自动导入终态查询失败]` 和 `[处理建议]`，并停止这条任务的自动导入跟进，不再把 SQLite 读取异常混写成“还没有终态事件”继续推进自动导入。
 - 2026-04-16 代码审查确认：`post_download_auto_import.run_for_record()` 遇到 `chat_id<=0` 的完成记录时，现在会打印红色中文 `[自动导入聊天身份无效]` 和 `[处理建议]`，不再静默跳过这类坏归属身份记录。
 - 2026-04-16 代码审查确认：`download_monitor_repo.list_completed_for_auto_import()` 不再用 SQL 直接过滤 `chat_id<=0` 的完成记录；自动导入读路径会把这类坏归属身份显式交给 `post_download_auto_import.run_for_record()` 打日志，而不是混成普通“这轮没有候选”。
