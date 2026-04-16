@@ -685,7 +685,7 @@ class AddToDownloaderService:
         if self._approval_repo is None:
             return
         try:
-            self._approval_repo.restore_downloader_pending(
+            restored = self._approval_repo.restore_downloader_pending(
                 task_id=task_id,
                 task_hash=task_hash,
                 task_ref=task_ref,
@@ -697,6 +697,11 @@ class AddToDownloaderService:
                 flush=True,
             )
             return
+        if restored is False:
+            print(
+                f"\033[31m[下载审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
+                flush=True,
+            )
 
     def _cancel_pending_approval(
         self,

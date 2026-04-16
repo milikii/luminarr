@@ -568,6 +568,16 @@ def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     assert "lease_version=2" in output
 
 
+def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: False})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
+    service._restore_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123", expected_lease_version=2)
+    output = capsys.readouterr().out
+    assert "[下载审批回退失败]" in output
+    assert "approval_record restore rejected current state" in output
+    assert "lease_version=2" in output
+
+
 def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
