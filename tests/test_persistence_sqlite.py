@@ -437,16 +437,20 @@ def test_download_monitor_repo_rejects_missing_internal_identity(tmp_path: Path)
 
 
 @pytest.mark.parametrize(
-    ("task_id", "task_hash", "status_code", "expected_message", "read_mode"),
+    ("task_id", "task_hash", "chat_id", "user_id", "status_code", "expected_message", "read_mode"),
     [
-        ("42", "", 0, "download monitor row identity corrupted after read", "list_pending"),
-        ("42", "hash-42", -1, "download monitor status corrupted after read", "get_record"),
+        ("42", "", 1001, 2001, 0, "download monitor row identity corrupted after read", "list_pending"),
+        ("42", "hash-42", 1001, 2001, -1, "download monitor status corrupted after read", "get_record"),
+        ("42", "hash-42", -1, 2001, 0, "download monitor chat identity corrupted after read", "list_pending"),
+        ("42", "hash-42", 1001, -1, 0, "download monitor user identity corrupted after read", "get_record"),
     ],
 )
 def test_download_monitor_repo_rejects_corrupted_row_after_read(
     tmp_path: Path,
     task_id: str,
     task_hash: str,
+    chat_id: int,
+    user_id: int,
     status_code: int,
     expected_message: str,
     read_mode: str,
@@ -477,8 +481,8 @@ def test_download_monitor_repo_rejects_corrupted_row_after_read(
                 task_id,
                 task_hash,
                 "Dune: Part Two",
-                1001,
-                2001,
+                chat_id,
+                user_id,
                 status_code,
                 0.5,
             ),

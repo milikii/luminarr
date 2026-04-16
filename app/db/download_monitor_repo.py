@@ -284,11 +284,17 @@ def _is_download_completed(task_status: TransmissionTaskStatus) -> bool:
 def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRecord:
     task_id = str(row["task_id"]).strip()
     task_hash = str(row["task_hash"]).strip()
+    chat_id = int(row["chat_id"])
+    user_id = int(row["user_id"])
     status_code = int(row["status_code"])
     percent_done = float(row["percent_done"])
 
     if not task_id or not task_hash:
         raise DownloadMonitorPersistenceError("download monitor row identity corrupted after read")
+    if chat_id < 0:
+        raise DownloadMonitorPersistenceError("download monitor chat identity corrupted after read")
+    if user_id < 0:
+        raise DownloadMonitorPersistenceError("download monitor user identity corrupted after read")
     if status_code < 0:
         raise DownloadMonitorPersistenceError("download monitor status corrupted after read")
     if percent_done < 0:
@@ -298,8 +304,8 @@ def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRec
         task_id=task_id,
         task_hash=task_hash,
         name=str(row["name"]),
-        chat_id=int(row["chat_id"]),
-        user_id=int(row["user_id"]),
+        chat_id=chat_id,
+        user_id=user_id,
         status_code=status_code,
         percent_done=percent_done,
         is_complete=bool(int(row["is_complete"])),
