@@ -390,6 +390,16 @@ def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_mark_completed_job_logs_rejected_current_state(capsys) -> None:
+    job_repo = type("JobRepo", (), {"mark_completed": lambda self, **kwargs: False})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    service._mark_completed_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87")
+    output = capsys.readouterr().out
+    assert "[导入确认任务完结失败]" in output
+    assert "jobs.mark_completed rejected current state" in output
+    assert "job_id=job-1" in output
+
+
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

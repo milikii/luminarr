@@ -1332,7 +1332,7 @@ class ImportToLibraryService:
         if self._job_repo is None:
             return
         try:
-            self._job_repo.mark_completed(
+            marked = self._job_repo.mark_completed(
                 job_id=job_id,
                 expected_version=expected_version,
                 lease_owner=lease_owner,
@@ -1344,6 +1344,11 @@ class ImportToLibraryService:
                 flush=True,
             )
             return
+        if marked is False:
+            print(
+                f"\033[31m[导入确认任务完结失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误=jobs.mark_completed rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配；当前导入结果已返回，但任务真相可能仍停留在待确认或执行中。",
+                flush=True,
+            )
 
     def _build_job_lease_owner(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
