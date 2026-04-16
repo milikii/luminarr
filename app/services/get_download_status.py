@@ -14,6 +14,7 @@ STATUS_QUERY_USAGE_TEXT = "状态查询格式：status <任务ID或Hash>"
 STATUS_NOT_FOUND_TEXT = "未找到对应下载任务，请检查任务 ID/Hash。"
 STATUS_QUERY_FAILED_TEXT = "查询下载状态失败，请稍后重试。"
 STATUS_OBSERVATION_WARNING_TEXT = "注意：下载状态观察落盘失败，自动导入跟进可能未推进，请稍后重试。"
+STATUS_AUTO_IMPORT_WARNING_TEXT = "注意：自动导入跟进失败，本次状态查询未附带后续处理结果，请稍后重试。"
 
 _STATUS_CODE_LABELS = {
     0: "已停止",
@@ -101,7 +102,7 @@ class GetDownloadStatusService:
                 f"\033[31m[下载状态自动导入跟进失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查自动导入后半段依赖、SQLite 和导入审批链路；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
                 flush=True,
             )
-            return None
+            return STATUS_AUTO_IMPORT_WARNING_TEXT
 
 
 def parse_status_query(text: str) -> str | None:
