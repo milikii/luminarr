@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.clients.tmdb import TmdbMovie
-from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError
+from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationRepo
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -217,7 +217,10 @@ class SearchMediaService:
         if self._candidate_repo is None:
             return cleared
         try:
-            return self._candidate_repo.clear_candidates(chat_id) or cleared
+            cleared_result = self._candidate_repo.clear_candidates(chat_id)
+            if cleared_result is None:
+                raise CandidatePersistenceError("candidate clear result missing")
+            return cleared_result or cleared
         except Exception as error:
             print(
                 f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前进程内候选已清掉，但重启后旧候选可能仍残留。",

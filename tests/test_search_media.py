@@ -293,6 +293,19 @@ def test_clear_cached_candidates_logs_candidate_persistence_failure(capsys) -> N
     assert "[搜索候选清理失败]" in capsys.readouterr().out
 
 
+def test_clear_cached_candidates_logs_missing_candidate_clear_result(capsys) -> None:
+    repo = type("MissingRepo", (), {"clear_candidates": lambda self, chat_id: None})()
+    service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)
+    service._recent_candidates_by_chat[1001] = [{"title": "Dune"}]
+
+    assert service.clear_cached_candidates(1001) is False
+    assert service._recent_candidates_by_chat[1001] == [{"title": "Dune"}]
+    output = capsys.readouterr().out
+    assert "[搜索候选清理失败]" in output
+    assert "candidate clear result missing" in output
+    assert "[处理建议]" in output
+
+
 def test_get_cached_candidate_logs_candidate_payload_corruption(tmp_path: Path, capsys) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

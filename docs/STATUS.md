@@ -1,4 +1,4 @@
-# Current status (v246)
+# Current status (v247)
 
 ## Project position
 
@@ -351,6 +351,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-16 代码审查确认：`approval_repo._upsert_approval()` / `_to_approval_record()` 现在会把不在 `pending/approved/cancelled` 白名单里的 `status` 显式记成 `ApprovalPersistenceError`；审批真相层不再把坏审批状态混成普通 not pending。
 - 2026-04-16 代码审查确认：`approval_repo._get_requested_lease_version()` / `_to_approval_record()` 读到坏 `approval_record` 行时，如果 `action_type/task_id/task_hash/status` 为空、`lease_version<=0` 或 `executed_version<0`，现在也会显式抛出 `ApprovalPersistenceError`；审批真相层不再把损坏审批记录误包装成正常审批状态返回给 confirm 读路径。
 - 2026-04-15 代码审查确认：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 删除失败时，现在会恢复当前进程内候选并返回 `False`，Telegram 私聊入口也不会再回 `已清除当前候选，请重新搜索。`，避免把 SQLite/候选表删除失败误判成成功重置。
+- 2026-04-16 代码审查确认：`search_media.clear_cached_candidates()` 现在也会把 `candidate_repo.clear_candidates()` 意外返回空结果显式记成 `candidate clear result missing`，并恢复当前进程内候选；候选清理入口不再把这类仓储契约破坏混成普通清理结果。
 - 2026-04-16 代码审查确认：`search_media.has_cached_candidates()` 现在会显式区分“真没有候选”和“候选读取失败”；shared runtime 的 frustration/reset 入口不再把 SQLite/candidate 读取异常混成普通“没有候选可重置”继续往下走。
 - 2026-04-15 代码审查确认：`search_media.clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 删除失败时，现在会恢复当前进程内待澄清状态并返回 `False`；Telegram 私聊入口也不会再回 `已重置当前澄清，请重新描述。` 之类的重置文本，避免把 SQLite/clarification 删除失败误判成成功重置。
 - 2026-04-15 代码审查确认：frustration/reset 入口在候选清理失败时，现在会直接结束这次“算了/取消”处理，不再把这类 frustration 文本继续当普通搜索请求往下走，避免候选表删除失败后又返回一条和用户意图无关的搜索结果。
@@ -531,6 +532,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - search media clarification-load observability tests：2026-04-16，`7 passed, 23 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or is_clarification_pending_logs_persistence_failure or load_persisted_clarification_query_distinguishes_repo_failure_from_missing_state"`）
 - search media candidate-clear observability tests：2026-04-15，`1 passed, 22 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k clear_cached_candidates_logs_candidate_persistence_failure`）
 - search media candidate-presence observability tests：2026-04-16，`3 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clear_cached_candidates_logs_candidate_persistence_failure or test_get_cached_candidate_logs_candidate_payload_corruption or test_has_cached_candidates_distinguishes_lookup_failure"`）
+- search media regression tests：2026-04-16，`32 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
 - search media candidate-load observability manual check：2026-04-15，`passed`（`PYTHONPATH=/home/alex/projects/luminarr /home/alex/projects/luminarr/.venv/bin/python -c "from app.services.search_media import SearchMediaService; BoomRepo=type('BoomRepo', (), {'get_candidate': lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError('db down'))}); service=SearchMediaService(lambda query: None, candidate_repo=BoomRepo()); service.get_cached_candidate(1001, 1)"`）
 - private runtime frustration fail-closed tests：2026-04-16，`2 passed, 18 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "pending_job_lookup_failure or test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure"`）
 - private runtime jobs-lookup fail-closed tests：2026-04-16，`4 passed, 26 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "pending_job_lookup_failure or confirm_job_lookup_failure"`）
