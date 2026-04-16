@@ -706,5 +706,27 @@ def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) 
     assert "[处理建议]" in output
 
 
+def test_post_download_auto_import_run_once_logs_completed_list_missing_result(capsys) -> None:
+    monitor_repo = type(
+        "MissingRepo",
+        (),
+        {"list_completed_for_auto_import": lambda self, *, limit: None},
+    )()
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=type("EventRepo", (), {})(),
+        auto_import_func=AsyncMock(),
+    )
+
+    result = asyncio.run(auto_import_service.run_once(limit=5))
+
+    assert result == AutoImportRunResult(scanned=0, progressed=0, replies=(), state_unavailable=True)
+    output = capsys.readouterr().out
+    assert "[自动导入候选读取失败]" in output
+    assert "limit=5" in output
+    assert "auto import completed list result missing" in output
+    assert "[处理建议]" in output
+
+
 def _run(coroutine: Awaitable[str]) -> str:
     return asyncio.run(coroutine)
