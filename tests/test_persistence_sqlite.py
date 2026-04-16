@@ -1233,6 +1233,50 @@ def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: P
         repo.list_items(chat_id=0)
 
 
+@pytest.mark.parametrize(
+    ("title", "media_kind", "expected_message"),
+    [
+        ("", "anime", "bt_subscription_item row identity corrupted after read"),
+        ("Frieren", "documentary", "bt_subscription_item media kind corrupted after read"),
+    ],
+)
+def test_bt_subscription_repo_rejects_corrupted_row_after_read(
+    tmp_path: Path,
+    title: str,
+    media_kind: str,
+    expected_message: str,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtSubscriptionRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_subscription_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                1001,
+                title,
+                "2023",
+                media_kind,
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(BtSubscriptionPersistenceError, match=expected_message):
+        repo.list_items(chat_id=1001)
+
+
 def test_approval_repo_raises_when_upsert_row_missing(tmp_path: Path) -> None:
     class MissingRowApprovalRepo(ApprovalRepo):
         def _get_exact_approval_record(
