@@ -14,6 +14,7 @@ STATUS_QUERY_USAGE_TEXT = "状态查询格式：status <任务ID或Hash>"
 STATUS_NOT_FOUND_TEXT = "未找到对应下载任务，请检查任务 ID/Hash。"
 STATUS_QUERY_FAILED_TEXT = "查询下载状态失败，请稍后重试。"
 STATUS_OBSERVATION_WARNING_TEXT = "注意：下载状态观察落盘失败，自动导入跟进可能未推进，请稍后重试。"
+STATUS_COMPLETION_EVENT_WARNING_TEXT = "注意：下载完成观察事件落盘失败，后续恢复可能缺少这次完成记录，请稍后重试。"
 STATUS_AUTO_IMPORT_WARNING_TEXT = "注意：自动导入跟进失败，本次状态查询未附带后续处理结果，请稍后重试。"
 
 _STATUS_CODE_LABELS = {
@@ -79,6 +80,7 @@ class GetDownloadStatusService:
                 flush=True,
             )
             return STATUS_OBSERVATION_WARNING_TEXT
+        follow_up_parts: list[str] = []
         if update.newly_completed and self._job_event_repo is not None:
             try:
                 self._job_event_repo.append_event(
@@ -93,16 +95,24 @@ class GetDownloadStatusService:
                     f"\033[31m[下载完成观察事件落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
                     flush=True,
                 )
+                follow_up_parts.append(STATUS_COMPLETION_EVENT_WARNING_TEXT)
         if self._post_download_auto_import_service is None:
-            return None
+            if not follow_up_parts:
+                return None
+            return "\n\n".join(follow_up_parts)
         try:
-            return await self._post_download_auto_import_service.run_for_record(update.record)
+            auto_import_text = await self._post_download_auto_import_service.run_for_record(update.record)
         except Exception as error:
             print(
                 f"\033[31m[下载状态自动导入跟进失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查自动导入后半段依赖、SQLite 和导入审批链路；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
                 flush=True,
             )
-            return STATUS_AUTO_IMPORT_WARNING_TEXT
+            auto_import_text = STATUS_AUTO_IMPORT_WARNING_TEXT
+        if auto_import_text:
+            follow_up_parts.append(auto_import_text)
+        if not follow_up_parts:
+            return None
+        return "\n\n".join(follow_up_parts)
 
 
 def parse_status_query(text: str) -> str | None:
