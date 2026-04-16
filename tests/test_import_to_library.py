@@ -796,7 +796,7 @@ def test_handle_expired_pending_confirm_logs_approval_cancel_failure(capsys) -> 
         ),
         approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
     )
-    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_EXPIRED_TEXT
+    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
     assert "[导入确认超时审批取消失败]" in output
     assert "lease_version=2" in output
@@ -825,7 +825,7 @@ def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
         ),
         approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
     )
-    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_EXPIRED_TEXT
+    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
     assert "[导入确认超时任务取消失败]" in output
     assert "job_id=job-1" in output
@@ -854,7 +854,7 @@ def test_handle_expired_pending_confirm_logs_job_cancel_state_rejection(capsys) 
         ),
         approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
     )
-    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_EXPIRED_TEXT
+    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
     assert "[导入确认超时任务取消失败]" in output
     assert "jobs.cancel_pending_job rejected current state" in output

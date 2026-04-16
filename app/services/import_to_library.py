@@ -1390,7 +1390,7 @@ class ImportToLibraryService:
             return None
         if self._approval_repo is not None:
             try:
-                self._approval_repo.cancel_import(
+                approval_cancelled = self._approval_repo.cancel_import(
                     task_id=context.job.task_id,
                     task_hash=context.job.task_hash,
                     task_ref=task_ref,
@@ -1401,6 +1401,13 @@ class ImportToLibraryService:
                     f"\033[31m[导入确认超时审批取消失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} lease_version={approval_record.lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前会继续返回超时文本，但审批真相可能仍残留在 pending。",
                     flush=True,
                 )
+                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+            if not approval_cancelled:
+                print(
+                    f"\033[31m[导入确认超时审批取消失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} lease_version={approval_record.lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在，或是否已被其他路径抢先取消/确认；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“导入确认已超时”。",
+                    flush=True,
+                )
+                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
             try:
                 cancelled = self._job_repo.cancel_pending_job(
@@ -1413,12 +1420,14 @@ class ImportToLibraryService:
                     f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前会继续返回超时文本，但任务真相可能仍残留在待确认状态。",
                     flush=True,
                 )
+                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
             else:
                 if not cancelled:
                     print(
                         f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前会继续返回超时文本，但待确认任务真相可能已被其他状态迁移抢先改写。",
                         flush=True,
                     )
+                    return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         self._clear_pending_copy_fallback(
             task_id=context.job.task_id,
             task_hash=context.job.task_hash,

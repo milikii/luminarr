@@ -91,6 +91,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library._find_latest_import_target_path()` 在 `job_event` 关联查询异常时，现在也会打印红色中文 `[导入目标路径查询失败]` 日志和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“没有目标路径”
   - `import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[导入取消任务更新失败]` / `[导入确认超时任务取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“取消/超时文本回了就算任务真相也收口”
   - `import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、或 `jobs.cancel_pending_job()` 更新失败/拒绝时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`，不再把这类持久化异常继续混成普通“没有待取消导入”
+  - `import_to_library._handle_expired_pending_confirm()` 在超时取消审批或任务更新失败时，现在会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把这类持久化异常继续混成普通“导入确认已超时”
   - `import_to_library._handle_expired_pending_confirm()` 在 `approval_repo.cancel_import()` 更新失败时，现在也会打印红色中文 `[导入确认超时审批取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“超时文本回了就算审批真相也收口”
   - `search_media` 在 TMDB 归一化查询异常时，现在也会打印红色中文 `[TMDB 查询失败]` 日志和 `[处理建议]`，不再静默退回普通搜索
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
@@ -287,6 +288,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-16 代码审查确认：`add_to_downloader._handle_expired_pending_confirm()` 现在会把 `jobs.cancel_pending_job()` 的 `False` 分支显式记成 `jobs.cancel_pending_job rejected current state`；下载确认超时入口不再把“任务已被其他状态迁移抢先改写”和“SQLite 真相缺口”混成同一条失败日志。
 - 2026-04-16 代码审查确认：`add_to_downloader._handle_expired_pending_confirm()` 在超时取消审批或任务更新失败时，现在都会直接返回 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`；下载 confirm 超时入口不再把这类持久化异常混成普通“下载确认已超时”。
 - 2026-04-16 代码审查确认：`import_to_library._handle_expired_pending_confirm()` 现在也会把 `jobs.cancel_pending_job()` 的 `False` 分支显式记成 `jobs.cancel_pending_job rejected current state`；导入确认超时入口不再把“任务已被其他状态迁移抢先改写”和“SQLite 真相缺口”混成同一条失败日志。
+- 2026-04-16 代码审查确认：`import_to_library._handle_expired_pending_confirm()` 在超时取消审批或任务更新失败时，现在都会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`；导入 confirm 超时入口不再把这类持久化异常混成普通“导入确认已超时”。
 - 2026-04-16 代码审查确认：`import_to_library.cancel_pending_import()` 现在也会把 `jobs.cancel_pending_job()` 的 `False` 分支显式记成 `jobs.cancel_pending_job rejected current state`；导入手动取消入口不再把“任务已被其他状态迁移抢先改写”和“SQLite 真相缺口”混成同一条失败日志。
 - 2026-04-16 代码审查确认：`job_repo.get_*_job_*()` / `get_latest_pending_*()` 读路径遇到空 `chat_id`、空 `task_ref` 或空 `workflow_type` 时，现在也会显式抛出 `JobPersistenceError`；任务真相层不再把坏查询身份静默折叠成普通“没查到任务”。
 - 2026-04-16 代码审查确认：`job_repo._select_one()` 读到 `jobs` 坏行时，如果 `job_id/workflow_type/state/task_id/task_hash` 为空、`chat_id<=0` 或 `version<=0`，现在也会显式抛出 `JobPersistenceError`；任务真相层不再把损坏持久化记录误包装成一条正常 `JobRecord` 返回给下载/导入/cleanup 读路径。
@@ -566,6 +568,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import approval-fallback observability tests：2026-04-15，`4 passed, 33 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs_persistence_failure or resolve_pending_lease_version_logs_approval_lookup_failure or find_version_stale_rejection_text_logs_approval_lookup_failure or is_pending_approval_expired_logs_approval_lookup_failure"`）
 - import target-path lookup observability tests：2026-04-15，`1 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k find_latest_import_target_path_logs_event_lookup_failure`）
 - import cancel-path fail-closed tests：2026-04-16，`5 passed, 68 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import"`）
+- import confirm-expiry fail-closed tests：2026-04-16，`3 passed, 70 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "handle_expired_pending_confirm"`）
 - import cancel lookup observability tests：2026-04-15，`1 passed, 51 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k cancel_pending_import_logs_job_lookup_failure`）
 - import source-missing observability tests：2026-04-15，`1 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_source_missing`）
 - import target-exists observability tests：2026-04-15，`1 passed, 56 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_exists`）
