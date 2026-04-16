@@ -249,6 +249,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`private_chat_runtime` 里 frustration / confirm 两条 `job_repo` 查询失败路径现在也会打印红色中文 `[待处理任务查询失败]` / `[确认关联任务查询失败]` 和 `[处理建议]`，不再把 SQLite 读取异常静默吞成“当前没有待处理任务 / 没匹配到确认任务”。
 - 2026-04-16 代码审查确认：`private_chat_runtime` 在 frustration / confirm 顶层 `jobs` 查询失败时，现在会直接停在 shared runtime 并回 `SERVICE_NOT_READY_TEXT`；即使 add/import/search service 都已经注入，也不再继续探测后续 fallback 分支。
 - 2026-04-15 代码审查确认：`add_to_downloader.confirm_add_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“下载确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的下载请求”或“未过期”继续推进 confirm。
+- 2026-04-16 代码审查确认：`add_to_downloader._claim_pending_job()` 在 `jobs.claim_lease()` 抛异常时，现在也会把异常态继续向上抛成 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT`；下载 confirm 不再把 SQLite/jobs lease 更新失败混成普通 stale/not pending。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的导入请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在已执行导入的 stale-check 里，如果读取 `job_event` 目标路径失败，现在也会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/job_event 读取异常误判成普通“无导入目标路径/没有待确认导入”。
 - 2026-04-16 代码审查确认：`import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、`jobs.cancel_pending_job()` 异常或 `False` 时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`；导入手动取消入口不再把这类持久化异常混成普通“没有待取消导入”。
