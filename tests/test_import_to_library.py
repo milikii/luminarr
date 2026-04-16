@@ -343,7 +343,7 @@ def test_record_import_approval_logs_persistence_failure(capsys) -> None:
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     service._pending_import_identities.add(("87", "hash-87"))
     service._pending_import_lease_versions[("87", "hash-87")] = 2
-    assert service._record_import_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2) is True
+    assert service._record_import_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2) is None
     assert "[导入确认审批更新失败]" in capsys.readouterr().out
 
 
@@ -362,6 +362,74 @@ def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[导入待确认任务落盘失败]" in output
     assert "task_ref=87" in output
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_update_fails(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type("ApprovalRecord", (), {"status": "pending", "lease_version": 2, "executed_version": 0})()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_import_job_for_chat_ref": lambda self, **kwargs: job,
+            "claim_lease": lambda self, **kwargs: True,
+            "release_lease_to_pending": lambda self, **kwargs: True,
+        },
+    )()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: approval_record,
+            "is_import_pending_expired": lambda self, **kwargs: False,
+            "approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+        },
+    )()
+    get_import_source = AsyncMock(return_value=import_source)
+    service = ImportToLibraryService(
+        get_import_source,
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_awaited_once()
+    output = capsys.readouterr().out
+    assert "[导入确认审批更新失败]" in output
+    assert "lease_version=2" in output
 
 
 def test_import_by_task_ref_returns_state_unavailable_when_pending_approval_persist_fails(tmp_path: Path) -> None:

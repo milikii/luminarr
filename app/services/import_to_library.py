@@ -343,6 +343,14 @@ class ImportToLibraryService:
             task_hash=import_source.task_hash,
             expected_lease_version=expected_lease_version,
         )
+        if approved is None:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if not approved:
             stale_text = self._find_version_stale_rejection_text(
                 task_id=import_source.task_id,
@@ -1039,7 +1047,7 @@ class ImportToLibraryService:
         task_id: str,
         task_hash: str,
         expected_lease_version: int,
-    ) -> bool:
+    ) -> bool | None:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
             return False
@@ -1063,11 +1071,10 @@ class ImportToLibraryService:
             )
         except Exception as error:
             print(
-                f"\033[31m[导入确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前请求会退回进程内待确认身份判断，重启后审批状态可能不一致。",
+                f"\033[31m[导入确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成导入已确认。",
                 flush=True,
             )
-            current_lease = self._pending_import_lease_versions.get(identity, 0)
-            approved = identity in self._pending_import_identities and current_lease == expected_lease_version
+            return None
 
         if approved and identity in self._pending_import_identities:
             self._pending_import_identities.remove(identity)
