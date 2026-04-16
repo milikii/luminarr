@@ -246,6 +246,54 @@ def test_get_status_text_warns_when_download_monitor_returns_missing_record(caps
     assert "download monitor observed record missing" in output
 
 
+def test_get_status_text_warns_when_download_monitor_returns_missing_completion_flag(capsys) -> None:
+    monitor_repo = type(
+        "MissingCompletionRepo",
+        (),
+        {
+            "record_status": lambda self, task_status: type(
+                "Update",
+                (),
+                {
+                    "record": type(
+                        "Record",
+                        (),
+                        {
+                            "task_id": "87",
+                            "task_hash": "hash-87",
+                            "name": "Dune 1984",
+                            "chat_id": 1001,
+                            "user_id": 2001,
+                        },
+                    )(),
+                },
+            )()
+        },
+    )()
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=4,
+                percent_done=0.5,
+                rate_download=1024,
+                eta_seconds=30,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 下载中" in text
+    assert "注意：下载状态观察落盘失败" in text
+    output = capsys.readouterr().out
+    assert "[下载状态观察落盘失败]" in output
+    assert "download monitor completion flag missing" in output
+
+
 def test_get_status_text_warns_when_completion_event_write_fails(capsys) -> None:
     monitor_repo = type(
         "MonitorRepo",
