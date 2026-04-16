@@ -482,6 +482,10 @@ class ImportToLibraryService:
             )
             return None
         if not cancelled:
+            print(
+                f"\033[31m[导入取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前审批可能已取消，但待确认任务真相可能已被其他状态迁移抢先改写。",
+                flush=True,
+            )
             return None
         self._clear_pending_copy_fallback(
             task_id=pending_job.task_id,
