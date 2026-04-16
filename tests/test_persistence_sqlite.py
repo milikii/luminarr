@@ -1533,6 +1533,26 @@ def test_approval_repo_rejects_missing_identity_for_requested_lease_lookup(tmp_p
         )
 
 
+def test_approval_repo_rejects_missing_identity_for_exact_lookup(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for exact query"):
+        repo._get_exact_approval_record(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id="",
+            task_hash="hash-87",
+        )
+
+    with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for exact query"):
+        repo._get_exact_approval_record(
+            action_type=ACTION_IMPORT_TO_LIBRARY,
+            task_id="87",
+            task_hash="",
+        )
+
+
 def test_approval_repo_raises_when_mark_executed_row_missing(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
