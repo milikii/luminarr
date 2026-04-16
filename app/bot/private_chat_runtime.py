@@ -227,6 +227,10 @@ async def handle_private_chat_query_text(
     if bt_processing_path_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
+    bt_classification_pending = tg._is_bt_classification_pending(context=context, chat_id=chat_id)
+    if bt_classification_pending is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return
     if bt_processing_path_pending and (
         bt_processing_path is not None or bt_processing_shortcut is not None
     ):
@@ -273,7 +277,7 @@ async def handle_private_chat_query_text(
             )
             return
 
-    if bt_classification is not None and tg._is_bt_classification_pending(context=context, chat_id=chat_id):
+    if bt_classification is not None and bt_classification_pending:
         bt_source = tg._pop_bt_classification_pending(context=context, chat_id=chat_id) or ""
         tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
@@ -577,7 +581,7 @@ async def handle_private_chat_query_text(
         await reply_func(tg.BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
         return
 
-    if tg._is_bt_classification_pending(context=context, chat_id=chat_id):
+    if bt_classification_pending:
         await reply_func(tg.BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
         return
 

@@ -254,6 +254,40 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_processing_p
     assert "db down" in captured.out
 
 
+def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classification_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def __init__(self, database: SqliteDatabase) -> None:
+            super().__init__(database)
+            self._calls = 0
+
+        def get_pending(self, *, chat_id: int):
+            self._calls += 1
+            if self._calls == 1:
+                return None
+            raise RuntimeError("db down")
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="movie",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理读取失败]" in captured.out
+    assert "stage=classification" in captured.out
+    assert "db down" in captured.out
+
+
 def test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

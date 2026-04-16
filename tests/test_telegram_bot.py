@@ -1172,7 +1172,7 @@ def test_bt_classification_pending_logs_read_failure(capsys: pytest.CaptureFixtu
         )
     )
 
-    assert _is_bt_classification_pending(context=context, chat_id=1001) is False
+    assert _is_bt_classification_pending(context=context, chat_id=1001) is None
 
     output = capsys.readouterr().out
     assert "[BT 待处理读取失败]" in output
