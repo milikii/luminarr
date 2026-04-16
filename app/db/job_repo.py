@@ -254,7 +254,11 @@ class JobRepo:
                 ),
             )
             connection.commit()
-        return cursor.rowcount == 1
+        if cursor.rowcount == 1:
+            return True
+        if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
+            raise JobPersistenceError("job missing during lease claim")
+        return False
 
     def release_lease_to_pending(
         self,
