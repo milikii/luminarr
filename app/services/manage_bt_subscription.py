@@ -32,6 +32,10 @@ BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
 BT_SUBSCRIPTION_RUN_FAILED_TEXT = "BT 订阅扫描失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
 BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。"
+BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT = (
+    "注意：本轮有命中的 BT 订阅未能创建下载待确认。\n"
+    "请检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。"
+)
 BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT = (
     "注意：BT 订阅最近资源真相未更新，下次扫描可能重复命中同一资源。\n"
     "请检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
@@ -67,6 +71,7 @@ class BtSubscriptionRunResult:
     scanned: int
     matched: int
     replies: tuple[str, ...]
+    pending_creation_failed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -376,7 +381,12 @@ class ManageBtSubscriptionService:
             replies.append(reply)
         if pending_creation_failed and matched <= 0:
             return None
-        return BtSubscriptionRunResult(scanned=len(items), matched=matched, replies=tuple(replies))
+        return BtSubscriptionRunResult(
+            scanned=len(items),
+            matched=matched,
+            replies=tuple(replies),
+            pending_creation_failed=pending_creation_failed,
+        )
 
     def _update_last_seen(
         self,
@@ -664,4 +674,7 @@ def _format_bt_subscription_run_result(result: BtSubscriptionRunResult) -> str:
     )
     if not result.replies:
         return header
-    return f"{header}\n\n" + "\n\n".join(result.replies)
+    body = "\n\n".join(result.replies)
+    if result.pending_creation_failed:
+        body = f"{body}\n\n{BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT}"
+    return f"{header}\n\n{body}"

@@ -1,4 +1,4 @@
-# Current status (v232)
+# Current status (v233)
 
 ## Project position
 
@@ -391,6 +391,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_once()` / `_scan_chat_once()` 在读取 `bt_subscription_repo.list_items()` 失败时，现在也会打印红色中文 `[BT 订阅扫描读取失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，避免把 SQLite 读取异常误报成“当前没有可扫描的 BT 订阅”或直接把后台扫描打崩。
 - 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并显式返回 `None` 给上层 scheduler；后台 tick 不再把 SQLite 读取异常混成普通“本轮没有任何通知”。
 - 2026-04-16 代码审查确认：`manage_bt_subscription._run_for_item()` 在命中新资源后，如果 `add_to_downloader.add_candidate_source()` 返回 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，现在也会打印红色中文 `[BT 订阅待确认创建失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，不再把待确认真相写入失败混成普通“当前没有新资源”。
+- 2026-04-16 代码审查确认：`manage_bt_subscription._scan_chat_once()` / `_format_bt_subscription_run_result()` 在同一轮 `btsub run` 里遇到“部分条目成功创建待确认、部分条目写失败”时，现在会在成功回复后追加“本轮仍有命中条目未创建待确认”的显式 warning，不再把部分失败伪装成纯成功。
 - 2026-04-15 代码审查确认：`import_to_library._is_raw_bt_task()` 在读取到坏 `payload_json` 时，现在也会打印红色中文 `[导入 raw_bt 判定载荷损坏]` 和 `[处理建议]`，不再把持久化坏数据静默混写成“不是 raw_bt”。
 - 2026-04-15 代码审查确认：`import_to_library._resolve_execution_mode()` 在读取到坏 `payload_json` 时，现在也会打印红色中文 `[导入执行模式载荷损坏]` 和 `[处理建议]`，并带出具体损坏原因（坏 JSON / 非对象），不再把 copy-fallback 待确认坏数据静默混写成普通 hardlink 执行模式。
 - 2026-04-15 代码审查确认：`add_to_downloader` 里的 `[下载取消载荷损坏]` / `[下载确认上下文载荷损坏]` 现在也会带出 `payload_json` 的具体损坏原因（空载荷 / 坏 JSON / 非对象 / 缺关键字段），不再只报笼统的“载荷损坏”。
@@ -607,6 +608,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - bt subscription scheduler tick fail-closed tests：2026-04-16，`5 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "scheduler_tick"`）
 - bt subscription scheduler chat-id lookup sentinel tests：2026-04-16，`1 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "returns_none_when_chat_id_lookup_raises"`）
 - bt subscription pending-creation fail-closed tests：2026-04-16，`4 passed, 16 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "pending_creation_is_unavailable or run_once_enqueues_new_candidate_and_skips_seen_source or returns_none_when_chat_id_lookup_raises"`）
+- bt subscription partial pending-creation warning tests：2026-04-16，`4 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "partially_unavailable or pending_creation_is_unavailable or run_once_enqueues_new_candidate_and_skips_seen_source"`）
 - telegram bt subscription scheduler none-sentinel compatibility tests：2026-04-16，`1 passed, 132 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "run_bt_subscription_scheduler_tick_once_skips_none_notifications"`）
 - clarification pending fail-closed routing tests：2026-04-16，`4 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification_pending"`；`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "clarification_lookup_failure"`）
 - add by selection candidate lookup fail-closed tests：2026-04-16，`5 passed`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "add_by_selection"`）

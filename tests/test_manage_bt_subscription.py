@@ -470,6 +470,51 @@ def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_pa
     assert "命中资源: Frieren S01E01 720p" in reply
 
 
+def test_bt_subscription_run_once_warns_when_pending_creation_is_partially_unavailable(tmp_path: Path) -> None:
+    async def _multi_item_search(query: str) -> list[dict[str, object]]:
+        return [
+            {
+                "title": f"{query} 1080p",
+                "downloadUrl": f"https://example.com/{query}.torrent",
+            }
+        ]
+
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    repo.add_item(chat_id=1001, title="沙丘", year="2021", media_kind="movie")
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    pending_texts = iter(
+        (
+            "下载待确认：Frieren S01E01 1080p\n选择序号: hash-1\n请发送 confirm hash-1 执行下载。",
+            "下载待确认状态写入失败，请稍后重试。",
+        )
+    )
+
+    async def _mixed_add_candidate_source(**_: object) -> str:
+        return next(pending_texts)
+
+    add_service.add_candidate_source = _mixed_add_candidate_source  # type: ignore[method-assign]
+    service = ManageBtSubscriptionService(repo, _multi_item_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert "BT 订阅扫描完成：共扫描 2 条，命中新资源 1 条。" in reply
+    assert "下载待确认：Frieren S01E01 1080p" in reply
+    assert "本轮有命中的 BT 订阅未能创建下载待确认" in reply
+
+
 def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_raise(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)
