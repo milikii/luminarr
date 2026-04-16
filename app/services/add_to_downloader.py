@@ -228,14 +228,14 @@ class AddToDownloaderService:
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
-        confirm_context, confirm_context_lookup_failed = self._rebuild_confirm_context(
+        confirm_context, confirm_context_unavailable = self._rebuild_confirm_context(
             task_ref=cleaned_ref,
             chat_id=chat_id,
         )
         if confirm_context is None:
             in_memory_pending = self._get_in_memory_pending(chat_id=chat_id, task_ref=cleaned_ref)
             if in_memory_pending is None:
-                if confirm_context_lookup_failed:
+                if confirm_context_unavailable:
                     return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
                 return ADD_CONFIRM_NOT_PENDING_TEXT
         else:
@@ -738,10 +738,10 @@ class AddToDownloaderService:
         pending_add, payload_problem = _pending_add_from_json(job.payload_json)
         if pending_add is None:
             print(
-                f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前 confirm 会按“没有待确认下载”继续处理，但这可能是持久化状态损坏。",
+                f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；若当前进程里也没有待确认上下文，当前 confirm 会直接返回状态读取失败，避免把持久化坏数据误判成“没有待确认下载”。",
                 flush=True,
             )
-            return None, False
+            return None, True
 
         approval_record: ApprovalRecord | None = None
         approval_lookup_failed = False

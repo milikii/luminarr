@@ -176,7 +176,7 @@ def test_rebuild_confirm_context_logs_payload_corruption(capsys) -> None:
 
     context, lookup_failed = service._rebuild_confirm_context(task_ref="1", chat_id=1001)
     assert context is None
-    assert lookup_failed is False
+    assert lookup_failed is True
 
     output = capsys.readouterr().out
     assert "[下载确认上下文载荷损坏]" in output
@@ -201,6 +201,25 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_on_context_lookup_fai
     assert "[下载确认上下文查询失败]" in output
     assert "chat_id=1001" in output
     assert "task_ref=1" in output
+
+
+def test_confirm_add_by_task_ref_returns_state_unavailable_on_context_payload_corruption(capsys) -> None:
+    job = type("Job", (), {"payload_json": "{}", "task_id": "selection:1", "task_hash": "abc123"})()
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        job_repo=job_repo,
+    )
+
+    text = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert text == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+    add_torrent.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[下载确认上下文载荷损坏]" in output
+    assert "task_hash=abc123" in output
 
 
 def test_confirm_add_by_task_ref_uses_in_memory_pending_when_context_lookup_fails(capsys) -> None:
