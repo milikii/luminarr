@@ -456,11 +456,13 @@ async def handle_private_chat_query_text(
                     return
 
         add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
-        if (
-            isinstance(add_service, tg.AddToDownloaderService)
-            and chat_id is not None
-            and add_service.has_pending_add(chat_id, confirm_ref)
-        ):
+        has_pending_add: bool | None = False
+        if isinstance(add_service, tg.AddToDownloaderService) and chat_id is not None:
+            has_pending_add = add_service.has_pending_add(chat_id, confirm_ref)
+        if has_pending_add is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        if isinstance(add_service, tg.AddToDownloaderService) and chat_id is not None and has_pending_add:
             reply = await execution_gate.run(
                 tg.ACTION_CONFIRM_ADD_TO_DOWNLOADER,
                 lambda: add_service.confirm_add_by_task_ref(

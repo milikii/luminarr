@@ -41,7 +41,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - 下载器名 lookup 在 `downloader_name` 指向不存在实例时，现在也会打印红色中文 `[下载器实例不存在]` 日志和 `[处理建议]`
   - 状态查询和导入源查询在 `downloader_name` 能命中实例、但应用启动阶段没装好对应 client 时，现在也会打印红色中文 `[下载器客户端未配置]` 日志和 `[处理建议]`，不再静默停路成普通未命中
   - 下载投递在显式 `downloader_name` 命中不存在实例或未装好 client 时，现在也会先打印红色中文 `[下载器投递路由失败]` 日志和 `[处理建议]`，不再只抛英文 `ValueError`
-  - `add_to_downloader.has_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载待确认查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
+  - `add_to_downloader.has_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载待确认查询失败]` 日志和 `[处理建议]`；若当前进程里也没有待确认上下文，就会显式返回异常态给 shared runtime，由 shared runtime 回 `SERVICE_NOT_READY_TEXT`，不再把 SQLite 查询异常静默吞成“没有待确认下载”
   - `add_to_downloader.cancel_pending_add()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载取消查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待取消下载”
   - `add_to_downloader.cancel_pending_add()` 在 `jobs.payload_json` 损坏时，现在也会打印红色中文 `[下载取消载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏数据静默吞成“没有待取消下载”
   - `add_to_downloader._rebuild_confirm_context()` 在 `jobs` 查询异常时，现在也会打印红色中文 `[下载确认上下文查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待确认下载”

@@ -305,6 +305,42 @@ def test_dispatch_private_chat_text_logs_confirm_job_lookup_failure(
     assert "[处理建议]" in captured.out
 
 
+def test_dispatch_private_chat_text_stops_on_downloader_pending_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    add_service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search),
+        add_torrent_func=AsyncMock(),
+        job_repo=type(
+            "BoomJobRepo",
+            (),
+            {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+    )
+    import_service = type("ImportService", (), {"confirm_import_by_task_ref": Mock()})()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="confirm 1",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            },
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[下载待确认查询失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "task_ref=1" in captured.out
+    import_service.confirm_import_by_task_ref.assert_not_called()  # type: ignore[attr-defined]
+
+
 def test_dispatch_private_chat_text_routes_cleanup_inspect_without_telegram_update(
     tmp_path: Path,
 ) -> None:

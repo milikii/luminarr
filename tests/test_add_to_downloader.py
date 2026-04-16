@@ -86,7 +86,28 @@ def test_confirm_add_by_task_ref_without_pending_request_returns_not_pending() -
 def test_has_pending_add_logs_job_lookup_failure(capsys) -> None:
     job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
-    assert service.has_pending_add(1001, "1") is False
+    assert service.has_pending_add(1001, "1") is None
+    assert "[下载待确认查询失败]" in capsys.readouterr().out
+
+
+def test_has_pending_add_uses_in_memory_pending_when_job_lookup_fails(capsys) -> None:
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+
+    assert service.has_pending_add(1001, "1") is True
     assert "[下载待确认查询失败]" in capsys.readouterr().out
 
 

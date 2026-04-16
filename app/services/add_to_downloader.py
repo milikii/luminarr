@@ -401,22 +401,23 @@ class AddToDownloaderService:
         self._clear_pending_context(chat_id=chat_id, task_ref=cleaned_ref)
         return reply
 
-    def has_pending_add(self, chat_id: int, task_ref: str) -> bool:
+    def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:
         cleaned_ref = task_ref.strip()
         if chat_id <= 0 or not cleaned_ref:
             return False
+        in_memory_pending = (chat_id, cleaned_ref) in self._pending_add_contexts_by_chat_ref
         if self._job_repo is not None:
             try:
                 job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=cleaned_ref)
             except Exception as error:
                 print(
-                    f"\033[31m[下载待确认查询失败]\033[0m chat_id={chat_id} task_ref={cleaned_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前请求会按“无待确认下载”继续处理，但实际待确认状态可能被误判。",
+                    f"\033[31m[下载待确认查询失败]\033[0m chat_id={chat_id} task_ref={cleaned_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；若当前进程里也没有待确认上下文，这次请求会直接返回服务未就绪，避免把持久化异常误判成“没有待确认下载”。",
                     flush=True,
                 )
-                job = None
+                return True if in_memory_pending else None
             if job is not None and job.state == JOB_STATE_PENDING_APPROVAL:
                 return True
-        return (chat_id, cleaned_ref) in self._pending_add_contexts_by_chat_ref
+        return in_memory_pending
 
     def cancel_pending_add(self, chat_id: int) -> str | None:
         if chat_id <= 0:
