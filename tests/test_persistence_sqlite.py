@@ -1328,6 +1328,37 @@ def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: P
         repo.list_items(chat_id=0)
 
 
+def test_bt_subscription_repo_list_chat_ids_keeps_invalid_chat_identity_rows(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = BtSubscriptionRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_subscription_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                0,
+                "Frieren",
+                "2023",
+                "anime",
+            ),
+        )
+        connection.commit()
+
+    assert repo.list_chat_ids() == [0]
+
+
 @pytest.mark.parametrize(
     ("title", "media_kind", "expected_message"),
     [

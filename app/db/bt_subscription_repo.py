@@ -120,7 +120,6 @@ class BtSubscriptionRepo:
                 """
                 SELECT DISTINCT chat_id
                 FROM bt_subscription_item
-                WHERE chat_id > 0
                 ORDER BY chat_id ASC
                 """
             ).fetchall()

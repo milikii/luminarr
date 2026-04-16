@@ -494,6 +494,53 @@ def test_bt_subscription_scheduler_tick_returns_empty_when_chat_id_lookup_raises
     assert "[处理建议]" in captured.out
 
 
+def test_bt_subscription_scheduler_tick_surfaces_invalid_chat_identity_row(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_subscription_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                0,
+                "葬送的芙莉莲",
+                "2023",
+                "anime",
+            ),
+        )
+        connection.commit()
+
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications == ()
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "chat_id=0" in captured.out
+    assert "bt_subscription_item chat identity missing for list" in captured.out
+
+
 def test_bt_subscription_scheduler_tick_warns_when_last_seen_update_raises(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)
