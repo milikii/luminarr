@@ -501,7 +501,7 @@ def test_download_monitor_pending_completion_limit_is_stable(tmp_path: Path) -> 
     assert [record.task_id for record in repo.list_pending_completion(limit=1)] == ["41"]
 
 
-def test_download_monitor_completed_list_keeps_invalid_chat_identity_rows(tmp_path: Path) -> None:
+def test_download_monitor_completed_list_rejects_invalid_chat_identity_rows(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     repo = DownloadMonitorRepo(database)
@@ -537,10 +537,11 @@ def test_download_monitor_completed_list_keeps_invalid_chat_identity_rows(tmp_pa
         )
         connection.commit()
 
-    completed_records = repo.list_completed_for_auto_import(limit=5)
-    assert len(completed_records) == 1
-    assert completed_records[0].task_id == "42"
-    assert completed_records[0].chat_id == 0
+    with pytest.raises(
+        DownloadMonitorPersistenceError,
+        match="download monitor completed row chat identity corrupted after read",
+    ):
+        repo.list_completed_for_auto_import(limit=5)
 
 
 def test_completed_download_truth_after_restart_can_progress_to_import_pending(tmp_path: Path) -> None:

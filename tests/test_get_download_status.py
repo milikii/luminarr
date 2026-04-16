@@ -635,7 +635,7 @@ def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(cap
     assert "chat_id=0" in output
 
 
-def test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate(tmp_path: Path, capsys) -> None:
+def test_post_download_auto_import_run_once_surfaces_completed_list_corruption(tmp_path: Path, capsys) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     with database.connect() as connection:
@@ -677,11 +677,11 @@ def test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate(tmp_
 
     result = asyncio.run(auto_import_service.run_once(limit=5))
 
-    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=(), state_unavailable=True)
+    assert result == AutoImportRunResult(scanned=0, progressed=0, replies=(), state_unavailable=True)
     output = capsys.readouterr().out
-    assert "[自动导入聊天身份无效]" in output
-    assert "task_id=87" in output
-    assert "chat_id=0" in output
+    assert "[自动导入候选读取失败]" in output
+    assert "limit=5" in output
+    assert "download monitor completed row chat identity corrupted after read" in output
 
 
 def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) -> None:

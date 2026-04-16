@@ -241,7 +241,7 @@ class DownloadMonitorRepo:
                 """,
                 (max(1, limit),),
             ).fetchall()
-        return [_to_download_monitor_record(row) for row in rows]
+        return [_to_auto_import_record(row) for row in rows]
 
     def _get_record_by_identity(self, *, task_id: str, task_hash: str) -> DownloadMonitorRecord | None:
         cleaned_task_id = task_id.strip()
@@ -308,3 +308,10 @@ def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRec
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
     )
+
+
+def _to_auto_import_record(row: Mapping[str, object]) -> DownloadMonitorRecord:
+    record = _to_download_monitor_record(row)
+    if record.chat_id <= 0:
+        raise DownloadMonitorPersistenceError("download monitor completed row chat identity corrupted after read")
+    return record
