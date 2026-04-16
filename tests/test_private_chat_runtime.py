@@ -310,6 +310,68 @@ def test_dispatch_private_chat_text_replies_import_cancel_state_unavailable_with
     assert "db down" in captured.out
 
 
+def test_dispatch_private_chat_text_replies_service_not_ready_on_clarification_clear_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    search_service = SearchMediaService(
+        _fake_search,
+        clarification_repo=type(
+            "BoomRepo",
+            (),
+            {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+    )
+    search_service._clarification_pending_by_chat[1001] = "dune"
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={SEARCH_SERVICE_KEY: search_service},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[搜索澄清态清理失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down" in captured.out
+
+
+def test_dispatch_private_chat_text_replies_service_not_ready_on_candidate_clear_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    search_service = SearchMediaService(
+        _fake_search,
+        candidate_repo=type(
+            "BoomRepo",
+            (),
+            {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+    )
+    search_service._recent_candidates_by_chat[1001] = [{"title": "title-dune"}]
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={SEARCH_SERVICE_KEY: search_service},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[搜索候选清理失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down" in captured.out
+
+
 def test_dispatch_private_chat_text_digit_stops_on_clarification_lookup_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

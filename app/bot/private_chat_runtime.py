@@ -131,6 +131,8 @@ async def handle_private_chat_query_text(
                 )
                 if clarification_cleared:
                     await reply_func(tg.CLARIFICATION_RESET_TEXT)
+                    return
+                await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
             has_cached_candidates = search_service.has_cached_candidates(chat_id)
             if has_cached_candidates is None:
@@ -144,6 +146,8 @@ async def handle_private_chat_query_text(
                 )
                 if candidates_cleared:
                     await reply_func(tg.FRUSTRATION_RESET_TEXT)
+                    return
+                await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
         if tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id):
             await reply_func(tg.RAW_BT_DESTINATION_CANCELLED_TEXT)

@@ -91,9 +91,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `search_media` 在 TMDB 归一化查询异常时，现在也会打印红色中文 `[TMDB 查询失败]` 日志和 `[处理建议]`，不再静默退回普通搜索
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media` 在 BT 只读探索搜索源异常时，现在也会打印红色中文 `[BT 只读搜索失败]` 日志和 `[处理建议]`，不再只抛原始异常
-  - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`，不再静默吞掉 SQLite 删除/读取异常
+  - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`；shared private-chat runtime 在 `取消` 路径里也会直接回 `SERVICE_NOT_READY_TEXT`，不再静默吞掉 SQLite 删除/读取异常
   - `search_media.get_cached_candidate()` 在 `candidate_mapping.candidate_json` 为空、坏 JSON 或非对象时，现在也会打印红色中文 `[搜索候选载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏候选混写成普通缓存未命中
-  - `search_media.clear_cached_candidates()` 在 `candidate_mapping.clear_candidates()` 删除异常时，现在也会打印红色中文 `[搜索候选清理失败]` 日志和 `[处理建议]`，不再把 SQLite 删除异常静默吞成“候选本来就清空了”
+  - `search_media.clear_cached_candidates()` 在 `candidate_mapping.clear_candidates()` 删除异常时，现在也会打印红色中文 `[搜索候选清理失败]` 日志和 `[处理建议]`；shared private-chat runtime 在 `取消` 路径里也会直接回 `SERVICE_NOT_READY_TEXT`，不再把 SQLite 删除异常静默吞成“候选本来就清空了”
   - copy fallback、completion-monitor、post-download auto import
   - `post_download_auto_import` 最小后台 tick 已接入应用启动/停止链，完成态 `download_monitor` 不再只能靠用户手动 `status` 才推进一次
   - `download_monitor` 的待完成下载列表现在已支持限流读取，便于后续独立后台轮询按批次推进下载完成观察
