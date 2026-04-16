@@ -327,6 +327,7 @@ def test_bt_subscription_run_once_warns_when_last_seen_truth_is_not_updated(tmp_
     captured = capsys.readouterr()
     assert "[BT 订阅最近资源回写失败]" in captured.out
     assert "[处理建议]" in captured.out
+    assert "bt subscription last_seen update result missing" in captured.out
 
 
 def test_bt_subscription_run_once_logs_missing_row_during_last_seen_update(tmp_path: Path, capsys) -> None:

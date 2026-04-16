@@ -256,6 +256,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`bt_subscription_repo.list_items()` 遇到空 `chat_id` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅清单读取失败]` 和 `[处理建议]`，不再把坏列表身份静默折叠成普通空清单。
 - 2026-04-16 代码审查确认：`bt_subscription_repo.list_chat_ids()` 不再用 SQL 直接过滤 `chat_id<=0` 的订阅行；后台 `run_scheduler_tick()` 会把这类坏 chat 身份显式交给现有扫描失败日志，而不是混成普通“当前没有可扫描 chat”。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.update_last_seen()` 在回写最近资源真相时如果条目已不存在，现在会显式抛出 `bt_subscription_item missing during last_seen update`，并由 `manage_bt_subscription` 继续打印红色中文 `[BT 订阅最近资源回写失败]` 和 `[处理建议]`，不再把这类持久化缺失和普通 `returned False` 混成同一个模糊原因。
+- 2026-04-16 代码审查确认：`manage_bt_subscription._update_last_seen()` 现在会把 `bt_subscription_repo.update_last_seen()` 意外返回空结果显式记成 `bt subscription last_seen update result missing`；BT 订阅入口不再把这类契约破坏继续混写成模糊的 `returned False`。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.update_last_seen()` 遇到空 `chat_id/item_id` 或空 `source` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅最近资源回写失败]` 和 `[处理建议]`，不再把坏最近资源身份静默折叠成普通 `returned False`。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.remove_item()` 遇到空 `chat_id` 或空 `item_id` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅删除失败]` 和 `[处理建议]`，不再把坏删除身份静默折叠成普通 `False`。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.clear_items()` 遇到空 `chat_id` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅清单清空失败]` 和 `[处理建议]`，不再把坏清空身份静默折叠成普通 `0`。

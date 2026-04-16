@@ -380,6 +380,8 @@ class ManageBtSubscriptionService:
                 source=source,
                 title=title,
             )
+            if not updated:
+                raise BtSubscriptionPersistenceError("bt subscription last_seen update result missing")
         except Exception as error:
             _log_bt_subscription_last_seen_update_failed(
                 item=item,
@@ -389,16 +391,7 @@ class ManageBtSubscriptionService:
                 reason=str(error),
             )
             return False
-        if updated:
-            return True
-        _log_bt_subscription_last_seen_update_failed(
-            item=item,
-            chat_id=chat_id,
-            source=source,
-            title=title,
-            reason="bt_subscription_repo.update_last_seen returned False",
-        )
-        return False
+        return True
 
 
 def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
