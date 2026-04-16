@@ -647,29 +647,19 @@ class ApprovalRepo:
             raise ApprovalPersistenceError("approval task identity missing for pending expiry check")
         if expected_lease_version <= 0:
             raise ApprovalPersistenceError("approval expected lease version missing for pending expiry check")
-        with self._database.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT 1
-                FROM approval_record
-                WHERE action_type = ?
-                  AND task_id = ?
-                  AND task_hash = ?
-                  AND status = ?
-                  AND lease_version = ?
-                  AND expires_at != ''
-                  AND expires_at <= CURRENT_TIMESTAMP
-                LIMIT 1
-                """,
-                (
-                    action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
-                    APPROVAL_STATUS_PENDING,
-                    expected_lease_version,
-                ),
-            ).fetchone()
-        return row is not None
+        approval_record = self._get_exact_approval_record(
+            action_type=action_type,
+            task_id=cleaned_task_id,
+            task_hash=cleaned_task_hash,
+        )
+        if approval_record is None:
+            return False
+        if approval_record.status != APPROVAL_STATUS_PENDING:
+            return False
+        if approval_record.lease_version != expected_lease_version:
+            return False
+        expires_at = _parse_pending_expires_at(approval_record.expires_at)
+        return expires_at <= _utcnow()
 
     def _get_requested_lease_version(
         self,
@@ -744,3 +734,14 @@ def _normalize_approval_status(raw_status: object, *, context: str) -> str:
             raise ApprovalPersistenceError("approval status invalid for upsert")
         raise ApprovalPersistenceError("approval row status corrupted after read")
     return status
+
+
+def _parse_pending_expires_at(raw_expires_at: object) -> datetime:
+    expires_at = str(raw_expires_at).strip()
+    if not expires_at:
+        raise ApprovalPersistenceError("approval expires_at missing for pending expiry check")
+    try:
+        parsed = datetime.strptime(expires_at, "%Y-%m-%d %H:%M:%S")
+    except ValueError as error:
+        raise ApprovalPersistenceError("approval expires_at invalid for pending expiry check") from error
+    return parsed.replace(tzinfo=UTC)

@@ -1547,6 +1547,55 @@ def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("expires_at", "expected_message"),
+    [
+        ("", "approval expires_at missing for pending expiry check"),
+        ("bad-expiry", "approval expires_at invalid for pending expiry check"),
+    ],
+)
+def test_approval_repo_rejects_corrupted_pending_expiry_truth(
+    tmp_path: Path,
+    expires_at: str,
+    expected_message: str,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO approval_record (
+                action_type,
+                task_id,
+                task_hash,
+                status,
+                lease_version,
+                executed_version,
+                expires_at,
+                last_task_ref,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                ACTION_IMPORT_TO_LIBRARY,
+                "87",
+                "hash-87",
+                APPROVAL_STATUS_PENDING,
+                3,
+                0,
+                expires_at,
+                "87",
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(ApprovalPersistenceError, match=expected_message):
+        repo.is_import_pending_expired(task_id="87", task_hash="hash-87", expected_lease_version=3)
+
+
 def test_downloader_pending_approval_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
