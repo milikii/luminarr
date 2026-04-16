@@ -1111,6 +1111,9 @@ def test_bt_subscription_repo_rejects_missing_identity_for_add(tmp_path: Path) -
     with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item media kind missing"):
         repo.add_item(chat_id=1001, title="Frieren", year="2023", media_kind="   ")
 
+    with pytest.raises(BtSubscriptionPersistenceError, match="bt_subscription_item media kind invalid"):
+        repo.add_item(chat_id=1001, title="Frieren", year="2023", media_kind="documentary")
+
 
 def test_bt_subscription_repo_rejects_missing_identity_for_last_seen_update(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))

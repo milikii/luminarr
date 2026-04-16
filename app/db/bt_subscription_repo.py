@@ -46,6 +46,8 @@ class BtSubscriptionRepo:
             raise BtSubscriptionPersistenceError("bt_subscription_item title missing")
         if not cleaned_kind:
             raise BtSubscriptionPersistenceError("bt_subscription_item media kind missing")
+        if cleaned_kind not in VALID_BT_SUBSCRIPTION_MEDIA_KINDS:
+            raise BtSubscriptionPersistenceError("bt_subscription_item media kind invalid")
 
         with self._database.connect() as connection:
             cursor = connection.execute(
