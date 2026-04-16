@@ -179,15 +179,17 @@ class SearchMediaService:
         return format_movie_query_reply(cleaned_query, parsed_query, tmdb_movie, candidates)
 
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
+        return self.get_cached_candidate_load_result(chat_id, index).candidate
+
+    def get_cached_candidate_load_result(self, chat_id: int, index: int) -> CandidateLoadResult:
         if index < 1:
-            return None
+            return CandidateLoadResult()
         candidates = self._recent_candidates_by_chat.get(chat_id)
         resolved_index = index - 1
         if candidates and resolved_index < len(candidates):
-            return candidates[resolved_index]
+            return CandidateLoadResult(candidate=candidates[resolved_index])
 
-        load_result = self._load_persisted_candidate(chat_id=chat_id, index=index)
-        return load_result.candidate
+        return self._load_persisted_candidate(chat_id=chat_id, index=index)
 
     def has_cached_candidates(self, chat_id: int) -> bool | None:
         if chat_id <= 0:

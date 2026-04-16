@@ -18,6 +18,7 @@ from app.services.add_to_downloader import (
     ADD_FAILED_TEXT,
     CANDIDATE_SOURCE_MISSING_TEXT,
     ConfirmExecutionContext,
+    SELECT_LOOKUP_FAILED_TEXT,
     SELECT_NOT_FOUND_TEXT,
     SELECT_OUT_OF_RANGE_TEXT,
     SELECT_USAGE_TEXT,
@@ -571,6 +572,44 @@ def test_add_by_selection_out_of_range() -> None:
 
     reply = _run(service.add_by_selection(1001, "2"))
     assert reply == SELECT_OUT_OF_RANGE_TEXT
+    add_torrent.assert_not_called()
+
+
+def test_add_by_selection_returns_lookup_failed_when_candidate_lookup_fails() -> None:
+    failing_repo = type(
+        "BoomRepo",
+        (),
+        {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    add_torrent = AsyncMock()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url, candidate_repo=failing_repo),
+        add_torrent_func=add_torrent,
+    )
+
+    reply = _run(service.add_by_selection(1001, "1"))
+
+    assert reply == SELECT_LOOKUP_FAILED_TEXT
+    add_torrent.assert_not_called()
+
+
+def test_add_by_selection_returns_lookup_failed_when_range_probe_fails() -> None:
+    class PartialRepo:
+        def get_candidate(self, chat_id: int, index: int):
+            _ = chat_id
+            if index == 2:
+                return None
+            raise RuntimeError("db down")
+
+    add_torrent = AsyncMock()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url, candidate_repo=PartialRepo()),
+        add_torrent_func=add_torrent,
+    )
+
+    reply = _run(service.add_by_selection(1001, "2"))
+
+    assert reply == SELECT_LOOKUP_FAILED_TEXT
     add_torrent.assert_not_called()
 
 

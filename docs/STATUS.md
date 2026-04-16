@@ -256,6 +256,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`bt_subscription_repo.list_items()` 遇到空 `chat_id` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅清单读取失败]` 和 `[处理建议]`，不再把坏列表身份静默折叠成普通空清单。
 - 2026-04-16 代码审查确认：`bt_subscription_repo.list_chat_ids()` 不再用 SQL 直接过滤 `chat_id<=0` 的订阅行；后台 `run_scheduler_tick()` 会把这类坏 chat 身份显式交给现有扫描失败日志，而不是混成普通“当前没有可扫描 chat”。
 - 2026-04-16 代码审查确认：`search_media.is_clarification_pending()` 在读取 `clarification_state` 失败时，现在会显式返回 `None`；shared private-chat runtime 在 `取消/重来` 和数字选序号入口都会直接回 `SERVICE_NOT_READY_TEXT`，不再把 SQLite 读取异常误判成普通“当前没有待澄清状态”继续往下走。
+- 2026-04-16 代码审查确认：`add_to_downloader.add_by_selection()` 现在会显式区分候选读取失败和“真没有候选/真超范围”；候选读取失败时会直接回“搜索候选读取失败，请稍后重试。”，不再把 SQLite 读取异常误报成“没有可用的候选结果”或“序号超出范围”。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.update_last_seen()` 在回写最近资源真相时如果条目已不存在，现在会显式抛出 `bt_subscription_item missing during last_seen update`，并由 `manage_bt_subscription` 继续打印红色中文 `[BT 订阅最近资源回写失败]` 和 `[处理建议]`，不再把这类持久化缺失和普通 `returned False` 混成同一个模糊原因。
 - 2026-04-16 代码审查确认：`manage_bt_subscription._update_last_seen()` 现在会把 `bt_subscription_repo.update_last_seen()` 意外返回空结果显式记成 `bt subscription last_seen update result missing`；BT 订阅入口不再把这类契约破坏继续混写成模糊的 `returned False`。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.update_last_seen()` 遇到空 `chat_id/item_id` 或空 `source` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅最近资源回写失败]` 和 `[处理建议]`，不再把坏最近资源身份静默折叠成普通 `returned False`。
@@ -565,6 +566,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - post download auto import invalid-chat observability tests：2026-04-16，`4 passed, 15 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "post_download_auto_import or run_once_logs_completed_list_failure or run_for_record_logs_invalid_chat_identity or test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate"`）
 - bt subscription scheduler tick fail-closed tests：2026-04-16，`5 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "scheduler_tick"`）
 - clarification pending fail-closed routing tests：2026-04-16，`4 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification_pending"`；`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "clarification_lookup_failure"`）
+- add by selection candidate lookup fail-closed tests：2026-04-16，`5 passed`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "add_by_selection"`）
 - telegram update dedup observability tests：2026-04-15，`4 passed, 115 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "deduplicates_update or dedup_persist_fails"`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - search media compile check：2026-04-15，`passed`（`python3 -m compileall app/services/search_media.py tests/test_search_media.py`）

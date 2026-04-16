@@ -24,6 +24,7 @@ AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 SELECT_USAGE_TEXT = "请输入要选择的序号，例如：1"
 SELECT_NOT_FOUND_TEXT = "没有可用的候选结果，请先发一条搜索请求。"
 SELECT_OUT_OF_RANGE_TEXT = "序号超出范围，请按搜索结果里的序号重试。"
+SELECT_LOOKUP_FAILED_TEXT = "搜索候选读取失败，请稍后重试。"
 CANDIDATE_SOURCE_MISSING_TEXT = "该候选缺少可下载链接，请换一个序号。"
 ADD_FAILED_TEXT = "下载投递失败，请稍后重试。"
 ADD_APPROVAL_PENDING_TEXT = (
@@ -103,9 +104,15 @@ class AddToDownloaderService:
         if index is None:
             return SELECT_USAGE_TEXT
 
-        candidate = self._search_service.get_cached_candidate(chat_id, index)
+        candidate_result = self._search_service.get_cached_candidate_load_result(chat_id, index)
+        if candidate_result.load_failed:
+            return SELECT_LOOKUP_FAILED_TEXT
+        candidate = candidate_result.candidate
         if candidate is None:
-            if self._search_service.get_cached_candidate(chat_id, 1) is None:
+            first_candidate_result = self._search_service.get_cached_candidate_load_result(chat_id, 1)
+            if first_candidate_result.load_failed:
+                return SELECT_LOOKUP_FAILED_TEXT
+            if first_candidate_result.candidate is None:
                 return SELECT_NOT_FOUND_TEXT
             return SELECT_OUT_OF_RANGE_TEXT
 
