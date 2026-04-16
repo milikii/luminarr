@@ -696,7 +696,7 @@ class ImportToLibraryService:
             downloader_job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
         except Exception as error:
             print(
-                f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会按“不是 raw_bt”继续判断，但原本应被阻断的 raw_bt 任务可能继续进入入库链。",
+                f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
                 flush=True,
             )
             return None
@@ -730,7 +730,7 @@ class ImportToLibraryService:
 
     def _log_raw_bt_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
         print(
-            f"\033[31m[导入 raw_bt 判定载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会按“不是 raw_bt”继续判断，但原本应被阻断的 raw_bt 任务可能继续进入入库链。",
+            f"\033[31m[导入 raw_bt 判定载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
             flush=True,
         )
 

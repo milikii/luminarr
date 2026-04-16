@@ -271,6 +271,7 @@ def test_import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails(capsys
     output = capsys.readouterr().out
     assert "[导入 raw_bt 判定查询失败]" in output
     assert "task_ref=87" in output
+    assert "当前请求会直接返回查询失败" in output
 
 
 def test_import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted(
@@ -288,6 +289,7 @@ def test_import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupte
     output = capsys.readouterr().out
     assert "[导入 raw_bt 判定载荷损坏]" in output
     assert "payload_json invalid json" in output
+    assert "当前请求会直接返回查询失败" in output
 
 
 def test_claim_pending_job_logs_persistence_failure(capsys) -> None:

@@ -258,6 +258,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-16 代码审查确认：`import_to_library._claim_pending_job()` 在 `jobs.claim_lease()` 抛异常时，现在也会把异常态继续向上抛成 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`；导入 confirm 不再把 SQLite/jobs lease 更新失败混成普通 stale/not pending。
 - 2026-04-16 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 stale-check 之后再次读取待确认版号失败时，现在也会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`；导入 confirm 不再把 `approval_record` 二次读取异常吃成进程内 lease 兜底或普通 not pending。
 - 2026-04-16 代码审查确认：`job_event_repo.find_latest_import_correlation()` 现在也会把内部事件列表 helper 意外返回空结果显式记成 `job_event list result missing during correlation lookup`；导入关联查询不再把这类真相层契约破坏滑成泛化异常。
+- 2026-04-16 代码审查确认：`import_to_library._is_raw_bt_task()` 查询失败或载荷损坏时的终端日志，现在也已改成“直接返回查询失败”的真实语义；运维排障不再被旧的“继续按不是 raw_bt 判断”文案误导。
 - 2026-04-15 代码审查确认：`watchlist_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `watchlist_item missing after insert`，并由 `manage_watchlist` 继续打印红色中文 `[想看写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
 - 2026-04-16 代码审查确认：`manage_watchlist._add_item()` 现在会把 `watchlist_repo.add_item()` 意外返回空结果显式记成 `watchlist add result missing`；想看清单入口不再把这类契约破坏继续混写成模糊的 `repo returned None`。
 - 2026-04-15 代码审查确认：`watchlist_repo.get_item_by_id()` 遇到空 `chat_id` 或空 `item_id` 时，现在也会显式抛出 `WatchlistPersistenceError`；`watchlist_repo.add_item()` 在回读新条目时继续只把“真查不到条目”当成 `watchlist_item missing after insert`，不再把坏 ID 查询身份静默折叠成普通 `None`。
