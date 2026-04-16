@@ -538,7 +538,7 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_raise(tmp_pat
         )
     )
 
-    assert notifications == ()
+    assert notifications is None
     captured = capsys.readouterr()
     assert "[BT 订阅扫描读取失败]" in captured.out
     assert "chat_id=1001" in captured.out
@@ -617,7 +617,7 @@ def test_bt_subscription_scheduler_tick_surfaces_invalid_chat_identity_row(tmp_p
         )
     )
 
-    assert notifications == ()
+    assert notifications is None
     captured = capsys.readouterr()
     assert "[BT 订阅扫描读取失败]" in captured.out
     assert "chat_id=0" in captured.out
@@ -684,7 +684,7 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_pending_creation_is_unav
         )
     )
 
-    assert notifications == ()
+    assert notifications is None
     captured = capsys.readouterr()
     assert "[BT 订阅待确认创建失败]" in captured.out
     assert "chat_id=1001" in captured.out

@@ -143,6 +143,7 @@ class ManageBtSubscriptionService:
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> tuple[tuple[int, str], ...] | None:
         notifications: list[tuple[int, str]] = []
+        scan_failed = False
         try:
             chat_ids = self._bt_subscription_repo.list_chat_ids()
         except Exception as error:
@@ -155,10 +156,13 @@ class ManageBtSubscriptionService:
                 dispatch_context=dispatch_context,
             )
             if result is None:
+                scan_failed = True
                 continue
             if result.matched <= 0:
                 continue
             notifications.append((chat_id, _format_bt_subscription_run_result(result)))
+        if scan_failed and not notifications:
+            return None
         return tuple(notifications)
 
     def _list_text(self, *, chat_id: int) -> str:
