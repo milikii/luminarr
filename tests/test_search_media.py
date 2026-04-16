@@ -277,7 +277,9 @@ def test_is_clarification_pending_logs_persistence_failure(capsys) -> None:
     repo = type("BoomRepo", (), {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)
     assert service.is_clarification_pending(1001) is None
-    assert "[搜索澄清态读取失败]" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "[搜索澄清态读取失败]" in output
+    assert "当前相关入口会按状态不可用处理" in output
 
 
 def test_load_persisted_clarification_query_distinguishes_repo_failure_from_missing_state() -> None:
@@ -344,6 +346,7 @@ def test_get_cached_candidate_logs_candidate_payload_corruption(tmp_path: Path, 
     assert service.get_cached_candidate(1001, 1) is None
     output = capsys.readouterr().out
     assert "[搜索候选载荷损坏]" in output
+    assert "当前相关入口会按候选读取失败或状态不可用处理" in output
 
 
 def test_has_cached_candidates_distinguishes_lookup_failure(capsys) -> None:
@@ -357,6 +360,7 @@ def test_has_cached_candidates_distinguishes_lookup_failure(capsys) -> None:
     assert "chat_id=1001" in output
     assert "index=1" in output
     assert "[处理建议]" in output
+    assert "当前相关入口会按候选读取失败或状态不可用处理" in output
 
 
 async def _fake_search_quality_from_title(query: str) -> list[dict[str, object]]:

@@ -294,7 +294,7 @@ class SearchMediaService:
             )
         except Exception as error:
             print(
-                f"\033[31m[搜索澄清态读取失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表读取是否正常；当前请求会按“无待澄清记录”继续处理，但重启后的澄清状态可能被误判为已丢失。",
+                f"\033[31m[搜索澄清态读取失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表读取是否正常；当前相关入口会按状态不可用处理，避免把持久化异常误判成“无待澄清记录”。",
                 flush=True,
             )
             return ClarificationQueryLoadResult(load_failed=True)
@@ -306,13 +306,13 @@ class SearchMediaService:
             return CandidateLoadResult(candidate=self._candidate_repo.get_candidate(chat_id, index))
         except CandidatePayloadCorruptionError as error:
             print(
-                f"\033[31m[搜索候选载荷损坏]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 表里的 candidate_json 是否仍是合法 JSON；当前会按无候选返回，但这可能是持久化坏数据，不是用户真的没搜过。",
+                f"\033[31m[搜索候选载荷损坏]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 表里的 candidate_json 是否仍是合法 JSON；当前相关入口会按候选读取失败或状态不可用处理，避免把持久化坏数据误判成“无候选”。",
                 flush=True,
             )
             return CandidateLoadResult(load_failed=True)
         except Exception as error:
             print(
-                f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前会按无候选返回，但这可能不是用户真的没搜过。",
+                f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前相关入口会按候选读取失败或状态不可用处理，避免把持久化异常误判成“无候选”。",
                 flush=True,
             )
             return CandidateLoadResult(load_failed=True)
