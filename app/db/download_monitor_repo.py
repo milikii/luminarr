@@ -233,7 +233,7 @@ class DownloadMonitorRepo:
                     created_at,
                     updated_at
                 FROM download_monitor
-                WHERE is_complete = 1 AND chat_id > 0
+                WHERE is_complete = 1
                 ORDER BY completion_observed_at ASC, updated_at ASC
                 LIMIT ?
                 """,

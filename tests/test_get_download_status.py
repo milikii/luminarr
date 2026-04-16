@@ -530,6 +530,55 @@ def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(cap
     assert "chat_id=0" in output
 
 
+def test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO download_monitor (
+                task_id,
+                task_hash,
+                name,
+                chat_id,
+                user_id,
+                status_code,
+                percent_done,
+                is_complete,
+                completion_observed_at,
+                last_observed_at,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                "87",
+                "hash-87",
+                "Dune 2024 1080p WEB-DL",
+                0,
+                2001,
+                6,
+                1.0,
+                1,
+            ),
+        )
+        connection.commit()
+
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=DownloadMonitorRepo(database),
+        job_event_repo=type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: []})(),
+        auto_import_func=AsyncMock(return_value="AUTO IMPORT"),
+    )
+
+    result = asyncio.run(auto_import_service.run_once(limit=5))
+
+    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=())
+    output = capsys.readouterr().out
+    assert "[自动导入聊天身份无效]" in output
+    assert "task_id=87" in output
+    assert "chat_id=0" in output
+
+
 def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) -> None:
     monitor_repo = type(
         "BoomRepo",
