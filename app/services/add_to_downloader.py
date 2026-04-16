@@ -41,6 +41,7 @@ ADD_CONFIRM_STATE_UNAVAILABLE_TEXT = "下载确认状态读取失败，请稍后
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
+PENDING_LEASE_LOOKUP_FAILED = -1
 
 
 @dataclass(frozen=True, slots=True)
@@ -485,7 +486,16 @@ class AddToDownloaderService:
             expected_lease_version = self._resolve_pending_lease_version(
                 task_id=pending_add.task_id,
                 task_hash=pending_add.task_hash,
+                allow_in_memory_fallback_on_error=False,
             )
+            if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
+                self._log_cancel_state_unavailable(
+                    task_ref=task_ref,
+                    task_id=pending_add.task_id,
+                    task_hash=pending_add.task_hash,
+                    reason="downloader approval pending lease lookup failed",
+                )
+                return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
             if expected_lease_version <= 0:
                 self._log_cancel_state_unavailable(
                     task_ref=task_ref,
@@ -523,7 +533,16 @@ class AddToDownloaderService:
         expected_lease_version = self._resolve_pending_lease_version(
             task_id=pending_job.task_id,
             task_hash=pending_job.task_hash,
+            allow_in_memory_fallback_on_error=False,
         )
+        if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
+            self._log_cancel_state_unavailable(
+                task_ref=pending_job.task_ref,
+                task_id=pending_job.task_id,
+                task_hash=pending_job.task_hash,
+                reason="downloader approval pending lease lookup failed",
+            )
+            return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
         if expected_lease_version <= 0:
             self._log_cancel_state_unavailable(
                 task_ref=pending_job.task_ref,
@@ -916,7 +935,13 @@ class AddToDownloaderService:
             return JOB_LEASE_OWNER
         return f"{JOB_LEASE_OWNER}:{cleaned_ref}"
 
-    def _resolve_pending_lease_version(self, *, task_id: str, task_hash: str) -> int:
+    def _resolve_pending_lease_version(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        allow_in_memory_fallback_on_error: bool = True,
+    ) -> int:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
             return 0
@@ -932,6 +957,8 @@ class AddToDownloaderService:
                 f"\033[31m[下载待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前会退回进程内版号判断，但持久化真相可能已经变化。",
                 flush=True,
             )
+            if not allow_in_memory_fallback_on_error:
+                return PENDING_LEASE_LOOKUP_FAILED
             if identity not in self._pending_add_identities:
                 return 0
             return self._pending_add_lease_versions.get(identity, 1)

@@ -986,6 +986,50 @@ def test_cancel_pending_add_returns_state_unavailable_when_pending_lease_missing
     assert "downloader approval pending lease missing" in output
 
 
+def test_cancel_pending_add_returns_state_unavailable_when_pending_lease_lookup_fails_with_in_memory_pending(
+    capsys,
+) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_downloader should not be called")),
+        },
+    )()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_latest_pending_downloader_job": lambda self, chat_id: None,
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_pending_job should not be called")),
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+    service._pending_add_identities.add((pending_add.task_id, pending_add.task_hash))
+    service._pending_add_lease_versions[(pending_add.task_id, pending_add.task_hash)] = 2
+
+    assert service.cancel_pending_add(1001) == ADD_CANCEL_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[下载待确认版号查询失败]" in output
+    assert "[下载取消状态读取失败]" in output
+    assert "downloader approval pending lease lookup failed" in output
+
+
 def test_add_by_selection_without_cached_candidates() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     add_torrent = AsyncMock()
