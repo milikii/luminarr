@@ -167,7 +167,9 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     assert lookup_failed is False
     assert context.approval_record is None
     assert context.approval_lookup_failed is True
-    assert "[下载确认审批查询失败]" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "[下载确认审批查询失败]" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
 
 
 def test_rebuild_confirm_context_logs_payload_corruption(capsys) -> None:
@@ -589,7 +591,9 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_lookup_
 
     assert reply == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
     add_torrent.assert_not_awaited()
-    assert "[下载确认审批查询失败]" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "[下载确认审批查询失败]" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
 
 
 def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_row_missing(capsys) -> None:
