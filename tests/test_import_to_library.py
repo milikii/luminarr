@@ -210,7 +210,9 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     assert lookup_failed is False
     assert context.approval_record is None
     assert context.approval_lookup_failed is True
-    assert "[导入确认审批查询失败]" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "[导入确认审批查询失败]" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
 
 
 def test_confirm_import_by_task_ref_returns_state_unavailable_on_context_lookup_failure(
@@ -801,7 +803,9 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_look
 
     assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     get_import_source.assert_not_awaited()
-    assert "[导入确认审批查询失败]" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "[导入确认审批查询失败]" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
 
 
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_row_missing(capsys) -> None:
