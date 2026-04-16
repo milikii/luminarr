@@ -428,6 +428,17 @@ def test_record_import_approval_logs_persistence_failure(capsys) -> None:
     assert "[导入确认审批更新失败]" in capsys.readouterr().out
 
 
+def test_record_import_approval_logs_rejected_current_state(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"approve_import": lambda self, **kwargs: False})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    service._pending_import_identities.add(("87", "hash-87"))
+    service._pending_import_lease_versions[("87", "hash-87")] = 2
+    assert service._record_import_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2) is False
+    output = capsys.readouterr().out
+    assert "[导入确认审批更新失败]" in output
+    assert "approval_record approve rejected current state" in output
+
+
 def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"mark_import_executed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
