@@ -247,7 +247,7 @@ def test_is_raw_bt_task_logs_payload_corruption(
     job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
 
-    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is False
+    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is None
 
     output = capsys.readouterr().out
     assert "[导入 raw_bt 判定载荷损坏]" in output
@@ -255,6 +255,37 @@ def test_is_raw_bt_task_logs_payload_corruption(
     assert "task_ref=87" in output
     assert expected_summary in output
     assert "[处理建议]" in output
+
+
+def test_import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails(capsys: pytest.CaptureFixture[str]) -> None:
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    get_import_source = AsyncMock()
+    service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
+
+    text = _run(service.import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_QUERY_FAILED_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入 raw_bt 判定查询失败]" in output
+    assert "task_ref=87" in output
+
+
+def test_import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job = type("Job", (), {"payload_json": "{"})()
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
+    get_import_source = AsyncMock()
+    service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
+
+    text = _run(service.import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_QUERY_FAILED_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入 raw_bt 判定载荷损坏]" in output
+    assert "payload_json invalid json" in output
 
 
 def test_claim_pending_job_logs_persistence_failure(capsys) -> None:

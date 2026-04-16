@@ -132,7 +132,10 @@ class ImportToLibraryService:
         if not cleaned_ref:
             return IMPORT_QUERY_USAGE_TEXT
 
-        if self._is_raw_bt_task(chat_id=chat_id, task_ref=cleaned_ref):
+        raw_bt_task = self._is_raw_bt_task(chat_id=chat_id, task_ref=cleaned_ref)
+        if raw_bt_task is None:
+            return IMPORT_QUERY_FAILED_TEXT
+        if raw_bt_task:
             return IMPORT_RAW_BT_UNSUPPORTED_TEXT
 
         prepared_import, error_text = await self._prepare_import(cleaned_ref, chat_id=chat_id)
@@ -659,7 +662,7 @@ class ImportToLibraryService:
 
         return PreparedImport(import_source=import_source, source_path=source_path, target_path=target_path), ""
 
-    def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool:
+    def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool | None:
         if self._job_repo is None or chat_id is None or chat_id <= 0:
             return False
         try:
@@ -669,7 +672,7 @@ class ImportToLibraryService:
                 f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会按“不是 raw_bt”继续判断，但原本应被阻断的 raw_bt 任务可能继续进入入库链。",
                 flush=True,
             )
-            return False
+            return None
         if downloader_job is None:
             return False
         cleaned_payload = downloader_job.payload_json.strip()
@@ -679,7 +682,7 @@ class ImportToLibraryService:
                 task_ref=task_ref,
                 payload_summary="payload_json empty",
             )
-            return False
+            return None
         try:
             payload = json.loads(cleaned_payload)
         except json.JSONDecodeError:
@@ -688,14 +691,14 @@ class ImportToLibraryService:
                 task_ref=task_ref,
                 payload_summary="payload_json invalid json",
             )
-            return False
+            return None
         if not isinstance(payload, dict):
             self._log_raw_bt_payload_corrupted(
                 chat_id=chat_id,
                 task_ref=task_ref,
                 payload_summary="payload_json not object",
             )
-            return False
+            return None
         return payload.get("auto_import_enabled") is False
 
     def _log_raw_bt_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
