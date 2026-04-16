@@ -618,7 +618,7 @@ def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
             source="https://example.com/dune.torrent",
         ),
     )
-    assert service._handle_expired_pending_confirm(task_ref="1", context=context, chat_id=1001) == ADD_CONFIRM_EXPIRED_TEXT
+    assert service._handle_expired_pending_confirm(task_ref="1", context=context, chat_id=1001) == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
     assert "[下载确认超时任务取消失败]" in output
     assert "job_id=job-1" in output
@@ -654,10 +654,52 @@ def test_handle_expired_pending_confirm_logs_job_cancel_state_rejection(capsys) 
             source="https://example.com/dune.torrent",
         ),
     )
-    assert service._handle_expired_pending_confirm(task_ref="1", context=context, chat_id=1001) == ADD_CONFIRM_EXPIRED_TEXT
+    assert service._handle_expired_pending_confirm(task_ref="1", context=context, chat_id=1001) == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
     assert "[下载确认超时任务取消失败]" in output
     assert "jobs.cancel_pending_job rejected current state" in output
+
+
+def test_handle_expired_pending_confirm_returns_state_unavailable_when_approval_cancel_fails(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    service._is_pending_approval_expired = lambda **kwargs: True
+    context = ConfirmExecutionContext(
+        job=JobRecord(
+            job_id="job-1",
+            chat_id=1001,
+            user_id=2001,
+            workflow_type="add_to_downloader",
+            state="pending_approval",
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            payload_json="{}",
+            version=3,
+            lease_owner="",
+            lease_until="",
+            created_at="2026-04-15 00:00:00",
+            updated_at="2026-04-15 00:00:00",
+        ),
+        approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
+        pending_add=PendingAddContext(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            title="Dune: Part Two",
+            source="https://example.com/dune.torrent",
+        ),
+    )
+
+    assert service._handle_expired_pending_confirm(task_ref="1", context=context, chat_id=1001) == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[下载取消审批更新失败]" in output
+    assert "lease_version=2" in output
 
 
 def test_cancel_pending_add_logs_job_cancel_state_rejection(capsys) -> None:

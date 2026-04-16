@@ -956,12 +956,14 @@ class AddToDownloaderService:
             return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         if not approval_expired:
             return None
-        self._cancel_pending_approval(
+        approval_cancelled = self._cancel_pending_approval(
             task_ref=task_ref,
             task_id=context.pending_add.task_id,
             task_hash=context.pending_add.task_hash,
             expected_lease_version=approval_record.lease_version,
         )
+        if not approval_cancelled:
+            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
             try:
                 cancelled = self._job_repo.cancel_pending_job(
@@ -974,12 +976,14 @@ class AddToDownloaderService:
                     f"\033[31m[下载确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前会继续返回超时文本，但任务真相可能仍残留在待确认状态。",
                     flush=True,
                 )
+                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
             else:
                 if not cancelled:
                     print(
                         f"\033[31m[下载确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前会继续返回超时文本，但待确认任务真相可能已被其他状态迁移抢先改写。",
                         flush=True,
                     )
+                    return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
         self._record_event(
             task_ref=task_ref,
