@@ -1,4 +1,4 @@
-# Current status (v249)
+# Current status (v250)
 
 ## Project position
 
@@ -207,7 +207,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Channel progress 坏 payload 整链路门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在同一日志文件混入损坏 cleanup smoke payload 行时，会忽略坏行并把合法渠道写进 `Channel progress`，避免 helper 级通过但真实文档回写链丢证据。
 - 仓库证据未来日期门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也单独锁住“晚于当前快照日期的 cleanup smoke 日志不会被算进 `local_smoke_evidence`”，避免未来日期日志被误回填成当前窗口证据。
 - 仓库证据日期聚合快照：cleanup 文档同步工具现在也会按渠道保留“窗口内最近一次真实 smoke 日期”，后续要把日志证据接到 `Channel progress` 表时不需要重新解析一遍原始日志。
-- Channel progress 同步快照：`docs/CLEANUP_VERIFICATION_WINDOW.md` 里的四渠道进度表现在也会由同步工具按固定顺序自动重写；由于当前仓库仍无窗口内真实 smoke 证据，表格状态继续保持四个 `待验证`。
+- Channel progress 同步快照：`docs/CLEANUP_VERIFICATION_WINDOW.md` 里的四渠道进度表现在也会由同步工具按固定顺序自动重写；当前表格已同步为 Telegram / personal WeChat / Feishu / WeCom 四个渠道 `已完成`，最近一次日期均为 `2026-04-14`，不再停留在四个 `待验证` 的旧快照。
 - Channel progress 截断保护快照：同步工具现在在重写四渠道进度表时也会保留 `Verification evidence`、`PT 做种 guardrail 评估` 和 `Update rule` 后续章节，不会再把窗口台账截断成只剩表格。
 - Channel progress 整链路门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接跑最小 `sync_documents()` 回写样例，锁住真实文档同步路径在重写进度表后仍保留 `Verification evidence`、`PT 做种 guardrail 评估` 和 `Update rule` 标题。
 - Channel progress 固定顺序门禁快照：`tests/test_cleanup_verification_docs_sync.py` 现在也直接锁住 `sync_documents()` 在日志乱序时仍按 Telegram / personal WeChat / Feishu / WeCom 的固定顺序输出完成行，避免窗口台账顺序随日志抖动。
