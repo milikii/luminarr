@@ -955,6 +955,15 @@ def test_job_repo_rejects_missing_identity_for_pending_upsert(tmp_path: Path) ->
             payload_json='{"source":"https://example.com/demo.torrent"}',
         )
 
+    with pytest.raises(JobPersistenceError, match="job user identity invalid for pending upsert"):
+        repo.upsert_import_job_pending(
+            chat_id=1001,
+            user_id=0,
+            task_ref="89",
+            task_id="89",
+            task_hash="hash-89",
+        )
+
 
 def test_job_repo_rejects_missing_identity_for_state_transitions(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
@@ -1101,7 +1110,19 @@ def test_job_repo_raises_when_cancel_target_missing_after_update(tmp_path: Path)
         repo._get_latest_pending_job_for_workflow(workflow_type="   ", chat_id=1001)
 
 
-def test_job_repo_rejects_corrupted_row_after_read(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("task_hash", "user_id", "expected_message"),
+    [
+        ("", 2001, "job row identity corrupted after read"),
+        ("hash-87", -1, "job row user identity corrupted after read"),
+    ],
+)
+def test_job_repo_rejects_corrupted_row_after_read(
+    tmp_path: Path,
+    task_hash: str,
+    user_id: int,
+    expected_message: str,
+) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     repo = JobRepo(database)
@@ -1129,12 +1150,12 @@ def test_job_repo_rejects_corrupted_row_after_read(tmp_path: Path) -> None:
             (
                 "import_to_library:hash-87",
                 1001,
-                2001,
+                user_id,
                 WORKFLOW_ADD_TO_DOWNLOADER,
                 JOB_STATE_PENDING_APPROVAL,
                 "87",
                 "87",
-                "",
+                task_hash,
                 "{}",
                 1,
                 "",
@@ -1143,7 +1164,7 @@ def test_job_repo_rejects_corrupted_row_after_read(tmp_path: Path) -> None:
         )
         connection.commit()
 
-    with pytest.raises(JobPersistenceError, match="job row identity corrupted after read"):
+    with pytest.raises(JobPersistenceError, match=expected_message):
         repo.get_job_for_chat_ref(chat_id=1001, task_ref="87")
 
 

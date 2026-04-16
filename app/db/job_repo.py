@@ -404,6 +404,8 @@ class JobRepo:
             raise JobPersistenceError("job workflow missing for pending upsert")
         if chat_id is None or chat_id <= 0:
             raise JobPersistenceError("job chat identity missing for pending upsert")
+        if user_id is not None and user_id <= 0:
+            raise JobPersistenceError("job user identity invalid for pending upsert")
         if not cleaned_task_id or not cleaned_task_hash:
             raise JobPersistenceError("job task identity missing for pending upsert")
 
@@ -665,18 +667,21 @@ def _to_job_record(row: Mapping[str, object]) -> JobRecord:
     task_hash = str(row["task_hash"]).strip()
     version = int(row["version"])
     chat_id = int(row["chat_id"])
+    user_id = int(row["user_id"])
 
     if not job_id or not workflow_type or not state or not task_id or not task_hash:
         raise JobPersistenceError("job row identity corrupted after read")
     if chat_id <= 0:
         raise JobPersistenceError("job row chat identity corrupted after read")
+    if user_id < 0:
+        raise JobPersistenceError("job row user identity corrupted after read")
     if version <= 0:
         raise JobPersistenceError("job row version corrupted after read")
 
     return JobRecord(
         job_id=job_id,
         chat_id=chat_id,
-        user_id=int(row["user_id"]),
+        user_id=user_id,
         workflow_type=workflow_type,
         state=state,
         task_ref=str(row["task_ref"]),
