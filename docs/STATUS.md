@@ -1,4 +1,4 @@
-# Current status (v256)
+# Current status (v257)
 
 ## Project position
 
@@ -305,6 +305,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-16 代码审查确认：`add_to_downloader._mark_completed_job()` 在 `job_repo.mark_downloader_completed()` 返回 `False` 时，现在也会打印红色中文 `[下载确认任务完结失败]` 和 `[处理建议]`；下载 confirm 不再把任务完结真相被当前状态拒绝混成“下载已投递、账本应该也写成完成了”。
 - 2026-04-16 代码审查确认：`add_to_downloader._restore_pending_job()` 在 `job_repo.release_lease_to_pending()` 返回 `False` 时，现在也会打印红色中文 `[下载确认任务回退失败]` 和 `[处理建议]`；下载 confirm 不再把任务回退真相被当前状态拒绝混成“审批已经退回待确认、账本应该也跟着回退了”。
 - 2026-04-16 代码审查确认：`import_to_library._mark_completed_job()` 在 `job_repo.mark_completed()` 返回 `False` 时，现在也会打印红色中文 `[导入确认任务完结失败]` 和 `[处理建议]`；导入 confirm 不再把任务完结真相被当前状态拒绝混成“导入已完成、账本应该也写成完成了”。
+- 2026-04-16 代码审查确认：`import_to_library._restore_pending_job()` 在 `job_repo.release_lease_to_pending()` 返回 `False` 时，现在也会打印红色中文 `[导入确认任务回退失败]` 和 `[处理建议]`；导入 confirm 不再把任务回退真相被当前状态拒绝混成“审批已经退回待确认、账本应该也跟着回退了”。
 - 2026-04-16 代码审查确认：`job_repo.release_lease_to_pending()` / `mark_completed()` 在 UPDATE 未命中且任务行已缺失时，现在也会显式抛出 `job missing during state transition`；下载/导入确认链不再把缺失任务真相混成普通任务回退/完结冲突。
 - 2026-04-15 代码审查确认：`job_repo.claim_lease()` / `cancel_pending_job()` 遇到空 `job_id/workflow_type/lease_owner` 或空 `expected_version` 时，现在也会显式抛出 `JobPersistenceError`；下载/导入服务会继续复用现有红色中文任务抢占失败 / 超时任务取消失败 / 取消任务更新失败日志和 `[处理建议]`，不再把坏任务控制身份静默折叠成普通冲突或普通取消失败。
 - 2026-04-16 代码审查确认：`job_repo.claim_lease()` 在 UPDATE 未命中且任务行已缺失时，现在也会显式抛出 `job missing during lease claim`；下载/导入确认链不再把缺失任务真相混成普通并发抢占失败。
@@ -622,6 +623,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import confirm job-lifecycle observability tests：2026-04-15，`5 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "rebuild_confirm_context_logs or claim_pending_job_logs_persistence_failure or restore_pending_job_logs_persistence_failure or mark_completed_job_logs_persistence_failure"`）
 - import approval-fallback observability tests：2026-04-15，`4 passed, 33 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs_persistence_failure or resolve_pending_lease_version_logs_approval_lookup_failure or find_version_stale_rejection_text_logs_approval_lookup_failure or is_pending_approval_expired_logs_approval_lookup_failure"`）
 - import approval-restore rejected-state tests：2026-04-16，`2 passed, 81 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_rejected_current_state"`）
+- import job-restore rejected-state tests：2026-04-16，`2 passed, 83 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_job_logs_persistence_failure or restore_pending_job_logs_rejected_current_state"`）
 - import job-complete rejected-state tests：2026-04-16，`2 passed, 82 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
 - import target-path lookup observability tests：2026-04-15，`1 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k find_latest_import_target_path_logs_event_lookup_failure`）
 - import cancel-path fail-closed tests：2026-04-16，`5 passed, 68 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import"`）
