@@ -300,6 +300,33 @@ async def _get_torrent_import_source_with_routing(
     return await client.get_torrent_import_source(task_ref)
 
 
+async def _get_torrent_status_with_routing(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> TransmissionTaskStatus | None:
+    downloader_name = _resolve_downloader_name_for_task(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+    )
+    if downloader_name is None:
+        raise DownloaderRouteLookupError(f"downloader route unavailable for status task: {task_ref}")
+    client = _resolve_downloader_client_for_lookup(
+        downloader_name=downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
+    if client is None:
+        raise DownloaderRouteLookupError(f"downloader client unavailable for status task: {task_ref}")
+    return await client.get_torrent_status(task_ref)
+
+
 def _build_bt_source_providers(
     *,
     prowlarr_client: ProwlarrClient,
@@ -410,20 +437,14 @@ def main() -> None:
         return await client.add_torrent(source, download_dir=download_dir)
 
     async def get_torrent_status_with_routing(task_ref: str, chat_id: int | None = None) -> TransmissionTaskStatus | None:
-        downloader_name = _resolve_downloader_name_for_task(
+        return await _get_torrent_status_with_routing(
             task_ref=task_ref,
             chat_id=chat_id,
             job_repo=job_repo,
-        )
-        client = _resolve_downloader_client_for_lookup(
-            downloader_name=downloader_name or "",
             downloader_instances_by_name=downloader_instances_by_name,
             transmission_clients_by_name=transmission_clients_by_name,
             qbittorrent_clients_by_name=qbittorrent_clients_by_name,
         )
-        if client is None:
-            return None
-        return await client.get_torrent_status(task_ref)
 
     async def get_torrent_import_source_with_routing(
         task_ref: str,
