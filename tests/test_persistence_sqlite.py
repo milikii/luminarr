@@ -1361,6 +1361,9 @@ def test_approval_repo_rejects_missing_identity_for_write_paths(tmp_path: Path) 
     with pytest.raises(ApprovalPersistenceError, match="approval status missing for upsert"):
         repo.upsert_import_approval(task_id="87", task_hash="hash-87", task_ref="87", status="")
 
+    with pytest.raises(ApprovalPersistenceError, match="approval status invalid for upsert"):
+        repo.upsert_import_approval(task_id="87", task_hash="hash-87", task_ref="87", status="pendng")
+
     with pytest.raises(ApprovalPersistenceError, match="approval task identity missing for pending request"):
         repo.request_import_approval(task_id="", task_hash="hash-87", task_ref="87")
 
@@ -1474,6 +1477,7 @@ def test_approval_repo_rejects_task_hash_mismatch_for_query(tmp_path: Path) -> N
     ("status", "lease_version", "expected_message"),
     [
         ("", 1, "approval row identity corrupted after read"),
+        ("pendng", 1, "approval row status corrupted after read"),
         (APPROVAL_STATUS_PENDING, 0, "approval row lease version corrupted after read"),
     ],
 )

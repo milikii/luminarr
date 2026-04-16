@@ -11,6 +11,13 @@ ACTION_IMPORT_TO_LIBRARY = "import_to_library"
 APPROVAL_STATUS_CANCELLED = "cancelled"
 APPROVAL_STATUS_PENDING = "pending"
 APPROVAL_STATUS_APPROVED = "approved"
+VALID_APPROVAL_STATUSES = frozenset(
+    {
+        APPROVAL_STATUS_CANCELLED,
+        APPROVAL_STATUS_PENDING,
+        APPROVAL_STATUS_APPROVED,
+    }
+)
 DEFAULT_PENDING_TIMEOUT_SECONDS = 15 * 60
 
 
@@ -257,9 +264,7 @@ class ApprovalRepo:
         cleaned_task_hash = task_hash.strip()
         if not cleaned_task_id or not cleaned_task_hash:
             raise ApprovalPersistenceError("approval task identity missing for upsert")
-        cleaned_status = status.strip()
-        if not cleaned_status:
-            raise ApprovalPersistenceError("approval status missing for upsert")
+        cleaned_status = _normalize_approval_status(status, context="upsert")
 
         initial_lease_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
         initial_executed_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
@@ -695,11 +700,11 @@ def _to_approval_record(row: Mapping[str, object]) -> ApprovalRecord:
     action_type = str(row["action_type"]).strip()
     task_id = str(row["task_id"]).strip()
     task_hash = str(row["task_hash"]).strip()
-    status = str(row["status"]).strip()
+    status = _normalize_approval_status(row["status"], context="read")
     lease_version = int(row["lease_version"])
     executed_version = int(row["executed_version"])
 
-    if not action_type or not task_id or not task_hash or not status:
+    if not action_type or not task_id or not task_hash:
         raise ApprovalPersistenceError("approval row identity corrupted after read")
     if lease_version <= 0:
         raise ApprovalPersistenceError("approval row lease version corrupted after read")
@@ -726,3 +731,16 @@ def _utcnow() -> datetime:
 
 def _format_utc(value: datetime) -> str:
     return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _normalize_approval_status(raw_status: object, *, context: str) -> str:
+    status = str(raw_status).strip()
+    if not status:
+        if context == "upsert":
+            raise ApprovalPersistenceError("approval status missing for upsert")
+        raise ApprovalPersistenceError("approval row identity corrupted after read")
+    if status not in VALID_APPROVAL_STATUSES:
+        if context == "upsert":
+            raise ApprovalPersistenceError("approval status invalid for upsert")
+        raise ApprovalPersistenceError("approval row status corrupted after read")
+    return status
