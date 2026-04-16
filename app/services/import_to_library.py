@@ -735,6 +735,8 @@ class ImportToLibraryService:
             return fallback
         try:
             events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
+            if events is None:
+                raise RuntimeError("import naming truth result missing")
         except Exception as error:
             print(
                 f"\033[31m[导入命名真相查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前导入会退回下载源名称做命名，文件名可能缺少 downloader 已确认的标题真相。",

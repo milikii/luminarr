@@ -1900,6 +1900,29 @@ def test_confirm_import_prefers_downloader_title_for_normalized_name(tmp_path: P
     assert str(target_file) in text
 
 
+def test_resolve_normalized_naming_truth_logs_missing_result(capsys: pytest.CaptureFixture[str]) -> None:
+    event_repo = type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: None})()
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=None),
+        library_target_dir="/data/library/movies",
+        job_event_repo=event_repo,
+    )
+
+    result = service._resolve_normalized_naming_truth(
+        task_id="87",
+        task_hash="hash-87",
+        fallback_name="Dune.Part.Two.2024.1080p.WEB-DL.mkv",
+    )
+
+    assert result == "Dune.Part.Two.2024.1080p.WEB-DL.mkv"
+    output = capsys.readouterr().out
+    assert "[导入命名真相查询失败]" in output
+    assert "import naming truth result missing" in output
+    assert "task_id=87" in output
+    assert "task_hash=hash-87" in output
+    assert "[处理建议]" in output
+
+
 def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

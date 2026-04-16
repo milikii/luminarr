@@ -252,6 +252,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在 `approval_record` 读取失败、执行版号读取失败或过期判断失败时，现在会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/approval_record 读取异常误判成普通“没有待确认的导入请求”或“未过期”继续推进 confirm。
 - 2026-04-15 代码审查确认：`import_to_library.confirm_import_by_task_ref()` 在已执行导入的 stale-check 里，如果读取 `job_event` 目标路径失败，现在也会直接返回“导入确认状态读取失败，请稍后重试。”，不再把 SQLite/job_event 读取异常误判成普通“无导入目标路径/没有待确认导入”。
 - 2026-04-16 代码审查确认：`import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、`jobs.cancel_pending_job()` 异常或 `False` 时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`；导入手动取消入口不再把这类持久化异常混成普通“没有待取消导入”。
+- 2026-04-16 代码审查确认：`import_to_library._resolve_normalized_naming_truth()` 现在也会把 `job_event_repo.list_events_for_task_identity()` 意外返回空结果显式记成 `import naming truth result missing`；导入命名真相读取不再把这类 repo 契约破坏滑成未捕获异常或模糊回退。
 - 2026-04-15 代码审查确认：`watchlist_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `watchlist_item missing after insert`，并由 `manage_watchlist` 继续打印红色中文 `[想看写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
 - 2026-04-16 代码审查确认：`manage_watchlist._add_item()` 现在会把 `watchlist_repo.add_item()` 意外返回空结果显式记成 `watchlist add result missing`；想看清单入口不再把这类契约破坏继续混写成模糊的 `repo returned None`。
 - 2026-04-15 代码审查确认：`watchlist_repo.get_item_by_id()` 遇到空 `chat_id` 或空 `item_id` 时，现在也会显式抛出 `WatchlistPersistenceError`；`watchlist_repo.add_item()` 在回读新条目时继续只把“真查不到条目”当成 `watchlist_item missing after insert`，不再把坏 ID 查询身份静默折叠成普通 `None`。
