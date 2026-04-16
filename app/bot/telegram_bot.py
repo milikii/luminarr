@@ -6,7 +6,7 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
@@ -1452,7 +1452,7 @@ def _get_bt_tmdb_association_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> BtTmdbAssociationPending | None:
+) -> BtTmdbAssociationPending | None | Literal[False]:
     if chat_id is None or chat_id <= 0:
         return None
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
@@ -1470,7 +1470,7 @@ def _get_bt_tmdb_association_pending(
             stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
             reason=str(error),
         )
-        return None
+        return False
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
         return None
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
@@ -1563,7 +1563,7 @@ def _get_raw_bt_destination_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> RawBtDestinationPending | None:
+) -> RawBtDestinationPending | None | Literal[False]:
     if chat_id is None or chat_id <= 0:
         return None
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
@@ -1581,7 +1581,7 @@ def _get_raw_bt_destination_pending(
             stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
             reason=str(error),
         )
-        return None
+        return False
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_RAW_BT_DESTINATION:
         return None
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)

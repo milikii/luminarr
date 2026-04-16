@@ -1405,7 +1405,7 @@ def test_bt_tmdb_association_pending_logs_read_failure(capsys: pytest.CaptureFix
         )
     )
 
-    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is False
 
     output = capsys.readouterr().out
     assert "[BT 待处理读取失败]" in output
@@ -1580,7 +1580,7 @@ def test_raw_bt_destination_pending_logs_read_failure(capsys: pytest.CaptureFixt
         )
     )
 
-    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    assert _get_raw_bt_destination_pending(context=context, chat_id=1001) is False
 
     output = capsys.readouterr().out
     assert "[BT 待处理读取失败]" in output

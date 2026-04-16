@@ -512,6 +512,9 @@ async def handle_private_chat_query_text(
         return
 
     bt_tmdb_pending = tg._get_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    if bt_tmdb_pending is False:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return
     if bt_tmdb_pending is not None:
         reply = await tg._handle_bt_tmdb_association_query(
             query=query,
@@ -524,6 +527,9 @@ async def handle_private_chat_query_text(
         return
 
     raw_bt_destination_pending = tg._get_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    if raw_bt_destination_pending is False:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return
     if raw_bt_destination_pending is not None:
         reply = await tg._handle_raw_bt_destination_query(
             query=query,
