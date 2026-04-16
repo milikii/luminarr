@@ -319,6 +319,62 @@ def test_download_monitor_repo_raises_when_status_row_missing_after_upsert(tmp_p
         )
 
 
+@pytest.mark.parametrize(
+    ("task_id", "task_hash", "status_code", "expected_message", "read_mode"),
+    [
+        ("42", "", 0, "download monitor row identity corrupted after read", "list_pending"),
+        ("42", "hash-42", -1, "download monitor status corrupted after read", "get_record"),
+    ],
+)
+def test_download_monitor_repo_rejects_corrupted_row_after_read(
+    tmp_path: Path,
+    task_id: str,
+    task_hash: str,
+    status_code: int,
+    expected_message: str,
+    read_mode: str,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO download_monitor (
+                task_id,
+                task_hash,
+                name,
+                chat_id,
+                user_id,
+                status_code,
+                percent_done,
+                is_complete,
+                completion_observed_at,
+                last_observed_at,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                task_id,
+                task_hash,
+                "Dune: Part Two",
+                1001,
+                2001,
+                status_code,
+                0.5,
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(DownloadMonitorPersistenceError, match=expected_message):
+        if read_mode == "list_pending":
+            repo.list_pending_completion()
+        else:
+            repo.get_record(task_id="42", task_hash="hash-42")
+
+
 def test_download_monitor_pending_completion_limit_is_stable(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
