@@ -122,8 +122,12 @@ class JobEventRepo:
         events: list[JobEvent] = []
         if cleaned_task_id or cleaned_task_hash:
             events = self.list_events_for_task_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
+            if events is None:
+                raise JobEventPersistenceError("job_event list result missing during correlation lookup")
         if not events and cleaned_task_ref:
             events = self.list_events_for_task_ref(cleaned_task_ref)
+            if events is None:
+                raise JobEventPersistenceError("job_event list result missing during correlation lookup")
 
         for event in reversed(events):
             if event.event_type != "import.succeeded":

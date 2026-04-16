@@ -2342,6 +2342,20 @@ def test_job_event_repo_finds_latest_import_correlation_with_message_fallback(tm
     assert correlation.target_path == "/data/library/movies/Dune.2021.mkv"
 
 
+def test_job_event_repo_find_latest_import_correlation_raises_when_event_list_result_is_missing(tmp_path: Path) -> None:
+    class MissingListJobEventRepo(JobEventRepo):
+        def list_events_for_task_identity(self, *, task_id: str, task_hash: str):
+            _ = (task_id, task_hash)
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingListJobEventRepo(database)
+
+    with pytest.raises(JobEventPersistenceError, match="job_event list result missing during correlation lookup"):
+        repo.find_latest_import_correlation(task_id="87", task_hash="hash-87")
+
+
 async def _fake_search_with_download_url(query: str) -> list[dict[str, object]]:
     assert query == "dune"
     return [
