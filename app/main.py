@@ -235,6 +235,10 @@ def _log_downloader_route_payload_corruption(
     )
 
 
+class DownloaderRouteLookupError(RuntimeError):
+    pass
+
+
 def _resolve_downloader_name_for_task(
     *,
     task_ref: str,
@@ -267,6 +271,33 @@ def _resolve_downloader_name_for_task(
         return downloader_name
     _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
     return None
+
+
+async def _get_torrent_import_source_with_routing(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> TransmissionImportSource | None:
+    downloader_name = _resolve_downloader_name_for_task(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+    )
+    if downloader_name is None:
+        raise DownloaderRouteLookupError(f"downloader route unavailable for import task: {task_ref}")
+    client = _resolve_downloader_client_for_lookup(
+        downloader_name=downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
+    if client is None:
+        raise DownloaderRouteLookupError(f"downloader client unavailable for import task: {task_ref}")
+    return await client.get_torrent_import_source(task_ref)
 
 
 def _build_bt_source_providers(
@@ -398,20 +429,14 @@ def main() -> None:
         task_ref: str,
         chat_id: int | None = None,
     ) -> TransmissionImportSource | None:
-        downloader_name = _resolve_downloader_name_for_task(
+        return await _get_torrent_import_source_with_routing(
             task_ref=task_ref,
             chat_id=chat_id,
             job_repo=job_repo,
-        )
-        client = _resolve_downloader_client_for_lookup(
-            downloader_name=downloader_name or "",
             downloader_instances_by_name=downloader_instances_by_name,
             transmission_clients_by_name=transmission_clients_by_name,
             qbittorrent_clients_by_name=qbittorrent_clients_by_name,
         )
-        if client is None:
-            return None
-        return await client.get_torrent_import_source(task_ref)
 
     add_to_downloader_service = AddToDownloaderService(
         search_service=search_service,

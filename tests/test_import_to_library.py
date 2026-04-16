@@ -30,6 +30,7 @@ from app.services.import_to_library import (
     IMPORT_HARDLINK_FAILED_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
+    IMPORT_QUERY_FAILED_TEXT,
     PreparedImport,
     IMPORT_REFRESH_FAILED_TEXT,
     IMPORT_SOURCE_MISSING_TEXT,
@@ -483,6 +484,20 @@ def test_prepare_import_logs_target_dir_create_failure(
     assert "[导入目标目录创建失败]" in output
     assert "task_id=87" in output
     assert "permission denied" in output
+    assert "[处理建议]" in output
+
+
+def test_prepare_import_logs_query_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    service = ImportToLibraryService(AsyncMock(side_effect=RuntimeError("route unavailable")), "/data/library/movies")
+
+    prepared, message = _run(service._prepare_import("87", chat_id=1001))
+
+    assert prepared is None
+    assert message == IMPORT_QUERY_FAILED_TEXT
+    output = capsys.readouterr().out
+    assert "[导入源查询失败]" in output
+    assert "task_ref=87" in output
+    assert "route unavailable" in output
     assert "[处理建议]" in output
 
 

@@ -6,6 +6,8 @@ import pytest
 from telegram.error import NetworkError
 
 from app.main import (
+    DownloaderRouteLookupError,
+    _get_torrent_import_source_with_routing,
     _resolve_downloader_client_for_dispatch,
     _resolve_downloader_client_for_lookup,
     _resolve_downloader_name_for_task,
@@ -115,6 +117,72 @@ def test_resolve_downloader_client_for_lookup_logs_missing_client(capsys: pytest
     assert "[处理建议]" in captured.out
 
 
+@pytest.mark.asyncio
+async def test_get_torrent_import_source_with_routing_raises_when_route_lookup_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+
+    with pytest.raises(DownloaderRouteLookupError, match="downloader route unavailable for import task: 87"):
+        await _get_torrent_import_source_with_routing(
+            task_ref="87",
+            chat_id=1001,
+            job_repo=job_repo,
+            downloader_instances_by_name={},
+            transmission_clients_by_name={},
+            qbittorrent_clients_by_name={},
+        )
+
+    captured = capsys.readouterr()
+    assert "[下载器路由查询失败]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "db down" in captured.out
+
+
+@pytest.mark.asyncio
+async def test_get_torrent_import_source_with_routing_raises_when_client_missing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json='{"downloader_name":"pt-main"}'),
+    )
+
+    with pytest.raises(DownloaderRouteLookupError, match="downloader client unavailable for import task: 87"):
+        await _get_torrent_import_source_with_routing(
+            task_ref="87",
+            chat_id=1001,
+            job_repo=job_repo,
+            downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+            transmission_clients_by_name={},
+            qbittorrent_clients_by_name={},
+        )
+
+    captured = capsys.readouterr()
+    assert "[下载器客户端未配置]" in captured.out
+    assert "downloader_name=pt-main" in captured.out
+
+
+@pytest.mark.asyncio
+async def test_get_torrent_import_source_with_routing_returns_none_for_real_not_found() -> None:
+    client = SimpleNamespace(get_torrent_import_source=lambda task_ref: _return_async(None))
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json='{"downloader_name":"pt-main"}'),
+    )
+
+    result = await _get_torrent_import_source_with_routing(
+        task_ref="87",
+        chat_id=1001,
+        job_repo=job_repo,
+        downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+        transmission_clients_by_name={"pt-main": client},
+        qbittorrent_clients_by_name={},
+    )
+
+    assert result is None
+
+
 def test_resolve_downloader_client_for_dispatch_rejects_unknown_explicit_instance() -> None:
     default_client = object()
     assert _resolve_downloader_client_for_dispatch(
@@ -171,3 +239,7 @@ def test_resolve_downloader_client_for_dispatch_logs_missing_client(
     assert "downloader_type=transmission" in captured.out
     assert "原因=client not configured" in captured.out
     assert "[处理建议]" in captured.out
+
+
+async def _return_async(value):
+    return value
