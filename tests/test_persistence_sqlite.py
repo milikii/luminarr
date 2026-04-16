@@ -1719,6 +1719,19 @@ def test_pending_approval_persists_expiry_truth(tmp_path: Path) -> None:
     )
 
 
+def test_approval_repo_raises_when_pending_expiry_row_missing(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing during pending expiry check"):
+        repo.is_import_pending_expired(
+            task_id="87",
+            task_hash="hash-87",
+            expected_lease_version=1,
+        )
+
+
 @pytest.mark.parametrize(
     ("expires_at", "expected_message"),
     [

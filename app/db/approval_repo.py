@@ -657,7 +657,7 @@ class ApprovalRepo:
             task_hash=cleaned_task_hash,
         )
         if approval_record is None:
-            return False
+            raise ApprovalPersistenceError("approval_record missing during pending expiry check")
         if approval_record.status != APPROVAL_STATUS_PENDING:
             return False
         if approval_record.lease_version != expected_lease_version:
