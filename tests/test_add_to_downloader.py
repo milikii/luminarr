@@ -512,6 +512,47 @@ def test_handle_expired_pending_confirm_logs_job_cancel_state_rejection(capsys) 
     assert "jobs.cancel_pending_job rejected current state" in output
 
 
+def test_cancel_pending_add_logs_job_cancel_state_rejection(capsys) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json='{"task_ref":"1","task_id":"selection:1","task_hash":"abc123","title":"Dune: Part Two","source":"https://example.com/dune.torrent","downloader_name":"tr-main","download_dir":"/data/downloads/tr"}',
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_latest_pending_downloader_job": lambda self, chat_id: pending_job,
+            "cancel_pending_job": lambda self, **kwargs: False,
+        },
+    )()
+    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: True})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+    service._resolve_pending_lease_version = lambda **kwargs: 2
+
+    assert service.cancel_pending_add(1001) is None
+
+    output = capsys.readouterr().out
+    assert "[下载取消任务更新失败]" in output
+    assert "jobs.cancel_pending_job rejected current state" in output
+
+
 def test_add_by_selection_without_cached_candidates() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     add_torrent = AsyncMock()
