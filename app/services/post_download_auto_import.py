@@ -30,6 +30,7 @@ class AutoImportRunResult:
     scanned: int
     progressed: int
     replies: tuple[str, ...]
+    state_unavailable: bool = False
 
 
 class AutoImportStateUnavailableError(RuntimeError):
@@ -55,15 +56,17 @@ class PostDownloadAutoImportService:
                 f"\033[31m[自动导入候选读取失败]\033[0m limit={limit} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
                 flush=True,
             )
-            return AutoImportRunResult(scanned=0, progressed=0, replies=())
+            return AutoImportRunResult(scanned=0, progressed=0, replies=(), state_unavailable=True)
         replies: list[str] = []
         progressed = 0
+        state_unavailable = False
 
         for candidate in candidates:
             blocked_reason = _match_low_quality_reason(candidate.name)
             try:
                 reply = await self.run_for_record(candidate)
             except AutoImportStateUnavailableError:
+                state_unavailable = True
                 continue
             if reply is None:
                 continue
@@ -75,6 +78,7 @@ class PostDownloadAutoImportService:
             scanned=len(candidates),
             progressed=progressed,
             replies=tuple(replies),
+            state_unavailable=state_unavailable,
         )
 
     async def run_for_record(self, candidate: DownloadMonitorRecord) -> str | None:

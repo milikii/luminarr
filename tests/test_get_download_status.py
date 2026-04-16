@@ -431,7 +431,7 @@ def test_post_download_auto_import_run_once_skips_record_when_terminal_lookup_fa
 
     result = asyncio.run(auto_import_service.run_once(limit=5))
 
-    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=())
+    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=(), state_unavailable=True)
     auto_import.assert_not_awaited()
     output = capsys.readouterr().out
     assert "[自动导入终态查询失败]" in output
@@ -677,7 +677,7 @@ def test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate(tmp_
 
     result = asyncio.run(auto_import_service.run_once(limit=5))
 
-    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=())
+    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=(), state_unavailable=True)
     output = capsys.readouterr().out
     assert "[自动导入聊天身份无效]" in output
     assert "task_id=87" in output
@@ -698,7 +698,7 @@ def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) 
 
     result = asyncio.run(auto_import_service.run_once(limit=5))
 
-    assert result == AutoImportRunResult(scanned=0, progressed=0, replies=())
+    assert result == AutoImportRunResult(scanned=0, progressed=0, replies=(), state_unavailable=True)
     output = capsys.readouterr().out
     assert "[自动导入候选读取失败]" in output
     assert "limit=5" in output

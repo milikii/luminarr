@@ -1,4 +1,4 @@
-# Current status (v238)
+# Current status (v239)
 
 ## Project position
 
@@ -391,6 +391,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`post_download_auto_import.run_once()` 在读取 `download_monitor.list_completed_for_auto_import()` 失败时，现在会单独打印红色中文 `[自动导入候选读取失败]` 和 `[处理建议]`，并返回空结果，不再只在上层下载完成轮询里混成泛化的轮询失败。
 - 2026-04-16 代码审查确认：`post_download_auto_import._has_terminal_activity()` 在读取 `job_event` 终态失败时，现在会抛出显式 `AutoImportStateUnavailableError`；`run_for_record()` 不再把这类异常压成普通 `None`，`run_once()` 则按单条记录级别跳过当前候选，不再把 SQLite 读取失败混成普通“这次没有 auto-import follow-up”。
 - 2026-04-16 代码审查确认：`post_download_auto_import.run_for_record()` 在 `download_monitor` 读到坏 `chat_id` 时，现在也会抛出显式 `AutoImportStateUnavailableError`；坏聊天身份不再被混成普通“这条记录没有 auto-import follow-up”，而是由 `run_once()` 按单条异常态跳过。
+- 2026-04-16 代码审查确认：`post_download_auto_import.run_once()` 现在会在 `AutoImportRunResult.state_unavailable` 里显式区分“整轮候选因持久化/身份异常被跳过”和“本轮本来就没有 follow-up”；`download_monitor` 读取失败、终态查询失败、坏聊天身份三类异常都不再混成普通空结果。
 - 2026-04-15 代码审查确认：`telegram_bot._poll_pending_download_completion_once()` 在读取 `download_monitor.list_pending_completion()` 失败时，现在会单独打印红色中文 `[下载完成待轮询列表读取失败]` 和 `[处理建议]`，并直接结束本轮 helper，不再只在上层 loop 里混成泛化的 `[下载完成状态轮询失败]`。
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_once()` / `_scan_chat_once()` 在读取 `bt_subscription_repo.list_items()` 失败时，现在也会打印红色中文 `[BT 订阅扫描读取失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，避免把 SQLite 读取异常误报成“当前没有可扫描的 BT 订阅”或直接把后台扫描打崩。
 - 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并显式返回 `None` 给上层 scheduler；后台 tick 不再把 SQLite 读取异常混成普通“本轮没有任何通知”。
@@ -614,6 +615,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - post download auto import invalid-chat observability tests：2026-04-16，`4 passed, 15 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "post_download_auto_import or run_once_logs_completed_list_failure or run_for_record_logs_invalid_chat_identity or test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate"`）
 - post download auto import invalid-chat state-unavailable tests：2026-04-16，`2 passed, 19 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "run_for_record_logs_invalid_chat_identity or run_once_surfaces_invalid_chat_candidate"`）
 - post download auto import terminal-lookup fail-closed tests：2026-04-16，`5 passed, 15 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "terminal_lookup_fails or post_download_auto_import_run_once_skips_record_when_terminal_lookup_fails or post_download_auto_import_run_once"`）
+- post download auto import aggregate state-unavailable tests：2026-04-16，`4 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "run_once_skips_record_when_terminal_lookup_fails or run_once_surfaces_invalid_chat_candidate or run_once_logs_completed_list_failure or run_once_counts_only_real_progress"`）
 - bt subscription scheduler tick fail-closed tests：2026-04-16，`5 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "scheduler_tick"`）
 - bt subscription scheduler aggregate none-sentinel tests：2026-04-16，`5 passed, 16 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "scheduler_tick and (scan_items_raise or chat_id_lookup_raises or invalid_chat_identity_row or pending_creation_is_unavailable or reuses_ranked_candidate_selection)"`）
 - bt subscription scheduler chat-id lookup sentinel tests：2026-04-16，`1 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "returns_none_when_chat_id_lookup_raises"`）
