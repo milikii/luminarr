@@ -58,6 +58,7 @@ IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT = "导入确认状态读取失败，请稍
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
 JOB_LEASE_OWNER = "import_confirm"
+PENDING_LEASE_LOOKUP_FAILED = -1
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 
@@ -493,7 +494,14 @@ class ImportToLibraryService:
         expected_lease_version = self._resolve_pending_lease_version(
             task_id=pending_job.task_id,
             task_hash=pending_job.task_hash,
+            allow_in_memory_fallback_on_error=False,
         )
+        if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
+            print(
+                f"\033[31m[导入取消状态读取失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease lookup failed\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前取消会直接返回状态读取失败，避免把审批查询异常误判成“没有待取消导入”。",
+                flush=True,
+            )
+            return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
         if expected_lease_version <= 0:
             print(
                 f"\033[31m[导入取消状态读取失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease missing\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
@@ -1325,7 +1333,13 @@ class ImportToLibraryService:
             return JOB_LEASE_OWNER
         return f"{JOB_LEASE_OWNER}:{cleaned_ref}"
 
-    def _resolve_pending_lease_version(self, *, task_id: str, task_hash: str) -> int:
+    def _resolve_pending_lease_version(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        allow_in_memory_fallback_on_error: bool = True,
+    ) -> int:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
             return 0
@@ -1341,6 +1355,8 @@ class ImportToLibraryService:
                 f"\033[31m[导入待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前会退回进程内版号判断，但持久化真相可能已经变化。",
                 flush=True,
             )
+            if not allow_in_memory_fallback_on_error:
+                return PENDING_LEASE_LOOKUP_FAILED
             if identity not in self._pending_import_identities:
                 return 0
             return self._pending_import_lease_versions.get(identity, 1)

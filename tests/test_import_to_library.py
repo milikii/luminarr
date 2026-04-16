@@ -1131,6 +1131,58 @@ def test_cancel_pending_import_returns_state_unavailable_when_pending_lease_miss
     assert "import approval pending lease missing" in output
 
 
+def test_cancel_pending_import_returns_state_unavailable_when_pending_lease_lookup_fails(
+    capsys,
+) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_latest_pending_import_job": lambda self, chat_id: pending_job,
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_pending_job should not be called")),
+        },
+    )()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_import should not be called")),
+        },
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    service._pending_import_identities.add((pending_job.task_id, pending_job.task_hash))
+    service._pending_import_lease_versions[(pending_job.task_id, pending_job.task_hash)] = 2
+
+    assert service.cancel_pending_import(1001) == IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入待确认版号查询失败]" in output
+    assert "[导入取消状态读取失败]" in output
+    assert "import approval pending lease lookup failed" in output
+
+
 @pytest.mark.parametrize(
     ("payload_json", "expected_summary"),
     [
