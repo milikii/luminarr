@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
-from app.services.add_to_downloader import AddToDownloaderService
+from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import parse_movie_query
 
@@ -286,24 +286,24 @@ class ManageBtSubscriptionService:
         chat_id: int,
         user_id: int | None,
         dispatch_context: BtSubscriptionDispatchContext,
-    ) -> str | None:
+    ) -> tuple[str | None, bool]:
         query = _build_subscription_query(item)
         try:
             results = await self._search_func(query)
         except Exception as error:
             _log_bt_subscription_scan_error(item=item, query=query, error=error)
-            return None
+            return None, False
 
         selected_result = _pick_subscription_candidate(
             results,
             last_seen_source=item.last_seen_source,
         )
         if selected_result is None:
-            return None
+            return None, False
 
         selected_source = _resolve_candidate_source(selected_result)
         if not selected_source:
-            return None
+            return None, False
 
         candidate_title = _resolve_candidate_title(selected_result, item=item)
         pending_text = await self._add_to_downloader_service.add_candidate_source(
@@ -316,8 +316,17 @@ class ManageBtSubscriptionService:
             download_dir=dispatch_context.download_dir,
             auto_import_enabled=True,
         )
+        if pending_text == ADD_PENDING_STATE_UNAVAILABLE_TEXT:
+            _log_bt_subscription_pending_creation_failed(
+                item=item,
+                chat_id=chat_id,
+                source=selected_source,
+                title=candidate_title,
+                reason=pending_text,
+            )
+            return None, True
         if "下载待确认：" not in pending_text:
-            return None
+            return None, False
 
         year_text = item.year if item.year else "-"
         reply = (
@@ -332,8 +341,8 @@ class ManageBtSubscriptionService:
             source=selected_source,
             title=candidate_title,
         ):
-            return reply
-        return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT}"
+            return reply, False
+        return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT}", False
 
     async def _scan_chat_once(
         self,
@@ -352,17 +361,21 @@ class ManageBtSubscriptionService:
 
         replies: list[str] = []
         matched = 0
+        pending_creation_failed = False
         for item in items:
-            reply = await self._run_for_item(
+            reply, item_pending_creation_failed = await self._run_for_item(
                 item=item,
                 chat_id=chat_id,
                 user_id=user_id,
                 dispatch_context=dispatch_context,
             )
+            pending_creation_failed = pending_creation_failed or item_pending_creation_failed
             if reply is None:
                 continue
             matched += 1
             replies.append(reply)
+        if pending_creation_failed and matched <= 0:
+            return None
         return BtSubscriptionRunResult(scanned=len(items), matched=matched, replies=tuple(replies))
 
     def _update_last_seen(
@@ -625,6 +638,21 @@ def _log_bt_subscription_last_seen_update_failed(
         f"\033[31m[BT 订阅最近资源回写失败]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
         f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
+    )
+
+
+def _log_bt_subscription_pending_creation_failed(
+    *,
+    item: BtSubscriptionItem,
+    chat_id: int,
+    source: str,
+    title: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅待确认创建失败]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
+        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。"
     )
 
 

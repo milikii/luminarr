@@ -394,6 +394,42 @@ def test_bt_subscription_run_once_returns_failure_text_when_scan_items_raise(tmp
     assert "[处理建议]" in captured.out
 
 
+def test_bt_subscription_run_once_returns_failure_text_when_pending_creation_is_unavailable(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+
+    async def _fail_add_candidate_source(**_: object) -> str:
+        return "下载待确认状态写入失败，请稍后重试。"
+
+    add_service.add_candidate_source = _fail_add_candidate_source  # type: ignore[method-assign]
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert reply == BT_SUBSCRIPTION_RUN_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅待确认创建失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "下载待确认状态写入失败，请稍后重试。" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_path: Path) -> None:
     async def _scheduler_search(_: str) -> list[dict[str, object]]:
         return [
@@ -575,6 +611,40 @@ def test_bt_subscription_scheduler_tick_warns_when_last_seen_update_raises(tmp_p
     captured = capsys.readouterr()
     assert "[BT 订阅最近资源回写失败]" in captured.out
     assert "db down" in captured.out
+
+
+def test_bt_subscription_scheduler_tick_skips_chat_when_pending_creation_is_unavailable(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+
+    async def _fail_add_candidate_source(**_: object) -> str:
+        return "下载待确认状态写入失败，请稍后重试。"
+
+    add_service.add_candidate_source = _fail_add_candidate_source  # type: ignore[method-assign]
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications == ()
+    captured = capsys.readouterr()
+    assert "[BT 订阅待确认创建失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "下载待确认状态写入失败，请稍后重试。" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:
