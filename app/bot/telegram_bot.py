@@ -1142,7 +1142,7 @@ def _is_bt_processing_path_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> bool:
+) -> bool | None:
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
@@ -1159,7 +1159,7 @@ def _is_bt_processing_path_pending(
             stage=BT_PENDING_STAGE_PROCESSING_PATH,
             reason=str(error),
         )
-        return False
+        return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
         return False
     payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)

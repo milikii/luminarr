@@ -15,6 +15,7 @@ from app.bot.personal_wechat_login import (
 from app.bot.private_chat_runtime import dispatch_private_chat_text
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
+    BT_PENDING_REPO_KEY,
     BT_PROCESSING_PATH_PROMPT_TEXT,
     CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
@@ -27,6 +28,7 @@ from app.bot.telegram_bot import (
 )
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
+from app.db.bt_pending_repo import BtPendingRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import ADD_CANCEL_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
@@ -223,6 +225,33 @@ def test_dispatch_private_chat_text_stops_on_pending_job_lookup_failure_even_wit
     import_service.cancel_pending_import.assert_not_called()
     assert "[待处理任务查询失败]" in captured.out
     assert "sqlite busy" in captured.out
+
+
+def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_processing_path_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def get_pending(self, *, chat_id: int):
+            raise RuntimeError("db down")
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="影视入库链",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理读取失败]" in captured.out
+    assert "stage=processing_path" in captured.out
+    assert "db down" in captured.out
 
 
 def test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure(

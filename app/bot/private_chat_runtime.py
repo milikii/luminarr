@@ -223,7 +223,11 @@ async def handle_private_chat_query_text(
     bt_classification = tg._parse_bt_classification_choice(query)
     bt_processing_path = tg._parse_bt_processing_path_choice(query)
     bt_processing_shortcut = tg._parse_bt_processing_path_legacy_shortcut(query)
-    if tg._is_bt_processing_path_pending(context=context, chat_id=chat_id) and (
+    bt_processing_path_pending = tg._is_bt_processing_path_pending(context=context, chat_id=chat_id)
+    if bt_processing_path_pending is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return
+    if bt_processing_path_pending and (
         bt_processing_path is not None or bt_processing_shortcut is not None
     ):
         bt_source = tg._pop_bt_processing_path_pending(context=context, chat_id=chat_id) or ""
@@ -569,7 +573,7 @@ async def handle_private_chat_query_text(
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
 
-    if tg._is_bt_processing_path_pending(context=context, chat_id=chat_id):
+    if bt_processing_path_pending:
         await reply_func(tg.BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
         return
 
