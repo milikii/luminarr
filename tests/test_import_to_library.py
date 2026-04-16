@@ -309,10 +309,64 @@ def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
         created_at="2026-04-15 00:00:00",
         updated_at="2026-04-15 00:00:00",
     )
-    assert service._claim_pending_job(job=job, lease_owner="import_confirm:87") is False
+    assert service._claim_pending_job(job=job, lease_owner="import_confirm:87") is None
     output = capsys.readouterr().out
     assert "[导入确认任务抢占失败]" in output
     assert "job_id=job-1" in output
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_claim_lease_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type("ApprovalRecord", (), {"status": "pending", "lease_version": 2, "executed_version": 0})()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_import_job_for_chat_ref": lambda self, **kwargs: job,
+            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+        },
+    )()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: approval_record,
+            "is_import_pending_expired": lambda self, **kwargs: False,
+        },
+    )()
+    get_import_source = AsyncMock(return_value=None)
+    service = ImportToLibraryService(
+        get_import_source,
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入确认任务抢占失败]" in output
+    assert "job_id=job-1" in output
+    assert "db down" in output
 
 
 def test_restore_pending_job_logs_persistence_failure(capsys) -> None:

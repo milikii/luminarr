@@ -251,6 +251,8 @@ class ImportToLibraryService:
                 job=confirm_context.job,
                 lease_owner=lease_owner,
             )
+            if claimed_job is None:
+                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
             if not claimed_job:
                 stale_text = self._find_version_stale_rejection_text(
                     task_id=confirm_context.job.task_id,
@@ -1266,7 +1268,7 @@ class ImportToLibraryService:
             False,
         )
 
-    def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool:
+    def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool | None:
         if self._job_repo is None:
             return False
         try:
@@ -1281,7 +1283,7 @@ class ImportToLibraryService:
                 f"\033[31m[导入确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 更新是否正常；当前 confirm 会按未持有执行权处理，但这次失败也可能不是业务真的冲突。",
                 flush=True,
             )
-            return False
+            return None
 
     def _restore_pending_job(
         self,
