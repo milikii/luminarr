@@ -664,6 +664,12 @@ class AddToDownloaderService:
                 flush=True,
             )
             return None
+        if not approved:
+            print(
+                f"\033[31m[下载确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record approve rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在、lease_version 是否匹配；当前 confirm 会按 not pending 处理，避免把审批真相状态冲突误判成已确认。",
+                flush=True,
+            )
+            return False
 
         if approved and identity in self._pending_add_identities:
             self._pending_add_identities.remove(identity)
