@@ -94,6 +94,8 @@ class DownloadMonitorRepo:
                 ),
             )
             connection.commit()
+        if self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash) is None:
+            raise DownloadMonitorPersistenceError("download monitor state missing after register")
 
     def record_status(self, task_status: TransmissionTaskStatus) -> DownloadMonitorUpdate:
         cleaned_task_id = task_status.task_id.strip()
