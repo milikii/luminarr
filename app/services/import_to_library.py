@@ -37,6 +37,7 @@ IMPORT_TARGET_EXISTS_TEXT = "目标已存在，已拒绝覆盖：{target_path}"
 IMPORT_PREPARE_TARGET_FAILED_TEXT = "创建目标目录失败：{target_path}"
 IMPORT_HARDLINK_CROSS_FILESYSTEM_TEXT = "硬链接失败：源和目标不在同一文件系统。"
 IMPORT_HARDLINK_FAILED_TEXT = "硬链接失败：{reason}"
+IMPORT_PENDING_STATE_UNAVAILABLE_TEXT = "导入待确认状态写入失败，请稍后重试。"
 IMPORT_COPY_APPROVAL_PENDING_TEXT = (
     "硬链接失败：源和目标不在同一文件系统。\n"
     "如需改用复制导入（会额外占用磁盘空间），请再次发送 confirm {task_ref}。"
@@ -139,19 +140,35 @@ class ImportToLibraryService:
             return error_text
 
         import_source = prepared_import.import_source
-        self._record_pending_approval(
+        expected_lease_version = self._record_pending_approval(
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
             task_hash=import_source.task_hash,
         )
-        self._record_pending_job(
+        if expected_lease_version <= 0:
+            return IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
+        if not self._record_pending_job(
             chat_id=chat_id,
             user_id=user_id,
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
             task_hash=import_source.task_hash,
             payload_json="",
-        )
+        ):
+            if self._approval_repo is not None:
+                try:
+                    self._approval_repo.cancel_import(
+                        task_id=import_source.task_id,
+                        task_hash=import_source.task_hash,
+                        task_ref=cleaned_ref,
+                        expected_lease_version=expected_lease_version,
+                    )
+                except Exception as error:
+                    print(
+                        f"\033[31m[导入取消审批更新失败]\033[0m task_ref={cleaned_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前导入待确认创建会直接失败返回，但审批真相可能仍残留。",
+                        flush=True,
+                    )
+            return IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
         self._record_event(
             task_ref=cleaned_ref,
             task_id=import_source.task_id,
@@ -1006,7 +1023,7 @@ class ImportToLibraryService:
                 f"\033[31m[导入待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会退回进程内待确认身份判断，重启后审批状态可能不一致。",
                 flush=True,
             )
-            lease_version = in_memory_next_lease
+            return 0
 
         self._pending_import_lease_versions[identity] = lease_version
         self._pending_import_identities.add(identity)
@@ -1122,7 +1139,7 @@ class ImportToLibraryService:
         payload_json: str = "",
     ) -> bool:
         if self._job_repo is None:
-            return False
+            return True
         try:
             self._job_repo.upsert_import_job_pending(
                 chat_id=chat_id,

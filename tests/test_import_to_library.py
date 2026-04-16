@@ -31,6 +31,7 @@ from app.services.import_to_library import (
     IMPORT_HARDLINK_FAILED_TEXT,
     IMPORT_NOT_COMPLETED_TEXT,
     IMPORT_NOT_FOUND_TEXT,
+    IMPORT_PENDING_STATE_UNAVAILABLE_TEXT,
     IMPORT_QUERY_FAILED_TEXT,
     PreparedImport,
     IMPORT_REFRESH_FAILED_TEXT,
@@ -302,7 +303,7 @@ def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
-    assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 1
+    assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 0
     assert "[导入待确认审批落盘失败]" in capsys.readouterr().out
 
 
@@ -330,6 +331,65 @@ def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[导入待确认任务落盘失败]" in output
     assert "task_ref=87" in output
+
+
+def test_import_by_task_ref_returns_state_unavailable_when_pending_approval_persist_fails(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+
+    assert text == IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
+
+
+def test_import_by_task_ref_returns_state_unavailable_when_pending_job_persist_fails(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "request_import_approval": lambda self, **kwargs: 2,
+            "cancel_import": lambda self, **kwargs: True,
+        },
+    )()
+    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+
+    assert text == IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
 
 
 def test_record_event_logs_persistence_failure(capsys) -> None:
