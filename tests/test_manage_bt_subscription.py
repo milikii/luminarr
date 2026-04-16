@@ -464,7 +464,7 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_raise(tmp_pat
     assert "db down for 1001" in captured.out
 
 
-def test_bt_subscription_scheduler_tick_returns_empty_when_chat_id_lookup_raises(
+def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_raises(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -489,7 +489,7 @@ def test_bt_subscription_scheduler_tick_returns_empty_when_chat_id_lookup_raises
         )
     )
 
-    assert notifications == ()
+    assert notifications is None
     captured = capsys.readouterr()
     assert "[BT 订阅扫描 chat 列表读取失败]" in captured.out
     assert "db down" in captured.out

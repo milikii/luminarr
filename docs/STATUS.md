@@ -1,4 +1,4 @@
-# Current status (v229)
+# Current status (v230)
 
 ## Project position
 
@@ -388,7 +388,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`post_download_auto_import.run_once()` 在读取 `download_monitor.list_completed_for_auto_import()` 失败时，现在会单独打印红色中文 `[自动导入候选读取失败]` 和 `[处理建议]`，并返回空结果，不再只在上层下载完成轮询里混成泛化的轮询失败。
 - 2026-04-15 代码审查确认：`telegram_bot._poll_pending_download_completion_once()` 在读取 `download_monitor.list_pending_completion()` 失败时，现在会单独打印红色中文 `[下载完成待轮询列表读取失败]` 和 `[处理建议]`，并直接结束本轮 helper，不再只在上层 loop 里混成泛化的 `[下载完成状态轮询失败]`。
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_once()` / `_scan_chat_once()` 在读取 `bt_subscription_repo.list_items()` 失败时，现在也会打印红色中文 `[BT 订阅扫描读取失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，避免把 SQLite 读取异常误报成“当前没有可扫描的 BT 订阅”或直接把后台扫描打崩。
-- 2026-04-15 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并安全返回空通知，避免后台 tick 因最外层 chat 列表读取失败直接中断。
+- 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并显式返回 `None` 给上层 scheduler；后台 tick 不再把 SQLite 读取异常混成普通“本轮没有任何通知”。
 - 2026-04-15 代码审查确认：`import_to_library._is_raw_bt_task()` 在读取到坏 `payload_json` 时，现在也会打印红色中文 `[导入 raw_bt 判定载荷损坏]` 和 `[处理建议]`，不再把持久化坏数据静默混写成“不是 raw_bt”。
 - 2026-04-15 代码审查确认：`import_to_library._resolve_execution_mode()` 在读取到坏 `payload_json` 时，现在也会打印红色中文 `[导入执行模式载荷损坏]` 和 `[处理建议]`，并带出具体损坏原因（坏 JSON / 非对象），不再把 copy-fallback 待确认坏数据静默混写成普通 hardlink 执行模式。
 - 2026-04-15 代码审查确认：`add_to_downloader` 里的 `[下载取消载荷损坏]` / `[下载确认上下文载荷损坏]` 现在也会带出 `payload_json` 的具体损坏原因（空载荷 / 坏 JSON / 非对象 / 缺关键字段），不再只报笼统的“载荷损坏”。
@@ -602,6 +602,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - post download auto import skip-event observability checks：2026-04-15，`passed`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py`；`PYTHONPATH=/home/alex/projects/luminarr .venv/bin/python -c "import asyncio; from app.db.download_monitor_repo import DownloadMonitorRecord; from app.services.post_download_auto_import import PostDownloadAutoImportService; EventRepo=type('EventRepo', (), {'list_events_for_task_identity': lambda self, **kwargs: [], 'append_event': lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError('db down'))}); service=PostDownloadAutoImportService(download_monitor_repo=None, job_event_repo=EventRepo(), auto_import_func=lambda task_ref, chat_id, user_id: asyncio.sleep(0, result='AUTO IMPORT')); record=DownloadMonitorRecord(task_id='87', task_hash='hash-87', name='Dune 2024 CAM', chat_id=1001, user_id=2001, status_code=6, percent_done=1.0, is_complete=True, completion_observed_at='2026-04-15T00:00:00+00:00', last_observed_at='2026-04-15T00:00:00+00:00', created_at='2026-04-15T00:00:00+00:00', updated_at='2026-04-15T00:00:00+00:00'); print(asyncio.run(service.run_for_record(record)))"`）
 - post download auto import invalid-chat observability tests：2026-04-16，`4 passed, 15 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "post_download_auto_import or run_once_logs_completed_list_failure or run_for_record_logs_invalid_chat_identity or test_post_download_auto_import_run_once_surfaces_invalid_chat_candidate"`）
 - bt subscription scheduler tick fail-closed tests：2026-04-16，`5 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "scheduler_tick"`）
+- bt subscription scheduler chat-id lookup sentinel tests：2026-04-16，`1 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "returns_none_when_chat_id_lookup_raises"`）
+- telegram bt subscription scheduler none-sentinel compatibility tests：2026-04-16，`1 passed, 132 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "run_bt_subscription_scheduler_tick_once_skips_none_notifications"`）
 - clarification pending fail-closed routing tests：2026-04-16，`4 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification_pending"`；`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "clarification_lookup_failure"`）
 - add by selection candidate lookup fail-closed tests：2026-04-16，`5 passed`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "add_by_selection"`）
 - import source route fail-closed tests：2026-04-16，`4 passed`（`.venv/bin/python -m pytest -q tests/test_main.py -k "get_torrent_import_source_with_routing"`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "prepare_import_logs_query_failure"`）
