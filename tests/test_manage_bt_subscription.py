@@ -706,6 +706,38 @@ def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_raises(
     assert "[处理建议]" in captured.out
 
 
+def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_returns_none(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _missing_list_chat_ids() -> None:
+        return None
+
+    repo.list_chat_ids = _missing_list_chat_ids  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications is None
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描 chat 列表读取失败]" in captured.out
+    assert "bt subscription chat list result missing" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_bt_subscription_scheduler_tick_surfaces_invalid_chat_identity_row(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)

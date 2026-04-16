@@ -146,6 +146,8 @@ class ManageBtSubscriptionService:
         scan_failed = False
         try:
             chat_ids = self._bt_subscription_repo.list_chat_ids()
+            if chat_ids is None:
+                raise BtSubscriptionPersistenceError("bt subscription chat list result missing")
         except Exception as error:
             _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
             return None

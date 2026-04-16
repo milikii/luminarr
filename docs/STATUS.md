@@ -1,4 +1,4 @@
-# Current status (v242)
+# Current status (v243)
 
 ## Project position
 
@@ -398,6 +398,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`manage_bt_subscription.run_once()` / `_scan_chat_once()` 在读取 `bt_subscription_repo.list_items()` 失败时，现在也会打印红色中文 `[BT 订阅扫描读取失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，避免把 SQLite 读取异常误报成“当前没有可扫描的 BT 订阅”或直接把后台扫描打崩。
 - 2026-04-16 代码审查确认：`manage_bt_subscription._scan_chat_once()` 现在也会把 `bt_subscription_repo.list_items()` 意外返回空结果显式记成 `bt subscription scan items result missing`；手动 `btsub run` 和后台 `run_scheduler_tick()` 都不再把这类仓储契约破坏混成普通“当前没有可扫描的 BT 订阅”。
 - 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在读取 `bt_subscription_repo.list_chat_ids()` 失败时，现在也会打印红色中文 `[BT 订阅扫描 chat 列表读取失败]` 和 `[处理建议]`，并显式返回 `None` 给上层 scheduler；后台 tick 不再把 SQLite 读取异常混成普通“本轮没有任何通知”。
+- 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 现在也会把 `bt_subscription_repo.list_chat_ids()` 意外返回空结果显式记成 `bt subscription chat list result missing`；后台 tick 不再让这类仓储契约破坏滑成未捕获异常或普通空通知。
 - 2026-04-16 代码审查确认：`manage_bt_subscription.run_scheduler_tick()` 在 chat 列表读取成功、但各 chat 扫描因 `list_items()` 读取失败、坏 `chat_id` 行或待确认落盘失败而全部跳过、最终没有任何通知时，现在也会显式返回 `None` 给上层 scheduler；后台 tick 不再把“全量失败且无通知”混成普通空通知。
 - 2026-04-16 代码审查确认：`manage_bt_subscription._run_for_item()` 在命中新资源后，如果 `add_to_downloader.add_candidate_source()` 返回 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，现在也会打印红色中文 `[BT 订阅待确认创建失败]` 和 `[处理建议]`；手动 `btsub run` 会明确返回“BT 订阅扫描失败”，后台 `run_scheduler_tick()` 则跳过当前 chat，不再把待确认真相写入失败混成普通“当前没有新资源”。
 - 2026-04-16 代码审查确认：`manage_bt_subscription._scan_chat_once()` / `_format_bt_subscription_run_result()` 在同一轮 `btsub run` 里遇到“部分条目成功创建待确认、部分条目写失败”时，现在会在成功回复后追加“本轮仍有命中条目未创建待确认”的显式 warning，不再把部分失败伪装成纯成功。
@@ -577,7 +578,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - bt subscription remove identity fail-closed persistence tests：2026-04-15，`3 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "bt_subscription_repo_rejects_missing_identity_for_remove or bt_subscription_repo_rejects_missing_identity_for_last_seen_update or bt_subscription_repo_rejects_missing_identity_for_add"`）
 - bt subscription clear identity fail-closed persistence tests：2026-04-15，`4 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "bt_subscription_repo_rejects_missing_chat_identity_for_clear or bt_subscription_repo_rejects_missing_identity_for_remove or bt_subscription_repo_rejects_missing_identity_for_last_seen_update or bt_subscription_repo_rejects_missing_identity_for_add"`）
 - bt subscription chat-list persistence tests：2026-04-16，`8 passed, 96 deselected`（`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "bt_subscription_repo_rejects_missing_identity_for_add or bt_subscription_repo_rejects_missing_identity_for_last_seen_update or bt_subscription_repo_rejects_missing_identity_for_remove or bt_subscription_repo_rejects_missing_chat_identity_for_clear or bt_subscription_repo_rejects_missing_chat_identity_for_list or test_bt_subscription_repo_list_chat_ids_rejects_invalid_chat_identity_rows or bt_subscription_repo_rejects_corrupted_row_after_read"`）
-- bt subscription service missing-result observability tests：2026-04-16，`26 passed`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`）
+- bt subscription service missing-result observability tests：2026-04-16，`27 passed`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`）
 - add to downloader event-monitor observability tests：2026-04-15，`9 passed, 11 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or record_event_logs_persistence_failure or register_download_monitor_logs_persistence_failure"`）
 - downloader pending-creation fail-closed tests：2026-04-16，`11 passed, 39 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending_approval or pending_job or add_candidate_source_returns_state_unavailable"`）
 - add to downloader job-lifecycle observability tests：2026-04-15，`11 passed, 13 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "pending or record_pending_job_logs_persistence_failure or claim_pending_job_logs_persistence_failure or restore_pending_job_logs_persistence_failure or mark_completed_job_logs_persistence_failure"`）
