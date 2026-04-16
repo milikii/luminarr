@@ -475,6 +475,7 @@ def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载确认任务抢占失败]" in output
     assert "job_id=job-1" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
 
 
 def test_confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_raises(capsys) -> None:
@@ -576,6 +577,7 @@ def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> N
     output = capsys.readouterr().out
     assert "[下载待确认版号查询失败]" in output
     assert "task_id=selection:1" in output
+    assert "当前调用会按状态读取失败处理" in output
 
 
 def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) -> None:
