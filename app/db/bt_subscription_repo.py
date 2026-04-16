@@ -123,7 +123,7 @@ class BtSubscriptionRepo:
                 ORDER BY chat_id ASC
                 """
             ).fetchall()
-        return [int(row["chat_id"]) for row in rows]
+        return [_to_bt_subscription_chat_id(row) for row in rows]
 
     def remove_item(self, *, chat_id: int, item_id: int) -> bool:
         if chat_id <= 0 or item_id <= 0:
@@ -201,3 +201,10 @@ def _to_bt_subscription_item(row: Mapping[str, object]) -> BtSubscriptionItem:
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
     )
+
+
+def _to_bt_subscription_chat_id(row: Mapping[str, object]) -> int:
+    chat_id = int(row["chat_id"])
+    if chat_id <= 0:
+        raise BtSubscriptionPersistenceError("bt_subscription_item chat identity corrupted in chat list after read")
+    return chat_id

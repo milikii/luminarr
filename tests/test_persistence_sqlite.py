@@ -1415,7 +1415,7 @@ def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: P
         repo.list_items(chat_id=0)
 
 
-def test_bt_subscription_repo_list_chat_ids_keeps_invalid_chat_identity_rows(tmp_path: Path) -> None:
+def test_bt_subscription_repo_list_chat_ids_rejects_invalid_chat_identity_rows(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     repo = BtSubscriptionRepo(database)
@@ -1443,7 +1443,11 @@ def test_bt_subscription_repo_list_chat_ids_keeps_invalid_chat_identity_rows(tmp
         )
         connection.commit()
 
-    assert repo.list_chat_ids() == [0]
+    with pytest.raises(
+        BtSubscriptionPersistenceError,
+        match="bt_subscription_item chat identity corrupted in chat list after read",
+    ):
+        repo.list_chat_ids()
 
 
 @pytest.mark.parametrize(

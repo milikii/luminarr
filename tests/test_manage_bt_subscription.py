@@ -619,9 +619,8 @@ def test_bt_subscription_scheduler_tick_surfaces_invalid_chat_identity_row(tmp_p
 
     assert notifications is None
     captured = capsys.readouterr()
-    assert "[BT 订阅扫描读取失败]" in captured.out
-    assert "chat_id=0" in captured.out
-    assert "bt_subscription_item chat identity missing for list" in captured.out
+    assert "[BT 订阅扫描 chat 列表读取失败]" in captured.out
+    assert "bt_subscription_item chat identity corrupted in chat list after read" in captured.out
 
 
 def test_bt_subscription_scheduler_tick_warns_when_last_seen_update_raises(tmp_path: Path, capsys) -> None:
