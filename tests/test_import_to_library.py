@@ -360,6 +360,22 @@ def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) 
     assert "task_id=87" in output
 
 
+def test_find_version_stale_rejection_text_logs_missing_approval_row(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: None})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+    )
+
+    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入确认执行版号查询失败]" in output
+    assert "approval_record missing during stale check" in output
+    assert "task_hash=hash-87" in output
+
+
 def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> None:
     event_repo = type(
         "EventRepo",
@@ -603,6 +619,42 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_look
     assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     get_import_source.assert_not_awaited()
     assert "[导入确认审批查询失败]" in capsys.readouterr().out
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_row_missing(capsys) -> None:
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: None})()
+    get_import_source = AsyncMock(return_value=None)
+    service = ImportToLibraryService(
+        get_import_source,
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入确认执行版号查询失败]" in output
+    assert "approval_record missing during stale check" in output
 
 
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_expiry_lookup_fails(capsys) -> None:
