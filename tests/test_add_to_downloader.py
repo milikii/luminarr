@@ -247,10 +247,36 @@ def test_confirm_add_by_task_ref_uses_in_memory_pending_when_context_lookup_fail
 
     text = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
 
+    assert text == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+    add_torrent.assert_not_awaited()
+    assert "[下载确认上下文查询失败]" in capsys.readouterr().out
+
+
+def test_confirm_add_by_task_ref_uses_in_memory_pending_without_job_repo() -> None:
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="selection-hash",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+    service._record_pending_approval(
+        task_ref=pending_add.task_ref,
+        task_id=pending_add.task_id,
+        task_hash=pending_add.task_hash,
+    )
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+
+    text = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
     assert "任务 ID: 42" in text
     assert "任务 Hash: abc123" in text
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
-    assert "[下载确认上下文查询失败]" in capsys.readouterr().out
 
 
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:

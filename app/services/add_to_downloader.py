@@ -254,10 +254,10 @@ class AddToDownloaderService:
             chat_id=chat_id,
         )
         if confirm_context is None:
+            if confirm_context_unavailable:
+                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
             in_memory_pending = self._get_in_memory_pending(chat_id=chat_id, task_ref=cleaned_ref)
             if in_memory_pending is None:
-                if confirm_context_unavailable:
-                    return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
                 return ADD_CONFIRM_NOT_PENDING_TEXT
         else:
             if confirm_context.approval_lookup_failed:
@@ -791,7 +791,7 @@ class AddToDownloaderService:
             job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
         except Exception as error:
             print(
-                f"\033[31m[下载确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；若当前进程里也没有待确认上下文，当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认下载”。",
+                f"\033[31m[下载确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认下载”。",
                 flush=True,
             )
             return None, True
