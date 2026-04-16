@@ -205,6 +205,15 @@ def test_job_event_repo_raises_when_appended_row_missing(tmp_path: Path) -> None
         repo.append_event(task_ref="87", event_type="import.succeeded", message="/data/library/movies/demo.mkv")
 
 
+def test_job_event_repo_rejects_missing_internal_event_id(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    with pytest.raises(JobEventPersistenceError, match="job_event id missing for internal query"):
+        repo._get_event_by_id(0)
+
+
 def test_job_event_repo_rejects_missing_task_ref(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

@@ -138,7 +138,7 @@ class JobEventRepo:
 
     def _get_event_by_id(self, event_id: int) -> JobEvent | None:
         if event_id <= 0:
-            return None
+            raise JobEventPersistenceError("job_event id missing for internal query")
         with self._database.connect() as connection:
             row = connection.execute(
                 """
