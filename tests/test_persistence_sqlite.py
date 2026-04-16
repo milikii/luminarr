@@ -1099,6 +1099,9 @@ def test_watchlist_repo_rejects_missing_identity_for_add(tmp_path: Path) -> None
     with pytest.raises(WatchlistPersistenceError, match="watchlist_item title missing"):
         repo.add_item(chat_id=1001, title="   ", year="2021", media_kind="movie")
 
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item media kind invalid"):
+        repo.add_item(chat_id=1001, title="Dune", year="2021", media_kind="documentary")
+
 
 def test_bt_subscription_repo_rejects_missing_identity_for_add(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
@@ -1213,6 +1216,9 @@ def test_watchlist_repo_rejects_missing_identity_for_exact_lookup(tmp_path: Path
 
     with pytest.raises(WatchlistPersistenceError, match="watchlist_item title missing for exact lookup"):
         repo.get_item_by_identity(chat_id=1001, title="   ", year="2021", media_kind="movie")
+
+    with pytest.raises(WatchlistPersistenceError, match="watchlist_item media kind invalid"):
+        repo.get_item_by_identity(chat_id=1001, title="Dune", year="2021", media_kind="documentary")
 
 
 @pytest.mark.parametrize(

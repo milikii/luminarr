@@ -37,7 +37,7 @@ class WatchlistRepo:
     ) -> tuple[WatchlistItem, bool] | None:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
-        cleaned_media_kind = _normalize_media_kind(media_kind)
+        cleaned_media_kind = _normalize_media_kind(media_kind, allow_empty_default=True)
         if chat_id <= 0:
             raise WatchlistPersistenceError("watchlist_item chat identity missing")
         if not cleaned_title:
@@ -149,7 +149,7 @@ class WatchlistRepo:
     ) -> WatchlistItem | None:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
-        cleaned_media_kind = _normalize_media_kind(media_kind)
+        cleaned_media_kind = _normalize_media_kind(media_kind, allow_empty_default=True)
         if chat_id <= 0:
             raise WatchlistPersistenceError("watchlist_item identity missing for exact lookup")
         if not cleaned_title:
@@ -198,8 +198,10 @@ def _to_watchlist_item(row: Mapping[str, object]) -> WatchlistItem:
     )
 
 
-def _normalize_media_kind(media_kind: str) -> str:
+def _normalize_media_kind(media_kind: str, *, allow_empty_default: bool = False) -> str:
     cleaned_media_kind = media_kind.strip().lower()
     if cleaned_media_kind in VALID_MEDIA_KINDS:
         return cleaned_media_kind
-    return "movie"
+    if not cleaned_media_kind and allow_empty_default:
+        return "movie"
+    raise WatchlistPersistenceError("watchlist_item media kind invalid")
