@@ -27,6 +27,7 @@ SELECT_OUT_OF_RANGE_TEXT = "序号超出范围，请按搜索结果里的序号�
 SELECT_LOOKUP_FAILED_TEXT = "搜索候选读取失败，请稍后重试。"
 CANDIDATE_SOURCE_MISSING_TEXT = "该候选缺少可下载链接，请换一个序号。"
 ADD_FAILED_TEXT = "下载投递失败，请稍后重试。"
+ADD_PENDING_STATE_UNAVAILABLE_TEXT = "下载待确认状态写入失败，请稍后重试。"
 ADD_APPROVAL_PENDING_TEXT = (
     "下载待确认：{title}\n"
     "选择序号: {task_ref}\n"
@@ -132,13 +133,23 @@ class AddToDownloaderService:
             download_dir=download_dir,
         )
 
-        self._record_pending_approval(
+        expected_lease_version = self._record_pending_approval(
             task_ref=task_ref,
             task_id=pending_add.task_id,
             task_hash=pending_add.task_hash,
         )
+        if expected_lease_version <= 0:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
         self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
-        self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add)
+        if not self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add):
+            self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
+            self._cancel_pending_approval(
+                task_ref=task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
         self._record_event(
             task_ref=task_ref,
             task_id=pending_add.task_id,
@@ -201,13 +212,23 @@ class AddToDownloaderService:
             download_dir=download_dir,
             auto_import_enabled=auto_import_enabled,
         )
-        self._record_pending_approval(
+        expected_lease_version = self._record_pending_approval(
             task_ref=pending_add.task_ref,
             task_id=pending_add.task_id,
             task_hash=pending_add.task_hash,
         )
+        if expected_lease_version <= 0:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
         self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
-        self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add)
+        if not self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add):
+            self._clear_pending_context(chat_id=chat_id, task_ref=pending_add.task_ref)
+            self._cancel_pending_approval(
+                task_ref=pending_add.task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
         self._record_event(
             task_ref=pending_add.task_ref,
             task_id=pending_add.task_id,
@@ -566,7 +587,7 @@ class AddToDownloaderService:
                 f"\033[31m[下载待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会退回进程内 lease 计数，重启后待确认状态可能无法恢复。",
                 flush=True,
             )
-            lease_version = in_memory_next_lease
+            return 0
 
         self._pending_add_lease_versions[identity] = lease_version
         self._pending_add_identities.add(identity)
@@ -731,9 +752,9 @@ class AddToDownloaderService:
         chat_id: int,
         user_id: int | None,
         pending_add: PendingAddContext,
-    ) -> None:
+    ) -> bool:
         if self._job_repo is None:
-            return
+            return True
         try:
             self._job_repo.upsert_downloader_job_pending(
                 chat_id=chat_id,
@@ -748,7 +769,8 @@ class AddToDownloaderService:
                 f"\033[31m[下载待确认任务落盘失败]\033[0m chat_id={chat_id} user_id={user_id} task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表写入是否正常；当前请求会继续返回待确认文本，但重启后 confirm 上下文可能无法重建。",
                 flush=True,
             )
-            return
+            return False
+        return True
 
     def _rebuild_confirm_context(
         self,
