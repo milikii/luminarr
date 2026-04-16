@@ -50,6 +50,7 @@ IMPORT_APPROVAL_PENDING_TEXT = (
 )
 IMPORT_RAW_BT_UNSUPPORTED_TEXT = "当前任务属于 raw_bt 资源，不走媒体入库链。请直接到已选目标目录中使用文件。"
 IMPORT_CANCELLED_TEXT = "已取消当前导入确认。请重新发送 import <任务ID或Hash>。"
+IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT = "导入取消状态读取失败，请稍后重试。"
 IMPORT_CONFIRM_NOT_PENDING_TEXT = "没有待确认的导入请求，请先发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_EXPIRED_TEXT = "导入确认已超时，请重新发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT = "导入确认状态读取失败，请稍后重试。"
@@ -437,15 +438,19 @@ class ImportToLibraryService:
         if self._job_repo is None:
             return None
 
+        pending_lookup_failed = False
         try:
             pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
         except Exception as error:
             print(
-                f"\033[31m[导入取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前取消请求会直接失败返回，避免把查询异常误判成“没有待取消导入”。",
+                f"\033[31m[导入取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前取消会直接返回状态读取失败，避免把查询异常误判成“没有待取消导入”。",
                 flush=True,
             )
-            return None
+            pending_job = None
+            pending_lookup_failed = True
         if pending_job is None:
+            if pending_lookup_failed:
+                return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
             return None
 
         expected_lease_version = self._resolve_pending_lease_version(

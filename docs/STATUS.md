@@ -64,7 +64,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `search -> select -> downloader approval -> confirm -> dispatch -> status`
   - `import approval -> confirm -> hardlink import`
   - `import_to_library.cancel_pending_import()` 在 `approval_repo.cancel_import()` 抛异常时，现在也会打印红色中文 `[导入取消审批更新失败]` 日志和 `[处理建议]`，不再把审批真相更新异常静默吞成“取消直接失败”
-  - `import_to_library.cancel_pending_import()` 在 `job_repo.get_latest_pending_import_job()` 查询异常时，现在也会打印红色中文 `[导入取消查询失败]` 日志和 `[处理建议]`，不再把 SQLite 查询异常静默吞成“没有待取消导入”
+  - `import_to_library.cancel_pending_import()` 在 `job_repo.get_latest_pending_import_job()` 查询异常时，现在也会打印红色中文 `[导入取消查询失败]` 日志和 `[处理建议]`；若没有可用的待确认导入真相可继续读取，就会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 查询异常静默吞成“没有待取消导入”
   - `import_to_library._prepare_import()` 在下载源已缺失时，现在也会打印红色中文 `[导入源文件缺失]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在目标路径已存在时，现在也会打印红色中文 `[导入目标已存在]` 日志和 `[处理建议]`，不再只回用户文本和事件
   - `import_to_library._prepare_import()` 在创建 `LIBRARY_TARGET_DIR` 失败时，现在也会打印红色中文 `[导入目标目录创建失败]` 日志和 `[处理建议]`，不再只回用户文本和事件

@@ -80,7 +80,7 @@ async def handle_private_chat_query_text(
                                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                                 lambda: import_service.cancel_pending_import(chat_id),
                             )
-                            if cancelled_text == tg.IMPORT_CANCELLED_TEXT:
+                            if cancelled_text is not None:
                                 await reply_func(cancelled_text)
                                 return
                     if pending_job.workflow_type == tg.WORKFLOW_ADD_TO_DOWNLOADER:
@@ -102,7 +102,7 @@ async def handle_private_chat_query_text(
                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                 lambda: import_service.cancel_pending_import(chat_id),
             )
-            if cancelled_text == tg.IMPORT_CANCELLED_TEXT:
+            if cancelled_text is not None:
                 await reply_func(cancelled_text)
                 return
 

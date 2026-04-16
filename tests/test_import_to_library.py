@@ -22,6 +22,7 @@ from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     ConfirmExecutionContext,
     CONFIRM_QUERY_USAGE_TEXT,
+    IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT,
     IMPORT_COPY_APPROVAL_PENDING_TEXT,
     IMPORT_COPY_FAILED_TEXT,
     IMPORT_CONFIRM_EXPIRED_TEXT,
@@ -763,7 +764,7 @@ def test_cancel_pending_import_logs_job_lookup_failure(capsys) -> None:
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
 
-    assert service.cancel_pending_import(1001) is None
+    assert service.cancel_pending_import(1001) == IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
 
     output = capsys.readouterr().out
     assert "[导入取消查询失败]" in output
