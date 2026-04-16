@@ -592,7 +592,7 @@ class AddToDownloaderService:
                 lease_version = requested_lease
         except Exception as error:
             print(
-                f"\033[31m[下载待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会退回进程内 lease 计数，重启后待确认状态可能无法恢复。",
+                f"\033[31m[下载待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认下载。",
                 flush=True,
             )
             return 0

@@ -283,7 +283,9 @@ def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert service._record_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123") == 0
-    assert "[下载待确认审批落盘失败]" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "[下载待确认审批落盘失败]" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
 
 
 def test_record_downloader_approval_logs_persistence_failure(capsys) -> None:
