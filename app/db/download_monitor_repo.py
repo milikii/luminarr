@@ -242,6 +242,10 @@ class DownloadMonitorRepo:
         return [_to_download_monitor_record(row) for row in rows]
 
     def _get_record_by_identity(self, *, task_id: str, task_hash: str) -> DownloadMonitorRecord | None:
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise DownloadMonitorPersistenceError("download monitor task identity missing for internal query")
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -262,7 +266,7 @@ class DownloadMonitorRepo:
                 WHERE task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (task_id, task_hash),
+                (cleaned_task_id, cleaned_task_hash),
             ).fetchone()
         if row is None:
             return None

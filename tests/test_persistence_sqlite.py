@@ -404,6 +404,18 @@ def test_download_monitor_repo_raises_when_status_row_missing_after_upsert(tmp_p
         )
 
 
+def test_download_monitor_repo_rejects_missing_internal_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing for internal query"):
+        repo._get_record_by_identity(task_id="", task_hash="hash-42")
+
+    with pytest.raises(DownloadMonitorPersistenceError, match="download monitor task identity missing for internal query"):
+        repo._get_record_by_identity(task_id="42", task_hash="")
+
+
 @pytest.mark.parametrize(
     ("task_id", "task_hash", "status_code", "expected_message", "read_mode"),
     [
