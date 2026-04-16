@@ -12,6 +12,7 @@ from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
     ADD_APPROVAL_PENDING_TEXT,
+    ADD_CANCEL_STATE_UNAVAILABLE_TEXT,
     ADD_CONFIRM_EXPIRED_TEXT,
     ADD_CONFIRM_NOT_PENDING_TEXT,
     ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
@@ -114,7 +115,7 @@ def test_has_pending_add_uses_in_memory_pending_when_job_lookup_fails(capsys) ->
 def test_cancel_pending_add_logs_job_lookup_failure(capsys) -> None:
     job_repo = type("BoomJobRepo", (), {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
-    assert service.cancel_pending_add(1001) is None
+    assert service.cancel_pending_add(1001) == ADD_CANCEL_STATE_UNAVAILABLE_TEXT
     assert "[下载取消查询失败]" in capsys.readouterr().out
 
 

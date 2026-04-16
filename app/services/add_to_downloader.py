@@ -33,6 +33,7 @@ ADD_APPROVAL_PENDING_TEXT = (
     "请发送 confirm {task_ref} 执行下载。"
 )
 ADD_CANCELLED_TEXT = "已取消当前下载确认。请重新发送序号。"
+ADD_CANCEL_STATE_UNAVAILABLE_TEXT = "下载取消状态读取失败，请稍后重试。"
 ADD_CONFIRM_NOT_PENDING_TEXT = "没有待确认的下载请求，请先重新发送序号。"
 ADD_CONFIRM_EXPIRED_TEXT = "下载确认已超时，请重新发送序号。"
 ADD_CONFIRM_STATE_UNAVAILABLE_TEXT = "下载确认状态读取失败，请稍后重试。"
@@ -429,22 +430,28 @@ class AddToDownloaderService:
             return None
 
         pending_job: JobRecord | None = None
+        pending_lookup_failed = False
         if self._job_repo is not None:
             try:
                 pending_job = self._job_repo.get_latest_pending_downloader_job(chat_id=chat_id)
             except Exception as error:
                 print(
-                    f"\033[31m[下载取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前请求会按“无待确认下载”继续处理，但实际待取消状态可能被误判。",
+                    f"\033[31m[下载取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；若当前进程里也没有待确认上下文，当前取消会直接返回状态读取失败，避免把持久化异常误判成“没有待取消下载”。",
                     flush=True,
                 )
                 pending_job = None
+                pending_lookup_failed = True
 
         if pending_job is None:
             task_ref = self._latest_pending_task_ref_by_chat.get(chat_id, "").strip()
             if not task_ref:
+                if pending_lookup_failed:
+                    return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
                 return None
             pending_add = self._pending_add_contexts_by_chat_ref.get((chat_id, task_ref))
             if pending_add is None:
+                if pending_lookup_failed:
+                    return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
                 return None
             expected_lease_version = self._resolve_pending_lease_version(
                 task_id=pending_add.task_id,

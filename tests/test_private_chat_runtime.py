@@ -248,6 +248,37 @@ def test_dispatch_private_chat_text_stops_on_clarification_lookup_failure(
     assert "db down" in captured.out
 
 
+def test_dispatch_private_chat_text_replies_downloader_cancel_state_unavailable_without_job_repo(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    add_service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search),
+        add_torrent_func=AsyncMock(),
+        job_repo=type(
+            "BoomJobRepo",
+            (),
+            {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+    )
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={ADD_TO_DOWNLOADER_SERVICE_KEY: add_service},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with("下载取消状态读取失败，请稍后重试。")
+    assert "[下载取消查询失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "db down" in captured.out
+
+
 def test_dispatch_private_chat_text_digit_stops_on_clarification_lookup_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
