@@ -993,6 +993,20 @@ def test_job_repo_rejects_missing_identity_for_state_transitions(tmp_path: Path)
         )
 
 
+def test_job_repo_raises_when_state_transition_target_missing_after_update(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobRepo(database)
+
+    with pytest.raises(JobPersistenceError, match="job missing during state transition"):
+        repo.release_lease_to_pending(
+            job_id="add_to_downloader:hash-1",
+            expected_version=1,
+            lease_owner="owner-1",
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+        )
+
+
 def test_job_repo_rejects_missing_identity_for_lease_and_cancel(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

@@ -610,7 +610,11 @@ class JobRepo:
                 ),
             )
             connection.commit()
-        return cursor.rowcount == 1
+        if cursor.rowcount == 1:
+            return True
+        if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
+            raise JobPersistenceError("job missing during state transition")
+        return False
 
     def _get_job_by_identity(self, *, job_id: str, workflow_type: str) -> JobRecord | None:
         cleaned_job_id = job_id.strip()
