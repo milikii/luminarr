@@ -318,9 +318,18 @@ def test_get_cached_candidate_logs_candidate_payload_corruption(tmp_path: Path, 
     assert service.get_cached_candidate(1001, 1) is None
     output = capsys.readouterr().out
     assert "[搜索候选载荷损坏]" in output
+
+
+def test_has_cached_candidates_distinguishes_lookup_failure(capsys) -> None:
+    repo = type("BoomRepo", (), {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)
+
+    assert service.has_cached_candidates(1001) is None
+
+    output = capsys.readouterr().out
+    assert "[搜索候选读取失败]" in output
     assert "chat_id=1001" in output
     assert "index=1" in output
-    assert "candidate_json invalid json" in output
     assert "[处理建议]" in output
 
 

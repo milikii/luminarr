@@ -192,6 +192,32 @@ def test_dispatch_private_chat_text_logs_pending_job_lookup_failure(
     assert "[处理建议]" in captured.out
 
 
+def test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    reply_text = AsyncMock()
+    search_service = SearchMediaService(
+        _fake_search,
+        candidate_repo=type("BoomRepo", (), {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError("db down"))})(),
+    )
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={SEARCH_SERVICE_KEY: search_service},
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[搜索候选读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "index=1" in captured.out
+
+
 def test_dispatch_private_chat_text_logs_confirm_job_lookup_failure(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],

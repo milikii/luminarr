@@ -57,6 +57,12 @@ class ClarificationQueryLoadResult:
     load_failed: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class CandidateLoadResult:
+    candidate: Mapping[str, Any] | None = None
+    load_failed: bool = False
+
+
 class SearchMediaService:
     def __init__(
         self,
@@ -180,32 +186,19 @@ class SearchMediaService:
         if candidates and resolved_index < len(candidates):
             return candidates[resolved_index]
 
-        if self._candidate_repo is None:
-            return None
-        try:
-            persisted_candidate = self._candidate_repo.get_candidate(chat_id, index)
-        except CandidatePayloadCorruptionError as error:
-            print(
-                f"\033[31m[搜索候选载荷损坏]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 表里的 candidate_json 是否仍是合法 JSON；当前会按无候选返回，但这可能是持久化坏数据，不是用户真的没搜过。",
-                flush=True,
-            )
-            return None
-        except Exception as error:
-            print(
-                f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前会按无候选返回，但这可能不是用户真的没搜过。",
-                flush=True,
-            )
-            return None
-        if persisted_candidate is None:
-            return None
-        return persisted_candidate
+        load_result = self._load_persisted_candidate(chat_id=chat_id, index=index)
+        return load_result.candidate
 
-    def has_cached_candidates(self, chat_id: int) -> bool:
+    def has_cached_candidates(self, chat_id: int) -> bool | None:
         if chat_id <= 0:
             return False
-        if self.get_cached_candidate(chat_id, 1) is not None:
+        candidates = self._recent_candidates_by_chat.get(chat_id)
+        if candidates:
             return True
-        return False
+        load_result = self._load_persisted_candidate(chat_id=chat_id, index=1)
+        if load_result.load_failed:
+            return None
+        return load_result.candidate is not None
 
     def clear_cached_candidates(self, chat_id: int) -> bool:
         if chat_id <= 0:
@@ -295,6 +288,24 @@ class SearchMediaService:
                 flush=True,
             )
             return ClarificationQueryLoadResult(load_failed=True)
+
+    def _load_persisted_candidate(self, *, chat_id: int, index: int) -> CandidateLoadResult:
+        if self._candidate_repo is None:
+            return CandidateLoadResult()
+        try:
+            return CandidateLoadResult(candidate=self._candidate_repo.get_candidate(chat_id, index))
+        except CandidatePayloadCorruptionError as error:
+            print(
+                f"\033[31m[搜索候选载荷损坏]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 表里的 candidate_json 是否仍是合法 JSON；当前会按无候选返回，但这可能是持久化坏数据，不是用户真的没搜过。",
+                flush=True,
+            )
+            return CandidateLoadResult(load_failed=True)
+        except Exception as error:
+            print(
+                f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前会按无候选返回，但这可能不是用户真的没搜过。",
+                flush=True,
+            )
+            return CandidateLoadResult(load_failed=True)
 
 
 def parse_movie_query(query: str) -> ParsedMovieQuery:
