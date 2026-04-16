@@ -491,6 +491,60 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_upda
     assert "lease_version=2" in output
 
 
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_pending_lease_lookup_fails_without_confirm_context(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    approval_records = iter(
+        (
+            type("ApprovalRecord", (), {"lease_version": 0, "executed_version": 0})(),
+            RuntimeError("db down"),
+        )
+    )
+
+    def _get_import_approval(**_: object):
+        next_value = next(approval_records)
+        if isinstance(next_value, Exception):
+            raise next_value
+        return next_value
+
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: _get_import_approval(**kwargs),
+            "approve_import": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("approve_import should not be called")),
+        },
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+    service._pending_import_identities.add((import_source.task_id, import_source.task_hash))
+    service._pending_import_lease_versions[(import_source.task_id, import_source.task_hash)] = 2
+
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    output = capsys.readouterr().out
+    assert "[导入待确认版号查询失败]" in output
+    assert "task_id=87" in output
+    assert "db down" in output
+
+
 def test_import_by_task_ref_returns_state_unavailable_when_pending_approval_persist_fails(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
