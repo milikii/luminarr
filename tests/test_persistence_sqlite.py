@@ -26,7 +26,7 @@ from app.db.bt_pending_repo import (
     BtPendingPersistenceError,
     BtPendingRepo,
 )
-from app.db.candidate_repo import CandidateMappingRepo, CandidatePersistenceError
+from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
@@ -132,6 +132,33 @@ def test_candidate_mapping_repo_rejects_missing_chat_identity_for_clear(tmp_path
 
     with pytest.raises(CandidatePersistenceError, match="candidate_mapping chat identity missing for clear"):
         repo.clear_candidates(0)
+
+
+def test_candidate_mapping_repo_rejects_empty_payload_object_after_read(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = CandidateMappingRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO candidate_mapping (
+                chat_id,
+                selection_index,
+                candidate_json,
+                updated_at
+            ) VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (
+                1001,
+                1,
+                "{}",
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(CandidatePayloadCorruptionError, match="candidate_json empty object"):
+        repo.get_candidate(1001, 1)
 
 
 def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:

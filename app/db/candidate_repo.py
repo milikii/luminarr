@@ -73,6 +73,8 @@ class CandidateMappingRepo:
             raise CandidatePayloadCorruptionError("candidate_json invalid json") from None
         if not isinstance(payload, dict):
             raise CandidatePayloadCorruptionError("candidate_json not object")
+        if not payload:
+            raise CandidatePayloadCorruptionError("candidate_json empty object")
         return {str(key): value for key, value in payload.items()}
 
     def _count_candidates(self, *, chat_id: int) -> int:
