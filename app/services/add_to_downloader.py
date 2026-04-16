@@ -876,7 +876,11 @@ class AddToDownloaderService:
             )
             return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         if approval_record is None:
-            return None
+            print(
+                f"\033[31m[下载确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误=approval_record missing during stale check\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通没有待确认下载。",
+                flush=True,
+            )
+            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
         if approval_record.lease_version <= 0:
             return None
         if approval_record.executed_version < approval_record.lease_version:
