@@ -3344,6 +3344,23 @@ def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
     service.run_once.assert_awaited_once()
 
 
+def test_post_download_auto_import_scheduler_loop_logs_state_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
+    stop_event = asyncio.Event()
+
+    async def run_once() -> AutoImportRunResult:
+        stop_event.set()
+        return AutoImportRunResult(scanned=2, progressed=0, replies=(), state_unavailable=True)
+
+    service = SimpleNamespace(run_once=AsyncMock(side_effect=run_once))
+
+    asyncio.run(_post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event))
+
+    output = capsys.readouterr().out
+    assert "[下载完成后台轮询状态读取失败]" in output
+    assert "scanned=2" in output
+    assert "[处理建议]" in output
+
+
 def test_poll_pending_download_completion_once_reuses_status_service() -> None:
     repo = SimpleNamespace(
         list_pending_completion=Mock(

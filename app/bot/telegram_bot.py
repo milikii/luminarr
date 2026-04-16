@@ -753,7 +753,9 @@ async def _post_download_auto_import_scheduler_loop(
 ) -> None:
     while not stop_event.is_set():
         try:
-            await service.run_once()
+            result = await service.run_once()
+            if result.state_unavailable:
+                _log_post_download_auto_import_scheduler_state_unavailable(scanned=result.scanned)
         except Exception as error:
             _log_post_download_auto_import_scheduler_error(error=error)
         try:
@@ -2048,6 +2050,13 @@ def _log_post_download_auto_import_scheduler_error(*, error: Exception) -> None:
     print(
         f"\033[31m[下载完成后台轮询失败]\033[0m 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 download_monitor、SQLite 和导入审批链路后等待下一轮自动轮询。"
+    )
+
+
+def _log_post_download_auto_import_scheduler_state_unavailable(*, scanned: int) -> None:
+    print(
+        f"\033[31m[下载完成后台轮询状态读取失败]\033[0m scanned={scanned}\n"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor、job_event 和导入审批链路的持久化状态；当前这轮自动导入已跳过异常记录，下一轮仍会继续尝试。",
     )
 
 
