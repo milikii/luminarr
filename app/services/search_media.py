@@ -7,7 +7,7 @@ from typing import Any
 
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
-from app.db.clarification_repo import ClarificationRepo
+from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
@@ -272,7 +272,10 @@ class SearchMediaService:
         if self._clarification_repo is None:
             return cleared
         try:
-            return self._clarification_repo.clear_pending(chat_id=chat_id) or cleared
+            cleared_result = self._clarification_repo.clear_pending(chat_id=chat_id)
+            if cleared_result is None:
+                raise ClarificationPersistenceError("clarification clear result missing")
+            return cleared_result or cleared
         except Exception as error:
             print(
                 f"\033[31m[搜索澄清态清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表删除是否正常；当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
