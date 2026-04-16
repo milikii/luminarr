@@ -454,6 +454,41 @@ def test_bt_subscription_run_once_returns_failure_text_when_scan_items_raise(tmp
     assert "[处理建议]" in captured.out
 
 
+def test_bt_subscription_run_once_returns_failure_text_when_scan_items_return_none(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _missing_list_items(**_: object) -> None:
+        return None
+
+    repo.list_items = _missing_list_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert reply == BT_SUBSCRIPTION_RUN_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "bt subscription scan items result missing" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_bt_subscription_run_once_returns_failure_text_when_pending_creation_is_unavailable(
     tmp_path: Path,
     capsys,
@@ -603,6 +638,40 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_raise(tmp_pat
     assert "[BT 订阅扫描读取失败]" in captured.out
     assert "chat_id=1001" in captured.out
     assert "db down for 1001" in captured.out
+
+
+def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_return_none(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+
+    def _missing_list_items(*, chat_id: int) -> None:
+        _ = chat_id
+        return None
+
+    repo.list_items = _missing_list_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications is None
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "bt subscription scan items result missing" in captured.out
 
 
 def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_raises(

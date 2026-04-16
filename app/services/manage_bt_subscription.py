@@ -371,6 +371,8 @@ class ManageBtSubscriptionService:
     ) -> BtSubscriptionRunResult | None:
         try:
             items = self._bt_subscription_repo.list_items(chat_id=chat_id)
+            if items is None:
+                raise BtSubscriptionPersistenceError("bt subscription scan items result missing")
         except Exception as error:
             _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=str(error))
             return None
