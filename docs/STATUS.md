@@ -96,7 +96,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 更新失败时，现在也会打印红色中文 `[导入取消任务更新失败]` / `[导入确认超时任务取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“取消/超时文本回了就算任务真相也收口”
   - `import_to_library.cancel_pending_import()` 在待确认版号缺失、`approval_record` 取消更新未命中、或 `jobs.cancel_pending_job()` 更新失败/拒绝时，现在都会直接返回 `IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT`，不再把这类持久化异常继续混成普通“没有待取消导入”
   - `import_to_library._handle_expired_pending_confirm()` 在超时取消审批或任务更新失败时，现在会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把这类持久化异常继续混成普通“导入确认已超时”
-  - `import_to_library._handle_expired_pending_confirm()` 在 `approval_repo.cancel_import()` 更新失败时，现在也会打印红色中文 `[导入确认超时审批取消失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成“超时文本回了就算审批真相也收口”
+  - `import_to_library._handle_expired_pending_confirm()` 在 `approval_repo.cancel_import()` 或 `jobs.cancel_pending_job()` 超时收口失败时，现在也会打印红色中文 `[导入确认超时审批取消失败]` / `[导入确认超时任务取消失败]` 日志和 `[处理建议]`；`confirm_import_by_task_ref()` 会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 更新异常静默吞成普通“导入确认已超时”
   - `search_media` 在 TMDB 归一化查询异常时，现在也会打印红色中文 `[TMDB 查询失败]` 日志和 `[处理建议]`，不再静默退回普通搜索
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media` 在 BT 只读探索搜索源异常时，现在也会打印红色中文 `[BT 只读搜索失败]` 日志和 `[处理建议]`，不再只抛原始异常
