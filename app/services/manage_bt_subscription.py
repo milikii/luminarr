@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
+from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import parse_movie_query
@@ -245,6 +245,8 @@ class ManageBtSubscriptionService:
                 year=year,
                 media_kind=media_kind,
             )
+            if created is None:
+                raise BtSubscriptionPersistenceError("bt subscription add result missing")
         except Exception as error:
             _log_bt_subscription_add_failed(
                 chat_id=chat_id,
@@ -254,16 +256,7 @@ class ManageBtSubscriptionService:
                 reason=str(error),
             )
             return None
-        if created is not None:
-            return created
-        _log_bt_subscription_add_failed(
-            chat_id=chat_id,
-            title=title,
-            year=year,
-            media_kind=media_kind,
-            reason="bt_subscription_repo.add_item returned None",
-        )
-        return None
+        return created
 
     def _list_items(self, *, chat_id: int):
         try:

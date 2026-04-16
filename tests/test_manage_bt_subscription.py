@@ -98,6 +98,7 @@ def test_manage_bt_subscription_add_returns_failure_text_when_repo_returns_none(
     captured = capsys.readouterr()
     assert "[BT 订阅写入失败]" in captured.out
     assert "[处理建议]" in captured.out
+    assert "bt subscription add result missing" in captured.out
 
 
 def test_manage_bt_subscription_add_logs_missing_row_after_insert(tmp_path: Path, capsys) -> None:

@@ -36,7 +36,7 @@ class BtSubscriptionRepo:
         title: str,
         year: str,
         media_kind: str,
-    ) -> tuple[BtSubscriptionItem, bool] | None:
+    ) -> tuple[BtSubscriptionItem, bool]:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
         cleaned_kind = media_kind.strip().lower()

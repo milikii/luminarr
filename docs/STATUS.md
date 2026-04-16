@@ -250,6 +250,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-15 代码审查确认：`watchlist_repo.clear_items()` 遇到空 `chat_id` 时，现在也会显式抛出 `WatchlistPersistenceError`；`manage_watchlist` 会继续复用现有红色中文 `[想看清单清空失败]` 和 `[处理建议]`，不再把坏清空身份静默折叠成普通 `0`。
 - 2026-04-16 代码审查确认：`watchlist_repo._to_watchlist_item()` 读到坏 `watchlist_item` 行时，如果 `id/chat_id<=0`、`title` 为空或 `media_kind` 不是 `movie/series/anime`，现在也会显式抛出 `WatchlistPersistenceError`；想看清单真相层不再把损坏条目误包装成正常列表数据返回给 `watchlist list` / `watchlist add` 回读路径。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.add_item()` 在插入成功但写后回读不到新条目时，现在会显式抛出 `bt_subscription_item missing after insert`，并由 `manage_bt_subscription` 继续打印红色中文 `[BT 订阅写入失败]` 和 `[处理建议]`，不再把这类持久化回读异常和普通 `repo returned None` 混成同一个模糊原因。
+- 2026-04-16 代码审查确认：`manage_bt_subscription._add_item()` 现在会把 `bt_subscription_repo.add_item()` 意外返回空结果显式记成 `bt subscription add result missing`；BT 订阅入口不再把这类契约破坏继续混写成模糊的 `repo returned None`。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.add_item()` 遇到空 `chat_id`、空 `title` 或空 `media_kind` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅写入失败]` 和 `[处理建议]`，不再把坏订阅身份静默折叠成普通 `repo returned None`。
 - 2026-04-16 代码审查确认：`bt_subscription_repo.add_item()` 遇到不受支持的 `media_kind` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；BT 订阅真相层不再接受“写得进去、读回再炸”的非法订阅类型。
 - 2026-04-15 代码审查确认：`bt_subscription_repo.list_items()` 遇到空 `chat_id` 时，现在也会显式抛出 `BtSubscriptionPersistenceError`；`manage_bt_subscription` 会继续复用现有红色中文 `[BT 订阅清单读取失败]` 和 `[处理建议]`，不再把坏列表身份静默折叠成普通空清单。
