@@ -13,6 +13,7 @@ GetStatusFunc = Callable[..., Awaitable[TransmissionTaskStatus | None]]
 STATUS_QUERY_USAGE_TEXT = "状态查询格式：status <任务ID或Hash>"
 STATUS_NOT_FOUND_TEXT = "未找到对应下载任务，请检查任务 ID/Hash。"
 STATUS_QUERY_FAILED_TEXT = "查询下载状态失败，请稍后重试。"
+STATUS_OBSERVATION_WARNING_TEXT = "注意：下载状态观察落盘失败，自动导入跟进可能未推进，请稍后重试。"
 
 _STATUS_CODE_LABELS = {
     0: "已停止",
@@ -76,7 +77,7 @@ class GetDownloadStatusService:
                 f"\033[31m[下载状态观察落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前请求仍会返回下载状态文本，但下载完成观察和后续自动导入可能不会推进。",
                 flush=True,
             )
-            return None
+            return STATUS_OBSERVATION_WARNING_TEXT
         if update.newly_completed and self._job_event_repo is not None:
             try:
                 self._job_event_repo.append_event(

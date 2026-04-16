@@ -167,6 +167,7 @@ def test_get_status_text_logs_download_monitor_persistence_failure(capsys) -> No
     text = _run(service.get_status_text("87"))
 
     assert "状态: 下载中" in text
+    assert "注意：下载状态观察落盘失败" in text
     output = capsys.readouterr().out
     assert "[下载状态观察落盘失败]" in output
     assert "download monitor task identity missing" in output
