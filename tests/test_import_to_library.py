@@ -364,6 +364,7 @@ def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[导入待确认任务落盘失败]" in output
     assert "task_ref=87" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
 
 
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_update_fails(
