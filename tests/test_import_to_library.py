@@ -181,7 +181,9 @@ def test_confirm_import_by_task_ref_usage_when_empty() -> None:
 def test_rebuild_confirm_context_logs_job_lookup_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
-    assert service._rebuild_confirm_context(task_ref="87", chat_id=1001) is None
+    context, lookup_failed = service._rebuild_confirm_context(task_ref="87", chat_id=1001)
+    assert context is None
+    assert lookup_failed is True
     assert "[导入确认上下文查询失败]" in capsys.readouterr().out
 
 
@@ -201,11 +203,29 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
     approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo, approval_repo=approval_repo)
-    context = service._rebuild_confirm_context(task_ref="87", chat_id=1001)
+    context, lookup_failed = service._rebuild_confirm_context(task_ref="87", chat_id=1001)
     assert context is not None
+    assert lookup_failed is False
     assert context.approval_record is None
     assert context.approval_lookup_failed is True
     assert "[导入确认审批查询失败]" in capsys.readouterr().out
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_on_context_lookup_failure(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    get_import_source = AsyncMock(return_value=None)
+    service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入确认上下文查询失败]" in output
+    assert "chat_id=1001" in output
+    assert "task_ref=87" in output
 
 
 @pytest.mark.parametrize(

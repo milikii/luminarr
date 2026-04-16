@@ -177,7 +177,12 @@ class ImportToLibraryService:
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
-        confirm_context = self._rebuild_confirm_context(task_ref=cleaned_ref, chat_id=chat_id)
+        confirm_context, confirm_context_lookup_failed = self._rebuild_confirm_context(
+            task_ref=cleaned_ref,
+            chat_id=chat_id,
+        )
+        if confirm_context_lookup_failed:
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if confirm_context is not None and confirm_context.approval_lookup_failed:
             return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if confirm_context is not None and confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
@@ -1159,19 +1164,19 @@ class ImportToLibraryService:
         *,
         task_ref: str,
         chat_id: int | None,
-    ) -> ConfirmExecutionContext | None:
+    ) -> tuple[ConfirmExecutionContext | None, bool]:
         if self._job_repo is None or chat_id is None or chat_id <= 0:
-            return None
+            return None, False
         try:
             job = self._job_repo.get_import_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
         except Exception as error:
             print(
-                f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会按“没有待确认导入”继续处理，但实际待确认上下文可能未能重建。",
+                f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认导入”或“未找到对应下载任务”。",
                 flush=True,
             )
-            return None
+            return None, True
         if job is None:
-            return None
+            return None, False
 
         approval_record: ApprovalRecord | None = None
         approval_lookup_failed = False
@@ -1188,10 +1193,13 @@ class ImportToLibraryService:
                 )
                 approval_record = None
                 approval_lookup_failed = True
-        return ConfirmExecutionContext(
-            job=job,
-            approval_record=approval_record,
-            approval_lookup_failed=approval_lookup_failed,
+        return (
+            ConfirmExecutionContext(
+                job=job,
+                approval_record=approval_record,
+                approval_lookup_failed=approval_lookup_failed,
+            ),
+            False,
         )
 
     def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool:
