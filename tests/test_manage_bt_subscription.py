@@ -10,6 +10,7 @@ from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_ADD_FAILED_TEXT,
     BT_SUBSCRIPTION_CLEAR_FAILED_TEXT,
     BT_SUBSCRIPTION_LIST_FAILED_TEXT,
+    BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT,
     BT_SUBSCRIPTION_REMOVE_FAILED_TEXT,
     BT_SUBSCRIPTION_RUN_FAILED_TEXT,
     BtSubscriptionDispatchContext,
@@ -517,7 +518,7 @@ def test_bt_subscription_run_once_returns_failure_text_when_pending_creation_is_
         )
     )
 
-    assert reply == BT_SUBSCRIPTION_RUN_FAILED_TEXT
+    assert reply == BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT
     captured = capsys.readouterr()
     assert "[BT 订阅待确认创建失败]" in captured.out
     assert "chat_id=1001" in captured.out

@@ -30,6 +30,7 @@ BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
 BT_SUBSCRIPTION_CLEAR_FAILED_TEXT = "BT 订阅清单清空失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
 BT_SUBSCRIPTION_RUN_FAILED_TEXT = "BT 订阅扫描失败，请稍后重试。"
+BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT = "BT 订阅待确认状态写入失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
 BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。"
 BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT = (
@@ -133,6 +134,8 @@ class ManageBtSubscriptionService:
         )
         if result is None:
             return BT_SUBSCRIPTION_RUN_FAILED_TEXT
+        if result.pending_creation_failed and result.matched <= 0:
+            return BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT
         if result.scanned <= 0:
             return BT_SUBSCRIPTION_RUN_EMPTY_TEXT
         return _format_bt_subscription_run_result(result)
@@ -158,6 +161,9 @@ class ManageBtSubscriptionService:
                 dispatch_context=dispatch_context,
             )
             if result is None:
+                scan_failed = True
+                continue
+            if result.pending_creation_failed and result.matched <= 0:
                 scan_failed = True
                 continue
             if result.matched <= 0:
@@ -396,8 +402,6 @@ class ManageBtSubscriptionService:
                 continue
             matched += 1
             replies.append(reply)
-        if pending_creation_failed and matched <= 0:
-            return None
         return BtSubscriptionRunResult(
             scanned=len(items),
             matched=matched,
