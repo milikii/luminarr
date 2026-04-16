@@ -85,9 +85,12 @@ class BtPendingRepo:
                     (chat_id,),
                 )
             else:
+                cleaned_stage = expected_stage.strip()
+                if not cleaned_stage:
+                    raise BtPendingPersistenceError("bt_pending_state expected stage missing for clear")
                 cursor = connection.execute(
                     "DELETE FROM bt_pending_state WHERE chat_id = ? AND stage = ?",
-                    (chat_id, expected_stage.strip()),
+                    (chat_id, cleaned_stage),
                 )
             connection.commit()
         return cursor.rowcount > 0

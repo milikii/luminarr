@@ -744,6 +744,9 @@ def test_bt_pending_repo_rejects_missing_chat_identity_for_clear(tmp_path: Path)
     with pytest.raises(BtPendingPersistenceError, match="bt_pending_state chat identity missing for clear"):
         repo.clear_pending(chat_id=0)
 
+    with pytest.raises(BtPendingPersistenceError, match="bt_pending_state expected stage missing for clear"):
+        repo.clear_pending(chat_id=1001, expected_stage="   ")
+
 
 def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
