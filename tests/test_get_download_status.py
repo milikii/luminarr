@@ -5,6 +5,8 @@ from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import pytest
+
 from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
@@ -18,6 +20,7 @@ from app.services.get_download_status import (
 )
 from app.services.post_download_auto_import import (
     AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+    AutoImportStateUnavailableError,
     AutoImportRunResult,
     PostDownloadAutoImportService,
 )
@@ -625,7 +628,8 @@ def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(cap
         },
     )()
 
-    assert asyncio.run(auto_import_service.run_for_record(record)) is None
+    with pytest.raises(AutoImportStateUnavailableError):
+        asyncio.run(auto_import_service.run_for_record(record))
     output = capsys.readouterr().out
     assert "[自动导入聊天身份无效]" in output
     assert "chat_id=0" in output
