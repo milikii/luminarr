@@ -177,12 +177,22 @@ class WatchlistRepo:
 
 
 def _to_watchlist_item(row: Mapping[str, object]) -> WatchlistItem:
+    item_id = int(row["id"])
+    chat_id = int(row["chat_id"])
+    title = str(row["title"]).strip()
+    raw_media_kind = str(row["media_kind"]).strip().lower()
+
+    if item_id <= 0 or chat_id <= 0 or not title:
+        raise WatchlistPersistenceError("watchlist_item row identity corrupted after read")
+    if raw_media_kind not in VALID_MEDIA_KINDS:
+        raise WatchlistPersistenceError("watchlist_item media kind corrupted after read")
+
     return WatchlistItem(
-        item_id=int(row["id"]),
-        chat_id=int(row["chat_id"]),
-        title=str(row["title"]),
+        item_id=item_id,
+        chat_id=chat_id,
+        title=title,
         year=str(row["year"]),
-        media_kind=_normalize_media_kind(str(row["media_kind"])),
+        media_kind=raw_media_kind,
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
     )

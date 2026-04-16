@@ -1182,6 +1182,48 @@ def test_watchlist_repo_rejects_missing_identity_for_exact_lookup(tmp_path: Path
         repo.get_item_by_identity(chat_id=1001, title="   ", year="2021", media_kind="movie")
 
 
+@pytest.mark.parametrize(
+    ("title", "media_kind", "expected_message"),
+    [
+        ("", "movie", "watchlist_item row identity corrupted after read"),
+        ("Dune", "documentary", "watchlist_item media kind corrupted after read"),
+    ],
+)
+def test_watchlist_repo_rejects_corrupted_row_after_read(
+    tmp_path: Path,
+    title: str,
+    media_kind: str,
+    expected_message: str,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = WatchlistRepo(database)
+
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO watchlist_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                1001,
+                title,
+                "2021",
+                media_kind,
+            ),
+        )
+        connection.commit()
+
+    with pytest.raises(WatchlistPersistenceError, match=expected_message):
+        repo.list_items(chat_id=1001)
+
+
 def test_bt_subscription_repo_rejects_missing_chat_identity_for_list(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
