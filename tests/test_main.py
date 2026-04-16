@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -117,8 +118,7 @@ def test_resolve_downloader_client_for_lookup_logs_missing_client(capsys: pytest
     assert "[处理建议]" in captured.out
 
 
-@pytest.mark.asyncio
-async def test_get_torrent_import_source_with_routing_raises_when_route_lookup_fails(
+def test_get_torrent_import_source_with_routing_raises_when_route_lookup_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     job_repo = SimpleNamespace(
@@ -126,13 +126,15 @@ async def test_get_torrent_import_source_with_routing_raises_when_route_lookup_f
     )
 
     with pytest.raises(DownloaderRouteLookupError, match="downloader route unavailable for import task: 87"):
-        await _get_torrent_import_source_with_routing(
-            task_ref="87",
-            chat_id=1001,
-            job_repo=job_repo,
-            downloader_instances_by_name={},
-            transmission_clients_by_name={},
-            qbittorrent_clients_by_name={},
+        asyncio.run(
+            _get_torrent_import_source_with_routing(
+                task_ref="87",
+                chat_id=1001,
+                job_repo=job_repo,
+                downloader_instances_by_name={},
+                transmission_clients_by_name={},
+                qbittorrent_clients_by_name={},
+            )
         )
 
     captured = capsys.readouterr()
@@ -141,8 +143,7 @@ async def test_get_torrent_import_source_with_routing_raises_when_route_lookup_f
     assert "db down" in captured.out
 
 
-@pytest.mark.asyncio
-async def test_get_torrent_import_source_with_routing_raises_when_client_missing(
+def test_get_torrent_import_source_with_routing_raises_when_client_missing(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     job_repo = SimpleNamespace(
@@ -150,13 +151,15 @@ async def test_get_torrent_import_source_with_routing_raises_when_client_missing
     )
 
     with pytest.raises(DownloaderRouteLookupError, match="downloader client unavailable for import task: 87"):
-        await _get_torrent_import_source_with_routing(
-            task_ref="87",
-            chat_id=1001,
-            job_repo=job_repo,
-            downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
-            transmission_clients_by_name={},
-            qbittorrent_clients_by_name={},
+        asyncio.run(
+            _get_torrent_import_source_with_routing(
+                task_ref="87",
+                chat_id=1001,
+                job_repo=job_repo,
+                downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+                transmission_clients_by_name={},
+                qbittorrent_clients_by_name={},
+            )
         )
 
     captured = capsys.readouterr()
@@ -164,20 +167,21 @@ async def test_get_torrent_import_source_with_routing_raises_when_client_missing
     assert "downloader_name=pt-main" in captured.out
 
 
-@pytest.mark.asyncio
-async def test_get_torrent_import_source_with_routing_returns_none_for_real_not_found() -> None:
+def test_get_torrent_import_source_with_routing_returns_none_for_real_not_found() -> None:
     client = SimpleNamespace(get_torrent_import_source=lambda task_ref: _return_async(None))
     job_repo = SimpleNamespace(
         get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json='{"downloader_name":"pt-main"}'),
     )
 
-    result = await _get_torrent_import_source_with_routing(
-        task_ref="87",
-        chat_id=1001,
-        job_repo=job_repo,
-        downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
-        transmission_clients_by_name={"pt-main": client},
-        qbittorrent_clients_by_name={},
+    result = asyncio.run(
+        _get_torrent_import_source_with_routing(
+            task_ref="87",
+            chat_id=1001,
+            job_repo=job_repo,
+            downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+            transmission_clients_by_name={"pt-main": client},
+            qbittorrent_clients_by_name={},
+        )
     )
 
     assert result is None
