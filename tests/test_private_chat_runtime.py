@@ -28,7 +28,7 @@ from app.bot.telegram_bot import (
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
-from app.services.add_to_downloader import AddToDownloaderService
+from app.services.add_to_downloader import ADD_CANCEL_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.cleanup_downloaded_source import (
     CLEANUP_INSPECT_QUERY_USAGE_TEXT,
@@ -277,6 +277,42 @@ def test_dispatch_private_chat_text_replies_downloader_cancel_state_unavailable_
     assert "[下载取消查询失败]" in captured.out
     assert "chat_id=1001" in captured.out
     assert "db down" in captured.out
+
+
+def test_dispatch_private_chat_text_stops_on_pending_downloader_cancel_state_unavailable(
+    tmp_path: Path,
+) -> None:
+    reply_text = AsyncMock()
+    job_repo = JobRepo(_make_database(tmp_path))
+    job_repo.upsert_downloader_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{}",
+    )
+    add_service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search),
+        add_torrent_func=AsyncMock(),
+    )
+    add_service.cancel_pending_add = Mock(return_value=ADD_CANCEL_STATE_UNAVAILABLE_TEXT)  # type: ignore[method-assign]
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data={
+                JOB_REPO_KEY: job_repo,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+            },
+        )
+    )
+
+    add_service.cancel_pending_add.assert_called_once_with(1001)
+    reply_text.assert_awaited_once_with(ADD_CANCEL_STATE_UNAVAILABLE_TEXT)
 
 
 def test_dispatch_private_chat_text_replies_import_cancel_state_unavailable_without_job_repo(

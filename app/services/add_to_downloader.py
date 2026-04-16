@@ -458,7 +458,13 @@ class AddToDownloaderService:
                 task_hash=pending_add.task_hash,
             )
             if expected_lease_version <= 0:
-                return None
+                self._log_cancel_state_unavailable(
+                    task_ref=task_ref,
+                    task_id=pending_add.task_id,
+                    task_hash=pending_add.task_hash,
+                    reason="downloader approval pending lease missing",
+                )
+                return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
             approval_cancelled = self._cancel_pending_approval(
                 task_ref=task_ref,
                 task_id=pending_add.task_id,
@@ -466,7 +472,7 @@ class AddToDownloaderService:
                 expected_lease_version=expected_lease_version,
             )
             if not approval_cancelled:
-                return None
+                return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
             self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
             self._record_event(
                 task_ref=task_ref,
@@ -490,7 +496,13 @@ class AddToDownloaderService:
             task_hash=pending_job.task_hash,
         )
         if expected_lease_version <= 0:
-            return None
+            self._log_cancel_state_unavailable(
+                task_ref=pending_job.task_ref,
+                task_id=pending_job.task_id,
+                task_hash=pending_job.task_hash,
+                reason="downloader approval pending lease missing",
+            )
+            return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
 
         approval_cancelled = self._cancel_pending_approval(
             task_ref=pending_job.task_ref,
@@ -499,7 +511,7 @@ class AddToDownloaderService:
             expected_lease_version=expected_lease_version,
         )
         if not approval_cancelled:
-            return None
+            return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
         try:
             cancelled = self._job_repo.cancel_pending_job(
                 job_id=pending_job.job_id,
@@ -511,13 +523,13 @@ class AddToDownloaderService:
                 f"\033[31m[下载取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
                 flush=True,
             )
-            return None
+            return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
         if not cancelled:
             print(
                 f"\033[31m[下载取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前审批可能已取消，但待确认任务真相可能已被其他状态迁移抢先改写。",
                 flush=True,
             )
-            return None
+            return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
         self._clear_pending_context(chat_id=chat_id, task_ref=pending_job.task_ref)
         self._record_event(
             task_ref=pending_job.task_ref,
@@ -644,18 +656,40 @@ class AddToDownloaderService:
         if self._approval_repo is None:
             return True
         try:
-            return self._approval_repo.cancel_downloader(
+            cancelled = self._approval_repo.cancel_downloader(
                 task_id=task_id,
                 task_hash=task_hash,
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
         except Exception as error:
+            self._pending_add_identities.add(identity)
             print(
                 f"\033[31m[下载取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认状态可能仍残留。",
                 flush=True,
             )
             return False
+        if not cancelled:
+            self._pending_add_identities.add(identity)
+            print(
+                f"\033[31m[下载取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消下载”。",
+                flush=True,
+            )
+            return False
+        return True
+
+    def _log_cancel_state_unavailable(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        reason: str,
+    ) -> None:
+        print(
+            f"\033[31m[下载取消状态读取失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消下载”。",
+            flush=True,
+        )
 
     def _record_executed_lease_version(
         self,

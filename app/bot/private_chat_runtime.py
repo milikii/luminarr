@@ -91,7 +91,7 @@ async def handle_private_chat_query_text(
                                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                                 lambda: add_service.cancel_pending_add(chat_id),
                             )
-                            if cancelled_text == tg.ADD_CANCELLED_TEXT:
+                            if cancelled_text is not None:
                                 await reply_func(cancelled_text)
                                 return
 
