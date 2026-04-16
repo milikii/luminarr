@@ -743,6 +743,35 @@ def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_handle_expired_pending_confirm_logs_job_cancel_state_rejection(capsys) -> None:
+    job_repo = type("JobRepo", (), {"cancel_pending_job": lambda self, **kwargs: False})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    service._is_pending_approval_expired = lambda **kwargs: True
+    context = ConfirmExecutionContext(
+        job=JobRecord(
+            job_id="job-1",
+            chat_id=1001,
+            user_id=2001,
+            workflow_type="import_to_library",
+            state="pending_approval",
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            payload_json="{}",
+            version=3,
+            lease_owner="",
+            lease_until="",
+            created_at="2026-04-15 00:00:00",
+            updated_at="2026-04-15 00:00:00",
+        ),
+        approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
+    )
+    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_EXPIRED_TEXT
+    output = capsys.readouterr().out
+    assert "[导入确认超时任务取消失败]" in output
+    assert "jobs.cancel_pending_job rejected current state" in output
+
+
 @pytest.mark.parametrize(
     ("payload_json", "expected_summary"),
     [
