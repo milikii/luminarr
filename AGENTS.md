@@ -8,6 +8,9 @@ This file is the repository contract for AI coding agents.
 - No black-box jargon. Explain who sends what data to whom.
 - Before modifying a file, explain its role in 1-2 plain Chinese sentences.
 - Never fail silently. On operational failure, print explicit colored Chinese logs with a clear fix hint.
+- Default user-facing progress reports should be brief and non-technical.
+- Per iteration, report only: current task, verification result, changed files, docs updated or not, commit hash / blocker.
+- Give detailed logs or deep technical explanation only when failure happens or the user explicitly asks.
 
 ## 2. Read Order
 
@@ -95,12 +98,15 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 The current next smallest path is:
 
-- **four-channel cleanup verification baseline（把已落地 cleanup 文本闭环收口成有退出条件的验证窗口；四个渠道都要保持可用，但不扩自动 cleanup、批量 cleanup 或删种）**
+- **persistent swallowing-error closure（把剩余 `except Exception: pass/return None`、`None/False` 混写异常态的持久化路径继续收口成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`，不改 workflow 真相和副作用边界）**
 
-Detailed current baselines and exit conditions live in:
+Detailed current goal and exit conditions live in:
 
 - `docs/NEXT_STEP.md`
 - `docs/STATUS.md`
+
+Completed cleanup verification evidence lives in:
+
 - `docs/CLEANUP_VERIFICATION_WINDOW.md`
 
 ## 9. Runtime rules
