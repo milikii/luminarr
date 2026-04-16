@@ -128,6 +128,7 @@ def test_manage_watchlist_add_returns_failure_text_when_repo_returns_none(tmp_pa
     captured = capsys.readouterr()
     assert "[想看写入失败]" in captured.out
     assert "[处理建议]" in captured.out
+    assert "watchlist add result missing" in captured.out
 
 
 def test_manage_watchlist_add_logs_missing_row_after_insert(tmp_path: Path, capsys) -> None:

@@ -34,7 +34,7 @@ class WatchlistRepo:
         title: str,
         year: str,
         media_kind: str,
-    ) -> tuple[WatchlistItem, bool] | None:
+    ) -> tuple[WatchlistItem, bool]:
         cleaned_title = title.strip()
         cleaned_year = year.strip()
         cleaned_media_kind = _normalize_media_kind(media_kind, allow_empty_default=True)

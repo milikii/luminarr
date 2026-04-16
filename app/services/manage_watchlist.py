@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from app.db.watchlist_repo import WatchlistRepo
+from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.services.search_media import parse_movie_query
 
 WATCHLIST_USAGE_TEXT = (
@@ -148,6 +148,8 @@ class ManageWatchlistService:
                 year=year,
                 media_kind=media_kind,
             )
+            if created is None:
+                raise WatchlistPersistenceError("watchlist add result missing")
         except Exception as error:
             _log_watchlist_add_failed(
                 chat_id=chat_id,
@@ -157,16 +159,7 @@ class ManageWatchlistService:
                 reason=str(error),
             )
             return None
-        if created is not None:
-            return created
-        _log_watchlist_add_failed(
-            chat_id=chat_id,
-            title=title,
-            year=year,
-            media_kind=media_kind,
-            reason="watchlist_repo.add_item returned None",
-        )
-        return None
+        return created
 
     def _list_items(self, *, chat_id: int):
         try:
