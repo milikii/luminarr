@@ -279,6 +279,20 @@ class ImportToLibraryService:
                 )
             return stale_text
 
+        execution_mode = self._resolve_execution_mode(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            confirm_context=confirm_context,
+        )
+        if execution_mode is None:
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+
         expected_lease_version = 0
         if confirm_context is not None and confirm_context.approval_record is not None:
             expected_lease_version = max(0, confirm_context.approval_record.lease_version)
@@ -338,11 +352,6 @@ class ImportToLibraryService:
             message=cleaned_ref,
         )
 
-        execution_mode = self._resolve_execution_mode(
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            confirm_context=confirm_context,
-        )
         execution = await self._execute_import(
             cleaned_ref,
             prepared_import,
@@ -1128,15 +1137,17 @@ class ImportToLibraryService:
         task_id: str,
         task_hash: str,
         confirm_context: ConfirmExecutionContext | None,
-    ) -> str:
+    ) -> str | None:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
             return IMPORT_EXECUTION_MODE_HARDLINK
+        payload_corrupted = False
         if confirm_context is not None:
             copy_fallback_pending, payload_problem = _parse_copy_fallback_pending_payload(confirm_context.job.payload_json)
             if copy_fallback_pending is True:
                 return IMPORT_EXECUTION_MODE_COPY
             if copy_fallback_pending is None:
+                payload_corrupted = True
                 self._log_copy_fallback_payload_corrupted(
                     task_id=task_id,
                     task_hash=task_hash,
@@ -1144,6 +1155,8 @@ class ImportToLibraryService:
                 )
         if identity in self._pending_copy_fallback_identities:
             return IMPORT_EXECUTION_MODE_COPY
+        if payload_corrupted:
+            return None
         return IMPORT_EXECUTION_MODE_HARDLINK
 
     def _record_copy_fallback_pending(self, *, task_id: str, task_hash: str) -> None:
@@ -1160,7 +1173,7 @@ class ImportToLibraryService:
 
     def _log_copy_fallback_payload_corrupted(self, *, task_id: str, task_hash: str, payload_problem: str) -> None:
         print(
-            f"\033[31m[导入执行模式载荷损坏]\033[0m task_id={task_id} task_hash={task_hash} 载荷={payload_problem}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整 copy-fallback 待确认上下文；当前 confirm 会按硬链接继续判断，但原本应进入复制导入确认的任务可能被误判。",
+            f"\033[31m[导入执行模式载荷损坏]\033[0m task_id={task_id} task_hash={task_hash} 载荷={payload_problem}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整 copy-fallback 待确认上下文；若当前进程里也没有 copy-fallback 待确认兜底，当前 confirm 会直接返回状态读取失败，避免把坏载荷误判成硬链接导入。",
             flush=True,
         )
 

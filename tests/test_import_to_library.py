@@ -935,7 +935,7 @@ def test_resolve_execution_mode_logs_copy_fallback_payload_corruption(
             task_hash="hash-87",
             confirm_context=context,
         )
-        == import_module.IMPORT_EXECUTION_MODE_HARDLINK
+        is None
     )
 
     output = capsys.readouterr().out
@@ -944,6 +944,110 @@ def test_resolve_execution_mode_logs_copy_fallback_payload_corruption(
     assert "task_hash=hash-87" in output
     assert expected_summary in output
     assert "[处理建议]" in output
+
+
+def test_resolve_execution_mode_uses_in_memory_copy_fallback_when_payload_corrupted(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    service._record_copy_fallback_pending(task_id="87", task_hash="hash-87")
+    context = ConfirmExecutionContext(
+        job=JobRecord(
+            job_id="job-1",
+            chat_id=1001,
+            user_id=2001,
+            workflow_type="import_to_library",
+            state="pending_approval",
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            payload_json="{",
+            version=3,
+            lease_owner="",
+            lease_until="",
+            created_at="2026-04-15 00:00:00",
+            updated_at="2026-04-15 00:00:00",
+        ),
+        approval_record=None,
+    )
+
+    assert (
+        service._resolve_execution_mode(
+            task_id="87",
+            task_hash="hash-87",
+            confirm_context=context,
+        )
+        == import_module.IMPORT_EXECUTION_MODE_COPY
+    )
+    assert "[导入执行模式载荷损坏]" in capsys.readouterr().out
+
+
+def test_confirm_import_by_task_ref_returns_state_unavailable_on_copy_fallback_payload_corruption(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type(
+        "ApprovalRecord",
+        (),
+        {"status": APPROVAL_STATUS_PENDING, "lease_version": 2, "executed_version": 0},
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        job_repo=type(
+            "JobRepo",
+            (),
+            {
+                "get_import_job_for_chat_ref": lambda self, **kwargs: job,
+                "claim_lease": lambda self, **kwargs: True,
+                "release_lease_to_pending": lambda self, **kwargs: True,
+            },
+        )(),
+        approval_repo=type(
+            "ApprovalRepo",
+            (),
+            {
+                "get_import_approval": lambda self, **kwargs: approval_record,
+                "is_import_pending_expired": lambda self, **kwargs: False,
+            },
+        )(),
+    )
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    output = capsys.readouterr().out
+    assert "[导入执行模式载荷损坏]" in output
+    assert "task_id=87" in output
 
 
 def test_confirm_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:

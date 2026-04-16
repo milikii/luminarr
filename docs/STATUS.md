@@ -79,6 +79,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `RefreshMediaServerService.refresh_text()` 在 Emby 刷新异常被转成失败文本时，现在也会打印红色中文 `[媒体库刷新失败]` 日志和 `[处理建议]`，不再把真实刷新异常只折叠成一行失败文本
   - `subtitle_translator._read_metadata_title()` 在 metadata JSON 根结构损坏或 `tmdb` 字段不是对象时，现在也会打印红色中文 `[字幕翻译失败]` 日志和 `[处理建议]`，不再把持久化坏 metadata 静默混写成普通空标题
   - `import_to_library._rebuild_confirm_context()` 在 `jobs` / `approval_record` 查询异常时，现在也会打印红色中文 `[导入确认上下文查询失败]` / `[导入确认审批查询失败]` 日志和 `[处理建议]`；其中 `jobs` 查询异常会让 `confirm_import_by_task_ref()` 直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把 SQLite 查询异常静默吞成“没有待确认导入 / 未找到对应下载任务 / 审批状态缺失”
+  - `import_to_library._resolve_execution_mode()` 在 copy-fallback `payload_json` 损坏时，现在也会打印红色中文 `[导入执行模式载荷损坏]` 日志和 `[处理建议]`；若当前进程里也没有 copy-fallback 待确认兜底，`confirm_import_by_task_ref()` 会直接返回 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT`，不再把坏载荷静默误判成硬链接导入
   - `import_to_library._claim_pending_job()` / `_restore_pending_job()` / `_mark_completed_job()` 在 `jobs` lease/完成态更新异常时，现在也会打印红色中文 `[导入确认任务抢占失败]` / `[导入确认任务回退失败]` / `[导入确认任务完结失败]` 日志和 `[处理建议]`，不再把 SQLite 更新异常静默吞成普通冲突或无事发生
   - `import_to_library._record_pending_approval()` / `_record_import_approval()` / `_record_executed_lease_version()` / `_record_pending_job()` 在 `approval_record` / `jobs` 写入异常时，现在也会打印红色中文 `[导入待确认审批落盘失败]` / `[导入确认审批更新失败]` / `[导入执行版号回写失败]` / `[导入待确认任务落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“只靠进程内状态兜底”
   - `import_to_library._record_event()` 在 `job_event` 写入异常时，现在也会打印红色中文 `[导入事件落盘失败]` 日志和 `[处理建议]`，不再把 SQLite 写入异常静默吞成“导入流程继续了，但事件没记下来”
