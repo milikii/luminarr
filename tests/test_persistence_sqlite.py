@@ -98,6 +98,20 @@ def test_candidate_mapping_repo_raises_when_saved_count_mismatches(tmp_path: Pat
         repo.save_candidates(1001, [{"title": "Dune"}])
 
 
+def test_candidate_mapping_repo_raises_when_count_row_missing(tmp_path: Path) -> None:
+    class MissingCandidateCountRowRepo(CandidateMappingRepo):
+        def _load_candidate_count_row(self, *, chat_id: int):
+            _ = chat_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingCandidateCountRowRepo(database)
+
+    with pytest.raises(CandidatePersistenceError, match="candidate_mapping count missing after query"):
+        repo.save_candidates(1001, [])
+
+
 def test_candidate_mapping_repo_rejects_missing_chat_identity(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

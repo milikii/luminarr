@@ -78,14 +78,17 @@ class CandidateMappingRepo:
         return {str(key): value for key, value in payload.items()}
 
     def _count_candidates(self, *, chat_id: int) -> int:
+        row = self._load_candidate_count_row(chat_id=chat_id)
+        if row is None:
+            raise CandidatePersistenceError("candidate_mapping count missing after query")
+        return int(row["total"])
+
+    def _load_candidate_count_row(self, *, chat_id: int) -> Mapping[str, object] | None:
         with self._database.connect() as connection:
-            row = connection.execute(
+            return connection.execute(
                 "SELECT COUNT(*) AS total FROM candidate_mapping WHERE chat_id = ?",
                 (chat_id,),
             ).fetchone()
-        if row is None:
-            return 0
-        return int(row["total"])
 
 
 def _normalize_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
