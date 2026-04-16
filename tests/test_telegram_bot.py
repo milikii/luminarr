@@ -997,6 +997,7 @@ def test_bt_processing_path_pending_logs_read_failure(capsys: pytest.CaptureFixt
     assert "[BT 待处理读取失败]" in output
     assert "stage=processing_path" in output
     assert "db down" in output
+    assert "当前相关入口会按状态不可用处理" in output
 
 
 def test_pop_bt_processing_path_pending_logs_missing_source_after_restart(
