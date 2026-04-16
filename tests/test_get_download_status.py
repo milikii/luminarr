@@ -12,6 +12,7 @@ from app.db.download_monitor_repo import DownloadMonitorPersistenceError, Downlo
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.get_download_status import (
+    STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT,
     STATUS_NOT_FOUND_TEXT,
     STATUS_QUERY_FAILED_TEXT,
     STATUS_QUERY_USAGE_TEXT,
@@ -506,11 +507,11 @@ def test_get_status_text_stops_auto_import_when_terminal_lookup_fails(
 
     assert "状态: 做种中" in text
     assert "导入待确认" not in text
-    assert "注意：自动导入跟进失败" in text
+    assert STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT in text
     auto_import.assert_not_awaited()
     output = capsys.readouterr().out
     assert "[自动导入终态查询失败]" in output
-    assert "[下载状态自动导入跟进失败]" in output
+    assert "[下载状态自动导入状态读取失败]" in output
     assert "task_id=87" in output
     assert "db down" in output
 
