@@ -503,6 +503,24 @@ def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_restore_pending_job_logs_missing_result(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("job missing during state transition")
+            )
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    service._restore_pending_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87")
+    output = capsys.readouterr().out
+    assert "[导入确认任务回退结果缺失]" in output
+    assert "lease 回退后是否还能回读到待确认状态" in output
+    assert "job_id=job-1" in output
+
+
 def test_restore_pending_job_logs_rejected_current_state(capsys) -> None:
     job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: False})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)

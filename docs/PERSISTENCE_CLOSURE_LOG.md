@@ -1,4 +1,4 @@
-# Persistence closure log (v19)
+# Persistence closure log (v20)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 导入确认任务回退结果缺失分流缺口
+
+- 闭环：`import_to_library._restore_pending_job()` 在 `jobs.release_lease_to_pending()` 已经找不到任务行时，不再和普通 SQLite lease 回退异常共用同一条“导入确认任务回退失败”日志；现在会单独打印“导入确认任务回退结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 confirm 错误恢复边界，不改审批真相和副作用。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "restore_pending_job_logs_persistence_failure or restore_pending_job_logs_missing_result or restore_pending_job_logs_rejected_current_state"`；`tests/test_import_to_library.py -k "promotes_pending_to_approved"`
 
 ### 2026-04-17 导入审批回退结果缺失分流缺口
 

@@ -73,6 +73,7 @@ IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
+IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1514,10 +1515,18 @@ class ImportToLibraryService:
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
-                flush=True,
-            )
+            if str(error) == IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入确认任务回退结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认任务是否仍存在，以及 lease 回退后是否还能回读到待确认状态；"
+                    "当前审批已尝试退回待确认，但任务真相还没有确认回退成功。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
+                    flush=True,
+                )
             return
         if restored is False:
             print(
