@@ -438,6 +438,26 @@ def test_register_download_monitor_logs_persistence_failure(capsys) -> None:
     assert "task_id=42" in output
 
 
+def test_register_download_monitor_logs_missing_registered_result(capsys) -> None:
+    download_monitor_repo = type(
+        "DownloadMonitorRepo",
+        (),
+        {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("download monitor state missing after register"))},
+    )()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)
+    service._register_download_monitor(
+        task_id="42",
+        task_hash="abc123",
+        title="Dune: Part Two",
+        chat_id=1001,
+        user_id=2001,
+    )
+    output = capsys.readouterr().out
+    assert "[下载监控登记结果缺失]" in output
+    assert "download monitor state missing after register" in output
+    assert "task_id=42" in output
+
+
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)

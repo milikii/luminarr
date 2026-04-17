@@ -43,6 +43,7 @@ ADD_FINALIZATION_WARNING_TEXT = (
     "请稍后用 status 查询任务状态，或检查 SQLite/approval_record 与 jobs 表。"
 )
 DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
+DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
@@ -1192,10 +1193,18 @@ class AddToDownloaderService:
                 user_id=user_id,
             )
         except Exception as error:
-            print(
-                f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
-                flush=True,
-            )
+            if str(error) == DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[下载监控登记结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 download_monitor 写入后回读是否仍能拿到刚登记的任务状态；"
+                    "当前下载已投递，但后续状态跟踪和自动导入真相还没有确认落稳。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
+                    flush=True,
+                )
             return
 
     async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
