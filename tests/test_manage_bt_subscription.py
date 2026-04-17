@@ -214,7 +214,7 @@ def test_manage_bt_subscription_remove_returns_failure_text_when_repo_returns_no
 
     assert reply == BT_SUBSCRIPTION_REMOVE_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[BT 订阅删除失败]" in captured.out
+    assert "[BT 订阅删除结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "bt subscription remove result missing" in captured.out
 
