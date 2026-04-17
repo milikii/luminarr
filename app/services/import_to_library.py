@@ -66,7 +66,7 @@ PENDING_LEASE_LOOKUP_FAILED = -1
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
-IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "import approval missing after request"
+IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 
 

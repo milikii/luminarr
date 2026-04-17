@@ -424,7 +424,7 @@ def test_record_pending_approval_logs_missing_pending_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("import approval missing after request"))},
+        {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing after pending request"))},
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 0
