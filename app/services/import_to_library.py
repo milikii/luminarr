@@ -76,6 +76,7 @@ IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
 IMPORT_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missing during restore"
+IMPORT_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
@@ -1509,10 +1510,18 @@ class ImportToLibraryService:
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 更新是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常继续混成普通未持有执行权。",
-                flush=True,
-            )
+            if str(error) == IMPORT_CLAIM_PENDING_JOB_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入确认任务抢占结果缺失]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认任务是否仍存在，并确认抢占前后的 version/lease_owner 没有被其他路径改写；"
+                    "当前 confirm 会直接返回状态读取失败，避免把任务真相缺口误判成普通未持有执行权。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 更新是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常继续混成普通未持有执行权。",
+                    flush=True,
+                )
             return None
         if claimed is False:
             print(
