@@ -28,6 +28,7 @@ AMBIGUOUS_QUERY_TEXT_TEMPLATE = (
 AMBIGUOUS_OPTION_FALLBACK_TEXT = "- 暂无可区分候选，请直接补充年份。"
 AMBIGUOUS_MIN_RESULT_COUNT = 3
 AMBIGUOUS_MAX_OPTION_COUNT = 3
+CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失败，请稍后重试。"
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,8 +156,8 @@ class SearchMediaService:
             raw_results=raw_results,
         )
         if ambiguous_text is not None:
-            if chat_id is not None:
-                self._set_clarification_pending(chat_id=chat_id, query=cleaned_query)
+            if chat_id is not None and not self._set_clarification_pending(chat_id=chat_id, query=cleaned_query):
+                return CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
             return ambiguous_text
 
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
@@ -165,7 +166,9 @@ class SearchMediaService:
             if selected_raw_results:
                 self._clear_clarification_pending(chat_id=chat_id)
             else:
-                self._set_clarification_pending(chat_id=chat_id, query=cleaned_query)
+                if not self._set_clarification_pending(chat_id=chat_id, query=cleaned_query):
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    return CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
             if self._candidate_repo is not None:
                 try:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
@@ -248,12 +251,13 @@ class SearchMediaService:
             return False
         return self._clear_clarification_pending(chat_id=chat_id)
 
-    def _set_clarification_pending(self, *, chat_id: int, query: str) -> None:
+    def _set_clarification_pending(self, *, chat_id: int, query: str) -> bool:
         if chat_id <= 0:
-            return
+            return False
+        previous_query = self._clarification_pending_by_chat.get(chat_id, "")
         self._clarification_pending_by_chat[chat_id] = query
         if self._clarification_repo is None:
-            return
+            return True
         try:
             self._clarification_repo.upsert_pending(chat_id=chat_id, query=query)
         except Exception as error:
@@ -261,6 +265,12 @@ class SearchMediaService:
                 f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",
                 flush=True,
             )
+            if previous_query:
+                self._clarification_pending_by_chat[chat_id] = previous_query
+            else:
+                self._clarification_pending_by_chat.pop(chat_id, None)
+            return False
+        return True
 
     def _clear_clarification_pending(self, *, chat_id: int) -> bool:
         cleared = False

@@ -13,6 +13,7 @@ from app.services.search_media import (
     BT_READ_ONLY_EMPTY_QUERY_TEXT,
     BT_READ_ONLY_NOTICE_TEXT,
     BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE,
+    CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT,
     EMPTY_QUERY_TEXT,
     NO_RESULT_TEXT_TEMPLATE,
     SearchMediaService,
@@ -222,8 +223,31 @@ def test_search_clarification_pending_logs_persistence_failure(tmp_path: Path, c
 
     text = _run(service.search_and_format("Dune", chat_id=1001))
 
-    assert "片名可能有多个版本：Dune" in text
-    assert service.is_clarification_pending(1001)
+    assert text == CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
+    assert not service.is_clarification_pending(1001)
+    output = capsys.readouterr().out
+    assert "[搜索澄清态持久化失败]" in output
+    assert "clarification_state missing after upsert" in output
+
+
+def test_search_no_result_returns_state_unavailable_when_clarification_persist_fails(tmp_path: Path, capsys) -> None:
+    class MissingRowClarificationRepo(ClarificationRepo):
+        def get_pending_query(self, *, chat_id: int) -> str | None:
+            _ = chat_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    service = SearchMediaService(
+        _fake_search_empty,
+        clarification_repo=MissingRowClarificationRepo(database),
+    )
+
+    text = _run(service.search_and_format("unknown", chat_id=1001))
+
+    assert text == CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
+    assert service.get_cached_candidate(1001, 1) is None
+    assert not service.is_clarification_pending(1001)
     output = capsys.readouterr().out
     assert "[搜索澄清态持久化失败]" in output
     assert "clarification_state missing after upsert" in output
