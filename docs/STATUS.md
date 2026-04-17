@@ -50,6 +50,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram BT 待答写入链也已补一处分流：`bt_pending_state` 写入后立即回读不到记录时，会打印“BT 待处理写入后记录缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
 - 搜索候选写入链也已补一处分流：`candidate_mapping` 保存后条数和预期不一致时，会打印“搜索候选写入后记录不一致”日志，不再和普通 SQLite 写入失败共用同一类诊断。
 - 截至 2026-04-17，当前主线最近 5 个最小闭环已经继续收口到“写入成功但回读缺失 / 条数不一致”的分流诊断：想看清单、BT 订阅、搜索待澄清、Telegram BT 待答、搜索候选这几条轻状态路径，都已补成显式中文日志与 `[处理建议]`，详细 focused tests 和 commit 轨迹继续只记在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 下载状态观察链也已补一处分流：`download_monitor` 返回空 update、缺回读记录、或缺完成标记时，不再都只打印同一类观察落盘失败日志，而会分别提示“结果缺失 / 完成标记缺失”与对应 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改自动导入 follow-up 边界。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
 - 当前本地联调基线仍是 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 - `docs/STATUS.md` 从本版开始只保留短快照；当前主线的详细闭环、focused tests 和 commit 轨迹收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。

@@ -243,8 +243,9 @@ def test_get_status_text_warns_when_download_monitor_returns_missing_record(caps
     assert "状态: 下载中" in text
     assert "注意：下载状态观察落盘失败" in text
     output = capsys.readouterr().out
-    assert "[下载状态观察落盘失败]" in output
+    assert "[下载状态观察结果缺失]" in output
     assert "download monitor observed record missing" in output
+    assert "[处理建议]" in output
 
 
 def test_get_status_text_warns_when_download_monitor_returns_missing_completion_flag(capsys) -> None:
@@ -291,8 +292,9 @@ def test_get_status_text_warns_when_download_monitor_returns_missing_completion_
     assert "状态: 下载中" in text
     assert "注意：下载状态观察落盘失败" in text
     output = capsys.readouterr().out
-    assert "[下载状态观察落盘失败]" in output
+    assert "[下载状态观察完成标记缺失]" in output
     assert "download monitor completion flag missing" in output
+    assert "[处理建议]" in output
 
 
 def test_get_status_text_warns_when_completion_event_write_fails(capsys) -> None:

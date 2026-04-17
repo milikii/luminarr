@@ -17,6 +17,9 @@ STATUS_OBSERVATION_WARNING_TEXT = "注意：下载状态观察落盘失败，自
 STATUS_COMPLETION_EVENT_WARNING_TEXT = "注意：下载完成观察事件落盘失败，后续恢复可能缺少这次完成记录，请稍后重试。"
 STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT = "注意：自动导入状态读取失败，本次状态查询未附带后续处理结果，请稍后重试。"
 STATUS_AUTO_IMPORT_WARNING_TEXT = "注意：自动导入跟进失败，本次状态查询未附带后续处理结果，请稍后重试。"
+DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON = "download monitor status result missing"
+DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON = "download monitor observed record missing"
+DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON = "download monitor completion flag missing"
 
 _STATUS_CODE_LABELS = {
     0: "已停止",
@@ -76,17 +79,23 @@ class GetDownloadStatusService:
         try:
             update = self._download_monitor_repo.record_status(task_status)
             if update is None:
-                raise RuntimeError("download monitor status result missing")
+                raise RuntimeError(DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON)
             if getattr(update, "record", None) is None:
-                raise RuntimeError("download monitor observed record missing")
+                raise RuntimeError(DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON)
             newly_completed = getattr(update, "newly_completed", None)
             if not isinstance(newly_completed, bool):
-                raise RuntimeError("download monitor completion flag missing")
+                raise RuntimeError(DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON)
         except Exception as error:
-            print(
-                f"\033[31m[下载状态观察落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前请求仍会返回下载状态文本，但下载完成观察和后续自动导入可能不会推进。",
-                flush=True,
-            )
+            if str(error) == DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON:
+                _log_download_monitor_observed_record_missing(task_ref=task_ref, task_status=task_status, reason=str(error))
+            elif str(error) == DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON:
+                _log_download_monitor_completion_flag_missing(
+                    task_ref=task_ref,
+                    task_status=task_status,
+                    reason=str(error),
+                )
+            else:
+                _log_download_monitor_observation_failed(task_ref=task_ref, task_status=task_status, reason=str(error))
             return STATUS_OBSERVATION_WARNING_TEXT
         follow_up_parts: list[str] = []
         if newly_completed and self._job_event_repo is not None:
@@ -187,3 +196,48 @@ def _format_eta(eta_seconds: int) -> str:
     if hours > 0:
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def _log_download_monitor_observation_failed(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载状态观察落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；"
+        "当前请求仍会返回下载状态文本，但下载完成观察和后续自动导入可能不会推进。",
+        flush=True,
+    )
+
+
+def _log_download_monitor_observed_record_missing(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载状态观察结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor 写入后是否能立即回读到完整记录；"
+        "当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
+        flush=True,
+    )
+
+
+def _log_download_monitor_completion_flag_missing(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载状态观察完成标记缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor 更新结果是否仍带有完整的 newly_completed 真相；"
+        "当前请求仍会返回下载状态文本，但不会把这次完成观察继续推进到后续自动导入。",
+        flush=True,
+    )

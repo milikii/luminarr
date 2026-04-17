@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载状态观察结果缺字段分流缺口
+
+- 闭环：`get_download_status._record_status_observation()` 在 `download_monitor_repo.record_status()` 返回空 update、缺 `record`、或缺 `newly_completed` 标记时，不再都只打印同一类“下载状态观察落盘失败”日志；现在会把“观察结果缺失”“完成标记缺失”和普通 SQLite/调用异常拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `STATUS_OBSERVATION_WARNING_TEXT`，不改状态查询和自动导入 follow-up 的 fail-closed 边界。
+- 代码：`app/services/get_download_status.py`
+- 验证：`tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 搜索候选写入后真相不一致缺口
 
 - 闭环：`search_media` 在 `candidate_mapping` 保存候选后，如果持久化表里的条数和预期不一致，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“搜索候选写入后记录不一致”中文日志和单独的 `[处理建议]`，但用户侧仍保持 `CANDIDATE_STATE_UNAVAILABLE_TEXT`，不改候选回滚和 fail-closed 协议。
