@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载/导入确认审批结果缺失分流缺口
+
+- 闭环：`approval_repo._approve()` 在 confirm 审批更新时，如果 `approval_record` 行已经不存在，不再把“审批行缺失”和普通状态冲突一起压成 `False`；`add_to_downloader._record_downloader_approval()` / `import_to_library._record_import_approval()` 现在会单独打印“下载确认审批结果缺失”/“导入确认审批结果缺失”中文日志与 `[处理建议]`，并继续让 confirm 走原来的状态读取失败 fail-closed 边界，不改审批真相和副作用。
+- 代码：`app/db/approval_repo.py`、`app/services/add_to_downloader.py`、`app/services/import_to_library.py`
+- 验证：`tests/test_persistence_sqlite.py -k "approval_repo_approve_raises_when_row_missing"`；`tests/test_add_to_downloader.py -k "record_downloader_approval_logs_missing_result or record_downloader_approval_logs_rejected_current_state"`；`tests/test_import_to_library.py -k "record_import_approval_logs_missing_result or record_import_approval_logs_rejected_current_state"`
+
 ### 2026-04-17 导入确认过期结果缺失分流缺口
 
 - 闭环：`import_to_library._is_pending_approval_expired()` 在 `approval_repo.is_import_pending_expired()` 已经出现“待确认审批结果缺失”时，不再和普通 SQLite/approval 查询异常共用同一条“导入确认过期判断失败”日志；现在会单独打印“导入确认过期结果缺失”中文日志与 `[处理建议]`，并继续让 confirm 走原来的 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改审批真相和副作用。

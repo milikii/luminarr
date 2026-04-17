@@ -397,6 +397,33 @@ def test_record_downloader_approval_logs_persistence_failure(capsys) -> None:
     assert "[下载确认审批更新失败]" in capsys.readouterr().out
 
 
+def test_record_downloader_approval_logs_missing_result(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during approve"))},
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    service._pending_add_identities.add(("selection:1", "abc123"))
+    service._pending_add_lease_versions[("selection:1", "abc123")] = 1
+
+    assert service._record_downloader_approval(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        expected_lease_version=1,
+    ) is None
+
+    output = capsys.readouterr().out
+    assert "[下载确认审批结果缺失]" in output
+    assert "approval_record missing during approve" in output
+    assert "[处理建议]" in output
+
+
 def test_record_downloader_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"approve_downloader": lambda self, **kwargs: False})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
