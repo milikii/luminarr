@@ -75,6 +75,7 @@ IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
+IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1772,10 +1773,18 @@ class ImportToLibraryService:
                 expected_lease_version=expected_lease_version,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
-                flush=True,
-            )
+            if str(error) == IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入确认过期结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里的待确认导入审批是否仍存在，并确认对应 lease_version 没有被其他路径抢先改写；"
+                    "当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“未过期”。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
+                    flush=True,
+                )
             return None
 
     def _record_event(
