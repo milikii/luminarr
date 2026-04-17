@@ -486,7 +486,29 @@ def test_record_pending_job_logs_missing_pending_job_result(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载待确认任务结果缺失]" in output
     assert "task_ref=1" in output
-    assert "downloader pending job missing after upsert" in output
+    assert "job missing after pending upsert" in output
+
+
+def test_record_pending_job_logs_missing_pending_job_result_when_repo_returns_none(capsys) -> None:
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: None})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+    )
+
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        title="Dune",
+        source="https://example.com/dune.torrent",
+    )
+    assert service._record_pending_job(chat_id=1001, user_id=2001, pending_add=pending_add) is False
+    output = capsys.readouterr().out
+    assert "[下载待确认任务结果缺失]" in output
+    assert "downloader pending job result missing" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
 
 
 def test_record_downloader_approval_logs_persistence_failure(capsys) -> None:
@@ -805,6 +827,30 @@ def test_add_by_selection_returns_state_unavailable_when_pending_job_persist_fai
     assert reply == ADD_PENDING_STATE_UNAVAILABLE_TEXT
 
 
+def test_add_by_selection_returns_state_unavailable_when_pending_job_result_is_missing() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "request_downloader_approval": lambda self, **kwargs: 2,
+            "cancel_downloader": lambda self, **kwargs: True,
+        },
+    )()
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: None})()
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+
+    reply = _run(service.add_by_selection(1001, "1"))
+
+    assert reply == ADD_PENDING_STATE_UNAVAILABLE_TEXT
+
+
 def test_add_candidate_source_returns_state_unavailable_when_pending_job_persist_fails() -> None:
     approval_repo = type(
         "ApprovalRepo",
@@ -815,6 +861,34 @@ def test_add_candidate_source_returns_state_unavailable_when_pending_job_persist
         },
     )()
     job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+
+    reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abc",
+            title="Dune: Part Two",
+        )
+    )
+
+    assert reply == ADD_PENDING_STATE_UNAVAILABLE_TEXT
+
+
+def test_add_candidate_source_returns_state_unavailable_when_pending_job_result_is_missing() -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "request_downloader_approval": lambda self, **kwargs: 2,
+            "cancel_downloader": lambda self, **kwargs: True,
+        },
+    )()
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: None})()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
         add_torrent_func=AsyncMock(),

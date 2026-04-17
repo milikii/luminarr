@@ -73,6 +73,7 @@ IMPORT_APPROVE_RESULT_MISSING_REASON = "approval_record missing during approve"
 IMPORT_APPROVE_RESULT_NONE_REASON = "import approval result missing"
 IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during executed version update"
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
+IMPORT_PENDING_JOB_NONE_REASON = "import pending job result missing"
 IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
@@ -1420,7 +1421,7 @@ class ImportToLibraryService:
         if self._job_repo is None:
             return True
         try:
-            self._job_repo.upsert_import_job_pending(
+            pending_job = self._job_repo.upsert_import_job_pending(
                 chat_id=chat_id,
                 user_id=user_id,
                 task_ref=task_ref,
@@ -1428,10 +1429,15 @@ class ImportToLibraryService:
                 task_hash=task_hash,
                 payload_json=payload_json,
             )
+            if pending_job is None:
+                raise RuntimeError(IMPORT_PENDING_JOB_NONE_REASON)
         except Exception as error:
-            if str(error) == IMPORT_PENDING_JOB_RESULT_MISSING_REASON:
+            if str(error) in {
+                IMPORT_PENDING_JOB_RESULT_MISSING_REASON,
+                IMPORT_PENDING_JOB_NONE_REASON,
+            }:
                 print(
-                    f"\033[31m[导入待确认任务结果缺失]\033[0m chat_id={chat_id} user_id={user_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误=import pending job missing after upsert\n\033[33m[处理建议]\033[0m 检查 jobs 写入后回读是否仍能拿到刚创建的导入待确认任务；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
+                    f"\033[31m[导入待确认任务结果缺失]\033[0m chat_id={chat_id} user_id={user_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 jobs 写入后回读是否仍能拿到刚创建的导入待确认任务；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
                     flush=True,
                 )
             else:

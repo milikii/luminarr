@@ -1,4 +1,4 @@
-# Persistence closure log (v32)
+# Persistence closure log (v33)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载/导入待确认任务空返回值分流缺口
+
+- 闭环：`add_to_downloader._record_pending_job()` 和 `import_to_library._record_pending_job()` 之前在 `upsert_downloader_job_pending()` / `upsert_import_job_pending()` 直接回 `None` 时，会把这步当成成功继续往下走；现在这类“空返回值”会单独记成“待确认任务结果缺失”中文日志，并直接返回待确认状态写入失败，不再把 `jobs` 真相缺口误判成可 confirm 的待确认任务。
+- 代码：`app/services/add_to_downloader.py`、`app/services/import_to_library.py`
+- 验证：`tests/test_add_to_downloader.py -k "record_pending_job_logs_missing_pending_job_result or record_pending_job_logs_missing_pending_job_result_when_repo_returns_none or add_by_selection_returns_state_unavailable_when_pending_job_persist_fails or add_by_selection_returns_state_unavailable_when_pending_job_result_is_missing or add_candidate_source_returns_state_unavailable_when_pending_job_persist_fails or add_candidate_source_returns_state_unavailable_when_pending_job_result_is_missing"`；`tests/test_import_to_library.py -k "record_pending_job_logs_missing_pending_job_result or record_pending_job_logs_missing_pending_job_result_when_repo_returns_none or import_by_task_ref_returns_state_unavailable_when_pending_job_persist_fails or import_by_task_ref_returns_state_unavailable_when_pending_job_result_is_missing"`
 
 ### 2026-04-18 下载/导入待确认审批空 lease 结果分流缺口
 

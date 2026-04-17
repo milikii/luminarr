@@ -919,7 +919,17 @@ def test_record_pending_job_logs_missing_pending_job_result(capsys) -> None:
     output = capsys.readouterr().out
     assert "[导入待确认任务结果缺失]" in output
     assert "task_ref=87" in output
-    assert "import pending job missing after upsert" in output
+    assert "job missing after pending upsert" in output
+
+
+def test_record_pending_job_logs_missing_pending_job_result_when_repo_returns_none(capsys) -> None:
+    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: None})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    assert service._record_pending_job(chat_id=1001, user_id=2001, task_ref="87", task_id="87", task_hash="hash-87", payload_json="{}") is False
+    output = capsys.readouterr().out
+    assert "[导入待确认任务结果缺失]" in output
+    assert "import pending job result missing" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
 
 
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_update_fails(
@@ -1185,6 +1195,40 @@ def test_import_by_task_ref_returns_state_unavailable_when_pending_job_persist_f
         },
     )()
     job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+
+    assert text == IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
+
+
+def test_import_by_task_ref_returns_state_unavailable_when_pending_job_result_is_missing(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "request_import_approval": lambda self, **kwargs: 2,
+            "cancel_import": lambda self, **kwargs: True,
+        },
+    )()
+    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: None})()
     service = ImportToLibraryService(
         AsyncMock(return_value=import_source),
         str(tmp_path / "library"),
