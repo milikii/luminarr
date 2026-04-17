@@ -74,6 +74,7 @@ IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job res
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
+IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1651,10 +1652,18 @@ class ImportToLibraryService:
                 task_hash=task_hash,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
-                flush=True,
-            )
+            if str(error) == IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入目标路径结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 job_event 关联查询返回是否仍带有完整事件列表；"
+                    "当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“无导入目标路径”。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
+                    flush=True,
+                )
             return ImportTargetLookupResult(lookup_failed=True)
         if correlation is None:
             return ImportTargetLookupResult()

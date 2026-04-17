@@ -1181,6 +1181,28 @@ def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> Non
     assert "task_hash=hash-87" in output
 
 
+def test_find_latest_import_target_path_logs_missing_event_lookup_result(capsys) -> None:
+    event_repo = type(
+        "EventRepo",
+        (),
+        {
+            "find_latest_import_correlation": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("job_event list result missing during correlation lookup"))
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
+
+    result = service._find_latest_import_target_path(task_id="87", task_hash="hash-87")
+
+    assert result.target_path is None
+    assert result.lookup_failed is True
+    output = capsys.readouterr().out
+    assert "[导入目标路径结果缺失]" in output
+    assert "job_event list result missing during correlation lookup" in output
+    assert "task_hash=hash-87" in output
+
+
 def test_find_latest_import_target_path_logs_missing_structured_target(capsys) -> None:
     event_repo = type(
         "EventRepo",

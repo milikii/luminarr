@@ -1,4 +1,4 @@
-# Persistence closure log (v20)
+# Persistence closure log (v21)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 导入目标路径查询结果缺失分流缺口
+
+- 闭环：`import_to_library._find_latest_import_target_path()` 在 `job_event_repo.find_latest_import_correlation()` 返回链路里已经出现“关联查询结果缺失”时，不再和普通 SQLite/job_event 查询异常共用同一条“导入目标路径查询失败”日志；现在会单独打印“导入目标路径结果缺失”中文日志与 `[处理建议]`，并继续让 confirm 走原来的 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改导入真相和副作用。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "find_latest_import_target_path_logs_event_lookup_failure or find_latest_import_target_path_logs_missing_event_lookup_result or find_latest_import_target_path_logs_missing_structured_target or find_version_stale_rejection_text_returns_state_unavailable_when_event_lookup_fails"`
 
 ### 2026-04-17 导入确认任务回退结果缺失分流缺口
 
