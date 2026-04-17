@@ -700,6 +700,16 @@ def test_record_pending_approval_logs_missing_pending_result(capsys) -> None:
     assert "approval_record 写入后回读是否仍能拿到当前待确认导入审批的 lease_version" in output
 
 
+def test_record_pending_approval_logs_missing_pending_result_when_repo_returns_zero(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: 0})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 0
+    output = capsys.readouterr().out
+    assert "[导入待确认审批结果缺失]" in output
+    assert "import pending approval result missing" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
+
+
 def test_record_import_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -1117,6 +1127,31 @@ def test_import_by_task_ref_returns_state_unavailable_when_pending_approval_pers
         percent_done=1.0,
     )
     approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+
+    text = _run(service.import_by_task_ref("87"))
+
+    assert text == IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
+
+
+def test_import_by_task_ref_returns_state_unavailable_when_pending_approval_result_is_missing(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: 0})()
     service = ImportToLibraryService(
         AsyncMock(return_value=import_source),
         str(tmp_path / "library"),

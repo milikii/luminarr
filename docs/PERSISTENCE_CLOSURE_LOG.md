@@ -1,4 +1,4 @@
-# Persistence closure log (v31)
+# Persistence closure log (v32)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载/导入待确认审批空 lease 结果分流缺口
+
+- 闭环：`add_to_downloader._record_pending_approval()` 和 `import_to_library._record_pending_approval()` 之前在 `request_downloader_approval()` / `request_import_approval()` 返回 `0` 时，会偷偷退回进程内自增 lease 继续往下走；现在这类“空 lease/空结果”会被单独记成“待确认审批结果缺失”中文日志，并直接返回待确认状态写入失败，不再把 `approval_record` 真相缺口误判成可 confirm 的待确认请求。
+- 代码：`app/services/add_to_downloader.py`、`app/services/import_to_library.py`
+- 验证：`tests/test_add_to_downloader.py -k "record_pending_approval_logs_missing_pending_result or record_pending_approval_logs_missing_pending_result_when_repo_returns_zero or add_by_selection_returns_state_unavailable_when_pending_approval_persist_fails or add_by_selection_returns_state_unavailable_when_pending_approval_result_is_missing"`；`tests/test_import_to_library.py -k "record_pending_approval_logs_missing_pending_result or record_pending_approval_logs_missing_pending_result_when_repo_returns_zero or import_by_task_ref_returns_state_unavailable_when_pending_approval_persist_fails or import_by_task_ref_returns_state_unavailable_when_pending_approval_result_is_missing"`
 
 ### 2026-04-18 下载状态观察写后回读缺失分流缺口
 

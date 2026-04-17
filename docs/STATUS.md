@@ -1,4 +1,4 @@
-# Current status (v293)
+# Current status (v294)
 
 ## Project position
 
@@ -39,6 +39,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 下载 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
 - 导入 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
 - 截至 2026-04-18，最近补齐的最小分流已从下载 / 导入确认链继续扩到下载状态观察落盘：确认任务回退结果缺失、执行版号结果缺失、审批回退结果缺失、取消结果缺失、任务抢占失败，以及下载状态观察空结果 / 写后回读缺失 / 缺字段，都已收口成显式中文日志与 `[处理建议]`，但不改 confirm、状态查询、副作用和 SQLite 真相边界；详细条目继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐“空 lease/空结果”分流：`request_downloader_approval()` / `request_import_approval()` 若回 `0`，现在会明确打印“待确认审批结果缺失”中文日志并直接 fail-closed，不再偷偷退回进程内 lease 继续放行可 confirm 状态。
 - 截至 2026-04-17，下载 / 导入确认链的 `jobs` 完结阶段也已补齐“结果缺失”分流：`mark_downloader_completed()` / `mark_completed()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并在成功回复后继续追加原有 finalization warning，不再把“完结结果缺失”误判成全链已落盘成功。
 - 截至 2026-04-17，下载 / 导入确认链的审批更新阶段也已补齐“结果缺失”分流：`approve_downloader()` / `approve_import()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并让 confirm 直接回状态读取失败，不再把“审批结果缺失”误判成普通 not pending。
 - 截至 2026-04-17，下载 / 导入取消链的审批取消阶段也已补齐“结果缺失”分流：`cancel_downloader()` / `cancel_import()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并让 cancel 直接回状态读取失败，不再把“取消结果缺失”误判成普通状态冲突。

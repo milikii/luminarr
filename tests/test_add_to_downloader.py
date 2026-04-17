@@ -431,6 +431,16 @@ def test_record_pending_approval_logs_missing_pending_result(capsys) -> None:
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_approval_logs_missing_pending_result_when_repo_returns_zero(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: 0})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
+    assert service._record_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123") == 0
+    output = capsys.readouterr().out
+    assert "[下载待确认审批结果缺失]" in output
+    assert "downloader pending approval result missing" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
+
+
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(
@@ -745,6 +755,21 @@ def test_add_by_selection_returns_state_unavailable_when_pending_approval_persis
     search_service = SearchMediaService(_fake_search_with_download_url)
     _run(search_service.search_and_format("dune", chat_id=1001))
     approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+
+    reply = _run(service.add_by_selection(1001, "1"))
+
+    assert reply == ADD_PENDING_STATE_UNAVAILABLE_TEXT
+
+
+def test_add_by_selection_returns_state_unavailable_when_pending_approval_result_is_missing() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: 0})()
     service = AddToDownloaderService(
         search_service=search_service,
         add_torrent_func=AsyncMock(),

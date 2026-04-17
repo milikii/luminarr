@@ -53,6 +53,7 @@ DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "downloader restore 
 DOWNLOADER_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missing during restore"
 DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
+DOWNLOADER_PENDING_APPROVAL_NONE_REASON = "downloader pending approval result missing"
 DOWNLOADER_APPROVE_RESULT_MISSING_REASON = "approval_record missing during approve"
 DOWNLOADER_APPROVE_RESULT_NONE_REASON = "downloader approval result missing"
 DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
@@ -782,10 +783,14 @@ class AddToDownloaderService:
                 task_ref=task_ref,
                 timeout_seconds=DEFAULT_PENDING_TIMEOUT_SECONDS,
             )
-            if requested_lease > 0:
-                lease_version = requested_lease
+            if type(requested_lease) is not int or requested_lease <= 0:
+                raise RuntimeError(DOWNLOADER_PENDING_APPROVAL_NONE_REASON)
+            lease_version = requested_lease
         except Exception as error:
-            if str(error) == DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON:
+            if str(error) in {
+                DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON,
+                DOWNLOADER_PENDING_APPROVAL_NONE_REASON,
+            }:
                 print(
                     f"\033[31m[下载待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
                     "\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认审批的 lease_version；"
