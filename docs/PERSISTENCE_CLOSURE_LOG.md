@@ -219,6 +219,12 @@
 - 验证：`tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`
 - commit：`61d36de` `Separate download monitor observation diagnostics`
 
+### 2026-04-17 下载状态观察空结果分流缺口
+
+- 闭环：`get_download_status._record_status_observation()` 在 `download_monitor_repo.record_status()` 直接返回空 update 时，不再和普通 SQLite/调用异常共用同一条“下载状态观察落盘失败”日志；现在也会落到“下载状态观察结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `STATUS_OBSERVATION_WARNING_TEXT`，不改状态查询和自动导入 follow-up 的 fail-closed 边界。
+- 代码：`app/services/get_download_status.py`
+- 验证：`tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`
+
 ### 2026-04-17 导入命名真相结果缺失分流缺口
 
 - 闭环：`import_to_library._resolve_normalized_naming_truth()` 在 `job_event` 查询返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“导入命名真相查询失败”日志；现在会把“查询结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但导入链仍保持原来的 fallback：退回下载源名称做命名，不改导入副作用边界。

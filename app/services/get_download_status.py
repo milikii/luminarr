@@ -87,8 +87,15 @@ class GetDownloadStatusService:
             if not isinstance(newly_completed, bool):
                 raise RuntimeError(DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON)
         except Exception as error:
-            if str(error) == DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON:
-                _log_download_monitor_observed_record_missing(task_ref=task_ref, task_status=task_status, reason=str(error))
+            if str(error) in {
+                DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON,
+                DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON,
+            }:
+                _log_download_monitor_observation_result_missing(
+                    task_ref=task_ref,
+                    task_status=task_status,
+                    reason=str(error),
+                )
             elif str(error) == DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON:
                 _log_download_monitor_completion_flag_missing(
                     task_ref=task_ref,
@@ -220,7 +227,7 @@ def _log_download_monitor_observation_failed(
     )
 
 
-def _log_download_monitor_observed_record_missing(
+def _log_download_monitor_observation_result_missing(
     *,
     task_ref: str,
     task_status: TransmissionTaskStatus,
@@ -229,7 +236,7 @@ def _log_download_monitor_observed_record_missing(
     print(
         f"\033[31m[下载状态观察结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
         f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor 写入后是否能立即回读到完整记录；"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor 返回是否仍带有完整 update 和 record；"
         "当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
         flush=True,
     )
