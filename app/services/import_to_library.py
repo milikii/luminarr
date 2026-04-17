@@ -415,15 +415,23 @@ class ImportToLibraryService:
                     lease_owner=lease_owner,
                 )
         elif execution.pending_copy_approval:
-            self._record_copy_fallback_pending(
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-            )
-            self._restore_pending_approval(
+            approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
                 expected_lease_version=expected_lease_version,
+            )
+            if approval_restored is not True:
+                if claimed_job:
+                    self._restore_pending_job(
+                        job_id=claimed_job_id,
+                        expected_version=claimed_job_version,
+                        lease_owner=lease_owner,
+                    )
+                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+            self._record_copy_fallback_pending(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
             )
             if confirm_context is not None:
                 persisted = self._record_pending_job(
@@ -441,12 +449,20 @@ class ImportToLibraryService:
                         lease_owner=lease_owner,
                     )
         else:
-            self._restore_pending_approval(
+            approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
                 expected_lease_version=expected_lease_version,
             )
+            if approval_restored is not True:
+                if claimed_job:
+                    self._restore_pending_job(
+                        job_id=claimed_job_id,
+                        expected_version=claimed_job_version,
+                        lease_owner=lease_owner,
+                    )
+                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
             if execution_mode == IMPORT_EXECUTION_MODE_COPY:
                 self._record_copy_fallback_pending(
                     task_id=import_source.task_id,
@@ -1114,16 +1130,16 @@ class ImportToLibraryService:
         task_id: str,
         task_hash: str,
         expected_lease_version: int,
-    ) -> None:
+    ) -> bool | None:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1]:
-            return
+            return False
         if expected_lease_version <= 0:
-            return
+            return False
         self._pending_import_identities.add(identity)
         self._pending_import_lease_versions[identity] = expected_lease_version
         if self._approval_repo is None:
-            return
+            return True
         try:
             restored = self._approval_repo.restore_import_pending(
                 task_id=task_id,
@@ -1136,12 +1152,14 @@ class ImportToLibraryService:
                 f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
                 flush=True,
             )
-            return
+            return None
         if restored is False:
             print(
                 f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
                 flush=True,
             )
+            return False
+        return True
 
     def _record_executed_lease_version(
         self,

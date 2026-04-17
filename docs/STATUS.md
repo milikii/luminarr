@@ -1,4 +1,4 @@
-# Current status (v262)
+# Current status (v263)
 
 ## Project position
 
@@ -33,6 +33,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram / personal WeChat / Feishu / WeCom 四个正式私聊入口继续共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相。
 - 下载和导入待确认链已经收口到 fail-closed：`approval_record` 查询异常、审批行缺失、lease/version 读写异常，不再混成普通 not pending。
 - 下载 confirm 的异常回退链也已补一处 fail-closed：下载投递失败后，如果待确认审批回退失败，不再继续回普通下载失败，而会直接按状态不可用停路。
+- 导入 confirm 的异常回退链也已补一处 fail-closed：导入执行失败或进入 copy-fallback 待确认后，如果待确认审批回退失败，不再继续回普通执行结果，而会直接按状态不可用停路。
 - 搜索链最近几轮也已收口到 fail-closed：待澄清写入失败、旧澄清态清理失败、候选缓存写入失败，都不再保留误导性的 in-memory 状态。
 - 自动导入低质量资源的规则跳过链也已补一处 fail-closed：`job_event` 跳过事件写入失败时，不再继续回“已跳过自动导入”，而会按状态不可用停路，避免把持久化缺口混成普通规则命中。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。

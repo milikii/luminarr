@@ -661,7 +661,15 @@ def test_record_event_logs_persistence_failure(capsys) -> None:
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
-    service._restore_pending_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2)
+    assert (
+        service._restore_pending_approval(
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            expected_lease_version=2,
+        )
+        is None
+    )
     output = capsys.readouterr().out
     assert "[导入审批回退失败]" in output
     assert "lease_version=2" in output
@@ -670,11 +678,97 @@ def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
 def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: False})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
-    service._restore_pending_approval(task_ref="87", task_id="87", task_hash="hash-87", expected_lease_version=2)
+    assert (
+        service._restore_pending_approval(
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            expected_lease_version=2,
+        )
+        is False
+    )
     output = capsys.readouterr().out
     assert "[导入审批回退失败]" in output
     assert "approval_record restore rejected current state" in output
     assert "lease_version=2" in output
+
+
+@pytest.mark.parametrize(
+    ("execution_result", "expected_reply"),
+    [
+        (
+            import_module.ImportExecutionResult(
+                reply=IMPORT_COPY_FAILED_TEXT,
+                imported=False,
+            ),
+            IMPORT_COPY_FAILED_TEXT,
+        ),
+        (
+            import_module.ImportExecutionResult(
+                reply=IMPORT_COPY_APPROVAL_PENDING_TEXT,
+                imported=False,
+                pending_copy_approval=True,
+            ),
+            IMPORT_COPY_APPROVAL_PENDING_TEXT,
+        ),
+    ],
+    ids=("import_failed", "copy_fallback_pending"),
+)
+def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_cannot_restore_pending_approval(
+    tmp_path: Path,
+    execution_result: import_module.ImportExecutionResult,
+    expected_reply: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class BrokenRestoreApprovalRepo:
+        def request_import_approval(self, **_: object) -> int:
+            return 1
+
+        def get_import_approval(self, **_: object):
+            return type(
+                "ApprovalRecord",
+                (),
+                {"status": APPROVAL_STATUS_PENDING, "lease_version": 1, "executed_version": 0},
+            )()
+
+        def approve_import(self, **_: object) -> bool:
+            return True
+
+        def restore_import_pending(self, **_: object) -> bool:
+            raise RuntimeError("db down")
+
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        approval_repo=BrokenRestoreApprovalRepo(),
+    )
+
+    async def _fake_execute_import(*_: object, **__: object) -> import_module.ImportExecutionResult:
+        return execution_result
+
+    service._execute_import = _fake_execute_import  # type: ignore[method-assign]
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    assert expected_reply not in text
+    output = capsys.readouterr().out
+    assert "[导入审批回退失败]" in output
+    assert "db down" in output
 
 
 def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:
