@@ -212,7 +212,7 @@ def test_manage_watchlist_remove_returns_failure_text_when_repo_returns_none(tmp
 
     assert reply == WATCHLIST_REMOVE_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[想看删除失败]" in captured.out
+    assert "[想看删除结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "watchlist remove result missing" in captured.out
 

@@ -200,7 +200,10 @@ class ManageWatchlistService:
                 raise WatchlistPersistenceError("watchlist remove result missing")
             return removed
         except Exception as error:
-            _log_watchlist_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
+            if str(error) == "watchlist remove result missing":
+                _log_watchlist_remove_result_missing(chat_id=chat_id, item_id=item_id, reason=str(error))
+            else:
+                _log_watchlist_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
             return None
 
     def _clear_items(self, *, chat_id: int):
@@ -319,6 +322,14 @@ def _log_watchlist_remove_failed(*, chat_id: int, item_id: int, reason: str) -> 
     print(
         f"\033[31m[想看删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
+    )
+
+
+def _log_watchlist_remove_result_missing(*, chat_id: int, item_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[想看删除结果缺失]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 watchlist_item 删除查询返回是否仍带有完整结果；"
+        "当前会按删除失败处理，避免把缺失真相误判成“条目不存在”。"
     )
 
 

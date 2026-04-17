@@ -51,6 +51,13 @@
 - 闭环：`manage_watchlist._list_items()` 在 `watchlist_item` 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“想看清单读取失败”日志；现在会把“清单结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `WATCHLIST_LIST_FAILED_TEXT`，不改 watchlist workflow。
 - 代码：`app/services/manage_watchlist.py`
 - 验证：`tests/test_manage_watchlist.py -k "list_returns_failure_text_when_repo_raises or list_returns_failure_text_when_repo_returns_none"`
+- commit：`703dc31` `Separate watchlist list diagnostics`
+
+### 2026-04-17 想看删除结果缺失分流缺口
+
+- 闭环：`manage_watchlist._remove_item()` 在 `watchlist_item` 删除查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“想看删除失败”日志；现在会把“删除结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `WATCHLIST_REMOVE_FAILED_TEXT`，不改 watchlist workflow。
+- 代码：`app/services/manage_watchlist.py`
+- 验证：`tests/test_manage_watchlist.py -k "remove_returns_failure_text_when_repo_raises or remove_returns_failure_text_when_repo_returns_none"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 搜索候选写入后真相不一致缺口
