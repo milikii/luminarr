@@ -161,6 +161,7 @@
 - 保持 `telegram_bot._post_download_auto_import_scheduler_loop()` 在 `run_once()` 返回 `state_unavailable=True` 时继续补一条红色中文 `[下载完成后台轮询状态读取失败]` 汇总日志和 `[处理建议]`，避免后台自动导入 loop 再次静默吞掉“本轮持久化状态异常已跳过”。
 - 保持 `manage_bt_subscription.run_once()` 在命中新资源但待确认真相写入失败时继续明确返回“BT 订阅待确认状态写入失败”，避免手动 `btsub run` 重新退回成泛化的“BT 订阅扫描失败”。
 - 保持 `telegram_bot._run_bt_subscription_scheduler_tick_once()` 在 `run_scheduler_tick()` 返回 `None` 时继续补一条红色中文 `[BT 订阅后台扫描结果不可用]` 汇总日志和 `[处理建议]`，避免后台 `btsub` loop 再次静默吞掉“本轮扫描/待确认状态异常已跳过”。
+- 保持 `add_to_downloader._resolve_pending_lease_version()` 在已配置 `approval_repo` 且当前进程仍留有 in-memory pending 身份时，如果 `approval_record` 行缺失，也继续打印红色中文 `[下载待确认版号查询失败]` 和 `[处理建议]`，并让 `cancel_pending_add()` 直接按状态读取失败停路，避免把审批真相缺口混成普通待确认版号缺失或继续吃内存版号兜底。
 - 保持 verification docs gate 继续显式校验 Telegram / personal WeChat / Feishu / WeCom 四个单渠道 `cleanup-shortcut` 门禁都还写在 `docs/NEXT_STEP.md` / `docs/STATUS.md`，避免前面几轮刚补上的 shared-runtime 身份链门禁从文档快照里漂走。
 - 保持 `docs/STATUS.md` 里的 WeCom cleanup service-not-ready 快照和 Latest verification 同步到同一组跑数，避免同一轮结果在同一文件里写出两套数字。
 - 保持 verification docs gate 继续显式校验 `success-event-append-failure observability` 命名观察，避免窗口台账把这类事件落盘失败可观测性写丢。
