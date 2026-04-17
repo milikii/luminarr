@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载待确认任务缺失行与进程内残留上下文分流缺口
+
+- 闭环：`add_to_downloader.has_pending_add()` / `confirm_add_by_task_ref()` 在 `jobs.get_downloader_job_for_chat_ref()` 已经查不到待确认任务、但当前进程里还残留待确认上下文时，不再静默把这条缺口混成普通“仍有待确认下载”或继续放行 confirm；现在会单独打印“下载待确认任务结果缺失”中文日志与 `[处理建议]`，并让 runtime / confirm 直接按状态读取失败 fail-closed，避免把进程内残留上下文误判成仍可确认下载，不改下载副作用和 SQLite 真相边界。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "has_pending_add_logs_job_lookup_failure or has_pending_add_uses_in_memory_pending_when_job_lookup_fails or has_pending_add_returns_state_unavailable_when_job_row_missing_with_in_memory_pending or confirm_add_by_task_ref_returns_state_unavailable_when_job_row_missing_with_in_memory_pending or confirm_add_by_task_ref_uses_in_memory_pending_without_job_repo"`；`tests/test_private_chat_runtime.py -k "stops_on_downloader_pending_lookup_failure"`
+
 ### 2026-04-17 导入确认任务抢占结果缺失分流缺口
 
 - 闭环：`import_to_library._claim_pending_job()` 在 `jobs.claim_lease()` 已经出现“任务行缺失”时，不再和普通 SQLite lease 更新异常共用同一条“导入确认任务抢占失败”日志；现在会单独打印“导入确认任务抢占结果缺失”中文日志与 `[处理建议]`，并继续让 confirm 走原来的 `IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改任务真相和副作用。

@@ -149,6 +149,29 @@ def test_has_pending_add_uses_in_memory_pending_when_job_lookup_fails(capsys) ->
     assert "[下载待确认查询失败]" in capsys.readouterr().out
 
 
+def test_has_pending_add_returns_state_unavailable_when_job_row_missing_with_in_memory_pending(capsys) -> None:
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: None})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="selection-hash",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+
+    assert service.has_pending_add(1001, "1") is None
+    output = capsys.readouterr().out
+    assert "[下载待确认任务结果缺失]" in output
+    assert "jobs pending row missing while in-memory pending exists" in output
+    assert "[处理建议]" in output
+
+
 def test_cancel_pending_add_logs_job_lookup_failure(capsys) -> None:
     job_repo = type("BoomJobRepo", (), {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
@@ -315,6 +338,38 @@ def test_confirm_add_by_task_ref_uses_in_memory_pending_without_job_repo() -> No
     assert "任务 ID: 42" in text
     assert "任务 Hash: abc123" in text
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
+
+
+def test_confirm_add_by_task_ref_returns_state_unavailable_when_job_row_missing_with_in_memory_pending(capsys) -> None:
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: None})()
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        job_repo=job_repo,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="selection-hash",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+    service._record_pending_approval(
+        task_ref=pending_add.task_ref,
+        task_id=pending_add.task_id,
+        task_hash=pending_add.task_hash,
+    )
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+
+    text = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert text == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+    add_torrent.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[下载待确认任务结果缺失]" in output
+    assert "jobs pending row missing while in-memory pending exists" in output
+    assert "[处理建议]" in output
 
 
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
