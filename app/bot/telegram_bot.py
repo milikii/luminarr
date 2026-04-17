@@ -239,6 +239,7 @@ LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 BT_PENDING_MISSING_AFTER_UPSERT_REASON = "bt_pending_state missing after upsert"
+BT_PENDING_CLEAR_RESULT_MISSING_REASON = "bt_pending_state clear result missing"
 
 BT_PROCESSING_PATH_ALIASES = {
     "影视入库链": "media_import",
@@ -1101,6 +1102,14 @@ def _log_bt_pending_clear_failed(*, chat_id: int | None, stage: str, reason: str
     )
 
 
+def _log_bt_pending_clear_result_missing(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理清理结果缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 删除返回是否仍带有明确结果；当前进程内待处理状态已尽量回滚，避免把缺失真相误判成已清理成功。",
+        flush=True,
+    )
+
+
 def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
         f"\033[31m[BT 待处理读取失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
@@ -1226,9 +1235,19 @@ def _clear_bt_processing_path_pending(
     if pending_repo is None:
         return cleared
     try:
-        return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH) or cleared
+        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
+        if cleared_result is None:
+            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
+        return cleared_result or cleared
     except Exception as error:
-        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
+        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+            _log_bt_pending_clear_result_missing(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
         if isinstance(pending_source, str):
             pending_by_chat[chat_id] = pending_source
         return None
@@ -1247,14 +1266,26 @@ def _pop_bt_processing_path_pending(
         pending_repo = _resolve_bt_pending_repo(context)
         if pending_repo is not None:
             try:
-                pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
+                cleared_result = pending_repo.clear_pending(
+                    chat_id=chat_id,
+                    expected_stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                )
+                if cleared_result is None:
+                    raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
             except Exception as error:
                 pending_by_chat[chat_id] = pending_source
-                _log_bt_pending_clear_failed(
-                    chat_id=chat_id,
-                    stage=BT_PENDING_STAGE_PROCESSING_PATH,
-                    reason=str(error),
-                )
+                if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+                    _log_bt_pending_clear_result_missing(
+                        chat_id=chat_id,
+                        stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                        reason=str(error),
+                    )
+                else:
+                    _log_bt_pending_clear_failed(
+                        chat_id=chat_id,
+                        stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                        reason=str(error),
+                    )
                 return False
         return pending_source
 
@@ -1285,10 +1316,19 @@ def _pop_bt_processing_path_pending(
         )
         return None
     try:
-        pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
+        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
+        if cleared_result is None:
+            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
     except Exception as error:
         pending_by_chat[chat_id] = pending_source
-        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
+        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+            _log_bt_pending_clear_result_missing(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
         return False
     return pending_source
 
