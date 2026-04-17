@@ -1171,6 +1171,48 @@ def test_cancel_pending_add_logs_job_cancel_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_cancel_pending_add_logs_missing_job_cancel_result(capsys) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{\"task_ref\":\"1\",\"task_id\":\"selection:1\",\"task_hash\":\"abc123\",\"title\":\"Dune: Part Two\",\"source\":\"https://example.com/dune.torrent\"}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_latest_pending_downloader_job": lambda self, chat_id: pending_job,
+            "cancel_pending_job": lambda self, **kwargs: None,
+        },
+    )()
+    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: True})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+    service._resolve_pending_lease_version = lambda **kwargs: 2
+
+    assert service.cancel_pending_add(1001) == ADD_CANCEL_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[下载取消任务结果缺失]" in output
+    assert "job_id=job-1" in output
+    assert "downloader cancel pending job result missing" in output
+
+
 def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
@@ -1205,6 +1247,58 @@ def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载确认超时任务取消失败]" in output
     assert "job_id=job-1" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
+
+
+def test_handle_expired_pending_confirm_logs_missing_job_during_cancel(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("job missing during cancel")
+            )
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+    )
+    service._is_pending_approval_expired = lambda **kwargs: True
+    context = ConfirmExecutionContext(
+        job=JobRecord(
+            job_id="job-1",
+            chat_id=1001,
+            user_id=2001,
+            workflow_type="add_to_downloader",
+            state="pending_approval",
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            payload_json="{}",
+            version=3,
+            lease_owner="",
+            lease_until="",
+            created_at="2026-04-15 00:00:00",
+            updated_at="2026-04-15 00:00:00",
+        ),
+        approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
+        pending_add=PendingAddContext(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            title="Dune: Part Two",
+            source="https://example.com/dune.torrent",
+        ),
+    )
+
+    assert service._handle_expired_pending_confirm(task_ref="1", context=context, chat_id=1001) == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[下载确认超时任务结果缺失]" in output
+    assert "job_id=job-1" in output
+    assert "job missing during cancel" in output
     assert "当前 confirm 会直接返回状态读取失败" in output
 
 
