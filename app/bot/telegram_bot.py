@@ -1340,13 +1340,12 @@ def _clear_bt_classification_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> bool:
-    cleared = False
+) -> bool | None:
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    if pending_by_chat.pop(chat_id, None) is not None:
-        cleared = True
+    pending_query = pending_by_chat.pop(chat_id, None)
+    cleared = pending_query is not None
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return cleared
@@ -1354,14 +1353,16 @@ def _clear_bt_classification_pending(
         return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION) or cleared
     except Exception as error:
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
-        return cleared
+        if isinstance(pending_query, str):
+            pending_by_chat[chat_id] = pending_query
+        return None
 
 
 def _pop_bt_classification_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> str | None:
+) -> str | Literal[False] | None:
     if chat_id is None or chat_id <= 0:
         return None
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
@@ -1372,11 +1373,13 @@ def _pop_bt_classification_pending(
             try:
                 pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
             except Exception as error:
+                pending_by_chat[chat_id] = pending_query
                 _log_bt_pending_clear_failed(
                     chat_id=chat_id,
                     stage=BT_PENDING_STAGE_CLASSIFICATION,
                     reason=str(error),
                 )
+                return False
         return pending_query
 
     pending_repo = _resolve_bt_pending_repo(context)
@@ -1408,7 +1411,9 @@ def _pop_bt_classification_pending(
     try:
         pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
     except Exception as error:
+        pending_by_chat[chat_id] = pending_query
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
+        return False
     return pending_query
 
 

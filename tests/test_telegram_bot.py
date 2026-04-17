@@ -1229,7 +1229,8 @@ def test_clear_bt_classification_pending_logs_persistence_failure(capsys: pytest
         )
     )
 
-    assert _clear_bt_classification_pending(context=context, chat_id=1001) is True
+    assert _clear_bt_classification_pending(context=context, chat_id=1001) is None
+    assert context.application.bot_data["bt_classification_pending_by_chat"][1001] == "magnet:?xt=urn:btih:abc"
 
     output = capsys.readouterr().out
     assert "[BT 待处理清理失败]" in output
@@ -1276,7 +1277,8 @@ def test_pop_bt_classification_pending_logs_persistence_failure(capsys: pytest.C
         )
     )
 
-    assert _pop_bt_classification_pending(context=context, chat_id=1001) == "magnet:?xt=urn:btih:abc"
+    assert _pop_bt_classification_pending(context=context, chat_id=1001) is False
+    assert context.application.bot_data["bt_classification_pending_by_chat"][1001] == "magnet:?xt=urn:btih:abc"
 
     output = capsys.readouterr().out
     assert "[BT 待处理清理失败]" in output

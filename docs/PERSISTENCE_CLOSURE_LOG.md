@@ -1,4 +1,4 @@
-# Persistence closure log (v8)
+# Persistence closure log (v9)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -58,6 +58,13 @@
 - 闭环：`telegram_bot._clear_bt_processing_path_pending()` 和 `_pop_bt_processing_path_pending()` 在清理 `bt_pending_state` 失败时，不再把旧 processing_path 当成“已取消”或“已弹出”；它们会把 in-memory 状态放回，并让 `private_chat_runtime` 回 `SERVICE_NOT_READY_TEXT`。
 - 代码：`app/bot/telegram_bot.py`、`app/bot/private_chat_runtime.py`
 - 验证：`tests/test_telegram_bot.py`、`tests/test_private_chat_runtime.py`
+- commit：`a2f8d92` `Fail closed telegram BT processing cleanup gap`
+
+### 2026-04-17 Telegram BT classification 清理缺口
+
+- 闭环：`telegram_bot._clear_bt_classification_pending()` 和 `_pop_bt_classification_pending()` 在清理 `bt_pending_state` 失败时，不再把旧 classification 当成“已取消”或“已弹出”；它们会把 in-memory 状态放回，并让 `private_chat_runtime` 回 `SERVICE_NOT_READY_TEXT`。
+- 代码：`app/bot/telegram_bot.py`、`app/bot/private_chat_runtime.py`
+- 验证：`tests/test_telegram_bot.py`、`tests/test_private_chat_runtime.py`
 - commit：待补
 
 ### 2026-04-17 下载审批缺口
@@ -97,6 +104,7 @@
 
 ## 3. Focused verification
 
+- telegram bt-classification cleanup fail-closed tests：2026-04-17，`4 passed, 177 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_bt_classification_pending_logs_persistence_failure or pop_bt_classification_pending_logs_persistence_failure or bt_classification_clear_fails_on_cancel or bt_classification_pop_clear_fails"`）
 - telegram bt-processing-path cleanup fail-closed tests：2026-04-17，`4 passed, 175 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_bt_processing_path_pending_logs_persistence_failure or pop_bt_processing_path_pending_logs_persistence_failure or bt_processing_path_clear_fails_on_cancel or bt_processing_path_pop_clear_fails"`）
 - telegram bt-pending fail-closed tests：2026-04-17，`8 passed, 169 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "bt_processing_path_persist_fails or set_bt_processing_path_pending_logs_persistence_failure or set_bt_classification_pending_logs_persistence_failure or set_bt_tmdb_association_pending_logs_persistence_failure or set_raw_bt_destination_pending_logs_persistence_failure or enter_media_import_bt_flow_returns_service_not_ready or enter_pure_bt_flow_returns_service_not_ready"`）
 - import finalization warning tests：2026-04-17，`5 passed, 87 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
