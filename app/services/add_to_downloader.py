@@ -639,6 +639,15 @@ class AddToDownloaderService:
                 if pending_lookup_failed:
                     return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
                 return None
+            if self._job_repo is not None:
+                self._log_pending_job_result_missing(
+                    chat_id=chat_id,
+                    task_ref=task_ref,
+                    task_id=pending_add.task_id,
+                    task_hash=pending_add.task_hash,
+                    stage="cancel",
+                )
+                return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
             expected_lease_version = self._resolve_pending_lease_version(
                 task_id=pending_add.task_id,
                 task_hash=pending_add.task_hash,
@@ -1118,6 +1127,11 @@ class AddToDownloaderService:
             suggestion = (
                 "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前 confirm 会直接返回状态读取失败，"
                 "避免把进程内残留上下文误判成仍可确认下载。"
+            )
+        elif stage == "cancel":
+            suggestion = (
+                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前取消会直接返回状态读取失败，"
+                "避免把进程内残留上下文误判成仍可取消下载。"
             )
         else:
             suggestion = (
