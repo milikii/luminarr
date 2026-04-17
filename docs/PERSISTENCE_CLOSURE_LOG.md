@@ -16,35 +16,35 @@
 - 闭环：`search_media` 在 `candidate_mapping` 保存候选后，如果持久化表里的条数和预期不一致，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“搜索候选写入后记录不一致”中文日志和单独的 `[处理建议]`，但用户侧仍保持 `CANDIDATE_STATE_UNAVAILABLE_TEXT`，不改候选回滚和 fail-closed 协议。
 - 代码：`app/services/search_media.py`
 - 验证：`tests/test_search_media.py -k "candidate_persist_logs_persistence_failure or no_result_returns_state_unavailable_when_candidate_persist_fails"`
-- commit：待补
+- commit：`d7f8da7` `Separate candidate count mismatch diagnostics`
 
 ### 2026-04-17 Telegram BT 待答写入后回读缺口
 
 - 闭环：`telegram_bot` 的四个 BT pending setter（processing_path / classification / tmdb_association / raw_bt_destination）在 `bt_pending_state` upsert 成功后，如果立即回读不到记录，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“BT 待处理写入后记录缺失”中文日志和单独的 `[处理建议]`，但用户侧仍保持原来的 `SERVICE_NOT_READY_TEXT`，不改 BT follow-up workflow。
 - 代码：`app/bot/telegram_bot.py`
 - 验证：`tests/test_telegram_bot.py -k "set_bt_processing_path_pending_logs_persistence_failure or set_bt_processing_path_pending_logs_missing_row_after_upsert or set_bt_classification_pending_logs_persistence_failure"`
-- commit：待补
+- commit：`788290a` `Separate BT pending missing-row diagnostics`
 
 ### 2026-04-17 搜索待澄清写入后回读缺口
 
 - 闭环：`search_media._set_clarification_pending()` 在 `clarification_state` upsert 成功后，如果立即回读不到记录，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“搜索澄清态写入后记录缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持 `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT`，不改搜索 workflow。
 - 代码：`app/services/search_media.py`
 - 验证：`tests/test_search_media.py -k "clarification_pending_logs_persistence_failure or no_result_returns_state_unavailable_when_clarification_persist_fails"`
-- commit：待补
+- commit：`7979d38` `Separate clarification missing-row diagnostics`
 
 ### 2026-04-17 BT 订阅写入后回读缺口
 
 - 闭环：`manage_bt_subscription._add_item()` 在 `bt_subscription_item` 插入成功后，如果立即回读不到新条目，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“BT 订阅写入后条目缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持原来的失败文本，不改订阅 workflow。
 - 代码：`app/services/manage_bt_subscription.py`
 - 验证：`tests/test_manage_bt_subscription.py -k "add_logs_missing_row_after_insert or add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`
-- commit：待补
+- commit：`0db8d00` `Separate btsub missing-row diagnostics`
 
 ### 2026-04-17 想看清单写入后回读缺口
 
 - 闭环：`manage_watchlist._add_item()` 在 `watchlist_item` 插入成功后，如果立即回读不到新条目，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“想看写入后条目缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持原来的失败文本，不改 workflow。
 - 代码：`app/services/manage_watchlist.py`
 - 验证：`tests/test_manage_watchlist.py -k "missing_row_after_insert or add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`
-- commit：待补
+- commit：`8f0f50f` `Separate watchlist missing-row diagnostics`
 
 ### 2026-04-17 BT 订阅最近资源回写缺口
 
