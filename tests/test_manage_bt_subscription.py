@@ -388,7 +388,42 @@ def test_bt_subscription_run_once_warns_when_last_seen_truth_is_not_updated(tmp_
     assert "最近资源真相未更新" in reply
     assert repo.list_items(chat_id=1001)[0].last_seen_source == ""
     captured = capsys.readouterr()
-    assert "[BT 订阅最近资源回写失败]" in captured.out
+    assert "[BT 订阅最近资源回写结果缺失]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt subscription last_seen update result missing" in captured.out
+
+
+def test_bt_subscription_run_once_warns_when_last_seen_truth_update_returns_none(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    created = repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    assert created is not None
+
+    def _missing_update_last_seen(**_: object) -> None:
+        return None
+
+    repo.update_last_seen = _missing_update_last_seen  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert "下载待确认：" in reply
+    assert "最近资源真相未更新" in reply
+    assert repo.list_items(chat_id=1001)[0].last_seen_source == ""
+    captured = capsys.readouterr()
+    assert "[BT 订阅最近资源回写结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "bt subscription last_seen update result missing" in captured.out
 

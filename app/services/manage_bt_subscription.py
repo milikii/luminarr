@@ -46,6 +46,7 @@ BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT = (
     "请先确认是否有人删除了该条订阅；如仍需继续追踪，请重新添加后再执行 btsub run。"
 )
 BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON = "bt_subscription_item missing after insert"
+BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON = "bt subscription last_seen update result missing"
 MEDIA_KIND_ALIASES = {
     "movie": "movie",
     "film": "movie",
@@ -488,7 +489,7 @@ class ManageBtSubscriptionService:
                 title=title,
             )
             if not updated:
-                raise BtSubscriptionPersistenceError("bt subscription last_seen update result missing")
+                raise BtSubscriptionPersistenceError(BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON)
         except BtSubscriptionPersistenceError as error:
             if str(error) == "bt_subscription_item missing during last_seen update":
                 _log_bt_subscription_last_seen_item_missing(
@@ -499,6 +500,15 @@ class ManageBtSubscriptionService:
                     reason=str(error),
                 )
                 return BtSubscriptionLastSeenUpdateResult(status="item_missing")
+            if str(error) == BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON:
+                _log_bt_subscription_last_seen_result_missing(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=str(error),
+                )
+                return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
             _log_bt_subscription_last_seen_update_failed(
                 item=item,
                 chat_id=chat_id,
@@ -837,6 +847,22 @@ def _log_bt_subscription_last_seen_item_missing(
         f"\033[31m[BT 订阅最近资源回写条目缺失]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
         f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查该订阅条目是否已被删除；如仍需继续追踪，请重新添加后再执行 btsub run。"
+    )
+
+
+def _log_bt_subscription_last_seen_result_missing(
+    *,
+    item: BtSubscriptionItem,
+    chat_id: int,
+    source: str,
+    title: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅最近资源回写结果缺失]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
+        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 更新返回是否仍带有明确结果；"
+        "当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把持久化缺口误判成普通成功。"
     )
 
 
