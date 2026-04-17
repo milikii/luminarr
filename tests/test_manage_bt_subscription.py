@@ -737,7 +737,7 @@ def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_returns
 
     assert notifications is None
     captured = capsys.readouterr()
-    assert "[BT 订阅扫描 chat 列表读取失败]" in captured.out
+    assert "[BT 订阅扫描 chat 列表结果缺失]" in captured.out
     assert "bt subscription chat list result missing" in captured.out
     assert "[处理建议]" in captured.out
 

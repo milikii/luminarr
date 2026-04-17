@@ -37,6 +37,13 @@
 - 闭环：`manage_bt_subscription._scan_chat_once()` 在 `bt_subscription_item` 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅扫描读取失败”日志；现在会把“扫描结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但 `run_once()` / scheduler tick 仍保持原来的 fail-closed：本轮扫描直接按失败停路，不把缺失真相误判成“没有可扫描条目”。
 - 代码：`app/services/manage_bt_subscription.py`
 - 验证：`tests/test_manage_bt_subscription.py -k "scan_items_return_none or scheduler_tick_returns_none_when_scan_items_return_none"`
+- commit：`2f28a2c` `Separate btsub scan result diagnostics`
+
+### 2026-04-17 BT 订阅 chat 列表结果缺失分流缺口
+
+- 闭环：`manage_bt_subscription.run_scheduler_tick()` 在 `bt_subscription_item` chat 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅扫描 chat 列表读取失败”日志；现在会把“chat 列表结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但 scheduler tick 仍保持原来的 fail-closed：本轮直接停路，不把缺失真相误判成“当前没有订阅 chat”。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "chat_id_lookup_fails or chat_id_lookup_returns_none"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 搜索候选写入后真相不一致缺口

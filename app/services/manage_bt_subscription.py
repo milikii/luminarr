@@ -170,7 +170,10 @@ class ManageBtSubscriptionService:
             if chat_ids is None:
                 raise BtSubscriptionPersistenceError("bt subscription chat list result missing")
         except Exception as error:
-            _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
+            if str(error) == "bt subscription chat list result missing":
+                _log_bt_subscription_scan_chat_ids_result_missing(reason=str(error))
+            else:
+                _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
             return None
         for chat_id in chat_ids:
             result = await self._scan_chat_once(
@@ -686,6 +689,14 @@ def _log_bt_subscription_scan_chat_ids_failed(*, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅扫描 chat 列表读取失败]\033[0m 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
+    )
+
+
+def _log_bt_subscription_scan_chat_ids_result_missing(*, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅扫描 chat 列表结果缺失]\033[0m 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item chat 列表查询返回是否仍带有完整结果；"
+        "当前会停止 scheduler tick，避免把缺失真相误判成“当前没有订阅 chat”。"
     )
 
 
