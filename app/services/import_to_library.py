@@ -66,6 +66,7 @@ PENDING_LEASE_LOOKUP_FAILED = -1
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
+IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1224,10 +1225,16 @@ class ImportToLibraryService:
                 payload_json=payload_json,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入待确认任务落盘失败]\033[0m chat_id={chat_id} user_id={user_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把待确认任务真相缺口误报成可确认导入。",
-                flush=True,
-            )
+            if str(error) == IMPORT_PENDING_JOB_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入待确认任务结果缺失]\033[0m chat_id={chat_id} user_id={user_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误=import pending job missing after upsert\n\033[33m[处理建议]\033[0m 检查 jobs 写入后回读是否仍能拿到刚创建的导入待确认任务；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入待确认任务落盘失败]\033[0m chat_id={chat_id} user_id={user_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把待确认任务真相缺口误报成可确认导入。",
+                    flush=True,
+                )
             return False
         return True
 

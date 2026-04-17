@@ -466,6 +466,30 @@ def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_job_logs_missing_pending_job_result(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job missing after pending upsert"))},
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    assert (
+        service._record_pending_job(
+            chat_id=1001,
+            user_id=2001,
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            payload_json="{}",
+        )
+        is False
+    )
+    output = capsys.readouterr().out
+    assert "[导入待确认任务结果缺失]" in output
+    assert "task_ref=87" in output
+    assert "import pending job missing after upsert" in output
+
+
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_update_fails(
     tmp_path: Path,
     capsys,
