@@ -424,6 +424,29 @@ def test_record_downloader_approval_logs_missing_result(capsys) -> None:
     assert "[处理建议]" in output
 
 
+def test_record_downloader_approval_logs_missing_result_when_repo_returns_none(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"approve_downloader": lambda self, **kwargs: None})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    service._pending_add_identities.add(("selection:1", "abc123"))
+    service._pending_add_lease_versions[("selection:1", "abc123")] = 1
+
+    assert service._record_downloader_approval(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        expected_lease_version=1,
+    ) is None
+
+    output = capsys.readouterr().out
+    assert "[下载确认审批结果缺失]" in output
+    assert "downloader approval result missing" in output
+    assert "[处理建议]" in output
+
+
 def test_record_downloader_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"approve_downloader": lambda self, **kwargs: False})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
@@ -1375,6 +1398,60 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_update_
     add_torrent.assert_not_awaited()
     output = capsys.readouterr().out
     assert "[下载确认审批更新失败]" in output
+    assert "lease_version=2" in output
+
+
+def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_result_is_missing(capsys) -> None:
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{\"task_ref\":\"1\",\"task_id\":\"selection:1\",\"task_hash\":\"abc123\",\"title\":\"Dune: Part Two\",\"source\":\"https://example.com/dune.torrent\"}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type("ApprovalRecord", (), {"status": "pending", "lease_version": 2, "executed_version": 0})()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_downloader_job_for_chat_ref": lambda self, **kwargs: job,
+            "claim_lease": lambda self, **kwargs: True,
+            "release_lease_to_pending": lambda self, **kwargs: True,
+        },
+    )()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_downloader_approval": lambda self, **kwargs: approval_record,
+            "is_downloader_pending_expired": lambda self, **kwargs: False,
+            "approve_downloader": lambda self, **kwargs: None,
+        },
+    )()
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert reply == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+    add_torrent.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[下载确认审批结果缺失]" in output
+    assert "downloader approval result missing" in output
     assert "lease_version=2" in output
 
 

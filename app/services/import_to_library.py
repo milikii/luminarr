@@ -69,6 +69,7 @@ IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 IMPORT_APPROVE_RESULT_MISSING_REASON = "approval_record missing during approve"
+IMPORT_APPROVE_RESULT_NONE_REASON = "import approval result missing"
 IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during executed version update"
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
@@ -1265,8 +1266,13 @@ class ImportToLibraryService:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
+            if approved is None:
+                raise RuntimeError(IMPORT_APPROVE_RESULT_NONE_REASON)
         except Exception as error:
-            if str(error) == IMPORT_APPROVE_RESULT_MISSING_REASON:
+            if str(error) in {
+                IMPORT_APPROVE_RESULT_MISSING_REASON,
+                IMPORT_APPROVE_RESULT_NONE_REASON,
+            }:
                 print(
                     f"\033[31m[导入确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
                     "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及审批更新后是否还能回读到该行；"
