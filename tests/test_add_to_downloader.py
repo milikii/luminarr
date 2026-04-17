@@ -617,6 +617,32 @@ def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
     assert "当前 confirm 会直接返回状态读取失败" in output
 
 
+def test_claim_pending_job_logs_rejected_current_state(capsys) -> None:
+    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: False})()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    assert service._claim_pending_job(job=job, lease_owner="downloader_confirm:1") is False
+    output = capsys.readouterr().out
+    assert "[下载确认任务抢占失败]" in output
+    assert "jobs.claim_lease rejected current state" in output
+    assert "job_id=job-1" in output
+
+
 def test_confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_raises(capsys) -> None:
     job = JobRecord(
         job_id="job-1",
@@ -667,6 +693,58 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_rais
     assert "[下载确认任务抢占失败]" in output
     assert "job_id=job-1" in output
     assert "db down" in output
+
+
+def test_confirm_add_by_task_ref_returns_not_pending_when_claim_lease_is_rejected(capsys) -> None:
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="add_to_downloader",
+        state="pending_approval",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        payload_json="{\"task_ref\":\"1\",\"task_id\":\"selection:1\",\"task_hash\":\"abc123\",\"title\":\"Dune: Part Two\",\"source\":\"https://example.com/dune.torrent\"}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type("ApprovalRecord", (), {"status": "pending", "lease_version": 2, "executed_version": 0})()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_downloader_job_for_chat_ref": lambda self, **kwargs: job,
+            "claim_lease": lambda self, **kwargs: False,
+        },
+    )()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_downloader_approval": lambda self, **kwargs: approval_record,
+            "is_downloader_pending_expired": lambda self, **kwargs: False,
+        },
+    )()
+    add_torrent = AsyncMock()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+
+    reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert reply == ADD_CONFIRM_NOT_PENDING_TEXT
+    add_torrent.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[下载确认任务抢占失败]" in output
+    assert "jobs.claim_lease rejected current state" in output
+    assert "job_id=job-1" in output
 
 
 def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
