@@ -291,5 +291,6 @@ make run
 
 - 想理解“代码为什么这么分”：读 `docs/ARCHITECTURE.md`
 - 想知道“当前正在做什么”：读 `docs/NEXT_STEP.md`
-- 想知道“现在做到哪里”：读 `docs/STATUS.md`
+- 想知道“现在做到哪里”：先读 `docs/STATUS.md`
+- 想看“当前主线详细闭环”：读 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - 想看“所有文档地图”：读 `docs/INDEX.md`

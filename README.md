@@ -112,7 +112,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- 截至 2026-04-14，当前四渠道真实私聊 smoke 已补齐 Telegram / personal WeChat / Feishu / WeCom，cleanup 四渠道验证窗口已完成；详细台账和当前进度统一看 `docs/CLEANUP_VERIFICATION_WINDOW.md` 与 `docs/STATUS.md`，不要把窗口细节再抄回仓库入口。
+- 截至 2026-04-14，当前四渠道真实私聊 smoke 已补齐 Telegram / personal WeChat / Feishu / WeCom，cleanup 四渠道验证窗口已完成；cleanup 详细台账继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`，当前主线的详细持久化收口台账看 `docs/PERSISTENCE_CLOSURE_LOG.md`，`docs/STATUS.md` 只保留短快照。
 - 截至 2026-04-15，`shared private-chat runtime` 最小抽离也已完成：owner 已移到 `app/bot/private_chat_runtime.py`，四个渠道都先走同一个 shared wrapper，`微信登录` 的 Telegram 文本/媒资能力也已改成显式注入。
 - 当前唯一最小主线：持久化吞错收口。
 - 当前目标：把剩余 `except Exception: pass/return None`、`None/False` 混写异常态的持久化路径继续改成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`，不动 workflow 真相和副作用边界。
@@ -177,14 +177,17 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 4. `docs/DECISIONS.md`
 5. `docs/NEXT_STEP.md`
 6. `docs/STATUS.md`
-7. `AGENTS.md`
-8. `docs/HISTORY.md`（只看背景，不看当前执行真相）
+7. `docs/PERSISTENCE_CLOSURE_LOG.md`
+8. `AGENTS.md`
+9. `docs/HISTORY.md`（只看背景，不看当前执行真相）
 
 常用入口：
 
 - `docs/INDEX.md`：文档地图
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
+- `docs/STATUS.md`：当前短快照
+- `docs/PERSISTENCE_CLOSURE_LOG.md`：当前主线详细闭环
 - `.env.example`：配置模板
 - `Makefile`：常用命令入口
 - `Dockerfile` / `docker-compose.yml`：最小容器启动入口
