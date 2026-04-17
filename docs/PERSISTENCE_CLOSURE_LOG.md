@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 搜索候选写入后真相不一致缺口
+
+- 闭环：`search_media` 在 `candidate_mapping` 保存候选后，如果持久化表里的条数和预期不一致，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“搜索候选写入后记录不一致”中文日志和单独的 `[处理建议]`，但用户侧仍保持 `CANDIDATE_STATE_UNAVAILABLE_TEXT`，不改候选回滚和 fail-closed 协议。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "candidate_persist_logs_persistence_failure or no_result_returns_state_unavailable_when_candidate_persist_fails"`
+- commit：待补
+
 ### 2026-04-17 Telegram BT 待答写入后回读缺口
 
 - 闭环：`telegram_bot` 的四个 BT pending setter（processing_path / classification / tmdb_association / raw_bt_destination）在 `bt_pending_state` upsert 成功后，如果立即回读不到记录，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“BT 待处理写入后记录缺失”中文日志和单独的 `[处理建议]`，但用户侧仍保持原来的 `SERVICE_NOT_READY_TEXT`，不改 BT follow-up workflow。

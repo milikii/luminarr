@@ -300,7 +300,8 @@ def test_search_candidate_persist_logs_persistence_failure(tmp_path: Path, capsy
     assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
     assert service.get_cached_candidate(1001, 1) is None
     output = capsys.readouterr().out
-    assert "[搜索候选持久化失败]" in output
+    assert "[搜索候选写入后记录不一致]" in output
+    assert "[处理建议]" in output
     assert "candidate_mapping count mismatch after save" in output
 
 
@@ -322,7 +323,8 @@ def test_search_no_result_returns_state_unavailable_when_candidate_persist_fails
     assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
     assert service.get_cached_candidate(1001, 1) is None
     output = capsys.readouterr().out
-    assert "[搜索候选持久化失败]" in output
+    assert "[搜索候选写入后记录不一致]" in output
+    assert "[处理建议]" in output
     assert "candidate_mapping count mismatch after save" in output
 
 

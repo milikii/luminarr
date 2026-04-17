@@ -32,6 +32,7 @@ CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失�
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after upsert"
+CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +182,30 @@ class SearchMediaService:
             if self._candidate_repo is not None:
                 try:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
+                except CandidatePersistenceError as error:
+                    if str(error) == CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON:
+                        print(
+                            f"\033[31m[搜索候选写入后记录不一致]\033[0m chat_id={chat_id} 错误={error}\n"
+                            "\033[33m[处理建议]\033[0m 检查 candidate_mapping 表是否被并发删除或部分回滚；"
+                            "如需继续按序号选择，请先确认 SQLite 写入后条目数和预期一致。",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；当前会直接返回候选状态写入失败，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。",
+                            flush=True,
+                        )
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    try:
+                        cleared_result = self._candidate_repo.clear_candidates(chat_id)
+                        if cleared_result is None:
+                            raise CandidatePersistenceError("candidate clear result missing during persist rollback")
+                    except Exception as rollback_error:
+                        print(
+                            f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                            flush=True,
+                        )
+                    return CANDIDATE_STATE_UNAVAILABLE_TEXT
                 except Exception as error:
                     print(
                         f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；当前会直接返回候选状态写入失败，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。",
