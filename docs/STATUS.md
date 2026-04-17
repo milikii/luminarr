@@ -1,4 +1,4 @@
-# Current status (v271)
+# Current status (v272)
 
 ## Project position
 
@@ -38,6 +38,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 下载 confirm 的成功收尾链也已补 warning：下载已真实投递后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。
 - 下载事件 helper 也已补一处分流：`job_event` 写入后立即回读不到下载事件时，会打印“下载事件结果缺失”日志，不再和普通 SQLite 写入异常共用同一类诊断；但当前下载流程仍保持原来的继续执行边界。
 - 导入 confirm 的异常回退链也已补一处 fail-closed：导入执行失败或进入 copy-fallback 待确认后，如果待确认审批回退失败，不再继续回普通执行结果，而会直接按状态不可用停路。
+- 导入 confirm 的任务抢占链也已补一处分流：`jobs.claim_lease()` 返回 `False` 时，会先打印“导入确认任务抢占失败”日志，不再静默混进普通 not pending；但用户侧仍保持原来的 stale check / not pending 边界。
 - 导入 confirm 的成功收尾链也已补 warning：导入已成功后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。
 - Telegram BT 待答状态也已补一处 fail-closed：BT processing/classification/tmdb/raw-destination 写库失败时，不再继续发下一步提示，而会回 `SERVICE_NOT_READY_TEXT`。
 - Telegram BT `processing_path` 清理链也已补一处 fail-closed：清理失败时不再把旧状态当成“已取消”或“已弹出”，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
