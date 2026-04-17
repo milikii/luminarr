@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载待确认任务结果缺失分流缺口
+
+- 闭环：`add_to_downloader._record_pending_job()` 在 `jobs` 待确认任务已写入、但写入后立即回读不到待确认任务时，不再和普通 SQLite 写入异常共用同一条“下载待确认任务落盘失败”日志；现在会单独打印“下载待确认任务结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不改下载审批 fail-closed 边界。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "record_pending_job_logs_persistence_failure or record_pending_job_logs_missing_pending_job_result"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 cleanup 事件结果缺失分流缺口
 
 - 闭环：`cleanup_downloaded_source._record_event()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到 cleanup 事件时，不再和普通 SQLite 写入异常共用同一条“cleanup 事件写入失败”日志；现在会单独打印“cleanup 事件结果缺失”中文日志与 `[处理建议]`，但 cleanup 文本结果仍保持原来的继续返回边界，不改 guardrail 和副作用真相。
