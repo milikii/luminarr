@@ -13,6 +13,7 @@ from app.services.search_media import (
     BT_READ_ONLY_EMPTY_QUERY_TEXT,
     BT_READ_ONLY_NOTICE_TEXT,
     BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE,
+    CANDIDATE_STATE_UNAVAILABLE_TEXT,
     CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT,
     EMPTY_QUERY_TEXT,
     NO_RESULT_TEXT_TEMPLATE,
@@ -268,8 +269,30 @@ def test_search_candidate_persist_logs_persistence_failure(tmp_path: Path, capsy
 
     text = _run(service.search_and_format("dune", chat_id=1001))
 
-    assert "搜索结果：dune" in text
-    assert service.get_cached_candidate(1001, 1) is not None
+    assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
+    assert service.get_cached_candidate(1001, 1) is None
+    output = capsys.readouterr().out
+    assert "[搜索候选持久化失败]" in output
+    assert "candidate_mapping count mismatch after save" in output
+
+
+def test_search_no_result_returns_state_unavailable_when_candidate_persist_fails(tmp_path: Path, capsys) -> None:
+    class MissingCandidateRowRepo(CandidateMappingRepo):
+        def _count_candidates(self, *, chat_id: int) -> int:
+            _ = chat_id
+            return 1
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    service = SearchMediaService(
+        _fake_search_empty,
+        candidate_repo=MissingCandidateRowRepo(database),
+    )
+
+    text = _run(service.search_and_format("unknown", chat_id=1001))
+
+    assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
+    assert service.get_cached_candidate(1001, 1) is None
     output = capsys.readouterr().out
     assert "[搜索候选持久化失败]" in output
     assert "candidate_mapping count mismatch after save" in output

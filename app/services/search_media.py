@@ -29,6 +29,7 @@ AMBIGUOUS_OPTION_FALLBACK_TEXT = "- 暂无可区分候选，请直接补充年�
 AMBIGUOUS_MIN_RESULT_COUNT = 3
 AMBIGUOUS_MAX_OPTION_COUNT = 3
 CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失败，请稍后重试。"
+CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,9 +175,20 @@ class SearchMediaService:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
                 except Exception as error:
                     print(
-                        f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；本次搜索文本已返回，但后续按序号选择可能缺少这批候选。",
+                        f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；当前会直接返回候选状态写入失败，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。",
                         flush=True,
                     )
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    try:
+                        cleared_result = self._candidate_repo.clear_candidates(chat_id)
+                        if cleared_result is None:
+                            raise CandidatePersistenceError("candidate clear result missing during persist rollback")
+                    except Exception as rollback_error:
+                        print(
+                            f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                            flush=True,
+                        )
+                    return CANDIDATE_STATE_UNAVAILABLE_TEXT
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
         return format_movie_query_reply(cleaned_query, parsed_query, tmdb_movie, candidates)
