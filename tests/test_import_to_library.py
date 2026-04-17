@@ -689,6 +689,31 @@ def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> N
     assert "当前调用会按状态读取失败处理" in output
 
 
+def test_resolve_pending_lease_version_logs_missing_approval_row_with_in_memory_pending(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: None})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+    )
+    service._pending_import_identities.add(("87", "hash-87"))
+    service._pending_import_lease_versions[("87", "hash-87")] = 3
+
+    assert (
+        service._resolve_pending_lease_version(
+            task_id="87",
+            task_hash="hash-87",
+            allow_in_memory_fallback_on_error=False,
+        )
+        == -1
+    )
+
+    output = capsys.readouterr().out
+    assert "[导入待确认版号查询失败]" in output
+    assert "approval_record missing while in-memory pending exists" in output
+    assert "task_hash=hash-87" in output
+
+
 def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -1332,6 +1357,59 @@ def test_cancel_pending_import_returns_state_unavailable_when_pending_lease_look
 
     output = capsys.readouterr().out
     assert "[导入待确认版号查询失败]" in output
+    assert "[导入取消状态读取失败]" in output
+    assert "import approval pending lease lookup failed" in output
+
+
+def test_cancel_pending_import_returns_state_unavailable_when_pending_approval_row_missing_with_in_memory_pending(
+    capsys,
+) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_latest_pending_import_job": lambda self, chat_id: pending_job,
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_pending_job should not be called")),
+        },
+    )()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: None,
+            "cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_import should not be called")),
+        },
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    service._pending_import_identities.add((pending_job.task_id, pending_job.task_hash))
+    service._pending_import_lease_versions[(pending_job.task_id, pending_job.task_hash)] = 2
+
+    assert service.cancel_pending_import(1001) == IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入待确认版号查询失败]" in output
+    assert "approval_record missing while in-memory pending exists" in output
     assert "[导入取消状态读取失败]" in output
     assert "import approval pending lease lookup failed" in output
 
