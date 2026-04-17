@@ -16,7 +16,7 @@
 - 闭环：`manage_bt_subscription._update_last_seen()` 现在会区分两类真相缺口：如果 `bt_subscription_item` 条目在回写前已不存在，会打印“条目缺失”中文日志，并把用户 warning 改成“本轮待确认已创建，但该订阅已不存在”；只有 SQLite 或其它持久化异常，才继续走“最近资源真相未更新”的状态不可用 warning，避免把真缺数据和写库异常混成一类。
 - 代码：`app/services/manage_bt_subscription.py`
 - 验证：`tests/test_manage_bt_subscription.py -k last_seen`
-- commit：待补
+- commit：`58d3471` `Distinguish btsub last-seen missing row`
 
 ### 2026-04-17 自动导入规则跳过事件缺口
 
@@ -86,7 +86,7 @@
 - 闭环：`telegram_bot._clear_raw_bt_destination_pending()` 在清理 `bt_pending_state` 失败时，不再把旧 raw_bt 目标目录选择当成“已取消”或让后续媒体入库链继续推进；它会把 in-memory 状态放回，并让 `private_chat_runtime` 回 `SERVICE_NOT_READY_TEXT`。
 - 代码：`app/bot/telegram_bot.py`、`app/bot/private_chat_runtime.py`
 - 验证：`tests/test_telegram_bot.py`、`tests/test_private_chat_runtime.py`
-- commit：待补
+- commit：`842e065` `Fail closed telegram BT raw destination cleanup gap`
 
 ### 2026-04-17 下载审批缺口
 
