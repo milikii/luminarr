@@ -253,7 +253,7 @@ def test_manage_bt_subscription_clear_returns_failure_text_when_repo_returns_non
 
     assert reply == BT_SUBSCRIPTION_CLEAR_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[BT 订阅清单清空失败]" in captured.out
+    assert "[BT 订阅清单清空结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "bt subscription clear result missing" in captured.out
 
