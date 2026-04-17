@@ -157,7 +157,11 @@ async def handle_private_chat_query_text(
         if tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id):
             await reply_func(tg.RAW_BT_DESTINATION_CANCELLED_TEXT)
             return
-        if tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id):
+        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        if cleared_tmdb_association is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        if cleared_tmdb_association:
             await reply_func(tg.BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
             return
         cleared_classification = tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
@@ -181,7 +185,10 @@ async def handle_private_chat_query_text(
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
-        tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        if cleared_tmdb_association is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         cleared_classification = tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
         if cleared_classification is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
@@ -255,7 +262,10 @@ async def handle_private_chat_query_text(
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
-        tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        if cleared_tmdb_association is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
         if bt_processing_path == "media_import":
             await reply_func(
@@ -302,7 +312,10 @@ async def handle_private_chat_query_text(
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
-        tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        if cleared_tmdb_association is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         await reply_func(
             tg._enter_media_import_bt_flow(
                 context=context,

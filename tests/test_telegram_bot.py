@@ -1441,7 +1441,10 @@ def test_clear_bt_tmdb_association_pending_logs_persistence_failure(capsys: pyte
         )
     )
 
-    assert _clear_bt_tmdb_association_pending(context=context, chat_id=1001) is True
+    assert _clear_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    pending = context.application.bot_data["bt_tmdb_association_pending_by_chat"][1001]
+    assert pending.media_kind == "movie"
+    assert pending.source == "magnet:?xt=urn:btih:abc"
 
     output = capsys.readouterr().out
     assert "[BT 待处理清理失败]" in output

@@ -419,7 +419,9 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_classifica
 ) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            if expected_stage == "classification":
+                raise RuntimeError("db down")
+            return False
 
     reply_text = AsyncMock()
 
@@ -543,6 +545,38 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_tmdb_lookup_
     assert "db down" in captured.out
 
 
+def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_tmdb_clear_fails_on_cancel(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                "bt_tmdb_association_pending_by_chat": {
+                    1001: SimpleNamespace(media_kind="movie", source="magnet:?xt=urn:btih:abcdef1234567890")
+                },
+            },
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理清理失败]" in captured.out
+    assert "stage=tmdb_association" in captured.out
+    assert "db down" in captured.out
+
+
 def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_tmdb_payload_corruption(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -574,6 +608,43 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_tmdb_payload
     assert "[BT 待处理载荷损坏]" in captured.out
     assert "stage=tmdb_association" in captured.out
     assert "payload_json invalid json" in captured.out
+
+
+def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_tmdb_clear_fails_before_media_import_flow(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            if expected_stage == "tmdb_association":
+                raise RuntimeError("db down")
+            return False
+
+    database = _make_database(tmp_path)
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+                query="movie",
+                reply_func=reply_text,
+                chat_id=1001,
+                user_id=2001,
+                bot_data=_build_bot_data()
+                | {
+                    BT_PENDING_REPO_KEY: _FailingPendingRepo(database),
+                    "bt_classification_pending_by_chat": {1001: "magnet:?xt=urn:btih:abcdef1234567890"},
+                    "bt_tmdb_association_pending_by_chat": {
+                        1001: SimpleNamespace(media_kind="movie", source="stale-source")
+                    },
+                },
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理清理失败]" in captured.out
+    assert "stage=tmdb_association" in captured.out
+    assert "db down" in captured.out
 
 
 def test_dispatch_private_chat_text_replies_service_not_ready_on_raw_bt_destination_lookup_failure(
