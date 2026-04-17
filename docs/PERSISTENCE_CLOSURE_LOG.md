@@ -1,4 +1,4 @@
-# Persistence closure log (v15)
+# Persistence closure log (v16)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 下载执行版号结果缺失分流缺口
+
+- 闭环：`add_to_downloader._record_executed_lease_version()` 在 `approval_record.executed_version` 更新时，如果 `approval_record` 行已经不存在，不再和普通 SQLite 更新异常共用同一条“下载执行版号回写失败”日志；现在会单独打印“下载执行版号结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `ADD_FINALIZATION_WARNING_TEXT`，不改下载成功真相和 confirm 收尾边界。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "record_executed_lease_version_logs_persistence_failure or record_executed_lease_version_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_executed_version_write_fails"`
 
 ### 2026-04-17 下载取消任务结果缺失分流缺口
 
@@ -433,6 +439,7 @@
 - telegram bt-pending fail-closed tests：2026-04-17，`8 passed, 169 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "bt_processing_path_persist_fails or set_bt_processing_path_pending_logs_persistence_failure or set_bt_classification_pending_logs_persistence_failure or set_bt_tmdb_association_pending_logs_persistence_failure or set_raw_bt_destination_pending_logs_persistence_failure or enter_media_import_bt_flow_returns_service_not_ready or enter_pure_bt_flow_returns_service_not_ready"`）
 - import finalization warning tests：2026-04-17，`5 passed, 87 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
 - downloader finalization warning tests：2026-04-17，`5 passed, 60 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
+- downloader executed-version diagnostics tests：2026-04-17，`3 passed, 74 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_executed_lease_version_logs_persistence_failure or record_executed_lease_version_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_executed_version_write_fails"`）
 - import approval-restore fail-closed tests：2026-04-17，`4 passed, 86 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs or execution_cannot_restore_pending_approval"`）
 - downloader approval-restore fail-closed tests：2026-04-17，`5 passed, 58 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_approval_logs or dispatch_failure_cannot_restore_pending_approval or confirm_add_by_task_ref_returns_failed_when_downloader_errors"`）
 - auto-import skip-event fail-closed tests：2026-04-17，`4 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "get_status_text_returns_state_unavailable_when_skip_event_write_fails or post_download_auto_import_run_once_marks_state_unavailable_when_skip_event_write_fails or post_download_auto_import_run_for_record_raises_when_skip_event_write_fails"`）
