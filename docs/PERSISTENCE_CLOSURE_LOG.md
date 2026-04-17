@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 导入待确认审批结果缺失分流缺口
+
+- 闭环：`import_to_library._record_pending_approval()` 在 `approval_record` 已写入、但写入后立即回读不到当前待确认导入审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一条“导入待确认审批落盘失败”日志；现在会单独打印“导入待确认审批结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `IMPORT_PENDING_STATE_UNAVAILABLE_TEXT`，不改导入审批 fail-closed 边界。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "record_pending_approval_logs_persistence_failure or record_pending_approval_logs_missing_pending_result"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 下载待确认审批结果缺失分流缺口
 
 - 闭环：`add_to_downloader._record_pending_approval()` 在 `approval_record` 已写入、但写入后立即回读不到当前待确认审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一条“下载待确认审批落盘失败”日志；现在会单独打印“下载待确认审批结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不改下载审批 fail-closed 边界。

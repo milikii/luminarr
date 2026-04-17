@@ -66,6 +66,7 @@ PENDING_LEASE_LOOKUP_FAILED = -1
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
+IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "import approval missing after request"
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 
 
@@ -1080,10 +1081,18 @@ class ImportToLibraryService:
             if requested_lease > 0:
                 lease_version = requested_lease
         except Exception as error:
-            print(
-                f"\033[31m[导入待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认导入。",
-                flush=True,
-            )
+            if str(error) == IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认导入审批的 lease_version；"
+                    "当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认导入。",
+                    flush=True,
+                )
             return 0
 
         self._pending_import_lease_versions[identity] = lease_version
