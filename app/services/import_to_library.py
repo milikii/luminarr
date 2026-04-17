@@ -70,6 +70,8 @@ IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during executed version update"
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
+IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
+IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 
 
 @dataclass(frozen=True, slots=True)
@@ -678,11 +680,19 @@ class ImportToLibraryService:
                 expected_version=pending_job.version,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
+            if cancelled is None:
+                raise RuntimeError(IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON)
         except Exception as error:
-            print(
-                f"\033[31m[导入取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
-                flush=True,
-            )
+            if str(error) in {
+                IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
+                IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
+            }:
+                self._log_cancel_pending_job_result_missing(job=pending_job, reason=str(error))
+            else:
+                print(
+                    f"\033[31m[导入取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
+                    flush=True,
+                )
             return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
         if not cancelled:
             print(
@@ -703,6 +713,18 @@ class ImportToLibraryService:
             message=IMPORT_CANCELLED_TEXT,
         )
         return IMPORT_CANCELLED_TEXT
+
+    def _log_cancel_pending_job_result_missing(self, *, job: JobRecord, reason: str) -> None:
+        print(
+            f"\033[31m[导入取消任务结果缺失]\033[0m task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认导入任务是否仍存在，以及取消更新后是否还能回读到最新状态；当前审批可能已取消，但任务真相还没有确认取消成功。",
+            flush=True,
+        )
+
+    def _log_expired_cancel_pending_job_result_missing(self, *, job: JobRecord, task_ref: str, reason: str) -> None:
+        print(
+            f"\033[31m[导入确认超时任务结果缺失]\033[0m task_ref={task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认导入任务是否仍存在，以及超时取消后是否还能回读到最新状态；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“导入确认已超时”。",
+            flush=True,
+        )
 
     async def _get_import_source(
         self,
@@ -1669,11 +1691,23 @@ class ImportToLibraryService:
                     expected_version=context.job.version,
                     workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
                 )
+                if cancelled is None:
+                    raise RuntimeError(IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON)
             except Exception as error:
-                print(
-                    f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把任务真相缺口误判成普通“导入确认已超时”。",
-                    flush=True,
-                )
+                if str(error) in {
+                    IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
+                    IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
+                }:
+                    self._log_expired_cancel_pending_job_result_missing(
+                        job=context.job,
+                        task_ref=task_ref,
+                        reason=str(error),
+                    )
+                else:
+                    print(
+                        f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把任务真相缺口误判成普通“导入确认已超时”。",
+                        flush=True,
+                    )
                 return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
             else:
                 if not cancelled:

@@ -1487,6 +1487,48 @@ def test_cancel_pending_import_logs_job_lookup_failure(capsys) -> None:
     assert "[处理建议]" in output
 
 
+def test_cancel_pending_import_logs_missing_job_cancel_result(capsys) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_latest_pending_import_job": lambda self, chat_id: pending_job,
+            "cancel_pending_job": lambda self, **kwargs: None,
+        },
+    )()
+    approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: True})()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+    service._resolve_pending_lease_version = lambda **kwargs: 2
+
+    assert service.cancel_pending_import(1001) == IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入取消任务结果缺失]" in output
+    assert "job_id=job-1" in output
+    assert "import cancel pending job result missing" in output
+
+
 def test_handle_expired_pending_confirm_logs_approval_cancel_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -1544,6 +1586,47 @@ def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
     output = capsys.readouterr().out
     assert "[导入确认超时任务取消失败]" in output
     assert "job_id=job-1" in output
+    assert "当前 confirm 会直接返回状态读取失败" in output
+
+
+def test_handle_expired_pending_confirm_logs_missing_job_during_cancel(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("job missing during cancel")
+            )
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    service._is_pending_approval_expired = lambda **kwargs: True
+    context = ConfirmExecutionContext(
+        job=JobRecord(
+            job_id="job-1",
+            chat_id=1001,
+            user_id=2001,
+            workflow_type="import_to_library",
+            state="pending_approval",
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            payload_json="{}",
+            version=3,
+            lease_owner="",
+            lease_until="",
+            created_at="2026-04-15 00:00:00",
+            updated_at="2026-04-15 00:00:00",
+        ),
+        approval_record=type("ApprovalRecord", (), {"lease_version": 2})(),
+    )
+
+    assert service._handle_expired_pending_confirm(task_ref="87", context=context) == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入确认超时任务结果缺失]" in output
+    assert "job_id=job-1" in output
+    assert "job missing during cancel" in output
     assert "当前 confirm 会直接返回状态读取失败" in output
 
 

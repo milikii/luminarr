@@ -16,6 +16,13 @@
 - 闭环：`add_to_downloader.cancel_pending_add()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 返回 `None` 或抛出 `job missing during cancel` 时，不再和普通 SQLite 更新异常共用同一条“任务更新失败”日志；现在会单独打印“下载取消任务结果缺失”/“下载确认超时任务结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态读取失败文本，不改取消、超时 confirm 和审批边界。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "cancel_pending_add_logs_job_cancel_failure or cancel_pending_add_logs_missing_job_cancel_result or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_missing_job_during_cancel or handle_expired_pending_confirm_logs_job_cancel_state_rejection or cancel_pending_add_logs_job_cancel_state_rejection"`
+- commit：`193508e` `Separate downloader cancel result diagnostics`
+
+### 2026-04-17 导入取消任务结果缺失分流缺口
+
+- 闭环：`import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 返回 `None` 或抛出 `job missing during cancel` 时，不再和普通 SQLite 更新异常共用同一条“任务更新失败”日志；现在会单独打印“导入取消任务结果缺失”/“导入确认超时任务结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态读取失败文本，不改取消、超时 confirm 和审批边界。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "cancel_pending_import_logs_job_cancel_failure or cancel_pending_import_logs_missing_job_cancel_result or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_missing_job_during_cancel or handle_expired_pending_confirm_logs_job_cancel_state_rejection or cancel_pending_import_logs_job_cancel_state_rejection"`
 
 ### 2026-04-17 导入确认任务抢占状态冲突分流缺口
 
