@@ -247,7 +247,7 @@ def test_manage_watchlist_clear_returns_failure_text_when_repo_returns_none(tmp_
 
     assert reply == WATCHLIST_CLEAR_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[想看清单清空失败]" in captured.out
+    assert "[想看清单清空结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "watchlist clear result missing" in captured.out
 
