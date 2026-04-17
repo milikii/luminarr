@@ -14,6 +14,7 @@ from app.services.search_media import (
     BT_READ_ONLY_NOTICE_TEXT,
     BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE,
     CANDIDATE_STATE_UNAVAILABLE_TEXT,
+    CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT,
     CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT,
     EMPTY_QUERY_TEXT,
     NO_RESULT_TEXT_TEMPLATE,
@@ -207,6 +208,31 @@ def test_search_success_clears_persisted_clarification_pending(tmp_path: Path) -
         clarification_repo=ClarificationRepo(SqliteDatabase(str(db_path))),
     )
     assert not verify_service.is_clarification_pending(1001)
+
+
+def test_search_success_returns_state_unavailable_when_clarification_clear_fails(tmp_path: Path, capsys) -> None:
+    class ClearFailsClarificationRepo(ClarificationRepo):
+        def clear_pending(self, *, chat_id: int) -> bool:
+            raise RuntimeError(f"db down for {chat_id}")
+
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    ClarificationRepo(database).upsert_pending(chat_id=1001, query="unknown")
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        clarification_repo=ClearFailsClarificationRepo(SqliteDatabase(str(db_path))),
+    )
+
+    text = _run(service.search_and_format("dune", chat_id=1001))
+
+    assert text == CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
+    assert service.get_cached_candidate(1001, 1) is None
+    assert service.is_clarification_pending(1001)
+    output = capsys.readouterr().out
+    assert "[搜索澄清态清理失败]" in output
+    assert "db down for 1001" in output
 
 
 def test_search_clarification_pending_logs_persistence_failure(tmp_path: Path, capsys) -> None:

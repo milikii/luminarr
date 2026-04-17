@@ -103,6 +103,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
   - `search_media` 在真实搜索源查询异常时，现在也会打印红色中文 `[搜索源查询失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media` 在 BT 只读探索搜索源异常时，现在也会打印红色中文 `[BT 只读搜索失败]` 日志和 `[处理建议]`，不再只抛原始异常
   - `search_media._set_clarification_pending()` 在 `clarification_repo.upsert_pending()` 写入失败时，现在会直接清掉本次 in-memory pending 并回“搜索待澄清状态写入失败，请稍后重试。”，不再把持久化真相缺口混成仍可继续跟进的待澄清状态
+  - `search_media` 在成功搜索命中候选、但 `clarification_repo.clear_pending()` 清理旧澄清态失败时，现在会直接清掉本次 in-memory candidate 并回“搜索待澄清状态清理失败，请稍后重试。”，不再把新的候选缓存和旧的待澄清真相混写到同一轮里
   - `search_media` 在 `candidate_repo.save_candidates()` 写入失败时，现在会直接清掉本次 in-memory candidate 并回“搜索候选状态写入失败，请稍后重试。”，不再把持久化真相缺口混成仍可继续按序号选择的候选缓存
   - `search_media` 在澄清态 `clear_pending()` 删除失败、`get_pending_query()` 读取失败时，现在也会打印红色中文 `[搜索澄清态清理失败]` / `[搜索澄清态读取失败]` 日志和 `[处理建议]`；shared private-chat runtime 在 `取消` 路径里也会直接回 `SERVICE_NOT_READY_TEXT`，不再静默吞掉 SQLite 删除/读取异常
   - `search_media.get_cached_candidate()` 在 `candidate_mapping.candidate_json` 为空、坏 JSON 或非对象时，现在也会打印红色中文 `[搜索候选载荷损坏]` 日志和 `[处理建议]`，不再把持久化坏候选混写成普通缓存未命中
@@ -652,6 +653,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import cancel lookup observability tests：2026-04-15，`1 passed, 51 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k cancel_pending_import_logs_job_lookup_failure`）
 - search clarification pending persist fail-closed tests：2026-04-17，`4 passed, 30 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification_pending_logs_persistence_failure or no_result_returns_state_unavailable_when_clarification_persist_fails"`）
 - search candidate persist fail-closed tests：2026-04-17，`2 passed, 33 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "candidate_persist_logs_persistence_failure or no_result_returns_state_unavailable_when_candidate_persist_fails"`）
+- search clarification clear fail-closed tests：2026-04-17，`2 passed, 34 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "search_success_clears_persisted_clarification_pending or search_success_returns_state_unavailable_when_clarification_clear_fails"`）
 - import source-missing observability tests：2026-04-15，`1 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_source_missing`）
 - import target-exists observability tests：2026-04-15，`1 passed, 56 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_exists`）
 - import target-dir create observability tests：2026-04-15，`1 passed, 52 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k prepare_import_logs_target_dir_create_failure`）

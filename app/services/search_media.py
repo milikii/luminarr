@@ -30,6 +30,7 @@ AMBIGUOUS_MIN_RESULT_COUNT = 3
 AMBIGUOUS_MAX_OPTION_COUNT = 3
 CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失败，请稍后重试。"
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
+CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +166,13 @@ class SearchMediaService:
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
             if selected_raw_results:
-                self._clear_clarification_pending(chat_id=chat_id)
+                clarification_pending = self.is_clarification_pending(chat_id)
+                if clarification_pending is None:
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    return CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
+                if clarification_pending and not self._clear_clarification_pending(chat_id=chat_id):
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    return CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
             else:
                 if not self._set_clarification_pending(chat_id=chat_id, query=cleaned_query):
                     self._recent_candidates_by_chat.pop(chat_id, None)
