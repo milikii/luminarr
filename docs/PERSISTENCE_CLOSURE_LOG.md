@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 BT 订阅写入后回读缺口
+
+- 闭环：`manage_bt_subscription._add_item()` 在 `bt_subscription_item` 插入成功后，如果立即回读不到新条目，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“BT 订阅写入后条目缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持原来的失败文本，不改订阅 workflow。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "add_logs_missing_row_after_insert or add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`
+- commit：待补
+
 ### 2026-04-17 想看清单写入后回读缺口
 
 - 闭环：`manage_watchlist._add_item()` 在 `watchlist_item` 插入成功后，如果立即回读不到新条目，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“想看写入后条目缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持原来的失败文本，不改 workflow。

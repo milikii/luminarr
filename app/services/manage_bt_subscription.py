@@ -45,6 +45,7 @@ BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT = (
     "注意：BT 订阅条目已不存在，本轮命中的下载待确认已经创建，但不会更新最近资源真相。\n"
     "请先确认是否有人删除了该条订阅；如仍需继续追踪，请重新添加后再执行 btsub run。"
 )
+BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON = "bt_subscription_item missing after insert"
 MEDIA_KIND_ALIASES = {
     "movie": "movie",
     "film": "movie",
@@ -281,6 +282,24 @@ class ManageBtSubscriptionService:
             )
             if created is None:
                 raise BtSubscriptionPersistenceError("bt subscription add result missing")
+        except BtSubscriptionPersistenceError as error:
+            if str(error) == BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON:
+                _log_bt_subscription_add_item_missing_after_insert(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
+            _log_bt_subscription_add_failed(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+                reason=str(error),
+            )
+            return None
         except Exception as error:
             _log_bt_subscription_add_failed(
                 chat_id=chat_id,
@@ -692,6 +711,22 @@ def _log_bt_subscription_add_failed(
         f"\033[31m[BT 订阅写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
         f"media_kind={media_kind} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。"
+    )
+
+
+def _log_bt_subscription_add_item_missing_after_insert(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅写入后条目缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表是否被并发删除或触发器回滚；"
+        "如需继续添加，请先确认 SQLite 写入后能立即回读该条目。"
     )
 
 

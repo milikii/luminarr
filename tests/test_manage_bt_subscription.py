@@ -117,7 +117,8 @@ def test_manage_bt_subscription_add_logs_missing_row_after_insert(tmp_path: Path
 
     assert reply == BT_SUBSCRIPTION_ADD_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[BT 订阅写入失败]" in captured.out
+    assert "[BT 订阅写入后条目缺失]" in captured.out
+    assert "[处理建议]" in captured.out
     assert "bt_subscription_item missing after insert" in captured.out
 
 
