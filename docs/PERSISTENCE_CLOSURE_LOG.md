@@ -44,6 +44,13 @@
 - 闭环：`manage_bt_subscription.run_scheduler_tick()` 在 `bt_subscription_item` chat 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅扫描 chat 列表读取失败”日志；现在会把“chat 列表结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但 scheduler tick 仍保持原来的 fail-closed：本轮直接停路，不把缺失真相误判成“当前没有订阅 chat”。
 - 代码：`app/services/manage_bt_subscription.py`
 - 验证：`tests/test_manage_bt_subscription.py -k "chat_id_lookup_fails or chat_id_lookup_returns_none"`
+- commit：`2a843cf` `Separate btsub chat list diagnostics`
+
+### 2026-04-17 想看清单结果缺失分流缺口
+
+- 闭环：`manage_watchlist._list_items()` 在 `watchlist_item` 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“想看清单读取失败”日志；现在会把“清单结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `WATCHLIST_LIST_FAILED_TEXT`，不改 watchlist workflow。
+- 代码：`app/services/manage_watchlist.py`
+- 验证：`tests/test_manage_watchlist.py -k "list_returns_failure_text_when_repo_raises or list_returns_failure_text_when_repo_returns_none"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 搜索候选写入后真相不一致缺口

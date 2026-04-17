@@ -126,7 +126,7 @@ def test_manage_watchlist_list_returns_failure_text_when_repo_returns_none(tmp_p
 
     assert reply == WATCHLIST_LIST_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[想看清单读取失败]" in captured.out
+    assert "[想看清单结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "watchlist list result missing" in captured.out
 

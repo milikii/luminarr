@@ -55,6 +55,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 自动导入终态读取链也已补一处分流：`job_event` 查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“自动导入终态结果缺失”；但自动导入仍保持原来的 fail-closed 停路边界。
 - `btsub run` 扫描入口也已补一处分流：订阅列表查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅扫描结果缺失”；但本轮扫描仍保持原来的 fail-closed 停路边界。
 - `btsub` scheduler tick 起点也已补一处分流：chat 列表查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅扫描 chat 列表结果缺失”；但 tick 仍保持原来的 fail-closed 停路边界。
+- `watchlist list` 读取链也已补一处分流：清单查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“想看清单结果缺失”；但用户侧仍保持原来的失败文本。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
 - 当前本地联调基线仍是 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 - `docs/STATUS.md` 从本版开始只保留短快照；当前主线的详细闭环、focused tests 和 commit 轨迹收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。
