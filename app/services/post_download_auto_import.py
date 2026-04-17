@@ -54,10 +54,18 @@ class PostDownloadAutoImportService:
             if candidates is None:
                 raise AutoImportStateUnavailableError("auto import completed list result missing")
         except Exception as error:
-            print(
-                f"\033[31m[自动导入候选读取失败]\033[0m limit={limit} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
-                flush=True,
-            )
+            if str(error) == "auto import completed list result missing":
+                print(
+                    f"\033[31m[自动导入候选结果缺失]\033[0m limit={limit} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 download_monitor 已完成列表查询返回是否仍带有完整结果；"
+                    "当前这轮自动导入会直接停路，避免把缺失真相误判成“当前没有可导入候选”。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[自动导入候选读取失败]\033[0m limit={limit} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
+                    flush=True,
+                )
             return AutoImportRunResult(scanned=0, progressed=0, replies=(), state_unavailable=True)
         replies: list[str] = []
         progressed = 0
