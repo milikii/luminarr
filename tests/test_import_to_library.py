@@ -2400,8 +2400,35 @@ def test_resolve_normalized_naming_truth_logs_missing_result(capsys: pytest.Capt
 
     assert result == "Dune.Part.Two.2024.1080p.WEB-DL.mkv"
     output = capsys.readouterr().out
-    assert "[导入命名真相查询失败]" in output
+    assert "[导入命名真相结果缺失]" in output
     assert "import naming truth result missing" in output
+    assert "task_id=87" in output
+    assert "task_hash=hash-87" in output
+    assert "[处理建议]" in output
+
+
+def test_resolve_normalized_naming_truth_logs_query_failure(capsys: pytest.CaptureFixture[str]) -> None:
+    event_repo = type(
+        "EventRepo",
+        (),
+        {"list_events_for_task_identity": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=None),
+        library_target_dir="/data/library/movies",
+        job_event_repo=event_repo,
+    )
+
+    result = service._resolve_normalized_naming_truth(
+        task_id="87",
+        task_hash="hash-87",
+        fallback_name="Dune.Part.Two.2024.1080p.WEB-DL.mkv",
+    )
+
+    assert result == "Dune.Part.Two.2024.1080p.WEB-DL.mkv"
+    output = capsys.readouterr().out
+    assert "[导入命名真相查询失败]" in output
+    assert "db down" in output
     assert "task_id=87" in output
     assert "task_hash=hash-87" in output
     assert "[处理建议]" in output

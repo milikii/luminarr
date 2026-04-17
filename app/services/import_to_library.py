@@ -776,10 +776,10 @@ class ImportToLibraryService:
             if events is None:
                 raise RuntimeError("import naming truth result missing")
         except Exception as error:
-            print(
-                f"\033[31m[导入命名真相查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前导入会退回下载源名称做命名，文件名可能缺少 downloader 已确认的标题真相。",
-                flush=True,
-            )
+            if str(error) == "import naming truth result missing":
+                _log_import_naming_truth_result_missing(task_id=task_id, task_hash=task_hash, reason=str(error))
+            else:
+                _log_import_naming_truth_query_failed(task_id=task_id, task_hash=task_hash, reason=str(error))
             return fallback
         for event in reversed(events):
             if event.event_type != "downloader.succeeded":
@@ -1829,3 +1829,21 @@ def _sanitize_target_component(value: str) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned).strip(" .-_")
     cleaned = re.sub(r"[\(\[\{]+$", "", cleaned).strip(" .-_")
     return cleaned
+
+
+def _log_import_naming_truth_query_failed(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[导入命名真相查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；"
+        "当前导入会退回下载源名称做命名，文件名可能缺少 downloader 已确认的标题真相。",
+        flush=True,
+    )
+
+
+def _log_import_naming_truth_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[导入命名真相结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
+        "当前导入会退回下载源名称做命名，避免把缺失真相误判成“没有 downloader 标题”。",
+        flush=True,
+    )
