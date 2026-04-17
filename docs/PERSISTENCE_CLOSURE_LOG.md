@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 导入执行版号结果缺失分流缺口
+
+- 闭环：`import_to_library._record_executed_lease_version()` 在 `approval_record.executed_version` 更新时，如果 `approval_record` 行已经不存在，不再和普通 SQLite 更新异常共用同一条“导入执行版号回写失败”日志；现在会单独打印“导入执行版号结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `IMPORT_FINALIZATION_WARNING_TEXT`，不改导入成功真相和 confirm 收尾边界。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "record_executed_lease_version_logs_persistence_failure or record_executed_lease_version_logs_missing_result"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 导入待确认审批结果缺失分流缺口
 
 - 闭环：`import_to_library._record_pending_approval()` 在 `approval_record` 已写入、但写入后立即回读不到当前待确认导入审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一条“导入待确认审批落盘失败”日志；现在会单独打印“导入待确认审批结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `IMPORT_PENDING_STATE_UNAVAILABLE_TEXT`，不改导入审批 fail-closed 边界。

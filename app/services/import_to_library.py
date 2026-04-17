@@ -67,6 +67,7 @@ IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
 IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
+IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during executed version update"
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 
 
@@ -1205,10 +1206,18 @@ class ImportToLibraryService:
                 executed_lease_version=executed_lease_version,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
-                flush=True,
-            )
+            if str(error) == IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入执行版号结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 更新后该审批行是否仍存在，并确认 executed_version 已被正确回写；"
+                    "当前进程内 lease 版本已前进，但持久化真相还没有确认落稳。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
+                    flush=True,
+                )
             return None
         return True
 

@@ -469,6 +469,32 @@ def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:
     assert "[导入执行版号回写失败]" in capsys.readouterr().out
 
 
+def test_record_executed_lease_version_logs_missing_result(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "mark_import_executed": lambda self, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("approval_record missing during executed version update")
+            )
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    assert (
+        service._record_executed_lease_version(
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            executed_lease_version=3,
+        )
+        is None
+    )
+    assert service._pending_import_lease_versions[("87", "hash-87")] == 3
+    output = capsys.readouterr().out
+    assert "[导入执行版号结果缺失]" in output
+    assert "approval_record 更新后该审批行是否仍存在" in output
+
+
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
