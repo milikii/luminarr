@@ -1,4 +1,4 @@
-# Persistence closure log (v1)
+# Persistence closure log (v2)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,13 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 自动导入规则跳过事件缺口
+
+- 闭环：`post_download_auto_import._record_skip_event()` 在低质量资源命中自动跳过规则时，如果 `job_event` 写入失败，不再继续回“已跳过自动导入”，而是抛成状态不可用；`run_once()` 和 `status` follow-up 都会按 fail-closed 停路，避免把 `job_event` 真相缺口混成普通规则命中并在后续轮询里重复提示。
+- 代码：`app/services/post_download_auto_import.py`
+- 验证：`tests/test_get_download_status.py`
+- commit：待补
 
 ### 2026-04-17 下载审批缺口
 
@@ -47,6 +54,8 @@
 - commit：`3fdf5c8` `Fail closed search clarification clear`
 
 ## 3. Focused verification
+
+- auto-import skip-event fail-closed tests：2026-04-17，`4 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "get_status_text_returns_state_unavailable_when_skip_event_write_fails or post_download_auto_import_run_once_marks_state_unavailable_when_skip_event_write_fails or post_download_auto_import_run_for_record_raises_when_skip_event_write_fails"`）
 
 - add to downloader missing-approval-row fail-closed tests：2026-04-17，`3 passed, 58 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "resolve_pending_lease_version_logs_missing_approval_row_with_in_memory_pending or cancel_pending_add_returns_state_unavailable_when_pending_approval_row_missing_with_in_memory_pending or pending_lease_lookup_fails_after_stale_check"`）
 - import missing-approval-row fail-closed tests：2026-04-17，`4 passed, 84 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "resolve_pending_lease_version_logs_missing_approval_row_with_in_memory_pending or cancel_pending_import_returns_state_unavailable_when_pending_approval_row_missing_with_in_memory_pending or pending_lease_lookup_fails"`）
