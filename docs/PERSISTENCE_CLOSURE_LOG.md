@@ -214,7 +214,7 @@
 
 ### 2026-04-17 下载状态观察缺字段分流缺口
 
-- 闭环：`get_download_status._record_status_observation()` 在 `download_monitor_repo.record_status()` 返回的 update 缺 `record`、或缺 `newly_completed` 标记时，不再都只打印同一类“下载状态观察落盘失败”日志；现在会把“观察结果缺失”“完成标记缺失”和普通 SQLite/调用异常拆开成更明确的中文日志与 `[处理建议]`。`record_status()` 直接返回空 update 的分流还未落地，当前仍会走通用“下载状态观察落盘失败”日志；用户侧仍保持原来的 `STATUS_OBSERVATION_WARNING_TEXT`，不改状态查询和自动导入 follow-up 的 fail-closed 边界。
+- 闭环：`get_download_status._record_status_observation()` 在 `download_monitor_repo.record_status()` 返回的 update 缺 `record`、或缺 `newly_completed` 标记时，不再都只打印同一类“下载状态观察落盘失败”日志；现在会把“观察结果缺失”“完成标记缺失”和普通 SQLite/调用异常拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `STATUS_OBSERVATION_WARNING_TEXT`，不改状态查询和自动导入 follow-up 的 fail-closed 边界。
 - 代码：`app/services/get_download_status.py`
 - 验证：`tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`
 - commit：`61d36de` `Separate download monitor observation diagnostics`
@@ -224,6 +224,7 @@
 - 闭环：`get_download_status._record_status_observation()` 在 `download_monitor_repo.record_status()` 直接返回空 update 时，不再和普通 SQLite/调用异常共用同一条“下载状态观察落盘失败”日志；现在也会落到“下载状态观察结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `STATUS_OBSERVATION_WARNING_TEXT`，不改状态查询和自动导入 follow-up 的 fail-closed 边界。
 - 代码：`app/services/get_download_status.py`
 - 验证：`tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`
+- commit：`eaca4d8` `Separate download monitor empty-result diagnostics`
 
 ### 2026-04-17 导入命名真相结果缺失分流缺口
 
