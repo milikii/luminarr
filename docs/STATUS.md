@@ -71,6 +71,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `btsub remove` 删除链也已补一处分流：删除查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅删除结果缺失”；但用户侧仍保持原来的失败文本。
 - `btsub clear` 清空链也已补一处分流：清空查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅清单清空结果缺失”；但用户侧仍保持原来的失败文本。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
+- cleanup 关联读取链也已补一处分流：`import.succeeded` 事件已存在但缺 `source_path/target_path` 时，会打印“cleanup 关联路径缺失”日志，不再和普通“未找到 import 关联”混成同一类诊断；但用户侧仍保持原来的拒绝 cleanup 文案，不改 guardrail。
 - 当前本地联调基线仍是 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 - `docs/STATUS.md` 从本版开始只保留短快照；当前主线的详细闭环、focused tests 和 commit 轨迹收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 

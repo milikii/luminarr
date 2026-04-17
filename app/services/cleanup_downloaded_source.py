@@ -5,7 +5,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
 
 CLEANUP_QUERY_USAGE_TEXT = (
@@ -397,6 +397,13 @@ class CleanupDownloadedSourceService:
         source_path = event.source_path.strip()
         target_path = event.target_path.strip()
         if not source_path or not target_path:
+            _print_cleanup_correlation_path_missing_log(
+                task_ref=task_ref,
+                resolved_identity=resolved_identity,
+                event=event,
+                source_path_missing=not source_path,
+                target_path_missing=not target_path,
+            )
             return resolved_identity, None
         return resolved_identity, ImportCorrelation(
             task_ref=event.task_ref.strip() or resolved_identity.task_ref,
@@ -583,6 +590,33 @@ def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: 
     print(
         "\033[33m[处理建议]\033[0m 检查 jobs 表是否可读、该 chat 的任务引用是否仍存在；"
         "当前会回退到原始 task_ref 继续尝试匹配 import 关联。",
+        flush=True,
+    )
+
+
+def _print_cleanup_correlation_path_missing_log(
+    *,
+    task_ref: str,
+    resolved_identity: ResolvedCleanupTaskIdentity,
+    event: JobEvent,
+    source_path_missing: bool,
+    target_path_missing: bool,
+) -> None:
+    missing_fields: list[str] = []
+    if source_path_missing:
+        missing_fields.append("source_path")
+    if target_path_missing:
+        missing_fields.append("target_path")
+    print(
+        f"\033[31m[cleanup 关联路径缺失]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} event_type={event.event_type} "
+        f"missing_fields={','.join(missing_fields)}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 import.succeeded 事件是否带有完整 source_path/target_path；"
+        "当前会按未找到可清理关联停路，避免把结构化路径缺失误判成普通“没有 import 关联”。",
         flush=True,
     )
 

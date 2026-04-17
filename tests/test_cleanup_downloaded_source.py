@@ -232,6 +232,69 @@ def test_cleanup_by_task_ref_rejects_missing_structured_source_path(tmp_path: Pa
     assert "cleanup 87 / 清理 87：实际清理下载源资产" in reply
 
 
+def test_cleanup_by_task_ref_logs_missing_structured_source_path(tmp_path: Path, capsys) -> None:
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.write_bytes(b"demo")
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    output = capsys.readouterr().out
+    assert "[cleanup 关联路径缺失]" in output
+    assert "missing_fields=source_path" in output
+    assert "[处理建议]" in output
+
+
+def test_cleanup_by_task_ref_logs_missing_structured_target_path(tmp_path: Path, capsys) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    service = CleanupDownloadedSourceService(
+        type(
+            "MissingTargetPathRepo",
+            (),
+            {
+                "find_latest_import_correlation": lambda self, **kwargs: type(
+                    "Event",
+                    (),
+                    {
+                        "task_ref": "87",
+                        "task_id": "87",
+                        "task_hash": "hash-87",
+                        "event_type": "import.succeeded",
+                        "message": "",
+                        "source_path": str(source_file),
+                        "target_path": "",
+                    },
+                )()
+            },
+        )()
+    )
+
+    reply = service.cleanup_by_task_ref("87")
+
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    output = capsys.readouterr().out
+    assert "[cleanup 关联路径缺失]" in output
+    assert "missing_fields=target_path" in output
+    assert "[处理建议]" in output
+
+
 def test_cleanup_by_task_ref_rejects_when_target_missing(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

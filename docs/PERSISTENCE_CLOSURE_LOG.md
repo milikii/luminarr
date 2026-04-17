@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 cleanup 关联路径缺失分流缺口
+
+- 闭环：`cleanup_downloaded_source._find_import_correlation()` 在 `import.succeeded` 事件已存在、但 `source_path` 或 `target_path` 为空时，不再和普通“未找到 import 关联”混成静默 `None`；现在会单独打印“cleanup 关联路径缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的关联缺失拒绝文案，不改 cleanup guardrail 和副作用边界。
+- 代码：`app/services/cleanup_downloaded_source.py`
+- 验证：`tests/test_cleanup_downloaded_source.py -k "missing_structured_source_path or missing_structured_target_path"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 自动导入跳过事件结果缺失分流缺口
 
 - 闭环：`post_download_auto_import._record_skip_event()` 在 `job_event.append_event()` 已执行但写入后立即回读不到事件时，不再和普通 SQLite 写入异常共用同一条“自动导入跳过事件落盘失败”日志；现在会单独打印“自动导入跳过事件结果缺失”中文日志与 `[处理建议]`，但 `run_for_record()` / `run_once()` / `status` follow-up 仍保持原来的状态不可用停路，不改自动导入副作用边界。
