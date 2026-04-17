@@ -1,4 +1,4 @@
-# Current status (v275)
+# Current status (v276)
 
 ## Project position
 
@@ -36,7 +36,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-17，最近补齐的最小分流集中在七处：下载确认任务回退结果缺失、下载执行版号结果缺失、下载审批回退结果缺失、下载取消结果缺失、导入取消结果缺失、下载确认任务抢占失败、导入确认任务抢占失败；这些都已经改成显式中文日志与 `[处理建议]`，但不改 confirm、副作用和 SQLite 真相边界。
 - 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致 已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，状态页不再回灌长台账。
-- 最近提交轨迹已与当前主线台账对齐；`7b64c4f`、`9604e0c`、`c3ec7b0`、`193508e` 对应的详细闭环与验证入口统一收口在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 最近提交轨迹已与当前主线台账对齐；`02c864e`、`7b64c4f`、`9604e0c`、`c3ec7b0`、`193508e` 对应的详细闭环与验证入口统一收口在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps

@@ -1,4 +1,4 @@
-# Persistence closure log (v17)
+# Persistence closure log (v18)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -16,6 +16,7 @@
 - 闭环：`add_to_downloader._restore_pending_job()` 在 `jobs.release_lease_to_pending()` 已经找不到任务行时，不再和普通 SQLite lease 回退异常共用同一条“下载确认任务回退失败”日志；现在会单独打印“下载确认任务回退结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 confirm 错误恢复边界，不改审批真相和副作用。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "restore_pending_job_logs_persistence_failure or restore_pending_job_logs_missing_result or restore_pending_job_logs_rejected_current_state"`
+- commit：`02c864e` `Separate downloader restore-pending-job diagnostics`
 
 ### 2026-04-17 下载执行版号结果缺失分流缺口
 
