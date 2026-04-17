@@ -1663,9 +1663,19 @@ def _clear_bt_tmdb_association_pending(
     if pending_repo is None:
         return cleared
     try:
-        return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION) or cleared
+        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION)
+        if cleared_result is None:
+            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
+        return cleared_result or cleared
     except Exception as error:
-        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_TMDB_ASSOCIATION, reason=str(error))
+        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+            _log_bt_pending_clear_result_missing(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_TMDB_ASSOCIATION, reason=str(error))
         if pending is not None:
             pending_by_chat[chat_id] = pending
         return None

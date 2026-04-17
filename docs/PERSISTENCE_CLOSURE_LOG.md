@@ -472,6 +472,12 @@
 - 代码：`app/bot/telegram_bot.py`
 - 验证：`tests/test_telegram_bot.py`、`tests/test_private_chat_runtime.py`
 
+### 2026-04-17 Telegram BT tmdb_association 清理结果缺失分流缺口
+
+- 闭环：`telegram_bot._clear_bt_tmdb_association_pending()` 在 `bt_pending_state` 清理直接返回 `None` 时，不再借着 in-memory 已清掉而误报成“已取消”或继续放行后续媒体入库链；现在会单独打印“BT 待处理清理结果缺失”中文日志、把内存态放回，并让私聊 runtime 统一回 `SERVICE_NOT_READY_TEXT`，避免把“删除结果缺失”混成普通清理成功。
+- 代码：`app/bot/telegram_bot.py`
+- 验证：`tests/test_telegram_bot.py`、`tests/test_private_chat_runtime.py`
+
 ### 2026-04-17 下载成功收尾缺口
 
 - 闭环：`add_to_downloader.confirm_add_by_task_ref()` 在下载器已经真实接单后，如果 `approval_record.executed_version` 或 `jobs` 完结态回写失败，不再继续回纯成功文本，而会在成功回复后追加显式 warning，提醒不要重复 `confirm`，避免把“已执行但真相未落稳”混成“全链已落盘”。

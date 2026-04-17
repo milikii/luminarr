@@ -1604,6 +1604,35 @@ def test_clear_bt_tmdb_association_pending_logs_persistence_failure(capsys: pyte
     assert "db down" in output
 
 
+def test_clear_bt_tmdb_association_pending_logs_missing_clear_result(capsys: pytest.CaptureFixture[str]) -> None:
+    class _MissingClearResultPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None):
+            _ = (chat_id, expected_stage)
+            return None
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _MissingClearResultPendingRepo(SqliteDatabase(":memory:")),
+                "bt_tmdb_association_pending_by_chat": {
+                    1001: SimpleNamespace(media_kind="movie", source="magnet:?xt=urn:btih:abc")
+                },
+            }
+        )
+    )
+
+    assert _clear_bt_tmdb_association_pending(context=context, chat_id=1001) is None
+    pending = context.application.bot_data["bt_tmdb_association_pending_by_chat"][1001]
+    assert pending.media_kind == "movie"
+    assert pending.source == "magnet:?xt=urn:btih:abc"
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理清理结果缺失]" in output
+    assert "[处理建议]" in output
+    assert "stage=tmdb_association" in output
+    assert "bt_pending_state clear result missing" in output
+
+
 def test_set_raw_bt_destination_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
