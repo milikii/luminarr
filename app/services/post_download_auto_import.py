@@ -9,6 +9,7 @@ from app.db.job_event_repo import JobEventRepo
 
 AutoImportFunc = Callable[[str, int | None, int | None], Awaitable[str]]
 AUTO_IMPORT_SKIPPED_BY_RULE_EVENT = "auto_import.skipped_by_rule"
+AUTO_IMPORT_SKIP_EVENT_RESULT_MISSING_REASON = "auto import skip event missing after append"
 AUTO_IMPORT_SKIPPED_TEXT = (
     "资源自动规则已跳过自动导入：{name}\n"
     "原因：命中低质量来源标记 {reason}。\n"
@@ -157,10 +158,18 @@ class PostDownloadAutoImportService:
                 message=reason,
             )
         except Exception as error:
-            print(
-                f"\033[31m[自动导入跳过事件落盘失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前会按状态不可用停路，避免把落盘异常误判成普通“已跳过自动导入”。",
-                flush=True,
-            )
+            if str(error) == "job_event missing after append":
+                _log_auto_import_skip_event_result_missing(
+                    task_id=candidate.task_id,
+                    task_hash=candidate.task_hash,
+                    reason=AUTO_IMPORT_SKIP_EVENT_RESULT_MISSING_REASON,
+                )
+            else:
+                _log_auto_import_skip_event_append_failed(
+                    task_id=candidate.task_id,
+                    task_hash=candidate.task_hash,
+                    reason=str(error),
+                )
             raise AutoImportStateUnavailableError(
                 f"auto import skip event append failed for {candidate.task_id}/{candidate.task_hash}"
             ) from error
@@ -190,5 +199,25 @@ def _log_auto_import_terminal_lookup_result_missing(*, task_id: str, task_hash: 
         f"\033[31m[自动导入终态结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
         "当前会停止这条任务的自动导入跟进，避免把缺失真相误判成“还没有终态事件”。",
+        flush=True,
+    )
+
+
+def _log_auto_import_skip_event_append_failed(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[自动导入跳过事件落盘失败]\033[0m task_id={task_id} task_hash={task_hash} "
+        f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；"
+        "当前会按状态不可用停路，避免把落盘异常误判成普通“已跳过自动导入”。",
+        flush=True,
+    )
+
+
+def _log_auto_import_skip_event_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[自动导入跳过事件结果缺失]\033[0m task_id={task_id} task_hash={task_hash} "
+        f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 写入后是否还能立即回读到该条跳过事件；"
+        "当前会按状态不可用停路，避免把缺失真相误判成普通“已跳过自动导入”。",
         flush=True,
     )

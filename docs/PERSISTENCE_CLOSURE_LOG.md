@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 自动导入跳过事件结果缺失分流缺口
+
+- 闭环：`post_download_auto_import._record_skip_event()` 在 `job_event.append_event()` 已执行但写入后立即回读不到事件时，不再和普通 SQLite 写入异常共用同一条“自动导入跳过事件落盘失败”日志；现在会单独打印“自动导入跳过事件结果缺失”中文日志与 `[处理建议]`，但 `run_for_record()` / `run_once()` / `status` follow-up 仍保持原来的状态不可用停路，不改自动导入副作用边界。
+- 代码：`app/services/post_download_auto_import.py`
+- 验证：`tests/test_get_download_status.py -k "skip_event_result_is_missing or skip_event_write_fails"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 搜索候选写入结果缺失分流缺口
 
 - 闭环：`search_media.search_and_format()` 在 `candidate_mapping` 保存后的计数查询直接返回 `None` 时，不再和普通 SQLite 写入异常或“条数不一致”共用同一条日志；现在会单独打印“搜索候选写入结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持 `CANDIDATE_STATE_UNAVAILABLE_TEXT`，不改候选回滚和 fail-closed 协议。

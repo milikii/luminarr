@@ -767,6 +767,62 @@ def test_get_status_text_returns_state_unavailable_when_skip_event_write_fails(
     assert "[下载状态自动导入状态读取失败]" in output
 
 
+def test_get_status_text_returns_state_unavailable_when_skip_event_result_is_missing(
+    tmp_path: Path, capsys
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 CAM",
+        chat_id=1001,
+        user_id=2001,
+    )
+    event_repo = JobEventRepo(database)
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=type(
+            "MissingSkipEventRepo",
+            (),
+            {
+                "list_events_for_task_identity": lambda self, *, task_id, task_hash: [],
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append")),
+            },
+        )(),
+        auto_import_func=auto_import,
+    )
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 2024 CAM",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT in text
+    assert "资源自动规则已跳过自动导入" not in text
+    auto_import.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[自动导入跳过事件结果缺失]" in output
+    assert "auto import skip event missing after append" in output
+    assert "[下载状态自动导入状态读取失败]" in output
+
+
 def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
@@ -870,6 +926,54 @@ def test_post_download_auto_import_run_once_marks_state_unavailable_when_skip_ev
     assert "db down" in output
 
 
+def test_post_download_auto_import_run_once_marks_state_unavailable_when_skip_event_result_is_missing(
+    tmp_path: Path, capsys
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 CAM",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 2024 CAM",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=type(
+            "MissingSkipEventRepo",
+            (),
+            {
+                "list_events_for_task_identity": lambda self, *, task_id, task_hash: [],
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append")),
+            },
+        )(),
+        auto_import_func=auto_import,
+    )
+
+    result = asyncio.run(auto_import_service.run_once(limit=5))
+
+    assert result == AutoImportRunResult(scanned=1, progressed=0, replies=(), state_unavailable=True)
+    auto_import.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[自动导入跳过事件结果缺失]" in output
+    assert "task_id=87" in output
+    assert "auto import skip event missing after append" in output
+
+
 def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(capsys) -> None:
     auto_import_service = PostDownloadAutoImportService(
         download_monitor_repo=None,
@@ -943,6 +1047,49 @@ def test_post_download_auto_import_run_for_record_raises_when_skip_event_write_f
     assert "[自动导入跳过事件落盘失败]" in output
     assert "task_id=87" in output
     assert "db down" in output
+
+
+def test_post_download_auto_import_run_for_record_raises_when_skip_event_result_is_missing(capsys) -> None:
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=None,
+        job_event_repo=type(
+            "MissingSkipEventRepo",
+            (),
+            {
+                "list_events_for_task_identity": lambda self, **kwargs: [],
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append")),
+            },
+        )(),
+        auto_import_func=auto_import,
+    )
+    record = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "Dune 2024 CAM",
+            "chat_id": 1001,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15T00:00:00+00:00",
+            "last_observed_at": "2026-04-15T00:00:00+00:00",
+            "created_at": "2026-04-15T00:00:00+00:00",
+            "updated_at": "2026-04-15T00:00:00+00:00",
+        },
+    )()
+
+    with pytest.raises(AutoImportStateUnavailableError):
+        asyncio.run(auto_import_service.run_for_record(record))
+
+    auto_import.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[自动导入跳过事件结果缺失]" in output
+    assert "task_id=87" in output
+    assert "auto import skip event missing after append" in output
 
 
 def test_post_download_auto_import_run_once_surfaces_completed_list_corruption(tmp_path: Path, capsys) -> None:
