@@ -74,6 +74,7 @@ CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT = (
 CLEANUP_GUARD_REJECTED_FIX_HINT = (
     "检查 source_path 和 target_path 是否指向同一位置或互为父子目录，确认导入关联无误后再重试。"
 )
+CLEANUP_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 
 
 @dataclass(frozen=True, slots=True)
@@ -475,15 +476,26 @@ class CleanupDownloadedSourceService:
                 target_path=target_path,
             )
         except Exception as error:
-            _print_cleanup_event_append_failed_log(
-                task_ref=task_ref,
-                event_type=event_type,
-                task_id=task_id,
-                task_hash=task_hash,
-                source_path=source_path,
-                target_path=target_path,
-                error=error,
-            )
+            if str(error) == CLEANUP_EVENT_RESULT_MISSING_REASON:
+                _print_cleanup_event_append_result_missing_log(
+                    task_ref=task_ref,
+                    event_type=event_type,
+                    task_id=task_id,
+                    task_hash=task_hash,
+                    source_path=source_path,
+                    target_path=target_path,
+                    reason="cleanup event missing after append",
+                )
+            else:
+                _print_cleanup_event_append_failed_log(
+                    task_ref=task_ref,
+                    event_type=event_type,
+                    task_id=task_id,
+                    task_hash=task_hash,
+                    source_path=source_path,
+                    target_path=target_path,
+                    error=error,
+                )
             return
 
 
@@ -679,5 +691,36 @@ def _print_cleanup_event_append_failed_log(
     print(
         "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可写、磁盘是否只读或已满；"
         "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘。",
+        flush=True,
+    )
+
+
+def _print_cleanup_event_append_result_missing_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    reason: str,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
+    print(
+        f"\033[31m[cleanup 事件结果缺失]\033[0m {details_text} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的 cleanup 事件；"
+        "当前 cleanup 文本结果已返回，但这次执行记录真相还没有确认落稳。",
         flush=True,
     )
