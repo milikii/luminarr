@@ -14,7 +14,9 @@ This file is the repository contract for AI coding agents.
 
 ## 2. Read Order
 
-Before touching code, read in this order:
+### Cold start
+
+在**同一会话的第 1 轮**、第一次真正动代码前，按这个顺序读：
 
 1. `docs/INDEX.md`
 2. `docs/ARCHITECTURE.md`
@@ -22,6 +24,22 @@ Before touching code, read in this order:
 4. `docs/DECISIONS.md`
 5. `docs/STATUS.md`
 6. `docs/TEST_ENV.md`（only when the task depends on real downloader/import/refresh verification）
+
+### Same-session follow-up rounds
+
+同一会话里的**后续轮次**不要机械重读全文。默认只读：
+
+1. `AGENTS.md`
+2. `docs/NEXT_STEP.md` 当前主线相关段落
+3. `docs/STATUS.md` 当前快照
+4. 与本轮任务直接相关的代码、测试、最近提交
+
+只有在确实需要时才按需读取：
+
+- `docs/DECISIONS.md` 相关边界段落
+- `docs/PERSISTENCE_CLOSURE_LOG.md` 当前主线详细闭环
+- `docs/CLEANUP_VERIFICATION_WINDOW.md` cleanup 已完成窗口证据
+- `docs/TEST_ENV.md` 真实 downloader / import / refresh 联调规则
 
 ## 3. Environment
 
@@ -154,6 +172,8 @@ Completed cleanup verification evidence lives in:
 - Run verification yourself; do not stop at “here is the command”.
 - After implementation, review the diff for scope creep, debug leftovers, and temporary files.
 - If behavior, rules, or entrypoints changed, update the relevant docs in the same turn.
+- 同一会话默认最多连续推进 10 轮；到第 10 轮结束后，下一次继续施工时应新开会话，不要把第 11 轮继续叠在旧线程里。
+- 长会话重开时，优先用“最新 commit hash + 1 段当前快照 + 1 段当前主线详细闭环”做交接，不要把整段历史对话当执行上下文。
 
 ## 12. High-risk paths
 
