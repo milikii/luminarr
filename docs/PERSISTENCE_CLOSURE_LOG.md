@@ -93,6 +93,13 @@
 - 闭环：`post_download_auto_import.run_once()` 在 `download_monitor` 已完成列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“自动导入候选读取失败”日志；现在会把“候选结果缺失”和普通读取失败拆开成更明确的中文日志与 `[处理建议]`，但本轮自动导入仍保持原来的 fail-closed：直接停路，不把缺失真相误判成“当前没有可导入候选”。
 - 代码：`app/services/post_download_auto_import.py`
 - 验证：`tests/test_get_download_status.py -k "run_once_logs_completed_list_failure or run_once_logs_completed_list_missing_result"`
+- commit：`d42bdf3` `Separate auto-import completed list diagnostics`
+
+### 2026-04-17 BT 订阅写入结果缺失分流缺口
+
+- 闭环：`manage_bt_subscription._add_item()` 在 `bt_subscription_item` 插入查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅写入失败”日志；现在会把“写入结果缺失”和普通写入失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `BT_SUBSCRIPTION_ADD_FAILED_TEXT`，不改订阅新增 workflow。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 搜索候选写入后真相不一致缺口
@@ -255,6 +262,7 @@
 - downloader approval-restore fail-closed tests：2026-04-17，`5 passed, 58 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_approval_logs or dispatch_failure_cannot_restore_pending_approval or confirm_add_by_task_ref_returns_failed_when_downloader_errors"`）
 - auto-import skip-event fail-closed tests：2026-04-17，`4 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "get_status_text_returns_state_unavailable_when_skip_event_write_fails or post_download_auto_import_run_once_marks_state_unavailable_when_skip_event_write_fails or post_download_auto_import_run_for_record_raises_when_skip_event_write_fails"`）
 - auto-import completed-list diagnostics tests：2026-04-17，`2 passed, 27 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "run_once_logs_completed_list_failure or run_once_logs_completed_list_missing_result"`）
+- btsub add result diagnostics tests：2026-04-17，`2 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`）
 - btsub remove result diagnostics tests：2026-04-17，`2 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "remove_returns_failure_text_when_repo_raises or remove_returns_failure_text_when_repo_returns_none"`）
 - btsub clear result diagnostics tests：2026-04-17，`2 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "clear_returns_failure_text_when_repo_raises or clear_returns_failure_text_when_repo_returns_none"`）
 

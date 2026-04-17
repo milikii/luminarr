@@ -295,6 +295,15 @@ class ManageBtSubscriptionService:
                     reason=str(error),
                 )
                 return None
+            if str(error) == "bt subscription add result missing":
+                _log_bt_subscription_add_result_missing(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
             _log_bt_subscription_add_failed(
                 chat_id=chat_id,
                 title=title,
@@ -766,6 +775,22 @@ def _log_bt_subscription_add_failed(
         f"\033[31m[BT 订阅写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
         f"media_kind={media_kind} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。"
+    )
+
+
+def _log_bt_subscription_add_result_missing(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅写入结果缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 插入查询返回是否仍带有完整结果；"
+        "当前会按写入失败处理，避免把缺失真相误判成“已成功添加”。"
     )
 
 
