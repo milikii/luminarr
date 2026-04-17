@@ -9,6 +9,7 @@ from app.services.add_to_downloader import AddToDownloaderService
 from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_ADD_FAILED_TEXT,
     BT_SUBSCRIPTION_CLEAR_FAILED_TEXT,
+    BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT,
     BT_SUBSCRIPTION_LIST_FAILED_TEXT,
     BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT,
     BT_SUBSCRIPTION_REMOVE_FAILED_TEXT,
@@ -417,9 +418,10 @@ def test_bt_subscription_run_once_logs_missing_row_during_last_seen_update(tmp_p
     )
 
     assert "下载待确认：" in reply
-    assert "最近资源真相未更新" in reply
+    assert BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT in reply
     captured = capsys.readouterr()
-    assert "[BT 订阅最近资源回写失败]" in captured.out
+    assert "[BT 订阅最近资源回写条目缺失]" in captured.out
+    assert "[处理建议]" in captured.out
     assert "bt_subscription_item missing during last_seen update" in captured.out
 
 

@@ -43,6 +43,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Telegram BT `raw_bt_destination` 清理链也已补一处 fail-closed：清理失败时不再把旧目录选择当成“已取消”或继续推进后续链路，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
 - 搜索链最近几轮也已收口到 fail-closed：待澄清写入失败、旧澄清态清理失败、候选缓存写入失败，都不再保留误导性的 in-memory 状态。
 - 自动导入低质量资源的规则跳过链也已补一处 fail-closed：`job_event` 跳过事件写入失败时，不再继续回“已跳过自动导入”，而会按状态不可用停路，避免把持久化缺口混成普通规则命中。
+- BT 订阅最近资源回写链已补一处分流：订阅条目已不存在时，不再和 SQLite 回写异常共用同一类 warning；现在会显式提示“待确认已创建，但订阅条目已不存在”。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
 - 当前本地联调基线仍是 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 - `docs/STATUS.md` 从本版开始只保留短快照；当前主线的详细闭环、focused tests 和 commit 轨迹收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。

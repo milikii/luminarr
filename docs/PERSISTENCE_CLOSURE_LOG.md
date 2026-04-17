@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 BT 订阅最近资源回写缺口
+
+- 闭环：`manage_bt_subscription._update_last_seen()` 现在会区分两类真相缺口：如果 `bt_subscription_item` 条目在回写前已不存在，会打印“条目缺失”中文日志，并把用户 warning 改成“本轮待确认已创建，但该订阅已不存在”；只有 SQLite 或其它持久化异常，才继续走“最近资源真相未更新”的状态不可用 warning，避免把真缺数据和写库异常混成一类。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k last_seen`
+- commit：待补
+
 ### 2026-04-17 自动导入规则跳过事件缺口
 
 - 闭环：`post_download_auto_import._record_skip_event()` 在低质量资源命中自动跳过规则时，如果 `job_event` 写入失败，不再继续回“已跳过自动导入”，而是抛成状态不可用；`run_once()` 和 `status` follow-up 都会按 fail-closed 停路，避免把 `job_event` 真相缺口混成普通规则命中并在后续轮询里重复提示。

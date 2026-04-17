@@ -41,6 +41,10 @@ BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT = (
     "注意：BT 订阅最近资源真相未更新，下次扫描可能重复命中同一资源。\n"
     "请检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
 )
+BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT = (
+    "注意：BT 订阅条目已不存在，本轮命中的下载待确认已经创建，但不会更新最近资源真相。\n"
+    "请先确认是否有人删除了该条订阅；如仍需继续追踪，请重新添加后再执行 btsub run。"
+)
 MEDIA_KIND_ALIASES = {
     "movie": "movie",
     "film": "movie",
@@ -90,6 +94,19 @@ class BtSubscriptionCandidate:
     preferred: bool
     seeders: int
     size_bytes: int
+
+
+@dataclass(frozen=True, slots=True)
+class BtSubscriptionLastSeenUpdateResult:
+    status: str
+
+    @property
+    def updated(self) -> bool:
+        return self.status == "updated"
+
+    @property
+    def item_missing(self) -> bool:
+        return self.status == "item_missing"
 
 
 class ManageBtSubscriptionService:
@@ -361,13 +378,16 @@ class ManageBtSubscriptionService:
             f"命中资源: {candidate_title}\n\n"
             f"{pending_text}"
         )
-        if self._update_last_seen(
+        last_seen_update = self._update_last_seen(
             item=item,
             chat_id=chat_id,
             source=selected_source,
             title=candidate_title,
-        ):
+        )
+        if last_seen_update.updated:
             return reply, False
+        if last_seen_update.item_missing:
+            return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT}", False
         return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT}", False
 
     async def _scan_chat_once(
@@ -416,7 +436,7 @@ class ManageBtSubscriptionService:
         chat_id: int,
         source: str,
         title: str,
-    ) -> bool:
+    ) -> BtSubscriptionLastSeenUpdateResult:
         try:
             updated = self._bt_subscription_repo.update_last_seen(
                 chat_id=chat_id,
@@ -426,6 +446,24 @@ class ManageBtSubscriptionService:
             )
             if not updated:
                 raise BtSubscriptionPersistenceError("bt subscription last_seen update result missing")
+        except BtSubscriptionPersistenceError as error:
+            if str(error) == "bt_subscription_item missing during last_seen update":
+                _log_bt_subscription_last_seen_item_missing(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=str(error),
+                )
+                return BtSubscriptionLastSeenUpdateResult(status="item_missing")
+            _log_bt_subscription_last_seen_update_failed(
+                item=item,
+                chat_id=chat_id,
+                source=source,
+                title=title,
+                reason=str(error),
+            )
+            return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
         except Exception as error:
             _log_bt_subscription_last_seen_update_failed(
                 item=item,
@@ -434,8 +472,8 @@ class ManageBtSubscriptionService:
                 title=title,
                 reason=str(error),
             )
-            return False
-        return True
+            return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
+        return BtSubscriptionLastSeenUpdateResult(status="updated")
 
 
 def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
@@ -669,6 +707,21 @@ def _log_bt_subscription_last_seen_update_failed(
         f"\033[31m[BT 订阅最近资源回写失败]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
         f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
+    )
+
+
+def _log_bt_subscription_last_seen_item_missing(
+    *,
+    item: BtSubscriptionItem,
+    chat_id: int,
+    source: str,
+    title: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅最近资源回写条目缺失]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
+        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查该订阅条目是否已被删除；如仍需继续追踪，请重新添加后再执行 btsub run。"
     )
 
 
