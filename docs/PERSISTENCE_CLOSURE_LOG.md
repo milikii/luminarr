@@ -16,6 +16,13 @@
 - 闭环：`manage_bt_subscription._update_last_seen()` 在 `bt_subscription_item` 最近资源回写返回 `False` 或 `None` 时，不再和普通 SQLite/更新异常共用同一条“BT 订阅最近资源回写失败”日志；现在会把“回写结果缺失”和普通回写失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 warning：已创建的下载待确认保留，最近资源真相未更新提示不变，不改 `btsub run` 的副作用边界。
 - 代码：`app/services/manage_bt_subscription.py`
 - 验证：`tests/test_manage_bt_subscription.py -k "last_seen_truth_is_not_updated or last_seen_truth_update_returns_none or missing_row_during_last_seen_update"`
+- commit：`9e087dd` `Separate btsub last_seen result diagnostics`
+
+### 2026-04-17 想看写入结果缺失分流缺口
+
+- 闭环：`manage_watchlist._add_item()` 在 `watchlist_repo.add_item()` 返回 `None` 时，不再和普通 SQLite 写入异常共用同一条“想看写入失败”日志；现在会把“写入结果缺失”和普通写入失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的失败文本，不改 watchlist workflow。
+- 代码：`app/services/manage_watchlist.py`
+- 验证：`tests/test_manage_watchlist.py -k "add_returns_failure_text_when_repo_returns_none or add_logs_missing_row_after_insert or add_returns_failure_text_when_repo_raises"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 下载状态观察结果缺字段分流缺口
