@@ -51,6 +51,7 @@ DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "downloader restore 
 DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 DOWNLOADER_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during executed version update"
+DOWNLOADER_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
@@ -1098,10 +1099,18 @@ class AddToDownloaderService:
                 workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
         except Exception as error:
-            print(
-                f"\033[31m[下载确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
-                flush=True,
-            )
+            if str(error) == DOWNLOADER_RESTORE_PENDING_JOB_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[下载确认任务回退结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认任务是否仍存在，以及 lease 回退后是否还能回读到待确认状态；"
+                    "当前审批已尝试退回待确认，但任务真相还没有确认回退成功。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[下载确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
+                    flush=True,
+                )
             return
         if restored is False:
             print(
