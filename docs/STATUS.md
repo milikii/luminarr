@@ -1,4 +1,4 @@
-# Current status (v291)
+# Current status (v292)
 
 ## Project position
 
@@ -43,6 +43,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-17，下载 / 导入确认链的审批更新阶段也已补齐“结果缺失”分流：`approve_downloader()` / `approve_import()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并让 confirm 直接回状态读取失败，不再把“审批结果缺失”误判成普通 not pending。
 - 截至 2026-04-17，下载 / 导入取消链的审批取消阶段也已补齐“结果缺失”分流：`cancel_downloader()` / `cancel_import()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并让 cancel 直接回状态读取失败，不再把“取消结果缺失”误判成普通状态冲突。
 - 截至 2026-04-17，导入入口的 `raw_bt` 判定也已补齐“任务行缺失”分流：`_is_raw_bt_task()` 在 `jobs` 已查不到下载任务行时，会明确打印“导入 raw_bt 判定结果缺失”中文日志并直接 fail-closed，不再把分类真相缺口误判成普通“不是 raw_bt”继续送进入库链。
+- 截至 2026-04-17，cleanup 的导入关联查询也已补齐“结果缺失”分流：`_find_import_correlation()` 在 `job_event` 关联查询返回链路缺结果时，会明确打印“cleanup 关联结果缺失”中文日志，但继续保持原来的“未找到关联”停路和 guardrail，不改 cleanup 副作用边界。
 - 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致 已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 截至 2026-04-17，Telegram BT `processing_path` 清理也已补齐“结果缺失”分流：`_clear_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
 - 截至 2026-04-17，Telegram BT `classification` 清理也已补齐“结果缺失”分流：`_clear_bt_classification_pending()` / `_pop_bt_classification_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。

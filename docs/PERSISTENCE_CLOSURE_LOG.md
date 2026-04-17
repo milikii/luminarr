@@ -1,4 +1,4 @@
-# Persistence closure log (v29)
+# Persistence closure log (v30)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 cleanup 关联结果缺失分流缺口
+
+- 闭环：`cleanup_downloaded_source._find_import_correlation()` 之前在 `job_event.find_latest_import_correlation()` 返回“结果缺失”时，只会和普通 SQLite 查询异常共用同一条“cleanup 关联查询失败”日志；现在会单独打印“cleanup 关联结果缺失”中文日志与 `[处理建议]`，继续按原来的“未找到关联”停路，但不再把 `job_event` 返回缺口混成普通查询失败。
+- 代码：`app/services/cleanup_downloaded_source.py`
+- 验证：`tests/test_cleanup_downloaded_source.py -k "inspect_by_task_ref_logs_correlation_lookup_result_missing_and_returns_missing_state or cleanup_by_task_ref_logs_correlation_lookup_result_missing_and_keeps_follow_up or inspect_by_task_ref_logs_correlation_query_failure_and_returns_missing_state or cleanup_by_task_ref_logs_correlation_query_failure_and_keeps_follow_up"`
 
 ### 2026-04-17 导入 raw_bt 判定缺失行分流缺口
 
@@ -601,6 +607,7 @@
 - downloader finalization-result diagnostics tests：2026-04-17，`4 passed, 83 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "mark_completed_job_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
 - import finalization-result diagnostics tests：2026-04-17，`4 passed, 114 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "mark_completed_job_logs_missing_result or confirm_import_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
 - import raw_bt lookup diagnostics tests：2026-04-17，`4 passed, 120 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "is_raw_bt_task_logs_missing_job_result or import_by_task_ref_returns_query_failed_when_raw_bt_job_result_is_missing or import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails or import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted"`）
+- cleanup correlation result-missing diagnostics tests：2026-04-17，`4 passed, 74 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "inspect_by_task_ref_logs_correlation_lookup_result_missing_and_returns_missing_state or cleanup_by_task_ref_logs_correlation_lookup_result_missing_and_keeps_follow_up or inspect_by_task_ref_logs_correlation_query_failure_and_returns_missing_state or cleanup_by_task_ref_logs_correlation_query_failure_and_keeps_follow_up"`）
 - downloader approval-result diagnostics tests：2026-04-17，`4 passed, 84 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_downloader_approval_logs_missing_result_when_repo_returns_none or confirm_add_by_task_ref_returns_state_unavailable_when_approval_result_is_missing or record_downloader_approval_logs_missing_result or record_downloader_approval_logs_rejected_current_state"`）
 - import approval-result diagnostics tests：2026-04-17，`4 passed, 115 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_import_approval_logs_missing_result_when_repo_returns_none or confirm_import_by_task_ref_returns_state_unavailable_when_approval_result_is_missing or record_import_approval_logs_missing_result or record_import_approval_logs_rejected_current_state"`）
 - downloader cancel-approval-result diagnostics tests：2026-04-17，`4 passed, 87 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "cancel_pending_approval_logs_missing_result_when_repo_returns_none or cancel_pending_add_returns_state_unavailable_when_approval_cancel_result_is_missing or cancel_pending_approval_logs_missing_result or cancel_pending_add_returns_state_unavailable_when_approval_cancel_rejected"`）

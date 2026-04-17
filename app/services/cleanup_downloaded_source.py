@@ -75,6 +75,7 @@ CLEANUP_GUARD_REJECTED_FIX_HINT = (
     "检查 source_path 和 target_path 是否指向同一位置或互为父子目录，确认导入关联无误后再重试。"
 )
 CLEANUP_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
+CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
 
 @dataclass(frozen=True, slots=True)
@@ -381,17 +382,30 @@ class CleanupDownloadedSourceService:
                 task_hash=resolved_identity.lookup_task_hash,
             )
         except Exception as error:
-            print(
-                f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
-                f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
-                f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
-                flush=True,
-            )
-            print(
-                "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
-                "再重试 cleanup。",
-                flush=True,
-            )
+            if str(error) == CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[cleanup 关联结果缺失]\033[0m task_ref={task_ref} "
+                    f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+                    f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
+                    flush=True,
+                )
+                print(
+                    "\033[33m[处理建议]\033[0m 检查 job_event 关联查询返回是否仍带有完整事件列表；"
+                    "当前会按未找到关联停路，避免把缺失真相误判成普通“没有 import 关联”。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
+                    f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+                    f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
+                    flush=True,
+                )
+                print(
+                    "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
+                    "再重试 cleanup。",
+                    flush=True,
+                )
             return resolved_identity, None
         if event is None:
             return resolved_identity, None
