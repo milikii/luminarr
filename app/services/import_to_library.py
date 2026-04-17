@@ -1446,7 +1446,7 @@ class ImportToLibraryService:
         if self._job_repo is None:
             return False
         try:
-            return self._job_repo.claim_lease(
+            claimed = self._job_repo.claim_lease(
                 job_id=job.job_id,
                 expected_version=job.version,
                 lease_owner=lease_owner,
@@ -1458,6 +1458,13 @@ class ImportToLibraryService:
                 flush=True,
             )
             return None
+        if claimed is False:
+            print(
+                f"\033[31m[导入确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误=jobs.claim_lease rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配，或是否已被其他路径抢先确认/取消；当前 confirm 会继续按 stale check 处理，避免把任务真相冲突静默混成普通未确认。",
+                flush=True,
+            )
+            return False
+        return True
 
     def _restore_pending_job(
         self,
