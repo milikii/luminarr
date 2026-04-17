@@ -72,6 +72,7 @@ IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during ex
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
+IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1289,11 +1290,19 @@ class ImportToLibraryService:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
+            if restored is None:
+                raise RuntimeError(IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON)
         except Exception as error:
-            print(
-                f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
-                flush=True,
-            )
+            if str(error) == IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入审批回退结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
+                    flush=True,
+                )
             return None
         if restored is False:
             print(
