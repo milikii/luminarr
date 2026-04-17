@@ -1,4 +1,4 @@
-# Persistence closure log (v11)
+# Persistence closure log (v12)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -11,103 +11,110 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 最小 trace 基线落地
+
+- 闭环：shared private-chat runtime 的入站/回包，以及下载/导入待确认与 confirm 关键节点，都会通过 `app/trace_logging.py` 追加轻量文本轨迹到 `logs/trace.log`；这层 trace 只补可追溯串联，不替代现有中文故障日志，也不改变 workflow 真相和副作用边界。
+- 代码：`app/trace_logging.py`、`app/bot/private_chat_runtime.py`、`app/services/add_to_downloader.py`、`app/services/import_to_library.py`
+- 验证：`tests/test_trace_logging.py`、`tests/test_private_chat_runtime.py -k trace_log`、`tests/test_add_to_downloader.py -k trace_log`、`tests/test_import_to_library.py -k trace_log`
+- commit：`4c8a19d` `Add minimal trace logging baseline`
+
 ### 2026-04-17 导入执行版号结果缺失分流缺口
 
 - 闭环：`import_to_library._record_executed_lease_version()` 在 `approval_record.executed_version` 更新时，如果 `approval_record` 行已经不存在，不再和普通 SQLite 更新异常共用同一条“导入执行版号回写失败”日志；现在会单独打印“导入执行版号结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `IMPORT_FINALIZATION_WARNING_TEXT`，不改导入成功真相和 confirm 收尾边界。
 - 代码：`app/services/import_to_library.py`
 - 验证：`tests/test_import_to_library.py -k "record_executed_lease_version_logs_persistence_failure or record_executed_lease_version_logs_missing_result"`
-- commit：`待本轮提交`
+- commit：`bd47df2` `Separate import executed-version diagnostics`
 
 ### 2026-04-17 导入待确认审批结果缺失分流缺口
 
 - 闭环：`import_to_library._record_pending_approval()` 在 `approval_record` 已写入、但写入后立即回读不到当前待确认导入审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一条“导入待确认审批落盘失败”日志；现在会单独打印“导入待确认审批结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `IMPORT_PENDING_STATE_UNAVAILABLE_TEXT`，不改导入审批 fail-closed 边界。
 - 代码：`app/services/import_to_library.py`
 - 验证：`tests/test_import_to_library.py -k "record_pending_approval_logs_persistence_failure or record_pending_approval_logs_missing_pending_result"`
-- commit：`待本轮提交`
+- commit：`397a1f7` `Separate import approval diagnostics`；follow-up：`080fd81` `Fix import approval result reason`
 
 ### 2026-04-17 下载待确认审批结果缺失分流缺口
 
 - 闭环：`add_to_downloader._record_pending_approval()` 在 `approval_record` 已写入、但写入后立即回读不到当前待确认审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一条“下载待确认审批落盘失败”日志；现在会单独打印“下载待确认审批结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不改下载审批 fail-closed 边界。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "record_pending_approval_logs_persistence_failure or record_pending_approval_logs_missing_pending_result"`
-- commit：`待本轮提交`
+- commit：`dd2db74` `Separate downloader approval diagnostics`
 
 ### 2026-04-17 下载监控登记结果缺失分流缺口
 
 - 闭环：`add_to_downloader._register_download_monitor()` 在 `download_monitor` 已写入、但写入后立即回读不到刚登记的状态记录时，不再和普通 SQLite 写入异常共用同一条“下载监控登记失败”日志；现在会单独打印“下载监控登记结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的继续执行边界，不改下载已投递成功后的副作用真相。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "register_download_monitor_logs_persistence_failure or register_download_monitor_logs_missing_registered_result"`
-- commit：`待本轮提交`
+- commit：`8b02620` `Separate download monitor register diagnostics`
 
 ### 2026-04-17 导入待确认任务结果缺失分流缺口
 
 - 闭环：`import_to_library._record_pending_job()` 在 `jobs` 导入待确认任务已写入、但写入后立即回读不到待确认任务时，不再和普通 SQLite 写入异常共用同一条“导入待确认任务落盘失败”日志；现在会单独打印“导入待确认任务结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `IMPORT_PENDING_STATE_UNAVAILABLE_TEXT`，不改导入审批 fail-closed 边界。
 - 代码：`app/services/import_to_library.py`
 - 验证：`tests/test_import_to_library.py -k "record_pending_job_logs_persistence_failure or record_pending_job_logs_missing_pending_job_result"`
-- commit：`待本轮提交`
+- commit：`a9ed216` `Separate import pending-job diagnostics`
 
 ### 2026-04-17 下载待确认任务结果缺失分流缺口
 
 - 闭环：`add_to_downloader._record_pending_job()` 在 `jobs` 待确认任务已写入、但写入后立即回读不到待确认任务时，不再和普通 SQLite 写入异常共用同一条“下载待确认任务落盘失败”日志；现在会单独打印“下载待确认任务结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不改下载审批 fail-closed 边界。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "record_pending_job_logs_persistence_failure or record_pending_job_logs_missing_pending_job_result"`
-- commit：`待本轮提交`
+- commit：`93ded37` `Separate downloader pending-job diagnostics`
 
 ### 2026-04-17 cleanup 事件结果缺失分流缺口
 
 - 闭环：`cleanup_downloaded_source._record_event()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到 cleanup 事件时，不再和普通 SQLite 写入异常共用同一条“cleanup 事件写入失败”日志；现在会单独打印“cleanup 事件结果缺失”中文日志与 `[处理建议]`，但 cleanup 文本结果仍保持原来的继续返回边界，不改 guardrail 和副作用真相。
 - 代码：`app/services/cleanup_downloaded_source.py`
 - 验证：`tests/test_cleanup_downloaded_source.py -k "event_append_failure or missing_appended_event_result"`
-- commit：`待本轮提交`
+- commit：`9e1bd14` `Separate cleanup event result diagnostics`
 
 ### 2026-04-17 导入事件结果缺失分流缺口
 
 - 闭环：`import_to_library._record_event()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到导入事件时，不再和普通 SQLite 写入异常共用同一条“导入事件落盘失败”日志；现在会单独打印“导入事件结果缺失”中文日志与 `[处理建议]`，但导入流程仍保持原来的继续执行边界，不改导入副作用。
 - 代码：`app/services/import_to_library.py`
 - 验证：`tests/test_import_to_library.py -k "record_event_logs_persistence_failure or record_event_logs_missing_appended_event_result"`
-- commit：`待本轮提交`
+- commit：`eef4768` `Separate import event result diagnostics`
 
 ### 2026-04-17 下载完成观察事件结果缺失分流缺口
 
 - 闭环：`get_download_status._record_status_observation()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到 `downloader.completed_observed` 事件时，不再和普通 SQLite 写入异常共用同一条“下载完成观察事件落盘失败”日志；现在会单独打印“下载完成观察事件结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改状态查询和自动导入 follow-up 边界。
 - 代码：`app/services/get_download_status.py`
 - 验证：`tests/test_get_download_status.py -k "completion_event_write_fails or completion_event_result_is_missing"`
-- commit：`待本轮提交`
+- commit：`68a73cb` `Separate completion event result diagnostics`
 
 ### 2026-04-17 下载事件结果缺失分流缺口
 
 - 闭环：`add_to_downloader._record_event()` 在 `job_event.append_event()` 已执行但写入后立即回读不到下载事件时，不再和普通 SQLite 写入异常共用同一条“下载事件落盘失败”日志；现在会单独打印“下载事件结果缺失”中文日志与 `[处理建议]`，但当前下载流程仍保持原来的继续执行边界，不抬成新的状态失败。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "record_event_logs_persistence_failure or record_event_logs_missing_appended_event_result"`
-- commit：`待本轮提交`
+- commit：`974506d` `Separate downloader event result diagnostics`
 
 ### 2026-04-17 导入目标路径缺失分流缺口
 
 - 闭环：`import_to_library._find_latest_import_target_path()` 在已经读到 import 关联对象、但 `target_path` 与 `message` 都为空时，不再和普通“没有历史导入终态”混成静默空结果；现在会单独打印“导入目标路径缺失”中文日志与 `[处理建议]`，但 stale confirm 判定仍保持原来的 `IMPORT_CONFIRM_NOT_PENDING_TEXT` 边界，不改审批或导入副作用。
 - 代码：`app/services/import_to_library.py`
 - 验证：`tests/test_import_to_library.py -k "find_latest_import_target_path_logs_missing_structured_target or find_version_stale_rejection_text_logs_missing_structured_target"`
-- commit：`待本轮提交`
+- commit：`b684f18` `Separate import target-path diagnostics`
 
 ### 2026-04-17 cleanup 关联路径缺失分流缺口
 
 - 闭环：`cleanup_downloaded_source._find_import_correlation()` 在 `import.succeeded` 事件已存在、但 `source_path` 或 `target_path` 为空时，不再和普通“未找到 import 关联”混成静默 `None`；现在会单独打印“cleanup 关联路径缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的关联缺失拒绝文案，不改 cleanup guardrail 和副作用边界。
 - 代码：`app/services/cleanup_downloaded_source.py`
 - 验证：`tests/test_cleanup_downloaded_source.py -k "missing_structured_source_path or missing_structured_target_path"`
-- commit：`待本轮提交`
+- commit：`e430a8e` `Separate cleanup correlation path diagnostics`
 
 ### 2026-04-17 自动导入跳过事件结果缺失分流缺口
 
 - 闭环：`post_download_auto_import._record_skip_event()` 在 `job_event.append_event()` 已执行但写入后立即回读不到事件时，不再和普通 SQLite 写入异常共用同一条“自动导入跳过事件落盘失败”日志；现在会单独打印“自动导入跳过事件结果缺失”中文日志与 `[处理建议]`，但 `run_for_record()` / `run_once()` / `status` follow-up 仍保持原来的状态不可用停路，不改自动导入副作用边界。
 - 代码：`app/services/post_download_auto_import.py`
 - 验证：`tests/test_get_download_status.py -k "skip_event_result_is_missing or skip_event_write_fails"`
-- commit：`待本轮提交`
+- commit：`e30e1ed` `Separate auto-import skip event result diagnostics`
 
 ### 2026-04-17 搜索候选写入结果缺失分流缺口
 
 - 闭环：`search_media.search_and_format()` 在 `candidate_mapping` 保存后的计数查询直接返回 `None` 时，不再和普通 SQLite 写入异常或“条数不一致”共用同一条日志；现在会单独打印“搜索候选写入结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持 `CANDIDATE_STATE_UNAVAILABLE_TEXT`，不改候选回滚和 fail-closed 协议。
 - 代码：`app/services/search_media.py`
 - 验证：`tests/test_search_media.py -k "search_candidate_persist_logs_missing_count_result or search_candidate_persist_logs_count_mismatch_after_save"`
-- commit：`待本轮提交`
+- commit：`7ae80a6` `Separate candidate count-result diagnostics`
 
 ### 2026-04-17 BT 订阅最近资源回写结果缺失分流缺口
 
@@ -142,7 +149,7 @@
 - 闭环：`search_media.search_and_format()` 在候选写入失败后的回滚删除返回 `None` 时，不再和普通 SQLite 删除异常共用同一条“搜索候选清理失败”日志；现在会把“回滚清理结果缺失”和普通回滚清理失败拆开成更明确的中文日志与 `[处理建议]`，但 fail-closed 行为保持不变：当前请求仍直接返回候选状态写入失败，不继续暴露坏候选缓存。
 - 代码：`app/services/search_media.py`
 - 验证：`tests/test_search_media.py -k "candidate_persist_rollback_logs_missing_clear_result or search_candidate_persist_logs_persistence_failure"`
-- commit：`待本轮提交`
+- commit：`bc5625d` `Separate candidate rollback clear result diagnostics`
 
 ### 2026-04-17 下载状态观察结果缺字段分流缺口
 
@@ -233,7 +240,7 @@
 - 闭环：`manage_bt_subscription._add_item()` 在 `bt_subscription_item` 插入查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅写入失败”日志；现在会把“写入结果缺失”和普通写入失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `BT_SUBSCRIPTION_ADD_FAILED_TEXT`，不改订阅新增 workflow。
 - 代码：`app/services/manage_bt_subscription.py`
 - 验证：`tests/test_manage_bt_subscription.py -k "add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`
-- commit：`待本轮提交`
+- commit：`7d9355c` `Separate btsub add result diagnostics`
 
 ### 2026-04-17 搜索候选写入后真相不一致缺口
 
