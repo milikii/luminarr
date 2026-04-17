@@ -17,7 +17,7 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
+from app.db.job_repo import JOB_STATE_CANCELLED, JOB_STATE_PENDING_APPROVAL, WORKFLOW_IMPORT_TO_LIBRARY, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     ConfirmExecutionContext,
@@ -613,6 +613,45 @@ def test_record_import_approval_logs_rejected_current_state(capsys) -> None:
     output = capsys.readouterr().out
     assert "[导入确认审批更新失败]" in output
     assert "approval_record approve rejected current state" in output
+
+
+def test_cancel_pending_import_logs_missing_approval_result(capsys) -> None:
+    pending_job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
+        state=JOB_STATE_PENDING_APPROVAL,
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    job_repo = type("JobRepo", (), {"get_latest_pending_import_job": lambda self, chat_id: pending_job})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during cancel"))},
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        job_repo=job_repo,
+        approval_repo=approval_repo,
+    )
+    service._resolve_pending_lease_version = lambda **kwargs: 2
+
+    assert service.cancel_pending_import(1001) == IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入取消审批结果缺失]" in output
+    assert "approval_record missing during cancel" in output
+    assert "[处理建议]" in output
 
 
 def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:

@@ -73,6 +73,7 @@ IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during ex
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
+IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
@@ -665,11 +666,19 @@ class ImportToLibraryService:
                     expected_lease_version=expected_lease_version,
                 )
             except Exception as error:
-                print(
-                    f"\033[31m[导入取消审批更新失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认导入状态可能仍残留。",
-                    flush=True,
-                )
-                approval_cancelled = False
+                if str(error) == IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON:
+                    print(
+                        f"\033[31m[导入取消审批结果缺失]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n"
+                        "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及取消更新后是否还能回读到该行；"
+                        "当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消导入”。",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"\033[31m[导入取消审批更新失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认导入状态可能仍残留。",
+                        flush=True,
+                    )
+                return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
             if not approval_cancelled:
                 print(
                     f"\033[31m[导入取消审批更新失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",

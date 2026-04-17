@@ -47,6 +47,7 @@ ADD_FINALIZATION_WARNING_TEXT = (
 DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "downloader cancel pending job result missing"
 DOWNLOADER_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
+DOWNLOADER_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
 DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "downloader restore pending approval result missing"
 DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
@@ -887,6 +888,14 @@ class AddToDownloaderService:
             )
         except Exception as error:
             self._pending_add_identities.add(identity)
+            if str(error) == DOWNLOADER_CANCEL_APPROVAL_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[下载取消审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认下载审批是否仍存在，以及取消更新后是否还能回读到该行；"
+                    "当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消下载”。",
+                    flush=True,
+                )
+                return False
             print(
                 f"\033[31m[下载取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认状态可能仍残留。",
                 flush=True,

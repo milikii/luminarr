@@ -442,6 +442,31 @@ def test_cancel_pending_approval_logs_persistence_failure(capsys) -> None:
     assert "[下载取消审批更新失败]" in capsys.readouterr().out
 
 
+def test_cancel_pending_approval_logs_missing_result(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during cancel"))},
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+
+    assert service._cancel_pending_approval(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        expected_lease_version=1,
+    ) is False
+
+    output = capsys.readouterr().out
+    assert "[下载取消审批结果缺失]" in output
+    assert "approval_record missing during cancel" in output
+    assert "[处理建议]" in output
+
+
 def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"mark_downloader_executed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
