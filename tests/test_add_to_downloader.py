@@ -956,6 +956,32 @@ def test_restore_pending_approval_logs_missing_result(capsys) -> None:
     assert "lease_version=2" in output
 
 
+def test_restore_pending_approval_logs_missing_row_result(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during restore"))},
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    assert (
+        service._restore_pending_approval(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            expected_lease_version=2,
+        )
+        is None
+    )
+    output = capsys.readouterr().out
+    assert "[下载审批回退结果缺失]" in output
+    assert "approval_record missing during restore" in output
+    assert "lease_version=2" in output
+
+
 def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: False})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
@@ -1912,6 +1938,7 @@ def test_confirm_add_by_task_ref_appends_warning_when_job_completion_write_fails
     [
         ("raise", "[下载审批回退失败]", "db down"),
         ("missing", "[下载审批回退结果缺失]", "downloader restore pending approval result missing"),
+        ("missing_row", "[下载审批回退结果缺失]", "approval_record missing during restore"),
         ("reject", "[下载审批回退失败]", "approval_record restore rejected current state"),
     ],
 )
@@ -1940,6 +1967,8 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure
                 raise RuntimeError("db down")
             if restore_mode == "missing":
                 return None
+            if restore_mode == "missing_row":
+                raise RuntimeError("approval_record missing during restore")
             return False
 
     search_service = SearchMediaService(_fake_search_with_download_url)

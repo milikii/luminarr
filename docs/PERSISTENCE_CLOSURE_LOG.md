@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载/导入审批回退缺失行分流缺口
+
+- 闭环：`approval_repo._restore_pending()` 在审批回退时，如果 `approval_record` 行已经不存在，不再把“审批行缺失”和普通状态冲突一起压成 `False`；`add_to_downloader._restore_pending_approval()` / `import_to_library._restore_pending_approval()` 现在会把这类缺失继续记成“审批回退结果缺失”中文日志，并继续让 confirm 走原来的状态读取失败 fail-closed 边界，不改审批真相和副作用。
+- 代码：`app/db/approval_repo.py`、`app/services/add_to_downloader.py`、`app/services/import_to_library.py`
+- 验证：`tests/test_persistence_sqlite.py -k "approval_repo_restore_pending_raises_when_row_missing"`；`tests/test_add_to_downloader.py -k "restore_pending_approval_logs_missing_result or restore_pending_approval_logs_missing_row_result or confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval"`；`tests/test_import_to_library.py -k "restore_pending_approval_logs_missing_result or restore_pending_approval_logs_missing_row_result or confirm_import_by_task_ref_returns_state_unavailable_when_execution_restore_pending_approval_result_is_missing"`
+
 ### 2026-04-17 下载/导入取消审批结果缺失分流缺口
 
 - 闭环：`approval_repo._cancel()` 在取消审批更新时，如果 `approval_record` 行已经不存在，不再把“审批行缺失”和普通状态冲突一起压成 `False`；`add_to_downloader._cancel_pending_approval()` / `import_to_library.cancel_pending_import()` 现在会单独打印“下载取消审批结果缺失”/“导入取消审批结果缺失”中文日志与 `[处理建议]`，并继续让 cancel 走原来的状态读取失败 fail-closed 边界，不改审批真相和副作用。

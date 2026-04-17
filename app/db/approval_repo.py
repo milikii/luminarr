@@ -467,7 +467,16 @@ class ApprovalRepo:
                 ),
             )
             connection.commit()
-        return cursor.rowcount == 1
+        if cursor.rowcount == 1:
+            return True
+        approval_record = self._get_exact_approval_record(
+            action_type=action_type,
+            task_id=cleaned_task_id,
+            task_hash=cleaned_task_hash,
+        )
+        if approval_record is None:
+            raise ApprovalPersistenceError("approval_record missing during restore")
+        return False
 
     def _cancel(
         self,

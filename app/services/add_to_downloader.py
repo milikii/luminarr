@@ -49,6 +49,7 @@ DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "downloader cancel pending
 DOWNLOADER_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 DOWNLOADER_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
 DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "downloader restore pending approval result missing"
+DOWNLOADER_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missing during restore"
 DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 DOWNLOADER_APPROVE_RESULT_MISSING_REASON = "approval_record missing during approve"
@@ -845,7 +846,10 @@ class AddToDownloaderService:
             if restored is None:
                 raise RuntimeError(DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON)
         except Exception as error:
-            if str(error) == DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON:
+            if str(error) in {
+                DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON,
+                DOWNLOADER_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON,
+            }:
                 print(
                     f"\033[31m[下载审批回退结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
                     flush=True,

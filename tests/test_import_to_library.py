@@ -990,6 +990,28 @@ def test_restore_pending_approval_logs_missing_result(capsys) -> None:
     assert "lease_version=2" in output
 
 
+def test_restore_pending_approval_logs_missing_row_result(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during restore"))},
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    assert (
+        service._restore_pending_approval(
+            task_ref="87",
+            task_id="87",
+            task_hash="hash-87",
+            expected_lease_version=2,
+        )
+        is None
+    )
+    output = capsys.readouterr().out
+    assert "[导入审批回退结果缺失]" in output
+    assert "approval_record missing during restore" in output
+    assert "lease_version=2" in output
+
+
 def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: False})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -1087,30 +1109,45 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_can
 
 
 @pytest.mark.parametrize(
-    ("execution_result", "expected_reply"),
+    ("restore_mode", "execution_result", "expected_reply", "expected_error"),
     [
         (
+            "missing",
             import_module.ImportExecutionResult(
                 reply=IMPORT_COPY_FAILED_TEXT,
                 imported=False,
             ),
             IMPORT_COPY_FAILED_TEXT,
+            "import restore pending approval result missing",
         ),
         (
+            "missing_row",
+            import_module.ImportExecutionResult(
+                reply=IMPORT_COPY_FAILED_TEXT,
+                imported=False,
+            ),
+            IMPORT_COPY_FAILED_TEXT,
+            "approval_record missing during restore",
+        ),
+        (
+            "missing",
             import_module.ImportExecutionResult(
                 reply=IMPORT_COPY_APPROVAL_PENDING_TEXT,
                 imported=False,
                 pending_copy_approval=True,
             ),
             IMPORT_COPY_APPROVAL_PENDING_TEXT,
+            "import restore pending approval result missing",
         ),
     ],
-    ids=("import_failed", "copy_fallback_pending"),
+    ids=("missing_import_failed", "missing_row_import_failed", "missing_copy_fallback_pending"),
 )
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_restore_pending_approval_result_is_missing(
     tmp_path: Path,
+    restore_mode: str,
     execution_result: import_module.ImportExecutionResult,
     expected_reply: str,
+    expected_error: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     class MissingRestoreApprovalRepo:
@@ -1128,6 +1165,8 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_res
             return True
 
         def restore_import_pending(self, **_: object):
+            if restore_mode == "missing_row":
+                raise RuntimeError("approval_record missing during restore")
             return None
 
     download_dir = tmp_path / "downloads"
@@ -1161,7 +1200,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_res
     assert expected_reply not in text
     output = capsys.readouterr().out
     assert "[导入审批回退结果缺失]" in output
-    assert "import restore pending approval result missing" in output
+    assert expected_error in output
 
 
 def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:

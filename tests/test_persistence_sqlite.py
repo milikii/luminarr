@@ -2112,6 +2112,20 @@ def test_approval_repo_cancel_raises_when_row_missing(tmp_path: Path) -> None:
         )
 
 
+def test_approval_repo_restore_pending_raises_when_row_missing(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = ApprovalRepo(database)
+
+    with pytest.raises(ApprovalPersistenceError, match="approval_record missing during restore"):
+        repo.restore_downloader_pending(
+            task_id="87",
+            task_hash="hash-87",
+            task_ref="87",
+            expected_lease_version=1,
+        )
+
+
 def test_import_stale_guard_blocks_duplicate_after_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

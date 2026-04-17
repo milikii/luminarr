@@ -75,6 +75,7 @@ IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job res
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
+IMPORT_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missing during restore"
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
@@ -1314,7 +1315,10 @@ class ImportToLibraryService:
             if restored is None:
                 raise RuntimeError(IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON)
         except Exception as error:
-            if str(error) == IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON:
+            if str(error) in {
+                IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON,
+                IMPORT_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON,
+            }:
                 print(
                     f"\033[31m[导入审批回退结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
                     flush=True,
