@@ -1,4 +1,4 @@
-# Current status (v272)
+# Current status (v273)
 
 ## Project position
 
@@ -32,70 +32,17 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前唯一主线仍是“持久化吞错收口”；cleanup 四渠道验证窗口已完成，shared private-chat runtime 最小抽离已完成。
 - Telegram / personal WeChat / Feishu / WeCom 四个正式私聊入口继续共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相。
 - 当前也已落一层最小可追溯 trace baseline：shared private-chat 入站/回包，以及下载/导入待确认与 confirm 关键节点会统一追加到 `logs/trace.log`，不替代现有中文故障日志。
-- 下载和导入待确认链已经收口到 fail-closed：`approval_record` 查询异常、审批行缺失、lease/version 读写异常，不再混成普通 not pending。
-- 下载 confirm 的异常回退链也已补一处 fail-closed：下载投递失败后，如果待确认审批回退失败，不再继续回普通下载失败，而会直接按状态不可用停路。
-- 下载审批回退链也已补一处分流：`restore_downloader_pending()` 返回空结果时，会单独打印“下载审批回退结果缺失”日志，不再和普通 SQLite 更新异常共用同一类诊断；但 dispatch 失败后的 confirm 仍保持原来的状态不可用停路边界。
-- 下载 confirm 的任务抢占链也已补一处分流：`jobs.claim_lease()` 返回 `False` 时，会先打印“下载确认任务抢占失败”日志，不再静默混进普通 not pending；但用户侧仍保持原来的 stale check / not pending 边界。
-- 下载 confirm 的成功收尾链也已补 warning：下载已真实投递后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。
-- 下载取消链也已补一处分流：`jobs.cancel_pending_job()` 返回空结果或取消时任务行已缺失时，会单独打印“下载取消任务结果缺失”/“下载确认超时任务结果缺失”日志，不再和普通 SQLite 更新异常共用同一类诊断；但用户侧仍保持原来的取消/超时状态读取失败边界。
-- 下载事件 helper 也已补一处分流：`job_event` 写入后立即回读不到下载事件时，会打印“下载事件结果缺失”日志，不再和普通 SQLite 写入异常共用同一类诊断；但当前下载流程仍保持原来的继续执行边界。
-- 导入 confirm 的异常回退链也已补一处 fail-closed：导入执行失败或进入 copy-fallback 待确认后，如果待确认审批回退失败，不再继续回普通执行结果，而会直接按状态不可用停路。
-- 导入 confirm 的任务抢占链也已补一处分流：`jobs.claim_lease()` 返回 `False` 时，会先打印“导入确认任务抢占失败”日志，不再静默混进普通 not pending；但用户侧仍保持原来的 stale check / not pending 边界。
-- 导入 confirm 的成功收尾链也已补 warning：导入已成功后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。
-- 导入取消链也已补一处分流：`jobs.cancel_pending_job()` 返回空结果或取消时任务行已缺失时，会单独打印“导入取消任务结果缺失”/“导入确认超时任务结果缺失”日志，不再和普通 SQLite 更新异常共用同一类诊断；但用户侧仍保持原来的取消/超时状态读取失败边界。
-- Telegram BT 待答状态也已补一处 fail-closed：BT processing/classification/tmdb/raw-destination 写库失败时，不再继续发下一步提示，而会回 `SERVICE_NOT_READY_TEXT`。
-- Telegram BT `processing_path` 清理链也已补一处 fail-closed：清理失败时不再把旧状态当成“已取消”或“已弹出”，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
-- Telegram BT `classification` 清理链也已补一处 fail-closed：清理失败时不再把旧状态当成“已取消”或“已弹出”，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
-- Telegram BT `tmdb_association` 清理链也已补一处 fail-closed：清理失败时不再把旧 TMDB 关联态当成“已取消”或继续推进后续媒体入库链，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
-- Telegram BT `raw_bt_destination` 清理链也已补一处 fail-closed：清理失败时不再把旧目录选择当成“已取消”或继续推进后续链路，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
-- 搜索链最近几轮也已收口到 fail-closed：待澄清写入失败、旧澄清态清理失败、候选缓存写入失败，都不再保留误导性的 in-memory 状态。
-- 自动导入低质量资源的规则跳过链也已补一处 fail-closed：`job_event` 跳过事件写入失败时，不再继续回“已跳过自动导入”，而会按状态不可用停路，避免把持久化缺口混成普通规则命中。
-- 自动导入低质量资源的规则跳过链继续补一处分流：`job_event` 写入后立即回读不到跳过事件时，会打印“自动导入跳过事件结果缺失”日志，不再和普通 SQLite 写入异常共用同一类诊断；但用户侧仍保持原来的状态不可用停路，不改自动导入边界。
-- BT 订阅最近资源回写链已补一处分流：订阅条目已不存在时，不再和 SQLite 回写异常共用同一类 warning；现在会显式提示“待确认已创建，但订阅条目已不存在”。
-- BT 订阅最近资源回写链继续补一处分流：回写返回空结果时，不再和普通 SQLite 回写异常共用同一类日志，而会单独提示“BT 订阅最近资源回写结果缺失”；但用户侧仍保持原来的 warning，不改 `btsub run` 副作用边界。
-- BT 订阅写入入口也已补一处分流：插入查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅写入结果缺失”；但用户侧仍保持原来的失败文本。
-- 想看写入入口也已补一处分流：插入返回空结果时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“想看写入结果缺失”；但用户侧仍保持原来的失败文本。
-- 想看清单写入链也已补一处分流：新增后回读不到条目时，会打印“写入后条目缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
-- BT 订阅写入链也已补一处分流：新增后回读不到条目时，会打印“BT 订阅写入后条目缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
-- 搜索待澄清写入链也已补一处分流：写入后立即回读不到记录时，会打印“搜索澄清态写入后记录缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
-- 搜索澄清态清理链也已补一处分流：删除返回空结果时，不再和普通 SQLite 删除异常共用同一类日志，而会单独提示“搜索澄清态清理结果缺失”；但 fail-closed 行为保持不变，当前进程会恢复待澄清内存态。
-- 搜索候选清理链也已补一处分流：删除返回空结果时，不再和普通 SQLite 删除异常共用同一类日志，而会单独提示“搜索候选清理结果缺失”；但 fail-closed 行为保持不变，当前进程会恢复候选内存态。
-- 搜索候选回滚清理链也已补一处分流：候选写入失败后的回滚删除返回空结果时，不再和普通 SQLite 删除异常共用同一类日志，而会单独提示“搜索候选回滚清理结果缺失”；但 fail-closed 行为保持不变，当前请求仍直接返回候选状态写入失败。
-- Telegram BT 待答写入链也已补一处分流：`bt_pending_state` 写入后立即回读不到记录时，会打印“BT 待处理写入后记录缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
-- 搜索候选写入链继续补一处分流：`candidate_mapping` 保存后的计数查询直接返回空结果时，会打印“搜索候选写入结果缺失”日志，不再和普通 SQLite 写入失败或“条数不一致”共用同一类诊断。
-- 搜索候选写入链也已补一处分流：`candidate_mapping` 保存后条数和预期不一致时，会打印“搜索候选写入后记录不一致”日志，不再和普通 SQLite 写入失败共用同一类诊断。
-- 截至 2026-04-17，当前主线最近几轮已经继续收口到“写入成功但回读缺失 / 结果缺失 / 条数不一致”的分流诊断：想看清单、BT 订阅、搜索待澄清、Telegram BT 待答、搜索候选这几条轻状态路径，都已补成显式中文日志与 `[处理建议]`，详细 focused tests 和 commit 轨迹继续只记在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
-- 下载状态观察链也已补一处分流：`download_monitor` 返回空 update、缺回读记录、或缺完成标记时，不再都只打印同一类观察落盘失败日志，而会分别提示“结果缺失 / 完成标记缺失”与对应 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改自动导入 follow-up 边界。
-- 下载完成观察事件链也已补一处分流：`job_event.append_event()` 已执行、但回读不到 `downloader.completed_observed` 事件时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“下载完成观察事件结果缺失”；但用户侧仍保持原来的状态 warning，不改自动导入 follow-up 边界。
-- 导入事件记录链也已补一处分流：`job_event.append_event()` 已执行、但回读不到刚追加的导入事件时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“导入事件结果缺失”；但导入流程仍保持原来的继续执行边界，不改导入副作用。
-- cleanup 事件记录链也已补一处分流：`job_event.append_event()` 已执行、但回读不到刚追加的 cleanup 事件时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“cleanup 事件结果缺失”；但 cleanup 文本结果仍保持原来的继续返回边界，不改 guardrail。
-- 下载待确认审批写入链也已补一处分流：`approval_record` 已写入、但回读不到当前待确认审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“下载待确认审批结果缺失”；但用户侧仍保持原来的待确认状态写入失败，不改下载审批 fail-closed 边界。
-- 导入待确认审批写入链也已补一处分流：`approval_record` 已写入、但回读不到当前待确认导入审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“导入待确认审批结果缺失”；但用户侧仍保持原来的待确认状态写入失败，不改导入审批 fail-closed 边界。
-- 导入成功收尾链的审批版号回写也已补一处分流：`approval_record.executed_version` 更新时如果审批行已缺失，不再和普通 SQLite 更新异常共用同一类日志，而会单独提示“导入执行版号结果缺失”；但用户侧仍保持原来的 finalization warning，不改导入成功真相。
-- 下载待确认任务写入链也已补一处分流：`jobs` 待确认任务已写入、但回读不到刚创建的待确认任务时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“下载待确认任务结果缺失”；但用户侧仍保持原来的待确认状态写入失败，不改下载审批 fail-closed 边界。
-- 导入待确认任务写入链也已补一处分流：`jobs` 导入待确认任务已写入、但回读不到刚创建的导入待确认任务时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“导入待确认任务结果缺失”；但用户侧仍保持原来的待确认状态写入失败，不改导入审批 fail-closed 边界。
-- 下载监控登记链也已补一处分流：`download_monitor` 已写入、但回读不到刚登记的状态记录时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“下载监控登记结果缺失”；但下载已投递后的继续执行边界保持不变，不改状态跟踪和自动导入真相。
-- 导入命名真相读取链也已补一处分流：`job_event` 查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“导入命名真相结果缺失”；但导入命名仍保持原来的 fallback，不改导入副作用边界。
-- 导入目标读取链也已补一处分流：已经读到 import 关联、但 `target_path/message` 都为空时，会打印“导入目标路径缺失”日志，不再和普通“没有历史导入终态”混成同一类诊断；但 stale confirm 判定仍保持原来的 not pending 边界。
-- 自动导入终态读取链也已补一处分流：`job_event` 查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“自动导入终态结果缺失”；但自动导入仍保持原来的 fail-closed 停路边界。
-- 自动导入扫描入口也已补一处分流：`download_monitor` 已完成列表查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“自动导入候选结果缺失”；但本轮自动导入仍保持原来的 fail-closed 停路边界。
-- `btsub run` 扫描入口也已补一处分流：订阅列表查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅扫描结果缺失”；但本轮扫描仍保持原来的 fail-closed 停路边界。
-- `btsub` scheduler tick 起点也已补一处分流：chat 列表查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅扫描 chat 列表结果缺失”；但 tick 仍保持原来的 fail-closed 停路边界。
-- `watchlist list` 读取链也已补一处分流：清单查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“想看清单结果缺失”；但用户侧仍保持原来的失败文本。
-- `watchlist remove` 删除链也已补一处分流：删除查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“想看删除结果缺失”；但用户侧仍保持原来的失败文本。
-- `watchlist clear` 清空链也已补一处分流：清空查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“想看清单清空结果缺失”；但用户侧仍保持原来的失败文本。
-- `btsub list` 读取链也已补一处分流：订阅清单查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅清单结果缺失”；但用户侧仍保持原来的失败文本。
-- `btsub remove` 删除链也已补一处分流：删除查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅删除结果缺失”；但用户侧仍保持原来的失败文本。
-- `btsub clear` 清空链也已补一处分流：清空查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“BT 订阅清单清空结果缺失”；但用户侧仍保持原来的失败文本。
-- cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
-- cleanup 关联读取链也已补一处分流：`import.succeeded` 事件已存在但缺 `source_path/target_path` 时，会打印“cleanup 关联路径缺失”日志，不再和普通“未找到 import 关联”混成同一类诊断；但用户侧仍保持原来的拒绝 cleanup 文案，不改 guardrail。
-- 当前本地联调基线仍是 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
-- `docs/STATUS.md` 从本版开始只保留短快照；当前主线的详细闭环、focused tests 和 commit 轨迹收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 下载 / 导入待确认与 confirm 主链已经持续收口到 fail-closed：`approval_record` 行缺失、lease/version 读写异常、审批回退失败、成功收尾回写失败，都不会再伪装成普通 not pending 或纯成功。
+- 截至 2026-04-17，最近补齐的最小分流集中在五处：下载审批回退结果缺失、下载取消结果缺失、导入取消结果缺失、下载确认任务抢占失败、导入确认任务抢占失败；这些都已经改成显式中文日志与 `[处理建议]`，但不改 confirm、副作用和 SQLite 真相边界。
+- 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致 已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，状态页不再回灌长台账。
+- 最近提交轨迹已与当前主线台账对齐；`9604e0c`、`c3ec7b0`、`193508e` 对应的详细闭环与验证入口统一收口在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
 
 - 剩余的持久化吞错缺口仍在其它轻状态和边界路径里；下一步继续按 `docs/NEXT_STEP.md` 逐个最小闭环收口。
-- `docs/NEXT_STEP.md` 仍然偏长，但当前最大 token 放大器已经从状态页拆走；后续如果继续瘦身，优先继续压缩 NEXT_STEP 的长 guard 列表。
+- 当前必须继续守住已经落下来的 fail-closed 方向，不能把下载 / 导入 / 搜索 / BT 待答重新放回静默吞错。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - Feishu 长连接私有 API 风险、`series / anime` 名称解析、`.ass` 字幕支持仍是当前主线之后的工作，不提前并行展开。
 
@@ -112,7 +59,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - focused config truth tests：`4 passed, 21 deselected`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
-- docs consistency check：2026-04-14，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- docs consistency check：2026-04-17，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - focused downloader cancel diagnostics tests：2026-04-17，`6 passed, 68 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "cancel_pending_add_logs_job_cancel_failure or cancel_pending_add_logs_missing_job_cancel_result or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_missing_job_during_cancel or handle_expired_pending_confirm_logs_job_cancel_state_rejection or cancel_pending_add_logs_job_cancel_state_rejection"`）
 - focused downloader approval-restore diagnostics tests：2026-04-17，`6 passed, 70 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_missing_result or restore_pending_approval_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval"`）
 - focused import cancel diagnostics tests：2026-04-17，`6 passed, 98 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import_logs_job_cancel_failure or cancel_pending_import_logs_missing_job_cancel_result or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_missing_job_during_cancel or handle_expired_pending_confirm_logs_job_cancel_state_rejection or cancel_pending_import_logs_job_cancel_state_rejection"`）

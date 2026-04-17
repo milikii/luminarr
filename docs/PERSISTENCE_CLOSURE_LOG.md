@@ -1,4 +1,4 @@
-# Persistence closure log (v14)
+# Persistence closure log (v15)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -30,6 +30,7 @@
 - 闭环：`add_to_downloader._restore_pending_approval()` 在 `approval_repo.restore_downloader_pending()` 返回 `None` 时，不再把空结果混成普通“审批回退失败”日志；现在会单独打印“下载审批回退结果缺失”中文日志与 `[处理建议]`，并继续让 dispatch 失败后的 confirm 走原来的 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改待确认身份回退和审批真相边界。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_missing_result or restore_pending_approval_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval"`
+- commit：`9604e0c` `Separate downloader restore-approval diagnostics`
 
 ### 2026-04-17 导入确认任务抢占状态冲突分流缺口
 
