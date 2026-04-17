@@ -1,4 +1,4 @@
-# Next step (v201)
+# Next step (v202)
 
 ## Current goal
 
@@ -56,10 +56,11 @@
 1. Feishu 长连接私有 API 风险收口
 2. Feishu 私聊事件解析器去重
 3. 独立后台下载完成轮询剩余少量回归与验证收口
-4. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
-5. `.ass` 字幕支持评估与最小实现
-6. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-7. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-8. BT 共享确定性评分器
-9. Jellyfin / Plex 支持（后续）
-10. plugin 体系继续后置
+4. `telegram_bot.py` 渠道层瘦身 / 模块化：把 Telegram 收包回包、后台生命周期、BT pending helper 和 shared runtime 包装继续拆开；目标是让渠道层更接近“协议差异 + 调 shared runtime”，但不改 shared runtime、approval、`jobs`、SQLite 真相和现有副作用边界
+5. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
+6. `.ass` 字幕支持评估与最小实现
+7. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+8. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+9. BT 共享确定性评分器
+10. Jellyfin / Plex 支持（后续）
+11. plugin 体系继续后置
