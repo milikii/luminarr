@@ -163,12 +163,19 @@ async def handle_private_chat_query_text(
         if tg._clear_bt_classification_pending(context=context, chat_id=chat_id):
             await reply_func(tg.BT_CLASSIFICATION_CANCELLED_TEXT)
             return
-        if tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id):
+        cleared_processing_path = tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
+        if cleared_processing_path is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        if cleared_processing_path:
             await reply_func(tg.BT_PROCESSING_PATH_CANCELLED_TEXT)
             return
 
     if tg._is_bt_direct_intent(query):
-        tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
+        cleared_processing_path = tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
+        if cleared_processing_path is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
         tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
@@ -236,8 +243,8 @@ async def handle_private_chat_query_text(
     if bt_processing_path_pending and (
         bt_processing_path is not None or bt_processing_shortcut is not None
     ):
-        bt_source = tg._pop_bt_processing_path_pending(context=context, chat_id=chat_id) or ""
-        if not bt_source:
+        bt_source = tg._pop_bt_processing_path_pending(context=context, chat_id=chat_id)
+        if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)

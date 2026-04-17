@@ -106,12 +106,14 @@ def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -
 
 
 def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_processing_path_persist_fails(
+    tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
             raise RuntimeError("db down")
 
+    database = _make_database(tmp_path)
     reply_text = AsyncMock()
 
     asyncio.run(
@@ -121,13 +123,43 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_processing
             chat_id=1001,
             user_id=2001,
             bot_data=_build_bot_data()
-            | {BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))},
+            | {BT_PENDING_REPO_KEY: _FailingPendingRepo(database)},
         )
     )
     captured = capsys.readouterr()
 
     reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
     assert "[BT 待处理持久化失败]" in captured.out
+    assert "stage=processing_path" in captured.out
+    assert "db down" in captured.out
+
+
+def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_processing_path_clear_fails_on_cancel(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                "bt_processing_path_pending_by_chat": {1001: "magnet:?xt=urn:btih:abcdef1234567890"},
+            },
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理清理失败]" in captured.out
     assert "stage=processing_path" in captured.out
     assert "db down" in captured.out
 
@@ -312,6 +344,38 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_processing_p
     assert "[BT 待处理载荷损坏]" in captured.out
     assert "stage=processing_path" in captured.out
     assert "payload_json invalid json" in captured.out
+
+
+def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_processing_path_pop_clear_fails(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
+            raise RuntimeError("db down")
+
+    database = _make_database(tmp_path)
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="影视入库链",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(database),
+                "bt_processing_path_pending_by_chat": {1001: "magnet:?xt=urn:btih:abcdef1234567890"},
+            },
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理清理失败]" in captured.out
+    assert "stage=processing_path" in captured.out
+    assert "db down" in captured.out
 
 
 def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classification_lookup_failure(

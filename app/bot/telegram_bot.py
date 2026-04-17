@@ -1188,13 +1188,12 @@ def _clear_bt_processing_path_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> bool:
-    cleared = False
+) -> bool | None:
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
-    if pending_by_chat.pop(chat_id, None) is not None:
-        cleared = True
+    pending_source = pending_by_chat.pop(chat_id, None)
+    cleared = pending_source is not None
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return cleared
@@ -1202,14 +1201,16 @@ def _clear_bt_processing_path_pending(
         return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH) or cleared
     except Exception as error:
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
-        return cleared
+        if isinstance(pending_source, str):
+            pending_by_chat[chat_id] = pending_source
+        return None
 
 
 def _pop_bt_processing_path_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> str | None:
+) -> str | Literal[False] | None:
     if chat_id is None or chat_id <= 0:
         return None
     pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
@@ -1220,11 +1221,13 @@ def _pop_bt_processing_path_pending(
             try:
                 pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
             except Exception as error:
+                pending_by_chat[chat_id] = pending_source
                 _log_bt_pending_clear_failed(
                     chat_id=chat_id,
                     stage=BT_PENDING_STAGE_PROCESSING_PATH,
                     reason=str(error),
                 )
+                return False
         return pending_source
 
     pending_repo = _resolve_bt_pending_repo(context)
@@ -1256,7 +1259,9 @@ def _pop_bt_processing_path_pending(
     try:
         pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_PROCESSING_PATH)
     except Exception as error:
+        pending_by_chat[chat_id] = pending_source
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_PROCESSING_PATH, reason=str(error))
+        return False
     return pending_source
 
 

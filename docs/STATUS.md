@@ -1,4 +1,4 @@
-# Current status (v266)
+# Current status (v267)
 
 ## Project position
 
@@ -37,6 +37,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 导入 confirm 的异常回退链也已补一处 fail-closed：导入执行失败或进入 copy-fallback 待确认后，如果待确认审批回退失败，不再继续回普通执行结果，而会直接按状态不可用停路。
 - 导入 confirm 的成功收尾链也已补 warning：导入已成功后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。
 - Telegram BT 待答状态也已补一处 fail-closed：BT processing/classification/tmdb/raw-destination 写库失败时，不再继续发下一步提示，而会回 `SERVICE_NOT_READY_TEXT`。
+- Telegram BT `processing_path` 清理链也已补一处 fail-closed：清理失败时不再把旧状态当成“已取消”或“已弹出”，而会保留内存态并回 `SERVICE_NOT_READY_TEXT`。
 - 搜索链最近几轮也已收口到 fail-closed：待澄清写入失败、旧澄清态清理失败、候选缓存写入失败，都不再保留误导性的 in-memory 状态。
 - 自动导入低质量资源的规则跳过链也已补一处 fail-closed：`job_event` 跳过事件写入失败时，不再继续回“已跳过自动导入”，而会按状态不可用停路，避免把持久化缺口混成普通规则命中。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
