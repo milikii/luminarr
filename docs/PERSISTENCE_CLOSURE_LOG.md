@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载待确认审批结果缺失分流缺口
+
+- 闭环：`add_to_downloader._record_pending_approval()` 在 `approval_record` 已写入、但写入后立即回读不到当前待确认审批的 `lease_version` 时，不再和普通 SQLite 写入异常共用同一条“下载待确认审批落盘失败”日志；现在会单独打印“下载待确认审批结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `ADD_PENDING_STATE_UNAVAILABLE_TEXT`，不改下载审批 fail-closed 边界。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "record_pending_approval_logs_persistence_failure or record_pending_approval_logs_missing_pending_result"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 下载监控登记结果缺失分流缺口
 
 - 闭环：`add_to_downloader._register_download_monitor()` 在 `download_monitor` 已写入、但写入后立即回读不到刚登记的状态记录时，不再和普通 SQLite 写入异常共用同一条“下载监控登记失败”日志；现在会单独打印“下载监控登记结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的继续执行边界，不改下载已投递成功后的副作用真相。

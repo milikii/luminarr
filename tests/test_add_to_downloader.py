@@ -293,6 +293,20 @@ def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_approval_logs_missing_pending_result(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing after pending request"))},
+    )()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
+    assert service._record_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123") == 0
+    output = capsys.readouterr().out
+    assert "[下载待确认审批结果缺失]" in output
+    assert "approval_record missing after pending request" in output
+    assert "当前请求会直接返回待确认状态写入失败" in output
+
+
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(

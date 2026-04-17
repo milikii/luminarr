@@ -44,6 +44,7 @@ ADD_FINALIZATION_WARNING_TEXT = (
 )
 DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
+DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
@@ -636,10 +637,18 @@ class AddToDownloaderService:
             if requested_lease > 0:
                 lease_version = requested_lease
         except Exception as error:
-            print(
-                f"\033[31m[下载待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认下载。",
-                flush=True,
-            )
+            if str(error) == DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[下载待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认审批的 lease_version；"
+                    "当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认下载。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[下载待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认下载。",
+                    flush=True,
+                )
             return 0
 
         self._pending_add_lease_versions[identity] = lease_version
