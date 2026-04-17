@@ -55,6 +55,10 @@ IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT = "导入取消状态读取失败，请稍�
 IMPORT_CONFIRM_NOT_PENDING_TEXT = "没有待确认的导入请求，请先发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_EXPIRED_TEXT = "导入确认已超时，请重新发送 import <任务ID或Hash>。"
 IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT = "导入确认状态读取失败，请稍后重试。"
+IMPORT_FINALIZATION_WARNING_TEXT = (
+    "注意：导入已执行，但状态回写失败，请勿重复 confirm。\n"
+    "请稍后检查 SQLite/approval_record 与 jobs 表，再确认当前导入任务状态。"
+)
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
 IMPORT_REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
 JOB_LEASE_OWNER = "import_confirm"
@@ -398,22 +402,29 @@ class ImportToLibraryService:
             execution_mode=execution_mode,
         )
         if execution.imported:
-            self._record_executed_lease_version(
+            finalization_warning = ""
+            lease_recorded = self._record_executed_lease_version(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
                 executed_lease_version=expected_lease_version,
             )
+            if lease_recorded is not True:
+                finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
             self._clear_pending_copy_fallback(
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
             )
             if claimed_job:
-                self._mark_completed_job(
+                job_completed = self._mark_completed_job(
                     job_id=claimed_job_id,
                     expected_version=claimed_job_version,
                     lease_owner=lease_owner,
                 )
+                if job_completed is not True:
+                    finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
+            if finalization_warning:
+                return f"{execution.reply}\n\n{finalization_warning}"
         elif execution.pending_copy_approval:
             approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
@@ -1168,13 +1179,14 @@ class ImportToLibraryService:
         task_id: str,
         task_hash: str,
         executed_lease_version: int,
-    ) -> None:
+    ) -> bool | None:
         _ = task_ref
         identity = (task_id.strip(), task_hash.strip())
-        if identity[0] and identity[1] and executed_lease_version > 0:
-            self._pending_import_lease_versions[identity] = executed_lease_version
+        if not identity[0] or not identity[1] or executed_lease_version <= 0:
+            return False
+        self._pending_import_lease_versions[identity] = executed_lease_version
         if self._approval_repo is None:
-            return
+            return True
         try:
             self._approval_repo.mark_import_executed(
                 task_id=task_id,
@@ -1186,7 +1198,8 @@ class ImportToLibraryService:
                 f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
                 flush=True,
             )
-            return
+            return None
+        return True
 
     def _record_pending_job(
         self,
@@ -1357,9 +1370,9 @@ class ImportToLibraryService:
         job_id: str,
         expected_version: int,
         lease_owner: str,
-    ) -> None:
+    ) -> bool | None:
         if self._job_repo is None:
-            return
+            return True
         try:
             marked = self._job_repo.mark_completed(
                 job_id=job_id,
@@ -1372,12 +1385,14 @@ class ImportToLibraryService:
                 f"\033[31m[导入确认任务完结失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前导入结果已返回，但任务真相可能仍停留在待确认或执行中。",
                 flush=True,
             )
-            return
+            return None
         if marked is False:
             print(
                 f"\033[31m[导入确认任务完结失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误=jobs.mark_completed rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配；当前导入结果已返回，但任务真相可能仍停留在待确认或执行中。",
                 flush=True,
             )
+            return False
+        return True
 
     def _build_job_lease_owner(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()

@@ -1,4 +1,4 @@
-# Persistence closure log (v5)
+# Persistence closure log (v6)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -37,6 +37,13 @@
 - 闭环：`add_to_downloader.confirm_add_by_task_ref()` 在下载器已经真实接单后，如果 `approval_record.executed_version` 或 `jobs` 完结态回写失败，不再继续回纯成功文本，而会在成功回复后追加显式 warning，提醒不要重复 `confirm`，避免把“已执行但真相未落稳”混成“全链已落盘”。
 - 代码：`app/services/add_to_downloader.py`
 - 验证：`tests/test_add_to_downloader.py`
+- commit：`188677b` `Warn on downloader finalization persistence gap`
+
+### 2026-04-17 导入成功收尾缺口
+
+- 闭环：`import_to_library.confirm_import_by_task_ref()` 在导入已经成功后，如果 `approval_record.executed_version` 或 `jobs` 完结态回写失败，不再继续回纯成功文本，而会在成功回复后追加显式 warning，提醒不要重复 `confirm`，避免把“已导入但真相未落稳”混成“全链已落盘”。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py`
 - commit：待补
 
 ### 2026-04-17 下载审批缺口
@@ -76,6 +83,7 @@
 
 ## 3. Focused verification
 
+- import finalization warning tests：2026-04-17，`5 passed, 87 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
 - downloader finalization warning tests：2026-04-17，`5 passed, 60 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
 - import approval-restore fail-closed tests：2026-04-17，`4 passed, 86 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs or execution_cannot_restore_pending_approval"`）
 - downloader approval-restore fail-closed tests：2026-04-17，`5 passed, 58 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_approval_logs or dispatch_failure_cannot_restore_pending_approval or confirm_add_by_task_ref_returns_failed_when_downloader_errors"`）
