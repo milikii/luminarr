@@ -20,6 +20,7 @@ STATUS_AUTO_IMPORT_WARNING_TEXT = "注意：自动导入跟进失败，本次状
 DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON = "download monitor status result missing"
 DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON = "download monitor observed record missing"
 DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON = "download monitor completion flag missing"
+DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 
 _STATUS_CODE_LABELS = {
     0: "已停止",
@@ -108,10 +109,16 @@ class GetDownloadStatusService:
                     message=task_status.name,
                 )
             except Exception as error:
-                print(
-                    f"\033[31m[下载完成观察事件落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
-                    flush=True,
-                )
+                if str(error) == DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON:
+                    print(
+                        f"\033[31m[下载完成观察事件结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"\033[31m[下载完成观察事件落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
+                        flush=True,
+                    )
                 follow_up_parts.append(STATUS_COMPLETION_EVENT_WARNING_TEXT)
         if self._post_download_auto_import_service is None:
             if not follow_up_parts:

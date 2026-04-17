@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载完成观察事件结果缺失分流缺口
+
+- 闭环：`get_download_status._record_status_observation()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到 `downloader.completed_observed` 事件时，不再和普通 SQLite 写入异常共用同一条“下载完成观察事件落盘失败”日志；现在会单独打印“下载完成观察事件结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改状态查询和自动导入 follow-up 边界。
+- 代码：`app/services/get_download_status.py`
+- 验证：`tests/test_get_download_status.py -k "completion_event_write_fails or completion_event_result_is_missing"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 下载事件结果缺失分流缺口
 
 - 闭环：`add_to_downloader._record_event()` 在 `job_event.append_event()` 已执行但写入后立即回读不到下载事件时，不再和普通 SQLite 写入异常共用同一条“下载事件落盘失败”日志；现在会单独打印“下载事件结果缺失”中文日志与 `[处理建议]`，但当前下载流程仍保持原来的继续执行边界，不抬成新的状态失败。
