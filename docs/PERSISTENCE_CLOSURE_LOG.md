@@ -37,6 +37,13 @@
 - 闭环：`search_media.clear_cached_candidates()` 在 `candidate_repo.clear_candidates()` 返回 `None` 时，不再和普通 SQLite 删除异常共用同一条“搜索候选清理失败”日志；现在会把“清理结果缺失”和普通清理失败拆开成更明确的中文日志与 `[处理建议]`，但 fail-closed 行为保持不变：当前进程会恢复内存里的候选缓存，不把缺失真相误判成已清理成功。
 - 代码：`app/services/search_media.py`
 - 验证：`tests/test_search_media.py -k "clear_cached_candidates_logs_missing_candidate_clear_result or clear_cached_candidates_logs_candidate_persistence_failure"`
+- commit：`0f25f60` `Separate candidate clear result diagnostics`
+
+### 2026-04-17 搜索候选回滚清理结果缺失分流缺口
+
+- 闭环：`search_media.search_and_format()` 在候选写入失败后的回滚删除返回 `None` 时，不再和普通 SQLite 删除异常共用同一条“搜索候选清理失败”日志；现在会把“回滚清理结果缺失”和普通回滚清理失败拆开成更明确的中文日志与 `[处理建议]`，但 fail-closed 行为保持不变：当前请求仍直接返回候选状态写入失败，不继续暴露坏候选缓存。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "candidate_persist_rollback_logs_missing_clear_result or search_candidate_persist_logs_persistence_failure"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 下载状态观察结果缺字段分流缺口

@@ -35,6 +35,7 @@ CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after u
 CLARIFICATION_CLEAR_RESULT_MISSING_REASON = "clarification clear result missing"
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
 CANDIDATE_CLEAR_RESULT_MISSING_REASON = "candidate clear result missing"
+CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON = "candidate clear result missing during persist rollback"
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,12 +202,20 @@ class SearchMediaService:
                     try:
                         cleared_result = self._candidate_repo.clear_candidates(chat_id)
                         if cleared_result is None:
-                            raise CandidatePersistenceError("candidate clear result missing during persist rollback")
+                            raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
                     except Exception as rollback_error:
-                        print(
-                            f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                            flush=True,
-                        )
+                        if str(rollback_error) == CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON:
+                            print(
+                                f"\033[31m[搜索候选回滚清理结果缺失]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
+                                "\033[33m[处理建议]\033[0m 检查 candidate_mapping 回滚删除返回是否仍带有明确结果；"
+                                "当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                                flush=True,
+                            )
+                        else:
+                            print(
+                                f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                                flush=True,
+                            )
                     return CANDIDATE_STATE_UNAVAILABLE_TEXT
                 except Exception as error:
                     print(
@@ -217,12 +226,20 @@ class SearchMediaService:
                     try:
                         cleared_result = self._candidate_repo.clear_candidates(chat_id)
                         if cleared_result is None:
-                            raise CandidatePersistenceError("candidate clear result missing during persist rollback")
+                            raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
                     except Exception as rollback_error:
-                        print(
-                            f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                            flush=True,
-                        )
+                        if str(rollback_error) == CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON:
+                            print(
+                                f"\033[31m[搜索候选回滚清理结果缺失]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
+                                "\033[33m[处理建议]\033[0m 检查 candidate_mapping 回滚删除返回是否仍带有明确结果；"
+                                "当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                                flush=True,
+                            )
+                        else:
+                            print(
+                                f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                                flush=True,
+                            )
                     return CANDIDATE_STATE_UNAVAILABLE_TEXT
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]

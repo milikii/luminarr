@@ -328,6 +328,33 @@ def test_search_no_result_returns_state_unavailable_when_candidate_persist_fails
     assert "candidate_mapping count mismatch after save" in output
 
 
+def test_search_candidate_persist_rollback_logs_missing_clear_result(capsys) -> None:
+    class RollbackMissingRepo:
+        def save_candidates(self, chat_id: int, results) -> None:
+            _ = (chat_id, results)
+            raise RuntimeError("db down")
+
+        def clear_candidates(self, chat_id: int):
+            _ = chat_id
+            return None
+
+        def get_candidate(self, chat_id: int, index: int):
+            _ = (chat_id, index)
+            return None
+
+    service = SearchMediaService(_fake_search_with_results, candidate_repo=RollbackMissingRepo())
+
+    text = _run(service.search_and_format("dune", chat_id=1001))
+
+    assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
+    assert service.get_cached_candidate(1001, 1) is None
+    output = capsys.readouterr().out
+    assert "[搜索候选持久化失败]" in output
+    assert "[搜索候选回滚清理结果缺失]" in output
+    assert "candidate clear result missing during persist rollback" in output
+    assert "[处理建议]" in output
+
+
 def test_clear_clarification_pending_logs_persistence_failure(capsys) -> None:
     repo = type("BoomRepo", (), {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)
