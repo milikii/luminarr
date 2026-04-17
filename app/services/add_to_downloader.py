@@ -995,6 +995,14 @@ class AddToDownloaderService:
                 return 0
             return self._pending_add_lease_versions.get(identity, 1)
         if approval_record is None:
+            if identity in self._pending_add_identities:
+                print(
+                    f"\033[31m[下载待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误=approval_record missing while in-memory pending exists\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前调用会按状态读取失败处理，避免把审批真相缺口继续混成进程内版号兜底。",
+                    flush=True,
+                )
+                if not allow_in_memory_fallback_on_error:
+                    return PENDING_LEASE_LOOKUP_FAILED
+                return self._pending_add_lease_versions.get(identity, 1)
             if identity not in self._pending_add_identities:
                 return 0
             return self._pending_add_lease_versions.get(identity, 1)
