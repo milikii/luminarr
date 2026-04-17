@@ -1118,15 +1118,15 @@ def _set_bt_processing_path_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
     source: str,
-) -> None:
+) -> bool:
     if chat_id is None or chat_id <= 0:
-        return
+        return False
     pending_by_chat = _resolve_bt_processing_path_pending_by_chat(context)
     cleaned_source = source.strip()
     pending_by_chat[chat_id] = cleaned_source
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
-        return
+        return True
     try:
         pending_repo.upsert_pending(
             chat_id=chat_id,
@@ -1139,6 +1139,9 @@ def _set_bt_processing_path_pending(
             stage=BT_PENDING_STAGE_PROCESSING_PATH,
             reason=str(error),
         )
+        pending_by_chat.pop(chat_id, None)
+        return False
+    return True
 
 
 def _is_bt_processing_path_pending(
@@ -1262,15 +1265,15 @@ def _set_bt_classification_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
     query: str,
-) -> None:
+) -> bool:
     if chat_id is None or chat_id <= 0:
-        return
+        return False
     pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
     cleaned_query = query.strip()
     pending_by_chat[chat_id] = cleaned_query
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
-        return
+        return True
     try:
         pending_repo.upsert_pending(
             chat_id=chat_id,
@@ -1283,6 +1286,9 @@ def _set_bt_classification_pending(
             stage=BT_PENDING_STAGE_CLASSIFICATION,
             reason=str(error),
         )
+        pending_by_chat.pop(chat_id, None)
+        return False
+    return True
 
 
 def _is_bt_classification_pending(
@@ -1429,14 +1435,14 @@ def _set_bt_tmdb_association_pending(
     chat_id: int | None,
     media_kind: str,
     source: str,
-) -> None:
+) -> bool:
     if chat_id is None or chat_id <= 0:
-        return
+        return False
     pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
     pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind, source=source.strip())
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
-        return
+        return True
     try:
         pending_repo.upsert_pending(
             chat_id=chat_id,
@@ -1449,6 +1455,9 @@ def _set_bt_tmdb_association_pending(
             stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
             reason=str(error),
         )
+        pending_by_chat.pop(chat_id, None)
+        return False
+    return True
 
 
 def _get_bt_tmdb_association_pending(
@@ -1528,14 +1537,14 @@ def _set_raw_bt_destination_pending(
     chat_id: int | None,
     options: tuple[RawBtDestinationOption, ...],
     source: str,
-) -> None:
+) -> bool:
     if chat_id is None or chat_id <= 0:
-        return
+        return False
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
     pending_by_chat[chat_id] = RawBtDestinationPending(options=options, source=source.strip())
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
-        return
+        return True
     try:
         pending_repo.upsert_pending(
             chat_id=chat_id,
@@ -1560,6 +1569,9 @@ def _set_raw_bt_destination_pending(
             stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
             reason=str(error),
         )
+        pending_by_chat.pop(chat_id, None)
+        return False
+    return True
 
 
 def _get_raw_bt_destination_pending(
@@ -1690,12 +1702,13 @@ def _enter_pure_bt_flow(
     raw_bt_destination_options = _resolve_raw_bt_destination_options(context)
     if not raw_bt_destination_options:
         return RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT
-    _set_raw_bt_destination_pending(
+    if not _set_raw_bt_destination_pending(
         context=context,
         chat_id=chat_id,
         options=raw_bt_destination_options,
         source=source,
-    )
+    ):
+        return SERVICE_NOT_READY_TEXT
     return _format_raw_bt_destination_prompt(raw_bt_destination_options)
 
 
@@ -1707,18 +1720,20 @@ def _enter_media_import_bt_flow(
     media_kind: str | None = None,
 ) -> str:
     if media_kind is not None:
-        _set_bt_tmdb_association_pending(
+        if not _set_bt_tmdb_association_pending(
             context=context,
             chat_id=chat_id,
             media_kind=media_kind,
             source=source,
-        )
+        ):
+            return SERVICE_NOT_READY_TEXT
         return _format_bt_tmdb_association_prompt(media_kind)
-    _set_bt_classification_pending(
+    if not _set_bt_classification_pending(
         context=context,
         chat_id=chat_id,
         query=source,
-    )
+    ):
+        return SERVICE_NOT_READY_TEXT
     return BT_CLASSIFICATION_PROMPT_TEXT
 
 

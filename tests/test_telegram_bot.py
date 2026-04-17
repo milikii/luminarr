@@ -59,6 +59,8 @@ from app.bot.telegram_bot import (
     _clear_bt_classification_pending,
     _clear_bt_processing_path_pending,
     _clear_bt_tmdb_association_pending,
+    _enter_media_import_bt_flow,
+    _enter_pure_bt_flow,
     _is_bt_classification_pending,
     _is_bt_processing_path_pending,
     _pop_bt_classification_pending,
@@ -1036,13 +1038,16 @@ def test_set_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.
         )
     )
 
-    _set_bt_processing_path_pending(
-        context=context,
-        chat_id=1001,
-        source="magnet:?xt=urn:btih:abc",
+    assert (
+        _set_bt_processing_path_pending(
+            context=context,
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abc",
+        )
+        is False
     )
 
-    assert context.application.bot_data["bt_processing_path_pending_by_chat"][1001] == "magnet:?xt=urn:btih:abc"
+    assert context.application.bot_data.get("bt_processing_path_pending_by_chat", {}) == {}
     output = capsys.readouterr().out
     assert "[BT 待处理持久化失败]" in output
     assert "stage=processing_path" in output
@@ -1192,13 +1197,16 @@ def test_set_bt_classification_pending_logs_persistence_failure(capsys: pytest.C
         )
     )
 
-    _set_bt_classification_pending(
-        context=context,
-        chat_id=1001,
-        query="magnet:?xt=urn:btih:abc",
+    assert (
+        _set_bt_classification_pending(
+            context=context,
+            chat_id=1001,
+            query="magnet:?xt=urn:btih:abc",
+        )
+        is False
     )
 
-    assert context.application.bot_data["bt_classification_pending_by_chat"][1001] == "magnet:?xt=urn:btih:abc"
+    assert context.application.bot_data.get("bt_classification_pending_by_chat", {}) == {}
     output = capsys.readouterr().out
     assert "[BT 待处理持久化失败]" in output
     assert "stage=classification" in output
@@ -1304,16 +1312,17 @@ def test_set_bt_tmdb_association_pending_logs_persistence_failure(capsys: pytest
         )
     )
 
-    _set_bt_tmdb_association_pending(
-        context=context,
-        chat_id=1001,
-        media_kind="movie",
-        source="magnet:?xt=urn:btih:abc",
+    assert (
+        _set_bt_tmdb_association_pending(
+            context=context,
+            chat_id=1001,
+            media_kind="movie",
+            source="magnet:?xt=urn:btih:abc",
+        )
+        is False
     )
 
-    pending = context.application.bot_data["bt_tmdb_association_pending_by_chat"][1001]
-    assert pending.media_kind == "movie"
-    assert pending.source == "magnet:?xt=urn:btih:abc"
+    assert context.application.bot_data.get("bt_tmdb_association_pending_by_chat", {}) == {}
     output = capsys.readouterr().out
     assert "[BT 待处理持久化失败]" in output
     assert "stage=tmdb_association" in output
@@ -1454,20 +1463,87 @@ def test_set_raw_bt_destination_pending_logs_persistence_failure(capsys: pytest.
         ),
     )
 
-    _set_raw_bt_destination_pending(
-        context=context,
-        chat_id=1001,
-        options=options,
-        source="magnet:?xt=urn:btih:abc",
+    assert (
+        _set_raw_bt_destination_pending(
+            context=context,
+            chat_id=1001,
+            options=options,
+            source="magnet:?xt=urn:btih:abc",
+        )
+        is False
     )
 
-    pending = context.application.bot_data["raw_bt_destination_pending_by_chat"][1001]
-    assert pending.options == options
-    assert pending.source == "magnet:?xt=urn:btih:abc"
+    assert context.application.bot_data.get("raw_bt_destination_pending_by_chat", {}) == {}
     output = capsys.readouterr().out
     assert "[BT 待处理持久化失败]" in output
     assert "stage=raw_bt_destination" in output
     assert "db down" in output
+
+
+def test_enter_media_import_bt_flow_returns_service_not_ready_when_classification_persist_fails() -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))}
+        )
+    )
+
+    reply = _enter_media_import_bt_flow(
+        context=context,
+        chat_id=1001,
+        source="magnet:?xt=urn:btih:abc",
+    )
+
+    assert reply == SERVICE_NOT_READY_TEXT
+
+
+def test_enter_media_import_bt_flow_returns_service_not_ready_when_tmdb_pending_persist_fails() -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:"))}
+        )
+    )
+
+    reply = _enter_media_import_bt_flow(
+        context=context,
+        chat_id=1001,
+        source="magnet:?xt=urn:btih:abc",
+        media_kind="movie",
+    )
+
+    assert reply == SERVICE_NOT_READY_TEXT
+
+
+def test_enter_pure_bt_flow_returns_service_not_ready_when_destination_persist_fails() -> None:
+    class _FailingPendingRepo(BtPendingRepo):
+        def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
+            raise RuntimeError("db down")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _FailingPendingRepo(SqliteDatabase(":memory:")),
+                RAW_BT_DESTINATION_OPTIONS_KEY: (
+                    RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/downloads/raw"),
+                ),
+            }
+        )
+    )
+
+    reply = _enter_pure_bt_flow(
+        context=context,
+        chat_id=1001,
+        source="magnet:?xt=urn:btih:abc",
+    )
+
+    assert reply == SERVICE_NOT_READY_TEXT
 
 
 def test_raw_bt_destination_pending_logs_payload_corruption_after_restart(
@@ -2805,7 +2881,7 @@ def test_handle_message_confirm_routes_stale_downloader_confirm_to_add_service(t
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_awaited_once_with("没有待确认的下载请求，请先重新发送序号。")
+    reply_text.assert_awaited_once_with("下载确认状态读取失败，请稍后重试。")
     import_service.confirm_import_by_task_ref.assert_not_called()
 
 
@@ -3053,7 +3129,7 @@ def test_handle_message_frustration_does_not_reply_when_candidate_clear_fails(ca
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_not_awaited()
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
     assert search_service.get_cached_candidate(1001, 1) is not None
     output = capsys.readouterr().out
     assert "[搜索候选清理失败]" in output
@@ -3114,7 +3190,7 @@ def test_handle_message_frustration_does_not_reply_when_clarification_clear_fail
 
     asyncio.run(handle_message(update, context))
 
-    reply_text.assert_not_awaited()
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
     assert search_service.is_clarification_pending(1001)
     output = capsys.readouterr().out
     assert "[搜索澄清态清理失败]" in output
