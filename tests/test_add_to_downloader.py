@@ -830,6 +830,28 @@ def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     assert "lease_version=2" in output
 
 
+def test_restore_pending_approval_logs_missing_result(capsys) -> None:
+    approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: None})()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    assert (
+        service._restore_pending_approval(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            expected_lease_version=2,
+        )
+        is None
+    )
+    output = capsys.readouterr().out
+    assert "[下载审批回退结果缺失]" in output
+    assert "downloader restore pending approval result missing" in output
+    assert "lease_version=2" in output
+
+
 def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: False})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
@@ -1782,14 +1804,16 @@ def test_confirm_add_by_task_ref_appends_warning_when_job_completion_write_fails
 
 
 @pytest.mark.parametrize(
-    ("restore_mode", "expected_error"),
+    ("restore_mode", "expected_label", "expected_error"),
     [
-        ("raise", "db down"),
-        ("reject", "approval_record restore rejected current state"),
+        ("raise", "[下载审批回退失败]", "db down"),
+        ("missing", "[下载审批回退结果缺失]", "downloader restore pending approval result missing"),
+        ("reject", "[下载审批回退失败]", "approval_record restore rejected current state"),
     ],
 )
 def test_confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval(
     restore_mode: str,
+    expected_label: str,
     expected_error: str,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -1810,6 +1834,8 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure
         def restore_downloader_pending(self, **_: object) -> bool:
             if restore_mode == "raise":
                 raise RuntimeError("db down")
+            if restore_mode == "missing":
+                return None
             return False
 
     search_service = SearchMediaService(_fake_search_with_download_url)
@@ -1827,7 +1853,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure
     assert reply == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
     add_torrent.assert_awaited_once()
     output = capsys.readouterr().out
-    assert "[下载审批回退失败]" in output
+    assert expected_label in output
     assert expected_error in output
 
 

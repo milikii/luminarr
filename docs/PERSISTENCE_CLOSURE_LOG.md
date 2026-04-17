@@ -23,6 +23,13 @@
 - 闭环：`import_to_library.cancel_pending_import()` 和 `_handle_expired_pending_confirm()` 在 `jobs.cancel_pending_job()` 返回 `None` 或抛出 `job missing during cancel` 时，不再和普通 SQLite 更新异常共用同一条“任务更新失败”日志；现在会单独打印“导入取消任务结果缺失”/“导入确认超时任务结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态读取失败文本，不改取消、超时 confirm 和审批边界。
 - 代码：`app/services/import_to_library.py`
 - 验证：`tests/test_import_to_library.py -k "cancel_pending_import_logs_job_cancel_failure or cancel_pending_import_logs_missing_job_cancel_result or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_missing_job_during_cancel or handle_expired_pending_confirm_logs_job_cancel_state_rejection or cancel_pending_import_logs_job_cancel_state_rejection"`
+- commit：`c3ec7b0` `Separate import cancel result diagnostics`
+
+### 2026-04-17 下载审批回退结果缺失分流缺口
+
+- 闭环：`add_to_downloader._restore_pending_approval()` 在 `approval_repo.restore_downloader_pending()` 返回 `None` 时，不再把空结果混成普通“审批回退失败”日志；现在会单独打印“下载审批回退结果缺失”中文日志与 `[处理建议]`，并继续让 dispatch 失败后的 confirm 走原来的 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改待确认身份回退和审批真相边界。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_missing_result or restore_pending_approval_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval"`
 
 ### 2026-04-17 导入确认任务抢占状态冲突分流缺口
 
