@@ -1880,6 +1880,35 @@ def test_clear_raw_bt_destination_pending_logs_persistence_failure(capsys: pytes
     assert "db down" in output
 
 
+def test_clear_raw_bt_destination_pending_logs_missing_clear_result(capsys: pytest.CaptureFixture[str]) -> None:
+    class _MissingClearResultPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None):
+            _ = (chat_id, expected_stage)
+            return None
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                BT_PENDING_REPO_KEY: _MissingClearResultPendingRepo(SqliteDatabase(":memory:")),
+                "raw_bt_destination_pending_by_chat": {
+                    1001: SimpleNamespace(options=(), source="magnet:?xt=urn:btih:abc")
+                },
+            }
+        )
+    )
+
+    assert _clear_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    pending = context.application.bot_data["raw_bt_destination_pending_by_chat"][1001]
+    assert pending.options == ()
+    assert pending.source == "magnet:?xt=urn:btih:abc"
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理清理结果缺失]" in output
+    assert "[处理建议]" in output
+    assert "stage=raw_bt_destination" in output
+    assert "bt_pending_state clear result missing" in output
+
+
 def test_handle_message_replies_service_not_ready() -> None:
     reply_text = AsyncMock()
     message = SimpleNamespace(text="dune", reply_text=reply_text)

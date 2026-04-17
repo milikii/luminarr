@@ -1,4 +1,4 @@
-# Persistence closure log (v25)
+# Persistence closure log (v26)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 Telegram BT raw_bt_destination 清理结果缺失分流缺口
+
+- 闭环：`telegram_bot._clear_raw_bt_destination_pending()` 在 `bt_pending_state` 清理直接返回 `None` 时，不再借着 in-memory 已清掉而误报成“已取消”或继续放行 raw BT 目录选择后续流程；现在会单独打印“BT 待处理清理结果缺失”中文日志、把内存态放回，并让私聊 runtime 统一回 `SERVICE_NOT_READY_TEXT`，避免把“删除结果缺失”混成普通清理成功。
+- 代码：`app/bot/telegram_bot.py`
+- 验证：`tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_raw_bt_destination_pending_logs_persistence_failure or clear_raw_bt_destination_pending_logs_missing_clear_result or dispatch_private_chat_text_replies_service_not_ready_when_raw_bt_destination_clear_fails_on_cancel"`
 
 ### 2026-04-17 下载取消查询失败与缺失行分流回归
 
@@ -564,6 +570,7 @@
 
 ## 3. Focused verification
 
+- telegram raw-bt-destination cleanup result-missing tests：2026-04-17，`3 passed, 193 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_raw_bt_destination_pending_logs_persistence_failure or clear_raw_bt_destination_pending_logs_missing_clear_result or dispatch_private_chat_text_replies_service_not_ready_when_raw_bt_destination_clear_fails_on_cancel"`）
 - telegram raw-bt-destination cleanup fail-closed tests：2026-04-17，`3 passed, 182 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_raw_bt_destination_pending_logs_persistence_failure or raw_bt_destination_clear_fails_on_cancel or raw_bt_destination_clear_fails_before_media_import_flow"`）
 - telegram bt-tmdb cleanup fail-closed tests：2026-04-17，`3 passed, 180 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_bt_tmdb_association_pending_logs_persistence_failure or bt_tmdb_clear_fails_on_cancel or bt_tmdb_clear_fails_before_media_import_flow"`）
 - telegram bt-classification cleanup fail-closed tests：2026-04-17，`4 passed, 177 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_bt_classification_pending_logs_persistence_failure or pop_bt_classification_pending_logs_persistence_failure or bt_classification_clear_fails_on_cancel or bt_classification_pop_clear_fails"`）

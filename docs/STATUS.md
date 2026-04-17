@@ -1,4 +1,4 @@
-# Current status (v285)
+# Current status (v286)
 
 ## Project position
 
@@ -46,6 +46,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-17，Telegram BT `processing_path` 清理也已补齐“结果缺失”分流：`_clear_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
 - 截至 2026-04-17，Telegram BT `classification` 清理也已补齐“结果缺失”分流：`_clear_bt_classification_pending()` / `_pop_bt_classification_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
 - 截至 2026-04-17，Telegram BT `tmdb_association` 清理也已补齐“结果缺失”分流：`_clear_bt_tmdb_association_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或继续推进媒体入库链。
+- 截至 2026-04-17，Telegram BT `raw_bt_destination` 清理也已补齐“结果缺失”分流：`_clear_raw_bt_destination_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或继续推进 raw BT 目录选择。
 - 截至 2026-04-17，下载待确认轻状态查询 / 取消也已补齐“持久化行缺失”和“SQLite 查询失败”分流：`has_pending_add()` / `confirm_add_by_task_ref()` / `cancel_pending_add()` 在 `jobs` 已查不到待确认任务、但内存里还残留上下文时，会明确打印“下载待确认任务结果缺失”中文日志并直接 fail-closed；而取消链的 `jobs` 查询异常仍保持单独“下载取消查询失败”日志，不再和缺失行混写。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，状态页不再回灌长台账。
 - 最近提交轨迹继续与当前主线台账同步；详细闭环与验证入口统一收口在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
@@ -72,6 +73,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-17，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- telegram raw_bt destination cleanup result-missing tests：2026-04-17，`3 passed, 193 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "clear_raw_bt_destination_pending_logs_persistence_failure or clear_raw_bt_destination_pending_logs_missing_clear_result or dispatch_private_chat_text_replies_service_not_ready_when_raw_bt_destination_clear_fails_on_cancel"`）
 - focused downloader cancel diagnostics tests：2026-04-17，`6 passed, 68 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "cancel_pending_add_logs_job_cancel_failure or cancel_pending_add_logs_missing_job_cancel_result or handle_expired_pending_confirm_logs_job_cancel_failure or handle_expired_pending_confirm_logs_missing_job_during_cancel or handle_expired_pending_confirm_logs_job_cancel_state_rejection or cancel_pending_add_logs_job_cancel_state_rejection"`）
 - focused downloader executed-version diagnostics tests：2026-04-17，`3 passed, 74 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_executed_lease_version_logs_persistence_failure or record_executed_lease_version_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_executed_version_write_fails"`）
 - focused downloader restore-pending-job diagnostics tests：2026-04-17，`3 passed, 75 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_job_logs_persistence_failure or restore_pending_job_logs_missing_result or restore_pending_job_logs_rejected_current_state"`）
