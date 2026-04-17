@@ -23,6 +23,13 @@
 - 闭环：`manage_watchlist._add_item()` 在 `watchlist_repo.add_item()` 返回 `None` 时，不再和普通 SQLite 写入异常共用同一条“想看写入失败”日志；现在会把“写入结果缺失”和普通写入失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的失败文本，不改 watchlist workflow。
 - 代码：`app/services/manage_watchlist.py`
 - 验证：`tests/test_manage_watchlist.py -k "add_returns_failure_text_when_repo_returns_none or add_logs_missing_row_after_insert or add_returns_failure_text_when_repo_raises"`
+- commit：`26c3de1` `Separate watchlist add result diagnostics`
+
+### 2026-04-17 搜索澄清态清理结果缺失分流缺口
+
+- 闭环：`search_media._clear_clarification_pending()` 在 `clarification_repo.clear_pending()` 返回 `None` 时，不再和普通 SQLite 删除异常共用同一条“搜索澄清态清理失败”日志；现在会把“清理结果缺失”和普通清理失败拆开成更明确的中文日志与 `[处理建议]`，但 fail-closed 行为保持不变：当前进程会恢复内存里的待澄清状态，不把缺失真相误判成已清理成功。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "clear_clarification_pending_logs_missing_clear_result or clear_clarification_pending_logs_persistence_failure"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 下载状态观察结果缺字段分流缺口

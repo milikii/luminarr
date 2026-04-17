@@ -345,7 +345,7 @@ def test_clear_clarification_pending_logs_missing_clear_result(capsys) -> None:
     assert service.clear_clarification_pending(1001) is False
     assert service._clarification_pending_by_chat[1001] == "Dune"
     output = capsys.readouterr().out
-    assert "[搜索澄清态清理失败]" in output
+    assert "[搜索澄清态清理结果缺失]" in output
     assert "clarification clear result missing" in output
     assert "[处理建议]" in output
 

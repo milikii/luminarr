@@ -32,6 +32,7 @@ CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失�
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after upsert"
+CLARIFICATION_CLEAR_RESULT_MISSING_REASON = "clarification clear result missing"
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
 
 
@@ -347,13 +348,21 @@ class SearchMediaService:
         try:
             cleared_result = self._clarification_repo.clear_pending(chat_id=chat_id)
             if cleared_result is None:
-                raise ClarificationPersistenceError("clarification clear result missing")
+                raise ClarificationPersistenceError(CLARIFICATION_CLEAR_RESULT_MISSING_REASON)
             return cleared_result or cleared
         except Exception as error:
-            print(
-                f"\033[31m[搜索澄清态清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表删除是否正常；当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
-                flush=True,
-            )
+            if str(error) == CLARIFICATION_CLEAR_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[搜索澄清态清理结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 clarification 表删除返回是否仍带有明确结果；"
+                    "当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[搜索澄清态清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表删除是否正常；当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
+                    flush=True,
+                )
             if previous_query:
                 self._clarification_pending_by_chat[chat_id] = previous_query
             return False
