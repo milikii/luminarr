@@ -160,7 +160,8 @@ def test_manage_watchlist_add_logs_missing_row_after_insert(tmp_path: Path, caps
 
     assert reply == WATCHLIST_ADD_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[想看写入失败]" in captured.out
+    assert "[想看写入后条目缺失]" in captured.out
+    assert "[处理建议]" in captured.out
     assert "watchlist_item missing after insert" in captured.out
 
 

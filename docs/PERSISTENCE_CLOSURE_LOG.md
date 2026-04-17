@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 想看清单写入后回读缺口
+
+- 闭环：`manage_watchlist._add_item()` 在 `watchlist_item` 插入成功后，如果立即回读不到新条目，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“想看写入后条目缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持原来的失败文本，不改 workflow。
+- 代码：`app/services/manage_watchlist.py`
+- 验证：`tests/test_manage_watchlist.py -k "missing_row_after_insert or add_returns_failure_text_when_repo_raises or add_returns_failure_text_when_repo_returns_none"`
+- commit：待补
+
 ### 2026-04-17 BT 订阅最近资源回写缺口
 
 - 闭环：`manage_bt_subscription._update_last_seen()` 现在会区分两类真相缺口：如果 `bt_subscription_item` 条目在回写前已不存在，会打印“条目缺失”中文日志，并把用户 warning 改成“本轮待确认已创建，但该订阅已不存在”；只有 SQLite 或其它持久化异常，才继续走“最近资源真相未更新”的状态不可用 warning，避免把真缺数据和写库异常混成一类。

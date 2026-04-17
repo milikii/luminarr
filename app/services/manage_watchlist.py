@@ -43,6 +43,7 @@ MEDIA_KIND_LABELS = {
     "series": "剧集",
     "anime": "动漫",
 }
+WATCHLIST_ITEM_MISSING_AFTER_ADD_REASON = "watchlist_item missing after insert"
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,6 +151,24 @@ class ManageWatchlistService:
             )
             if created is None:
                 raise WatchlistPersistenceError("watchlist add result missing")
+        except WatchlistPersistenceError as error:
+            if str(error) == WATCHLIST_ITEM_MISSING_AFTER_ADD_REASON:
+                _log_watchlist_add_item_missing_after_insert(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
+            _log_watchlist_add_failed(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+                reason=str(error),
+            )
+            return None
         except Exception as error:
             _log_watchlist_add_failed(
                 chat_id=chat_id,
@@ -259,6 +278,22 @@ def _log_watchlist_add_failed(
         f"\033[31m[想看写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
         f"media_kind={media_kind} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
+    )
+
+
+def _log_watchlist_add_item_missing_after_insert(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[想看写入后条目缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表是否被并发删除或触发器回滚；"
+        "如需继续添加，请先确认 SQLite 写入后能立即回读该条目。"
     )
 
 
