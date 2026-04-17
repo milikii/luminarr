@@ -1,4 +1,4 @@
-# Persistence closure log (v12)
+# Persistence closure log (v13)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,13 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 下载确认任务抢占状态冲突分流缺口
+
+- 闭环：`add_to_downloader._claim_pending_job()` 在 `jobs.claim_lease()` 返回 `False` 时，不再静默交给后续 stale check 混成普通 `ADD_CONFIRM_NOT_PENDING_TEXT`；现在会先打印“下载确认任务抢占失败”中文日志与 `[处理建议]`，但用户侧仍保持原来的 stale check / not pending 边界，不改 confirm workflow 真相。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "claim_pending_job_logs_persistence_failure or claim_pending_job_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_raises or confirm_add_by_task_ref_returns_not_pending_when_claim_lease_is_rejected"`
+- commit：`987ff93` `Log rejected downloader lease claim`
 
 ### 2026-04-17 最小 trace 基线落地
 

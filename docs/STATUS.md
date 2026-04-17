@@ -1,4 +1,4 @@
-# Current status (v270)
+# Current status (v271)
 
 ## Project position
 
@@ -34,6 +34,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前也已落一层最小可追溯 trace baseline：shared private-chat 入站/回包，以及下载/导入待确认与 confirm 关键节点会统一追加到 `logs/trace.log`，不替代现有中文故障日志。
 - 下载和导入待确认链已经收口到 fail-closed：`approval_record` 查询异常、审批行缺失、lease/version 读写异常，不再混成普通 not pending。
 - 下载 confirm 的异常回退链也已补一处 fail-closed：下载投递失败后，如果待确认审批回退失败，不再继续回普通下载失败，而会直接按状态不可用停路。
+- 下载 confirm 的任务抢占链也已补一处分流：`jobs.claim_lease()` 返回 `False` 时，会先打印“下载确认任务抢占失败”日志，不再静默混进普通 not pending；但用户侧仍保持原来的 stale check / not pending 边界。
 - 下载 confirm 的成功收尾链也已补 warning：下载已真实投递后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。
 - 下载事件 helper 也已补一处分流：`job_event` 写入后立即回读不到下载事件时，会打印“下载事件结果缺失”日志，不再和普通 SQLite 写入异常共用同一类诊断；但当前下载流程仍保持原来的继续执行边界。
 - 导入 confirm 的异常回退链也已补一处 fail-closed：导入执行失败或进入 copy-fallback 待确认后，如果待确认审批回退失败，不再继续回普通执行结果，而会直接按状态不可用停路。
