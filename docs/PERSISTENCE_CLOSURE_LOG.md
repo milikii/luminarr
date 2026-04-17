@@ -1,4 +1,4 @@
-# Persistence closure log (v22)
+# Persistence closure log (v23)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 下载确认过期结果缺失分流缺口
+
+- 闭环：`add_to_downloader._is_pending_approval_expired()` 在 `approval_repo.is_downloader_pending_expired()` 已经出现“待确认审批结果缺失”时，不再和普通 SQLite/approval 查询异常共用同一条“下载确认过期判断失败”日志；现在会单独打印“下载确认过期结果缺失”中文日志与 `[处理建议]`，并继续让 confirm 走原来的 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改审批真相和副作用。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "is_pending_approval_expired_logs_approval_lookup_failure or is_pending_approval_expired_logs_missing_approval_result or confirm_add_by_task_ref_returns_state_unavailable_when_expiry_lookup_fails"`
 
 ### 2026-04-17 下载/导入审批回退缺失行分流缺口
 
