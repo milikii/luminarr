@@ -61,6 +61,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-17，当前主线最近几轮已经继续收口到“写入成功但回读缺失 / 结果缺失 / 条数不一致”的分流诊断：想看清单、BT 订阅、搜索待澄清、Telegram BT 待答、搜索候选这几条轻状态路径，都已补成显式中文日志与 `[处理建议]`，详细 focused tests 和 commit 轨迹继续只记在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 下载状态观察链也已补一处分流：`download_monitor` 返回空 update、缺回读记录、或缺完成标记时，不再都只打印同一类观察落盘失败日志，而会分别提示“结果缺失 / 完成标记缺失”与对应 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改自动导入 follow-up 边界。
 - 下载完成观察事件链也已补一处分流：`job_event.append_event()` 已执行、但回读不到 `downloader.completed_observed` 事件时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“下载完成观察事件结果缺失”；但用户侧仍保持原来的状态 warning，不改自动导入 follow-up 边界。
+- 导入事件记录链也已补一处分流：`job_event.append_event()` 已执行、但回读不到刚追加的导入事件时，不再和普通 SQLite 写入异常共用同一类日志，而会单独提示“导入事件结果缺失”；但导入流程仍保持原来的继续执行边界，不改导入副作用。
 - 导入命名真相读取链也已补一处分流：`job_event` 查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“导入命名真相结果缺失”；但导入命名仍保持原来的 fallback，不改导入副作用边界。
 - 导入目标读取链也已补一处分流：已经读到 import 关联、但 `target_path/message` 都为空时，会打印“导入目标路径缺失”日志，不再和普通“没有历史导入终态”混成同一类诊断；但 stale confirm 判定仍保持原来的 not pending 边界。
 - 自动导入终态读取链也已补一处分流：`job_event` 查询直接返回空结果时，不再和普通 SQLite 查询异常共用同一类日志，而会单独提示“自动导入终态结果缺失”；但自动导入仍保持原来的 fail-closed 停路边界。

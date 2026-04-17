@@ -65,6 +65,7 @@ JOB_LEASE_OWNER = "import_confirm"
 PENDING_LEASE_LOOKUP_FAILED = -1
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
+IMPORT_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1611,10 +1612,16 @@ class ImportToLibraryService:
                 target_path=target_path,
             )
         except Exception as error:
-            print(
-                f"\033[31m[导入事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
-                flush=True,
-            )
+            if str(error) == IMPORT_EVENT_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误=import event missing after append\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的导入事件；当前导入流程会继续执行，但这次事件真相还没有确认落稳。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
+                    flush=True,
+                )
 
 
 def parse_import_query(text: str) -> str | None:

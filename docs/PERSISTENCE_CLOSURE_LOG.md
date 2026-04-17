@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 导入事件结果缺失分流缺口
+
+- 闭环：`import_to_library._record_event()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到导入事件时，不再和普通 SQLite 写入异常共用同一条“导入事件落盘失败”日志；现在会单独打印“导入事件结果缺失”中文日志与 `[处理建议]`，但导入流程仍保持原来的继续执行边界，不改导入副作用。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "record_event_logs_persistence_failure or record_event_logs_missing_appended_event_result"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 下载完成观察事件结果缺失分流缺口
 
 - 闭环：`get_download_status._record_status_observation()` 在 `job_event.append_event()` 已执行、但写入后立即回读不到 `downloader.completed_observed` 事件时，不再和普通 SQLite 写入异常共用同一条“下载完成观察事件落盘失败”日志；现在会单独打印“下载完成观察事件结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改状态查询和自动导入 follow-up 边界。
