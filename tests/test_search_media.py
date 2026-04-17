@@ -253,7 +253,8 @@ def test_search_clarification_pending_logs_persistence_failure(tmp_path: Path, c
     assert text == CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
     assert not service.is_clarification_pending(1001)
     output = capsys.readouterr().out
-    assert "[搜索澄清态持久化失败]" in output
+    assert "[搜索澄清态写入后记录缺失]" in output
+    assert "[处理建议]" in output
     assert "clarification_state missing after upsert" in output
 
 
@@ -276,7 +277,8 @@ def test_search_no_result_returns_state_unavailable_when_clarification_persist_f
     assert service.get_cached_candidate(1001, 1) is None
     assert not service.is_clarification_pending(1001)
     output = capsys.readouterr().out
-    assert "[搜索澄清态持久化失败]" in output
+    assert "[搜索澄清态写入后记录缺失]" in output
+    assert "[处理建议]" in output
     assert "clarification_state missing after upsert" in output
 
 

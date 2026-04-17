@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 搜索待澄清写入后回读缺口
+
+- 闭环：`search_media._set_clarification_pending()` 在 `clarification_state` upsert 成功后，如果立即回读不到记录，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“搜索澄清态写入后记录缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持 `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT`，不改搜索 workflow。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "clarification_pending_logs_persistence_failure or no_result_returns_state_unavailable_when_clarification_persist_fails"`
+- commit：待补
+
 ### 2026-04-17 BT 订阅写入后回读缺口
 
 - 闭环：`manage_bt_subscription._add_item()` 在 `bt_subscription_item` 插入成功后，如果立即回读不到新条目，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“BT 订阅写入后条目缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持原来的失败文本，不改订阅 workflow。

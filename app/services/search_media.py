@@ -31,6 +31,7 @@ AMBIGUOUS_MAX_OPTION_COUNT = 3
 CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失败，请稍后重试。"
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
+CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after upsert"
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,6 +280,24 @@ class SearchMediaService:
             return True
         try:
             self._clarification_repo.upsert_pending(chat_id=chat_id, query=query)
+        except ClarificationPersistenceError as error:
+            if str(error) == CLARIFICATION_MISSING_AFTER_UPSERT_REASON:
+                print(
+                    f"\033[31m[搜索澄清态写入后记录缺失]\033[0m chat_id={chat_id} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 clarification_state 表是否被并发删除或触发器回滚；"
+                    "如需继续待澄清流程，请先确认 SQLite 写入后能立即回读该记录。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",
+                    flush=True,
+                )
+            if previous_query:
+                self._clarification_pending_by_chat[chat_id] = previous_query
+            else:
+                self._clarification_pending_by_chat.pop(chat_id, None)
+            return False
         except Exception as error:
             print(
                 f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",

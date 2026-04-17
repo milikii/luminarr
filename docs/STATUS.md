@@ -46,6 +46,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - BT 订阅最近资源回写链已补一处分流：订阅条目已不存在时，不再和 SQLite 回写异常共用同一类 warning；现在会显式提示“待确认已创建，但订阅条目已不存在”。
 - 想看清单写入链也已补一处分流：新增后回读不到条目时，会打印“写入后条目缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
 - BT 订阅写入链也已补一处分流：新增后回读不到条目时，会打印“BT 订阅写入后条目缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
+- 搜索待澄清写入链也已补一处分流：写入后立即回读不到记录时，会打印“搜索澄清态写入后记录缺失”日志，不再和普通 SQLite 写入失败共用同一类诊断。
 - cleanup 详细门禁、真实私聊 smoke 证据和窗口快照继续只写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，不再回灌到状态页长台账。
 - 当前本地联调基线仍是 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 - `docs/STATUS.md` 从本版开始只保留短快照；当前主线的详细闭环、focused tests 和 commit 轨迹收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。
