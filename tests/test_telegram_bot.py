@@ -3330,6 +3330,26 @@ def test_run_bt_subscription_scheduler_tick_once_skips_none_notifications() -> N
     application.bot.send_message.assert_not_awaited()
 
 
+def test_run_bt_subscription_scheduler_tick_once_logs_result_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
+    execution_gate = SimpleNamespace(run=AsyncMock(return_value=None))
+    application = SimpleNamespace(bot=SimpleNamespace(send_message=AsyncMock()))
+    service = SimpleNamespace(run_scheduler_tick=AsyncMock(return_value=None))
+
+    asyncio.run(
+        _run_bt_subscription_scheduler_tick_once(
+            application=application,
+            bt_subscription_service=service,
+            execution_gate=execution_gate,
+            dispatch_context=SimpleNamespace(),
+        )
+    )
+
+    output = capsys.readouterr().out
+    assert "[BT 订阅后台扫描结果不可用]" in output
+    assert "[处理建议]" in output
+    application.bot.send_message.assert_not_awaited()
+
+
 def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
     stop_event = asyncio.Event()
 

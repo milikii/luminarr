@@ -828,6 +828,7 @@ async def _run_bt_subscription_scheduler_tick_once(
         ),
     )
     if notifications is None:
+        _log_bt_subscription_scheduler_result_unavailable()
         return
     for chat_id, reply_text in notifications:
         await _send_bt_subscription_scheduler_message(
@@ -2036,6 +2037,13 @@ def _log_bt_subscription_scheduler_loop_error(*, error: Exception) -> None:
     print(
         f"\033[31m[BT 订阅后台扫描失败]\033[0m 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite 和 Telegram 发送链路后等待下一轮自动扫描。"
+    )
+
+
+def _log_bt_subscription_scheduler_result_unavailable() -> None:
+    print(
+        "\033[31m[BT 订阅后台扫描结果不可用]\033[0m 本轮未生成可发送通知。\n"
+        "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite、approval_record/jobs 和前面的后台扫描明细日志；当前这轮通知已跳过，下一轮自动扫描仍会继续尝试。"
     )
 
 
