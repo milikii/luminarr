@@ -282,17 +282,17 @@ def test_search_no_result_returns_state_unavailable_when_clarification_persist_f
     assert "clarification_state missing after upsert" in output
 
 
-def test_search_candidate_persist_logs_persistence_failure(tmp_path: Path, capsys) -> None:
-    class MissingCandidateRowRepo(CandidateMappingRepo):
-        def _count_candidates(self, *, chat_id: int) -> int:
+def test_search_candidate_persist_logs_missing_count_result(tmp_path: Path, capsys) -> None:
+    class MissingCandidateCountRepo(CandidateMappingRepo):
+        def _load_candidate_count_row(self, *, chat_id: int):
             _ = chat_id
-            return 0
+            return None
 
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     service = SearchMediaService(
         _fake_search_with_results,
-        candidate_repo=MissingCandidateRowRepo(database),
+        candidate_repo=MissingCandidateCountRepo(database),
     )
 
     text = _run(service.search_and_format("dune", chat_id=1001))
@@ -300,13 +300,13 @@ def test_search_candidate_persist_logs_persistence_failure(tmp_path: Path, capsy
     assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
     assert service.get_cached_candidate(1001, 1) is None
     output = capsys.readouterr().out
-    assert "[搜索候选写入后记录不一致]" in output
+    assert "[搜索候选写入结果缺失]" in output
     assert "[处理建议]" in output
-    assert "candidate_mapping count mismatch after save" in output
+    assert "candidate_mapping count missing after query" in output
 
 
-def test_search_no_result_returns_state_unavailable_when_candidate_persist_fails(tmp_path: Path, capsys) -> None:
-    class MissingCandidateRowRepo(CandidateMappingRepo):
+def test_search_candidate_persist_logs_count_mismatch_after_save(tmp_path: Path, capsys) -> None:
+    class CountMismatchCandidateRepo(CandidateMappingRepo):
         def _count_candidates(self, *, chat_id: int) -> int:
             _ = chat_id
             return 1
@@ -314,11 +314,11 @@ def test_search_no_result_returns_state_unavailable_when_candidate_persist_fails
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     service = SearchMediaService(
-        _fake_search_empty,
-        candidate_repo=MissingCandidateRowRepo(database),
+        _fake_search_with_results,
+        candidate_repo=CountMismatchCandidateRepo(database),
     )
 
-    text = _run(service.search_and_format("unknown", chat_id=1001))
+    text = _run(service.search_and_format("dune", chat_id=1001))
 
     assert text == CANDIDATE_STATE_UNAVAILABLE_TEXT
     assert service.get_cached_candidate(1001, 1) is None

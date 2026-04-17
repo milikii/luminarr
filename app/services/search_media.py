@@ -33,6 +33,7 @@ CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后�
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after upsert"
 CLARIFICATION_CLEAR_RESULT_MISSING_REASON = "clarification clear result missing"
+CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON = "candidate_mapping count missing after query"
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
 CANDIDATE_CLEAR_RESULT_MISSING_REASON = "candidate clear result missing"
 CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON = "candidate clear result missing during persist rollback"
@@ -186,7 +187,14 @@ class SearchMediaService:
                 try:
                     self._candidate_repo.save_candidates(chat_id, selected_raw_results)
                 except CandidatePersistenceError as error:
-                    if str(error) == CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON:
+                    if str(error) == CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON:
+                        print(
+                            f"\033[31m[搜索候选写入结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
+                            "\033[33m[处理建议]\033[0m 检查 candidate_mapping 写入后的计数查询是否仍带有完整结果；"
+                            "当前会直接返回候选状态写入失败，避免把缺失真相误判成仍可继续按序号选择的候选缓存。",
+                            flush=True,
+                        )
+                    elif str(error) == CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON:
                         print(
                             f"\033[31m[搜索候选写入后记录不一致]\033[0m chat_id={chat_id} 错误={error}\n"
                             "\033[33m[处理建议]\033[0m 检查 candidate_mapping 表是否被并发删除或部分回滚；"

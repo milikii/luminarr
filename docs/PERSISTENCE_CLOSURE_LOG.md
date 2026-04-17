@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 搜索候选写入结果缺失分流缺口
+
+- 闭环：`search_media.search_and_format()` 在 `candidate_mapping` 保存后的计数查询直接返回 `None` 时，不再和普通 SQLite 写入异常或“条数不一致”共用同一条日志；现在会单独打印“搜索候选写入结果缺失”中文日志与 `[处理建议]`，但用户侧仍保持 `CANDIDATE_STATE_UNAVAILABLE_TEXT`，不改候选回滚和 fail-closed 协议。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "search_candidate_persist_logs_missing_count_result or search_candidate_persist_logs_count_mismatch_after_save"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 BT 订阅最近资源回写结果缺失分流缺口
 
 - 闭环：`manage_bt_subscription._update_last_seen()` 在 `bt_subscription_item` 最近资源回写返回 `False` 或 `None` 时，不再和普通 SQLite/更新异常共用同一条“BT 订阅最近资源回写失败”日志；现在会把“回写结果缺失”和普通回写失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 warning：已创建的下载待确认保留，最近资源真相未更新提示不变，不改 `btsub run` 的副作用边界。
