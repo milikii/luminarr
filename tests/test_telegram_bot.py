@@ -532,6 +532,56 @@ def test_handle_message_bt_tmdb_association_succeeds_for_movie() -> None:
     search_service.search_and_format.assert_not_awaited()
 
 
+def test_handle_message_bt_tmdb_association_returns_service_not_ready_when_clear_result_missing(
+    tmp_path: Path,
+) -> None:
+    class _MissingClearResultPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None):
+            if expected_stage == BT_PENDING_STAGE_TMDB_ASSOCIATION:
+                pending_state = self.get_pending(chat_id=chat_id)
+                if pending_state is not None and pending_state.stage == BT_PENDING_STAGE_TMDB_ASSOCIATION:
+                    return None
+            return super().clear_pending(chat_id=chat_id, expected_stage=expected_stage)
+
+    update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
+    classify_update, second_reply_text = _build_update("movie", update_id=2)
+    title_update, third_reply_text = _build_update("Dune 2021", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+
+    async def fake_movie_lookup(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == "2021"
+        return [TmdbMovie(title="Dune", original_title="Dune", year="2021", tmdb_id="438631")]
+
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY: fake_movie_lookup,
+                BT_PENDING_REPO_KEY: _MissingClearResultPendingRepo(SqliteDatabase(str(db_path))),
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(title_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
+    third_reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+
+
 def test_handle_message_bt_tmdb_association_returns_ambiguous_text_without_year() -> None:
     update, first_reply_text = _build_update("magnet:?xt=urn:btih:abcdef1234567890")
     classify_update, second_reply_text = _build_update("series", update_id=2)

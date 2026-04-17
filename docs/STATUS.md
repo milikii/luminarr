@@ -1,4 +1,4 @@
-# Current status (v287)
+# Current status (v288)
 
 ## Project position
 
@@ -45,7 +45,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致 已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 截至 2026-04-17，Telegram BT `processing_path` 清理也已补齐“结果缺失”分流：`_clear_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
 - 截至 2026-04-17，Telegram BT `classification` 清理也已补齐“结果缺失”分流：`_clear_bt_classification_pending()` / `_pop_bt_classification_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
-- 截至 2026-04-17，Telegram BT `tmdb_association` 清理也已补齐“结果缺失”分流：`_clear_bt_tmdb_association_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或继续推进媒体入库链。
+- 截至 2026-04-17，Telegram BT `tmdb_association` 清理和关联入口也已补齐“结果缺失”分流：`_clear_bt_tmdb_association_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 与 TMDB 关联入口直接回服务未就绪，不再把缺失真相混成已取消或继续推进媒体入库链。
 - 截至 2026-04-17，Telegram BT `raw_bt_destination` 清理和目录选择入口也已补齐“结果缺失”分流：`_clear_raw_bt_destination_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 与目录选择入口直接回服务未就绪，不再把缺失真相混成已取消或继续推进 raw BT 目录选择。
 - 截至 2026-04-17，下载待确认轻状态查询 / 取消也已补齐“持久化行缺失”和“SQLite 查询失败”分流：`has_pending_add()` / `confirm_add_by_task_ref()` / `cancel_pending_add()` 在 `jobs` 已查不到待确认任务、但内存里还残留上下文时，会明确打印“下载待确认任务结果缺失”中文日志并直接 fail-closed；而取消链的 `jobs` 查询异常仍保持单独“下载取消查询失败”日志，不再和缺失行混写。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，状态页不再回灌长台账。

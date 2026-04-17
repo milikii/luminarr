@@ -2323,7 +2323,9 @@ async def _handle_bt_tmdb_association_query(
             options=_format_bt_tmdb_association_options(matches),
         )
 
-    _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    cleared_tmdb_association = _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    if cleared_tmdb_association is None:
+        return SERVICE_NOT_READY_TEXT
     association_text = _format_bt_tmdb_association_success(pending.media_kind, matches[0])
     if not _can_dispatch_bt_source(pending.source):
         return f"{association_text}\n\n{BT_SOURCE_REQUIRED_TEXT}"
