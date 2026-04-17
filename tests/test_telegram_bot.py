@@ -1688,7 +1688,10 @@ def test_clear_raw_bt_destination_pending_logs_persistence_failure(capsys: pytes
         )
     )
 
-    assert _clear_raw_bt_destination_pending(context=context, chat_id=1001) is True
+    assert _clear_raw_bt_destination_pending(context=context, chat_id=1001) is None
+    pending = context.application.bot_data["raw_bt_destination_pending_by_chat"][1001]
+    assert pending.options == ()
+    assert pending.source == "magnet:?xt=urn:btih:abc"
 
     output = capsys.readouterr().out
     assert "[BT 待处理清理失败]" in output

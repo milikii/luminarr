@@ -154,7 +154,11 @@ async def handle_private_chat_query_text(
                     return
                 await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
-        if tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id):
+        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        if cleared_raw_bt_destination is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        if cleared_raw_bt_destination:
             await reply_func(tg.RAW_BT_DESTINATION_CANCELLED_TEXT)
             return
         cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
@@ -184,7 +188,10 @@ async def handle_private_chat_query_text(
         if cleared_processing_path is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        if cleared_raw_bt_destination is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
@@ -261,7 +268,10 @@ async def handle_private_chat_query_text(
         if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        if cleared_raw_bt_destination is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
@@ -311,7 +321,10 @@ async def handle_private_chat_query_text(
         if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        if cleared_raw_bt_destination is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
         cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)

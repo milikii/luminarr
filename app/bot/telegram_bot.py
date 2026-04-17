@@ -1656,13 +1656,12 @@ def _clear_raw_bt_destination_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
-) -> bool:
-    cleared = False
+) -> bool | None:
     if chat_id is None or chat_id <= 0:
         return False
     pending_by_chat = _resolve_raw_bt_destination_pending_by_chat(context)
-    if pending_by_chat.pop(chat_id, None) is not None:
-        cleared = True
+    pending = pending_by_chat.pop(chat_id, None)
+    cleared = pending is not None
     pending_repo = _resolve_bt_pending_repo(context)
     if pending_repo is None:
         return cleared
@@ -1670,7 +1669,9 @@ def _clear_raw_bt_destination_pending(
         return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_RAW_BT_DESTINATION) or cleared
     except Exception as error:
         _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_RAW_BT_DESTINATION, reason=str(error))
-        return cleared
+        if pending is not None:
+            pending_by_chat[chat_id] = pending
+        return None
 
 
 def _parse_bt_classification_choice(text: str) -> str | None:
