@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载事件结果缺失分流缺口
+
+- 闭环：`add_to_downloader._record_event()` 在 `job_event.append_event()` 已执行但写入后立即回读不到下载事件时，不再和普通 SQLite 写入异常共用同一条“下载事件落盘失败”日志；现在会单独打印“下载事件结果缺失”中文日志与 `[处理建议]`，但当前下载流程仍保持原来的继续执行边界，不抬成新的状态失败。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "record_event_logs_persistence_failure or record_event_logs_missing_appended_event_result"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 导入目标路径缺失分流缺口
 
 - 闭环：`import_to_library._find_latest_import_target_path()` 在已经读到 import 关联对象、但 `target_path` 与 `message` 都为空时，不再和普通“没有历史导入终态”混成静默空结果；现在会单独打印“导入目标路径缺失”中文日志与 `[处理建议]`，但 stale confirm 判定仍保持原来的 `IMPORT_CONFIRM_NOT_PENDING_TEXT` 边界，不改审批或导入副作用。

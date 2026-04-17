@@ -373,6 +373,30 @@ def test_record_event_logs_persistence_failure(capsys) -> None:
     assert "event_type=downloader.approval_pending" in output
 
 
+def test_record_event_logs_missing_appended_event_result(capsys) -> None:
+    job_event_repo = type(
+        "JobEventRepo",
+        (),
+        {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append"))},
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_event_repo=job_event_repo,
+    )
+    service._record_event(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        event_type="downloader.approval_pending",
+        message="Dune: Part Two",
+    )
+    output = capsys.readouterr().out
+    assert "[下载事件结果缺失]" in output
+    assert "downloader event missing after append" in output
+    assert "event_type=downloader.approval_pending" in output
+
+
 def test_register_download_monitor_logs_persistence_failure(capsys) -> None:
     download_monitor_repo = type("DownloadMonitorRepo", (), {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)

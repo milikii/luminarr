@@ -1151,10 +1151,18 @@ class AddToDownloaderService:
                 message=message,
             )
         except Exception as error:
-            print(
-                f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
-                flush=True,
-            )
+            if str(error) == "job_event missing after append":
+                print(
+                    f"\033[31m[下载事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误=downloader event missing after append\n"
+                    "\033[33m[处理建议]\033[0m 检查 job_event 写入后是否还能立即回读到该条下载事件；"
+                    "当前流程会继续执行，但这条下载事件真相可能没有落稳。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
+                    flush=True,
+                )
             return
 
     def _register_download_monitor(
