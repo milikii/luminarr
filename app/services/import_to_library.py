@@ -78,6 +78,7 @@ IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending 
 IMPORT_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missing during restore"
 IMPORT_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
+IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON = "import completed job result missing"
 IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
 
@@ -1583,11 +1584,21 @@ class ImportToLibraryService:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
+            if marked is None:
+                raise RuntimeError(IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
         except Exception as error:
-            print(
-                f"\033[31m[导入确认任务完结失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前导入结果已返回，但任务真相可能仍停留在待确认或执行中。",
-                flush=True,
-            )
+            if str(error) == IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[导入确认任务完结结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该任务是否仍存在，以及完成态更新后是否还能回读到最新状态；"
+                    "当前导入结果已返回，但任务真相还没有确认完结成功。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入确认任务完结失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前导入结果已返回，但任务真相可能仍停留在待确认或执行中。",
+                    flush=True,
+                )
             return None
         if marked is False:
             print(

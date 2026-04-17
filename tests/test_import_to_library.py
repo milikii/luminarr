@@ -628,6 +628,16 @@ def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
     assert "job_id=job-1" in output
 
 
+def test_mark_completed_job_logs_missing_result(capsys) -> None:
+    job_repo = type("JobRepo", (), {"mark_completed": lambda self, **kwargs: None})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    assert service._mark_completed_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87") is None
+    output = capsys.readouterr().out
+    assert "[导入确认任务完结结果缺失]" in output
+    assert "import completed job result missing" in output
+    assert "job_id=job-1" in output
+
+
 def test_mark_completed_job_logs_rejected_current_state(capsys) -> None:
     job_repo = type("JobRepo", (), {"mark_completed": lambda self, **kwargs: False})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
@@ -2514,6 +2524,81 @@ def test_confirm_import_by_task_ref_appends_warning_when_job_completion_write_fa
     output = capsys.readouterr().out
     assert "[导入确认任务完结失败]" in output
     assert "db down" in output
+
+
+def test_confirm_import_by_task_ref_appends_warning_when_job_completion_result_is_missing(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    job = JobRecord(
+        job_id="job-1",
+        chat_id=1001,
+        user_id=2001,
+        workflow_type="import_to_library",
+        state="pending_approval",
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json="{}",
+        version=3,
+        lease_owner="",
+        lease_until="",
+        created_at="2026-04-15 00:00:00",
+        updated_at="2026-04-15 00:00:00",
+    )
+    approval_record = type(
+        "ApprovalRecord",
+        (),
+        {"status": APPROVAL_STATUS_PENDING, "lease_version": 2, "executed_version": 0},
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(tmp_path / "library"),
+        job_repo=type(
+            "JobRepo",
+            (),
+            {
+                "get_import_job_for_chat_ref": lambda self, **kwargs: job,
+                "claim_lease": lambda self, **kwargs: True,
+                "mark_completed": lambda self, **kwargs: None,
+            },
+        )(),
+        approval_repo=type(
+            "ApprovalRepo",
+            (),
+            {
+                "get_import_approval": lambda self, **kwargs: approval_record,
+                "is_import_pending_expired": lambda self, **kwargs: False,
+                "approve_import": lambda self, **kwargs: True,
+                "mark_import_executed": lambda self, **kwargs: None,
+            },
+        )(),
+    )
+
+    async def _fake_execute_import(*_: object, **__: object) -> import_module.ImportExecutionResult:
+        return import_module.ImportExecutionResult(reply="导入成功：Dune.2021.mkv", imported=True)
+
+    service._execute_import = _fake_execute_import  # type: ignore[method-assign]
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert "导入成功：Dune.2021.mkv" in text
+    assert IMPORT_FINALIZATION_WARNING_TEXT in text
+    output = capsys.readouterr().out
+    assert "[导入确认任务完结结果缺失]" in output
+    assert "import completed job result missing" in output
 
 
 def test_confirm_import_by_task_ref_success_with_refresh_success(tmp_path: Path) -> None:

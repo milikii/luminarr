@@ -323,6 +323,13 @@
 - 验证：`tests/test_manage_watchlist.py -k "clear_returns_failure_text_when_repo_raises or clear_returns_failure_text_when_repo_returns_none"`
 - commit：`68bb5f4` `Separate watchlist clear diagnostics`
 
+### 2026-04-17 下载/导入任务完结结果缺失分流缺口
+
+- 闭环：`add_to_downloader._mark_completed_job()` 和 `import_to_library._mark_completed_job()` 在 `jobs.mark_downloader_completed()` / `jobs.mark_completed()` 返回 `None` 时，不再把“完结结果缺失”误判成成功；现在会打印单独的中文日志与 `[处理建议]`，并让 confirm 成功回复继续追加原有 finalization warning，不改下载/导入副作用真相边界。
+- 代码：`app/services/add_to_downloader.py`、`app/services/import_to_library.py`
+- 验证：`tests/test_add_to_downloader.py -k "mark_completed_job_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`；`tests/test_import_to_library.py -k "mark_completed_job_logs_missing_result or confirm_import_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`
+- commit：本轮待提交（提交后见 `git log --oneline`）
+
 ### 2026-04-17 BT 订阅清单结果缺失分流缺口
 
 - 闭环：`manage_bt_subscription._list_items()` 在 `bt_subscription_item` 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅清单读取失败”日志；现在会把“清单结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但用户侧仍保持原来的 `BT_SUBSCRIPTION_LIST_FAILED_TEXT`，不改订阅清单 workflow。
@@ -514,6 +521,8 @@
 - telegram bt-pending fail-closed tests：2026-04-17，`8 passed, 169 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "bt_processing_path_persist_fails or set_bt_processing_path_pending_logs_persistence_failure or set_bt_classification_pending_logs_persistence_failure or set_bt_tmdb_association_pending_logs_persistence_failure or set_raw_bt_destination_pending_logs_persistence_failure or enter_media_import_bt_flow_returns_service_not_ready or enter_pure_bt_flow_returns_service_not_ready"`）
 - import finalization warning tests：2026-04-17，`5 passed, 87 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
 - downloader finalization warning tests：2026-04-17，`5 passed, 60 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
+- downloader finalization-result diagnostics tests：2026-04-17，`4 passed, 83 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "mark_completed_job_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
+- import finalization-result diagnostics tests：2026-04-17，`4 passed, 114 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "mark_completed_job_logs_missing_result or confirm_import_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
 - downloader executed-version diagnostics tests：2026-04-17，`3 passed, 74 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_executed_lease_version_logs_persistence_failure or record_executed_lease_version_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_executed_version_write_fails"`）
 - downloader restore-pending-job diagnostics tests：2026-04-17，`3 passed, 75 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_job_logs_persistence_failure or restore_pending_job_logs_missing_result or restore_pending_job_logs_rejected_current_state"`）
 - import approval-restore fail-closed tests：2026-04-17，`4 passed, 86 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "restore_pending_approval_logs or execution_cannot_restore_pending_approval"`）
