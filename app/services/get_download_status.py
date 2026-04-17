@@ -19,6 +19,7 @@ STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT = "注意：自动导入状态读取�
 STATUS_AUTO_IMPORT_WARNING_TEXT = "注意：自动导入跟进失败，本次状态查询未附带后续处理结果，请稍后重试。"
 DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON = "download monitor status result missing"
 DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON = "download monitor observed record missing"
+DOWNLOAD_MONITOR_STATUS_UPSERT_RESULT_MISSING_REASON = "download monitor state missing after status upsert"
 DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON = "download monitor completion flag missing"
 DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 
@@ -90,6 +91,7 @@ class GetDownloadStatusService:
             if str(error) in {
                 DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON,
                 DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON,
+                DOWNLOAD_MONITOR_STATUS_UPSERT_RESULT_MISSING_REASON,
             }:
                 _log_download_monitor_observation_result_missing(
                     task_ref=task_ref,

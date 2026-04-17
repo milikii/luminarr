@@ -1,4 +1,4 @@
-# Persistence closure log (v30)
+# Persistence closure log (v31)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载状态观察写后回读缺失分流缺口
+
+- 闭环：`get_download_status._record_status_observation()` 之前在 `download_monitor_repo.record_status()` 已经完成状态 upsert、但写后立即回读不到记录时，只会和普通 SQLite 落盘异常共用同一条“下载状态观察落盘失败”日志；现在会把这类“写后回读缺失”一起收口到“下载状态观察结果缺失”中文日志与 `[处理建议]`，不再把 `download_monitor` 真相缺口混成普通写库失败。
+- 代码：`app/services/get_download_status.py`
+- 验证：`tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_status_upsert_result_is_missing or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`
 
 ### 2026-04-17 cleanup 关联结果缺失分流缺口
 
