@@ -639,6 +639,8 @@ class AddToDownloaderService:
                 if pending_lookup_failed:
                     return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
                 return None
+            if pending_lookup_failed:
+                return ADD_CANCEL_STATE_UNAVAILABLE_TEXT
             if self._job_repo is not None:
                 self._log_pending_job_result_missing(
                     chat_id=chat_id,

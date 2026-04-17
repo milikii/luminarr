@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 下载取消查询失败与缺失行分流回归
+
+- 闭环：`add_to_downloader.cancel_pending_add()` 在 `jobs.get_latest_pending_downloader_job()` 抛出 SQLite 查询异常、且当前进程里仍有待确认上下文时，不再被上一轮新增的 fail-closed 分支误记成“下载待确认任务结果缺失”；现在会继续保持原来的“下载取消查询失败”中文日志并直接停路，把“查询失败”和“jobs 真缺行”重新拆开，不改取消副作用和 SQLite 真相边界。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "cancel_pending_add_logs_job_lookup_failure or cancel_pending_add_keeps_lookup_failure_when_job_lookup_fails_with_in_memory_pending or cancel_pending_add_returns_state_unavailable_when_job_row_missing_with_in_memory_pending or cancel_pending_add_returns_state_unavailable_when_pending_lease_lookup_fails_with_in_memory_pending or cancel_pending_add_returns_state_unavailable_when_pending_approval_row_missing_with_in_memory_pending or cancel_pending_add_returns_state_unavailable_when_pending_lease_missing"`
+
 ### 2026-04-17 下载取消任务缺失行与进程内残留上下文分流缺口
 
 - 闭环：`add_to_downloader.cancel_pending_add()` 在 `jobs.get_latest_pending_downloader_job()` 已经查不到待确认任务、但当前进程里还残留待确认上下文时，不再继续沿用进程内上下文去取消审批；现在会单独打印“下载待确认任务结果缺失”中文日志与 `[处理建议]`，并让取消直接按状态读取失败 fail-closed，避免把进程内残留上下文误判成仍可取消下载，不改下载副作用和 SQLite 真相边界。

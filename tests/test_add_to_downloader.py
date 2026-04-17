@@ -179,6 +179,42 @@ def test_cancel_pending_add_logs_job_lookup_failure(capsys) -> None:
     assert "[下载取消查询失败]" in capsys.readouterr().out
 
 
+def test_cancel_pending_add_keeps_lookup_failure_when_job_lookup_fails_with_in_memory_pending(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_downloader should not be called"))},
+    )()
+    job_repo = type(
+        "BoomJobRepo",
+        (),
+        {
+            "get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_pending_job should not be called")),
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+        job_repo=job_repo,
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="selection-hash",
+        title="Dune: Part Two",
+        source="https://example.com/dune.torrent",
+    )
+    service._record_pending_context(chat_id=1001, pending_add=pending_add)
+
+    assert service.cancel_pending_add(1001) == ADD_CANCEL_STATE_UNAVAILABLE_TEXT
+    output = capsys.readouterr().out
+    assert "[下载取消查询失败]" in output
+    assert "db down" in output
+    assert "[下载待确认任务结果缺失]" not in output
+
+
 def test_cancel_pending_add_logs_payload_corruption(capsys) -> None:
     pending_job = JobRecord(
         job_id="job-1",
