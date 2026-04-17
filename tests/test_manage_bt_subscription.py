@@ -175,7 +175,7 @@ def test_manage_bt_subscription_list_returns_failure_text_when_repo_returns_none
 
     assert reply == BT_SUBSCRIPTION_LIST_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[BT 订阅清单读取失败]" in captured.out
+    assert "[BT 订阅清单结果缺失]" in captured.out
     assert "[处理建议]" in captured.out
     assert "bt subscription list result missing" in captured.out
 

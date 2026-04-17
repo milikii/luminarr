@@ -321,7 +321,10 @@ class ManageBtSubscriptionService:
                 raise BtSubscriptionPersistenceError("bt subscription list result missing")
             return items
         except Exception as error:
-            _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
+            if str(error) == "bt subscription list result missing":
+                _log_bt_subscription_list_result_missing(chat_id=chat_id, reason=str(error))
+            else:
+                _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
             return None
 
     def _remove_item(self, *, chat_id: int, item_id: int):
@@ -704,6 +707,14 @@ def _log_bt_subscription_list_failed(*, chat_id: int, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
+    )
+
+
+def _log_bt_subscription_list_result_missing(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅清单结果缺失]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 查询返回是否仍带有完整列表；"
+        "当前会按读取失败处理，避免把缺失真相误判成“清单为空”。"
     )
 
 
