@@ -1433,9 +1433,19 @@ def _clear_bt_classification_pending(
     if pending_repo is None:
         return cleared
     try:
-        return pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION) or cleared
+        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+        if cleared_result is None:
+            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
+        return cleared_result or cleared
     except Exception as error:
-        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
+        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+            _log_bt_pending_clear_result_missing(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
         if isinstance(pending_query, str):
             pending_by_chat[chat_id] = pending_query
         return None
@@ -1454,14 +1464,26 @@ def _pop_bt_classification_pending(
         pending_repo = _resolve_bt_pending_repo(context)
         if pending_repo is not None:
             try:
-                pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+                cleared_result = pending_repo.clear_pending(
+                    chat_id=chat_id,
+                    expected_stage=BT_PENDING_STAGE_CLASSIFICATION,
+                )
+                if cleared_result is None:
+                    raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
             except Exception as error:
                 pending_by_chat[chat_id] = pending_query
-                _log_bt_pending_clear_failed(
-                    chat_id=chat_id,
-                    stage=BT_PENDING_STAGE_CLASSIFICATION,
-                    reason=str(error),
-                )
+                if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+                    _log_bt_pending_clear_result_missing(
+                        chat_id=chat_id,
+                        stage=BT_PENDING_STAGE_CLASSIFICATION,
+                        reason=str(error),
+                    )
+                else:
+                    _log_bt_pending_clear_failed(
+                        chat_id=chat_id,
+                        stage=BT_PENDING_STAGE_CLASSIFICATION,
+                        reason=str(error),
+                    )
                 return False
         return pending_query
 
@@ -1492,10 +1514,19 @@ def _pop_bt_classification_pending(
         )
         return None
     try:
-        pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
+        if cleared_result is None:
+            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
     except Exception as error:
         pending_by_chat[chat_id] = pending_query
-        _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
+        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
+            _log_bt_pending_clear_result_missing(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
         return False
     return pending_query
 

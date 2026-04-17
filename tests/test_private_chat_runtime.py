@@ -505,6 +505,38 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_classifica
     assert "db down" in captured.out
 
 
+def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_classification_clear_result_is_missing_on_cancel(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _MissingClearResultPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None):
+            if expected_stage == "classification":
+                return None
+            return False
+
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="取消",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data()
+            | {
+                BT_PENDING_REPO_KEY: _MissingClearResultPendingRepo(SqliteDatabase(":memory:")),
+                "bt_classification_pending_by_chat": {1001: "magnet:?xt=urn:btih:abcdef1234567890"},
+            },
+        )
+    )
+    captured = capsys.readouterr()
+
+    reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+    assert "[BT 待处理清理结果缺失]" in captured.out
+    assert "stage=classification" in captured.out
+    assert "bt_pending_state clear result missing" in captured.out
+
+
 def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classification_payload_corruption(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
