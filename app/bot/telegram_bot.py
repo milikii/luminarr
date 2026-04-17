@@ -2129,7 +2129,9 @@ async def _handle_raw_bt_destination_query(
     if selected_option is None:
         return _format_raw_bt_destination_invalid(query, pending.options)
 
-    _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    cleared_raw_bt_destination = _clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    if cleared_raw_bt_destination is None:
+        return SERVICE_NOT_READY_TEXT
     selected_text = _format_raw_bt_destination_selected(selected_option)
     add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
     if not isinstance(add_service, AddToDownloaderService):

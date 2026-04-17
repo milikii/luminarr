@@ -712,6 +712,54 @@ def test_handle_message_raw_bt_destination_selection_succeeds() -> None:
     assert "当前还缺少实际的磁力链接" in selected_text
 
 
+def test_handle_message_raw_bt_destination_selection_returns_service_not_ready_when_clear_result_missing(
+    tmp_path: Path,
+) -> None:
+    class _MissingClearResultPendingRepo(BtPendingRepo):
+        def clear_pending(self, *, chat_id: int, expected_stage: str | None = None):
+            if expected_stage == BT_PENDING_STAGE_RAW_BT_DESTINATION:
+                pending_state = self.get_pending(chat_id=chat_id)
+                if pending_state is not None and pending_state.stage == BT_PENDING_STAGE_RAW_BT_DESTINATION:
+                    return None
+            return super().clear_pending(chat_id=chat_id, expected_stage=expected_stage)
+
+    update, first_reply_text = _build_update("下载这个 BT")
+    classify_update, second_reply_text = _build_update("raw_bt", update_id=2)
+    select_update, third_reply_text = _build_update("2", update_id=3)
+    search_service = SearchMediaService(_fake_search)
+    search_service.search_and_format = AsyncMock(return_value="不应进入搜索")
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    options = (
+        RawBtDestinationOption(key="downloads", label="下载目录", target_dir="/data/raw/downloads"),
+        RawBtDestinationOption(key="archive", label="归档目录", target_dir="/data/raw/archive"),
+    )
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                RAW_BT_DESTINATION_OPTIONS_KEY: options,
+                BT_PENDING_REPO_KEY: _MissingClearResultPendingRepo(SqliteDatabase(str(db_path))),
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    asyncio.run(handle_message(classify_update, context))
+    asyncio.run(handle_message(select_update, context))
+
+    first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    assert "请选择预设目标目录：" in second_reply_text.await_args.args[0]
+    third_reply_text.assert_awaited_once_with(SERVICE_NOT_READY_TEXT)
+
+
 def test_handle_message_raw_bt_destination_invalid_text_returns_reminder() -> None:
     update, first_reply_text = _build_update("下载这个 BT")
     classify_update, second_reply_text = _build_update("raw_bt", update_id=2)
