@@ -75,6 +75,7 @@ IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON = "import cancel pending job result missing"
 IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON = "job missing during cancel"
 IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON = "approval_record missing during cancel"
+IMPORT_CANCEL_APPROVAL_NONE_REASON = "import cancel approval result missing"
 IMPORT_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON = "import restore pending approval result missing"
 IMPORT_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missing during restore"
 IMPORT_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
@@ -669,8 +670,13 @@ class ImportToLibraryService:
                     task_ref=pending_job.task_ref,
                     expected_lease_version=expected_lease_version,
                 )
+                if approval_cancelled is None:
+                    raise RuntimeError(IMPORT_CANCEL_APPROVAL_NONE_REASON)
             except Exception as error:
-                if str(error) == IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON:
+                if str(error) in {
+                    IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON,
+                    IMPORT_CANCEL_APPROVAL_NONE_REASON,
+                }:
                     print(
                         f"\033[31m[导入取消审批结果缺失]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n"
                         "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及取消更新后是否还能回读到该行；"
