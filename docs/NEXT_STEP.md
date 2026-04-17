@@ -164,6 +164,7 @@
 - 保持 `add_to_downloader._resolve_pending_lease_version()` 在已配置 `approval_repo` 且当前进程仍留有 in-memory pending 身份时，如果 `approval_record` 行缺失，也继续打印红色中文 `[下载待确认版号查询失败]` 和 `[处理建议]`，并让 `cancel_pending_add()` 直接按状态读取失败停路，避免把审批真相缺口混成普通待确认版号缺失或继续吃内存版号兜底。
 - 保持 `import_to_library._resolve_pending_lease_version()` 在已配置 `approval_repo` 且当前进程仍留有 in-memory pending 身份时，如果 `approval_record` 行缺失，也继续打印红色中文 `[导入待确认版号查询失败]` 和 `[处理建议]`，并让 `cancel_pending_import()` 直接按状态读取失败停路，避免把审批真相缺口混成普通待确认版号缺失或继续吃内存版号兜底。
 - 保持 `search_media._set_clarification_pending()` 在 `clarification_repo.upsert_pending()` 写入失败时，也继续清掉本次 in-memory pending 并回“搜索待澄清状态写入失败，请稍后重试。”，避免把持久化真相缺口混成仍可继续跟进的待澄清状态。
+- 保持 `search_media` 在 `candidate_repo.save_candidates()` 写入失败时，也继续清掉本次 in-memory candidate 并回“搜索候选状态写入失败，请稍后重试。”，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。
 - 保持 verification docs gate 继续显式校验 Telegram / personal WeChat / Feishu / WeCom 四个单渠道 `cleanup-shortcut` 门禁都还写在 `docs/NEXT_STEP.md` / `docs/STATUS.md`，避免前面几轮刚补上的 shared-runtime 身份链门禁从文档快照里漂走。
 - 保持 `docs/STATUS.md` 里的 WeCom cleanup service-not-ready 快照和 Latest verification 同步到同一组跑数，避免同一轮结果在同一文件里写出两套数字。
 - 保持 verification docs gate 继续显式校验 `success-event-append-failure observability` 命名观察，避免窗口台账把这类事件落盘失败可观测性写丢。
