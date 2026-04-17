@@ -38,6 +38,10 @@ ADD_CANCEL_STATE_UNAVAILABLE_TEXT = "下载取消状态读取失败，请稍后�
 ADD_CONFIRM_NOT_PENDING_TEXT = "没有待确认的下载请求，请先重新发送序号。"
 ADD_CONFIRM_EXPIRED_TEXT = "下载确认已超时，请重新发送序号。"
 ADD_CONFIRM_STATE_UNAVAILABLE_TEXT = "下载确认状态读取失败，请稍后重试。"
+ADD_FINALIZATION_WARNING_TEXT = (
+    "注意：下载已执行，但状态回写失败，请勿重复 confirm。\n"
+    "请稍后用 status 查询任务状态，或检查 SQLite/approval_record 与 jobs 表。"
+)
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
@@ -429,25 +433,32 @@ class AddToDownloaderService:
                 chat_id=chat_id,
                 user_id=user_id,
             )
-        self._record_executed_lease_version(
+        finalization_warning = ""
+        lease_recorded = self._record_executed_lease_version(
             task_ref=cleaned_ref,
             task_id=pending_add.task_id,
             task_hash=pending_add.task_hash,
             executed_lease_version=expected_lease_version,
         )
+        if lease_recorded is not True:
+            finalization_warning = ADD_FINALIZATION_WARNING_TEXT
         if claimed_job:
             completed_context = _to_completed_pending_add_context(
                 pending_add,
                 actual_task_id=result.task_id,
                 actual_task_hash=result.task_hash,
             )
-            self._mark_completed_job(
+            job_completed = self._mark_completed_job(
                 job_id=claimed_job_id,
                 expected_version=claimed_job_version,
                 lease_owner=lease_owner,
                 completed_add=completed_context,
             )
+            if job_completed is not True:
+                finalization_warning = ADD_FINALIZATION_WARNING_TEXT
         self._clear_pending_context(chat_id=chat_id, task_ref=cleaned_ref)
+        if finalization_warning:
+            return f"{reply}\n\n{finalization_warning}"
         return reply
 
     def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:
@@ -771,13 +782,14 @@ class AddToDownloaderService:
         task_id: str,
         task_hash: str,
         executed_lease_version: int,
-    ) -> None:
+    ) -> bool | None:
         _ = task_ref
         identity = (task_id.strip(), task_hash.strip())
-        if identity[0] and identity[1] and executed_lease_version > 0:
-            self._pending_add_lease_versions[identity] = executed_lease_version
+        if not identity[0] or not identity[1] or executed_lease_version <= 0:
+            return False
+        self._pending_add_lease_versions[identity] = executed_lease_version
         if self._approval_repo is None:
-            return
+            return True
         try:
             self._approval_repo.mark_downloader_executed(
                 task_id=task_id,
@@ -789,7 +801,8 @@ class AddToDownloaderService:
                 f"\033[31m[下载执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
                 flush=True,
             )
-            return
+            return None
+        return True
 
     def _record_pending_context(self, *, chat_id: int, pending_add: PendingAddContext) -> None:
         if chat_id <= 0:
@@ -941,9 +954,9 @@ class AddToDownloaderService:
         expected_version: int,
         lease_owner: str,
         completed_add: PendingAddContext,
-    ) -> None:
+    ) -> bool | None:
         if self._job_repo is None:
-            return
+            return True
         try:
             marked = self._job_repo.mark_downloader_completed(
                 job_id=job_id,
@@ -958,12 +971,14 @@ class AddToDownloaderService:
                 f"\033[31m[下载确认任务完结失败]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前下载结果已返回，但任务真相可能仍停留在待确认或执行中。",
                 flush=True,
             )
-            return
+            return None
         if marked is False:
             print(
                 f"\033[31m[下载确认任务完结失败]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误=jobs.mark_downloader_completed rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配；当前下载结果已返回，但任务真相可能仍停留在待确认或执行中。",
                 flush=True,
             )
+            return False
+        return True
 
     def _build_job_lease_owner(self, task_ref: str) -> str:
         cleaned_ref = task_ref.strip()
