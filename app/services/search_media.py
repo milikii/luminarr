@@ -34,6 +34,7 @@ CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败�
 CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after upsert"
 CLARIFICATION_CLEAR_RESULT_MISSING_REASON = "clarification clear result missing"
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
+CANDIDATE_CLEAR_RESULT_MISSING_REASON = "candidate clear result missing"
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,13 +269,21 @@ class SearchMediaService:
         try:
             cleared_result = self._candidate_repo.clear_candidates(chat_id)
             if cleared_result is None:
-                raise CandidatePersistenceError("candidate clear result missing")
+                raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_REASON)
             return cleared_result or cleared
         except Exception as error:
-            print(
-                f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前进程内候选已清掉，但重启后旧候选可能仍残留。",
-                flush=True,
-            )
+            if str(error) == CANDIDATE_CLEAR_RESULT_MISSING_REASON:
+                print(
+                    f"\033[31m[搜索候选清理结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 candidate_mapping 删除返回是否仍带有明确结果；"
+                    "当前进程内候选已清掉，但重启后旧候选可能仍残留。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前进程内候选已清掉，但重启后旧候选可能仍残留。",
+                    flush=True,
+                )
             if previous_candidates is not None:
                 self._recent_candidates_by_chat[chat_id] = list(previous_candidates)
             return False

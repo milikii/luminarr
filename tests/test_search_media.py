@@ -393,7 +393,7 @@ def test_clear_cached_candidates_logs_missing_candidate_clear_result(capsys) -> 
     assert service.clear_cached_candidates(1001) is False
     assert service._recent_candidates_by_chat[1001] == [{"title": "Dune"}]
     output = capsys.readouterr().out
-    assert "[搜索候选清理失败]" in output
+    assert "[搜索候选清理结果缺失]" in output
     assert "candidate clear result missing" in output
     assert "[处理建议]" in output
 
