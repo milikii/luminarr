@@ -487,7 +487,7 @@ def test_bt_subscription_run_once_returns_failure_text_when_scan_items_return_no
 
     assert reply == BT_SUBSCRIPTION_RUN_FAILED_TEXT
     captured = capsys.readouterr()
-    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "[BT 订阅扫描结果缺失]" in captured.out
     assert "chat_id=1001" in captured.out
     assert "bt subscription scan items result missing" in captured.out
     assert "[处理建议]" in captured.out
@@ -673,7 +673,7 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_return_none(
 
     assert notifications is None
     captured = capsys.readouterr()
-    assert "[BT 订阅扫描读取失败]" in captured.out
+    assert "[BT 订阅扫描结果缺失]" in captured.out
     assert "chat_id=1001" in captured.out
     assert "bt subscription scan items result missing" in captured.out
 

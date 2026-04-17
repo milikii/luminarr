@@ -30,6 +30,13 @@
 - 闭环：`post_download_auto_import._has_terminal_activity()` 在 `job_event` 查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“自动导入终态查询失败”日志；现在会把“终态结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但自动导入仍保持原来的 fail-closed：当前条目直接停路，不把读取缺口误判成“没有终态事件”。
 - 代码：`app/services/post_download_auto_import.py`
 - 验证：`tests/test_get_download_status.py -k "terminal_lookup_fails or terminal_lookup_returns_none"`
+- commit：`c666327` `Separate auto import terminal diagnostics`
+
+### 2026-04-17 BT 订阅扫描结果缺失分流缺口
+
+- 闭环：`manage_bt_subscription._scan_chat_once()` 在 `bt_subscription_item` 列表查询直接返回 `None` 时，不再和普通 SQLite 查询异常共用同一条“BT 订阅扫描读取失败”日志；现在会把“扫描结果缺失”和普通查询失败拆开成更明确的中文日志与 `[处理建议]`，但 `run_once()` / scheduler tick 仍保持原来的 fail-closed：本轮扫描直接按失败停路，不把缺失真相误判成“没有可扫描条目”。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "scan_items_return_none or scheduler_tick_returns_none_when_scan_items_return_none"`
 - commit：`待本轮提交`
 
 ### 2026-04-17 搜索候选写入后真相不一致缺口
