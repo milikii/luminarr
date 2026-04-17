@@ -1,4 +1,4 @@
-# Persistence closure log (v23)
+# Persistence closure log (v24)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 下载确认任务抢占结果缺失分流缺口
+
+- 闭环：`add_to_downloader._claim_pending_job()` 在 `jobs.claim_lease()` 已经出现“任务行缺失”时，不再和普通 SQLite lease 更新异常共用同一条“下载确认任务抢占失败”日志；现在会单独打印“下载确认任务抢占结果缺失”中文日志与 `[处理建议]`，并继续让 confirm 走原来的 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` fail-closed 边界，不改任务真相和副作用。
+- 代码：`app/services/add_to_downloader.py`
+- 验证：`tests/test_add_to_downloader.py -k "claim_pending_job_logs_persistence_failure or claim_pending_job_logs_missing_result or claim_pending_job_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_raises or confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_result_is_missing or confirm_add_by_task_ref_returns_not_pending_when_claim_lease_is_rejected"`
 
 ### 2026-04-17 下载确认过期结果缺失分流缺口
 

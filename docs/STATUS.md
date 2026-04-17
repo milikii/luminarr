@@ -1,4 +1,4 @@
-# Current status (v282)
+# Current status (v283)
 
 ## Project position
 
@@ -36,6 +36,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-17，共享 `approval_repo` 的 approve / cancel / restore 三条审批更新路径里，`approval_record` 缺失行也已从普通状态冲突里拆出单独中文日志与 `[处理建议]`；confirm / cancel 仍保持原来的 fail-closed 文本，不改审批真相和副作用边界。
 - 导入 confirm 的历史目标路径查询、审批过期判断也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通“无导入目标路径”或“未过期”。
 - 下载 confirm 的审批过期判断现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通“未过期”。
+- 下载 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
 - 截至 2026-04-17，最近补齐的最小分流已从下载 / 导入确认链继续扩到下载状态观察落盘：确认任务回退结果缺失、执行版号结果缺失、审批回退结果缺失、取消结果缺失、任务抢占失败，以及下载状态观察空结果 / 缺字段，都已收口成显式中文日志与 `[处理建议]`，但不改 confirm、状态查询、副作用和 SQLite 真相边界；详细条目继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致 已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，状态页不再回灌长台账。
@@ -68,6 +69,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - focused downloader restore-pending-job diagnostics tests：2026-04-17，`3 passed, 75 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_job_logs_persistence_failure or restore_pending_job_logs_missing_result or restore_pending_job_logs_rejected_current_state"`）
 - focused downloader approval-restore diagnostics tests：2026-04-17，`6 passed, 70 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "restore_pending_approval_logs_persistence_failure or restore_pending_approval_logs_missing_result or restore_pending_approval_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval"`）
 - focused downloader expiry diagnostics tests：2026-04-17，`3 passed, 80 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "is_pending_approval_expired_logs_approval_lookup_failure or is_pending_approval_expired_logs_missing_approval_result or confirm_add_by_task_ref_returns_state_unavailable_when_expiry_lookup_fails"`）
+- focused downloader lease-claim diagnostics tests：2026-04-17，`6 passed, 79 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "claim_pending_job_logs_persistence_failure or claim_pending_job_logs_missing_result or claim_pending_job_logs_rejected_current_state or confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_raises or confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_result_is_missing or confirm_add_by_task_ref_returns_not_pending_when_claim_lease_is_rejected"`）
 - focused download monitor diagnostics tests：2026-04-17，`3 passed, 30 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_returns_missing_record or download_monitor_returns_missing_completion_flag"`）
 - focused import target-path diagnostics tests：2026-04-17，`4 passed, 104 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "find_latest_import_target_path_logs_event_lookup_failure or find_latest_import_target_path_logs_missing_event_lookup_result or find_latest_import_target_path_logs_missing_structured_target or find_version_stale_rejection_text_returns_state_unavailable_when_event_lookup_fails"`）
 - focused import expiry diagnostics tests：2026-04-17，`3 passed, 106 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "is_pending_approval_expired_logs_approval_lookup_failure or is_pending_approval_expired_logs_missing_approval_result or confirm_import_by_task_ref_returns_state_unavailable_when_expiry_lookup_fails"`）
