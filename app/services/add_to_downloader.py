@@ -392,7 +392,7 @@ class AddToDownloaderService:
                 event_type="downloader.dispatch_failed",
                 message=ADD_FAILED_TEXT,
             )
-            self._restore_pending_approval(
+            approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
                 task_id=pending_add.task_id,
                 task_hash=pending_add.task_hash,
@@ -404,6 +404,8 @@ class AddToDownloaderService:
                     expected_version=claimed_job_version,
                     lease_owner=lease_owner,
                 )
+            if approval_restored is not True:
+                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
             return ADD_FAILED_TEXT
 
         result = AddResult(task_id=task.task_id, task_hash=task.task_hash, title=pending_add.title)
@@ -682,14 +684,14 @@ class AddToDownloaderService:
         task_id: str,
         task_hash: str,
         expected_lease_version: int,
-    ) -> None:
+    ) -> bool | None:
         identity = (task_id.strip(), task_hash.strip())
         if not identity[0] or not identity[1] or expected_lease_version <= 0:
-            return
+            return False
         self._pending_add_identities.add(identity)
         self._pending_add_lease_versions[identity] = expected_lease_version
         if self._approval_repo is None:
-            return
+            return True
         try:
             restored = self._approval_repo.restore_downloader_pending(
                 task_id=task_id,
@@ -702,12 +704,14 @@ class AddToDownloaderService:
                 f"\033[31m[下载审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
                 flush=True,
             )
-            return
+            return None
         if restored is False:
             print(
                 f"\033[31m[下载审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
                 flush=True,
             )
+            return False
+        return True
 
     def _cancel_pending_approval(
         self,

@@ -4,6 +4,8 @@ import asyncio
 from collections.abc import Awaitable
 from unittest.mock import AsyncMock
 
+import pytest
+
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
@@ -604,7 +606,15 @@ def test_mark_completed_job_logs_rejected_current_state(capsys) -> None:
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
-    service._restore_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123", expected_lease_version=2)
+    assert (
+        service._restore_pending_approval(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            expected_lease_version=2,
+        )
+        is None
+    )
     output = capsys.readouterr().out
     assert "[下载审批回退失败]" in output
     assert "lease_version=2" in output
@@ -613,7 +623,15 @@ def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
 def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: False})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
-    service._restore_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123", expected_lease_version=2)
+    assert (
+        service._restore_pending_approval(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            expected_lease_version=2,
+        )
+        is False
+    )
     output = capsys.readouterr().out
     assert "[下载审批回退失败]" in output
     assert "approval_record restore rejected current state" in output
@@ -1345,6 +1363,56 @@ def test_confirm_add_by_task_ref_returns_failed_when_downloader_errors() -> None
     reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
 
     assert reply == ADD_FAILED_TEXT
+
+
+@pytest.mark.parametrize(
+    ("restore_mode", "expected_error"),
+    [
+        ("raise", "db down"),
+        ("reject", "approval_record restore rejected current state"),
+    ],
+)
+def test_confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure_cannot_restore_pending_approval(
+    restore_mode: str,
+    expected_error: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class BrokenRestoreApprovalRepo:
+        def request_downloader_approval(self, **_: object) -> int:
+            return 1
+
+        def get_downloader_approval(self, **_: object):
+            return type(
+                "ApprovalRecord",
+                (),
+                {"status": "pending", "lease_version": 1, "executed_version": 0},
+            )()
+
+        def approve_downloader(self, **_: object) -> bool:
+            return True
+
+        def restore_downloader_pending(self, **_: object) -> bool:
+            if restore_mode == "raise":
+                raise RuntimeError("db down")
+            return False
+
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+    add_torrent = AsyncMock(side_effect=RuntimeError("boom"))
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=add_torrent,
+        approval_repo=BrokenRestoreApprovalRepo(),
+    )
+
+    _run(service.add_by_selection(1001, "1"))
+    reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert reply == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+    add_torrent.assert_awaited_once()
+    output = capsys.readouterr().out
+    assert "[下载审批回退失败]" in output
+    assert expected_error in output
 
 
 def test_confirm_add_by_task_ref_rejects_expired_pending(tmp_path) -> None:
