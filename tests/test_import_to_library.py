@@ -316,6 +316,36 @@ def test_import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails(capsys
     assert "当前请求会直接返回查询失败" in output
 
 
+def test_is_raw_bt_task_logs_missing_job_result(capsys: pytest.CaptureFixture[str]) -> None:
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: None})()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+
+    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is None
+
+    output = capsys.readouterr().out
+    assert "[导入 raw_bt 判定结果缺失]" in output
+    assert "chat_id=1001" in output
+    assert "task_ref=87" in output
+    assert "downloader job missing during raw_bt check" in output
+    assert "[处理建议]" in output
+
+
+def test_import_by_task_ref_returns_query_failed_when_raw_bt_job_result_is_missing(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: None})()
+    get_import_source = AsyncMock()
+    service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
+
+    text = _run(service.import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_QUERY_FAILED_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入 raw_bt 判定结果缺失]" in output
+    assert "当前请求会直接返回查询失败" in output
+
+
 def test_import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

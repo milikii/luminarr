@@ -1,4 +1,4 @@
-# Persistence closure log (v28)
+# Persistence closure log (v29)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,12 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-17 导入 raw_bt 判定缺失行分流缺口
+
+- 闭环：`import_to_library._is_raw_bt_task()` 之前在 `jobs.get_downloader_job_for_chat_ref()` 查不到下载任务行时，会把这类真相缺口直接当成普通 `False`，继续把请求当“不是 raw_bt”送进入库链；现在会单独打印“导入 raw_bt 判定结果缺失”中文日志与 `[处理建议]`，并让 `import_by_task_ref()` 直接回 `IMPORT_QUERY_FAILED_TEXT`，避免把 `jobs` 真相缺失误判成普通媒体任务。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "is_raw_bt_task_logs_missing_job_result or import_by_task_ref_returns_query_failed_when_raw_bt_job_result_is_missing or import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails or import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted"`
 
 ### 2026-04-17 Telegram BT tmdb_association 关联入口停路缺口
 
@@ -594,6 +600,7 @@
 - downloader finalization warning tests：2026-04-17，`5 passed, 60 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "executed_version_write_fails or job_completion_write_fails or record_executed_lease_version_logs_persistence_failure or mark_completed_job_logs"`）
 - downloader finalization-result diagnostics tests：2026-04-17，`4 passed, 83 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "mark_completed_job_logs_missing_result or confirm_add_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
 - import finalization-result diagnostics tests：2026-04-17，`4 passed, 114 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "mark_completed_job_logs_missing_result or confirm_import_by_task_ref_appends_warning_when_job_completion_result_is_missing or mark_completed_job_logs_persistence_failure or mark_completed_job_logs_rejected_current_state"`）
+- import raw_bt lookup diagnostics tests：2026-04-17，`4 passed, 120 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "is_raw_bt_task_logs_missing_job_result or import_by_task_ref_returns_query_failed_when_raw_bt_job_result_is_missing or import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails or import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted"`）
 - downloader approval-result diagnostics tests：2026-04-17，`4 passed, 84 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_downloader_approval_logs_missing_result_when_repo_returns_none or confirm_add_by_task_ref_returns_state_unavailable_when_approval_result_is_missing or record_downloader_approval_logs_missing_result or record_downloader_approval_logs_rejected_current_state"`）
 - import approval-result diagnostics tests：2026-04-17，`4 passed, 115 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_import_approval_logs_missing_result_when_repo_returns_none or confirm_import_by_task_ref_returns_state_unavailable_when_approval_result_is_missing or record_import_approval_logs_missing_result or record_import_approval_logs_rejected_current_state"`）
 - downloader cancel-approval-result diagnostics tests：2026-04-17，`4 passed, 87 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "cancel_pending_approval_logs_missing_result_when_repo_returns_none or cancel_pending_add_returns_state_unavailable_when_approval_cancel_result_is_missing or cancel_pending_approval_logs_missing_result or cancel_pending_add_returns_state_unavailable_when_approval_cancel_rejected"`）

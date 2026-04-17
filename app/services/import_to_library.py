@@ -83,6 +83,7 @@ IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state tra
 IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON = "import completed job result missing"
 IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
+IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON = "downloader job missing during raw_bt check"
 
 
 @dataclass(frozen=True, slots=True)
@@ -875,7 +876,12 @@ class ImportToLibraryService:
             )
             return None
         if downloader_job is None:
-            return False
+            self._log_raw_bt_lookup_result_missing(
+                chat_id=chat_id,
+                task_ref=task_ref,
+                reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
+            )
+            return None
         cleaned_payload = downloader_job.payload_json.strip()
         if not cleaned_payload:
             self._log_raw_bt_payload_corrupted(
@@ -905,6 +911,14 @@ class ImportToLibraryService:
     def _log_raw_bt_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
         print(
             f"\033[31m[导入 raw_bt 判定载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
+            flush=True,
+        )
+
+    def _log_raw_bt_lookup_result_missing(self, *, chat_id: int, task_ref: str, reason: str) -> None:
+        print(
+            f"\033[31m[导入 raw_bt 判定结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
+            "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务是否仍存在，并确认这条任务真相没有被提前清理；"
+            "当前请求会直接返回查询失败，避免把 raw_bt 分类真相缺口误判成普通“不是 raw_bt”。",
             flush=True,
         )
 
