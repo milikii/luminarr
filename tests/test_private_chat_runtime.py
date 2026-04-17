@@ -39,6 +39,7 @@ from app.services.cleanup_downloaded_source import (
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.search_media import SearchMediaService
+from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, parse_trace_log_line
 
 
 async def _fake_search(query: str) -> list[dict[str, object]]:
@@ -87,6 +88,32 @@ def test_dispatch_private_chat_text_routes_search_without_telegram_update() -> N
     sent_text = reply_text.await_args.args[0]
     assert "搜索结果：dune" in sent_text
     assert "title-dune" in sent_text
+
+
+def test_dispatch_private_chat_text_writes_trace_log_when_configured(tmp_path: Path) -> None:
+    reply_text = AsyncMock()
+    log_path = tmp_path / "trace.log"
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="dune",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            channel="telegram",
+            bot_data=_build_bot_data() | {TRACE_LOG_PATH_BOT_DATA_KEY: log_path},
+        )
+    )
+
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    parsed_entries = [parse_trace_log_line(line) for line in lines]
+
+    assert [entry.event if entry is not None else None for entry in parsed_entries] == ["inbound", "reply"]
+    assert parsed_entries[0] is not None
+    assert parsed_entries[0].channel == "telegram"
+    assert parsed_entries[0].query == "dune"
+    assert parsed_entries[1] is not None
+    assert parsed_entries[1].reply_head == "电影海报卡片"
 
 
 def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -> None:

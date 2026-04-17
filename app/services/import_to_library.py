@@ -20,6 +20,7 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
+from app.trace_logging import log_trace_event
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 RefreshMediaServerFunc = Callable[[], Awaitable[str]]
@@ -117,6 +118,7 @@ class ImportToLibraryService:
         job_event_repo: JobEventRepo | None = None,
         approval_repo: ApprovalRepo | None = None,
         job_repo: JobRepo | None = None,
+        trace_log_path: Path | None = None,
     ) -> None:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
@@ -126,9 +128,38 @@ class ImportToLibraryService:
         self._job_event_repo = job_event_repo
         self._approval_repo = approval_repo
         self._job_repo = job_repo
+        self._trace_log_path = trace_log_path
         self._pending_import_identities: set[tuple[str, str]] = set()
         self._pending_import_lease_versions: dict[tuple[str, str], int] = {}
         self._pending_copy_fallback_identities: set[tuple[str, str]] = set()
+
+    def _log_trace(
+        self,
+        *,
+        event: str,
+        result: str,
+        stage: str,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+        task_ref: str = "",
+        task_id: str = "",
+        task_hash: str = "",
+        detail: str = "",
+    ) -> None:
+        log_trace_event(
+            scope="workflow",
+            workflow=WORKFLOW_IMPORT_TO_LIBRARY,
+            event=event,
+            result=result,
+            stage=stage,
+            log_path=self._trace_log_path,
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            detail=detail,
+        )
 
     async def import_by_task_ref(
         self,
@@ -187,6 +218,17 @@ class ImportToLibraryService:
             task_hash=import_source.task_hash,
             event_type="import.approval_pending",
             message=cleaned_ref,
+        )
+        self._log_trace(
+            event="approval_pending",
+            result="created",
+            stage="pending",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=cleaned_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            detail=import_source.name,
         )
         return IMPORT_APPROVAL_PENDING_TEXT.format(
             name=import_source.name,
@@ -406,6 +448,17 @@ class ImportToLibraryService:
             execution_mode=execution_mode,
         )
         if execution.imported:
+            self._log_trace(
+                event="confirm_execute",
+                result="imported",
+                stage="execute",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                detail=execution.reply,
+            )
             finalization_warning = ""
             lease_recorded = self._record_executed_lease_version(
                 task_ref=cleaned_ref,
@@ -428,8 +481,41 @@ class ImportToLibraryService:
                 if job_completed is not True:
                     finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
             if finalization_warning:
+                self._log_trace(
+                    event="confirm_finalize",
+                    result="warning",
+                    stage="completed",
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    task_ref=cleaned_ref,
+                    task_id=import_source.task_id,
+                    task_hash=import_source.task_hash,
+                    detail=IMPORT_FINALIZATION_WARNING_TEXT,
+                )
                 return f"{execution.reply}\n\n{finalization_warning}"
+            self._log_trace(
+                event="confirm_finalize",
+                result="succeeded",
+                stage="completed",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                detail=execution.reply,
+            )
         elif execution.pending_copy_approval:
+            self._log_trace(
+                event="confirm_execute",
+                result="copy_fallback_pending",
+                stage="execute",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                detail=execution.reply,
+            )
             approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
@@ -510,6 +596,17 @@ class ImportToLibraryService:
                         expected_version=claimed_job_version,
                         lease_owner=lease_owner,
                     )
+            self._log_trace(
+                event="confirm_execute",
+                result="failed",
+                stage="execute",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                detail=execution.reply,
+            )
         return execution.reply
 
     def cancel_pending_import(self, chat_id: int) -> str | None:

@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from app.clients.transmission import TransmissionTask
@@ -18,6 +19,7 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
+from app.trace_logging import log_trace_event
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 
@@ -88,6 +90,7 @@ class AddToDownloaderService:
         job_repo: JobRepo | None = None,
         job_event_repo: JobEventRepo | None = None,
         download_monitor_repo: DownloadMonitorRepo | None = None,
+        trace_log_path: Path | None = None,
     ) -> None:
         self._search_service = search_service
         self._add_torrent_func = add_torrent_func
@@ -95,10 +98,39 @@ class AddToDownloaderService:
         self._job_repo = job_repo
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
+        self._trace_log_path = trace_log_path
         self._pending_add_identities: set[tuple[str, str]] = set()
         self._pending_add_lease_versions: dict[tuple[str, str], int] = {}
         self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
         self._latest_pending_task_ref_by_chat: dict[int, str] = {}
+
+    def _log_trace(
+        self,
+        *,
+        event: str,
+        result: str,
+        stage: str,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+        task_ref: str = "",
+        task_id: str = "",
+        task_hash: str = "",
+        detail: str = "",
+    ) -> None:
+        log_trace_event(
+            scope="workflow",
+            workflow=WORKFLOW_ADD_TO_DOWNLOADER,
+            event=event,
+            result=result,
+            stage=stage,
+            log_path=self._trace_log_path,
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            detail=detail,
+        )
 
     async def add_by_selection(
         self,
@@ -164,6 +196,17 @@ class AddToDownloaderService:
             task_hash=pending_add.task_hash,
             event_type="downloader.approval_pending",
             message=title,
+        )
+        self._log_trace(
+            event="approval_pending",
+            result="created",
+            stage="pending",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            detail=title,
         )
         return ADD_APPROVAL_PENDING_TEXT.format(title=title, task_ref=task_ref)
 
@@ -243,6 +286,17 @@ class AddToDownloaderService:
             task_hash=pending_add.task_hash,
             event_type="downloader.approval_pending",
             message=cleaned_title,
+        )
+        self._log_trace(
+            event="approval_pending",
+            result="created",
+            stage="pending",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=pending_add.task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            detail=cleaned_title,
         )
         return ADD_APPROVAL_PENDING_TEXT.format(title=cleaned_title, task_ref=pending_add.task_ref)
 
@@ -399,6 +453,17 @@ class AddToDownloaderService:
                 event_type="downloader.dispatch_failed",
                 message=ADD_FAILED_TEXT,
             )
+            self._log_trace(
+                event="confirm_dispatch",
+                result="failed",
+                stage="dispatch",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=cleaned_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                detail=str(error),
+            )
             approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
                 task_id=pending_add.task_id,
@@ -427,6 +492,17 @@ class AddToDownloaderService:
             task_hash=result.task_hash,
             event_type="downloader.succeeded",
             message=result.title,
+        )
+        self._log_trace(
+            event="confirm_dispatch",
+            result="succeeded",
+            stage="dispatch",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=cleaned_ref,
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            detail=result.title,
         )
         if pending_add.auto_import_enabled:
             self._register_download_monitor(
@@ -461,7 +537,29 @@ class AddToDownloaderService:
                 finalization_warning = ADD_FINALIZATION_WARNING_TEXT
         self._clear_pending_context(chat_id=chat_id, task_ref=cleaned_ref)
         if finalization_warning:
+            self._log_trace(
+                event="confirm_finalize",
+                result="warning",
+                stage="completed",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=cleaned_ref,
+                task_id=result.task_id,
+                task_hash=result.task_hash,
+                detail=ADD_FINALIZATION_WARNING_TEXT,
+            )
             return f"{reply}\n\n{finalization_warning}"
+        self._log_trace(
+            event="confirm_finalize",
+            result="succeeded",
+            stage="completed",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=cleaned_ref,
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            detail=result.title,
+        )
         return reply
 
     def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:

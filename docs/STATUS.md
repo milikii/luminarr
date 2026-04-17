@@ -31,6 +31,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前唯一主线仍是“持久化吞错收口”；cleanup 四渠道验证窗口已完成，shared private-chat runtime 最小抽离已完成。
 - Telegram / personal WeChat / Feishu / WeCom 四个正式私聊入口继续共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相。
+- 当前也已落一层最小可追溯 trace baseline：shared private-chat 入站/回包，以及下载/导入待确认与 confirm 关键节点会统一追加到 `logs/trace.log`，不替代现有中文故障日志。
 - 下载和导入待确认链已经收口到 fail-closed：`approval_record` 查询异常、审批行缺失、lease/version 读写异常，不再混成普通 not pending。
 - 下载 confirm 的异常回退链也已补一处 fail-closed：下载投递失败后，如果待确认审批回退失败，不再继续回普通下载失败，而会直接按状态不可用停路。
 - 下载 confirm 的成功收尾链也已补 warning：下载已真实投递后，如果 `approval_record/jobs` 回写失败，回复会显式提示不要重复 `confirm`，不再伪装成纯成功。

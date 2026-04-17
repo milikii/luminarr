@@ -318,6 +318,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_func=_build_telegram_reply_func(message.reply_text),
         chat_id=chat_id,
         user_id=user_id,
+        channel="telegram",
         bot_data=context.application.bot_data,
     )
 
@@ -357,6 +358,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         reply_func=_build_telegram_reply_func(message.reply_text),
         chat_id=chat_id,
         user_id=user_id,
+        channel="telegram",
         bot_data=context.application.bot_data,
     )
 
@@ -2268,6 +2270,7 @@ async def handle_private_chat_query_text(
         reply_func=reply_func,
         chat_id=chat_id,
         user_id=user_id,
+        channel="telegram",
         bot_data=context.application.bot_data,
     )
 

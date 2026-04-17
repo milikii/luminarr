@@ -114,6 +114,7 @@ async def handle_wecom_private_text_event(
         reply_func=reply_with_event,
         chat_id=chat_id,
         user_id=user_id,
+        channel=WECOM_CHANNEL,
         bot_data=bot_data,
     )
     return event

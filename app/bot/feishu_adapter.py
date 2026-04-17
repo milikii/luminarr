@@ -150,6 +150,7 @@ async def route_feishu_private_text_event(
         reply_func=reply_with_event,
         chat_id=chat_id,
         user_id=user_id,
+        channel=FEISHU_CHANNEL,
         bot_data=bot_data,
     )
 

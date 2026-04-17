@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable
+from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -31,6 +32,7 @@ from app.services.add_to_downloader import (
     PendingAddContext,
 )
 from app.services.search_media import SearchMediaService
+from app.trace_logging import parse_trace_log_line
 
 
 async def _fake_search_with_download_url(query: str) -> list[dict[str, object]]:
@@ -75,6 +77,37 @@ def test_confirm_add_by_task_ref_dispatches_download() -> None:
     assert "任务 ID: 42" in confirm_reply
     assert "任务 Hash: abc123" in confirm_reply
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
+
+
+def test_add_workflow_writes_trace_log_when_configured(tmp_path: Path) -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    log_path = tmp_path / "trace.log"
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=add_torrent,
+        trace_log_path=log_path,
+    )
+
+    _run(service.add_by_selection(1001, "1", user_id=2001))
+    _run(service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    parsed_entries = [parse_trace_log_line(line) for line in lines]
+
+    assert [entry.event if entry is not None else None for entry in parsed_entries] == [
+        "approval_pending",
+        "confirm_dispatch",
+        "confirm_finalize",
+    ]
+    assert parsed_entries[0] is not None
+    assert parsed_entries[0].workflow == "add_to_downloader"
+    assert parsed_entries[0].result == "created"
+    assert parsed_entries[1] is not None
+    assert parsed_entries[1].task_id == "42"
+    assert parsed_entries[1].result == "succeeded"
 
 
 def test_confirm_add_by_task_ref_without_pending_request_returns_not_pending() -> None:

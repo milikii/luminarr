@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
+from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, log_trace_event
 
 
 @dataclass(slots=True)
@@ -32,12 +34,20 @@ def _log_confirm_job_lookup_failed(*, chat_id: int | None, task_ref: str, reason
     )
 
 
+def _resolve_trace_log_path(bot_data: MutableMapping[str, object]) -> Path | None:
+    trace_log_path = bot_data.get(TRACE_LOG_PATH_BOT_DATA_KEY)
+    if isinstance(trace_log_path, Path):
+        return trace_log_path
+    return None
+
+
 async def dispatch_private_chat_text(
     *,
     query: str,
     reply_func: Callable[[str], Awaitable[object]],
     chat_id: int | None,
     user_id: int | None,
+    channel: str = "unknown",
     bot_data: MutableMapping[str, object],
 ) -> None:
     await handle_private_chat_query_text(
@@ -45,6 +55,7 @@ async def dispatch_private_chat_text(
         reply_func=reply_func,
         chat_id=chat_id,
         user_id=user_id,
+        channel=channel,
         bot_data=bot_data,
     )
 
@@ -55,6 +66,7 @@ async def handle_private_chat_query_text(
     reply_func: Callable[[str], Awaitable[object]],
     chat_id: int | None,
     user_id: int | None,
+    channel: str = "unknown",
     bot_data: MutableMapping[str, object],
 ) -> None:
     tg = telegram_runtime
@@ -62,6 +74,37 @@ async def handle_private_chat_query_text(
         application=_PrivateChatRuntimeApplication(bot_data=bot_data),
     )
     execution_gate = tg._resolve_execution_gate(context)
+    trace_log_path = _resolve_trace_log_path(bot_data)
+    log_trace_event(
+        scope="private_chat",
+        event="inbound",
+        result="received",
+        log_path=trace_log_path,
+        channel=channel,
+        action="query",
+        chat_id=chat_id,
+        user_id=user_id,
+        query=query,
+    )
+    original_reply_func = reply_func
+
+    async def reply_with_trace(reply_text: str) -> object:
+        result = await original_reply_func(reply_text)
+        log_trace_event(
+            scope="private_chat",
+            event="reply",
+            result="sent",
+            log_path=trace_log_path,
+            channel=channel,
+            action="reply",
+            chat_id=chat_id,
+            user_id=user_id,
+            query=query,
+            reply_text=reply_text,
+        )
+        return result
+
+    reply_func = reply_with_trace
     if tg._is_frustration_text(query):
         if chat_id is not None:
             job_repo = bot_data.get(tg.JOB_REPO_KEY)

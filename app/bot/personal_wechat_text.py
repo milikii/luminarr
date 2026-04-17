@@ -172,6 +172,7 @@ async def handle_personal_wechat_private_text_event(
             channel=PERSONAL_WECHAT_CHANNEL,
             external_user_id=event.from_user_id,
         ),
+        channel=PERSONAL_WECHAT_CHANNEL,
         bot_data=bot_data,
     )
     return event

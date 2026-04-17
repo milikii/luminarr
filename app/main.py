@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from telegram.error import NetworkError
 
@@ -51,6 +52,7 @@ from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService
 from app.services.search_media import SearchMediaService
 from app.services.subtitle_translator import SubtitleTranslatorService
+from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, configure_trace_log_file
 
 
 async def _skip_fanart_images(_: str):
@@ -351,6 +353,8 @@ def _build_bt_source_providers(
 
 def main() -> None:
     settings = load_settings()
+    trace_log_dir = Path((os.getenv("LUMINARR_LOG_DIR", "./logs") or "./logs").strip()).expanduser()
+    trace_log_path = configure_trace_log_file(log_dir=trace_log_dir)
     database = SqliteDatabase(settings.sqlite_db_path)
     database.initialize()
     candidate_repo = CandidateMappingRepo(database)
@@ -466,6 +470,7 @@ def main() -> None:
         job_repo=job_repo,
         job_event_repo=job_event_repo,
         download_monitor_repo=download_monitor_repo,
+        trace_log_path=trace_log_path,
     )
     refresh_media_server_func = None
     if settings.emby_base_url and settings.emby_api_key:
@@ -487,6 +492,7 @@ def main() -> None:
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,
         job_repo=job_repo,
+        trace_log_path=trace_log_path,
     )
     post_download_auto_import_service = PostDownloadAutoImportService(
         download_monitor_repo=download_monitor_repo,
@@ -533,6 +539,8 @@ def main() -> None:
         downloader_role_binding=settings.downloader_role_binding,
         outbound_proxy_url=settings.outbound_proxy_url,
     )
+    if trace_log_path is not None:
+        application.bot_data[TRACE_LOG_PATH_BOT_DATA_KEY] = trace_log_path
     application.bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()
     if settings.feishu_app_id and settings.feishu_app_secret:
         feishu_client = FeishuClient(

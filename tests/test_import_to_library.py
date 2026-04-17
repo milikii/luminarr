@@ -43,6 +43,7 @@ from app.services.import_to_library import (
 )
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
+from app.trace_logging import parse_trace_log_line
 
 
 def test_parse_import_query_supports_import_prefix() -> None:
@@ -119,6 +120,46 @@ def test_confirm_import_by_task_ref_executes_after_pending(tmp_path: Path) -> No
     assert str(target_file) in text
     assert target_file.exists()
     assert source_file.stat().st_ino == target_file.stat().st_ino
+
+
+def test_import_workflow_writes_trace_log_when_configured(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    log_path = tmp_path / "trace.log"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        trace_log_path=log_path,
+    )
+
+    _run(service.import_by_task_ref("87", chat_id=1001, user_id=2001))
+    _run(service.confirm_import_by_task_ref("87", chat_id=1001, user_id=2001))
+
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    parsed_entries = [parse_trace_log_line(line) for line in lines]
+
+    assert [entry.event if entry is not None else None for entry in parsed_entries] == [
+        "approval_pending",
+        "confirm_execute",
+        "confirm_finalize",
+    ]
+    assert parsed_entries[0] is not None
+    assert parsed_entries[0].workflow == "import_to_library"
+    assert parsed_entries[0].task_hash == "hash-87"
+    assert parsed_entries[1] is not None
+    assert parsed_entries[1].result == "imported"
 
 
 def test_confirm_import_records_structured_asset_correlation(tmp_path: Path) -> None:
