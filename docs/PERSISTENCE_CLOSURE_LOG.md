@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 导入目标路径缺失分流缺口
+
+- 闭环：`import_to_library._find_latest_import_target_path()` 在已经读到 import 关联对象、但 `target_path` 与 `message` 都为空时，不再和普通“没有历史导入终态”混成静默空结果；现在会单独打印“导入目标路径缺失”中文日志与 `[处理建议]`，但 stale confirm 判定仍保持原来的 `IMPORT_CONFIRM_NOT_PENDING_TEXT` 边界，不改审批或导入副作用。
+- 代码：`app/services/import_to_library.py`
+- 验证：`tests/test_import_to_library.py -k "find_latest_import_target_path_logs_missing_structured_target or find_version_stale_rejection_text_logs_missing_structured_target"`
+- commit：`待本轮提交`
+
 ### 2026-04-17 cleanup 关联路径缺失分流缺口
 
 - 闭环：`cleanup_downloaded_source._find_import_correlation()` 在 `import.succeeded` 事件已存在、但 `source_path` 或 `target_path` 为空时，不再和普通“未找到 import 关联”混成静默 `None`；现在会单独打印“cleanup 关联路径缺失”中文日志与 `[处理建议]`，但用户侧仍保持原来的关联缺失拒绝文案，不改 cleanup guardrail 和副作用边界。

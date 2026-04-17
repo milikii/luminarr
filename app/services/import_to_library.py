@@ -1491,6 +1491,12 @@ class ImportToLibraryService:
         target_path = correlation.target_path.strip() or correlation.message.strip()
         if target_path:
             return ImportTargetLookupResult(target_path=target_path)
+        print(
+            f"\033[31m[导入目标路径缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误=import correlation target path missing\n"
+            "\033[33m[处理建议]\033[0m 检查 import.succeeded 事件是否仍带有 target_path 或 message；"
+            "当前会按无导入目标路径处理，避免把结构化路径缺失误判成普通“没有历史导入终态”。",
+            flush=True,
+        )
         return ImportTargetLookupResult()
 
     def _handle_expired_pending_confirm(self, *, task_ref: str, context: ConfirmExecutionContext) -> str | None:

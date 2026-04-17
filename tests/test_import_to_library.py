@@ -859,6 +859,33 @@ def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> Non
     assert "task_hash=hash-87" in output
 
 
+def test_find_latest_import_target_path_logs_missing_structured_target(capsys) -> None:
+    event_repo = type(
+        "EventRepo",
+        (),
+        {
+            "find_latest_import_correlation": lambda self, **kwargs: type(
+                "Correlation",
+                (),
+                {
+                    "target_path": "",
+                    "message": "",
+                },
+            )()
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
+
+    result = service._find_latest_import_target_path(task_id="87", task_hash="hash-87")
+
+    assert result.target_path is None
+    assert result.lookup_failed is False
+    output = capsys.readouterr().out
+    assert "[导入目标路径缺失]" in output
+    assert "import correlation target path missing" in output
+    assert "task_hash=hash-87" in output
+
+
 def test_find_version_stale_rejection_text_returns_state_unavailable_when_event_lookup_fails(capsys) -> None:
     approval_record = type("ApprovalRecord", (), {"lease_version": 2, "executed_version": 2})()
     approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: approval_record})()
@@ -881,6 +908,38 @@ def test_find_version_stale_rejection_text_returns_state_unavailable_when_event_
 
     output = capsys.readouterr().out
     assert "[导入目标路径查询失败]" in output
+    assert "task_id=87" in output
+
+
+def test_find_version_stale_rejection_text_logs_missing_structured_target(capsys) -> None:
+    approval_record = type("ApprovalRecord", (), {"lease_version": 2, "executed_version": 2})()
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: approval_record})()
+    event_repo = type(
+        "EventRepo",
+        (),
+        {
+            "find_latest_import_correlation": lambda self, **kwargs: type(
+                "Correlation",
+                (),
+                {
+                    "target_path": "",
+                    "message": "",
+                },
+            )(),
+            "append_event": lambda self, **kwargs: None,
+        },
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+        job_event_repo=event_repo,
+    )
+
+    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") == IMPORT_CONFIRM_NOT_PENDING_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入目标路径缺失]" in output
     assert "task_id=87" in output
 
 
