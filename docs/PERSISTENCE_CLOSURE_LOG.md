@@ -11,6 +11,13 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-17 Telegram BT 待答写入后回读缺口
+
+- 闭环：`telegram_bot` 的四个 BT pending setter（processing_path / classification / tmdb_association / raw_bt_destination）在 `bt_pending_state` upsert 成功后，如果立即回读不到记录，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“BT 待处理写入后记录缺失”中文日志和单独的 `[处理建议]`，但用户侧仍保持原来的 `SERVICE_NOT_READY_TEXT`，不改 BT follow-up workflow。
+- 代码：`app/bot/telegram_bot.py`
+- 验证：`tests/test_telegram_bot.py -k "set_bt_processing_path_pending_logs_persistence_failure or set_bt_processing_path_pending_logs_missing_row_after_upsert or set_bt_classification_pending_logs_persistence_failure"`
+- commit：待补
+
 ### 2026-04-17 搜索待澄清写入后回读缺口
 
 - 闭环：`search_media._set_clarification_pending()` 在 `clarification_state` upsert 成功后，如果立即回读不到记录，不再和普通 SQLite 写入失败共用同一条日志；现在会打印“搜索澄清态写入后记录缺失”中文日志和单独的 `[处理建议]`，把“真缺数据 / 回读缺口”与一般持久化异常拆开，但用户侧仍保持 `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT`，不改搜索 workflow。

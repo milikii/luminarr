@@ -39,6 +39,7 @@ from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_CLASSIFICATION,
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingPersistenceError,
     BtPendingRepo,
 )
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -237,6 +238,7 @@ T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
+BT_PENDING_MISSING_AFTER_UPSERT_REASON = "bt_pending_state missing after upsert"
 
 BT_PROCESSING_PATH_ALIASES = {
     "影视入库链": "media_import",
@@ -1113,6 +1115,15 @@ def _log_bt_pending_persist_failed(*, chat_id: int | None, stage: str, reason: s
     )
 
 
+def _log_bt_pending_missing_after_upsert(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理写入后记录缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表是否被并发删除或触发器回滚；"
+        "如需继续当前 BT follow-up，请先确认 SQLite 写入后能立即回读该记录。",
+        flush=True,
+    )
+
+
 def _set_bt_processing_path_pending(
     *,
     context: ContextTypes.DEFAULT_TYPE,
@@ -1133,6 +1144,21 @@ def _set_bt_processing_path_pending(
             stage=BT_PENDING_STAGE_PROCESSING_PATH,
             payload_json=_serialize_bt_pending_payload({"source": cleaned_source}),
         )
+    except BtPendingPersistenceError as error:
+        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
+            _log_bt_pending_missing_after_upsert(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_persist_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
+        pending_by_chat.pop(chat_id, None)
+        return False
     except Exception as error:
         _log_bt_pending_persist_failed(
             chat_id=chat_id,
@@ -1285,6 +1311,21 @@ def _set_bt_classification_pending(
             stage=BT_PENDING_STAGE_CLASSIFICATION,
             payload_json=_serialize_bt_pending_payload({"query": cleaned_query}),
         )
+    except BtPendingPersistenceError as error:
+        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
+            _log_bt_pending_missing_after_upsert(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_persist_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
+        pending_by_chat.pop(chat_id, None)
+        return False
     except Exception as error:
         _log_bt_pending_persist_failed(
             chat_id=chat_id,
@@ -1459,6 +1500,21 @@ def _set_bt_tmdb_association_pending(
             stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
             payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
         )
+    except BtPendingPersistenceError as error:
+        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
+            _log_bt_pending_missing_after_upsert(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_persist_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        pending_by_chat.pop(chat_id, None)
+        return False
     except Exception as error:
         _log_bt_pending_persist_failed(
             chat_id=chat_id,
@@ -1574,6 +1630,21 @@ def _set_raw_bt_destination_pending(
                 }
             ),
         )
+    except BtPendingPersistenceError as error:
+        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
+            _log_bt_pending_missing_after_upsert(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_persist_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+                reason=str(error),
+            )
+        pending_by_chat.pop(chat_id, None)
+        return False
     except Exception as error:
         _log_bt_pending_persist_failed(
             chat_id=chat_id,

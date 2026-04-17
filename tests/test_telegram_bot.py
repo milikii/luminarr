@@ -13,6 +13,7 @@ from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, Per
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
+from app.db.bt_pending_repo import BtPendingPersistenceError
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
     BT_READ_ONLY_HELPER_FAILED_TEXT,
@@ -1052,6 +1053,37 @@ def test_set_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.
     assert "[BT 待处理持久化失败]" in output
     assert "stage=processing_path" in output
     assert "db down" in output
+
+
+def test_set_bt_processing_path_pending_logs_missing_row_after_upsert(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class _MissingRowPendingRepo(BtPendingRepo):
+        def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
+            _ = (chat_id, stage, payload_json)
+            raise BtPendingPersistenceError("bt_pending_state missing after upsert")
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: _MissingRowPendingRepo(SqliteDatabase(":memory:"))}
+        )
+    )
+
+    assert (
+        _set_bt_processing_path_pending(
+            context=context,
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abc",
+        )
+        is False
+    )
+
+    assert context.application.bot_data.get("bt_processing_path_pending_by_chat", {}) == {}
+    output = capsys.readouterr().out
+    assert "[BT 待处理写入后记录缺失]" in output
+    assert "[处理建议]" in output
+    assert "stage=processing_path" in output
+    assert "bt_pending_state missing after upsert" in output
 
 
 def test_clear_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
