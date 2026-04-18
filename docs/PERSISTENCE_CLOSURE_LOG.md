@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 BT 订阅扫描 chat 列表记录损坏分流缺口
+
+- 闭环：`manage_bt_subscription.run_scheduler_tick()` 之前在 `bt_subscription_item` chat 列表能查到行、但 `chat_id` 真相字段损坏时，会和普通 SQLite 读取异常共用同一条“BT 订阅扫描 chat 列表读取失败”日志；现在会单独打印“BT 订阅扫描 chat 列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮 scheduler tick 直接停路，不把坏行混成普通读库失败或可继续扫描的 chat。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py`
+
 ### 2026-04-18 BT 订阅清单记录损坏分流缺口
 
 - 闭环：`manage_bt_subscription._list_items()` 之前在 `bt_subscription_item` 清单查询能查到行、但行内 `id / title / media_kind` 等真相字段损坏时，会和普通 SQLite 读取异常共用同一条“BT 订阅清单读取失败”日志；现在会单独打印“BT 订阅清单记录损坏”中文日志与 `[处理建议]`，但用户侧仍保持原来的清单读取失败文本，不把坏记录混成普通读库失败或空清单。

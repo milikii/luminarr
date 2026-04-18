@@ -173,6 +173,8 @@ class ManageBtSubscriptionService:
         except Exception as error:
             if str(error) == "bt subscription chat list result missing":
                 _log_bt_subscription_scan_chat_ids_result_missing(reason=str(error))
+            elif _is_bt_subscription_chat_list_row_corrupted_reason(str(error)):
+                _log_bt_subscription_scan_chat_ids_row_corrupted(reason=str(error))
             else:
                 _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
             return None
@@ -730,6 +732,14 @@ def _log_bt_subscription_scan_chat_ids_result_missing(*, reason: str) -> None:
     )
 
 
+def _log_bt_subscription_scan_chat_ids_row_corrupted(*, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅扫描 chat 列表记录损坏]\033[0m 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里的 chat_id 真相字段；"
+        "当前会停止 scheduler tick，避免把损坏记录误判成可继续扫描的订阅 chat。"
+    )
+
+
 def _log_bt_subscription_list_failed(*, chat_id: int, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
@@ -910,3 +920,7 @@ def _is_bt_subscription_item_row_corrupted_reason(reason: str) -> bool:
         "bt_subscription_item row identity corrupted after read",
         "bt_subscription_item media kind corrupted after read",
     }
+
+
+def _is_bt_subscription_chat_list_row_corrupted_reason(reason: str) -> bool:
+    return reason == "bt_subscription_item chat identity corrupted in chat list after read"
