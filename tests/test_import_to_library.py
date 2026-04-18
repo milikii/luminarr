@@ -1006,6 +1006,24 @@ def test_record_pending_job_logs_missing_pending_job_result_when_repo_returns_no
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_job_logs_row_corruption(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "upsert_import_job_pending": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(JobPersistenceError("job row version corrupted after read"))
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+    assert service._record_pending_job(chat_id=1001, user_id=2001, task_ref="87", task_id="87", task_hash="hash-87", payload_json="{}") is False
+    output = capsys.readouterr().out
+    assert "[导入待确认任务记录损坏]" in output
+    assert "job row version corrupted after read" in output
+    assert "job_id / chat_id / user_id / version" in output
+
+
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_update_fails(
     tmp_path: Path,
     capsys,

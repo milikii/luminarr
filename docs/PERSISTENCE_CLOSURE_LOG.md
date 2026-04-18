@@ -1,4 +1,4 @@
-# Persistence closure log (v39)
+# Persistence closure log (v40)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,18 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载/导入待确认任务写后回读坏记录分流缺口
+
+- 闭环：`add_to_downloader._record_pending_job()` 和 `import_to_library._record_pending_job()` 之前在 `upsert_downloader_job_pending()` / `upsert_import_job_pending()` 写后回读命中的 `jobs` 行里，`job_id / chat_id / user_id / version` 等真相字段已损坏时，会和普通 SQLite 写入异常共用同一条“待确认任务落盘失败”日志；现在会分别单独打印“下载待确认任务记录损坏”或“导入待确认任务记录损坏”中文日志与 `[处理建议]`，并继续保持原来的 fail-closed：直接返回待确认状态写入失败，不改 `jobs` 真相和 confirm 边界。
+- 代码：
+  - `app/services/add_to_downloader.py`
+  - `app/services/import_to_library.py`
+  - `tests/test_add_to_downloader.py`
+  - `tests/test_import_to_library.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_pending_job"`
+  - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_pending_job"`
 
 ### 2026-04-18 下载/导入待确认审批 lease_version 读后损坏分流缺口
 

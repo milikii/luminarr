@@ -585,6 +585,36 @@ def test_record_pending_job_logs_missing_pending_job_result_when_repo_returns_no
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_job_logs_row_corruption(capsys) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "upsert_downloader_job_pending": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("job row version corrupted after read"))
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_repo=job_repo,
+    )
+
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        title="Dune",
+        source="https://example.com/dune.torrent",
+    )
+    assert service._record_pending_job(chat_id=1001, user_id=2001, pending_add=pending_add) is False
+    output = capsys.readouterr().out
+    assert "[下载待确认任务记录损坏]" in output
+    assert "job row version corrupted after read" in output
+    assert "job_id / chat_id / user_id / version" in output
+
+
 def test_record_downloader_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
