@@ -1599,6 +1599,30 @@ def test_is_pending_approval_expired_logs_missing_approval_result(capsys) -> Non
     assert "lease_version=2" in output
 
 
+def test_is_pending_approval_expired_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "is_downloader_pending_expired": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row status corrupted after read"))
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+
+    assert service._is_pending_approval_expired(task_id="selection:1", task_hash="abc123", expected_lease_version=2) is None
+
+    output = capsys.readouterr().out
+    assert "[下载确认过期审批记录损坏]" in output
+    assert "approval row status corrupted after read" in output
+    assert "status / lease_version / executed_version" in output
+
+
 def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_lookup_fails(capsys) -> None:
     job = JobRecord(
         job_id="job-1",

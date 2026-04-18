@@ -75,6 +75,14 @@ DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS = frozenset(
         "job row version corrupted after read",
     }
 )
+APPROVAL_ROW_CORRUPTED_REASONS = frozenset(
+    {
+        "approval row identity corrupted after read",
+        "approval row status corrupted after read",
+        "approval row lease version corrupted after read",
+        "approval row executed version corrupted after read",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1466,6 +1474,13 @@ class AddToDownloaderService:
                     f"\033[31m[下载确认过期结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
                     "\033[33m[处理建议]\033[0m 检查 approval_record 表里的待确认下载审批是否仍存在，并确认对应 lease_version 没有被其他路径抢先改写；"
                     "当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“未过期”。",
+                    flush=True,
+                )
+            elif str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
+                print(
+                    f"\033[31m[下载确认过期审批记录损坏]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；"
+                    "当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通“未过期”。",
                     flush=True,
                 )
             else:

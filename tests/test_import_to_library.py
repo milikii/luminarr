@@ -2077,6 +2077,26 @@ def test_is_pending_approval_expired_logs_missing_approval_result(capsys) -> Non
     assert "lease_version=2" in output
 
 
+def test_is_pending_approval_expired_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "is_import_pending_expired": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row status corrupted after read"))
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+
+    assert service._is_pending_approval_expired(task_id="87", task_hash="hash-87", expected_lease_version=2) is None
+
+    output = capsys.readouterr().out
+    assert "[导入确认过期审批记录损坏]" in output
+    assert "approval row status corrupted after read" in output
+    assert "status / lease_version / executed_version" in output
+
+
 def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_lookup_fails(capsys) -> None:
     job = JobRecord(
         job_id="job-1",
