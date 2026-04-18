@@ -1,12 +1,12 @@
-# Feishu event parser dedupe log (v1)
+# Feishu event parser dedupe log (v2)
 
-> 目的：承接当前“Feishu 私聊事件解析器去重”主线的详细台账。
+> 目的：承接已完成的“Feishu 私聊事件解析器去重”主线详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
 
-## 1. Current line
+## 1. Completed line
 
-- 当前唯一主线：Feishu 私聊事件解析器去重
-- 上一条主线“Feishu 长连接私有 API 风险收口”已在 2026-04-18 满足退出条件 1；详细台账继续只看 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
+- 已完成主线：Feishu 私聊事件解析器去重（已在 2026-04-18 满足 `Done when` 第 3 条：webhook 入口 `handle_feishu_private_text_event()` 与长连接入口 `_handle_sdk_event()` 继续共用 `FeishuPrivateTextEvent -> route_feishu_private_text_event()` 边界，且 focused tests `15 passed, 34 deselected`）
+- 上一条已完成主线“Feishu 长连接私有 API 风险收口”已在 2026-04-18 满足退出条件 1；详细台账继续只看 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
 - 更早主线“持久化吞错收口”已完成；详细台账继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 四渠道验证窗口已完成；详细证据继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`
 
@@ -39,4 +39,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 只有当当前主线完成并切到下一项时，才在 `docs/NEXT_STEP.md` 和 `README.md` 切换“当前唯一主线”。
+- 当前唯一主线已经切到 `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`；本文件只继续保留完成态路径和 focused tests 入口。
