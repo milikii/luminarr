@@ -1,11 +1,11 @@
-# Persistence closure log (v44)
+# Persistence closure log (v45)
 
-> 目的：承接当前“持久化吞错收口”主线的详细台账。
+> 目的：承接已完成的“持久化吞错收口”主线详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环按主题合并进下面分组，**不再逐天或逐字段追加 `### 2026-04-xx 分流缺口` 条目**。具体 commit 轨迹看 `git log`；原始逐条台账已在 v43 做最后一次保留，此后收敛为主题视图。
 
 ## 1. Current line
 
-- 当前唯一主线：持久化吞错收口
+- 上一条主线：持久化吞错收口（已在 2026-04-18 冷启动审计中满足 `Done when` 第 3 条：`git grep 'except Exception:\s*\(pass\|return None\)' app/services app/db app/bot` 命中 `0`）
 - cleanup 四渠道验证窗口已完成；详细证据继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
