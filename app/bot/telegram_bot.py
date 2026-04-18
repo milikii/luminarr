@@ -994,6 +994,24 @@ def _log_telegram_update_record_failed(
     )
 
 
+def _log_telegram_update_record_result_missing(
+    *,
+    source_type: str,
+    source_id: str,
+    chat_id: int | None,
+    user_id: int | None,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[Telegram 更新去重结果缺失]\033[0m source_type={source_type} "
+        f"source_id={source_id.strip() or '-'} chat_id={chat_id if chat_id is not None else '-'} "
+        f"user_id={user_id if user_id is not None else '-'} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 telegram_updates 写入返回是否仍带有明确布尔结果；"
+        "当前 update 会停止继续处理，避免把去重真相缺口误判成普通重复消息。",
+        flush=True,
+    )
+
+
 def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
     if not isinstance(update_repo, TelegramUpdateRepo):
@@ -1008,19 +1026,31 @@ def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     chat_id = chat.id if chat is not None else None
     user_id = user.id if user is not None else None
     try:
-        return update_repo.record_message_update(
+        recorded = update_repo.record_message_update(
             update_id=update_id,
             chat_id=chat_id,
             user_id=user_id,
         )
+        if recorded is None:
+            raise RuntimeError("telegram update record result missing")
+        return recorded
     except Exception as error:
-        _log_telegram_update_record_failed(
-            source_type="message",
-            source_id=str(update_id),
-            chat_id=chat_id,
-            user_id=user_id,
-            reason=str(error),
-        )
+        if str(error) == "telegram update record result missing":
+            _log_telegram_update_record_result_missing(
+                source_type="message",
+                source_id=str(update_id),
+                chat_id=chat_id,
+                user_id=user_id,
+                reason=str(error),
+            )
+        else:
+            _log_telegram_update_record_failed(
+                source_type="message",
+                source_id=str(update_id),
+                chat_id=chat_id,
+                user_id=user_id,
+                reason=str(error),
+            )
         return False
 
 
@@ -1036,19 +1066,31 @@ def _record_callback_update(
         return True
 
     try:
-        return update_repo.record_callback_update(
+        recorded = update_repo.record_callback_update(
             callback_query_id=callback_query_id,
             chat_id=chat_id,
             user_id=user_id,
         )
+        if recorded is None:
+            raise RuntimeError("telegram update record result missing")
+        return recorded
     except Exception as error:
-        _log_telegram_update_record_failed(
-            source_type="callback",
-            source_id=callback_query_id,
-            chat_id=chat_id,
-            user_id=user_id,
-            reason=str(error),
-        )
+        if str(error) == "telegram update record result missing":
+            _log_telegram_update_record_result_missing(
+                source_type="callback",
+                source_id=callback_query_id,
+                chat_id=chat_id,
+                user_id=user_id,
+                reason=str(error),
+            )
+        else:
+            _log_telegram_update_record_failed(
+                source_type="callback",
+                source_id=callback_query_id,
+                chat_id=chat_id,
+                user_id=user_id,
+                reason=str(error),
+            )
         return False
 
 

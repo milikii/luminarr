@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 Telegram 更新去重结果缺失分流缺口
+
+- 闭环：`telegram_bot._record_message_update()` / `_record_callback_update()` 之前如果 `telegram_updates` 去重写入链异常回 `None`，会被直接混成普通 `False`，从而和“正常重复 update”共用同一条停路语义；现在会单独打印“Telegram 更新去重结果缺失”中文日志与 `[处理建议]`，并继续让 message / callback 入口停路，不把去重真相缺口混成普通重复消息。
+- 代码：
+  - `app/bot/telegram_bot.py`
+  - `tests/test_telegram_bot.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "dedup_result_missing or dedup_persist_fails or update_id_invalid or callback_id_missing"`
+
 ### 2026-04-18 下载完成待轮询列表记录损坏分流缺口
 
 - 闭环：`telegram_bot._poll_pending_download_completion_once()` 之前读取 `download_monitor` 待轮询列表时，如果查询链直接回 `None`，或列表里命中的记录本身 `task_id / task_hash / chat_id` 等真相字段已损坏，只会统一落到“下载完成待轮询列表读取失败”；现在会分别打印“下载完成待轮询列表结果缺失”或“下载完成待轮询列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮后台轮询停路，不把缺失真相混成普通“没有待轮询任务”，也不把坏记录混成普通读库失败。

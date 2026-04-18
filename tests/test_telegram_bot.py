@@ -3358,6 +3358,43 @@ def test_handle_message_stops_when_update_dedup_persist_fails(tmp_path: Path, ca
     assert "[处理建议]" in output
 
 
+def test_handle_message_stops_when_update_dedup_result_missing(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    update_repo = TelegramUpdateRepo(database)
+
+    def _missing_record_message_update(**_: object) -> None:
+        return None
+
+    update_repo.record_message_update = _missing_record_message_update  # type: ignore[method-assign]
+    update, reply_text = _build_update("dune", update_id=9003)
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                TELEGRAM_UPDATE_REPO_KEY: update_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[Telegram 更新去重结果缺失]" in output
+    assert "source_type=message" in output
+    assert "source_id=9003" in output
+    assert "telegram update record result missing" in output
+    assert "[处理建议]" in output
+
+
 def test_handle_callback_query_stops_when_update_dedup_persist_fails(tmp_path: Path, capsys) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
@@ -3392,6 +3429,44 @@ def test_handle_callback_query_stops_when_update_dedup_persist_fails(tmp_path: P
     assert "[Telegram 更新去重落盘失败]" in output
     assert "source_type=callback" in output
     assert "source_id=cb-9002" in output
+    assert "[处理建议]" in output
+
+
+def test_handle_callback_query_stops_when_update_dedup_result_missing(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    update_repo = TelegramUpdateRepo(database)
+
+    def _missing_record_callback_update(**_: object) -> None:
+        return None
+
+    update_repo.record_callback_update = _missing_record_callback_update  # type: ignore[method-assign]
+    update, reply_text, answer = _build_callback_update("dune", callback_query_id="cb-9003")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                TELEGRAM_UPDATE_REPO_KEY: update_repo,
+            }
+        )
+    )
+
+    asyncio.run(handle_callback_query(update, context))
+
+    answer.assert_not_awaited()
+    reply_text.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[Telegram 更新去重结果缺失]" in output
+    assert "source_type=callback" in output
+    assert "source_id=cb-9003" in output
+    assert "telegram update record result missing" in output
     assert "[处理建议]" in output
 
 
