@@ -568,6 +568,56 @@ def test_bt_subscription_run_once_returns_failure_text_when_scan_items_return_no
     assert "[处理建议]" in captured.out
 
 
+def test_bt_subscription_run_once_surfaces_scan_item_row_corruption(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_subscription_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                1001,
+                "",
+                "2023",
+                "anime",
+            ),
+        )
+        connection.commit()
+
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert reply == BT_SUBSCRIPTION_RUN_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描记录损坏]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "bt_subscription_item row identity corrupted after read" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_bt_subscription_run_once_returns_failure_text_when_pending_creation_is_unavailable(
     tmp_path: Path,
     capsys,
@@ -751,6 +801,57 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_return_none(
     assert "[BT 订阅扫描结果缺失]" in captured.out
     assert "chat_id=1001" in captured.out
     assert "bt subscription scan items result missing" in captured.out
+
+
+def test_bt_subscription_scheduler_tick_skips_chat_when_scan_item_row_is_corrupted(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_subscription_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                1001,
+                "",
+                "2023",
+                "anime",
+            ),
+        )
+        connection.commit()
+
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications is None
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描记录损坏]" in captured.out
+    assert "chat_id=1001" in captured.out
+    assert "bt_subscription_item row identity corrupted after read" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_raises(

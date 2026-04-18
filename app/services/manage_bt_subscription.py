@@ -467,6 +467,8 @@ class ManageBtSubscriptionService:
         except Exception as error:
             if str(error) == "bt subscription scan items result missing":
                 _log_bt_subscription_scan_items_result_missing(chat_id=chat_id, reason=str(error))
+            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_scan_items_row_corrupted(chat_id=chat_id, reason=str(error))
             else:
                 _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=str(error))
             return None
@@ -732,6 +734,14 @@ def _log_bt_subscription_scan_items_result_missing(*, chat_id: int, reason: str)
         f"\033[31m[BT 订阅扫描结果缺失]\033[0m chat_id={chat_id} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 查询返回是否仍带有完整列表；"
         "当前会停止本轮扫描，避免把缺失真相误判成“当前没有可扫描条目”。"
+    )
+
+
+def _log_bt_subscription_scan_items_row_corrupted(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅扫描记录损坏]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会停止本轮扫描，避免把损坏记录误判成可继续自动追更的正常条目。"
     )
 
 

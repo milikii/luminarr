@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 BT 订阅扫描记录损坏分流缺口
+
+- 闭环：`manage_bt_subscription._scan_chat_once()` 之前在 `bt_subscription_item` 扫描条目列表能查到行、但行内 `id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 读取异常共用同一条“BT 订阅扫描读取失败”日志；现在会单独打印“BT 订阅扫描记录损坏”中文日志与 `[处理建议]`，并继续让 `btsub run` / scheduler tick 直接停路，不把坏记录混成普通读库失败或“当前没有新资源”。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "scan_items or scan_item_row or chat_id_lookup or add_logs_missing_row_after_insert or add_surfaces_row_corruption or list_surfaces_row_corruption"`
+
 ### 2026-04-18 BT 订阅写入命中坏记录分流缺口
 
 - 闭环：`manage_bt_subscription._add_item()` 之前在 `bt_subscription_item` 旧条目查询或写后回读命中坏行、抛出 `id / title / media_kind` 等字段损坏时，会和普通 SQLite 写入异常共用同一条“BT 订阅写入失败”日志；现在会单独打印“BT 订阅写入命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的写入失败文本，不把坏记录混成普通写入异常、重复条目或成功新增。
