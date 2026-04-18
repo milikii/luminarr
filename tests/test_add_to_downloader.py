@@ -11,6 +11,7 @@ from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
+from app.db.job_event_repo import JobEventPersistenceError
 from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
@@ -767,6 +768,34 @@ def test_record_event_logs_missing_appended_event_result(capsys) -> None:
     output = capsys.readouterr().out
     assert "[下载事件结果缺失]" in output
     assert "downloader event missing after append" in output
+    assert "event_type=downloader.approval_pending" in output
+
+
+def test_record_event_logs_row_corrupted_appended_event(capsys) -> None:
+    job_event_repo = type(
+        "JobEventRepo",
+        (),
+        {
+            "append_event": lambda self, **kwargs: (_ for _ in ()).throw(
+                JobEventPersistenceError("job_event row identity corrupted after read")
+            )
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        job_event_repo=job_event_repo,
+    )
+    service._record_event(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="abc123",
+        event_type="downloader.approval_pending",
+        message="Dune: Part Two",
+    )
+    output = capsys.readouterr().out
+    assert "[下载事件记录损坏]" in output
+    assert "job_event row identity corrupted after read" in output
     assert "event_type=downloader.approval_pending" in output
 
 

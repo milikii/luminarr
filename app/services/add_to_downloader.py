@@ -15,7 +15,7 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
@@ -1489,6 +1489,13 @@ class AddToDownloaderService:
                     "当前流程会继续执行，但这条下载事件真相可能没有落稳。",
                     flush=True,
                 )
+            elif _is_downloader_event_row_corrupted_error(error):
+                print(
+                    f"\033[31m[下载事件记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type 等真相字段是否仍然完整；"
+                    "当前流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
+                    flush=True,
+                )
             else:
                 print(
                     f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
@@ -1687,3 +1694,7 @@ def _pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None,
 
 def _is_download_monitor_register_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
+
+
+def _is_downloader_event_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
