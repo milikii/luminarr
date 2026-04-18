@@ -109,7 +109,11 @@ def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_
             ws=SimpleNamespace(Client=FakeWsClient),
         ),
     )
-    monkeypatch.setattr(feishu_long_connection_module, "lark_ws_client_module", SimpleNamespace(loop=None))
+    monkeypatch.setattr(
+        feishu_long_connection_module.importlib,
+        "reload",
+        lambda module: SimpleNamespace(Client=FakeWsClient),
+    )
 
     service = FeishuLongConnectionService(
         config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
@@ -200,7 +204,11 @@ def test_feishu_long_connection_logs_unexpected_loop_stop_failure(
             ws=SimpleNamespace(Client=FakeWsClient),
         ),
     )
-    monkeypatch.setattr(feishu_long_connection_module, "lark_ws_client_module", SimpleNamespace(loop=None))
+    monkeypatch.setattr(
+        feishu_long_connection_module.importlib,
+        "reload",
+        lambda module: SimpleNamespace(Client=FakeWsClient),
+    )
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "new_event_loop", lambda: fake_loop)
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "set_event_loop", lambda loop: None)
 
@@ -255,7 +263,11 @@ def test_feishu_long_connection_suppresses_expected_loop_stop_error(
             ws=SimpleNamespace(Client=FakeWsClient),
         ),
     )
-    monkeypatch.setattr(feishu_long_connection_module, "lark_ws_client_module", SimpleNamespace(loop=None))
+    monkeypatch.setattr(
+        feishu_long_connection_module.importlib,
+        "reload",
+        lambda module: SimpleNamespace(Client=FakeWsClient),
+    )
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "new_event_loop", lambda: fake_loop)
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "set_event_loop", lambda loop: None)
 

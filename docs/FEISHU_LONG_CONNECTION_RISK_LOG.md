@@ -5,17 +5,17 @@
 
 ## 1. Current line
 
-- 当前唯一主线：Feishu 长连接私有 API 风险收口
-- 上一条主线“持久化吞错收口”已在 2026-04-18 冷启动审计中满足退出条件 3；详细台账继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`
+- 上一条主线：Feishu 长连接私有 API 风险收口（已在 2026-04-18 满足退出条件 1：`app/bot/feishu_long_connection.py` 不再直接引用 `lark_ws_client_module.loop`、`_disconnect`、`_auto_reconnect`、`_cache`，且 `tests/test_feishu_long_connection.py` 全绿）
+- 更早主线“持久化吞错收口”已在 2026-04-18 冷启动审计中满足退出条件 3；详细台账继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 四渠道验证窗口已完成；详细证据继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`
 
 ## 2. Risk groups
 
 ### 2.1 启动 / 线程事件循环绑定
 
-当前风险：
-- `_run_client_thread()` 仍直接写 `lark_ws_client_module.loop = thread_loop`，把线程事件循环绑定在 SDK 私有模块状态上。
-- 这一组只允许收口“线程如何把事件循环交给 SDK”的边界，不改 shared runtime、回包协议或 Feishu webhook 入站。
+当前状态：
+- 2026-04-18 已完成：线程先 `set_event_loop(thread_loop)`，再在当前线程重载 `lark_oapi.ws.client` 模块并实例化 `Client`，不再直接写 `lark_ws_client_module.loop`。
+- shared runtime、回包协议和 Feishu webhook 入站保持不变；对应回归继续看下面 focused tests。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py -k "routes_sdk_event or does_not_log_start_failure or logs_unexpected_loop_stop_failure or suppresses_expected_loop_stop_error"`

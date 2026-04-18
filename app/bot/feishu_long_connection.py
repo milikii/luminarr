@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import threading
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
@@ -112,6 +113,11 @@ class FeishuLongConnectionService:
                     flush=True,
                 )
 
+    @staticmethod
+    def _reload_ws_client_module() -> Any:
+        assert lark_ws_client_module is not None
+        return importlib.reload(lark_ws_client_module)
+
     def _handle_loop_exception(self, loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
         exception = context.get("exception")
         if self._thread is None and context.get("message") == "Task exception was never retrieved":
@@ -124,22 +130,21 @@ class FeishuLongConnectionService:
         assert lark_ws_client_module is not None
         thread_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(thread_loop)
-        lark_ws_client_module.loop = thread_loop
         thread_loop.set_exception_handler(self._handle_loop_exception)
         self._thread_loop = thread_loop
-
-        event_handler = (
-            lark_oapi.EventDispatcherHandler.builder("", "")
-            .register_p2_im_message_receive_v1(self._handle_sdk_event)
-            .build()
-        )
-        client = lark_oapi.ws.Client(
-            self._config.app_id,
-            self._config.app_secret,
-            event_handler=event_handler,
-        )
-        self._ws_client = client
         try:
+            ws_client_module = self._reload_ws_client_module()
+            event_handler = (
+                lark_oapi.EventDispatcherHandler.builder("", "")
+                .register_p2_im_message_receive_v1(self._handle_sdk_event)
+                .build()
+            )
+            client = ws_client_module.Client(
+                self._config.app_id,
+                self._config.app_secret,
+                event_handler=event_handler,
+            )
+            self._ws_client = client
             client.start()
         except BaseException as error:
             if self._is_expected_shutdown_error(error, self._thread):

@@ -1,4 +1,4 @@
-# docs/INDEX.md (v3)
+# docs/INDEX.md (v4)
 
 > 目的：给人和 AI 一个统一的文档地图，先知道“哪份文档回答哪类问题”，再决定往哪里读。
 
@@ -22,8 +22,9 @@
 | `docs/ARCHITECTURE.md` | 一条消息从哪里进、到哪里去、谁写数据库 | 结构说明 |
 | `docs/NEXT_STEP.md` | 当前唯一主线是什么，不该顺手做什么 | 当前施工目标 |
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
-| `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` | 当前 Feishu 长连接私有 API 风险收口主线的详细闭环、focused tests 和风险分组 | 当前主线台账 |
-| `docs/PERSISTENCE_CLOSURE_LOG.md` | 已完成的持久化吞错收口主线详细闭环、focused tests 和 commit 轨迹 | 已完成主线台账 |
+| `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md` | 当前 Feishu 私聊事件解析器去重主线的详细闭环、focused tests 和风险分组 | 当前主线台账 |
+| `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` | 已完成的 Feishu 长连接私有 API 风险收口主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
+| `docs/PERSISTENCE_CLOSURE_LOG.md` | 更早完成的持久化吞错收口主线详细闭环、focused tests 和 commit 轨迹 | 已完成主线台账 |
 | `docs/DECISIONS.md` | 为什么这么做，哪些边界已经定死 | 长期决策 |
 | `docs/CLEANUP_VERIFICATION_WINDOW.md` | cleanup 验证窗口的详细台账和证据 | 活动台账 |
 | `docs/TEST_ENV.md` | 本地 Transmission / Emby 联调栈怎么检查 | 测试环境说明 |
@@ -47,9 +48,10 @@
 
 1. `docs/NEXT_STEP.md`
 2. `docs/STATUS.md`
-3. `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（需要看当前主线细节时）
-4. `docs/PERSISTENCE_CLOSURE_LOG.md`（需要看上一条主线闭环时）
-5. `docs/CLEANUP_VERIFICATION_WINDOW.md`（需要看 cleanup 已完成证据时）
+3. `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（需要看当前主线细节时）
+4. `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（需要看上一条主线闭环时）
+5. `docs/PERSISTENCE_CLOSURE_LOG.md`（需要看更早主线闭环时）
+6. `docs/CLEANUP_VERIFICATION_WINDOW.md`（需要看 cleanup 已完成证据时）
 
 ### 想理解“为什么不能随便改”
 
@@ -70,7 +72,7 @@
 ## 4. 文档维护规则
 
 - 同一条事实尽量只写一处；其他文档用“引用/跳转”，不要复制粘贴。
-- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前主线的详细闭环优先收口到对应主线台账（当前为 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`），不要把活动台账全文抄进去。
+- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前主线的详细闭环优先收口到对应主线台账（当前为 `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`），不要把活动台账全文抄进去。
 - **`STATUS.md` 和 `PERSISTENCE_CLOSURE_LOG.md` 不再逐天或逐字段追加 `截至 20xx-xx-xx 分流缺口` 条目**：新闭环优先合并进 `PERSISTENCE_CLOSURE_LOG.md` 的已有主题分组（2.1~2.5），`STATUS.md` 最多补一句当前结论或风险；commit 轨迹看 `git log`，不再重复粘贴。
 - 运行方式、环境变量、启动入口一律收口到 `docs/GETTING_STARTED.md` 和 `.env.example`。
 - 系统结构解释一律收口到 `docs/ARCHITECTURE.md`。

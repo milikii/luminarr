@@ -1,4 +1,4 @@
-# Luminarr (v63)
+# Luminarr (v64)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -112,15 +112,16 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：Feishu 长连接私有 API 风险收口（把 `app/bot/feishu_long_connection.py` 的启停从 SDK 私有属性 / 私有模块状态收回到仓库自管边界，不改 shared runtime、approval、`jobs` 和 SQLite 真相）。
+- **当前唯一主线**：Feishu 私聊事件解析器去重（把 webhook payload 解析和 SDK 长连接事件解析收口成同一套仓库自管解析边界，不改 shared runtime、回包协议和 SQLite 真相）。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线详细台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
-- **上一条主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
+- **当前主线详细台账**：`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`
+- **上一条主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
+- **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前主线 focused tests 入口收口在 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 的 2.1–2.3 分组；cleanup 相关回归入口继续见 `docs/GETTING_STARTED.md`。
-- 这一步只允许修 Feishu 长连接与 SDK 私有 API 的耦合，不做 Feishu 事件去重、群聊 / 卡片、通用多渠道平台化，也不新增自动 cleanup、批量 cleanup 或删种。
-- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（Feishu 事件解析去重 → 后台下载完成轮询收口 → 编排层瘦身 → `series / anime` 名称解析 → 等等）。
+- **本地回归命令**：当前主线 focused tests 入口收口在 `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md` 的 2.1–2.2 分组；cleanup 相关回归入口继续见 `docs/GETTING_STARTED.md`。
+- 这一步只允许修 Feishu webhook / SDK 两套私聊文本解析的重复分支，不做群聊 / 卡片 / 按钮回调、长连接新能力、通用多渠道平台化，也不新增自动 cleanup、批量 cleanup 或删种。
+- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（后台下载完成轮询收口 → 编排层瘦身 → `series / anime` 名称解析 → 等等）。
 
 ## 6. 当前明确不做
 
