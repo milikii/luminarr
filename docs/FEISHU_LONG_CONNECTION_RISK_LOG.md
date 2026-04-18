@@ -22,9 +22,10 @@ focused tests 入口：
 
 ### 2.2 停机 / 断链
 
-当前风险：
-- `shutdown()` 仍直接触碰 `_auto_reconnect`、`_disconnect()`、`_cache` 这些 SDK 私有属性 / 私有协程。
-- 这一组收口后，预期关闭仍不报错，非预期断开仍要打印显式中文日志和 `[处理建议]`。
+当前状态：
+- 2026-04-18 已先收口一轮：`shutdown()` 改为只请求长连接线程事件循环停止并 `join`，不再直接触碰 `_auto_reconnect`、`_disconnect()`、`_cache`。
+- 预期关闭仍不报错；如果请求线程 loop 停止时抛出非预期异常，仍打印显式中文日志和 `[处理建议]`。
+- 这一组剩余风险只剩 SDK 内部如何响应 loop stop，不再由仓库代码直接摸它的私有属性。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py -k "shutdown"`

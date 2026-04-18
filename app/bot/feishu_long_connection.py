@@ -76,30 +76,13 @@ class FeishuLongConnectionService:
 
     async def shutdown(self) -> None:
         loop = self._thread_loop
-        client = self._ws_client
         thread = self._thread
         self._thread = None
         self._ws_client = None
         self._thread_loop = None
-        if loop is None or client is None or thread is None:
+        if loop is None or thread is None:
             return
-        client._auto_reconnect = False
-        future = asyncio.run_coroutine_threadsafe(client._disconnect(), loop)
-        try:
-            future.result(timeout=5.0)
-        except Exception as error:
-            if not self._is_expected_disconnect_error(error):
-                print(
-                    f"\033[31m[Feishu 长连接关闭失败]\033[0m 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 Feishu SDK 连接状态和事件循环是否已提前关闭；"
-                    "如服务仍在运行，可稍后重试停机。",
-                    flush=True,
-                )
-        cron = getattr(getattr(client, "_cache", None), "_cron", None)
-        if cron is not None and not loop.is_closed():
-            loop.call_soon_threadsafe(cron.cancel)
-        if not loop.is_closed():
-            loop.call_soon_threadsafe(loop.stop)
+        self._request_thread_loop_stop(loop)
         thread.join(timeout=5.0)
 
     @staticmethod
@@ -111,17 +94,23 @@ class FeishuLongConnectionService:
         return thread is None and isinstance(error, asyncio.CancelledError)
 
     @staticmethod
-    def _is_expected_disconnect_error(error: Exception) -> bool:
-        error_text = str(error)
-        return (
-            error.__class__.__name__ == "ConnectionClosedOK"
-            or "Event loop is closed" in error_text
-            or "Event loop stopped before Future completed" in error_text
-        )
-
-    @staticmethod
     def _is_expected_loop_stop_error(error: Exception) -> bool:
-        return "Event loop is closed" in str(error)
+        error_text = str(error)
+        return "Event loop is closed" in error_text or "Event loop stopped before Future completed" in error_text
+
+    def _request_thread_loop_stop(self, loop: asyncio.AbstractEventLoop) -> None:
+        if loop.is_closed():
+            return
+        try:
+            loop.call_soon_threadsafe(loop.stop)
+        except Exception as error:
+            if not self._is_expected_loop_stop_error(error):
+                print(
+                    f"\033[31m[Feishu 长连接关闭失败]\033[0m 原因={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 Feishu 线程事件循环是否仍可停止；"
+                    "如服务仍在运行，可稍后重试停机或检查上游 SDK 状态。",
+                    flush=True,
+                )
 
     def _handle_loop_exception(self, loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
         exception = context.get("exception")

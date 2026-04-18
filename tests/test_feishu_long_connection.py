@@ -122,28 +122,18 @@ def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_
     assert "[Feishu 长连接启动失败]" not in captured.out
 
 
-def test_feishu_long_connection_shutdown_logs_unexpected_disconnect_failure(
-    monkeypatch,
-    capsys,
-) -> None:
+def test_feishu_long_connection_shutdown_logs_unexpected_loop_stop_request_failure(capsys) -> None:
     service = FeishuLongConnectionService(
         config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
         feishu_client=SimpleNamespace(),
     )
-    service._thread_loop = SimpleNamespace(is_closed=lambda: True)
-    service._ws_client = SimpleNamespace(_auto_reconnect=True, _disconnect=lambda: object(), _cache=None)
-    service._thread = SimpleNamespace(join=lambda timeout=0: None)
-
-    class FakeFuture:
-        def result(self, timeout: float | None = None) -> None:
-            _ = timeout
-            raise RuntimeError("network down")
-
-    monkeypatch.setattr(
-        feishu_long_connection_module.asyncio,
-        "run_coroutine_threadsafe",
-        lambda coroutine, loop: FakeFuture(),
+    service._thread_loop = SimpleNamespace(
+        is_closed=lambda: False,
+        stop=lambda: None,
+        call_soon_threadsafe=lambda callback: (_ for _ in ()).throw(RuntimeError("network down")),
     )
+    service._ws_client = SimpleNamespace()
+    service._thread = SimpleNamespace(join=lambda timeout=0: None)
 
     asyncio.run(service.shutdown())
 
@@ -153,28 +143,18 @@ def test_feishu_long_connection_shutdown_logs_unexpected_disconnect_failure(
     assert "[处理建议]" in captured.out
 
 
-def test_feishu_long_connection_shutdown_suppresses_expected_disconnect_error(
-    monkeypatch,
-    capsys,
-) -> None:
+def test_feishu_long_connection_shutdown_suppresses_expected_loop_stop_request_error(capsys) -> None:
     service = FeishuLongConnectionService(
         config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
         feishu_client=SimpleNamespace(),
     )
-    service._thread_loop = SimpleNamespace(is_closed=lambda: True)
-    service._ws_client = SimpleNamespace(_auto_reconnect=True, _disconnect=lambda: object(), _cache=None)
-    service._thread = SimpleNamespace(join=lambda timeout=0: None)
-
-    class FakeFuture:
-        def result(self, timeout: float | None = None) -> None:
-            _ = timeout
-            raise RuntimeError("Event loop is closed")
-
-    monkeypatch.setattr(
-        feishu_long_connection_module.asyncio,
-        "run_coroutine_threadsafe",
-        lambda coroutine, loop: FakeFuture(),
+    service._thread_loop = SimpleNamespace(
+        is_closed=lambda: False,
+        stop=lambda: None,
+        call_soon_threadsafe=lambda callback: (_ for _ in ()).throw(RuntimeError("Event loop is closed")),
     )
+    service._ws_client = SimpleNamespace()
+    service._thread = SimpleNamespace(join=lambda timeout=0: None)
 
     asyncio.run(service.shutdown())
 
