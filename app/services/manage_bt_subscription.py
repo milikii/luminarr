@@ -7,26 +7,25 @@ from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
+from app.services.bt_subscription_command import (
+    BT_SUBSCRIPTION_ADD_USAGE_TEXT,
+    BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
+    BT_SUBSCRIPTION_USAGE_TEXT,
+    BtSubscriptionCommand,
+    bt_subscription_media_kind_label,
+    format_bt_subscription_add_result,
+    format_bt_subscription_clear_result,
+    format_bt_subscription_list,
+    format_bt_subscription_remove_result,
+    parse_bt_subscription_add_request,
+    parse_bt_subscription_query,
+)
 from app.services.bt_sources import resolve_bt_source
-from app.services.search_media import parse_movie_query
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
-
-BT_SUBSCRIPTION_USAGE_TEXT = (
-    "BT 订阅命令格式：\n"
-    "btsub list\n"
-    "btsub add <movie|series|anime> <片名 [年份]>\n"
-    "btsub remove <条目ID>\n"
-    "btsub clear\n"
-    "btsub run"
-)
-BT_SUBSCRIPTION_EMPTY_TEXT = "BT 订阅清单为空。"
 BT_SUBSCRIPTION_LIST_FAILED_TEXT = "BT 订阅清单读取失败，请稍后重试。"
-BT_SUBSCRIPTION_ADD_USAGE_TEXT = "添加格式：btsub add <movie|series|anime> <片名 [年份]>"
 BT_SUBSCRIPTION_ADD_FAILED_TEXT = "BT 订阅写入失败，请稍后重试。"
-BT_SUBSCRIPTION_REMOVE_USAGE_TEXT = "删除格式：btsub remove <条目ID>"
 BT_SUBSCRIPTION_REMOVE_FAILED_TEXT = "BT 订阅删除失败，请稍后重试。"
-BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
 BT_SUBSCRIPTION_CLEAR_FAILED_TEXT = "BT 订阅清单清空失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_EMPTY_TEXT = "当前没有可扫描的 BT 订阅。"
 BT_SUBSCRIPTION_RUN_FAILED_TEXT = "BT 订阅扫描失败，请稍后重试。"
@@ -47,30 +46,6 @@ BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT = (
 )
 BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON = "bt_subscription_item missing after insert"
 BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON = "bt subscription last_seen update result missing"
-MEDIA_KIND_ALIASES = {
-    "movie": "movie",
-    "film": "movie",
-    "电影": "movie",
-    "series": "series",
-    "tv": "series",
-    "show": "series",
-    "电视剧": "series",
-    "剧集": "series",
-    "anime": "anime",
-    "动漫": "anime",
-    "动画": "anime",
-}
-MEDIA_KIND_LABELS = {
-    "movie": "电影",
-    "series": "剧集",
-    "anime": "动漫",
-}
-
-
-@dataclass(frozen=True, slots=True)
-class BtSubscriptionCommand:
-    action: str
-    arg: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,53 +176,23 @@ class ManageBtSubscriptionService:
         items = self._list_items(chat_id=chat_id)
         if items is None:
             return BT_SUBSCRIPTION_LIST_FAILED_TEXT
-        if not items:
-            return BT_SUBSCRIPTION_EMPTY_TEXT
-
-        lines = ["BT 订阅清单："]
-        for index, item in enumerate(items, start=1):
-            year_text = item.year if item.year else "-"
-            last_seen = item.last_seen_title.strip() or "-"
-            lines.append(
-                f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {_media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
-            )
-        return "\n".join(lines)
+        return format_bt_subscription_list(items)
 
     def _add_text(self, *, chat_id: int, raw_title: str) -> str:
-        cleaned_title = raw_title.strip()
-        if not cleaned_title:
-            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
-
-        media_kind, parsed_title = _parse_media_kind_prefix(cleaned_title)
-        if media_kind not in {"movie", "series", "anime"}:
-            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
-        parsed = parse_movie_query(parsed_title)
-        title = parsed.title.strip()
-        year = parsed.year.strip()
-        if not title:
+        parsed_request = parse_bt_subscription_add_request(raw_title)
+        if parsed_request is None:
             return BT_SUBSCRIPTION_ADD_USAGE_TEXT
 
         created = self._add_item(
             chat_id=chat_id,
-            title=title,
-            year=year,
-            media_kind=media_kind,
+            title=parsed_request.title,
+            year=parsed_request.year,
+            media_kind=parsed_request.media_kind,
         )
         if created is None:
             return BT_SUBSCRIPTION_ADD_FAILED_TEXT
         item, is_created = created
-        year_text = item.year if item.year else "-"
-        if is_created:
-            return (
-                f"已加入 BT 订阅：{item.title} ({year_text})\n"
-                f"类型: {_media_kind_label(item.media_kind)}\n"
-                f"条目ID: {item.item_id}"
-            )
-        return (
-            f"BT 订阅已存在：{item.title} ({year_text})\n"
-            f"类型: {_media_kind_label(item.media_kind)}\n"
-            f"条目ID: {item.item_id}"
-        )
+        return format_bt_subscription_add_result(item, is_created=is_created)
 
     def _remove_text(self, *, chat_id: int, item_ref: str) -> str:
         cleaned_ref = item_ref.strip()
@@ -259,17 +204,13 @@ class ManageBtSubscriptionService:
         removed = self._remove_item(chat_id=chat_id, item_id=item_id)
         if removed is None:
             return BT_SUBSCRIPTION_REMOVE_FAILED_TEXT
-        if not removed:
-            return "未找到对应 BT 订阅条目。"
-        return f"已删除 BT 订阅条目：{item_id}"
+        return format_bt_subscription_remove_result(item_id, removed=removed)
 
     def _clear_text(self, *, chat_id: int) -> str:
         deleted = self._clear_items(chat_id=chat_id)
         if deleted is None:
             return BT_SUBSCRIPTION_CLEAR_FAILED_TEXT
-        if deleted <= 0:
-            return BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT
-        return f"已清空 BT 订阅清单，共删除 {deleted} 条。"
+        return format_bt_subscription_clear_result(deleted)
 
     def _add_item(
         self,
@@ -441,7 +382,7 @@ class ManageBtSubscriptionService:
         year_text = item.year if item.year else "-"
         reply = (
             f"BT 订阅命中新资源：{item.title} ({year_text})\n"
-            f"类型: {_media_kind_label(item.media_kind)}\n"
+            f"类型: {bt_subscription_media_kind_label(item.media_kind)}\n"
             f"命中资源: {candidate_title}\n\n"
             f"{pending_text}"
         )
@@ -573,61 +514,6 @@ class ManageBtSubscriptionService:
             )
             return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
         return BtSubscriptionLastSeenUpdateResult(status="updated")
-
-
-def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
-    cleaned_text = text.strip()
-    if not cleaned_text:
-        return None
-
-    matched = re.match(r"^(?i:btsub)(?:\s+(.*))?$", cleaned_text)
-    if not matched:
-        return None
-    tail = (matched.group(1) or "").strip()
-    if not tail:
-        return BtSubscriptionCommand(action="list", arg="")
-
-    lowered_tail = tail.lower()
-    if lowered_tail == "list":
-        return BtSubscriptionCommand(action="list", arg="")
-    if lowered_tail == "clear":
-        return BtSubscriptionCommand(action="clear", arg="")
-    if lowered_tail == "run":
-        return BtSubscriptionCommand(action="run", arg="")
-    if lowered_tail == "add":
-        return BtSubscriptionCommand(action="add", arg="")
-    if lowered_tail in {"remove", "rm"}:
-        return BtSubscriptionCommand(action="remove", arg="")
-
-    matched_add = re.match(r"^(?i:add)\s+(.*)$", tail)
-    if matched_add:
-        return BtSubscriptionCommand(action="add", arg=(matched_add.group(1) or "").strip())
-
-    matched_remove = re.match(r"^(?:(?i:remove)|(?i:rm))\s+(.*)$", tail)
-    if matched_remove:
-        return BtSubscriptionCommand(action="remove", arg=(matched_remove.group(1) or "").strip())
-
-    return BtSubscriptionCommand(action="add", arg=tail)
-
-
-def _parse_media_kind_prefix(raw_title: str) -> tuple[str, str]:
-    cleaned_title = raw_title.strip()
-    if not cleaned_title:
-        return "movie", ""
-
-    head, separator, tail = cleaned_title.partition(" ")
-    direct_media_kind = MEDIA_KIND_ALIASES.get(head.strip().lower())
-    if not separator:
-        if direct_media_kind is not None:
-            return direct_media_kind, ""
-        return "", cleaned_title
-    if direct_media_kind is None:
-        return "", cleaned_title
-    return direct_media_kind, tail.strip()
-
-
-def _media_kind_label(media_kind: str) -> str:
-    return MEDIA_KIND_LABELS.get(media_kind.strip().lower(), MEDIA_KIND_LABELS["movie"])
 
 
 def _build_subscription_query(item: BtSubscriptionItem) -> str:

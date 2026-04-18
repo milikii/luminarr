@@ -29,6 +29,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    cleanup_slimming_log_text = Path("docs/CLEANUP_SLIMMING_LOG.md").read_text(encoding="utf-8")
     manage_bt_subscription_slimming_log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(
         encoding="utf-8"
     )
@@ -47,6 +48,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/STATUS.md" in readme_text
+    assert "docs/CLEANUP_SLIMMING_LOG.md" in readme_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in readme_text
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in readme_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in readme_text
@@ -59,6 +61,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
 
     assert "docs/STATUS.md" in index_text
+    assert "docs/CLEANUP_SLIMMING_LOG.md" in index_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in index_text
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in index_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in index_text
@@ -84,8 +87,9 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/DECISIONS.md" in agents_text
     assert "docs/STATUS.md" in agents_text
 
-    assert "manage_bt_subscription.py" in next_step_text and "订阅编排层瘦身 / 模块化" in next_step_text
-    assert "manage_bt_subscription.py" in status_text and "订阅编排层瘦身 / 模块化" in status_text
+    assert "cleanup_downloaded_source.py" in next_step_text and "cleanup 编排层瘦身 / 模块化" in next_step_text
+    assert "cleanup_downloaded_source.py" in status_text and "cleanup 编排层瘦身 / 模块化" in status_text
+    assert "cleanup_downloaded_source.py" in cleanup_slimming_log_text and "cleanup 编排层瘦身 / 模块化" in cleanup_slimming_log_text
     assert "manage_bt_subscription.py" in manage_bt_subscription_slimming_log_text and "订阅编排层瘦身 / 模块化" in manage_bt_subscription_slimming_log_text
     assert "search_media.py" in search_media_slimming_log_text and "搜索编排层瘦身 / 模块化" in search_media_slimming_log_text
     assert "add_to_downloader.py" in add_to_downloader_slimming_log_text and "下载编排层瘦身 / 模块化" in add_to_downloader_slimming_log_text
@@ -108,6 +112,7 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     assert "## What is implemented now" in status_text
     assert "## Main risks and gaps" in status_text
     assert "## Latest verification" in status_text
+    assert "docs/CLEANUP_SLIMMING_LOG.md" in status_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in status_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in status_text
     assert "docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md" in status_text
@@ -177,10 +182,26 @@ def test_search_media_slimming_log_keeps_current_line_detail() -> None:
     assert 'tests/test_search_media.py -k "clarification or candidate or quality_from_title"' in log_text
 
 
-def test_manage_bt_subscription_slimming_log_keeps_current_line_detail() -> None:
-    log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(encoding="utf-8")
+def test_cleanup_slimming_log_keeps_current_line_detail() -> None:
+    log_text = Path("docs/CLEANUP_SLIMMING_LOG.md").read_text(encoding="utf-8")
 
     assert "## 1. Current line" in log_text
+    assert "## 2. Risk groups" in log_text
+    assert "## 3. Focused verification" in log_text
+    assert "## 4. Maintenance rule" in log_text
+
+    assert "身份解析 / import 关联" in log_text
+    assert "inspect / execution 主路径" in log_text
+    assert "路径校验 / source 删除 / follow-up / 事件落盘与中文日志" in log_text
+    assert 'tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"' in log_text
+    assert 'tests/test_cleanup_downloaded_source.py -k "cleanup_by_task_ref or inspect_by_task_ref"' in log_text
+    assert 'tests/test_cleanup_downloaded_source.py -k "delete_failure or source_type_unsupported or event_append_failure or missing_appended_event_result"' in log_text
+
+
+def test_manage_bt_subscription_slimming_log_keeps_completed_line_detail() -> None:
+    log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(encoding="utf-8")
+
+    assert "## 1. Completed line" in log_text
     assert "## 2. Risk groups" in log_text
     assert "## 3. Focused verification" in log_text
     assert "## 4. Maintenance rule" in log_text

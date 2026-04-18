@@ -3,9 +3,17 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from app.db.bt_subscription_repo import BtSubscriptionPersistenceError, BtSubscriptionRepo
+from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.bt_subscription_command import (
+    ParsedBtSubscriptionAddRequest,
+    format_bt_subscription_add_result,
+    format_bt_subscription_clear_result,
+    format_bt_subscription_list,
+    format_bt_subscription_remove_result,
+    parse_bt_subscription_add_request,
+)
 from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_ADD_FAILED_TEXT,
     BT_SUBSCRIPTION_CLEAR_FAILED_TEXT,
@@ -50,6 +58,31 @@ def test_parse_bt_subscription_query_supports_list_add_remove_clear_and_run() ->
     assert parse_bt_subscription_query("btsub remove 7") is not None
     assert parse_bt_subscription_query("btsub clear") is not None
     assert parse_bt_subscription_query("watchlist list") is None
+
+
+def test_parse_bt_subscription_add_request_extracts_kind_title_and_year() -> None:
+    assert parse_bt_subscription_add_request("anime 葬送的芙莉莲 2023") == ParsedBtSubscriptionAddRequest(
+        media_kind="anime",
+        title="葬送的芙莉莲",
+        year="2023",
+    )
+    assert parse_bt_subscription_add_request("纪录片 2023") is None
+
+
+def test_bt_subscription_command_helper_formats_list_and_mutation_replies() -> None:
+    item = _make_bt_subscription_item(
+        item_id=7,
+        title="三体",
+        year="2023",
+        media_kind="series",
+        last_seen_title="三体 S01E01 1080p",
+    )
+
+    assert "BT 订阅清单：" in format_bt_subscription_list([item])
+    assert "最近资源: 三体 S01E01 1080p" in format_bt_subscription_list([item])
+    assert "已加入 BT 订阅" in format_bt_subscription_add_result(item, is_created=True)
+    assert format_bt_subscription_remove_result(7, removed=False) == "未找到对应 BT 订阅条目。"
+    assert format_bt_subscription_clear_result(2) == "已清空 BT 订阅清单，共删除 2 条。"
 
 
 def test_manage_bt_subscription_add_list_remove_clear_and_restart(tmp_path: Path) -> None:
@@ -1111,3 +1144,24 @@ def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     return database
+
+
+def _make_bt_subscription_item(
+    *,
+    item_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    last_seen_title: str = "",
+) -> BtSubscriptionItem:
+    return BtSubscriptionItem(
+        item_id=item_id,
+        chat_id=1001,
+        title=title,
+        year=year,
+        media_kind=media_kind,
+        last_seen_source="https://example.com/item.torrent" if last_seen_title else "",
+        last_seen_title=last_seen_title,
+        created_at="2026-04-19 00:00:00",
+        updated_at="2026-04-19 00:00:00",
+    )
