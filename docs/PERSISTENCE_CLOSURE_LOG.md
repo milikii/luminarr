@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 watchlist 删除记录损坏分流缺口
+
+- 闭环：`manage_watchlist._remove_item()` 之前在 `watchlist_item` 删除链命中坏记录、`id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 删除异常共用同一条“想看删除失败”日志；现在会单独打印“想看删除命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `WATCHLIST_REMOVE_FAILED_TEXT`，不改 watchlist 删除 workflow。
+- 代码：`app/services/manage_watchlist.py`
+- 验证：`tests/test_manage_watchlist.py -k "remove_returns_failure_text_when_repo_raises or remove_returns_failure_text_when_repo_returns_none or remove_surfaces_row_corruption"`
+
 ### 2026-04-18 cleanup 事件记录损坏分流缺口
 
 - 闭环：`cleanup_downloaded_source._record_event()` 之前在 `job_event.append_event()` 已写入 cleanup 事件、但写后回读命中的 `job_event` 行本身 `task_ref / event_type / source_path / target_path` 等真相字段损坏时，会和普通 SQLite 写入异常共用同一条“cleanup 事件写入失败”日志；现在会单独打印“cleanup 事件记录损坏”中文日志与 `[处理建议]`，但继续保持原来的“cleanup 文本结果继续返回”边界，不把坏记录混成普通写库失败。

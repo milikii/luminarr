@@ -253,6 +253,24 @@ def test_manage_watchlist_remove_returns_failure_text_when_repo_returns_none(tmp
     assert "watchlist remove result missing" in captured.out
 
 
+def test_manage_watchlist_remove_surfaces_row_corruption(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _corrupted_remove_item(**_: object) -> None:
+        raise RuntimeError("watchlist_item media kind corrupted after read")
+
+    repo.remove_item = _corrupted_remove_item  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist remove 7"), chat_id=1001)
+
+    assert reply == WATCHLIST_REMOVE_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看删除命中坏记录]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist_item media kind corrupted after read" in captured.out
+
+
 def test_manage_watchlist_clear_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     repo = WatchlistRepo(_make_database(tmp_path))
 
