@@ -66,6 +66,14 @@ CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
 JOB_LEASE_OWNER = "downloader_confirm"
 PENDING_LEASE_LOOKUP_FAILED = -1
+DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS = frozenset(
+    {
+        "job row identity corrupted after read",
+        "job row chat identity corrupted after read",
+        "job row user identity corrupted after read",
+        "job row version corrupted after read",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1081,10 +1089,16 @@ class AddToDownloaderService:
         try:
             job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
         except Exception as error:
-            print(
-                f"\033[31m[下载确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认下载”。",
-                flush=True,
-            )
+            if str(error) in DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS:
+                print(
+                    f"\033[31m[下载确认上下文记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里该待确认下载任务的 job_id / chat_id / task_id / task_hash / version 是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏记录误判成“没有待确认下载”。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[下载确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认下载”。",
+                    flush=True,
+                )
             return None, True
         if job is None:
             return None, False
