@@ -1341,6 +1341,34 @@ def test_record_event_logs_missing_appended_event_result(capsys) -> None:
     assert "import event missing after append" in output
 
 
+def test_record_event_logs_row_corrupted_appended_event(capsys) -> None:
+    event_repo = type(
+        "EventRepo",
+        (),
+        {
+            "append_event": lambda self, **kwargs: (_ for _ in ()).throw(
+                JobEventPersistenceError("job_event row identity corrupted after read")
+            )
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
+
+    service._record_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.approval_pending",
+        message="87",
+        source_path="/downloads/Dune.2021.mkv",
+        target_path="/library/Dune (2021).mkv",
+    )
+
+    output = capsys.readouterr().out
+    assert "[导入事件记录损坏]" in output
+    assert "event_type=import.approval_pending" in output
+    assert "job_event row identity corrupted after read" in output
+
+
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
