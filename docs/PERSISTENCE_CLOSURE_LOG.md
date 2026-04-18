@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 自动导入候选记录损坏分流缺口
+
+- 闭环：`post_download_auto_import.run_once()` 之前在 `download_monitor` 已完成列表能查到行、但行内 `chat_id / task_id / task_hash` 等真相已损坏时，会和普通 SQLite 读取异常共用同一条“自动导入候选读取失败”日志；现在会单独打印“自动导入候选记录损坏”中文日志与 `[处理建议]`，继续保持本轮自动导入直接停路，不把坏记录混成普通读库失败后继续推进导入审批。
+- 代码：`app/services/post_download_auto_import.py`
+- 验证：`tests/test_get_download_status.py -k "post_download_auto_import_run_once_surfaces_completed_list_corruption or post_download_auto_import_run_once_logs_completed_list_failure or post_download_auto_import_run_once_logs_completed_list_missing_result"`
+
 ### 2026-04-18 下载/导入待确认任务空返回值分流缺口
 
 - 闭环：`add_to_downloader._record_pending_job()` 和 `import_to_library._record_pending_job()` 之前在 `upsert_downloader_job_pending()` / `upsert_import_job_pending()` 直接回 `None` 时，会把这步当成成功继续往下走；现在这类“空返回值”会单独记成“待确认任务结果缺失”中文日志，并直接返回待确认状态写入失败，不再把 `jobs` 真相缺口误判成可 confirm 的待确认任务。

@@ -1232,9 +1232,10 @@ def test_post_download_auto_import_run_once_surfaces_completed_list_corruption(t
 
     assert result == AutoImportRunResult(scanned=0, progressed=0, replies=(), state_unavailable=True)
     output = capsys.readouterr().out
-    assert "[自动导入候选读取失败]" in output
+    assert "[自动导入候选记录损坏]" in output
     assert "limit=5" in output
     assert "download monitor completed row chat identity corrupted after read" in output
+    assert "[处理建议]" in output
 
 
 def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) -> None:
