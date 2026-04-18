@@ -57,10 +57,16 @@
 2. Feishu 私聊事件解析器去重
 3. 独立后台下载完成轮询剩余少量回归与验证收口
 4. `telegram_bot.py` 渠道层瘦身 / 模块化：把 Telegram 收包回包、后台生命周期、BT pending helper 和 shared runtime 包装继续拆开；目标是让渠道层更接近“协议差异 + 调 shared runtime”，但不改 shared runtime、approval、`jobs`、SQLite 真相和现有副作用边界
-5. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
-6. `.ass` 字幕支持评估与最小实现
-7. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-8. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-9. BT 共享确定性评分器
-10. Jellyfin / Plex 支持（后续）
-11. plugin 体系继续后置
+5. `import_to_library.py` 导入编排层瘦身 / 模块化：把导入前上下文重建与 raw_bt 判定、执行模式 / copy-fallback、文件系统导入执行、metadata / subtitle / refresh 收尾继续拆开；目标是不改 approval、`jobs`、`job_event`、导入成功真相和现有副作用边界
+6. `add_to_downloader.py` 下载编排层瘦身 / 模块化：把候选选择 / 来源解析、待确认写入、confirm 执行、下载监控登记和事件落盘继续拆开；目标是不改 search、approval、`jobs`、`download_monitor`、`job_event` 和现有下载副作用边界
+7. `search_media.py` 搜索编排层瘦身 / 模块化：把 query 解析、TMDB / Prowlarr 查询、歧义澄清与候选持久化、回复格式化继续拆开；目标是不改 clarification / candidate 状态协议、shared runtime 入口和 SQLite 真相边界
+8. `manage_bt_subscription.py` 订阅编排层瘦身 / 模块化：把清单增删、扫描候选筛选、`last_seen` 更新和 scheduler tick 收口继续拆开；目标是不改 `bt_subscription_item` 真相、downloader approval 边界和自动扫描停路规则
+9. `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化：把 frustration reset、pending state gate、命令分发和 shared reply 包装继续拆开；目标是不改四渠道共用协议、approval、`jobs` 和 SQLite 真相边界
+10. `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化：把 client 装配、后台任务启停、下载器路由 helper 和启动日志继续拆开；目标是不改启动入口、角色绑定和现有运行时真相
+11. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
+12. `.ass` 字幕支持评估与最小实现
+13. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+14. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+15. BT 共享确定性评分器
+16. Jellyfin / Plex 支持（后续）
+17. plugin 体系继续后置

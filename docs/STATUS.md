@@ -81,7 +81,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 剩余的持久化吞错缺口仍在其它轻状态和边界路径里；下一步继续按 `docs/NEXT_STEP.md` 逐个最小闭环收口。
 - 当前必须继续守住已经落下来的 fail-closed 方向，不能把下载 / 导入 / 搜索 / BT 待答重新放回静默吞错。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- `telegram_bot.py` 已列入后续瘦身任务。
+- `telegram_bot.py`、`import_to_library.py`、`add_to_downloader.py`、`search_media.py`、`manage_bt_subscription.py`、`private_chat_runtime.py`、`app/main.py` 已列入当前主线后的编排层瘦身计划。
 - Feishu 长连接私有 API 风险、`series / anime` 名称解析、`.ass` 字幕支持仍是当前主线之后的工作，不提前并行展开。
 
 ## Latest verification
