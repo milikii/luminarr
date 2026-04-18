@@ -17,7 +17,7 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
-from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 from app.trace_logging import log_trace_event
@@ -872,10 +872,17 @@ class ImportToLibraryService:
         try:
             downloader_job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
         except Exception as error:
-            print(
-                f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
-                flush=True,
-            )
+            if _is_job_row_corrupted_error(error):
+                self._log_raw_bt_lookup_row_corrupted(
+                    chat_id=chat_id,
+                    task_ref=task_ref,
+                    reason=str(error),
+                )
+            else:
+                print(
+                    f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
+                    flush=True,
+                )
             return None
         if downloader_job is None:
             self._log_raw_bt_lookup_result_missing(
@@ -921,6 +928,14 @@ class ImportToLibraryService:
             f"\033[31m[导入 raw_bt 判定结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
             "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务是否仍存在，并确认这条任务真相没有被提前清理；"
             "当前请求会直接返回查询失败，避免把 raw_bt 分类真相缺口误判成普通“不是 raw_bt”。",
+            flush=True,
+        )
+
+    def _log_raw_bt_lookup_row_corrupted(self, *, chat_id: int, task_ref: str, reason: str) -> None:
+        print(
+            f"\033[31m[导入 raw_bt 判定记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
+            "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务的 job_id / chat_id / task_ref / payload_json 等真相字段；"
+            "当前请求会直接返回查询失败，避免把坏任务记录误判成普通查询失败或普通“不是 raw_bt”。",
             flush=True,
         )
 
@@ -2145,6 +2160,10 @@ def _log_import_naming_truth_result_missing(*, task_id: str, task_hash: str, rea
         "当前导入会退回下载源名称做命名，避免把缺失真相误判成“没有 downloader 标题”。",
         flush=True,
     )
+
+
+def _is_job_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobPersistenceError) and str(error).endswith("corrupted after read")
 
 
 def _is_import_target_lookup_row_corrupted_error(error: Exception) -> bool:

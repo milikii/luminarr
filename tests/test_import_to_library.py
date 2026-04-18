@@ -17,7 +17,14 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
-from app.db.job_repo import JOB_STATE_CANCELLED, JOB_STATE_PENDING_APPROVAL, WORKFLOW_IMPORT_TO_LIBRARY, JobRecord, JobRepo
+from app.db.job_repo import (
+    JOB_STATE_CANCELLED,
+    JOB_STATE_PENDING_APPROVAL,
+    WORKFLOW_IMPORT_TO_LIBRARY,
+    JobPersistenceError,
+    JobRecord,
+    JobRepo,
+)
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
     ConfirmExecutionContext,
@@ -327,6 +334,28 @@ def test_is_raw_bt_task_logs_missing_job_result(capsys: pytest.CaptureFixture[st
     assert "chat_id=1001" in output
     assert "task_ref=87" in output
     assert "downloader job missing during raw_bt check" in output
+    assert "[处理建议]" in output
+
+
+def test_is_raw_bt_task_logs_row_corruption(capsys: pytest.CaptureFixture[str]) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(
+                JobPersistenceError("job row identity corrupted after read")
+            )
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
+
+    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is None
+
+    output = capsys.readouterr().out
+    assert "[导入 raw_bt 判定记录损坏]" in output
+    assert "chat_id=1001" in output
+    assert "task_ref=87" in output
+    assert "job row identity corrupted after read" in output
     assert "[处理建议]" in output
 
 

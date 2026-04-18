@@ -52,6 +52,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-18，自动导入低质量资源跳过事件写入也已补齐“记录损坏”分流：`job_event` 跳过事件已写入、但写后回读命中坏行、`task_ref / event_type` 等真相字段损坏时，现在会明确打印“自动导入跳过事件记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态不可用边界停路，不再把坏记录混成普通落盘失败或稳定落盘成功。
 - 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐“空 lease/空结果”分流：`request_downloader_approval()` / `request_import_approval()` 若回 `0`，现在会明确打印“待确认审批结果缺失”中文日志并直接 fail-closed，不再偷偷退回进程内 lease 继续放行可 confirm 状态。
 - 截至 2026-04-18，下载 / 导入待确认任务创建阶段也已补齐“空返回值”分流：`upsert_downloader_job_pending()` / `upsert_import_job_pending()` 若直接回 `None`，现在会明确打印“待确认任务结果缺失”中文日志并直接 fail-closed，不再把 `jobs` 真相缺口混成可 confirm 的待确认任务。
+- 截至 2026-04-18，导入入口的 `raw_bt` 判定也已补齐“记录损坏”分流：`_is_raw_bt_task()` 在 `jobs` 能查到下载任务、但 `job_id / chat_id / task_ref / payload_json` 等真相字段损坏时，现在会明确打印“导入 raw_bt 判定记录损坏”中文日志与 `[处理建议]`，并继续让导入入口直接返回查询失败，不再把坏任务记录混成普通查询失败或普通“不是 raw_bt”。
 - 截至 2026-04-18，Telegram message / callback 去重落盘也已补齐“结果缺失”分流：`record_message_update()` / `record_callback_update()` 若异常回 `None`，现在会明确打印“Telegram 更新去重结果缺失”中文日志与 `[处理建议]`，并继续让对应入口停路，不再把去重真相缺口混成普通重复 update。
 - 截至 2026-04-18，下载完成后台轮询读取 `download_monitor` 待轮询列表时，也已补齐“结果缺失 / 记录损坏”分流：待轮询列表查询若直接回 `None`，或命中的待轮询记录里 `task_id / task_hash / chat_id` 等真相字段损坏时，现在会分别明确打印“下载完成待轮询列表结果缺失”或“下载完成待轮询列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮后台轮询停路，不再把这类缺口混成普通读库失败或“当前没有待轮询任务”。
 - 截至 2026-04-17，下载 / 导入确认链的 `jobs` 完结阶段也已补齐“结果缺失”分流：`mark_downloader_completed()` / `mark_completed()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并在成功回复后继续追加原有 finalization warning，不再把“完结结果缺失”误判成全链已落盘成功。
@@ -95,6 +96,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-17，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- 当前主线 focused verification：2026-04-18，`8 passed, 123 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "raw_bt"`）
 - 当前主线 focused verification：2026-04-18，`6 passed, 147 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "dedup_result_missing or dedup_persist_fails or update_id_invalid or callback_id_missing"`）
 - 当前主线 focused verification：2026-04-18，`3 passed, 148 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list"`）
 - 当前主线 focused verification：详见 `docs/PERSISTENCE_CLOSURE_LOG.md`
