@@ -112,18 +112,19 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：`telegram_bot.py` 渠道层瘦身 / 模块化（把 Telegram 收包回包、后台生命周期、BT pending helper 和 shared runtime 包装按连贯切片继续拆开，但不改 shared runtime、approval、`jobs` 和 SQLite 真相）。
+- **当前唯一主线**：`import_to_library.py` 导入编排层瘦身 / 模块化（把导入前上下文重建 / raw_bt 判定、执行模式 / copy-fallback、文件系统导入执行、metadata / subtitle / refresh 收尾按连贯切片继续拆开，但不改 approval、`jobs`、`job_event`、导入成功真相和现有副作用边界）。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线详细台账**：`docs/TELEGRAM_BOT_SLIMMING_LOG.md`
-- **上一条主线台账**：`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（下载完成轮询主线已在 2026-04-18 达到退出条件 1）
+- **当前主线详细台账**：`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`
+- **上一条主线台账**：`docs/TELEGRAM_BOT_SLIMMING_LOG.md`（Telegram 渠道层瘦身主线已在 2026-04-19 达到退出条件 1）
+- **更早主线台账**：`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（下载完成轮询主线已在 2026-04-18 达到退出条件 1）
 - **更早主线台账**：`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（Feishu 私聊事件解析器去重已在 2026-04-18 达到退出条件 3）
 - **更早主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
 - **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前主线 focused tests 入口收口在 `docs/TELEGRAM_BOT_SLIMMING_LOG.md` 的 2.1–2.2 分组；cleanup 相关回归入口继续见 `docs/GETTING_STARTED.md`。
-- 这一步只允许收 `telegram_bot.py` 的一个连贯切片，不做通用多渠道平台化、通用 scheduler 平台化，也不新增自动 cleanup、批量 cleanup 或删种。
-- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（`import_to_library.py` 瘦身 → 其他编排层瘦身 → `series / anime` 名称解析 → 等等）。
+- **本地回归命令**：当前主线 focused tests 入口收口在 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md` 的 2.1–2.2 分组；cleanup 相关回归入口继续见 `docs/GETTING_STARTED.md`。
+- 这一步只允许收 `import_to_library.py` 的一个连贯切片，不做通用工作流平台化、自动 copy、自动 cleanup、批量 cleanup 或删种。
+- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（`add_to_downloader.py` 瘦身 → 其他编排层瘦身 → `series / anime` 名称解析 → 等等）。
 
 ## 6. 当前明确不做
 
@@ -173,8 +174,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/TELEGRAM_BOT_SLIMMING_LOG.md`：当前主线详细闭环
-- `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`：上一条主线详细闭环
+- `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`：当前主线详细闭环
+- `docs/TELEGRAM_BOT_SLIMMING_LOG.md`：上一条主线详细闭环
+- `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`：更早主线详细闭环
 - `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`：更早主线详细闭环
 - `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`：更早主线详细闭环
 - `docs/PERSISTENCE_CLOSURE_LOG.md`：更早完成主线详细闭环

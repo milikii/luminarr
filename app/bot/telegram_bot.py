@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal, TypeVar
 
 from telegram import Update
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import Application, ContextTypes
 
 from app.bot.feishu_webhook_server import (
     FeishuWebhookServerConfig,
@@ -304,65 +304,15 @@ class ResolvedDownloaderExecution:
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.private_chat_runtime import dispatch_private_chat_text
+    from app.bot.telegram_runtime_adapter import handle_telegram_message
 
-    message = update.effective_message
-    if message is None:
-        return
-
-    chat_id = _resolve_chat_id(update)
-    user_id = _resolve_user_id(update)
-    if not _record_message_update(update=update, context=context):
-        return
-
-    await dispatch_private_chat_text(
-        query=(message.text or "").strip(),
-        reply_func=_build_telegram_reply_func(message.reply_text),
-        chat_id=chat_id,
-        user_id=user_id,
-        channel="telegram",
-        bot_data=context.application.bot_data,
-    )
+    await handle_telegram_message(update, context)
 
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.private_chat_runtime import dispatch_private_chat_text
+    from app.bot.telegram_runtime_adapter import handle_telegram_callback_query
 
-    callback_query = getattr(update, "callback_query", None)
-    if callback_query is None:
-        return
-
-    chat_id = _resolve_chat_id(update, callback_query=callback_query)
-    user_id = _resolve_user_id(update, callback_query=callback_query)
-    callback_query_id = str(getattr(callback_query, "id", "") or "").strip()
-    if not _record_callback_update(
-        callback_query_id=callback_query_id,
-        chat_id=chat_id,
-        user_id=user_id,
-        context=context,
-    ):
-        return
-
-    answer_func = getattr(callback_query, "answer", None)
-    if callable(answer_func):
-        await answer_func()
-
-    message = _resolve_callback_message(update, callback_query)
-    if message is None:
-        return
-
-    query = str(getattr(callback_query, "data", "") or "").strip()
-    if not query:
-        return
-
-    await dispatch_private_chat_text(
-        query=query,
-        reply_func=_build_telegram_reply_func(message.reply_text),
-        chat_id=chat_id,
-        user_id=user_id,
-        channel="telegram",
-        bot_data=context.application.bot_data,
-    )
+    await handle_telegram_callback_query(update, context)
 
 
 def build_application(
@@ -386,44 +336,29 @@ def build_application(
     downloader_role_binding: DownloaderRoleBinding | None = None,
     outbound_proxy_url: str = "",
 ) -> Application:
-    builder = (
-        Application.builder()
-        .token(token)
-        .post_init(_start_bt_subscription_scheduler)
-        .post_shutdown(_stop_bt_subscription_scheduler)
+    from app.bot.telegram_runtime_adapter import build_telegram_application
+
+    return build_telegram_application(
+        token=token,
+        search_service=search_service,
+        add_to_downloader_service=add_to_downloader_service,
+        get_download_status_service=get_download_status_service,
+        import_to_library_service=import_to_library_service,
+        cleanup_downloaded_source_service=cleanup_downloaded_source_service,
+        manage_watchlist_service=manage_watchlist_service,
+        manage_bt_subscription_service=manage_bt_subscription_service,
+        post_download_auto_import_service=post_download_auto_import_service,
+        telegram_update_repo=telegram_update_repo,
+        job_repo=job_repo,
+        execution_gate=execution_gate,
+        bt_pending_repo=bt_pending_repo,
+        bt_tmdb_movie_candidates_lookup_func=bt_tmdb_movie_candidates_lookup_func,
+        bt_tmdb_tv_candidates_lookup_func=bt_tmdb_tv_candidates_lookup_func,
+        raw_bt_destination_options=raw_bt_destination_options,
+        downloader_instances=downloader_instances,
+        downloader_role_binding=downloader_role_binding,
+        outbound_proxy_url=outbound_proxy_url,
     )
-    cleaned_proxy_url = outbound_proxy_url.strip()
-    if cleaned_proxy_url:
-        builder = builder.proxy(cleaned_proxy_url).get_updates_proxy(cleaned_proxy_url)
-    application = builder.build()
-    application.bot_data[SEARCH_SERVICE_KEY] = search_service
-    application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
-    application.bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
-    application.bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
-    if post_download_auto_import_service is not None:
-        application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY] = post_download_auto_import_service
-    application.bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_downloaded_source_service
-    application.bot_data[MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
-    application.bot_data[MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] = manage_bt_subscription_service
-    application.bot_data[EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
-    application.bot_data[DOWNLOADER_INSTANCES_KEY] = downloader_instances
-    application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
-    application.bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
-    application.bot_data[TELEGRAM_SEND_TEXT_FUNC_KEY] = build_telegram_send_text_func(application)
-    if bt_tmdb_movie_candidates_lookup_func is not None:
-        application.bot_data[BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
-    if bt_tmdb_tv_candidates_lookup_func is not None:
-        application.bot_data[BT_TMDB_TV_CANDIDATES_LOOKUP_KEY] = bt_tmdb_tv_candidates_lookup_func
-    application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY] = raw_bt_destination_options
-    if bt_pending_repo is not None:
-        application.bot_data[BT_PENDING_REPO_KEY] = bt_pending_repo
-    if telegram_update_repo is not None:
-        application.bot_data[TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
-    if job_repo is not None:
-        application.bot_data[JOB_REPO_KEY] = job_repo
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(handle_callback_query))
-    return application
 
 
 def build_telegram_send_media_func(application: Application) -> TelegramSendMediaFunc:
