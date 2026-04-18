@@ -187,6 +187,56 @@ docker compose logs -f luminarr
 - Docker Compose 会强制把 `SQLITE_DB_PATH` 覆盖成 `/app/state/luminarr.db`，并落到宿主机 `./data`
 - `SHARED_MEDIA_ROOT` 默认映射为宿主机 `/data` 到容器内 `/data`，用来保持 downloader / library 路径语义一致
 
+**外部依赖：必须你自己先把这些备齐**
+
+这个项目是自用部署，主 `docker-compose.yml` 只启 Luminarr 本体；Transmission / qBittorrent、Emby、Prowlarr 这三项**不**内置，请你自己在宿主机或其他机器上先跑起来。以下是部署前必须准备好的外部资源：
+
+- **Transmission 或 qBittorrent**：至少一个能正常接受 RPC 投递的实例。如果用 Transmission，记下它的 RPC 地址（如 `http://宿主机 IP:19091`）和用户名密码（如果开了鉴权）。
+- **Prowlarr**：当前 PT 主来源，需要一个能正常返回搜索结果的实例，以及一把可读取的 API Key。
+- **Emby**：入库刷新目标，需要 `EMBY_BASE_URL` 和 `EMBY_API_KEY`。
+- **TMDB API Key**：不填会关闭 metadata 增强，但不阻塞启动。
+- **Fanart.tv API Key**：不填会关闭 fanart 抓取，不阻塞启动。
+- **Telegram Bot Token**：当前是启动硬必填。Telegram 私聊入口无论你用不用都必须先有 token。
+- **可选：OpenAI / 字幕翻译 Key**：仅影响 `.srt` 字幕自动翻译。
+- **可选：Feishu / WeCom webhook 三元组**：只有你真的要用这两个渠道才填；当前都是"要么都空、要么都填"。
+
+如果这台机器不能直连公网（Telegram / TMDB / Fanart / BT 外站），再加一条 `OUTBOUND_PROXY_URL=http://192.168.2.110:7890` 走宿主机或旁路由代理；Transmission / Emby / Prowlarr 这类本地地址仍然直连，不吃代理。
+
+**容器网络：`127.0.0.1` 坑点**
+
+如果你的 Transmission / Emby / Prowlarr 在**宿主机上直接跑**（不是在同一个 compose 里），`.env` 里**不要**继续写 `http://127.0.0.1:19091`。容器里的 `127.0.0.1` 指容器自身，不是宿主机。两种可选方案：
+
+- **推荐**：用宿主机在局域网里的 IP，例如 `http://192.168.2.110:19091`。这个 IP 在 WSL2、纯 Linux Docker、Docker Desktop 环境下都能直接工作，而且和 `OUTBOUND_PROXY_URL` 的一贯写法一致。
+- 也可以在 `docker-compose.yml` 的 `luminarr` service 下补一行 `extra_hosts: ["host.docker.internal:host-gateway"]`，然后 `.env` 里把地址改成 `http://host.docker.internal:19091`；Docker Desktop 下这条主机名默认已可用，纯 Linux Docker 则必须补 `host-gateway` 映射才生效。
+
+如果你把依赖服务和 Luminarr 放进**同一个 compose** 里（本项目当前不推荐，见 `docs/DECISIONS.md` D-019），那就用 service 名而不是 IP：例如 `http://transmission:9091`。
+
+Feishu / WeCom webhook 的入站端口（默认 `18095` / `18097`）已经在 compose 里映射出来；想让外部能回调，还要自己在路由器 / 反代上开好这两个端口的公网入口。
+
+**硬链接 / `SHARED_MEDIA_ROOT` 具体是什么意思**
+
+媒体入库当前默认走**硬链接**（跨文件系统会进显式 `copy-fallback pending`，走人工确认）。硬链接要求"同一个文件系统上的同一个目录视图"，所以：
+
+- 下载器容器（Transmission）看到的下载目录、Luminarr 容器看到的下载目录，**必须映射到宿主机的同一个物理路径**。
+- 例如宿主机用 `/data/downloads` 存下载、`/data/library` 存媒体库，两者都在同一块盘上：
+  - Transmission 容器里 `/downloads/complete` → 宿主机 `/data/downloads/tr`
+  - Luminarr 容器里 `/data` → 宿主机 `/data`（当前 compose 默认已这么做）
+  - Emby 容器里 `/data/library` → 宿主机 `/data/library`
+- 这样 Luminarr 在容器里看到的 `/data/downloads/tr/xxx.mkv` 和宿主机上是同一个 inode，硬链接到 `/data/library/movies/xxx.mkv` 才能成功。
+
+如果你把下载盘和入库盘放在**两块物理盘**上，硬链接会失败，系统会改走 copy-fallback 待确认——这是有意的 fail-closed，不是 bug。
+
+**两个 compose 文件的职责不要搞混**
+
+- `docker-compose.yml`：**部署本体**，只启 Luminarr。你想"让项目跑起来给自己用"就用这个。
+- `docker-compose.test.yml`：**本地联调测试栈**，启 Transmission + BT Transmission + Emby 三个容器，仅用于 `docs/TEST_ENV.md` 的真实 import / refresh 验证。**不要拿来做正式部署**——它的端口、配置路径、卷映射都是测试约定，不是给长期运行用的。
+
+**personal WeChat 在容器里的限制**
+
+- personal WeChat 依赖 `wechat-clawbot`，首次启动需要扫码登录。当前 `docker-compose.yml` 没有为 personal WeChat 单独处理 QR 交互。
+- 如果你要在容器部署 personal WeChat，建议先在**本地 Python**（`make run` / `set -a && . ./.env && set +a && .venv/bin/python -m app.main`）里完成一次扫码登录，让 `wechat-clawbot` 的登录态文件落到磁盘；然后在 `docker-compose.yml` 里**把登录态目录也挂进容器**（当前默认没有这条挂载，需要你自己补）。
+- 容器重启时 `context_token` 可能已失效，personal WeChat 主动推送会降级到 Telegram（这个降级路径由代码自己处理）。
+
 ## 6. 第一条人工验证怎么做
 
 ### Telegram 最小 smoke
@@ -283,6 +333,17 @@ make run
 
 因为当前 cleanup / import / refresh 路径默认围绕 `/data/...` 组织。
 如果容器内看不到和下载器、媒体库同一套共享路径，hardlink / import / cleanup 语义会变掉。
+
+### 容器起来了但 Luminarr 说连不上 Transmission / Emby / Prowlarr
+
+大概率是 `.env` 里还写的 `http://127.0.0.1:<port>`。容器里 `127.0.0.1` 指容器自身，不是宿主机。把这几个 URL 的 host 改成宿主机在局域网里的 IP（例如 `http://192.168.2.110:19091`）即可。更多细节见 §5 方案 B 里的 **容器网络：`127.0.0.1` 坑点** 段。
+
+### 硬链接失败 / 一直进 copy-fallback 待确认
+
+检查：
+- Luminarr 容器看到的下载目录和 Transmission 容器看到的下载目录，是不是**宿主机的同一个物理路径**？
+- 下载盘和入库盘是不是**同一个文件系统**？
+- 两者有任何一条不满足，硬链接都会失败，系统会 fail-closed 走 copy-fallback 待确认——这是设计行为，不是 bug。具体映射约定见 §5 方案 B 的 **硬链接 / `SHARED_MEDIA_ROOT` 具体是什么意思** 段。
 
 ### 为什么 personal WeChat 没有 `.env` 配置项
 
