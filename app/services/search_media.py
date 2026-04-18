@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
-
-SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
-LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
+from app.services.search_request_context import (
+    LookupMovieFunc,
+    ParsedMovieQuery,
+    SearchFunc,
+    build_search_request_context,
+    normalize_spaces,
+    parse_movie_query,
+)
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
@@ -47,13 +52,6 @@ class Candidate:
     quality: str
     size: str
     indexer: str
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedMovieQuery:
-    title: str
-    year: str
-
 
 @dataclass(frozen=True, slots=True)
 class AmbiguousOption:
@@ -106,7 +104,7 @@ class SearchMediaService:
             raise
 
     async def search_bt_read_only_and_format(self, query: str) -> str:
-        cleaned_query = _normalize_spaces(query)
+        cleaned_query = normalize_spaces(query)
         if not cleaned_query:
             return BT_READ_ONLY_EMPTY_QUERY_TEXT
 
@@ -119,45 +117,14 @@ class SearchMediaService:
         if not cleaned_query:
             return EMPTY_QUERY_TEXT
 
-        parsed_query = parse_movie_query(cleaned_query)
-        fallback_query = _build_query(parsed_query.title, parsed_query.year)
-        raw_results: Sequence[Mapping[str, Any]] = ()
-        tmdb_movie: TmdbMovie | None = None
-
-        if self._lookup_movie_func is not None:
-            try:
-                tmdb_movie = await self._lookup_movie_func(parsed_query.title, parsed_query.year)
-            except Exception as error:
-                print(
-                    f"\033[31m[TMDB 查询失败]\033[0m query={cleaned_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}\n\033[33m[处理建议]\033[0m 检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但海报卡片和标题归一化结果可能缺失。",
-                    flush=True,
-                )
-                tmdb_movie = None
-            if tmdb_movie is not None:
-                resolved_year = tmdb_movie.year or parsed_query.year
-                ordered_queries = _unique_queries(
-                    [
-                        _build_query(tmdb_movie.title, resolved_year),
-                        _build_query(tmdb_movie.original_title, resolved_year),
-                    ]
-                )
-                raw_results = await _search_candidates_with_logging(
-                    search_func=self._search_func,
-                    ordered_queries=ordered_queries,
-                    user_query=cleaned_query,
-                )
-            else:
-                raw_results = await _search_candidates_with_logging(
-                    search_func=self._search_func,
-                    ordered_queries=(fallback_query,),
-                    user_query=cleaned_query,
-                )
-        else:
-            raw_results = await _search_candidates_with_logging(
-                search_func=self._search_func,
-                ordered_queries=(fallback_query,),
-                user_query=cleaned_query,
-            )
+        request_context = await build_search_request_context(
+            user_query=cleaned_query,
+            search_func=self._search_func,
+            lookup_movie_func=self._lookup_movie_func,
+        )
+        parsed_query = request_context.parsed_query
+        tmdb_movie = request_context.tmdb_movie
+        raw_results = request_context.raw_results
 
         ambiguous_text = _format_ambiguous_clarification(
             query=cleaned_query,
@@ -449,32 +416,6 @@ class SearchMediaService:
             )
             return CandidateLoadResult(load_failed=True)
 
-
-def parse_movie_query(query: str) -> ParsedMovieQuery:
-    cleaned_query = _normalize_spaces(query)
-    if not cleaned_query:
-        return ParsedMovieQuery(title="", year="")
-
-    matched_parentheses = re.match(
-        r"^(?P<title>.+?)\s*[\(（](?P<year>(?:19|20)\d{2})[\)）]\s*$",
-        cleaned_query,
-    )
-    if matched_parentheses is not None:
-        title = _normalize_spaces(matched_parentheses.group("title"))
-        year = matched_parentheses.group("year")
-        if title:
-            return ParsedMovieQuery(title=title, year=year)
-
-    matched_suffix = re.match(r"^(?P<title>.+?)\s+(?P<year>(?:19|20)\d{2})\s*$", cleaned_query)
-    if matched_suffix is not None:
-        title = _normalize_spaces(matched_suffix.group("title"))
-        year = matched_suffix.group("year")
-        if title:
-            return ParsedMovieQuery(title=title, year=year)
-
-    return ParsedMovieQuery(title=cleaned_query, year="")
-
-
 def normalize_candidate(item: Mapping[str, Any]) -> Candidate:
     title = _safe_text(item.get("title"), default="(no title)")
     year = _safe_year(item.get("year"))
@@ -536,8 +477,8 @@ def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMov
     card_alias = "-"
 
     if tmdb_movie is not None:
-        original_title = _normalize_spaces(tmdb_movie.original_title)
-        english_title = _normalize_spaces(tmdb_movie.title)
+        original_title = normalize_spaces(tmdb_movie.original_title)
+        english_title = normalize_spaces(tmdb_movie.title)
         if original_title:
             card_title = original_title
         elif english_title:
@@ -678,61 +619,12 @@ def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in item.items()}
 
 
-def _normalize_spaces(value: str) -> str:
-    return re.sub(r"\s+", " ", value.strip())
-
-
 def _truncate_text(value: str, *, limit: int) -> str:
     if len(value) <= limit:
         return value
     if limit <= 3:
         return value[:limit]
     return f"{value[: limit - 3]}..."
-
-
-def _build_query(title: str, year: str) -> str:
-    cleaned_title = _normalize_spaces(title)
-    cleaned_year = year.strip()
-    if not cleaned_year:
-        return cleaned_title
-    return f"{cleaned_title} {cleaned_year}"
-
-
-async def _search_first_non_empty(search_func: SearchFunc, ordered_queries: Sequence[str]) -> Sequence[Mapping[str, Any]]:
-    for query in ordered_queries:
-        raw_results = await search_func(query)
-        if raw_results:
-            return raw_results
-    return ()
-
-
-async def _search_candidates_with_logging(
-    *,
-    search_func: SearchFunc,
-    ordered_queries: Sequence[str],
-    user_query: str,
-) -> Sequence[Mapping[str, Any]]:
-    try:
-        return await _search_first_non_empty(search_func, ordered_queries)
-    except Exception as error:
-        query_display = " | ".join(query for query in ordered_queries if query.strip()) or user_query
-        print(
-            f"\033[31m[搜索源查询失败]\033[0m query={user_query} ordered_queries={query_display} 错误={error}\n\033[33m[处理建议]\033[0m 检查 Prowlarr/BT 来源、代理和网络连通性；当前搜索未拿到结果，且这不是正常的“无候选”状态。",
-            flush=True,
-        )
-        raise
-
-
-def _unique_queries(candidates: Sequence[str]) -> list[str]:
-    ordered_queries: list[str] = []
-    for query in candidates:
-        cleaned_query = query.strip()
-        if not cleaned_query:
-            continue
-        if cleaned_query in ordered_queries:
-            continue
-        ordered_queries.append(cleaned_query)
-    return ordered_queries
 
 
 def _format_ambiguous_clarification(

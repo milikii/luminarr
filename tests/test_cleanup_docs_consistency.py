@@ -29,6 +29,9 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    manage_bt_subscription_slimming_log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(
+        encoding="utf-8"
+    )
     search_media_slimming_log_text = Path("docs/SEARCH_MEDIA_SLIMMING_LOG.md").read_text(encoding="utf-8")
     add_to_downloader_slimming_log_text = Path("docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md").read_text(encoding="utf-8")
     import_to_library_slimming_log_text = Path("docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md").read_text(encoding="utf-8")
@@ -44,6 +47,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/STATUS.md" in readme_text
+    assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in readme_text
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in readme_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in readme_text
     assert "docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md" in readme_text
@@ -55,6 +59,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
 
     assert "docs/STATUS.md" in index_text
+    assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in index_text
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in index_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in index_text
     assert "docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md" in index_text
@@ -79,8 +84,9 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/DECISIONS.md" in agents_text
     assert "docs/STATUS.md" in agents_text
 
-    assert "search_media.py" in next_step_text and "搜索编排层瘦身 / 模块化" in next_step_text
-    assert "search_media.py" in status_text and "搜索编排层瘦身 / 模块化" in status_text
+    assert "manage_bt_subscription.py" in next_step_text and "订阅编排层瘦身 / 模块化" in next_step_text
+    assert "manage_bt_subscription.py" in status_text and "订阅编排层瘦身 / 模块化" in status_text
+    assert "manage_bt_subscription.py" in manage_bt_subscription_slimming_log_text and "订阅编排层瘦身 / 模块化" in manage_bt_subscription_slimming_log_text
     assert "search_media.py" in search_media_slimming_log_text and "搜索编排层瘦身 / 模块化" in search_media_slimming_log_text
     assert "add_to_downloader.py" in add_to_downloader_slimming_log_text and "下载编排层瘦身 / 模块化" in add_to_downloader_slimming_log_text
     assert "import_to_library.py" in import_to_library_slimming_log_text and "导入编排层瘦身 / 模块化" in import_to_library_slimming_log_text
@@ -102,6 +108,7 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     assert "## What is implemented now" in status_text
     assert "## Main risks and gaps" in status_text
     assert "## Latest verification" in status_text
+    assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in status_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in status_text
     assert "docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md" in status_text
     assert "docs/TELEGRAM_BOT_SLIMMING_LOG.md" in status_text
@@ -159,7 +166,7 @@ def test_download_completion_polling_log_keeps_completed_line_detail() -> None:
 def test_search_media_slimming_log_keeps_current_line_detail() -> None:
     log_text = Path("docs/SEARCH_MEDIA_SLIMMING_LOG.md").read_text(encoding="utf-8")
 
-    assert "## 1. Current line" in log_text
+    assert "## 1. Completed line" in log_text
     assert "## 2. Risk groups" in log_text
     assert "## 3. Focused verification" in log_text
     assert "## 4. Maintenance rule" in log_text
@@ -168,6 +175,20 @@ def test_search_media_slimming_log_keeps_current_line_detail() -> None:
     assert "歧义澄清 / 候选持久化 / 回复格式化" in log_text
     assert 'tests/test_search_media.py -k "parse_movie_query or tmdb or search_and_format_with_results or search_backend_failure"' in log_text
     assert 'tests/test_search_media.py -k "clarification or candidate or quality_from_title"' in log_text
+
+
+def test_manage_bt_subscription_slimming_log_keeps_current_line_detail() -> None:
+    log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(encoding="utf-8")
+
+    assert "## 1. Current line" in log_text
+    assert "## 2. Risk groups" in log_text
+    assert "## 3. Focused verification" in log_text
+    assert "## 4. Maintenance rule" in log_text
+
+    assert "清单增删 / 标题解析 / 回复文本" in log_text
+    assert "扫描候选筛选 / `last_seen` 更新 / scheduler tick" in log_text
+    assert 'tests/test_manage_bt_subscription.py -k "parse_bt_subscription_query or add or list or remove or clear"' in log_text
+    assert 'tests/test_manage_bt_subscription.py -k "run_once or scheduler_tick or last_seen"' in log_text
 
 
 def test_add_to_downloader_slimming_log_keeps_completed_line_detail() -> None:

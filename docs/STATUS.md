@@ -24,8 +24,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/SEARCH_MEDIA_SLIMMING_LOG.md`：当前“`search_media.py` 搜索编排层瘦身 / 模块化”详细台账
-- `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`：已完成的“`add_to_downloader.py` 下载编排层瘦身 / 模块化”详细台账
+- `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`：当前“`manage_bt_subscription.py` 订阅编排层瘦身 / 模块化”详细台账
+- `docs/SEARCH_MEDIA_SLIMMING_LOG.md`：已完成的“`search_media.py` 搜索编排层瘦身 / 模块化”详细台账
+- `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`：更早完成的“`add_to_downloader.py` 下载编排层瘦身 / 模块化”详细台账
 - `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`：更早完成的“`import_to_library.py` 导入编排层瘦身 / 模块化”详细台账
 - `docs/TELEGRAM_BOT_SLIMMING_LOG.md`：更早完成的“`telegram_bot.py` 渠道层瘦身 / 模块化”详细台账
 - `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`：更早完成的“独立后台下载完成轮询剩余少量回归与验证收口”详细台账
@@ -36,9 +37,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-当前快照按主题归纳；当前主线具体路径、focused tests 和风险分组统一只看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`，上一条主线详细闭环继续只看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，更早主线继续只看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 和 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
+当前快照按主题归纳；当前主线具体路径、focused tests 和风险分组统一只看 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`，上一条主线详细闭环继续只看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`，更早主线继续只看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 和 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
 
-- 当前唯一主线已切到“`search_media.py` 搜索编排层瘦身 / 模块化”；`add_to_downloader.py` 下载编排层瘦身主线已在 2026-04-19 通过 `app/services/add_pending_context.py` helper 抽离 + focused tests 满足 `Done when` 第 1 条，`import_to_library.py` 导入编排层瘦身、`telegram_bot.py` 渠道层瘦身、独立后台下载完成轮询、Feishu 私聊事件解析器去重、Feishu 长连接私有 API 风险收口、持久化吞错收口、cleanup 四渠道验证窗口与 shared private-chat runtime 最小抽离保持完成态。
+- 当前唯一主线已切到“`manage_bt_subscription.py` 订阅编排层瘦身 / 模块化”；上一条 `search_media.py` 搜索编排层瘦身主线已在 2026-04-19 通过 `app/services/search_request_context.py` helper 抽离 + focused tests 满足 `Done when` 第 1 条，`add_to_downloader.py` 下载编排层瘦身、`import_to_library.py` 导入编排层瘦身、`telegram_bot.py` 渠道层瘦身、独立后台下载完成轮询、Feishu 私聊事件解析器去重、Feishu 长连接私有 API 风险收口、持久化吞错收口、cleanup 四渠道验证窗口与 shared private-chat runtime 最小抽离保持完成态。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - 持久化吞错主线已经把下载 / 导入 confirm、事件落盘、下载监控 / 状态观察、轻状态路径和 confirm 上下文重建收口成显式中文日志 + `[处理建议]`，详细闭环继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
@@ -46,23 +47,23 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - Feishu 私聊事件解析器去重已完成；webhook 入口 `handle_feishu_private_text_event()` 与长连接入口 `_handle_sdk_event()` 继续都落到 `FeishuPrivateTextEvent -> route_feishu_private_text_event()` 共享边界，详细闭环改看 `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`。
 - 独立后台下载完成轮询已完成：真实 Transmission / Emby 联调下，一条现成完成任务已被验证能从待轮询列表推进到 `downloader.completed_observed + auto_import boundary`，详细闭环改看 `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`。
 - 上一条 Telegram 主线已把收包回包 / shared runtime wrapper 抽到 `app/bot/telegram_runtime_adapter.py`，`telegram_bot.py` 保留兼容导出入口；详细闭环改看 `docs/TELEGRAM_BOT_SLIMMING_LOG.md`。
-- 当前新主线只收 `search_media.py` 里的一个连贯切片，优先处理 query 解析 / TMDB 与搜索请求编排，或歧义澄清 / 候选持久化 / 回复格式化中的一组，不改 clarification、candidate、shared runtime 和 SQLite 真相边界；详细闭环改看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`。
+- 当前新主线只收 `manage_bt_subscription.py` 里的一个连贯切片，优先处理清单增删 / 标题解析 / 回复文本，或扫描候选筛选 / `last_seen` 更新 / scheduler tick 中的一组，不改 `bt_subscription_item` 真相、downloader approval 边界和自动扫描停路规则；详细闭环改看 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
 
-- 当前主风险是 `app/services/search_media.py` 仍把 query 解析、TMDB 查询、搜索源请求编排、歧义澄清、候选持久化和回复格式化揉在同一文件里；下一步只能拆一个连贯切片，不能顺手大改。
-- 当前必须继续守住已经落下来的 fail-closed 方向，不能在做 `search_media.py` 瘦身时回退 clarification、candidate、shared runtime 和 SQLite 真相边界。
+- 当前主风险是 `app/services/manage_bt_subscription.py` 仍把清单增删、标题解析、扫描候选筛选、`last_seen` 更新和 scheduler tick 揉在同一文件里；下一步只能拆一个连贯切片，不能顺手大改。
+- 当前必须继续守住已经落下来的 fail-closed 方向，不能在做 `manage_bt_subscription.py` 瘦身时回退 `bt_subscription_item`、downloader approval、shared runtime 和 SQLite 真相边界。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- `search_media.py`、`manage_bt_subscription.py`、`cleanup_downloaded_source.py`、`private_chat_runtime.py`、`app/main.py` 已列入当前主线后的编排层瘦身计划。
+- `manage_bt_subscription.py`、`cleanup_downloaded_source.py`、`private_chat_runtime.py`、`app/main.py` 已列入当前主线后的编排层瘦身计划。
 - `series / anime` 名称解析、`.ass` 字幕支持仍是更后面的工作，不提前并行展开。
 
 ## Latest verification
 
-- 窗口活性快照：已满足退出条件
+- 窗口活性快照：已切换到新主线
 - 当前状态快照：进行中
-- 当前结论快照：`add_to_downloader.py` 下载编排层瘦身主线已在 2026-04-19 通过 `app/services/add_pending_context.py` helper 抽离 + focused tests 满足退出条件 1；当前主线已切到 `search_media.py` 搜索编排层瘦身 / 模块化。
+- 当前结论快照：`search_media.py` 搜索编排层瘦身主线已在 2026-04-19 通过 `app/services/search_request_context.py` helper 抽离 + focused tests 满足退出条件 1；当前主线已切到 `manage_bt_subscription.py` 订阅编排层瘦身 / 模块化。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-14，`38 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
@@ -71,20 +72,23 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - focused config truth tests：`4 passed, 21 deselected`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
-- docs consistency check：2026-04-19，`8 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- docs consistency check：2026-04-19，`9 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - 上一条主线 focused verification：2026-04-18，`12 passed, 141 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list or download_completion_polling or post_download_auto_import_scheduler"`）
 - 上一条主线真实联调验证：2026-04-18，`passed`（复用 Transmission task_id=`1` task_hash=`e93d696a3e980458765f8016ce39f61437cc9543`；验证其从待轮询列表推进到 `downloader.completed_observed + auto_import boundary`；Emby=`9f4635e04057`）
 - 更早主线切换审计：2026-04-18，`15 passed, 34 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_feishu_long_connection.py -k "handle_feishu_private_text_event or routes_sdk_event"`）
 - 更早主线切换审计：2026-04-18，`passed`（`.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py`；`rg -n "lark_ws_client_module\\.loop|_disconnect|_auto_reconnect|_cache" app/bot/feishu_long_connection.py` 命中 `0`）
 - 更早主线切换审计：2026-04-18，`passed`（`bash -lc "git grep -n 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot | wc -l"`，命中 `0`）
 - 上一条主线 focused verification：2026-04-19，`27 passed, 112 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt or copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`）
-- 当前主线 baseline verification：2026-04-19，`20 passed, 19 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or candidate"`）
+- 当前主线 baseline verification：2026-04-19，`35 passed`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`）
+- 上一条主线 focused verification：2026-04-19，`12 passed, 27 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "parse_movie_query or tmdb or search_and_format_with_results or search_backend_failure"`）
+- 上一条主线 focused verification：2026-04-19，`21 passed, 18 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or candidate or quality_from_title"`）
 - 上一条主线 focused verification：2026-04-19，`21 passed, 88 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "add_by_selection or add_candidate_source or record_pending_approval or record_pending_job"`）
 - 上一条主线 focused verification：2026-04-19，`13 passed, 140 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "handle_callback_query or build_application"`）
 - 更早主线 focused verification：2026-04-18，`6 passed, 147 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "dedup_result_missing or dedup_persist_fails or update_id_invalid or callback_id_missing"`）
 - 更早主线 focused verification：2026-04-18，`3 passed, 148 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list"`）
-- 当前主线详细台账：`docs/SEARCH_MEDIA_SLIMMING_LOG.md`
-- 上一条主线详细台账：`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`
+- 当前主线详细台账：`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`
+- 上一条主线详细台账：`docs/SEARCH_MEDIA_SLIMMING_LOG.md`
+- 更早主线详细台账：`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`
 - 更早主线详细台账：`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`
 - 更早主线详细台账：`docs/TELEGRAM_BOT_SLIMMING_LOG.md`
 - 更早主线详细台账：`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`
