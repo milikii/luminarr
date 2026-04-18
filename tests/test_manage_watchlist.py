@@ -306,6 +306,24 @@ def test_manage_watchlist_clear_returns_failure_text_when_repo_returns_none(tmp_
     assert "watchlist clear result missing" in captured.out
 
 
+def test_manage_watchlist_clear_surfaces_row_corruption(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _corrupted_clear_items(**_: object) -> None:
+        raise RuntimeError("watchlist_item media kind corrupted after read")
+
+    repo.clear_items = _corrupted_clear_items  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist clear"), chat_id=1001)
+
+    assert reply == WATCHLIST_CLEAR_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看清单清空命中坏记录]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist_item media kind corrupted after read" in captured.out
+
+
 def test_watchlist_repo_persists_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     before_restart_db = SqliteDatabase(str(db_path))
