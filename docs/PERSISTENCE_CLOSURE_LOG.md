@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 cleanup 关联记录损坏分流缺口
+
+- 闭环：`cleanup_downloaded_source._find_import_correlation()` 之前在 `job_event.find_latest_import_correlation()` 能查到导入关联、但命中的 `job_event` 行本身 `task_ref / event_type / source_path / target_path` 等真相字段已损坏时，会和普通 SQLite 查询异常共用同一条“cleanup 关联查询失败”日志；现在会单独打印“cleanup 关联记录损坏”中文日志与 `[处理建议]`，继续按原来的“未找到关联”停路和 guardrail，不把坏记录混成普通读库失败或普通“没有 import 关联”。
+- 代码：
+  - `app/services/cleanup_downloaded_source.py`
+  - `tests/test_cleanup_downloaded_source.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "correlation"`
+
 ### 2026-04-18 自动导入跳过事件记录损坏分流缺口
 
 - 闭环：`post_download_auto_import._record_skip_event()` 之前在低质量资源命中自动跳过规则后，`job_event` 跳过事件已写入但写后回读命中坏记录、`task_ref / event_type` 等真相字段损坏时，会和普通 SQLite 写入异常共用同一条“自动导入跳过事件落盘失败”日志；现在会单独打印“自动导入跳过事件记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态不可用边界停路，不把坏记录混成普通写库失败或稳定落盘成功。

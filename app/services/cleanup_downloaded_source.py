@@ -5,7 +5,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.db.job_event_repo import JobEvent, JobEventRepo
+from app.db.job_event_repo import JobEvent, JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 
 CLEANUP_QUERY_USAGE_TEXT = (
@@ -394,6 +394,18 @@ class CleanupDownloadedSourceService:
                     "当前会按未找到关联停路，避免把缺失真相误判成普通“没有 import 关联”。",
                     flush=True,
                 )
+            elif _is_cleanup_correlation_row_corrupted_error(error):
+                print(
+                    f"\033[31m[cleanup 关联记录损坏]\033[0m task_ref={task_ref} "
+                    f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+                    f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
+                    flush=True,
+                )
+                print(
+                    "\033[33m[处理建议]\033[0m 检查 job_event 导入成功关联里的 task_ref / event_type / source_path / target_path "
+                    "是否仍是完整真相；当前会按未找到关联停路，避免把坏记录误判成普通“没有 import 关联”。",
+                    flush=True,
+                )
             else:
                 print(
                     f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
@@ -511,6 +523,10 @@ class CleanupDownloadedSourceService:
                     error=error,
                 )
             return
+
+
+def _is_cleanup_correlation_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
 
 
 def parse_cleanup_query(text: str) -> str | None:

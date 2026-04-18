@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services import cleanup_downloaded_source as cleanup_module
@@ -1278,6 +1278,64 @@ def test_cleanup_by_task_ref_logs_correlation_lookup_result_missing_and_keeps_fo
     assert "lookup_task_hash=87" in captured.out
     assert "job_event list result missing during correlation lookup" in captured.out
     assert "避免把缺失真相误判成普通“没有 import 关联”" in captured.out
+
+
+def test_inspect_by_task_ref_logs_correlation_row_corrupted_and_returns_missing_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    service = CleanupDownloadedSourceService(event_repo)
+
+    monkeypatch.setattr(
+        event_repo,
+        "find_latest_import_correlation",
+        lambda **_: (_ for _ in ()).throw(JobEventPersistenceError("job_event row identity corrupted after read")),
+    )
+
+    reply = service.inspect_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert "关联: 未找到" in reply
+    assert "当前 guardrail: 拒绝 cleanup" in reply
+    assert f"结论: {CLEANUP_CORRELATION_MISSING_TEXT}" in reply
+    assert "[cleanup 关联记录损坏]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "lookup_task_ref=87" in captured.out
+    assert "lookup_task_id=87" in captured.out
+    assert "lookup_task_hash=87" in captured.out
+    assert "job_event row identity corrupted after read" in captured.out
+    assert "避免把坏记录误判成普通“没有 import 关联”" in captured.out
+
+
+def test_cleanup_by_task_ref_logs_correlation_row_corrupted_and_keeps_follow_up(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    service = CleanupDownloadedSourceService(event_repo)
+
+    monkeypatch.setattr(
+        event_repo,
+        "find_latest_import_correlation",
+        lambda **_: (_ for _ in ()).throw(JobEventPersistenceError("job_event row identity corrupted after read")),
+    )
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert CLEANUP_CORRELATION_MISSING_TEXT in reply
+    assert "cleanup inspect 87 / 清理检查 87：只读预检，不删除任何文件" in reply
+    assert "cleanup 87 / 清理 87：实际清理下载源资产" in reply
+    assert "[cleanup 关联记录损坏]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "lookup_task_ref=87" in captured.out
+    assert "lookup_task_id=87" in captured.out
+    assert "lookup_task_hash=87" in captured.out
+    assert "job_event row identity corrupted after read" in captured.out
+    assert "避免把坏记录误判成普通“没有 import 关联”" in captured.out
 
 
 def test_inspect_by_task_ref_logs_correlation_query_failure_with_chat_scoped_identity(
