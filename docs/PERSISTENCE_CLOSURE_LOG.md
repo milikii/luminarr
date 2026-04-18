@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 BT 订阅清空记录损坏分流缺口
+
+- 闭环：`manage_bt_subscription._clear_items()` 之前在 `bt_subscription_item` 清空链命中坏记录、`id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 清空异常共用同一条“BT 订阅清单清空失败”日志；现在会单独打印“BT 订阅清单清空命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `BT_SUBSCRIPTION_CLEAR_FAILED_TEXT`，不改订阅清空 workflow。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "clear_returns_failure_text_when_repo_raises or clear_returns_failure_text_when_repo_returns_none or clear_surfaces_row_corruption"`
+
 ### 2026-04-18 BT 订阅删除记录损坏分流缺口
 
 - 闭环：`manage_bt_subscription._remove_item()` 之前在 `bt_subscription_item` 删除链命中坏记录、`id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 删除异常共用同一条“BT 订阅删除失败”日志；现在会单独打印“BT 订阅删除命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `BT_SUBSCRIPTION_REMOVE_FAILED_TEXT`，不改订阅删除 workflow。
