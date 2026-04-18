@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 自动导入跳过事件记录损坏分流缺口
+
+- 闭环：`post_download_auto_import._record_skip_event()` 之前在低质量资源命中自动跳过规则后，`job_event` 跳过事件已写入但写后回读命中坏记录、`task_ref / event_type` 等真相字段损坏时，会和普通 SQLite 写入异常共用同一条“自动导入跳过事件落盘失败”日志；现在会单独打印“自动导入跳过事件记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态不可用边界停路，不把坏记录混成普通写库失败或稳定落盘成功。
+- 代码：`app/services/post_download_auto_import.py`
+- 验证：`tests/test_get_download_status.py -k "skip_event or auto_import_terminal or completion_event_row or completed_list_corruption"`
+
 ### 2026-04-18 搜索澄清态写入命中坏记录分流缺口
 
 - 闭环：`search_media._set_clarification_pending()` 之前在 `clarification_state` 写入后立即回读命中坏记录、`query` 真相字段被写成空值或脏数据时，会和普通 SQLite 写入异常共用同一条“搜索澄清态持久化失败”日志；现在会单独打印“搜索澄清态写入命中坏记录”中文日志与 `[处理建议]`，并继续按原来的待澄清状态写入失败文本停路，不把坏记录混成普通写库失败或成功进入待澄清状态。

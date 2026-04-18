@@ -180,6 +180,12 @@ class PostDownloadAutoImportService:
                     task_hash=candidate.task_hash,
                     reason=AUTO_IMPORT_SKIP_EVENT_RESULT_MISSING_REASON,
                 )
+            elif _is_auto_import_skip_event_row_corrupted_error(error):
+                _log_auto_import_skip_event_row_corrupted(
+                    task_id=candidate.task_id,
+                    task_hash=candidate.task_hash,
+                    reason=str(error),
+                )
             else:
                 _log_auto_import_skip_event_append_failed(
                     task_id=candidate.task_id,
@@ -206,6 +212,10 @@ def _is_auto_import_completed_row_corrupted_error(error: Exception) -> bool:
 
 
 def _is_auto_import_terminal_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
+
+
+def _is_auto_import_skip_event_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
 
 
@@ -252,5 +262,15 @@ def _log_auto_import_skip_event_result_missing(*, task_id: str, task_hash: str, 
         f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 job_event 写入后是否还能立即回读到该条跳过事件；"
         "当前会按状态不可用停路，避免把缺失真相误判成普通“已跳过自动导入”。",
+        flush=True,
+    )
+
+
+def _log_auto_import_skip_event_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[自动导入跳过事件记录损坏]\033[0m task_id={task_id} task_hash={task_hash} "
+        f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 新写入的跳过事件里 task_ref / event_type 等字段是否仍是完整真相；"
+        "当前会按状态不可用停路，避免把坏记录误判成普通“已跳过自动导入”。",
         flush=True,
     )
