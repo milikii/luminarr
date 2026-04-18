@@ -1,11 +1,12 @@
-# Cleanup slimming log (v1)
+# Cleanup slimming log (v2)
 
 > 目的：承接当前“`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
 
 ## 1. Current line
 
-- 当前唯一主线：`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化
+- 当前主线状态：`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已完成
+- 该主线已在 2026-04-19 满足 `Done when` 第 1 条：`app/services/cleanup_correlation_lookup.py` 已承接“查询引用 -> 任务身份 -> import 关联”边界，focused tests `18 passed, 28 deselected`，全量 cleanup service tests `46 passed`
 - 上一条已完成主线“`manage_bt_subscription.py` 订阅编排层瘦身 / 模块化”已在 2026-04-19 满足 `Done when` 第 1 条：`app/services/bt_subscription_command.py` 已承接命令解析 / 标题解析 / 清单回复边界，且 focused tests `17 passed, 20 deselected`
 - 更早已完成主线“`search_media.py` 搜索编排层瘦身 / 模块化”已在 2026-04-19 满足 `Done when` 第 1 条；详细台账继续只看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`
 - 更早已完成主线“`add_to_downloader.py` 下载编排层瘦身 / 模块化”已在 2026-04-19 满足退出条件 1；详细台账继续只看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`
@@ -21,9 +22,9 @@
 
 ### 2.1 身份解析 / import 关联
 
-当前风险：
-- `cleanup_downloaded_source.py` 还把 `_resolve_cleanup_task_identity()`、`_find_import_correlation()`、`cleanup_by_task_ref()` / `inspect_by_task_ref()` 的入口衔接揉在同一服务文件；这一步只允许把“查询引用 -> 任务身份 -> import 关联”收成 helper，不改 cleanup guardrail、`job_event` 真相和现有中文协议。
-- 这一组只允许动 identity / correlation 前半段，不顺手改 source 删除、follow-up 文案或事件落盘。
+已完成闭环：
+- `cleanup_downloaded_source.py` 已把 `_resolve_cleanup_task_identity()`、`_find_import_correlation()` 的前半段边界抽到 `app/services/cleanup_correlation_lookup.py`；service 只保留 inspect / execution 编排，不改 cleanup guardrail、`job_event` 真相和现有中文协议。
+- 该 helper 统一承接 chat 作用域任务引用解析、import 关联查询、关联结果缺失 / 记录损坏 / 路径缺失中文日志，focused tests 已满足当前主线退出条件 1。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"`

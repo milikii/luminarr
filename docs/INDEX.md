@@ -22,7 +22,8 @@
 | `docs/ARCHITECTURE.md` | 一条消息从哪里进、到哪里去、谁写数据库 | 结构说明 |
 | `docs/NEXT_STEP.md` | 当前唯一主线是什么，不该顺手做什么 | 当前施工目标 |
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
-| `docs/CLEANUP_SLIMMING_LOG.md` | 当前 `cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化主线的详细闭环、focused tests 和风险分组 | 当前主线台账 |
+| `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md` | 当前 `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化主线的详细闭环、focused tests 和风险分组 | 当前主线台账 |
+| `docs/CLEANUP_SLIMMING_LOG.md` | 已完成的 `cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
 | `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md` | 已完成的 `manage_bt_subscription.py` 订阅编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
 | `docs/SEARCH_MEDIA_SLIMMING_LOG.md` | 已完成的 `search_media.py` 搜索编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
 | `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md` | 已完成的 `add_to_downloader.py` 下载编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
@@ -55,17 +56,18 @@
 
 1. `docs/NEXT_STEP.md`
 2. `docs/STATUS.md`
-3. `docs/CLEANUP_SLIMMING_LOG.md`（需要看当前主线细节时）
-4. `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`（需要看上一条主线闭环时）
-5. `docs/SEARCH_MEDIA_SLIMMING_LOG.md`（需要看更早主线闭环时）
-6. `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`（需要看更早主线闭环时）
-7. `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`（需要看更早主线闭环时）
-8. `docs/TELEGRAM_BOT_SLIMMING_LOG.md`（需要看更早主线闭环时）
-9. `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（需要看更早主线闭环时）
-10. `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（需要看更早主线闭环时）
-11. `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（需要看再更早主线闭环时）
-12. `docs/PERSISTENCE_CLOSURE_LOG.md`（需要看更早完成主线闭环时）
-13. `docs/CLEANUP_VERIFICATION_WINDOW.md`（需要看 cleanup 已完成证据时）
+3. `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（需要看当前主线细节时）
+4. `docs/CLEANUP_SLIMMING_LOG.md`（需要看上一条主线闭环时）
+5. `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`（需要看更早主线闭环时）
+6. `docs/SEARCH_MEDIA_SLIMMING_LOG.md`（需要看更早主线闭环时）
+7. `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`（需要看更早主线闭环时）
+8. `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`（需要看更早主线闭环时）
+9. `docs/TELEGRAM_BOT_SLIMMING_LOG.md`（需要看更早主线闭环时）
+10. `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（需要看更早主线闭环时）
+11. `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（需要看更早主线闭环时）
+12. `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（需要看再更早主线闭环时）
+13. `docs/PERSISTENCE_CLOSURE_LOG.md`（需要看更早完成主线闭环时）
+14. `docs/CLEANUP_VERIFICATION_WINDOW.md`（需要看 cleanup 已完成证据时）
 
 ### 想理解“为什么不能随便改”
 
