@@ -956,6 +956,8 @@ class ImportToLibraryService:
         except Exception as error:
             if str(error) == "import naming truth result missing":
                 _log_import_naming_truth_result_missing(task_id=task_id, task_hash=task_hash, reason=str(error))
+            elif _is_import_naming_truth_row_corrupted_error(error):
+                _log_import_naming_truth_row_corrupted(task_id=task_id, task_hash=task_hash, reason=str(error))
             else:
                 _log_import_naming_truth_query_failed(task_id=task_id, task_hash=task_hash, reason=str(error))
             return fallback
@@ -2164,6 +2166,19 @@ def _log_import_naming_truth_result_missing(*, task_id: str, task_hash: str, rea
 
 def _is_job_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobPersistenceError) and str(error).endswith("corrupted after read")
+
+
+def _log_import_naming_truth_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[导入命名真相记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 里的 task_ref / event_type / message 等命名真相字段是否仍是完整记录；"
+        "当前导入会退回下载源名称做命名，避免把坏记录混成普通查询失败。",
+        flush=True,
+    )
+
+
+def _is_import_naming_truth_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
 
 
 def _is_import_target_lookup_row_corrupted_error(error: Exception) -> bool:

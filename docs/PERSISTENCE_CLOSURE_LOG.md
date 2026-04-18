@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 导入命名真相记录损坏分流缺口
+
+- 闭环：`import_to_library._resolve_normalized_naming_truth()` 之前在 `job_event` 命名真相查询能命中记录、但行内 `task_ref / event_type / message` 等字段已损坏时，只会和普通 SQLite 查询异常共用同一条“导入命名真相查询失败”日志；现在会单独打印“导入命名真相记录损坏”中文日志与 `[处理建议]`，并继续保持原来的 fallback：退回下载源名称做命名，不把坏记录混成普通查询失败。
+- 代码：
+  - `app/services/import_to_library.py`
+  - `tests/test_import_to_library.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "naming_truth"`
+
 ### 2026-04-18 导入 raw_bt 判定记录损坏分流缺口
 
 - 闭环：`import_to_library._is_raw_bt_task()` 之前在 `jobs.get_downloader_job_for_chat_ref()` 能查到下载任务，但行内 `job_id / chat_id / task_ref / payload_json` 等真相字段已损坏时，只会和普通 SQLite 查询异常共用同一条“导入 raw_bt 判定查询失败”日志；现在会单独打印“导入 raw_bt 判定记录损坏”中文日志与 `[处理建议]`，并继续让导入入口直接返回查询失败，不把坏任务记录混成普通查询失败或普通“不是 raw_bt”。
