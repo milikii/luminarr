@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 自动导入终态记录损坏分流缺口
+
+- 闭环：`post_download_auto_import._has_terminal_activity()` 之前在 `job_event` 终态查询能查到行、但行内 `task_ref / event_type` 等真相字段已损坏时，会和普通 SQLite 读取异常共用同一条“自动导入终态查询失败”日志；现在会单独打印“自动导入终态记录损坏”中文日志与 `[处理建议]`，继续保持这条任务自动导入直接停路，不把坏记录混成普通查询失败后继续推进导入审批。
+- 代码：`app/services/post_download_auto_import.py`
+- 验证：`tests/test_get_download_status.py -k "post_download_auto_import_run_once_surfaces_terminal_row_corruption or post_download_auto_import_run_once_skips_record_when_terminal_lookup_fails or post_download_auto_import_run_once_skips_record_when_terminal_lookup_returns_none"`
+
 ### 2026-04-18 自动导入候选记录损坏分流缺口
 
 - 闭环：`post_download_auto_import.run_once()` 之前在 `download_monitor` 已完成列表能查到行、但行内 `chat_id / task_id / task_hash` 等真相已损坏时，会和普通 SQLite 读取异常共用同一条“自动导入候选读取失败”日志；现在会单独打印“自动导入候选记录损坏”中文日志与 `[处理建议]`，继续保持本轮自动导入直接停路，不把坏记录混成普通读库失败后继续推进导入审批。

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from app.db.download_monitor_repo import DownloadMonitorRecord, DownloadMonitorRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 
 AutoImportFunc = Callable[[str, int | None, int | None], Awaitable[str]]
 AUTO_IMPORT_SKIPPED_BY_RULE_EVENT = "auto_import.skipped_by_rule"
@@ -144,6 +144,12 @@ class PostDownloadAutoImportService:
                     task_hash=candidate.task_hash,
                     reason=str(error),
                 )
+            elif _is_auto_import_terminal_row_corrupted_error(error):
+                _log_auto_import_terminal_lookup_row_corrupted(
+                    task_id=candidate.task_id,
+                    task_hash=candidate.task_hash,
+                    reason=str(error),
+                )
             else:
                 _log_auto_import_terminal_lookup_failed(
                     task_id=candidate.task_id,
@@ -199,6 +205,10 @@ def _is_auto_import_completed_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
 
 
+def _is_auto_import_terminal_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
+
+
 def _log_auto_import_terminal_lookup_failed(*, task_id: str, task_hash: str, reason: str) -> None:
     print(
         f"\033[31m[自动导入终态查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
@@ -213,6 +223,15 @@ def _log_auto_import_terminal_lookup_result_missing(*, task_id: str, task_hash: 
         f"\033[31m[自动导入终态结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
         "当前会停止这条任务的自动导入跟进，避免把缺失真相误判成“还没有终态事件”。",
+        flush=True,
+    )
+
+
+def _log_auto_import_terminal_lookup_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
+    print(
+        f"\033[31m[自动导入终态记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 终态记录里的 task_ref / event_type 等字段是否仍是完整真相；"
+        "当前会停止这条任务的自动导入跟进，避免把坏记录误判成普通查询失败。",
         flush=True,
     )
 
