@@ -1741,6 +1741,30 @@ def test_find_version_stale_rejection_text_logs_missing_approval_row(capsys) -> 
     assert "task_hash=hash-87" in output
 
 
+def test_find_version_stale_rejection_text_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_import_approval": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row executed version corrupted after read"))
+        },
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+    )
+
+    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入确认执行版号记录损坏]" in output
+    assert "approval row executed version corrupted after read" in output
+    assert "status / lease_version / executed_version" in output
+
+
 def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> None:
     event_repo = type(
         "EventRepo",

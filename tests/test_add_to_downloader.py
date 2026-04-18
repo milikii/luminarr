@@ -1596,6 +1596,30 @@ def test_find_version_stale_rejection_text_logs_missing_approval_row(capsys) -> 
     assert "task_id=selection:1" in output
 
 
+def test_find_version_stale_rejection_text_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "get_downloader_approval": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row executed version corrupted after read"))
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+
+    assert service._find_version_stale_rejection_text(task_id="selection:1", task_hash="abc123") == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[下载确认执行版号记录损坏]" in output
+    assert "approval row executed version corrupted after read" in output
+    assert "status / lease_version / executed_version" in output
+
+
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"is_downloader_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)

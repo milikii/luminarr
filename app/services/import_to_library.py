@@ -1753,10 +1753,16 @@ class ImportToLibraryService:
         try:
             approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
         except Exception as error:
-            print(
-                f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
-                flush=True,
-            )
+            if str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
+                print(
+                    f"\033[31m[导入确认执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通没有待确认导入。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
+                    flush=True,
+                )
             return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
         if approval_record is None:
             print(
