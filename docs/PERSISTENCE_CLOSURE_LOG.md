@@ -1,4 +1,4 @@
-# Persistence closure log (v33)
+# Persistence closure log (v34)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,15 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载状态观察记录损坏分流缺口
+
+- 闭环：`get_download_status._record_status_observation()` 之前在 `download_monitor.record_status()` 已写入状态、但写后回读命中的 `download_monitor` 记录本身 `task_id / task_hash / status_code / percent_done` 等真相字段损坏时，会和普通 SQLite 写入异常共用同一条“下载状态观察落盘失败”日志；现在会单独打印“下载状态观察记录损坏”中文日志与 `[处理建议]`，并继续保持原来的状态 warning 边界，不把坏记录混成普通写库失败。
+- 代码：
+  - `app/services/get_download_status.py`
+  - `tests/test_get_download_status.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "download_monitor_returns_missing_update or download_monitor_status_upsert_result_is_missing or download_monitor_returns_missing_record or download_monitor_readback_row_is_corrupted or download_monitor_returns_missing_completion_flag or completion_event_row or auto_import_terminal or skip_event"`
 
 ### 2026-04-18 导入确认上下文记录损坏分流缺口
 

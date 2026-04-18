@@ -4,7 +4,7 @@ import re
 from collections.abc import Awaitable, Callable
 
 from app.clients.transmission import TransmissionTaskStatus
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.services.post_download_auto_import import AutoImportStateUnavailableError, PostDownloadAutoImportService
 
@@ -94,6 +94,12 @@ class GetDownloadStatusService:
                 DOWNLOAD_MONITOR_STATUS_UPSERT_RESULT_MISSING_REASON,
             }:
                 _log_download_monitor_observation_result_missing(
+                    task_ref=task_ref,
+                    task_status=task_status,
+                    reason=str(error),
+                )
+            elif _is_download_monitor_observation_row_corrupted_error(error):
+                _log_download_monitor_observation_row_corrupted(
                     task_ref=task_ref,
                     task_status=task_status,
                     reason=str(error),
@@ -262,6 +268,25 @@ def _log_download_monitor_completion_flag_missing(
         "当前请求仍会返回下载状态文本，但不会把这次完成观察继续推进到后续自动导入。",
         flush=True,
     )
+
+
+def _log_download_monitor_observation_row_corrupted(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载状态观察记录损坏]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 download_monitor 读回记录里的 task_id / task_hash / status_code / percent_done 等真相字段是否仍然完整；"
+        "当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
+        flush=True,
+    )
+
+
+def _is_download_monitor_observation_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
 
 
 def _is_completion_event_row_corrupted_error(error: Exception) -> bool:
