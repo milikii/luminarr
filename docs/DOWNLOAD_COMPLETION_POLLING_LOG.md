@@ -1,12 +1,12 @@
-# Download completion polling log (v1)
+# Download completion polling log (v2)
 
-> 目的：承接当前“独立后台下载完成轮询剩余少量回归与验证收口”主线的详细台账。
+> 目的：承接已完成的“独立后台下载完成轮询剩余少量回归与验证收口”主线详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
 
-## 1. Current line
+## 1. Completed line
 
-- 当前唯一主线：独立后台下载完成轮询剩余少量回归与验证收口
-- 上一条主线“Feishu 私聊事件解析器去重”已在 2026-04-18 满足退出条件 3；详细台账继续只看 `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`
+- 已完成主线：独立后台下载完成轮询剩余少量回归与验证收口（已在 2026-04-18 满足 `Done when` 第 1 条：focused tests `12 passed, 141 deselected`，且真实 Transmission / Emby 联调下复用 task_id=`1` task_hash=`e93d696a3e980458765f8016ce39f61437cc9543`，验证其从待轮询列表推进到 `downloader.completed_observed + auto_import boundary`）
+- 上一条已完成主线“Feishu 私聊事件解析器去重”已在 2026-04-18 满足退出条件 3；详细台账继续只看 `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`
 - 更早主线“Feishu 长连接私有 API 风险收口”已完成；详细台账继续只看 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
 - 更早主线“持久化吞错收口”已完成；详细台账继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 四渠道验证窗口已完成；详细证据继续只看 `docs/CLEANUP_VERIFICATION_WINDOW.md`
@@ -34,10 +34,11 @@ focused tests 入口：
 ## 3. Focused verification
 
 - `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list or download_completion_polling or post_download_auto_import_scheduler"`
+- `2026-04-18` 真实联调验证：Transmission `task_id=1` `task_hash=e93d696a3e980458765f8016ce39f61437cc9543` 从待轮询列表推进到 `downloader.completed_observed + auto_import boundary`；Emby 健康检查返回 `ServerName=9f4635e04057`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 
 ## 4. Maintenance rule
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 只有当当前主线完成并切到下一项时，才在 `docs/NEXT_STEP.md` 和 `README.md` 切换“当前唯一主线”。
+- 当前唯一主线已经切到 `docs/TELEGRAM_BOT_SLIMMING_LOG.md`；本文件只继续保留完成态路径和 focused tests / 联调证据入口。
