@@ -42,4 +42,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`；本文件只继续保留完成态路径和 focused tests 入口。
+- 当前唯一主线已经切到 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`；本文件只继续保留完成态路径和 focused tests 入口。

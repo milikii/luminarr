@@ -114,7 +114,7 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 ## 8. Current priority
 
-当前唯一主线是**`import_to_library.py` 导入编排层瘦身 / 模块化**；详细目标、可测量退出条件和 `After this step` 顺序一律看 `docs/NEXT_STEP.md`，当前快照看 `docs/STATUS.md`，当前主线详细闭环看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`，上一条已完成的 Telegram 渠道层瘦身详细闭环看 `docs/TELEGRAM_BOT_SLIMMING_LOG.md`，更早完成的持久化吞错收口详细闭环看 `docs/PERSISTENCE_CLOSURE_LOG.md`，cleanup 已完成证据看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+当前唯一主线是**`add_to_downloader.py` 下载编排层瘦身 / 模块化**；详细目标、可测量退出条件和 `After this step` 顺序一律看 `docs/NEXT_STEP.md`，当前快照看 `docs/STATUS.md`，当前主线详细闭环看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，上一条已完成的导入编排层瘦身详细闭环看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`，更早完成的 Telegram 渠道层瘦身详细闭环看 `docs/TELEGRAM_BOT_SLIMMING_LOG.md`，更早完成的持久化吞错收口详细闭环看 `docs/PERSISTENCE_CLOSURE_LOG.md`，cleanup 已完成证据看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 
 **诊断分流递减自检**：若本轮候选闭环的代码变更 < 20 行、只是对同一个 repo 方法再拆一条 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，则视为收益递减；本轮完成并提交后**直接停止**，把"当前主线可宣告完成"汇报给用户，不要自动进入下一轮再拆一条分流。
 

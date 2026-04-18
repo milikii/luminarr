@@ -18,6 +18,7 @@ from app.db.approval_repo import (
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 from app.trace_logging import log_trace_event
@@ -105,21 +106,6 @@ class PreparedImport:
 
 
 @dataclass(frozen=True, slots=True)
-class ConfirmExecutionContext:
-    job: JobRecord
-    approval_record: ApprovalRecord | None
-    approval_lookup_failed: bool = False
-
-    @property
-    def lookup_task_ref(self) -> str:
-        if self.job.task_hash:
-            return self.job.task_hash
-        if self.job.task_id:
-            return self.job.task_id
-        return self.job.task_ref
-
-
-@dataclass(frozen=True, slots=True)
 class ImportExecutionResult:
     reply: str
     imported: bool
@@ -157,6 +143,11 @@ class ImportToLibraryService:
         self._pending_import_identities: set[tuple[str, str]] = set()
         self._pending_import_lease_versions: dict[tuple[str, str], int] = {}
         self._pending_copy_fallback_identities: set[tuple[str, str]] = set()
+        self._context_lookup = ImportContextLookup(
+            job_repo=job_repo,
+            approval_repo=approval_repo,
+            is_job_row_corrupted_error=_is_job_row_corrupted_error,
+        )
 
     def _log_trace(
         self,
@@ -876,55 +867,35 @@ class ImportToLibraryService:
         return PreparedImport(import_source=import_source, source_path=source_path, target_path=target_path), ""
 
     def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool | None:
-        if self._job_repo is None or chat_id is None or chat_id <= 0:
-            return False
-        try:
-            downloader_job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception as error:
-            if _is_job_row_corrupted_error(error):
-                self._log_raw_bt_lookup_row_corrupted(
-                    chat_id=chat_id,
-                    task_ref=task_ref,
-                    reason=str(error),
-                )
-            else:
-                print(
-                    f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
-                    flush=True,
-                )
+        lookup = self._context_lookup.lookup_raw_bt_task(chat_id=chat_id, task_ref=task_ref)
+        if lookup.error_kind == "row_corrupted":
+            self._log_raw_bt_lookup_row_corrupted(
+                chat_id=chat_id or 0,
+                task_ref=task_ref,
+                reason=lookup.detail,
+            )
             return None
-        if downloader_job is None:
+        if lookup.error_kind == "lookup_failed":
+            print(
+                f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id or 0} task_ref={task_ref} 错误={lookup.detail}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
+                flush=True,
+            )
+            return None
+        if lookup.error_kind == "result_missing":
             self._log_raw_bt_lookup_result_missing(
-                chat_id=chat_id,
+                chat_id=chat_id or 0,
                 task_ref=task_ref,
                 reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
             )
             return None
-        cleaned_payload = downloader_job.payload_json.strip()
-        if not cleaned_payload:
+        if lookup.error_kind == "payload_corrupted":
             self._log_raw_bt_payload_corrupted(
-                chat_id=chat_id,
+                chat_id=chat_id or 0,
                 task_ref=task_ref,
-                payload_summary="payload_json empty",
+                payload_summary=lookup.detail,
             )
             return None
-        try:
-            payload = json.loads(cleaned_payload)
-        except json.JSONDecodeError:
-            self._log_raw_bt_payload_corrupted(
-                chat_id=chat_id,
-                task_ref=task_ref,
-                payload_summary="payload_json invalid json",
-            )
-            return None
-        if not isinstance(payload, dict):
-            self._log_raw_bt_payload_corrupted(
-                chat_id=chat_id,
-                task_ref=task_ref,
-                payload_summary="payload_json not object",
-            )
-            return None
-        return payload.get("auto_import_enabled") is False
+        return lookup.is_raw_bt
 
     def _log_raw_bt_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
         print(
@@ -1545,50 +1516,28 @@ class ImportToLibraryService:
         task_ref: str,
         chat_id: int | None,
     ) -> tuple[ConfirmExecutionContext | None, bool]:
-        if self._job_repo is None or chat_id is None or chat_id <= 0:
-            return None, False
-        try:
-            job = self._job_repo.get_import_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception as error:
-            if _is_job_row_corrupted_error(error):
+        lookup = self._context_lookup.rebuild_confirm_context(task_ref=task_ref, chat_id=chat_id)
+        if lookup.lookup_failed:
+            if lookup.job_error_kind == "row_corrupted":
                 print(
-                    f"\033[31m[导入确认上下文记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n"
+                    f"\033[31m[导入确认上下文记录损坏]\033[0m chat_id={chat_id or 0} task_ref={task_ref} 错误={lookup.job_error_detail}\n"
                     "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前导入任务的 job_id / chat_id / task_ref / task_id / task_hash / version 等真相字段；"
                     "当前 confirm 会直接返回状态读取失败，避免把坏任务记录误判成普通查询失败或“没有待确认导入”。",
                     flush=True,
                 )
             else:
                 print(
-                    f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认导入”或“未找到对应下载任务”。",
+                    f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id or 0} task_ref={task_ref} 错误={lookup.job_error_detail}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认导入”或“未找到对应下载任务”。",
                     flush=True,
                 )
             return None, True
-        if job is None:
-            return None, False
-
-        approval_record: ApprovalRecord | None = None
-        approval_lookup_failed = False
-        if self._approval_repo is not None:
-            try:
-                approval_record = self._approval_repo.get_import_approval(
-                    task_id=job.task_id,
-                    task_hash=job.task_hash,
-                )
-            except Exception as error:
-                print(
-                    f"\033[31m[导入确认审批查询失败]\033[0m task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通未确认状态。",
-                    flush=True,
-                )
-                approval_record = None
-                approval_lookup_failed = True
-        return (
-            ConfirmExecutionContext(
-                job=job,
-                approval_record=approval_record,
-                approval_lookup_failed=approval_lookup_failed,
-            ),
-            False,
-        )
+        context = lookup.context
+        if context is not None and context.approval_lookup_failed:
+            print(
+                f"\033[31m[导入确认审批查询失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} 错误={lookup.approval_error_detail}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通未确认状态。",
+                flush=True,
+            )
+        return context, False
 
     def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool | None:
         if self._job_repo is None:
