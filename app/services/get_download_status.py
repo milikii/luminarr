@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 
 from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorRepo
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.services.post_download_auto_import import AutoImportStateUnavailableError, PostDownloadAutoImportService
 
 GetStatusFunc = Callable[..., Awaitable[TransmissionTaskStatus | None]]
@@ -121,6 +121,11 @@ class GetDownloadStatusService:
                 if str(error) == DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON:
                     print(
                         f"\033[31m[下载完成观察事件结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
+                        flush=True,
+                    )
+                elif _is_completion_event_row_corrupted_error(error):
+                    print(
+                        f"\033[31m[下载完成观察事件记录损坏]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 完成观察记录里的 task_ref / event_type 等字段是否仍是完整真相；当前请求仍会返回下载状态文本，但这次完成观察事件不会当成已稳定落盘。",
                         flush=True,
                     )
                 else:
@@ -257,3 +262,7 @@ def _log_download_monitor_completion_flag_missing(
         "当前请求仍会返回下载状态文本，但不会把这次完成观察继续推进到后续自动导入。",
         flush=True,
     )
+
+
+def _is_completion_event_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")

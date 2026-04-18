@@ -449,6 +449,67 @@ def test_get_status_text_warns_when_completion_event_result_is_missing(capsys) -
     assert "job_event missing after append" in output
 
 
+def test_get_status_text_warns_when_completion_event_row_is_corrupted(capsys) -> None:
+    monitor_repo = type(
+        "MonitorRepo",
+        (),
+        {
+            "record_status": lambda self, task_status: type(
+                "Update",
+                (),
+                {
+                    "newly_completed": True,
+                    "record": type(
+                        "Record",
+                        (),
+                        {
+                            "task_id": "87",
+                            "task_hash": "hash-87",
+                            "name": "Dune 1984",
+                            "chat_id": 1001,
+                            "user_id": 2001,
+                        },
+                    )(),
+                },
+            )()
+        },
+    )()
+    event_repo = type(
+        "CorruptedEventRepo",
+        (),
+        {
+            "append_event": lambda self, **kwargs: (_ for _ in ()).throw(
+                JobEventPersistenceError("job_event row identity corrupted after read")
+            )
+        },
+    )()
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert "注意：下载完成观察事件落盘失败" in text
+    output = capsys.readouterr().out
+    assert "[下载完成观察事件记录损坏]" in output
+    assert "event_type=downloader.completed_observed" in output
+    assert "job_event row identity corrupted after read" in output
+    assert "[处理建议]" in output
+
+
 def test_get_download_status_service_exposes_download_monitor_repo(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 下载完成观察事件记录损坏分流缺口
+
+- 闭环：`get_download_status._record_status_observation()` 之前在 `job_event.append_event()` 已写入完成观察、但写后回读到的 `downloader.completed_observed` 行本身损坏时，会和普通 SQLite 写入异常共用同一条“下载完成观察事件落盘失败”日志；现在会单独打印“下载完成观察事件记录损坏”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改状态查询和自动导入 follow-up 边界。
+- 代码：`app/services/get_download_status.py`
+- 验证：`tests/test_get_download_status.py -k "completion_event_write_fails or completion_event_result_is_missing or completion_event_row_is_corrupted"`
+
 ### 2026-04-18 自动导入终态记录损坏分流缺口
 
 - 闭环：`post_download_auto_import._has_terminal_activity()` 之前在 `job_event` 终态查询能查到行、但行内 `task_ref / event_type` 等真相字段已损坏时，会和普通 SQLite 读取异常共用同一条“自动导入终态查询失败”日志；现在会单独打印“自动导入终态记录损坏”中文日志与 `[处理建议]`，继续保持这条任务自动导入直接停路，不把坏记录混成普通查询失败后继续推进导入审批。
