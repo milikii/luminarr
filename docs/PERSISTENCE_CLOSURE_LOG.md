@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 搜索待澄清记录损坏分流缺口
+
+- 闭环：`search_media._load_persisted_clarification_query()` 之前在 `clarification_state` 能查到行、但 `query` 真相字段已空或脏掉时，会和普通 SQLite 读取异常共用同一条“搜索澄清态读取失败”日志；现在会单独打印“搜索澄清态记录损坏”中文日志与 `[处理建议]`，并继续让相关入口按状态不可用停路，不把坏记录混成普通读库失败或“无待澄清记录”。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "clarification_pending_logs_persistence_failure or clarification_pending_logs_row_corruption"`
+
 ### 2026-04-18 BT 订阅扫描 chat 列表记录损坏分流缺口
 
 - 闭环：`manage_bt_subscription.run_scheduler_tick()` 之前在 `bt_subscription_item` chat 列表能查到行、但 `chat_id` 真相字段损坏时，会和普通 SQLite 读取异常共用同一条“BT 订阅扫描 chat 列表读取失败”日志；现在会单独打印“BT 订阅扫描 chat 列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮 scheduler tick 直接停路，不把坏行混成普通读库失败或可继续扫描的 chat。

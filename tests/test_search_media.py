@@ -386,6 +386,31 @@ def test_is_clarification_pending_logs_persistence_failure(capsys) -> None:
     assert "当前相关入口会按状态不可用处理" in output
 
 
+def test_is_clarification_pending_logs_row_corruption(tmp_path: Path, capsys) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO clarification_state (chat_id, query, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            """,
+            (1001, "   "),
+        )
+        connection.commit()
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        clarification_repo=ClarificationRepo(database),
+    )
+
+    assert service.is_clarification_pending(1001) is None
+    output = capsys.readouterr().out
+    assert "[搜索澄清态记录损坏]" in output
+    assert "[处理建议]" in output
+    assert "clarification_state query empty after read" in output
+
+
 def test_load_persisted_clarification_query_distinguishes_repo_failure_from_missing_state() -> None:
     missing_repo = type("MissingRepo", (), {"get_pending_query": lambda self, chat_id: None})()
     failed_repo = type("BoomRepo", (), {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
