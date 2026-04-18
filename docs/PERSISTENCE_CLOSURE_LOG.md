@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 BT 订阅最近资源回写记录损坏分流缺口
+
+- 闭环：`manage_bt_subscription._update_last_seen()` 之前在 `bt_subscription_item` 最近资源回写链命中坏记录、`id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 更新异常共用同一条“BT 订阅最近资源回写失败”日志；现在会单独打印“BT 订阅最近资源回写命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的“最近资源真相未更新” warning，不改已创建的下载待确认和订阅扫描 workflow。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "last_seen_truth_is_not_updated or last_seen_truth_update_returns_none or missing_row_during_last_seen_update or row_corruption_during_last_seen_update"`
+
 ### 2026-04-18 BT 订阅清空记录损坏分流缺口
 
 - 闭环：`manage_bt_subscription._clear_items()` 之前在 `bt_subscription_item` 清空链命中坏记录、`id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 清空异常共用同一条“BT 订阅清单清空失败”日志；现在会单独打印“BT 订阅清单清空命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的 `BT_SUBSCRIPTION_CLEAR_FAILED_TEXT`，不改订阅清空 workflow。

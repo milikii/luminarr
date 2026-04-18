@@ -50,6 +50,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-18，`watchlist` 清单读取也已补齐“记录损坏”分流：`watchlist_item` 能查到行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“想看清单记录损坏”中文日志与 `[处理建议]`，并继续按原来的读取失败文本停路，不再把坏记录混成普通读库失败或空清单。
 - 截至 2026-04-18，`BT 订阅` 写入也已补齐“命中坏记录”分流：`bt_subscription_item` 旧条目查询或写后回读命中坏行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“BT 订阅写入命中坏记录”中文日志与 `[处理建议]`，并继续按原来的写入失败文本停路，不再把坏记录混成普通写入失败、重复条目或成功新增。
 - 截至 2026-04-18，`BT 订阅` 清单读取也已补齐“记录损坏”分流：`bt_subscription_item` 能查到行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“BT 订阅清单记录损坏”中文日志与 `[处理建议]`，并继续按原来的读取失败文本停路，不再把坏记录混成普通读库失败或空清单。
+- 截至 2026-04-18，`watchlist / BT 订阅` 的删除、清空，以及 `BT 订阅` 的最近资源回写也已补齐“命中坏记录”分流：相关路径若命中 `id / title / media_kind` 等真相字段损坏，现在会分别打印专门中文日志与 `[处理建议]`，并继续保持原来的失败文本或 warning，不把坏记录混成普通删除/清空/回写异常。
 - 截至 2026-04-18，`BT 订阅` 扫描条目读取也已补齐“记录损坏”分流：`bt_subscription_item` 扫描列表能查到行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“BT 订阅扫描记录损坏”中文日志与 `[处理建议]`，并继续让 `btsub run` / scheduler tick 直接停路，不再把坏记录混成普通读库失败或“当前没有新资源”。
 - 截至 2026-04-18，`BT 订阅` 后台扫描读取 chat 列表也已补齐“记录损坏”分流：`bt_subscription_item` 能查到行、但 `chat_id` 真相字段损坏时，现在会明确打印“BT 订阅扫描 chat 列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮 scheduler tick 直接停路，不再把坏行混成普通读库失败或可继续扫描的 chat。
 - 截至 2026-04-18，自动导入轮询读取 `download_monitor` 已完成列表时，也已补齐“记录损坏”分流：列表能查到行、但 `chat_id / task_id / task_hash` 等真相字段损坏时，现在会明确打印“自动导入候选记录损坏”中文日志与 `[处理建议]`，并让本轮自动导入直接停路，不再把坏记录混成普通读库失败。
@@ -71,7 +72,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-18，cleanup 的导入关联查询也已补齐“记录损坏”分流：`_find_import_correlation()` 在 `job_event` 关联查询命中坏行、但 `task_ref / event_type / source_path / target_path` 等真相字段已损坏时，现在会明确打印“cleanup 关联记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“未找到关联”停路和 guardrail，不再把坏记录混成普通查询失败。
 - 截至 2026-04-18，Telegram BT 待答读取也已补齐“记录损坏”分流：`processing_path / classification / tmdb_association / raw_bt_destination` 从 `bt_pending_state` 读到坏行、但 `stage` 真相字段已空或脏掉时，现在会明确打印“BT 待处理记录损坏”中文日志与 `[处理建议]`，并继续让相关入口按状态不可用停路，不再把坏记录混成普通读库失败或“没有待处理状态”。
 - 截至 2026-04-18，下载 confirm 的上下文重建也已补齐“记录损坏”分流：`_rebuild_confirm_context()` 从 `jobs` 读到坏行、但 `job_id / chat_id / task_id / task_hash / version` 等真相字段已损坏时，现在会明确打印“下载确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 按状态不可用停路，不再把坏记录混成普通读库失败或“没有待确认下载”。
-- 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致 已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致，以及删除 / 清空 / 最近资源回写命中坏记录，都已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 截至 2026-04-17，Telegram BT `processing_path` 清理也已补齐“结果缺失”分流：`_clear_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
 - 截至 2026-04-17，Telegram BT `classification` 清理也已补齐“结果缺失”分流：`_clear_bt_classification_pending()` / `_pop_bt_classification_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
 - 截至 2026-04-17，Telegram BT `tmdb_association` 清理和关联入口也已补齐“结果缺失”分流：`_clear_bt_tmdb_association_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 与 TMDB 关联入口直接回服务未就绪，不再把缺失真相混成已取消或继续推进媒体入库链。

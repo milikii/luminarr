@@ -537,6 +537,15 @@ class ManageBtSubscriptionService:
                     reason=str(error),
                 )
                 return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
+            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_last_seen_row_corrupted(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=str(error),
+                )
+                return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
             _log_bt_subscription_last_seen_update_failed(
                 item=item,
                 chat_id=chat_id,
@@ -546,6 +555,15 @@ class ManageBtSubscriptionService:
             )
             return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
         except Exception as error:
+            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_last_seen_row_corrupted(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=str(error),
+                )
+                return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
             _log_bt_subscription_last_seen_update_failed(
                 item=item,
                 chat_id=chat_id,
@@ -947,6 +965,22 @@ def _log_bt_subscription_last_seen_result_missing(
         f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 更新返回是否仍带有明确结果；"
         "当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把持久化缺口误判成普通成功。"
+    )
+
+
+def _log_bt_subscription_last_seen_row_corrupted(
+    *,
+    item: BtSubscriptionItem,
+    chat_id: int,
+    source: str,
+    title: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅最近资源回写命中坏记录]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
+        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把损坏记录误判成普通回写失败。"
     )
 
 

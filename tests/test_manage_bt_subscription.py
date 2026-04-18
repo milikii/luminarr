@@ -541,6 +541,40 @@ def test_bt_subscription_run_once_logs_missing_row_during_last_seen_update(tmp_p
     assert "bt_subscription_item missing during last_seen update" in captured.out
 
 
+def test_bt_subscription_run_once_logs_row_corruption_during_last_seen_update(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    created = repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    assert created is not None
+
+    def _corrupted_update_last_seen(**_: object) -> bool:
+        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+
+    repo.update_last_seen = _corrupted_update_last_seen  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_subscription_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert "下载待确认：" in reply
+    assert "最近资源真相未更新" in reply
+    captured = capsys.readouterr()
+    assert "[BT 订阅最近资源回写命中坏记录]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt_subscription_item media kind corrupted after read" in captured.out
+
+
 def test_bt_subscription_run_once_returns_failure_text_when_scan_items_raise(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)
