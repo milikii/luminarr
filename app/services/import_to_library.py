@@ -16,7 +16,7 @@ from app.db.approval_repo import (
     ApprovalRecord,
     ApprovalRepo,
 )
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
@@ -1739,6 +1739,13 @@ class ImportToLibraryService:
                     "当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“无导入目标路径”。",
                     flush=True,
                 )
+            elif _is_import_target_lookup_row_corrupted_error(error):
+                print(
+                    f"\033[31m[导入目标路径记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 job_event 导入成功关联里的 task_ref / event_type / target_path / message "
+                    "是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏记录误判成普通“无导入目标路径”。",
+                    flush=True,
+                )
             else:
                 print(
                     f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
@@ -2138,3 +2145,7 @@ def _log_import_naming_truth_result_missing(*, task_id: str, task_hash: str, rea
         "当前导入会退回下载源名称做命名，避免把缺失真相误判成“没有 downloader 标题”。",
         flush=True,
     )
+
+
+def _is_import_target_lookup_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")

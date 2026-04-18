@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 导入目标路径记录损坏分流缺口
+
+- 闭环：`import_to_library._find_latest_import_target_path()` 之前在 `job_event.find_latest_import_correlation()` 能查到历史导入关联、但命中的 `job_event` 行本身 `task_ref / event_type / target_path / message` 等真相字段已损坏时，会和普通 SQLite 查询异常共用同一条“导入目标路径查询失败”日志；现在会单独打印“导入目标路径记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 按原来的状态读取失败停路，不把坏记录混成普通读库失败或普通“无导入目标路径”。
+- 代码：
+  - `app/services/import_to_library.py`
+  - `tests/test_import_to_library.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "target_path"`
+
 ### 2026-04-18 cleanup 关联记录损坏分流缺口
 
 - 闭环：`cleanup_downloaded_source._find_import_correlation()` 之前在 `job_event.find_latest_import_correlation()` 能查到导入关联、但命中的 `job_event` 行本身 `task_ref / event_type / source_path / target_path` 等真相字段已损坏时，会和普通 SQLite 查询异常共用同一条“cleanup 关联查询失败”日志；现在会单独打印“cleanup 关联记录损坏”中文日志与 `[处理建议]`，继续按原来的“未找到关联”停路和 guardrail，不把坏记录混成普通读库失败或普通“没有 import 关联”。

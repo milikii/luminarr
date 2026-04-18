@@ -16,7 +16,7 @@ from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
     ApprovalRepo,
 )
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JOB_STATE_PENDING_APPROVAL, WORKFLOW_IMPORT_TO_LIBRARY, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import (
@@ -1634,6 +1634,28 @@ def test_find_latest_import_target_path_logs_missing_event_lookup_result(capsys)
     assert "task_hash=hash-87" in output
 
 
+def test_find_latest_import_target_path_logs_corrupted_event_lookup_result(capsys) -> None:
+    event_repo = type(
+        "EventRepo",
+        (),
+        {
+            "find_latest_import_correlation": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(JobEventPersistenceError("job_event row identity corrupted after read"))
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
+
+    result = service._find_latest_import_target_path(task_id="87", task_hash="hash-87")
+
+    assert result.target_path is None
+    assert result.lookup_failed is True
+    output = capsys.readouterr().out
+    assert "[导入目标路径记录损坏]" in output
+    assert "job_event row identity corrupted after read" in output
+    assert "task_hash=hash-87" in output
+
+
 def test_find_latest_import_target_path_logs_missing_structured_target(capsys) -> None:
     event_repo = type(
         "EventRepo",
@@ -1684,6 +1706,34 @@ def test_find_version_stale_rejection_text_returns_state_unavailable_when_event_
     output = capsys.readouterr().out
     assert "[导入目标路径查询失败]" in output
     assert "task_id=87" in output
+
+
+def test_find_version_stale_rejection_text_returns_state_unavailable_when_event_lookup_row_corrupted(capsys) -> None:
+    approval_record = type("ApprovalRecord", (), {"lease_version": 2, "executed_version": 2})()
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: approval_record})()
+    event_repo = type(
+        "EventRepo",
+        (),
+        {
+            "find_latest_import_correlation": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(JobEventPersistenceError("job_event row identity corrupted after read")),
+            "append_event": lambda self, **kwargs: None,
+        },
+    )()
+    service = ImportToLibraryService(
+        AsyncMock(return_value=None),
+        "/data/library/movies",
+        approval_repo=approval_repo,
+        job_event_repo=event_repo,
+    )
+
+    assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+    output = capsys.readouterr().out
+    assert "[导入目标路径记录损坏]" in output
+    assert "task_id=87" in output
+    assert "job_event row identity corrupted after read" in output
 
 
 def test_find_version_stale_rejection_text_logs_missing_structured_target(capsys) -> None:
