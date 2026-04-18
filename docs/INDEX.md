@@ -22,6 +22,11 @@
 | `docs/ARCHITECTURE.md` | 一条消息从哪里进、到哪里去、谁写数据库 | 结构说明 |
 | `docs/NEXT_STEP.md` | 当前唯一主线是什么，不该顺手做什么 | 当前施工目标 |
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
+| `docs/SLIMMING_RULES.md` | 编排层瘦身 / 模块化主线的共用纪律 | 施工纪律 |
+| `docs/SERIES_ANIME_NAMING_PLAN.md` | `series / anime` 名称解析主线的设计蓝图 | 能力蓝图 |
+| `docs/BT_SCORING_PLAN.md` | BT 共享确定性评分器主线的设计蓝图 | 能力蓝图 |
+| `docs/SHARED_DELIVERY_UX_PLAN.md` | shared private-chat 交付体验收口主线的设计蓝图 | 能力蓝图 |
+| `docs/QUICK_START_PLAN.md` | 最小人类可用入口（给部署者）主线的设计蓝图 | 能力蓝图 |
 | `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md` | 当前 `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化主线的详细闭环、focused tests 和风险分组 | 当前主线台账 |
 | `docs/CLEANUP_SLIMMING_LOG.md` | 已完成的 `cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
 | `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md` | 已完成的 `manage_bt_subscription.py` 订阅编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |

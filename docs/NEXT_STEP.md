@@ -101,11 +101,11 @@
 
 ## After this step
 
-1. `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化：把 client 装配、后台任务启停、下载器路由 helper 和启动日志继续拆开；目标是不改启动入口、角色绑定和现有运行时真相
-2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
-3. `.ass` 字幕支持评估与最小实现
-4. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-5. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-6. BT 共享确定性评分器
+1. `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化：把 client 装配、后台任务启停、下载器路由 helper 和启动日志继续拆开；目标是不改启动入口、角色绑定和现有运行时真相。施工纪律见 `docs/SLIMMING_RULES.md`
+2. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）——详细蓝图见 `docs/SERIES_ANIME_NAMING_PLAN.md`
+3. `.ass` 字幕支持评估与最小实现——合并在 `docs/SERIES_ANIME_NAMING_PLAN.md` §7 同步落地
+4. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）——详细蓝图见 `docs/SHARED_DELIVERY_UX_PLAN.md`
+5. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）——详细蓝图见 `docs/QUICK_START_PLAN.md`
+6. BT 共享确定性评分器——详细蓝图见 `docs/BT_SCORING_PLAN.md`
 7. Jellyfin / Plex 支持（后续）
 8. plugin 体系继续后置
