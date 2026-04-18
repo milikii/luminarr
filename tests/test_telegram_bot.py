@@ -1101,6 +1101,37 @@ def test_bt_processing_path_pending_logs_read_failure(capsys: pytest.CaptureFixt
     assert "当前相关入口会按状态不可用处理" in output
 
 
+def test_bt_processing_path_pending_logs_row_corruption_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_pending_state (chat_id, stage, payload_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (1001, "   ", '{"source":"magnet:?xt=urn:btih:abcdef"}'),
+        )
+        connection.commit()
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _is_bt_processing_path_pending(context=context, chat_id=1001) is None
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理记录损坏]" in output
+    assert "stage=processing_path" in output
+    assert "bt_pending_state stage empty after read" in output
+
+
 def test_pop_bt_processing_path_pending_logs_missing_source_after_restart(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1675,6 +1706,37 @@ def test_bt_tmdb_association_pending_logs_read_failure(capsys: pytest.CaptureFix
     assert "[BT 待处理读取失败]" in output
     assert "stage=tmdb_association" in output
     assert "db down" in output
+
+
+def test_bt_tmdb_association_pending_logs_row_corruption_after_restart(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    with database.connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO bt_pending_state (chat_id, stage, payload_json, updated_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (1001, "   ", '{"media_kind":"movie","source":"magnet:?xt=urn:btih:abcdef"}'),
+        )
+        connection.commit()
+
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={BT_PENDING_REPO_KEY: BtPendingRepo(SqliteDatabase(str(db_path)))}
+        )
+    )
+
+    assert _get_bt_tmdb_association_pending(context=context, chat_id=1001) is False
+
+    output = capsys.readouterr().out
+    assert "[BT 待处理记录损坏]" in output
+    assert "stage=tmdb_association" in output
+    assert "bt_pending_state stage empty after read" in output
 
 
 def test_clear_bt_tmdb_association_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:

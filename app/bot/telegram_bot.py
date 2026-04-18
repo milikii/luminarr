@@ -240,6 +240,7 @@ TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 BT_PENDING_MISSING_AFTER_UPSERT_REASON = "bt_pending_state missing after upsert"
 BT_PENDING_CLEAR_RESULT_MISSING_REASON = "bt_pending_state clear result missing"
+BT_PENDING_STAGE_EMPTY_AFTER_READ_REASON = "bt_pending_state stage empty after read"
 
 BT_PROCESSING_PATH_ALIASES = {
     "影视入库链": "media_import",
@@ -1118,6 +1119,18 @@ def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str)
     )
 
 
+def _log_bt_pending_row_corrupted(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理记录损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.stage 是否仍是完整真相；当前相关入口会按状态不可用处理，避免把坏记录误判成“没有待处理状态”。",
+        flush=True,
+    )
+
+
+def _is_bt_pending_row_corrupted_reason(reason: str) -> bool:
+    return reason == BT_PENDING_STAGE_EMPTY_AFTER_READ_REASON
+
+
 def _log_bt_pending_persist_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
         f"\033[31m[BT 待处理持久化失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
@@ -1197,11 +1210,18 @@ def _is_bt_processing_path_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except Exception as error:
-        _log_bt_pending_read_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_PROCESSING_PATH,
-            reason=str(error),
-        )
+        if _is_bt_pending_row_corrupted_reason(str(error)):
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
         return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
         return False
@@ -1295,11 +1315,18 @@ def _pop_bt_processing_path_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except Exception as error:
-        _log_bt_pending_read_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_PROCESSING_PATH,
-            reason=str(error),
-        )
+        if _is_bt_pending_row_corrupted_reason(str(error)):
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_PROCESSING_PATH,
+                reason=str(error),
+            )
         return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_PROCESSING_PATH:
         return None
@@ -1395,11 +1422,18 @@ def _is_bt_classification_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except Exception as error:
-        _log_bt_pending_read_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_CLASSIFICATION,
-            reason=str(error),
-        )
+        if _is_bt_pending_row_corrupted_reason(str(error)):
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
         return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
         return False
@@ -1493,11 +1527,18 @@ def _pop_bt_classification_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except Exception as error:
-        _log_bt_pending_read_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_CLASSIFICATION,
-            reason=str(error),
-        )
+        if _is_bt_pending_row_corrupted_reason(str(error)):
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_CLASSIFICATION,
+                reason=str(error),
+            )
         return None
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
         return None
@@ -1616,11 +1657,18 @@ def _get_bt_tmdb_association_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except Exception as error:
-        _log_bt_pending_read_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-            reason=str(error),
-        )
+        if _is_bt_pending_row_corrupted_reason(str(error)):
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
         return False
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
         return None
@@ -1756,11 +1804,18 @@ def _get_raw_bt_destination_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except Exception as error:
-        _log_bt_pending_read_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
-            reason=str(error),
-        )
+        if _is_bt_pending_row_corrupted_reason(str(error)):
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
+                reason=str(error),
+            )
         return False
     if pending_state is None or pending_state.stage != BT_PENDING_STAGE_RAW_BT_DESTINATION:
         return None

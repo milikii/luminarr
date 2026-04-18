@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 Telegram BT 待答记录损坏分流缺口
+
+- 闭环：`telegram_bot.py` 里的 `processing_path / classification / tmdb_association / raw_bt_destination` 读取 `bt_pending_state` 时，之前如果 SQLite 能查到行、但 `stage` 真相字段已经被写空或写脏，只会和普通 SQLite 读取异常共用同一条“BT 待处理读取失败”日志；现在会单独打印“BT 待处理记录损坏”中文日志与 `[处理建议]`，并继续让相关入口按状态不可用停路，不把坏记录混成普通读库失败或“没有待处理状态”。
+- 代码：
+  - `app/bot/telegram_bot.py`
+  - `tests/test_telegram_bot.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "bt_processing_path_pending or bt_tmdb_association_pending or bt_pending_repo_rejects_empty_stage_after_read"`
+
 ### 2026-04-18 导入目标路径记录损坏分流缺口
 
 - 闭环：`import_to_library._find_latest_import_target_path()` 之前在 `job_event.find_latest_import_correlation()` 能查到历史导入关联、但命中的 `job_event` 行本身 `task_ref / event_type / target_path / message` 等真相字段已损坏时，会和普通 SQLite 查询异常共用同一条“导入目标路径查询失败”日志；现在会单独打印“导入目标路径记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 按原来的状态读取失败停路，不把坏记录混成普通读库失败或普通“无导入目标路径”。
