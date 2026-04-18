@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 下载完成待轮询列表记录损坏分流缺口
+
+- 闭环：`telegram_bot._poll_pending_download_completion_once()` 之前读取 `download_monitor` 待轮询列表时，如果查询链直接回 `None`，或列表里命中的记录本身 `task_id / task_hash / chat_id` 等真相字段已损坏，只会统一落到“下载完成待轮询列表读取失败”；现在会分别打印“下载完成待轮询列表结果缺失”或“下载完成待轮询列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮后台轮询停路，不把缺失真相混成普通“没有待轮询任务”，也不把坏记录混成普通读库失败。
+- 代码：
+  - `app/bot/telegram_bot.py`
+  - `tests/test_telegram_bot.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list"`
+
 ### 2026-04-18 下载确认上下文记录损坏分流缺口
 
 - 闭环：`add_to_downloader._rebuild_confirm_context()` 之前在 `jobs` 查询能命中待确认下载任务、但行内 `job_id / chat_id / task_id / task_hash / version` 等真相字段已损坏时，会和普通 SQLite 查询异常共用同一条“下载确认上下文查询失败”日志；现在会单独打印“下载确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 按原来的状态读取失败停路，不把坏记录混成普通读库失败或“没有待确认下载”。

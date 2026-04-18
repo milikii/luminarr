@@ -91,7 +91,7 @@ from app.db.bt_pending_repo import (
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -3857,6 +3857,40 @@ def test_poll_pending_download_completion_once_logs_pending_list_failure(capsys:
     output = capsys.readouterr().out
     assert "[下载完成待轮询列表读取失败]" in output
     assert "db down" in output
+    assert "[处理建议]" in output
+    status_service.get_status_text.assert_not_awaited()
+
+
+def test_poll_pending_download_completion_once_logs_pending_list_missing_result(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = SimpleNamespace(list_pending_completion=Mock(return_value=None))
+    status_service = SimpleNamespace(get_status_text=AsyncMock())
+
+    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
+
+    output = capsys.readouterr().out
+    assert "[下载完成待轮询列表结果缺失]" in output
+    assert "download completion pending list result missing" in output
+    assert "[处理建议]" in output
+    status_service.get_status_text.assert_not_awaited()
+
+
+def test_poll_pending_download_completion_once_logs_pending_list_row_corruption(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    repo = SimpleNamespace(
+        list_pending_completion=Mock(
+            side_effect=DownloadMonitorPersistenceError("download monitor chat identity corrupted after read")
+        )
+    )
+    status_service = SimpleNamespace(get_status_text=AsyncMock())
+
+    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
+
+    output = capsys.readouterr().out
+    assert "[下载完成待轮询列表记录损坏]" in output
+    assert "download monitor chat identity corrupted after read" in output
     assert "[处理建议]" in output
     status_service.get_status_text.assert_not_awaited()
 

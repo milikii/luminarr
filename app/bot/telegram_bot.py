@@ -42,7 +42,7 @@ from app.db.bt_pending_repo import (
     BtPendingPersistenceError,
     BtPendingRepo,
 )
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
@@ -775,6 +775,8 @@ async def _poll_pending_download_completion_once(
 ) -> None:
     try:
         pending_records = download_monitor_repo.list_pending_completion()
+        if pending_records is None:
+            raise RuntimeError("download completion pending list result missing")
     except Exception as error:
         _log_download_completion_pending_list_error(error=error)
         return
@@ -2324,10 +2326,26 @@ def _log_download_completion_polling_loop_error(*, error: Exception) -> None:
 
 
 def _log_download_completion_pending_list_error(*, error: Exception) -> None:
+    if str(error) == "download completion pending list result missing":
+        print(
+            f"\033[31m[下载完成待轮询列表结果缺失]\033[0m 原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查 download_monitor 待轮询列表查询返回是否仍带有完整结果；当前这轮不会继续逐条查状态，避免把缺失真相误判成“当前没有待轮询任务”。"
+        )
+        return
+    if _is_download_completion_pending_list_row_corrupted_error(error):
+        print(
+            f"\033[31m[下载完成待轮询列表记录损坏]\033[0m 原因={error}\n"
+            "\033[33m[处理建议]\033[0m 检查 download_monitor 待轮询记录里的 task_id / task_hash / chat_id 等真相字段；当前这轮不会继续逐条查状态，避免把坏记录混成普通读库失败。"
+        )
+        return
     print(
         f"\033[31m[下载完成待轮询列表读取失败]\033[0m 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 download_monitor 表读取和 SQLite 连通性；当前这轮不会继续逐条查状态，但下一轮轮询仍会继续尝试。"
     )
+
+
+def _is_download_completion_pending_list_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
 
 
 def _log_download_completion_polling_config_error(*, reason: str) -> None:
