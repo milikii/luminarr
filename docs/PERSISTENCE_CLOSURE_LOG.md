@@ -1,4 +1,4 @@
-# Persistence closure log (v34)
+# Persistence closure log (v35)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,15 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载监控登记记录损坏分流缺口
+
+- 闭环：`add_to_downloader._register_download_monitor()` 之前在 `download_monitor.register_download()` 已写入任务、但写后回读命中的 `download_monitor` 记录本身 `task_id / task_hash / chat_id / user_id` 等真相字段损坏时，会和普通 SQLite 写入异常共用同一条“下载监控登记失败”日志；现在会单独打印“下载监控登记记录损坏”中文日志与 `[处理建议]`，但继续保持原来的“下载已投递，不回滚副作用”边界，不把坏记录混成普通写库失败。
+- 代码：
+  - `app/services/add_to_downloader.py`
+  - `tests/test_add_to_downloader.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "register_download_monitor_logs_persistence_failure or register_download_monitor_logs_missing_registered_result or register_download_monitor_logs_row_corrupted_result"`
 
 ### 2026-04-18 下载状态观察记录损坏分流缺口
 

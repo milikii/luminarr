@@ -14,7 +14,7 @@ from app.db.approval_repo import (
     ApprovalRecord,
     ApprovalRepo,
 )
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.bt_sources import resolve_bt_source
@@ -1523,6 +1523,13 @@ class AddToDownloaderService:
                     "当前下载已投递，但后续状态跟踪和自动导入真相还没有确认落稳。",
                     flush=True,
                 )
+            elif _is_download_monitor_register_row_corrupted_error(error):
+                print(
+                    f"\033[31m[下载监控登记记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 download_monitor 读回记录里的 task_id / task_hash / chat_id / user_id 等真相字段是否仍然完整；"
+                    "当前下载已投递，但后续状态跟踪和自动导入不会把这条坏记录当成已稳定登记。",
+                    flush=True,
+                )
             else:
                 print(
                     f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
@@ -1676,3 +1683,7 @@ def _pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None,
         ),
         None,
     )
+
+
+def _is_download_monitor_register_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")

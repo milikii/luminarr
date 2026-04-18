@@ -10,7 +10,7 @@ import pytest
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
@@ -802,6 +802,30 @@ def test_register_download_monitor_logs_missing_registered_result(capsys) -> Non
     output = capsys.readouterr().out
     assert "[下载监控登记结果缺失]" in output
     assert "download monitor state missing after register" in output
+    assert "task_id=42" in output
+
+
+def test_register_download_monitor_logs_row_corrupted_result(capsys) -> None:
+    download_monitor_repo = type(
+        "DownloadMonitorRepo",
+        (),
+        {
+            "register_download": lambda self, **kwargs: (_ for _ in ()).throw(
+                DownloadMonitorPersistenceError("download monitor row identity corrupted after read")
+            )
+        },
+    )()
+    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)
+    service._register_download_monitor(
+        task_id="42",
+        task_hash="abc123",
+        title="Dune: Part Two",
+        chat_id=1001,
+        user_id=2001,
+    )
+    output = capsys.readouterr().out
+    assert "[下载监控登记记录损坏]" in output
+    assert "download monitor row identity corrupted after read" in output
     assert "task_id=42" in output
 
 
