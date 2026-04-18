@@ -784,6 +784,36 @@ def test_record_executed_lease_version_logs_missing_result(capsys) -> None:
     assert "approval_record 更新后该审批行是否仍存在" in output
 
 
+def test_record_executed_lease_version_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "mark_downloader_executed": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row executed version corrupted after read"))
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    assert (
+        service._record_executed_lease_version(
+            task_ref="1",
+            task_id="selection:1",
+            task_hash="abc123",
+            executed_lease_version=2,
+        )
+        is None
+    )
+    output = capsys.readouterr().out
+    assert "[下载执行版号记录损坏]" in output
+    assert "approval row executed version corrupted after read" in output
+    assert "lease_version / executed_version" in output
+
+
 def test_record_event_logs_persistence_failure(capsys) -> None:
     job_event_repo = type("JobEventRepo", (), {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_event_repo=job_event_repo)

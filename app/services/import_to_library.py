@@ -1433,6 +1433,13 @@ class ImportToLibraryService:
                     "当前进程内 lease 版本已前进，但持久化真相还没有确认落稳。",
                     flush=True,
                 )
+            elif str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
+                print(
+                    f"\033[31m[导入执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record 里的 lease_version / executed_version 等字段是否仍是完整真相；"
+                    "当前进程内 lease 版本已前进，但不会把坏审批记录当成已稳定回写。",
+                    flush=True,
+                )
             else:
                 print(
                     f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",

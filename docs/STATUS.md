@@ -39,6 +39,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-18，下载 / 导入确认的审批过期判断也已补齐“记录损坏”分流：`is_downloader_pending_expired()` / `is_import_pending_expired()` 若读到损坏的 `approval_record` 行、`status / lease_version / executed_version` 等真相字段已脏掉，现在会分别明确打印“下载确认过期审批记录损坏”或“导入确认过期审批记录损坏”中文日志与 `[处理建议]`，并继续直接 fail-closed，不再把坏审批记录混成普通过期判断失败。
 - 下载 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
 - 导入 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
+- 截至 2026-04-18，下载 / 导入确认收尾的执行版号回写也已补齐“记录损坏”分流：`mark_downloader_executed()` / `mark_import_executed()` 若读到损坏的 `approval_record` 行、`lease_version / executed_version` 等真相字段已脏掉，现在会分别明确打印“下载执行版号记录损坏”或“导入执行版号记录损坏”中文日志与 `[处理建议]`，并继续保持原来的 finalization warning 边界，不再把坏审批记录混成普通回写失败。
 - 截至 2026-04-18，最近补齐的最小分流已从下载 / 导入确认链继续扩到下载状态观察落盘：确认任务回退结果缺失、执行版号结果缺失、审批回退结果缺失、取消结果缺失、任务抢占失败，以及下载状态观察空结果 / 写后回读缺失 / 缺字段、下载完成观察事件记录损坏，都已收口成显式中文日志与 `[处理建议]`，但不改 confirm、状态查询、副作用和 SQLite 真相边界；详细条目继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 截至 2026-04-18，cleanup 事件落盘也已补齐“记录损坏”分流：`job_event.append_event()` 写后回读命中坏行、但 `task_ref / event_type / source_path / target_path` 等真相字段损坏时，现在会明确打印“cleanup 事件记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“cleanup 文本结果继续返回”边界，不再把坏记录混成普通落盘失败。
 - 截至 2026-04-18，导入事件落盘也已补齐“记录损坏”分流：`job_event.append_event()` 写后回读命中坏行、但 `task_ref / event_type / source_path / target_path` 等真相字段损坏时，现在会明确打印“导入事件记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“导入流程继续执行”边界，不再把坏记录混成普通落盘失败。

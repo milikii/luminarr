@@ -1,4 +1,4 @@
-# Persistence closure log (v41)
+# Persistence closure log (v42)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,18 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 下载/导入执行版号回写审批记录损坏分流缺口
+
+- 闭环：`add_to_downloader._record_executed_lease_version()` 和 `import_to_library._record_executed_lease_version()` 之前在 `mark_downloader_executed()` / `mark_import_executed()` 读到损坏的 `approval_record` 行、`lease_version / executed_version` 等真相字段已脏掉时，会和普通 SQLite 更新异常共用同一条“执行版号回写失败”日志；现在会分别单独打印“下载执行版号记录损坏”或“导入执行版号记录损坏”中文日志与 `[处理建议]`，并继续保持原来的 finalization warning 边界，不把坏审批记录混成普通回写失败。
+- 代码：
+  - `app/services/add_to_downloader.py`
+  - `app/services/import_to_library.py`
+  - `tests/test_add_to_downloader.py`
+  - `tests/test_import_to_library.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "record_executed_lease_version"`
+  - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_executed_lease_version"`
 
 ### 2026-04-18 下载/导入确认过期判断审批记录损坏分流缺口
 
