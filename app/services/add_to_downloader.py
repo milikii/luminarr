@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import hashlib
-import json
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import (
@@ -17,17 +14,23 @@ from app.db.approval_repo import (
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
-from app.services.bt_sources import resolve_bt_source
+from app.services.add_pending_context import (
+    CANDIDATE_SOURCE_MISSING_TEXT,
+    SELECT_LOOKUP_FAILED_TEXT,
+    SELECT_NOT_FOUND_TEXT,
+    SELECT_OUT_OF_RANGE_TEXT,
+    SELECT_USAGE_TEXT,
+    AddPendingContextBuilder,
+    PendingAddContext,
+    pending_add_from_json,
+    pending_add_to_json,
+    to_completed_pending_add_context,
+)
 from app.services.search_media import SearchMediaService
 from app.trace_logging import log_trace_event
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 
-SELECT_USAGE_TEXT = "请输入要选择的序号，例如：1"
-SELECT_NOT_FOUND_TEXT = "没有可用的候选结果，请先发一条搜索请求。"
-SELECT_OUT_OF_RANGE_TEXT = "序号超出范围，请按搜索结果里的序号重试。"
-SELECT_LOOKUP_FAILED_TEXT = "搜索候选读取失败，请稍后重试。"
-CANDIDATE_SOURCE_MISSING_TEXT = "该候选缺少可下载链接，请换一个序号。"
 ADD_FAILED_TEXT = "下载投递失败，请稍后重试。"
 ADD_PENDING_STATE_UNAVAILABLE_TEXT = "下载待确认状态写入失败，请稍后重试。"
 ADD_APPROVAL_PENDING_TEXT = (
@@ -93,19 +96,6 @@ class AddResult:
 
 
 @dataclass(frozen=True, slots=True)
-class PendingAddContext:
-    task_ref: str
-    task_id: str
-    task_hash: str
-    title: str
-    source: str
-    downloader_name: str = ""
-    downloader_type: str = "transmission"
-    download_dir: str = ""
-    auto_import_enabled: bool = True
-
-
-@dataclass(frozen=True, slots=True)
 class ConfirmExecutionContext:
     job: JobRecord
     approval_record: ApprovalRecord | None
@@ -131,6 +121,7 @@ class AddToDownloaderService:
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
         self._trace_log_path = trace_log_path
+        self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_add_identities: set[tuple[str, str]] = set()
         self._pending_add_lease_versions: dict[tuple[str, str], int] = {}
         self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
@@ -174,73 +165,16 @@ class AddToDownloaderService:
         downloader_type: str = "transmission",
         download_dir: str = "",
     ) -> str:
-        index = _parse_selection_index(selection_text)
-        if index is None:
-            return SELECT_USAGE_TEXT
-
-        candidate_result = self._search_service.get_cached_candidate_load_result(chat_id, index)
-        if candidate_result.load_failed:
-            return SELECT_LOOKUP_FAILED_TEXT
-        candidate = candidate_result.candidate
-        if candidate is None:
-            first_candidate_result = self._search_service.get_cached_candidate_load_result(chat_id, 1)
-            if first_candidate_result.load_failed:
-                return SELECT_LOOKUP_FAILED_TEXT
-            if first_candidate_result.candidate is None:
-                return SELECT_NOT_FOUND_TEXT
-            return SELECT_OUT_OF_RANGE_TEXT
-
-        source = _resolve_source(candidate)
-        if not source:
-            return CANDIDATE_SOURCE_MISSING_TEXT
-
-        task_ref = str(index)
-        title = str(candidate.get("title", "")).strip() or "(no title)"
-        pending_add = _build_pending_add_context(
-            task_ref=task_ref,
-            title=title,
-            source=source,
+        build_result = self._pending_context_builder.build_from_selection(
+            chat_id=chat_id,
+            selection_text=selection_text,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
         )
-
-        expected_lease_version = self._record_pending_approval(
-            task_ref=task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-        )
-        if expected_lease_version <= 0:
-            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
-        if not self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add):
-            self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
-            self._cancel_pending_approval(
-                task_ref=task_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                expected_lease_version=expected_lease_version,
-            )
-            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_event(
-            task_ref=task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            event_type="downloader.approval_pending",
-            message=title,
-        )
-        self._log_trace(
-            event="approval_pending",
-            result="created",
-            stage="pending",
-            chat_id=chat_id,
-            user_id=user_id,
-            task_ref=task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            detail=title,
-        )
-        return ADD_APPROVAL_PENDING_TEXT.format(title=title, task_ref=task_ref)
+        if build_result.pending_add is None:
+            return build_result.error_text
+        return self._persist_pending_add(chat_id=chat_id, user_id=user_id, pending_add=build_result.pending_add)
 
     async def add_bt_source(
         self,
@@ -281,56 +215,17 @@ class AddToDownloaderService:
         download_dir: str = "",
         auto_import_enabled: bool = True,
     ) -> str:
-        cleaned_source = source.strip()
-        if not cleaned_source:
-            return CANDIDATE_SOURCE_MISSING_TEXT
-
-        cleaned_title = title.strip() or "(no title)"
-        pending_add = _build_pending_add_context(
-            task_ref=_build_bt_task_ref(cleaned_source),
-            title=cleaned_title,
-            source=cleaned_source,
+        build_result = self._pending_context_builder.build_from_source(
+            source=source,
+            title=title,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
             auto_import_enabled=auto_import_enabled,
         )
-        expected_lease_version = self._record_pending_approval(
-            task_ref=pending_add.task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-        )
-        if expected_lease_version <= 0:
-            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
-        if not self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add):
-            self._clear_pending_context(chat_id=chat_id, task_ref=pending_add.task_ref)
-            self._cancel_pending_approval(
-                task_ref=pending_add.task_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                expected_lease_version=expected_lease_version,
-            )
-            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_event(
-            task_ref=pending_add.task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            event_type="downloader.approval_pending",
-            message=cleaned_title,
-        )
-        self._log_trace(
-            event="approval_pending",
-            result="created",
-            stage="pending",
-            chat_id=chat_id,
-            user_id=user_id,
-            task_ref=pending_add.task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            detail=cleaned_title,
-        )
-        return ADD_APPROVAL_PENDING_TEXT.format(title=cleaned_title, task_ref=pending_add.task_ref)
+        if build_result.pending_add is None:
+            return build_result.error_text
+        return self._persist_pending_add(chat_id=chat_id, user_id=user_id, pending_add=build_result.pending_add)
 
     async def confirm_add_by_task_ref(
         self,
@@ -563,7 +458,7 @@ class AddToDownloaderService:
         if lease_recorded is not True:
             finalization_warning = ADD_FINALIZATION_WARNING_TEXT
         if claimed_job:
-            completed_context = _to_completed_pending_add_context(
+            completed_context = to_completed_pending_add_context(
                 pending_add,
                 actual_task_id=result.task_id,
                 actual_task_hash=result.task_hash,
@@ -708,7 +603,7 @@ class AddToDownloaderService:
             )
             return ADD_CANCELLED_TEXT
 
-        pending_add, payload_problem = _pending_add_from_json(pending_job.payload_json)
+        pending_add, payload_problem = pending_add_from_json(pending_job.payload_json)
         if pending_add is None:
             print(
                 f"\033[31m[下载取消载荷损坏]\033[0m chat_id={chat_id} task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；当前取消会直接返回状态读取失败，避免把持久化坏数据误判成“没有待取消下载”。",
@@ -1064,6 +959,50 @@ class AddToDownloaderService:
         self._pending_add_contexts_by_chat_ref[key] = pending_add
         self._latest_pending_task_ref_by_chat[chat_id] = pending_add.task_ref
 
+    def _persist_pending_add(
+        self,
+        *,
+        chat_id: int,
+        user_id: int | None,
+        pending_add: PendingAddContext,
+    ) -> str:
+        expected_lease_version = self._record_pending_approval(
+            task_ref=pending_add.task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+        )
+        if expected_lease_version <= 0:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
+        if not self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add):
+            self._clear_pending_context(chat_id=chat_id, task_ref=pending_add.task_ref)
+            self._cancel_pending_approval(
+                task_ref=pending_add.task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        self._record_event(
+            task_ref=pending_add.task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            event_type="downloader.approval_pending",
+            message=pending_add.title,
+        )
+        self._log_trace(
+            event="approval_pending",
+            result="created",
+            stage="pending",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=pending_add.task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            detail=pending_add.title,
+        )
+        return ADD_APPROVAL_PENDING_TEXT.format(title=pending_add.title, task_ref=pending_add.task_ref)
+
     def _record_pending_job(
         self,
         *,
@@ -1080,7 +1019,7 @@ class AddToDownloaderService:
                 task_ref=pending_add.task_ref,
                 task_id=pending_add.task_id,
                 task_hash=pending_add.task_hash,
-                payload_json=_pending_add_to_json(pending_add),
+                payload_json=pending_add_to_json(pending_add),
             )
             if pending_job is None:
                 raise RuntimeError(DOWNLOADER_PENDING_JOB_NONE_REASON)
@@ -1131,7 +1070,7 @@ class AddToDownloaderService:
         if job is None:
             return None, False
 
-        pending_add, payload_problem = _pending_add_from_json(job.payload_json)
+        pending_add, payload_problem = pending_add_from_json(job.payload_json)
         if pending_add is None:
             print(
                 f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；若当前进程里也没有待确认上下文，当前 confirm 会直接返回状态读取失败，避免把持久化坏数据误判成“没有待确认下载”。",
@@ -1293,7 +1232,7 @@ class AddToDownloaderService:
                 lease_owner=lease_owner,
                 task_id=completed_add.task_id,
                 task_hash=completed_add.task_hash,
-                payload_json=_pending_add_to_json(completed_add),
+                payload_json=pending_add_to_json(completed_add),
             )
             if marked is None:
                 raise RuntimeError(DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
@@ -1602,137 +1541,6 @@ class AddToDownloaderService:
             f"原因={error}\n"
             "\033[33m[处理建议]\033[0m 检查下载器地址、认证信息、目标目录和磁力链接后重试。"
         )
-
-
-def _parse_selection_index(text: str) -> int | None:
-    cleaned = text.strip()
-    if not cleaned.isdigit():
-        return None
-    value = int(cleaned)
-    if value <= 0:
-        return None
-    return value
-
-
-def _resolve_source(candidate: Mapping[str, Any]) -> str:
-    return resolve_bt_source(candidate)
-
-
-def _build_pending_add_context(
-    *,
-    task_ref: str,
-    title: str,
-    source: str,
-    downloader_name: str = "",
-    downloader_type: str = "transmission",
-    download_dir: str = "",
-    auto_import_enabled: bool = True,
-) -> PendingAddContext:
-    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
-    return PendingAddContext(
-        task_ref=task_ref,
-        task_id=f"selection:{task_ref}",
-        task_hash=f"candidate:{digest}",
-        title=title,
-        source=source,
-        downloader_name=downloader_name.strip(),
-        downloader_type=downloader_type.strip() or "transmission",
-        download_dir=download_dir.strip(),
-        auto_import_enabled=bool(auto_import_enabled),
-    )
-
-
-def _to_completed_pending_add_context(
-    pending_add: PendingAddContext,
-    *,
-    actual_task_id: str,
-    actual_task_hash: str,
-) -> PendingAddContext:
-    return PendingAddContext(
-        task_ref=pending_add.task_ref,
-        task_id=actual_task_id.strip(),
-        task_hash=actual_task_hash.strip(),
-        title=pending_add.title,
-        source=pending_add.source,
-        downloader_name=pending_add.downloader_name,
-        downloader_type=pending_add.downloader_type,
-        download_dir=pending_add.download_dir,
-        auto_import_enabled=pending_add.auto_import_enabled,
-    )
-
-
-def _build_bt_task_ref(source: str) -> str:
-    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
-    return f"bt-{digest[:8]}"
-
-
-def _pending_add_to_json(pending_add: PendingAddContext) -> str:
-    return json.dumps(
-        {
-            "task_ref": pending_add.task_ref,
-            "task_id": pending_add.task_id,
-            "task_hash": pending_add.task_hash,
-            "title": pending_add.title,
-            "source": pending_add.source,
-            "downloader_name": pending_add.downloader_name,
-            "downloader_type": pending_add.downloader_type,
-            "download_dir": pending_add.download_dir,
-            "auto_import_enabled": pending_add.auto_import_enabled,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-    )
-
-
-def _pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None, str | None]:
-    cleaned_payload = payload_json.strip()
-    if not cleaned_payload:
-        return None, "payload_json empty"
-    try:
-        payload = json.loads(cleaned_payload)
-    except json.JSONDecodeError:
-        return None, "payload_json invalid json"
-    if not isinstance(payload, dict):
-        return None, "payload_json not object"
-
-    task_ref = str(payload.get("task_ref", "")).strip()
-    task_id = str(payload.get("task_id", "")).strip()
-    task_hash = str(payload.get("task_hash", "")).strip()
-    title = str(payload.get("title", "")).strip()
-    source = str(payload.get("source", "")).strip()
-    downloader_name = str(payload.get("downloader_name", "")).strip()
-    downloader_type = str(payload.get("downloader_type", "")).strip() or "transmission"
-    download_dir = str(payload.get("download_dir", "")).strip()
-    auto_import_enabled = payload.get("auto_import_enabled", True)
-    if not task_ref or not task_id or not task_hash or not title or not source:
-        missing_fields = [
-            field_name
-            for field_name, value in (
-                ("task_ref", task_ref),
-                ("task_id", task_id),
-                ("task_hash", task_hash),
-                ("title", title),
-                ("source", source),
-            )
-            if not value
-        ]
-        return None, "missing required fields: " + ",".join(missing_fields)
-    return (
-        PendingAddContext(
-            task_ref=task_ref,
-            task_id=task_id,
-            task_hash=task_hash,
-            title=title,
-            source=source,
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-            download_dir=download_dir,
-            auto_import_enabled=bool(auto_import_enabled),
-        ),
-        None,
-    )
-
-
 def _is_download_monitor_register_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
 

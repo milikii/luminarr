@@ -29,6 +29,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    search_media_slimming_log_text = Path("docs/SEARCH_MEDIA_SLIMMING_LOG.md").read_text(encoding="utf-8")
     add_to_downloader_slimming_log_text = Path("docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md").read_text(encoding="utf-8")
     import_to_library_slimming_log_text = Path("docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md").read_text(encoding="utf-8")
     telegram_bot_slimming_log_text = Path("docs/TELEGRAM_BOT_SLIMMING_LOG.md").read_text(encoding="utf-8")
@@ -43,6 +44,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/STATUS.md" in readme_text
+    assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in readme_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in readme_text
     assert "docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md" in readme_text
     assert "docs/TELEGRAM_BOT_SLIMMING_LOG.md" in readme_text
@@ -53,6 +55,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
 
     assert "docs/STATUS.md" in index_text
+    assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in index_text
     assert "docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md" in index_text
     assert "docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md" in index_text
     assert "docs/TELEGRAM_BOT_SLIMMING_LOG.md" in index_text
@@ -76,8 +79,9 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/DECISIONS.md" in agents_text
     assert "docs/STATUS.md" in agents_text
 
-    assert "add_to_downloader.py" in next_step_text and "下载编排层瘦身 / 模块化" in next_step_text
-    assert "add_to_downloader.py" in status_text and "下载编排层瘦身 / 模块化" in status_text
+    assert "search_media.py" in next_step_text and "搜索编排层瘦身 / 模块化" in next_step_text
+    assert "search_media.py" in status_text and "搜索编排层瘦身 / 模块化" in status_text
+    assert "search_media.py" in search_media_slimming_log_text and "搜索编排层瘦身 / 模块化" in search_media_slimming_log_text
     assert "add_to_downloader.py" in add_to_downloader_slimming_log_text and "下载编排层瘦身 / 模块化" in add_to_downloader_slimming_log_text
     assert "import_to_library.py" in import_to_library_slimming_log_text and "导入编排层瘦身 / 模块化" in import_to_library_slimming_log_text
     assert "telegram_bot.py" in telegram_bot_slimming_log_text and "渠道层瘦身 / 模块化" in telegram_bot_slimming_log_text
@@ -104,6 +108,7 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     assert "docs/DOWNLOAD_COMPLETION_POLLING_LOG.md" in status_text
     assert "docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md" in status_text
     assert "docs/FEISHU_LONG_CONNECTION_RISK_LOG.md" in status_text
+    assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in status_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in status_text
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in status_text
 
@@ -151,14 +156,29 @@ def test_download_completion_polling_log_keeps_completed_line_detail() -> None:
     assert 'tests/test_telegram_bot.py -k "download_completion_polling or post_download_auto_import_scheduler"' in log_text
 
 
-def test_add_to_downloader_slimming_log_keeps_current_line_detail() -> None:
-    log_text = Path("docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md").read_text(encoding="utf-8")
+def test_search_media_slimming_log_keeps_current_line_detail() -> None:
+    log_text = Path("docs/SEARCH_MEDIA_SLIMMING_LOG.md").read_text(encoding="utf-8")
 
     assert "## 1. Current line" in log_text
     assert "## 2. Risk groups" in log_text
     assert "## 3. Focused verification" in log_text
     assert "## 4. Maintenance rule" in log_text
 
+    assert "query 解析 / TMDB 查询 / 搜索请求编排" in log_text
+    assert "歧义澄清 / 候选持久化 / 回复格式化" in log_text
+    assert 'tests/test_search_media.py -k "parse_movie_query or tmdb or search_and_format_with_results or search_backend_failure"' in log_text
+    assert 'tests/test_search_media.py -k "clarification or candidate or quality_from_title"' in log_text
+
+
+def test_add_to_downloader_slimming_log_keeps_completed_line_detail() -> None:
+    log_text = Path("docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md").read_text(encoding="utf-8")
+
+    assert "## 1. Completed line" in log_text
+    assert "## 2. Risk groups" in log_text
+    assert "## 3. Focused verification" in log_text
+    assert "## 4. Maintenance rule" in log_text
+
+    assert "app/services/add_pending_context.py" in log_text
     assert "候选选择 / 来源解析 / 待确认写入" in log_text
     assert "confirm 执行 / 下载监控登记 / 事件落盘" in log_text
     assert 'tests/test_add_to_downloader.py -k "add_by_selection or add_candidate_source or record_pending_approval or record_pending_job"' in log_text
