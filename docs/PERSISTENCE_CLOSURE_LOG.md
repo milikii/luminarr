@@ -11,6 +11,15 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 导入确认上下文记录损坏分流缺口
+
+- 闭环：`import_to_library._rebuild_confirm_context()` 之前在 `jobs.get_import_job_for_chat_ref()` 命中坏行、但 `job_id / chat_id / task_ref / task_id / task_hash / version` 等真相字段已损坏时，只会和普通 SQLite 查询异常共用同一条“导入确认上下文查询失败”日志；现在会单独打印“导入确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 直接返回状态读取失败，不把坏任务记录混成普通查询失败或“没有待确认导入”。
+- 代码：
+  - `app/services/import_to_library.py`
+  - `tests/test_import_to_library.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "context_lookup or context_row_corruption"`
+
 ### 2026-04-18 导入命名真相记录损坏分流缺口
 
 - 闭环：`import_to_library._resolve_normalized_naming_truth()` 之前在 `job_event` 命名真相查询能命中记录、但行内 `task_ref / event_type / message` 等字段已损坏时，只会和普通 SQLite 查询异常共用同一条“导入命名真相查询失败”日志；现在会单独打印“导入命名真相记录损坏”中文日志与 `[处理建议]`，并继续保持原来的 fallback：退回下载源名称做命名，不把坏记录混成普通查询失败。

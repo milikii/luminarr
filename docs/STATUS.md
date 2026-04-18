@@ -52,6 +52,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-18，自动导入低质量资源跳过事件写入也已补齐“记录损坏”分流：`job_event` 跳过事件已写入、但写后回读命中坏行、`task_ref / event_type` 等真相字段损坏时，现在会明确打印“自动导入跳过事件记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态不可用边界停路，不再把坏记录混成普通落盘失败或稳定落盘成功。
 - 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐“空 lease/空结果”分流：`request_downloader_approval()` / `request_import_approval()` 若回 `0`，现在会明确打印“待确认审批结果缺失”中文日志并直接 fail-closed，不再偷偷退回进程内 lease 继续放行可 confirm 状态。
 - 截至 2026-04-18，下载 / 导入待确认任务创建阶段也已补齐“空返回值”分流：`upsert_downloader_job_pending()` / `upsert_import_job_pending()` 若直接回 `None`，现在会明确打印“待确认任务结果缺失”中文日志并直接 fail-closed，不再把 `jobs` 真相缺口混成可 confirm 的待确认任务。
+- 截至 2026-04-18，导入 confirm 上下文重建也已补齐“记录损坏”分流：`_rebuild_confirm_context()` 在 `jobs` 命中坏行、`job_id / chat_id / task_ref / task_id / task_hash / version` 等字段损坏时，现在会明确打印“导入确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 直接返回状态读取失败，不再把坏任务记录混成普通查询失败或“没有待确认导入”。
 - 截至 2026-04-18，导入命名真相读取也已补齐“记录损坏”分流：`_resolve_normalized_naming_truth()` 在 `job_event` 命中坏行、`task_ref / event_type / message` 等字段损坏时，现在会明确打印“导入命名真相记录损坏”中文日志与 `[处理建议]`，并继续按原来的 fallback 退回下载源名称做命名，不再把坏记录混成普通查询失败。
 - 截至 2026-04-18，导入入口的 `raw_bt` 判定也已补齐“记录损坏”分流：`_is_raw_bt_task()` 在 `jobs` 能查到下载任务、但 `job_id / chat_id / task_ref / payload_json` 等真相字段损坏时，现在会明确打印“导入 raw_bt 判定记录损坏”中文日志与 `[处理建议]`，并继续让导入入口直接返回查询失败，不再把坏任务记录混成普通查询失败或普通“不是 raw_bt”。
 - 截至 2026-04-18，Telegram message / callback 去重落盘也已补齐“结果缺失”分流：`record_message_update()` / `record_callback_update()` 若异常回 `None`，现在会明确打印“Telegram 更新去重结果缺失”中文日志与 `[处理建议]`，并继续让对应入口停路，不再把去重真相缺口混成普通重复 update。
@@ -97,6 +98,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-17，`passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- 当前主线 focused verification：2026-04-18，`2 passed, 131 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "context_lookup or context_row_corruption"`）
 - 当前主线 focused verification：2026-04-18，`3 passed, 129 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "naming_truth"`）
 - 当前主线 focused verification：2026-04-18，`8 passed, 123 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "raw_bt"`）
 - 当前主线 focused verification：2026-04-18，`6 passed, 147 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "dedup_result_missing or dedup_persist_fails or update_id_invalid or callback_id_missing"`）

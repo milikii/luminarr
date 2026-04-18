@@ -1522,10 +1522,18 @@ class ImportToLibraryService:
         try:
             job = self._job_repo.get_import_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
         except Exception as error:
-            print(
-                f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认导入”或“未找到对应下载任务”。",
-                flush=True,
-            )
+            if _is_job_row_corrupted_error(error):
+                print(
+                    f"\033[31m[导入确认上下文记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前导入任务的 job_id / chat_id / task_ref / task_id / task_hash / version 等真相字段；"
+                    "当前 confirm 会直接返回状态读取失败，避免把坏任务记录误判成普通查询失败或“没有待确认导入”。",
+                    flush=True,
+                )
+            else:
+                print(
+                    f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认导入”或“未找到对应下载任务”。",
+                    flush=True,
+                )
             return None, True
         if job is None:
             return None, False

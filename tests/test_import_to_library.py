@@ -281,6 +281,33 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_on_context_lookup_
     assert "task_ref=87" in output
 
 
+def test_confirm_import_by_task_ref_returns_state_unavailable_on_context_row_corruption(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    job_repo = type(
+        "JobRepo",
+        (),
+        {
+            "get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(
+                JobPersistenceError("job row identity corrupted after read")
+            )
+        },
+    )()
+    get_import_source = AsyncMock(return_value=None)
+    service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
+
+    text = _run(service.confirm_import_by_task_ref("87", chat_id=1001))
+
+    assert text == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+    get_import_source.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[导入确认上下文记录损坏]" in output
+    assert "chat_id=1001" in output
+    assert "task_ref=87" in output
+    assert "job row identity corrupted after read" in output
+    assert "[处理建议]" in output
+
+
 @pytest.mark.parametrize(
     ("payload_json", "expected_summary"),
     [
