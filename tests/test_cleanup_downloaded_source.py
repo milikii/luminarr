@@ -1164,6 +1164,51 @@ def test_cleanup_by_task_ref_logs_missing_appended_event_result(
     assert "当前 cleanup 文本结果已返回，但这次执行记录真相还没有确认落稳" in captured.out
 
 
+def test_cleanup_by_task_ref_logs_row_corrupted_appended_event(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    event_repo.append_event(
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    service = CleanupDownloadedSourceService(event_repo)
+
+    def _raise_row_corrupted(**_: object) -> None:
+        raise JobEventPersistenceError("job_event row identity corrupted after read")
+
+    monkeypatch.setattr(event_repo, "append_event", _raise_row_corrupted)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    captured = capsys.readouterr()
+    assert "已清理下载源资产" in reply
+    assert not source_file.exists()
+    assert target_file.exists()
+    assert "[cleanup 事件记录损坏]" in captured.out
+    assert "task_ref=87" in captured.out
+    assert "event_type=cleanup.succeeded" in captured.out
+    assert "job_event row identity corrupted after read" in captured.out
+    assert "当前 cleanup 文本结果已返回，但不会把这条坏事件当成已稳定落盘" in captured.out
+
+
 def test_inspect_by_task_ref_logs_correlation_query_failure_and_returns_missing_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -1,4 +1,4 @@
-# Persistence closure log (v37)
+# Persistence closure log (v38)
 
 > 目的：承接当前“持久化吞错收口”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环、focused tests 和 commit 轨迹优先记在这里。
@@ -10,6 +10,15 @@
 - shared private-chat runtime 最小抽离已完成；四渠道都先走同一个 shared wrapper
 
 ## 2. Recent closed loops
+
+### 2026-04-18 cleanup 事件记录损坏分流缺口
+
+- 闭环：`cleanup_downloaded_source._record_event()` 之前在 `job_event.append_event()` 已写入 cleanup 事件、但写后回读命中的 `job_event` 行本身 `task_ref / event_type / source_path / target_path` 等真相字段损坏时，会和普通 SQLite 写入异常共用同一条“cleanup 事件写入失败”日志；现在会单独打印“cleanup 事件记录损坏”中文日志与 `[处理建议]`，但继续保持原来的“cleanup 文本结果继续返回”边界，不把坏记录混成普通写库失败。
+- 代码：
+  - `app/services/cleanup_downloaded_source.py`
+  - `tests/test_cleanup_downloaded_source.py`
+- focused tests：
+  - `.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "cleanup_by_task_ref_logs_event_append_failure or cleanup_by_task_ref_logs_missing_appended_event_result or cleanup_by_task_ref_logs_row_corrupted_appended_event"`
 
 ### 2026-04-18 导入事件记录损坏分流缺口
 
