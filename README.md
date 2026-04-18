@@ -112,32 +112,14 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- 截至 2026-04-14，当前四渠道真实私聊 smoke 已补齐 Telegram / personal WeChat / Feishu / WeCom，cleanup 四渠道验证窗口已完成；cleanup 详细台账继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`，当前主线的详细持久化收口台账看 `docs/PERSISTENCE_CLOSURE_LOG.md`，`docs/STATUS.md` 只保留短快照。
-- 截至 2026-04-15，`shared private-chat runtime` 最小抽离也已完成：owner 已移到 `app/bot/private_chat_runtime.py`，四个渠道都先走同一个 shared wrapper，`微信登录` 的 Telegram 文本/媒资能力也已改成显式注入。
-- 当前唯一最小主线：持久化吞错收口。
-- 当前目标：把剩余 `except Exception: pass/return None`、`None/False` 混写异常态的持久化路径继续改成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`，不动 workflow 真相和副作用边界。
-- 完成标准：
-  - 剩余持久化吞错路径都能区分“真没数据”和“持久化异常”
-  - 四渠道现有 cleanup / search / approval / import / status 协议不回退
-  - verification docs gate 与 cleanup 完成态证据持续通过
-- cleanup 已完成基线仍需保持：
-  - `tests/test_cleanup_cross_channel_smoke.py` 继续保障四渠道 cleanup discoverability / inspect / execution / rejection guidance / post-cleanup confirmation / mixed-case 英文 `cleanup / cleanup inspect` 输入 / chat-scoped `task_ref` -> jobs -> import correlation，且已把 `job_event` 关联查询失败、缺结构化 `source_path/target_path` 两类 identity retention，以及 `guard-rejected` rejection guidance 验证进来。
-  - cleanup 完成态继续要求 verification docs gate 持续通过，避免入口页已经切主线、但 cleanup 完成证据门禁悄悄回退。
-  - 当前 cleanup 窗口的本地 gate 入口有十条：`make test-cleanup-smoke` 只跑四渠道 smoke gate，`make test-cleanup-service-not-ready` 单独盯 service-not-ready observability，`make test-cleanup-telegram` 跑 Telegram cleanup 入口回归，`make test-cleanup-personal-wechat` 跑 personal WeChat cleanup 入口回归，`make test-cleanup-feishu` 跑 Feishu cleanup 入口回归，`make test-cleanup-wecom` 跑 WeCom cleanup 入口回归，`make test-cleanup-feishu-webhook` 跑 Feishu webhook cleanup 入口回归，`make test-cleanup` 跑 cleanup 聚合回归，`make test-cleanup-docs-gate` 跑 cleanup verification docs gate，`make test-cleanup-window` 会连续跑 smoke gate、cleanup 聚合回归和 verification docs gate；它们都不能替代四渠道真实私聊 smoke 证据。
-  - 如果当前只想确认 WeCom 本地 callback 已就绪，先确保 `app.main` 正在运行，再跑 `curl -si http://127.0.0.1:18889/wecom/callback`；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于本地入口可达，不等于 WeCom 真实私聊 smoke 已完成；如果直接得到 `connection refused`，先检查应用有没有起起来。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改。
-  - 如果当前环境没有 `make`，就直接用底层一行命令跑：四渠道 smoke gate 用 `.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`，cleanup service-not-ready gate 用 `.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`，Telegram cleanup 回归用 `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`，cleanup 聚合回归用 `.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`，cleanup docs gate 用 `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`，其余单渠道与窗口组合 gate 继续看 `docs/GETTING_STARTED.md` 里的等价一行命令。
+- **当前唯一主线**：持久化吞错收口（`except Exception: pass/return None`、`None/False` 混写异常态继续改成显式中文日志 + `[处理建议]`，不动 workflow 真相和副作用边界）。
+- **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
+- **当前快照**：`docs/STATUS.md`
+- **详细闭环台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（按主题分组，不再逐天追加）
+- **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
+- **本地回归命令**：`make test-cleanup-*` 系列入口见 `docs/GETTING_STARTED.md`；当前主线的 focused tests 入口收口在 `docs/PERSISTENCE_CLOSURE_LOG.md` 的 2.1–2.4 分组。
 - 这一步只允许修剩余持久化吞错、shared runtime 回归和渠道胶水回归；不做多渠道平台化，也不新增自动 cleanup、批量 cleanup 或删种。
-- 当前主线完成后，下一步按顺序推进：
-  1. Feishu 长连接私有 API 风险收口
-  2. Feishu 私聊事件解析器去重
-  3. 独立后台下载完成轮询剩余少量回归与验证收口
-  4. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
-  5. `.ass` 字幕支持评估与最小实现
-  6. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-  7. 最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-  8. BT 共享确定性评分器
-  9. Jellyfin / Plex 支持（后续）
-  10. plugin 体系后置评估
+- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（Feishu 长连接风险 → Feishu 事件解析去重 → 后台下载完成轮询收口 → 编排层瘦身 → `series / anime` 名称解析 → 等等）。
 
 ## 6. 当前明确不做
 

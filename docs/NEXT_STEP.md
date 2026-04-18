@@ -33,6 +33,7 @@
   - `docs/STATUS.md` 只保留当前快照
   - `docs/PERSISTENCE_CLOSURE_LOG.md` 承接当前主线详细闭环
   - `docs/CLEANUP_VERIFICATION_WINDOW.md` 只承接 cleanup 已完成窗口证据
+- 新闭环按主题合并进 `PERSISTENCE_CLOSURE_LOG.md` 2.1~2.5 已有分组，**不再开新的 `### 2026-xx-xx 分流缺口` 小节；`STATUS.md` 只补一句当前结论或风险，不逐天追加 `截至 ...` 条目**
 - 保持 cleanup 完成态文档结论稳定：`README.md`、`docs/NEXT_STEP.md`、`docs/STATUS.md` 不要回退成“cleanup 仍在进行中”
 - 保持 verification docs gate 可持续通过；当前 docs gate 只需要锁住入口一致性、状态页短快照结构、固定验证快照和当前主线台账入口
 
@@ -46,9 +47,18 @@
 
 ## Done when
 
-- 剩余持久化路径里的 `except Exception: pass/return None`、`None/False` 混写异常态已基本收口成显式中文日志与 `[处理建议]`
-- 当前主线下已经改过的下载 / 导入 / 搜索 fail-closed 协议没有回退
-- shared runtime、approval、`jobs`、SQLite 真相和四渠道现有 cleanup / search / import / status / watchlist / btsub 协议没有回退
+当前主线视为 **已基本完成**，触发以下任一可测量条件即停止，并通知用户切换到下面 `After this step` 的第 1 项：
+
+1. `docs/PERSISTENCE_CLOSURE_LOG.md` 的 2.1–2.4 主题分组已覆盖当前业务代码里全部对外 repo 方法（`approval_repo` / `job_repo` / `job_event_repo` / `download_monitor_repo` / `clarification_repo` / `candidate_repo` / `watchlist_repo` / `bt_subscription_repo` / `bt_pending_repo` / `telegram_update_repo`），且每组都有一条 focused tests 入口命令可以复制运行；
+2. 或者本轮候选闭环的代码变更 **< 20 行**、本质只是为同一个 repo API 再拆一条 `if/elif/log` 诊断分支（收益递减），且上一轮也是同类微闭环——此时视为已越过完成线，直接停止；
+3. 或者 `git grep 'except Exception:\s*\(pass\|return None\)' app/services app/db app/bot` 命中数 ≤ 10 且均已在 `PERSISTENCE_CLOSURE_LOG.md` 的维护规则里白名单化。
+
+满足其中任一条时，**不要再新增 `Separate X diagnostics` 小 commit**，直接回到本文件 `After this step` 第 1 项（Feishu 长连接私有 API 风险收口）。
+
+附加约束（不算退出条件，只是不得违反）：
+
+- 四渠道现有 cleanup / search / approval / import / status / watchlist / btsub 协议不回退
+- `verification docs gate` 与 cleanup 完成态证据持续通过
 - `docs/STATUS.md` / `docs/NEXT_STEP.md` / `README.md` / `docs/PERSISTENCE_CLOSURE_LOG.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 继续保持分层一致，不重新写回长台账
 
 ## After this step

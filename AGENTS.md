@@ -114,18 +114,9 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 ## 8. Current priority
 
-The current next smallest path is:
+当前唯一主线是**持久化吞错收口**；详细目标、可测量退出条件和 `After this step` 顺序一律看 `docs/NEXT_STEP.md`，当前快照看 `docs/STATUS.md`，详细闭环看 `docs/PERSISTENCE_CLOSURE_LOG.md`，cleanup 已完成证据看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 
-- **persistent swallowing-error closure（把剩余 `except Exception: pass/return None`、`None/False` 混写异常态的持久化路径继续收口成“区分真缺数据和 SQLite / 配置异常”的显式中文日志与 `[处理建议]`，不改 workflow 真相和副作用边界）**
-
-Detailed current goal and exit conditions live in:
-
-- `docs/NEXT_STEP.md`
-- `docs/STATUS.md`
-
-Completed cleanup verification evidence lives in:
-
-- `docs/CLEANUP_VERIFICATION_WINDOW.md`
+**诊断分流递减自检**：若本轮候选闭环的代码变更 < 20 行、只是对同一个 repo 方法再拆一条 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，则视为收益递减；本轮完成并提交后**直接停止**，把"当前主线可宣告完成"汇报给用户，不要自动进入下一轮再拆一条分流。
 
 ## 9. Runtime rules
 
@@ -172,6 +163,7 @@ Completed cleanup verification evidence lives in:
 - Run verification yourself; do not stop at “here is the command”.
 - After implementation, review the diff for scope creep, debug leftovers, and temporary files.
 - If behavior, rules, or entrypoints changed, update the relevant docs in the same turn.
+- **诊断分流递减停机规则**：本轮代码变更 `< 20 行` 且只是为同一个 repo 方法追加 `if/elif/log` 诊断分支时，视为收益递减。本轮完成并提交后**直接停止**并请用户确认是否宣告当前主线完成、切换到 `After this step` 第 1 项；不要自动连续第 2/3 轮再拆一条分流。
 - 同一会话默认最多连续推进 10 轮；到第 10 轮结束后，下一次继续施工时应新开会话，不要把第 11 轮继续叠在旧线程里。
 - 长会话重开时，优先用“最新 commit hash + 1 段当前快照 + 1 段当前主线详细闭环”做交接，不要把整段历史对话当执行上下文。
 

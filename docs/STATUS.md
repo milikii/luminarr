@@ -29,62 +29,18 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
+当前快照按主题归纳；所有具体路径、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
+
 - 当前唯一主线仍是“持久化吞错收口”；cleanup 四渠道验证窗口已完成，shared private-chat runtime 最小抽离已完成。
-- Telegram / personal WeChat / Feishu / WeCom 四个正式私聊入口继续共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相。
-- 当前也已落一层最小可追溯 trace baseline：shared private-chat 入站/回包，以及下载/导入待确认与 confirm 关键节点会统一追加到 `logs/trace.log`，不替代现有中文故障日志。
-- 下载 / 导入待确认与 confirm 主链已经持续收口到 fail-closed：`approval_record` 行缺失、lease/version 读写异常、审批回退失败、成功收尾回写失败，都不会再伪装成普通 not pending 或纯成功。
-- 截至 2026-04-17，共享 `approval_repo` 的 approve / cancel / restore 三条审批更新路径里，`approval_record` 缺失行也已从普通状态冲突里拆出单独中文日志与 `[处理建议]`；confirm / cancel 仍保持原来的 fail-closed 文本，不改审批真相和副作用边界。
-- 导入 confirm 的历史目标路径查询、审批过期判断也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通“无导入目标路径”或“未过期”。
-- 下载 confirm 的审批过期判断现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通“未过期”。
-- 截至 2026-04-18，下载 / 导入确认的审批过期判断也已补齐“记录损坏”分流：`is_downloader_pending_expired()` / `is_import_pending_expired()` 若读到损坏的 `approval_record` 行、`status / lease_version / executed_version` 等真相字段已脏掉，现在会分别明确打印“下载确认过期审批记录损坏”或“导入确认过期审批记录损坏”中文日志与 `[处理建议]`，并继续直接 fail-closed，不再把坏审批记录混成普通过期判断失败。
-- 下载 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
-- 导入 confirm 的任务抢占阶段现在也已补齐“结果缺失”和“查询失败”分流；缺失真相时会明确打印中文日志与 `[处理建议]`，不再混成普通 lease 更新失败。
-- 截至 2026-04-18，下载 / 导入确认收尾的执行版号回写也已补齐“记录损坏”分流：`mark_downloader_executed()` / `mark_import_executed()` 若读到损坏的 `approval_record` 行、`lease_version / executed_version` 等真相字段已脏掉，现在会分别明确打印“下载执行版号记录损坏”或“导入执行版号记录损坏”中文日志与 `[处理建议]`，并继续保持原来的 finalization warning 边界，不再把坏审批记录混成普通回写失败。
-- 截至 2026-04-18，下载 / 导入 confirm 里的执行版号查询也已补齐“记录损坏”分流：`get_downloader_approval()` / `get_import_approval()` 若读到损坏的 `approval_record` 行、`status / lease_version / executed_version` 等真相字段已脏掉，现在会分别明确打印“下载确认执行版号记录损坏”或“导入确认执行版号记录损坏”中文日志与 `[处理建议]`，并继续直接 fail-closed，不再把坏审批记录混成普通查询失败或“没有待确认”。
-- 截至 2026-04-18，最近补齐的最小分流已从下载 / 导入确认链继续扩到下载状态观察落盘：确认任务回退结果缺失、执行版号结果缺失、审批回退结果缺失、取消结果缺失、任务抢占失败，以及下载状态观察空结果 / 写后回读缺失 / 缺字段、下载完成观察事件记录损坏，都已收口成显式中文日志与 `[处理建议]`，但不改 confirm、状态查询、副作用和 SQLite 真相边界；详细条目继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
-- 截至 2026-04-18，cleanup 事件落盘也已补齐“记录损坏”分流：`job_event.append_event()` 写后回读命中坏行、但 `task_ref / event_type / source_path / target_path` 等真相字段损坏时，现在会明确打印“cleanup 事件记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“cleanup 文本结果继续返回”边界，不再把坏记录混成普通落盘失败。
-- 截至 2026-04-18，导入事件落盘也已补齐“记录损坏”分流：`job_event.append_event()` 写后回读命中坏行、但 `task_ref / event_type / source_path / target_path` 等真相字段损坏时，现在会明确打印“导入事件记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“导入流程继续执行”边界，不再把坏记录混成普通落盘失败。
-- 截至 2026-04-18，下载事件落盘也已补齐“记录损坏”分流：`job_event.append_event()` 写后回读命中坏行、但 `task_ref / event_type` 等真相字段损坏时，现在会明确打印“下载事件记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“下载流程继续执行”边界，不再把坏记录混成普通落盘失败。
-- 截至 2026-04-18，下载投递后的监控登记也已补齐“记录损坏”分流：`download_monitor.register_download()` 写后回读命中坏行、但 `task_id / task_hash / chat_id / user_id` 等真相字段损坏时，现在会明确打印“下载监控登记记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“下载已投递、不回滚副作用”边界，不再把坏记录混成普通登记失败。
-- 截至 2026-04-18，下载状态观察写后回读也已补齐“记录损坏”分流：`download_monitor.record_status()` 写后回读命中坏行、但 `task_id / task_hash / status_code / percent_done` 等真相字段损坏时，现在会明确打印“下载状态观察记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态 warning 停路，不再把坏记录混成普通落盘失败。
-- 截至 2026-04-18，搜索待澄清状态读取也已补齐“记录损坏”分流：`clarification_state` 能查到行、但 `query` 真相字段已空或脏掉时，现在会明确打印“搜索澄清态记录损坏”中文日志与 `[处理建议]`，并继续让相关入口按状态不可用停路，不再把坏记录混成普通读库失败或“无待澄清记录”。
-- 截至 2026-04-18，搜索待澄清状态写入后回读也已补齐“命中坏记录”分流：`clarification_state` 写入后立即回读命中坏行、但 `query` 真相字段为空或脏掉时，现在会明确打印“搜索澄清态写入命中坏记录”中文日志与 `[处理建议]`，并继续按原来的待澄清状态写入失败文本停路，不再把坏记录混成普通写入失败或成功进入待澄清状态。
-- 截至 2026-04-18，`watchlist` 写入也已补齐“命中坏记录”分流：`watchlist_item` 旧条目查询或写后回读命中坏行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“想看写入命中坏记录”中文日志与 `[处理建议]`，并继续按原来的写入失败文本停路，不再把坏记录混成普通写入失败、重复条目或成功新增。
-- 截至 2026-04-18，`watchlist` 清单读取也已补齐“记录损坏”分流：`watchlist_item` 能查到行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“想看清单记录损坏”中文日志与 `[处理建议]`，并继续按原来的读取失败文本停路，不再把坏记录混成普通读库失败或空清单。
-- 截至 2026-04-18，`BT 订阅` 写入也已补齐“命中坏记录”分流：`bt_subscription_item` 旧条目查询或写后回读命中坏行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“BT 订阅写入命中坏记录”中文日志与 `[处理建议]`，并继续按原来的写入失败文本停路，不再把坏记录混成普通写入失败、重复条目或成功新增。
-- 截至 2026-04-18，`BT 订阅` 清单读取也已补齐“记录损坏”分流：`bt_subscription_item` 能查到行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“BT 订阅清单记录损坏”中文日志与 `[处理建议]`，并继续按原来的读取失败文本停路，不再把坏记录混成普通读库失败或空清单。
-- 截至 2026-04-18，`watchlist / BT 订阅` 的删除、清空，以及 `BT 订阅` 的最近资源回写也已补齐“命中坏记录”分流：相关路径若命中 `id / title / media_kind` 等真相字段损坏，现在会分别打印专门中文日志与 `[处理建议]`，并继续保持原来的失败文本或 warning，不把坏记录混成普通删除/清空/回写异常。
-- 截至 2026-04-18，`BT 订阅` 扫描条目读取也已补齐“记录损坏”分流：`bt_subscription_item` 扫描列表能查到行、但 `id / title / media_kind` 等真相字段损坏时，现在会明确打印“BT 订阅扫描记录损坏”中文日志与 `[处理建议]`，并继续让 `btsub run` / scheduler tick 直接停路，不再把坏记录混成普通读库失败或“当前没有新资源”。
-- 截至 2026-04-18，`BT 订阅` 后台扫描读取 chat 列表也已补齐“记录损坏”分流：`bt_subscription_item` 能查到行、但 `chat_id` 真相字段损坏时，现在会明确打印“BT 订阅扫描 chat 列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮 scheduler tick 直接停路，不再把坏行混成普通读库失败或可继续扫描的 chat。
-- 截至 2026-04-18，自动导入轮询读取 `download_monitor` 已完成列表时，也已补齐“记录损坏”分流：列表能查到行、但 `chat_id / task_id / task_hash` 等真相字段损坏时，现在会明确打印“自动导入候选记录损坏”中文日志与 `[处理建议]`，并让本轮自动导入直接停路，不再把坏记录混成普通读库失败。
-- 截至 2026-04-18，自动导入查询 `job_event` 终态时，也已补齐“终态记录损坏”分流：终态列表能查到行、但 `task_ref / event_type` 等真相字段损坏时，现在会明确打印“自动导入终态记录损坏”中文日志与 `[处理建议]`，并让这条任务直接停路，不再把坏记录混成普通终态查询失败。
-- 截至 2026-04-18，自动导入低质量资源跳过事件写入也已补齐“记录损坏”分流：`job_event` 跳过事件已写入、但写后回读命中坏行、`task_ref / event_type` 等真相字段损坏时，现在会明确打印“自动导入跳过事件记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态不可用边界停路，不再把坏记录混成普通落盘失败或稳定落盘成功。
-- 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐“空 lease/空结果”分流：`request_downloader_approval()` / `request_import_approval()` 若回 `0`，现在会明确打印“待确认审批结果缺失”中文日志并直接 fail-closed，不再偷偷退回进程内 lease 继续放行可 confirm 状态。
-- 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐 `lease_version` 读后坏记录分流：`request_downloader_approval()` / `request_import_approval()` 若写后回读命中的 `approval_record.lease_version` 已损坏，现在会分别明确打印“下载待确认审批记录损坏”或“导入待确认审批记录损坏”中文日志与 `[处理建议]`，并继续直接 fail-closed，不再把坏审批记录混成普通审批落盘失败。
-- 截至 2026-04-18，下载 / 导入待确认任务创建阶段也已补齐“空返回值”分流：`upsert_downloader_job_pending()` / `upsert_import_job_pending()` 若直接回 `None`，现在会明确打印“待确认任务结果缺失”中文日志并直接 fail-closed，不再把 `jobs` 真相缺口混成可 confirm 的待确认任务。
-- 截至 2026-04-18，下载 / 导入待确认任务创建阶段也已补齐写后回读坏记录分流：`upsert_downloader_job_pending()` / `upsert_import_job_pending()` 若写后回读命中的 `jobs` 行里 `job_id / chat_id / user_id / version` 等真相字段损坏，现在会分别明确打印“下载待确认任务记录损坏”或“导入待确认任务记录损坏”中文日志与 `[处理建议]`，并继续直接 fail-closed，不再把坏任务记录混成普通任务落盘失败。
-- 截至 2026-04-18，导入 confirm 上下文重建也已补齐“记录损坏”分流：`_rebuild_confirm_context()` 在 `jobs` 命中坏行、`job_id / chat_id / task_ref / task_id / task_hash / version` 等字段损坏时，现在会明确打印“导入确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 直接返回状态读取失败，不再把坏任务记录混成普通查询失败或“没有待确认导入”。
-- 截至 2026-04-18，导入命名真相读取也已补齐“记录损坏”分流：`_resolve_normalized_naming_truth()` 在 `job_event` 命中坏行、`task_ref / event_type / message` 等字段损坏时，现在会明确打印“导入命名真相记录损坏”中文日志与 `[处理建议]`，并继续按原来的 fallback 退回下载源名称做命名，不再把坏记录混成普通查询失败。
-- 截至 2026-04-18，导入入口的 `raw_bt` 判定也已补齐“记录损坏”分流：`_is_raw_bt_task()` 在 `jobs` 能查到下载任务、但 `job_id / chat_id / task_ref / payload_json` 等真相字段损坏时，现在会明确打印“导入 raw_bt 判定记录损坏”中文日志与 `[处理建议]`，并继续让导入入口直接返回查询失败，不再把坏任务记录混成普通查询失败或普通“不是 raw_bt”。
-- 截至 2026-04-18，Telegram message / callback 去重落盘也已补齐“结果缺失”分流：`record_message_update()` / `record_callback_update()` 若异常回 `None`，现在会明确打印“Telegram 更新去重结果缺失”中文日志与 `[处理建议]`，并继续让对应入口停路，不再把去重真相缺口混成普通重复 update。
-- 截至 2026-04-18，下载完成后台轮询读取 `download_monitor` 待轮询列表时，也已补齐“结果缺失 / 记录损坏”分流：待轮询列表查询若直接回 `None`，或命中的待轮询记录里 `task_id / task_hash / chat_id` 等真相字段损坏时，现在会分别明确打印“下载完成待轮询列表结果缺失”或“下载完成待轮询列表记录损坏”中文日志与 `[处理建议]`，并继续让本轮后台轮询停路，不再把这类缺口混成普通读库失败或“当前没有待轮询任务”。
-- 截至 2026-04-17，下载 / 导入确认链的 `jobs` 完结阶段也已补齐“结果缺失”分流：`mark_downloader_completed()` / `mark_completed()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并在成功回复后继续追加原有 finalization warning，不再把“完结结果缺失”误判成全链已落盘成功。
-- 截至 2026-04-17，下载 / 导入确认链的审批更新阶段也已补齐“结果缺失”分流：`approve_downloader()` / `approve_import()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并让 confirm 直接回状态读取失败，不再把“审批结果缺失”误判成普通 not pending。
-- 截至 2026-04-17，下载 / 导入取消链的审批取消阶段也已补齐“结果缺失”分流：`cancel_downloader()` / `cancel_import()` 若返回 `None`，现在会打印显式中文日志与 `[处理建议]`，并让 cancel 直接回状态读取失败，不再把“取消结果缺失”误判成普通状态冲突。
-- 截至 2026-04-17，导入入口的 `raw_bt` 判定也已补齐“任务行缺失”分流：`_is_raw_bt_task()` 在 `jobs` 已查不到下载任务行时，会明确打印“导入 raw_bt 判定结果缺失”中文日志并直接 fail-closed，不再把分类真相缺口误判成普通“不是 raw_bt”继续送进入库链。
-- 截至 2026-04-18，导入 confirm 的历史目标路径查询也已补齐“记录损坏”分流：`_find_latest_import_target_path()` 在 `job_event` 关联查询命中坏行、但 `task_ref / event_type / target_path / message` 等真相字段已损坏时，现在会明确打印“导入目标路径记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态读取失败停路，不再把坏记录混成普通查询失败或“无导入目标路径”。
-- 截至 2026-04-17，cleanup 的导入关联查询也已补齐“结果缺失”分流：`_find_import_correlation()` 在 `job_event` 关联查询返回链路缺结果时，会明确打印“cleanup 关联结果缺失”中文日志，但继续保持原来的“未找到关联”停路和 guardrail，不改 cleanup 副作用边界。
-- 截至 2026-04-18，cleanup 的导入关联查询也已补齐“记录损坏”分流：`_find_import_correlation()` 在 `job_event` 关联查询命中坏行、但 `task_ref / event_type / source_path / target_path` 等真相字段已损坏时，现在会明确打印“cleanup 关联记录损坏”中文日志与 `[处理建议]`，并继续保持原来的“未找到关联”停路和 guardrail，不再把坏记录混成普通查询失败。
-- 截至 2026-04-18，Telegram BT 待答读取也已补齐“记录损坏”分流：`processing_path / classification / tmdb_association / raw_bt_destination` 从 `bt_pending_state` 读到坏行、但 `stage` 真相字段已空或脏掉时，现在会明确打印“BT 待处理记录损坏”中文日志与 `[处理建议]`，并继续让相关入口按状态不可用停路，不再把坏记录混成普通读库失败或“没有待处理状态”。
-- 截至 2026-04-18，下载 confirm 的上下文重建也已补齐“记录损坏”分流：`_rebuild_confirm_context()` 从 `jobs` 读到坏行、但 `job_id / chat_id / task_id / task_hash / version` 等真相字段已损坏时，现在会明确打印“下载确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 按状态不可用停路，不再把坏记录混成普通读库失败或“没有待确认下载”。
-- 搜索、watchlist、BT 订阅、Telegram BT 待答这些轻状态路径里，写入成功后回读缺失 / 结果缺失 / 条数不一致，以及删除 / 清空 / 最近资源回写命中坏记录，都已持续收口成显式中文诊断；详细闭环、focused tests 和 commit 轨迹统一只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
-- 截至 2026-04-17，Telegram BT `processing_path` 清理也已补齐“结果缺失”分流：`_clear_bt_processing_path_pending()` / `_pop_bt_processing_path_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
-- 截至 2026-04-17，Telegram BT `classification` 清理也已补齐“结果缺失”分流：`_clear_bt_classification_pending()` / `_pop_bt_classification_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 直接回服务未就绪，不再把缺失真相混成已取消或已弹出。
-- 截至 2026-04-17，Telegram BT `tmdb_association` 清理和关联入口也已补齐“结果缺失”分流：`_clear_bt_tmdb_association_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 与 TMDB 关联入口直接回服务未就绪，不再把缺失真相混成已取消或继续推进媒体入库链。
-- 截至 2026-04-17，Telegram BT `raw_bt_destination` 清理和目录选择入口也已补齐“结果缺失”分流：`_clear_raw_bt_destination_pending()` 在 `bt_pending_state` 删除直接返回 `None` 时，会明确打印中文日志、放回 in-memory 状态，并让私聊 runtime 与目录选择入口直接回服务未就绪，不再把缺失真相混成已取消或继续推进 raw BT 目录选择。
-- 截至 2026-04-17，下载待确认轻状态查询 / 取消也已补齐“持久化行缺失”和“SQLite 查询失败”分流：`has_pending_add()` / `confirm_add_by_task_ref()` / `cancel_pending_add()` 在 `jobs` 已查不到待确认任务、但内存里还残留上下文时，会明确打印“下载待确认任务结果缺失”中文日志并直接 fail-closed；而取消链的 `jobs` 查询异常仍保持单独“下载取消查询失败”日志，不再和缺失行混写。
-- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`，状态页不再回灌长台账。
-- 最近提交轨迹继续与当前主线台账同步；详细闭环与验证入口统一收口在 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+- 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
+- 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
+- 下载 / 导入 confirm 主链已经全链 fail-closed：待确认创建、过期判断、任务抢占、审批回退 / 取消、成功收尾与执行版号回写，三类真相缺口（“结果缺失”“记录损坏”“SQLite 异常”）各自拆出独立中文日志与 `[处理建议]`，不再伪装成 not pending 或纯成功。
+- 共享 `approval_repo` 的 approve / cancel / restore 三路也已把 `approval_record` 缺失行从普通状态冲突里拆开；confirm / cancel 的用户侧文本和副作用边界保持不变。
+- 事件落盘链（`job_event.append_event()`：下载 / 导入 / cleanup / 状态观察 / 下载完成观察）全部补齐“结果缺失”“写后回读命中坏行”两路分流，均保持原来的后续 workflow 边界，不改副作用。
+- 下载监控 / 状态观察（`download_monitor.register_download()` / `record_status()`）、后台完成轮询待轮询列表、自动导入候选与终态查询、自动导入跳过事件，均已收口“空结果 / 写后回读缺失 / 记录损坏”三类分流，本轮观察或自动导入按原有 warning 或停路边界处理。
+- 轻状态路径（`search` 待澄清与候选、`watchlist`、`BT 订阅` 与扫描、Telegram BT 待答四态）里的写入-回读-清单读取-删除-清空-最近资源回写，都已把“真缺数据 / 回读缺失 / 命中坏行 / SQLite 异常”拆开；用户侧失败文本和 `SERVICE_NOT_READY_TEXT` 边界不变。
+- 导入 confirm 的上下文重建、历史目标路径查询、命名真相读取、`raw_bt` 判定，以及下载 confirm 的上下文重建，都已补齐“任务行 / 事件行记录损坏”分流，confirm 统一按状态读取失败 fail-closed，不继续送坏记录进入库或下载链。
+- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；最近提交轨迹与当前主线详细闭环继续只看 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
