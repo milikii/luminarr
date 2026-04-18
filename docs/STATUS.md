@@ -57,6 +57,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 截至 2026-04-18，自动导入查询 `job_event` 终态时，也已补齐“终态记录损坏”分流：终态列表能查到行、但 `task_ref / event_type` 等真相字段损坏时，现在会明确打印“自动导入终态记录损坏”中文日志与 `[处理建议]`，并让这条任务直接停路，不再把坏记录混成普通终态查询失败。
 - 截至 2026-04-18，自动导入低质量资源跳过事件写入也已补齐“记录损坏”分流：`job_event` 跳过事件已写入、但写后回读命中坏行、`task_ref / event_type` 等真相字段损坏时，现在会明确打印“自动导入跳过事件记录损坏”中文日志与 `[处理建议]`，并继续按原来的状态不可用边界停路，不再把坏记录混成普通落盘失败或稳定落盘成功。
 - 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐“空 lease/空结果”分流：`request_downloader_approval()` / `request_import_approval()` 若回 `0`，现在会明确打印“待确认审批结果缺失”中文日志并直接 fail-closed，不再偷偷退回进程内 lease 继续放行可 confirm 状态。
+- 截至 2026-04-18，下载 / 导入待确认审批创建阶段也已补齐 `lease_version` 读后坏记录分流：`request_downloader_approval()` / `request_import_approval()` 若写后回读命中的 `approval_record.lease_version` 已损坏，现在会分别明确打印“下载待确认审批记录损坏”或“导入待确认审批记录损坏”中文日志与 `[处理建议]`，并继续直接 fail-closed，不再把坏审批记录混成普通审批落盘失败。
 - 截至 2026-04-18，下载 / 导入待确认任务创建阶段也已补齐“空返回值”分流：`upsert_downloader_job_pending()` / `upsert_import_job_pending()` 若直接回 `None`，现在会明确打印“待确认任务结果缺失”中文日志并直接 fail-closed，不再把 `jobs` 真相缺口混成可 confirm 的待确认任务。
 - 截至 2026-04-18，导入 confirm 上下文重建也已补齐“记录损坏”分流：`_rebuild_confirm_context()` 在 `jobs` 命中坏行、`job_id / chat_id / task_ref / task_id / task_hash / version` 等字段损坏时，现在会明确打印“导入确认上下文记录损坏”中文日志与 `[处理建议]`，并继续让 confirm 直接返回状态读取失败，不再把坏任务记录混成普通查询失败或“没有待确认导入”。
 - 截至 2026-04-18，导入命名真相读取也已补齐“记录损坏”分流：`_resolve_normalized_naming_truth()` 在 `job_event` 命中坏行、`task_ref / event_type / message` 等字段损坏时，现在会明确打印“导入命名真相记录损坏”中文日志与 `[处理建议]`，并继续按原来的 fallback 退回下载源名称做命名，不再把坏记录混成普通查询失败。

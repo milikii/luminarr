@@ -493,6 +493,28 @@ def test_record_pending_approval_logs_missing_pending_result_when_repo_returns_z
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_approval_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "request_downloader_approval": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row lease version corrupted after read"))
+        },
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=approval_repo,
+    )
+    assert service._record_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123") == 0
+    output = capsys.readouterr().out
+    assert "[下载待确认审批记录损坏]" in output
+    assert "approval row lease version corrupted after read" in output
+    assert "approval_record.lease_version" in output
+
+
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
     job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(

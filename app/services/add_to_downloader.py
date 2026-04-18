@@ -55,6 +55,7 @@ DOWNLOADER_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON = "approval_record missin
 DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON = "download monitor state missing after register"
 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
 DOWNLOADER_PENDING_APPROVAL_NONE_REASON = "downloader pending approval result missing"
+DOWNLOADER_PENDING_APPROVAL_ROW_CORRUPTED_REASON = "approval row lease version corrupted after read"
 DOWNLOADER_APPROVE_RESULT_MISSING_REASON = "approval_record missing during approve"
 DOWNLOADER_APPROVE_RESULT_NONE_REASON = "downloader approval result missing"
 DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
@@ -804,6 +805,13 @@ class AddToDownloaderService:
                     f"\033[31m[下载待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
                     "\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认审批的 lease_version；"
                     "当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认下载。",
+                    flush=True,
+                )
+            elif str(error) == DOWNLOADER_PENDING_APPROVAL_ROW_CORRUPTED_REASON:
+                print(
+                    f"\033[31m[下载待确认审批记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 approval_record.lease_version 是否仍是正整数真相；"
+                    "当前请求会直接返回待确认状态写入失败，避免把坏审批记录误报成可确认下载。",
                     flush=True,
                 )
             else:

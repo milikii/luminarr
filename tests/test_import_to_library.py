@@ -766,6 +766,24 @@ def test_record_pending_approval_logs_missing_pending_result_when_repo_returns_z
     assert "当前请求会直接返回待确认状态写入失败" in output
 
 
+def test_record_pending_approval_logs_row_corruption(capsys) -> None:
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "request_import_approval": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(RuntimeError("approval row lease version corrupted after read"))
+        },
+    )()
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
+    assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 0
+    output = capsys.readouterr().out
+    assert "[导入待确认审批记录损坏]" in output
+    assert "approval row lease version corrupted after read" in output
+    assert "approval_record.lease_version" in output
+
+
 def test_record_import_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
