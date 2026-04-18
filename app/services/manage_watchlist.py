@@ -171,6 +171,15 @@ class ManageWatchlistService:
                     reason=str(error),
                 )
                 return None
+            if _is_watchlist_row_corrupted_reason(str(error)):
+                _log_watchlist_add_row_corrupted(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
             _log_watchlist_add_failed(
                 chat_id=chat_id,
                 title=title,
@@ -180,6 +189,15 @@ class ManageWatchlistService:
             )
             return None
         except Exception as error:
+            if _is_watchlist_row_corrupted_reason(str(error)):
+                _log_watchlist_add_row_corrupted(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
             _log_watchlist_add_failed(
                 chat_id=chat_id,
                 title=title,
@@ -331,6 +349,22 @@ def _log_watchlist_add_result_missing(
         f"media_kind={media_kind} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 watchlist_item 插入返回是否仍带有明确结果；"
         "当前会按写入失败处理，避免把缺失真相误判成“已成功加入想看”。"
+    )
+
+
+def _log_watchlist_add_row_corrupted(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[想看写入命中坏记录]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会按写入失败处理，避免把损坏记录误判成可复用旧条目或成功新建条目。"
     )
 
 

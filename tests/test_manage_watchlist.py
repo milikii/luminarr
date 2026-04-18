@@ -183,6 +183,24 @@ def test_manage_watchlist_add_logs_missing_row_after_insert(tmp_path: Path, caps
     assert "watchlist_item missing after insert" in captured.out
 
 
+def test_manage_watchlist_add_surfaces_row_corruption(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _corrupted_add_item(**_: object) -> None:
+        raise RuntimeError("watchlist_item media kind corrupted after read")
+
+    repo.add_item = _corrupted_add_item  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist add dune 2021"), chat_id=1001)
+
+    assert reply == WATCHLIST_ADD_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看写入命中坏记录]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist_item media kind corrupted after read" in captured.out
+
+
 def test_manage_watchlist_add_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     repo = WatchlistRepo(_make_database(tmp_path))
 
