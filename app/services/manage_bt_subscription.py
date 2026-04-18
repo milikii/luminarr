@@ -307,6 +307,15 @@ class ManageBtSubscriptionService:
                     reason=str(error),
                 )
                 return None
+            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_add_row_corrupted(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
             _log_bt_subscription_add_failed(
                 chat_id=chat_id,
                 title=title,
@@ -316,6 +325,15 @@ class ManageBtSubscriptionService:
             )
             return None
         except Exception as error:
+            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_add_row_corrupted(
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                    reason=str(error),
+                )
+                return None
             _log_bt_subscription_add_failed(
                 chat_id=chat_id,
                 title=title,
@@ -837,6 +855,22 @@ def _log_bt_subscription_add_item_missing_after_insert(
         f"media_kind={media_kind} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表是否被并发删除或触发器回滚；"
         "如需继续添加，请先确认 SQLite 写入后能立即回读该条目。"
+    )
+
+
+def _log_bt_subscription_add_row_corrupted(
+    *,
+    chat_id: int,
+    title: str,
+    year: str,
+    media_kind: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[BT 订阅写入命中坏记录]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
+        f"media_kind={media_kind} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会按写入失败处理，避免把损坏记录误判成可复用旧条目或成功新建条目。"
     )
 
 

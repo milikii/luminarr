@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 BT 订阅写入命中坏记录分流缺口
+
+- 闭环：`manage_bt_subscription._add_item()` 之前在 `bt_subscription_item` 旧条目查询或写后回读命中坏行、抛出 `id / title / media_kind` 等字段损坏时，会和普通 SQLite 写入异常共用同一条“BT 订阅写入失败”日志；现在会单独打印“BT 订阅写入命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的写入失败文本，不把坏记录混成普通写入异常、重复条目或成功新增。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py -k "add_logs_missing_row_after_insert or add_surfaces_row_corruption"`
+
 ### 2026-04-18 想看写入命中坏记录分流缺口
 
 - 闭环：`manage_watchlist._add_item()` 之前在 `watchlist_item` 旧条目查询或写后回读命中坏行、抛出 `id / title / media_kind` 等字段损坏时，会和普通 SQLite 写入异常共用同一条“想看写入失败”日志；现在会单独打印“想看写入命中坏记录”中文日志与 `[处理建议]`，但用户侧仍保持原来的写入失败文本，不把坏记录混成普通写入异常、重复条目或成功新增。
