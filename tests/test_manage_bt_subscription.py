@@ -259,6 +259,26 @@ def test_manage_bt_subscription_remove_returns_failure_text_when_repo_returns_no
     assert "bt subscription remove result missing" in captured.out
 
 
+def test_manage_bt_subscription_remove_surfaces_row_corruption(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _corrupted_remove_item(**_: object) -> None:
+        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+
+    repo.remove_item = _corrupted_remove_item  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub remove 7"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_REMOVE_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅删除命中坏记录]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt_subscription_item media kind corrupted after read" in captured.out
+
+
 def test_manage_bt_subscription_clear_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)

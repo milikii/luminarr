@@ -368,6 +368,8 @@ class ManageBtSubscriptionService:
         except Exception as error:
             if str(error) == "bt subscription remove result missing":
                 _log_bt_subscription_remove_result_missing(chat_id=chat_id, item_id=item_id, reason=str(error))
+            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_remove_row_corrupted(chat_id=chat_id, item_id=item_id, reason=str(error))
             else:
                 _log_bt_subscription_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
             return None
@@ -803,6 +805,14 @@ def _log_bt_subscription_remove_result_missing(*, chat_id: int, item_id: int, re
         f"\033[31m[BT 订阅删除结果缺失]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 删除查询返回是否仍带有完整结果；"
         "当前会按删除失败处理，避免把缺失真相误判成“条目不存在”。"
+    )
+
+
+def _log_bt_subscription_remove_row_corrupted(*, chat_id: int, item_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅删除命中坏记录]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会按删除失败处理，避免把损坏记录误判成可正常删除或“条目不存在”。"
     )
 
 
