@@ -73,12 +73,13 @@
 5. `add_to_downloader.py` 下载编排层瘦身 / 模块化：把候选选择 / 来源解析、待确认写入、confirm 执行、下载监控登记和事件落盘继续拆开；目标是不改 search、approval、`jobs`、`download_monitor`、`job_event` 和现有下载副作用边界
 6. `search_media.py` 搜索编排层瘦身 / 模块化：把 query 解析、TMDB / Prowlarr 查询、歧义澄清与候选持久化、回复格式化继续拆开；目标是不改 clarification / candidate 状态协议、shared runtime 入口和 SQLite 真相边界
 7. `manage_bt_subscription.py` 订阅编排层瘦身 / 模块化：把清单增删、扫描候选筛选、`last_seen` 更新和 scheduler tick 收口继续拆开；目标是不改 `bt_subscription_item` 真相、downloader approval 边界和自动扫描停路规则
-8. `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化：把 frustration reset、pending state gate、命令分发和 shared reply 包装继续拆开；目标是不改四渠道共用协议、approval、`jobs` 和 SQLite 真相边界
-9. `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化：把 client 装配、后台任务启停、下载器路由 helper 和启动日志继续拆开；目标是不改启动入口、角色绑定和现有运行时真相
-10. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
-11. `.ass` 字幕支持评估与最小实现
-12. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
-13. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
-14. BT 共享确定性评分器
-15. Jellyfin / Plex 支持（后续）
-16. plugin 体系继续后置
+8. `cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化：把 cleanup 身份解析（`_resolve_cleanup_task_identity` + `_find_import_correlation`）、inspect 与 execution 主路径、路径校验与 source 删除（`_validate_cleanup_paths` + `_delete_source_asset`）、follow-up 文案组装（`_append_cleanup_follow_up` / `_format_cleanup_inspect_follow_up` 等）和事件落盘 + 中文日志 helper（`_record_event` + `_print_cleanup_*`）继续拆开；目标是不改 cleanup guardrail、删除范围、identity retention、`job_event` 真相和现有 cleanup 文本协议
+9. `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化：把 frustration reset、pending state gate、命令分发和 shared reply 包装继续拆开；目标是不改四渠道共用协议、approval、`jobs` 和 SQLite 真相边界
+10. `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化：把 client 装配、后台任务启停、下载器路由 helper 和启动日志继续拆开；目标是不改启动入口、角色绑定和现有运行时真相
+11. `series / anime` 独立名称解析最小实现（结构化解析 + 小型识别词/替换配置）
+12. `.ass` 字幕支持评估与最小实现
+13. shared private-chat 交付体验收口（图片 / 信息卡片 / 字符排版 / 状态信息清晰化，不做 Web UI）
+14. 最小人类可用入口继续补齐（quick start / 配置模板 / 首个渠道 10 分钟跑通）
+15. BT 共享确定性评分器
+16. Jellyfin / Plex 支持（后续）
+17. plugin 体系继续后置

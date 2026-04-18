@@ -42,10 +42,10 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前主风险是 `app/bot/feishu_long_connection.py` 仍直接触碰 Feishu SDK 的 `_disconnect`、`_auto_reconnect`、`_cache` 和 `lark_ws_client_module.loop`；下一步只收口这层私有 API 依赖。
+- 当前主风险是 `app/bot/feishu_long_connection.py` 仍要把线程事件循环交给 Feishu SDK 的 `lark_ws_client_module.loop`；停机路径对 `_disconnect`、`_auto_reconnect`、`_cache` 的直接依赖已先收口。
 - 当前必须继续守住已经落下来的 fail-closed 方向，不能在做 Feishu 长连接风险收口时回退下载 / 导入 / 搜索 / BT 待答边界。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- `telegram_bot.py`、`import_to_library.py`、`add_to_downloader.py`、`search_media.py`、`manage_bt_subscription.py`、`private_chat_runtime.py`、`app/main.py` 已列入当前主线后的编排层瘦身计划。
+- `telegram_bot.py`、`import_to_library.py`、`add_to_downloader.py`、`search_media.py`、`manage_bt_subscription.py`、`cleanup_downloaded_source.py`、`private_chat_runtime.py`、`app/main.py` 已列入当前主线后的编排层瘦身计划。
 - `series / anime` 名称解析、`.ass` 字幕支持仍是更后面的工作，不提前并行展开。
 
 ## Latest verification
