@@ -349,6 +349,13 @@ class SearchMediaService:
                     "如需继续待澄清流程，请先确认 SQLite 写入后能立即回读该记录。",
                     flush=True,
                 )
+            elif str(error) == CLARIFICATION_QUERY_EMPTY_AFTER_READ_REASON:
+                print(
+                    f"\033[31m[搜索澄清态写入命中坏记录]\033[0m chat_id={chat_id} 错误={error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 clarification_state.query 是否在写后被写成空值或脏数据；"
+                    "当前会按待澄清状态写入失败处理，避免把坏记录误判成已成功进入待澄清状态。",
+                    flush=True,
+                )
             else:
                 print(
                     f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",

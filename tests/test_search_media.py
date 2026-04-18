@@ -7,7 +7,7 @@ import pytest
 
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
-from app.db.clarification_repo import ClarificationRepo
+from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.search_media import (
     BT_READ_ONLY_EMPTY_QUERY_TEXT,
@@ -280,6 +280,33 @@ def test_search_no_result_returns_state_unavailable_when_clarification_persist_f
     assert "[搜索澄清态写入后记录缺失]" in output
     assert "[处理建议]" in output
     assert "clarification_state missing after upsert" in output
+
+
+def test_search_no_result_surfaces_clarification_row_corruption_after_upsert(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    class CorruptedRowClarificationRepo(ClarificationRepo):
+        def get_pending_query(self, *, chat_id: int) -> str | None:
+            _ = chat_id
+            raise ClarificationPersistenceError("clarification_state query empty after read")
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    service = SearchMediaService(
+        _fake_search_empty,
+        clarification_repo=CorruptedRowClarificationRepo(database),
+    )
+
+    text = _run(service.search_and_format("unknown", chat_id=1001))
+
+    assert text == CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
+    assert service.get_cached_candidate(1001, 1) is None
+    assert not service.is_clarification_pending(1001)
+    output = capsys.readouterr().out
+    assert "[搜索澄清态写入命中坏记录]" in output
+    assert "[处理建议]" in output
+    assert "clarification_state query empty after read" in output
 
 
 def test_search_candidate_persist_logs_missing_count_result(tmp_path: Path, capsys) -> None:

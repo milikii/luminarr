@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 搜索澄清态写入命中坏记录分流缺口
+
+- 闭环：`search_media._set_clarification_pending()` 之前在 `clarification_state` 写入后立即回读命中坏记录、`query` 真相字段被写成空值或脏数据时，会和普通 SQLite 写入异常共用同一条“搜索澄清态持久化失败”日志；现在会单独打印“搜索澄清态写入命中坏记录”中文日志与 `[处理建议]`，并继续按原来的待澄清状态写入失败文本停路，不把坏记录混成普通写库失败或成功进入待澄清状态。
+- 代码：`app/services/search_media.py`
+- 验证：`tests/test_search_media.py -k "clarification_pending or clarification_row_corruption or search_no_result_returns_state_unavailable_when_clarification_persist_fails or search_no_result_surfaces_clarification_row_corruption_after_upsert"`
+
 ### 2026-04-18 BT 订阅扫描记录损坏分流缺口
 
 - 闭环：`manage_bt_subscription._scan_chat_once()` 之前在 `bt_subscription_item` 扫描条目列表能查到行、但行内 `id / title / media_kind` 等真相字段已损坏时，会和普通 SQLite 读取异常共用同一条“BT 订阅扫描读取失败”日志；现在会单独打印“BT 订阅扫描记录损坏”中文日志与 `[处理建议]`，并继续让 `btsub run` / scheduler tick 直接停路，不把坏记录混成普通读库失败或“当前没有新资源”。
