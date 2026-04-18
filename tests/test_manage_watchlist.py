@@ -131,6 +131,24 @@ def test_manage_watchlist_list_returns_failure_text_when_repo_returns_none(tmp_p
     assert "watchlist list result missing" in captured.out
 
 
+def test_manage_watchlist_list_surfaces_row_corruption(tmp_path: Path, capsys) -> None:
+    repo = WatchlistRepo(_make_database(tmp_path))
+
+    def _corrupted_list_items(**_: object) -> None:
+        raise RuntimeError("watchlist_item media kind corrupted after read")
+
+    repo.list_items = _corrupted_list_items  # type: ignore[method-assign]
+    service = ManageWatchlistService(repo)
+
+    reply = service.handle(parse_watchlist_query("watchlist list"), chat_id=1001)
+
+    assert reply == WATCHLIST_LIST_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[想看清单记录损坏]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "watchlist_item media kind corrupted after read" in captured.out
+
+
 def test_manage_watchlist_add_returns_failure_text_when_repo_returns_none(tmp_path: Path, capsys) -> None:
     repo = WatchlistRepo(_make_database(tmp_path))
 

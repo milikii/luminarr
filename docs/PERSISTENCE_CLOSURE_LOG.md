@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 watchlist 清单记录损坏分流缺口
+
+- 闭环：`manage_watchlist._list_items()` 之前在 `watchlist_item` 清单查询能查到行、但行内 `id / title / media_kind` 等真相字段损坏时，会和普通 SQLite 读取异常共用同一条“想看清单读取失败”日志；现在会单独打印“想看清单记录损坏”中文日志与 `[处理建议]`，但用户侧仍保持原来的清单读取失败文本，不把坏记录混成普通读库失败或空清单。
+- 代码：`app/services/manage_watchlist.py`
+- 验证：`tests/test_manage_watchlist.py`
+
 ### 2026-04-18 下载完成观察事件记录损坏分流缺口
 
 - 闭环：`get_download_status._record_status_observation()` 之前在 `job_event.append_event()` 已写入完成观察、但写后回读到的 `downloader.completed_observed` 行本身损坏时，会和普通 SQLite 写入异常共用同一条“下载完成观察事件落盘失败”日志；现在会单独打印“下载完成观察事件记录损坏”中文日志与 `[处理建议]`，但用户侧仍保持原来的状态 warning，不改状态查询和自动导入 follow-up 边界。

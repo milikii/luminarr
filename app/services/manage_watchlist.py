@@ -199,6 +199,8 @@ class ManageWatchlistService:
         except Exception as error:
             if str(error) == "watchlist list result missing":
                 _log_watchlist_list_result_missing(chat_id=chat_id, reason=str(error))
+            elif _is_watchlist_row_corrupted_reason(str(error)):
+                _log_watchlist_list_row_corrupted(chat_id=chat_id, reason=str(error))
             else:
                 _log_watchlist_list_failed(chat_id=chat_id, reason=str(error))
             return None
@@ -347,6 +349,14 @@ def _log_watchlist_list_result_missing(*, chat_id: int, reason: str) -> None:
     )
 
 
+def _log_watchlist_list_row_corrupted(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[想看清单记录损坏]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会按读取失败处理，避免把损坏记录误判成正常清单。"
+    )
+
+
 def _log_watchlist_remove_failed(*, chat_id: int, item_id: int, reason: str) -> None:
     print(
         f"\033[31m[想看删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
@@ -375,3 +385,10 @@ def _log_watchlist_clear_result_missing(*, chat_id: int, reason: str) -> None:
         "\033[33m[处理建议]\033[0m 检查 watchlist_item 清空查询返回是否仍带有完整结果；"
         "当前会按清空失败处理，避免把缺失真相误判成“本来就是空的”。"
     )
+
+
+def _is_watchlist_row_corrupted_reason(reason: str) -> bool:
+    return reason in {
+        "watchlist_item row identity corrupted after read",
+        "watchlist_item media kind corrupted after read",
+    }
