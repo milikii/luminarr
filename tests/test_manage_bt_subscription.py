@@ -180,6 +180,26 @@ def test_manage_bt_subscription_list_returns_failure_text_when_repo_returns_none
     assert "bt subscription list result missing" in captured.out
 
 
+def test_manage_bt_subscription_list_surfaces_row_corruption(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+
+    def _corrupted_list_items(**_: object) -> None:
+        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+
+    repo.list_items = _corrupted_list_items  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _fake_search, add_service)
+
+    reply = service.handle(parse_bt_subscription_query("btsub list"), chat_id=1001)
+
+    assert reply == BT_SUBSCRIPTION_LIST_FAILED_TEXT
+    captured = capsys.readouterr()
+    assert "[BT 订阅清单记录损坏]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "bt_subscription_item media kind corrupted after read" in captured.out
+
+
 def test_manage_bt_subscription_remove_returns_failure_text_when_repo_raises(tmp_path: Path, capsys) -> None:
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)

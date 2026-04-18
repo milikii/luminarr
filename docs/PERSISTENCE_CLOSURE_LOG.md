@@ -11,6 +11,12 @@
 
 ## 2. Recent closed loops
 
+### 2026-04-18 BT 订阅清单记录损坏分流缺口
+
+- 闭环：`manage_bt_subscription._list_items()` 之前在 `bt_subscription_item` 清单查询能查到行、但行内 `id / title / media_kind` 等真相字段损坏时，会和普通 SQLite 读取异常共用同一条“BT 订阅清单读取失败”日志；现在会单独打印“BT 订阅清单记录损坏”中文日志与 `[处理建议]`，但用户侧仍保持原来的清单读取失败文本，不把坏记录混成普通读库失败或空清单。
+- 代码：`app/services/manage_bt_subscription.py`
+- 验证：`tests/test_manage_bt_subscription.py`
+
 ### 2026-04-18 watchlist 清单记录损坏分流缺口
 
 - 闭环：`manage_watchlist._list_items()` 之前在 `watchlist_item` 清单查询能查到行、但行内 `id / title / media_kind` 等真相字段损坏时，会和普通 SQLite 读取异常共用同一条“想看清单读取失败”日志；现在会单独打印“想看清单记录损坏”中文日志与 `[处理建议]`，但用户侧仍保持原来的清单读取失败文本，不把坏记录混成普通读库失败或空清单。

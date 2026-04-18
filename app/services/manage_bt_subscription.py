@@ -333,6 +333,8 @@ class ManageBtSubscriptionService:
         except Exception as error:
             if str(error) == "bt subscription list result missing":
                 _log_bt_subscription_list_result_missing(chat_id=chat_id, reason=str(error))
+            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
+                _log_bt_subscription_list_row_corrupted(chat_id=chat_id, reason=str(error))
             else:
                 _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
             return None
@@ -743,6 +745,14 @@ def _log_bt_subscription_list_result_missing(*, chat_id: int, reason: str) -> No
     )
 
 
+def _log_bt_subscription_list_row_corrupted(*, chat_id: int, reason: str) -> None:
+    print(
+        f"\033[31m[BT 订阅清单记录损坏]\033[0m chat_id={chat_id} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
+        "当前会按读取失败处理，避免把损坏记录误判成正常订阅清单。"
+    )
+
+
 def _log_bt_subscription_remove_failed(*, chat_id: int, item_id: int, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
@@ -893,3 +903,10 @@ def _format_bt_subscription_run_result(result: BtSubscriptionRunResult) -> str:
     if result.pending_creation_failed:
         body = f"{body}\n\n{BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT}"
     return f"{header}\n\n{body}"
+
+
+def _is_bt_subscription_item_row_corrupted_reason(reason: str) -> bool:
+    return reason in {
+        "bt_subscription_item row identity corrupted after read",
+        "bt_subscription_item media kind corrupted after read",
+    }
