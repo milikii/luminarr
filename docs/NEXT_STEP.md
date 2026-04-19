@@ -1,11 +1,11 @@
-# Next step (v225)
+# Next step (v226)
 
 ## Current goal
 
-- 当前进行中的 promoted 主线改为 **BT 更多 allowlist 页面类型再评估**。2026-04-19 当前批次已补齐首页翻页页 `https://nyaa.si/?p=2` 和排序列表页 `https://nyaa.si/?s=seeders&o=desc`，上一条 **BT 更多 allowlist 列表页类型** 已满足退出条件。
+- 当前进行中的 promoted 主线改为 **BT allowlist 排序页分页语法 proof**。2026-04-19 当前批次已确认：上一条 **BT 更多 allowlist 页面类型再评估** 主线满足退出条件，既有 focused tests 已证明首页翻页页 `https://nyaa.si/?p=2`、排序列表页 `https://nyaa.si/?s=seeders&o=desc` 与 fail-closed 边界不回退。
 - 更早一条 **BT 用户页 / 编号范围页能力** 主线已在同日冷启动审计中确认满足退出条件，当前保持完成态。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；BT 这一批页面类型也已经站稳，眼下更保守的下一步只剩“是否还值得继续扩更多 allowlist 页面类型”的再评估。
-- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前不再重复施工这些已收口项。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；当前更小、更保守的下一步只收 `https://nyaa.si/?s=seeders&o=desc p=2` 这种“已声明排序页 + p=<页码>”直达语法 proof，不扩站点、不放宽页面 allowlist。
+- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前只补这一条直达 proof，不重做已收口页面。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
@@ -36,7 +36,7 @@
 
 - 当前优先交付：
   - 保持首页翻页页、排序列表页、category/list 页面和 `p=<页码>` 语法不回退
-  - 如果继续 BT，只允许从现有站点 allowlist 里再挑一个更小页面类型评估，不扩站点、不放宽抓站边界
+  - 当前只允许补 `https://nyaa.si/?s=seeders&o=desc p=2` 这类已声明排序页分页直达 proof，不扩站点、不放宽抓站边界
   - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -56,10 +56,10 @@
 
 ## Done when
 
-当前 BT 更多 allowlist 页面类型再评估主线视为 **已收口**，满足以下任一条即可：
+当前 BT allowlist 排序页分页语法 proof 主线视为 **已收口**，满足以下任一条即可：
 
-1. 已明确下一个值得补的 allowlist 页面类型，并把它收成一个单一最小闭环写回 `docs/BT_PAGE_RANGE_PLAN.md`；
-2. 已明确当前 allowlist 页面类型先维持现状更稳妥，且既有 focused tests 能证明首页翻页页、排序列表页与 fail-closed 边界不回退；
+1. `bt批量 https://nyaa.si/?s=seeders&o=desc p=2 1-3` 已能从命令入口稳定路由到 allowlist 页面抓取，而不是退回关键词搜索；对应 focused tests 全绿；
+2. 上述直达语法的只读批量预览文本已被证明可复用现有候选缓存边界，且未声明排序参数仍保持中文拒绝；对应 focused tests 全绿；
 3. 本轮代码变更 `< 20` 行且只是对同一个 page/range helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
@@ -69,5 +69,5 @@
 
 ## After this step
 
-1. 如果再继续 BT，就从现有 allowlist 里挑一个更小页面类型单独开主线
+1. 如果再继续 BT，就从现有 allowlist 里再挑一个更小页面形式单独开主线
 2. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
