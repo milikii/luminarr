@@ -13,8 +13,12 @@
 
 ### 2.1 DeliveryItem 抽象
 
+已完成闭环：
+- 已新增 `app/runtime/delivery.py`，落下 `DeliveryHeader` / `DeliverySection` / `DeliveryAction` / `DeliveryItem` 四个 dataclass，以及 Telegram / Feishu / personal WeChat / WeCom 四个纯文本 fallback renderer 骨架。
+- 已新增 `tests/test_delivery_renderers.py`，先锁 `search_results` / `approval` / `status` / `error` 四类核心消息在四渠道 fallback 渲染的最小排版输出。
+
 当前风险：
-- shared runtime 和 service 现在仍主要直接返回字符串；搜索结果、审批、状态和错误还没有统一的 `DeliveryItem` 结构。
+- shared runtime 和 service 现在仍主要直接返回字符串；虽然 `DeliveryItem` 与 renderer 骨架已落地，但还没真正接进搜索、审批、状态主链。
 
 ### 2.2 四渠道 renderer
 

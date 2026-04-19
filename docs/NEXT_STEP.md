@@ -33,7 +33,7 @@
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 已完成窗口的详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
-- 当前最小闭环：先收 `docs/SHARED_DELIVERY_UX_PLAN.md` Phase 1，新增 shared `DeliveryItem` 抽象和四渠道纯文本 fallback renderer 骨架；先锁内容模型和 renderer 入口，不顺手改 workflow 真相
+- 当前最小闭环：进入 `docs/SHARED_DELIVERY_UX_PLAN.md` Phase 2，把 `search_media` / `add_to_downloader` / `get_download_status` 的搜索结果 / 审批 / 状态回复先接到 `DeliveryItem`，fail-closed 文本常量先保持不动
 
 ## Source of truth
 
