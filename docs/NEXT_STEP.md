@@ -2,7 +2,7 @@
 
 ## Current goal
 
-- 当前没有进行中的 promoted 主线；上一条完成主线是 **Jellyfin / Plex 支持已基本完成**（2026-04-19 已满足退出条件 1：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client，`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`）
+- 当前没有进行中的 promoted 主线；上一条完成主线是 **Jellyfin / Plex 支持已基本完成**。2026-04-19 的 provider 选择 focused tests 为 `56 passed`；历史验收细节继续看 `docs/JELLYFIN_PLEX_PLAN.md` 与 `docs/STATUS.md`
 - 刚完成主线：**最小人类可用入口继续补齐已完成**；部署蓝图继续看 `docs/QUICK_START_PLAN.md`，交付物继续看 `docs/DEPLOY_CHECKLIST.md`
 - 上一条完成主线：**shared private-chat 交付体验收口已完成**；详细闭环继续写在 `docs/SHARED_DELIVERY_UX_LOG.md`
 - 再上一条完成主线：**`series / anime` 独立名称解析最小实现已完成**；详细闭环继续写在 `docs/SERIES_ANIME_NAMING_LOG.md`
