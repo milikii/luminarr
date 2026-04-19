@@ -22,6 +22,7 @@ class ParsedMovieQuery:
 class SearchRequestContext:
     parsed_query: ParsedMovieQuery
     tmdb_movie: TmdbMovie | None
+    resolved_query: str
     raw_results: Sequence[Mapping[str, Any]]
 
 
@@ -59,7 +60,7 @@ async def build_search_request_context(
             )
 
     ordered_queries = _resolve_ordered_queries(parsed_query=parsed_query, tmdb_movie=tmdb_movie)
-    raw_results = await _search_candidates_with_logging(
+    resolved_query, raw_results = await _search_candidates_with_logging(
         search_func=search_func,
         ordered_queries=ordered_queries,
         user_query=user_query,
@@ -67,6 +68,7 @@ async def build_search_request_context(
     return SearchRequestContext(
         parsed_query=parsed_query,
         tmdb_movie=tmdb_movie,
+        resolved_query=resolved_query,
         raw_results=raw_results,
     )
 
@@ -99,12 +101,15 @@ def _build_query(title: str, year: str) -> str:
     return f"{cleaned_title} {cleaned_year}"
 
 
-async def _search_first_non_empty(search_func: SearchFunc, ordered_queries: Sequence[str]) -> Sequence[Mapping[str, Any]]:
+async def _search_first_non_empty(
+    search_func: SearchFunc,
+    ordered_queries: Sequence[str],
+) -> tuple[str, Sequence[Mapping[str, Any]]]:
     for query in ordered_queries:
         raw_results = await search_func(query)
         if raw_results:
-            return raw_results
-    return ()
+            return query, raw_results
+    return "", ()
 
 
 async def _search_candidates_with_logging(
@@ -112,7 +117,7 @@ async def _search_candidates_with_logging(
     search_func: SearchFunc,
     ordered_queries: Sequence[str],
     user_query: str,
-) -> Sequence[Mapping[str, Any]]:
+) -> tuple[str, Sequence[Mapping[str, Any]]]:
     try:
         return await _search_first_non_empty(search_func, ordered_queries)
     except Exception as error:

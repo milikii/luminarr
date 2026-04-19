@@ -1,11 +1,11 @@
-# BT scoring log (v1)
+# BT scoring log (v2)
 
 > 目的：承接当前“BT 共享确定性评分器”主线的详细闭环。
 > 约束：蓝图继续看 `docs/BT_SCORING_PLAN.md`；`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
 
 ## 1. Current line
 
-- 当前主线状态：进行中；2026-04-19 已完成 Phase 1~4 基线，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py tests/test_manage_bt_subscription.py` 得到通过，当前最小下一步切到 Phase 5 接媒体型 BT 候选展示排序。
+- 当前主线状态：已完成；2026-04-19 已完成 Phase 1~5，三条 BT 路径都已接入共享评分器，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py tests/test_manage_bt_subscription.py` 得到 `62 passed`，主线已满足 `docs/NEXT_STEP.md` 退出条件 1。
 - 上一条已完成主线“最小人类可用入口继续补齐”继续看 `docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`。
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/BT_SCORING_PLAN.md`。
 
@@ -53,11 +53,22 @@
 当前风险：
 - 媒体型 BT 候选展示仍未按共享评分器排序，当前主线还差最后一条 BT 路径。
 
+### 2.5 媒体型 BT 候选展示排序
+
+已完成闭环：
+- 已把 `app/services/search_media.py` 的媒体型 BT 候选展示切到共享评分器排序；候选会先按统一 drop/filter/score 规则重排，再按相同顺序写进进程内缓存和 `candidate_mapping`，保证用户看到的编号和后续 `select <编号>` 读取的是同一份真相。
+- 已让 `search_request_context.py` 额外回传实际命中的搜索 query，排序阶段直接复用这条 query，避免 TMDB 英文命中和原始中文输入混在一起时误用错误的匹配基准。
+- 已补 `tests/test_search_media.py`，锁住“共享规则会改展示顺序，而且缓存顺序跟着一起变”的 focused case。
+
+当前风险：
+- BT 评分器主线已完成；后续风险转移到下一条 `Jellyfin / Plex` 主线，不再继续在这条线拆微分流。
+
 ## 3. Focused verification
 
 - `.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py`
 - `.venv/bin/python -m pytest -q tests/test_pure_bt.py`
 - `.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`
+- `.venv/bin/python -m pytest -q tests/test_search_media.py`
 - `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "handle_message_bt_processing_path_pure_bt_choice_routes_to_destination_prompt or enter_pure_bt_flow_returns_service_not_ready_when_destination_persist_fails"`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 

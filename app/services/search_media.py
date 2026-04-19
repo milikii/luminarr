@@ -9,6 +9,8 @@ from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
+from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
+from app.services.bt_sources import resolve_bt_source
 from app.services.search_request_context import (
     LookupMovieFunc,
     ParsedMovieQuery,
@@ -144,7 +146,11 @@ class SearchMediaService:
                 return CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
             return ambiguous_text
 
-        selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
+        ordered_raw_results = _order_media_bt_results(
+            raw_results,
+            query=request_context.resolved_query or cleaned_query,
+        )
+        selected_raw_results = [_to_candidate_dict(item) for item in ordered_raw_results[: self._limit]]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
             if selected_raw_results:
@@ -604,6 +610,58 @@ def _safe_indexer(indexer_value: Any, indexer_name_value: Any) -> str:
     return _safe_text(indexer_value, default="-")
 
 
+def _order_media_bt_results(
+    raw_results: Sequence[Mapping[str, Any]],
+    *,
+    query: str,
+) -> Sequence[Mapping[str, Any]]:
+    candidate_pairs: list[tuple[BTCandidate, Mapping[str, Any]]] = []
+    remainder: list[Mapping[str, Any]] = []
+    for item in raw_results:
+        candidate = _build_media_bt_candidate(item)
+        if candidate is None:
+            remainder.append(item)
+            continue
+        candidate_pairs.append((candidate, item))
+    if not candidate_pairs:
+        return raw_results
+
+    ordered_results: list[Mapping[str, Any]] = []
+    for scored_candidate in filter_candidates(
+        [candidate for candidate, _ in candidate_pairs],
+        BTScoringContext(query=query, media_kind="movie"),
+        rules=load_bt_scoring_rules(),
+    ):
+        for candidate, item in candidate_pairs:
+            if candidate is scored_candidate.candidate:
+                ordered_results.append(item)
+                break
+    ordered_results.extend(remainder)
+    return tuple(ordered_results)
+
+
+def _build_media_bt_candidate(item: Mapping[str, Any]) -> BTCandidate | None:
+    source = resolve_bt_source(item)
+    title = _safe_text(item.get("title"), default="")
+    if not source or not title:
+        return None
+    return BTCandidate(
+        source_site=_safe_indexer(item.get("indexer"), item.get("indexerName")),
+        title=title,
+        magnet_or_torrent_url=source,
+        size_bytes=_safe_optional_int(item.get("size")),
+        seeders=_safe_optional_int(item.get("seeders")),
+        leechers=_safe_optional_int(item.get("peers")),
+        resolution=_extract_resolution(title),
+        codec=_extract_codec(title),
+        source_type=_extract_source_type(title),
+        audio=(),
+        release_group=_extract_release_group(title),
+        age_days=None,
+        media_kind="movie",
+    )
+
+
 def _format_seeder_count(value: Any) -> str:
     if value is None:
         return "-"
@@ -686,6 +744,58 @@ def _guess_quality_from_title(title: str) -> str:
     if resolution == "-":
         return source
     return f"{resolution} {source}"
+
+
+def _extract_resolution(title: str) -> str | None:
+    lowered_title = title.strip().lower()
+    if re.search(r"\b(2160p|4k)\b", lowered_title):
+        return "2160p"
+    if re.search(r"\b1080p\b", lowered_title):
+        return "1080p"
+    if re.search(r"\b720p\b", lowered_title):
+        return "720p"
+    return None
+
+
+def _extract_codec(title: str) -> str | None:
+    lowered_title = title.strip().lower()
+    if re.search(r"\b(x265|hevc)\b", lowered_title):
+        return "x265" if "x265" in lowered_title else "HEVC"
+    if re.search(r"\b(x264|avc)\b", lowered_title):
+        return "x264"
+    return None
+
+
+def _extract_source_type(title: str) -> str | None:
+    lowered_title = title.strip().lower()
+    if "remux" in lowered_title:
+        return "Remux"
+    if "bluray" in lowered_title or "blu-ray" in lowered_title:
+        return "BluRay"
+    if "bdrip" in lowered_title:
+        return "BDRip"
+    if "web-dl" in lowered_title or "webdl" in lowered_title:
+        return "WEB-DL"
+    if "webrip" in lowered_title or "web-rip" in lowered_title:
+        return "WEBRip"
+    return None
+
+
+def _extract_release_group(title: str) -> str | None:
+    matched = re.search(r"-([A-Za-z0-9][A-Za-z0-9-]+)$", title.strip())
+    if matched is None:
+        return None
+    return str(matched.group(1) or "").strip() or None
+
+
+def _safe_optional_int(value: Any) -> int | None:
+    try:
+        resolved = int(value)
+    except (TypeError, ValueError):
+        return None
+    if resolved > 0:
+        return resolved
+    return None
 
 
 def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:

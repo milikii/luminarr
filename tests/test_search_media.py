@@ -9,6 +9,7 @@ from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.sqlite import SqliteDatabase
+from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
 from app.services.search_media import (
     BT_READ_ONLY_EMPTY_QUERY_TEXT,
     BT_READ_ONLY_NOTICE_TEXT,
@@ -558,6 +559,57 @@ def test_search_and_format_guesses_quality_from_title() -> None:
     service = SearchMediaService(_fake_search_quality_from_title)
     text = _run(service.search_and_format("dune"))
     assert "画质: 1080p WEB-DL" in text
+
+
+def test_search_and_format_orders_media_bt_candidates_with_shared_scorer(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune 2021"
+        return [
+            {
+                "title": "Dune 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 3 * 1024 * 1024 * 1024,
+                "seeders": 20,
+                "downloadUrl": "https://example.com/dune-1080p.torrent",
+                "indexerName": "IndexerA",
+            },
+            {
+                "title": "Dune 2021 720p WEB-DL",
+                "year": 2021,
+                "size": 2 * 1024 * 1024 * 1024,
+                "seeders": 20,
+                "downloadUrl": "https://example.com/dune-720p.torrent",
+                "indexerName": "IndexerB",
+            },
+        ]
+
+    custom_rules = BTScoringRules(
+        weights=dict(DEFAULT_BT_SCORING_RULES.weights),
+        resolution_scores={
+            "2160p": 0.0,
+            "1080p": 0.1,
+            "720p": 1.0,
+            None: 0.0,
+        },
+        source_type_scores=dict(DEFAULT_BT_SCORING_RULES.source_type_scores),
+        codec_scores=dict(DEFAULT_BT_SCORING_RULES.codec_scores),
+        release_group_preferred=DEFAULT_BT_SCORING_RULES.release_group_preferred,
+    )
+    monkeypatch.setattr("app.services.search_media.load_bt_scoring_rules", lambda: custom_rules)
+
+    _ = tmp_path
+    service = SearchMediaService(fake_search)
+
+    text = _run(service.search_and_format("Dune 2021", chat_id=1001))
+
+    assert "1. Dune 2021 720p WEB-DL (2021)" in text
+    assert "2. Dune 2021 1080p WEB-DL (2021)" in text
+    cached_first = service.get_cached_candidate(1001, 1)
+    assert cached_first is not None
+    assert cached_first["downloadUrl"] == "https://example.com/dune-720p.torrent"
 
 
 async def _fake_search_tmdb_hit(query: str) -> list[dict[str, object]]:
