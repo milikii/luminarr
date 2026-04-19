@@ -354,5 +354,5 @@ make run
 - 想理解“代码为什么这么分”：读 `docs/ARCHITECTURE.md`
 - 想知道“当前正在做什么”：读 `docs/NEXT_STEP.md`
 - 想知道“现在做到哪里”：先读 `docs/STATUS.md`
-- 想看“当前主线详细闭环”：读 `docs/APP_MAIN_SLIMMING_LOG.md`；上一条已完成的 runtime 主线看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
+- 想看“当前主线蓝图和详细闭环”：先读 `docs/SERIES_ANIME_NAMING_PLAN.md`，再读 `docs/SERIES_ANIME_NAMING_LOG.md`；上一条已完成的 `app/main.py` 主线看 `docs/APP_MAIN_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - 想看“所有文档地图”：读 `docs/INDEX.md`

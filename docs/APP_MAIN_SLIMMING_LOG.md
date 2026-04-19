@@ -5,10 +5,10 @@
 
 ## 1. Current line
 
-- 当前主线状态：2026-04-19 冷启动一致性检查已确认 `private_chat_runtime.py` 主线退出条件满足，当前正式切到 `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化
+- 当前主线状态：`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化已在 2026-04-19 通过 `app/downloader_route_lookup.py` helper 抽离满足 `Done when` 第 1 条，focused tests `16 passed, 1 deselected`
 - 上一条已完成主线“`private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化”已在 2026-04-19 满足 `Done when` 第 2 条：入站 trace 和回包 trace 已抽到 `_log_private_chat_inbound()` / `_wrap_reply_with_trace()` helper，focused tests `34 passed, 17 deselected`
 - 再上一条已完成主线“`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化”已在 2026-04-19 满足 `Done when` 第 1 条：`app/services/cleanup_correlation_lookup.py` 已承接“查询引用 -> 任务身份 -> import 关联”边界
-- 当前这一步只允许拆启动装配、下载器路由 helper、可选渠道启动绑定和启动日志；不改启动入口、角色绑定和运行时真相
+- 下一条主线已切到 `series / anime` 独立名称解析最小实现；蓝图见 `docs/SERIES_ANIME_NAMING_PLAN.md`，详细闭环见 `docs/SERIES_ANIME_NAMING_LOG.md`
 
 ## 2. Risk groups
 
@@ -20,6 +20,7 @@
 
 已完成闭环：
 - 2026-04-19 已先把 “task_ref/chat_id -> downloader_name” 查询、payload 解析和对应中文 fail-closed 日志抽到 `app/downloader_route_lookup.py`；`app/main.py` 先减掉一段共享路由查询逻辑，status/import source 的 client 解析仍留待下一轮同组收口。
+- 2026-04-19 已继续把实例缺失 / client 未配置 / 路由调用 `get_torrent_status` / `get_torrent_import_source` 一并合并进 `app/downloader_route_lookup.py`；`app/main.py` 这一组只剩装配调用点。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`
@@ -54,4 +55,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.3 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前主线完成后，在 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`README.md` 和 `AGENTS.md` 同步切到 `After this step` 的下一项。
+- 该主线已完成；后续只保留完成态路径和 focused tests，下一条主线按 `docs/NEXT_STEP.md` 推进。

@@ -112,12 +112,14 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化（把 client 装配、下载器路由 helper、可选渠道启动绑定和启动日志继续拆开，但不改启动入口、角色绑定和现有运行时真相）。
+- **当前唯一主线**：`series / anime` 独立名称解析最小实现（含 `.ass` 最小支持评估），按 `docs/SERIES_ANIME_NAMING_PLAN.md` 的 parser-first 蓝图推进。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线详细台账**：`docs/APP_MAIN_SLIMMING_LOG.md`
-- **上一条主线台账**：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（shared runtime 编排层瘦身主线已在 2026-04-19 达到退出条件 2）
-- **再上一条主线台账**：`docs/CLEANUP_SLIMMING_LOG.md`（cleanup 编排层瘦身主线已在 2026-04-19 达到退出条件 1）
+- **当前主线蓝图**：`docs/SERIES_ANIME_NAMING_PLAN.md`
+- **当前主线台账**：`docs/SERIES_ANIME_NAMING_LOG.md`
+- **上一条主线台账**：`docs/APP_MAIN_SLIMMING_LOG.md`（`app/main.py` 瘦身主线已在 2026-04-19 达到退出条件 1）
+- **再上一条主线台账**：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（shared runtime 编排层瘦身主线已在 2026-04-19 达到退出条件 2）
+- **更早主线台账**：`docs/CLEANUP_SLIMMING_LOG.md`（cleanup 编排层瘦身主线已在 2026-04-19 达到退出条件 1）
 - **更早主线台账**：`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`（BT 订阅编排层瘦身主线已在 2026-04-19 达到退出条件 1）
 - **更早主线台账**：`docs/SEARCH_MEDIA_SLIMMING_LOG.md`（搜索编排层瘦身主线已在 2026-04-19 达到退出条件 1）
 - **更早主线台账**：`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`（下载编排层瘦身主线已在 2026-04-19 达到退出条件 1）
@@ -128,9 +130,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
 - **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前主线 focused tests 入口收口在 `docs/APP_MAIN_SLIMMING_LOG.md` 的 2.1–2.3 分组；已完成的 runtime / cleanup 主线回归入口继续见 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md` 和 `docs/CLEANUP_SLIMMING_LOG.md`。
-- 这一步只允许收 `app/main.py` 的一个连贯切片，不顺手重构 runtime、cleanup 或其他编排层。
-- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（`app/main.py` 瘦身 → `series / anime` 名称解析 → `.ass` 支持评估 → 等等）。
+- **本地回归命令**：当前主线入口看 `docs/SERIES_ANIME_NAMING_LOG.md` 和 `docs/SERIES_ANIME_NAMING_PLAN.md`；已完成的 `app/main.py` / runtime / cleanup 主线回归入口继续见对应 log。
+- 这一步只允许收 parser、四处集成点和 `.ass` 最小支持，不顺手重构 runtime、cleanup、下载器或其他编排层。
+- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（shared private-chat 交付体验收口 → 最小人类可用入口 → BT 共享确定性评分器 → 等等）。
 
 ## 6. 当前明确不做
 
@@ -180,9 +182,11 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/APP_MAIN_SLIMMING_LOG.md`：当前主线详细闭环
-- `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：上一条主线详细闭环
-- `docs/CLEANUP_SLIMMING_LOG.md`：再上一条主线详细闭环
+- `docs/SERIES_ANIME_NAMING_PLAN.md`：当前主线蓝图
+- `docs/SERIES_ANIME_NAMING_LOG.md`：当前主线详细闭环
+- `docs/APP_MAIN_SLIMMING_LOG.md`：上一条主线详细闭环
+- `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：再上一条主线详细闭环
+- `docs/CLEANUP_SLIMMING_LOG.md`：更早主线详细闭环
 - `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`：更早主线详细闭环
 - `docs/SEARCH_MEDIA_SLIMMING_LOG.md`：更早主线详细闭环
 - `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`：更早主线详细闭环

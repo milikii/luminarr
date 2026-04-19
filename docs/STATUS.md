@@ -1,4 +1,4 @@
-# Current status (v308)
+# Current status (v309)
 
 ## Project position
 
@@ -24,7 +24,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/APP_MAIN_SLIMMING_LOG.md`：当前“`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化”详细台账
+- `docs/SERIES_ANIME_NAMING_PLAN.md`：当前“`series / anime` 独立名称解析最小实现”蓝图
+- `docs/SERIES_ANIME_NAMING_LOG.md`：当前“`series / anime` 独立名称解析最小实现”详细台账
+- `docs/APP_MAIN_SLIMMING_LOG.md`：已完成的“`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化”详细台账
 - `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：已完成的“`private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化”详细台账
 - `docs/CLEANUP_SLIMMING_LOG.md`：已完成的“`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化”详细台账
 - `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`：已完成的“`manage_bt_subscription.py` 订阅编排层瘦身 / 模块化”详细台账
@@ -40,31 +42,30 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-当前快照按主题归纳；当前主线具体路径、focused tests 和风险分组统一只看 `docs/APP_MAIN_SLIMMING_LOG.md`，上一条主线详细闭环继续只看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`，再上一条主线继续只看 `docs/CLEANUP_SLIMMING_LOG.md`，更早主线继续只看 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 和 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
+当前快照按主题归纳；当前主线具体路径、focused tests 和风险分组统一只看 `docs/SERIES_ANIME_NAMING_PLAN.md` 与 `docs/SERIES_ANIME_NAMING_LOG.md`，上一条主线详细闭环继续只看 `docs/APP_MAIN_SLIMMING_LOG.md`，再上一条主线继续只看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`，更早主线继续只看 `docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 和 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
 
-- 2026-04-19 冷启动一致性检查已确认：`private_chat_runtime.py` shared runtime 编排层瘦身主线退出条件 2 已满足，`PERSISTENCE_CLOSURE_LOG.md` 2.1~2.4 已覆盖 10 个指定 repo 的对外方法簇，`git grep 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot` 当前命中 `0`；当前主线已正式切到 `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化。
+- 2026-04-19 已通过 `app/downloader_route_lookup.py` 抽离把 `app/main.py` 主线的下载器路由 helper 收成独立边界；`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"` 得到 `16 passed, 1 deselected`，`app/main.py` 主线满足退出条件 1 并已切到 `series / anime` 解析主线。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
-- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 `app/main.py` 启动装配与下载器路由瘦身，不回退 cleanup 已确认的协议和 guardrail。
+- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 `series / anime` parser、四处集成点和 `.ass` 最小支持，不回退 cleanup 已确认的协议和 guardrail。
 - 上一条 BT 订阅主线已把命令解析、媒体类型前缀解析、标题年份抽取和清单增删回复文本抽到 `app/services/bt_subscription_command.py`；扫描候选筛选、`last_seen` 更新和 scheduler tick 继续保留在 service 内，作为已完成主线的剩余结构证据。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
 
-- `app/main.py` 当前仍把 client 装配、下载器路由解析、可选渠道 bot_data 绑定和启动入口揉在同一个 `main()` 里；后续只拆这些启动装配边界，不改运行时真相。
-- 当前必须继续守住已经落下来的 fail-closed 方向，不能在做 `app/main.py` 瘦身时回退四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界。
+- `series / anime` 现在还没有统一 `ParsedMediaName` parser；用户输入、来源候选和下载完成文件名仍没收口到同一结构。
+- 当前必须继续守住 movie-first 行为、四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 parser 主线里回退它们。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- `git log --oneline -20` 已包含 `f624c22 Complete private chat runtime trace slimming`，之前“近 20 条提交还停在订阅主线”的说法已在本轮冷启动审计中确认过期。
-- `app/main.py` 已进入当前主线，`private_chat_runtime.py` 与 `cleanup_downloaded_source.py` 已转入完成态台账。
-- `series / anime` 名称解析、`.ass` 字幕支持仍是更后面的工作，不提前并行展开。
+- `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
+- `series / anime` 名称解析与 `.ass` 最小支持现在已提升为当前唯一主线。
 
 ## Latest verification
 
-- 窗口活性快照：`app/main.py` 主线进行中
+- 窗口活性快照：`series / anime` 主线进行中
 - 当前状态快照：已切换
-- 当前结论快照：`app/main.py` 已成为当前唯一主线；`private_chat_runtime.py` 退出条件 2、持久化覆盖面审计和 `except Exception` 命中数审计都已在 2026-04-19 冷启动一致性检查中确认完成。
+- 当前结论快照：`app/main.py` 主线已在 2026-04-19 满足退出条件 1；当前唯一主线已切到 `series / anime` 独立名称解析最小实现。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
-- 当前主线 focused verification：2026-04-19，`34 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "routes_search_without_telegram_update or routes_bt_prompt_without_telegram_update or routes_cleanup or routes_bare_cleanup or personal_wechat_login or writes_trace_log or replies_service_not_ready"`）
+- 当前主线 focused verification：2026-04-19，`16 passed, 1 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`46 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - cleanup focused exit-condition tests：2026-04-19，`18 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"`）
@@ -86,9 +87,10 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 更早主线切换审计：2026-04-18，`15 passed, 34 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_feishu_long_connection.py -k "handle_feishu_private_text_event or routes_sdk_event"`）
 - 更早主线切换审计：2026-04-18，`passed`（`.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py`；`rg -n "lark_ws_client_module\\.loop|_disconnect|_auto_reconnect|_cache" app/bot/feishu_long_connection.py` 命中 `0`）
 - 更早主线切换审计：2026-04-18，`passed`（`bash -lc "git grep -n 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot | wc -l"`，命中 `0`）
-- 当前主线详细台账：`docs/APP_MAIN_SLIMMING_LOG.md`
-- 上一条主线详细台账：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`
-- 再上一条主线详细台账：`docs/CLEANUP_SLIMMING_LOG.md`
+- 当前主线蓝图：`docs/SERIES_ANIME_NAMING_PLAN.md`
+- 当前主线详细台账：`docs/SERIES_ANIME_NAMING_LOG.md`
+- 上一条主线详细台账：`docs/APP_MAIN_SLIMMING_LOG.md`
+- 再上一条主线详细台账：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`
 - 更早主线详细台账：`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`
 - 更早主线详细台账：`docs/SEARCH_MEDIA_SLIMMING_LOG.md`
 - 更早主线详细台账：`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`
