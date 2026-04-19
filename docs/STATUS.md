@@ -1,4 +1,4 @@
-# Current status (v318)
+# Current status (v319)
 
 ## Project position
 
@@ -24,7 +24,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_PAGE_RANGE_PLAN.md`：当前 BT 用户页 / 编号范围页能力蓝图
+- `docs/BT_PAGE_RANGE_PLAN.md`：当前 BT 更多 allowlist 页面类型再评估蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成的 Plex 真实 refresh smoke 值得性重评估蓝图
 - `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：更早完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
