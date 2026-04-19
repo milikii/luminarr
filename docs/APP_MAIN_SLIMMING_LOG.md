@@ -18,6 +18,9 @@
 - `app/main.py` 仍把 task_ref -> downloader_name 查询、payload 解析、client 选择和 status/import source 路由揉在同一段启动文件里；这一步只允许把“查任务真相 -> 选下载器 client -> 调对应协议”收成连贯 helper。
 - 这一组继续守住下载器角色绑定、历史任务里的 `downloader_name` 和现有 fail-closed 中文日志边界。
 
+已完成闭环：
+- 2026-04-19 已先把 “task_ref/chat_id -> downloader_name” 查询、payload 解析和对应中文 fail-closed 日志抽到 `app/downloader_route_lookup.py`；`app/main.py` 先减掉一段共享路由查询逻辑，status/import source 的 client 解析仍留待下一轮同组收口。
+
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`
 
