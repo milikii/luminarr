@@ -198,6 +198,9 @@ def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:
     sort_field = next((item.strip() for item in query.get("s", ()) if item.strip()), "")
     sort_order = next((item.strip() for item in query.get("o", ()) if item.strip()), "")
     has_page_number = _PAGE_NUMBER_TOKEN_PATTERN.fullmatch(f"p={page_number}") is not None
+    has_partial_sort = bool(sort_field) != bool(sort_order)
+    if has_partial_sort:
+        return False
     has_sort_page = bool(sort_field and sort_order)
     return bool(user_name or search_text or category_text or has_page_number or has_sort_page)
 

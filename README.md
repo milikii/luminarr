@@ -115,7 +115,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前进行中的 promoted 主线是 BT 用户页 / 编号范围页能力；上一条 Plex 真实 refresh smoke 值得性重评估已按“当前主机无可达 Plex 实例，先回到 BT”收口。
+- **当前施工状态**：当前进行中的 promoted 主线是 BT allowlist 分类排序分页组合页 proof；上一条 BT allowlist 分类排序组合页 proof 已按“现有 allowlist 页面预览链与 `bt批量确认` 复用已证明”收口。
+- **更早完成主线**：BT 用户页 / 编号范围页能力保持完成态，不回退。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
 - **当前主线蓝图**：`docs/BT_PAGE_RANGE_PLAN.md`
