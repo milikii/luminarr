@@ -25,6 +25,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
 - `docs/BT_SCORING_PLAN.md`：当前 BT 共享确定性评分器蓝图
+- `docs/BT_SCORING_LOG.md`：当前 BT 共享确定性评分器详细台账
 - `docs/QUICK_START_PLAN.md`：刚完成的 quick start 蓝图
 - `docs/DEPLOY_CHECKLIST.md`：刚完成的部署者最短路径 checklist
 - `docs/SHARED_DELIVERY_UX_LOG.md`：更早完成的“shared private-chat 交付体验收口”详细台账
@@ -56,6 +57,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已把 `add_to_downloader` 的待确认下载回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_runtime.py -k "delivery_renderer or add_pending"` 得到通过，四渠道审批提示开始按 `channel` 分层展示。
 - 2026-04-19 已把 `get_download_status` 的成功状态回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py tests/test_search_media.py tests/test_add_to_downloader.py tests/test_get_download_status.py` 得到通过，shared private-chat 主线满足当前 `Done when` 第 1 条。
 - 2026-04-19 已完成 quick start 主线：`docs/DEPLOY_CHECKLIST.md` 覆盖 `Phase 0-6`、`.env.example` 已按分组重构、README §0 已加 checklist 指针；当前唯一主线已切到 BT 共享确定性评分器。
+- 2026-04-19 已落 `app/services/bt_candidate_scorer.py` Phase 1 基线：统一 `BTCandidate` / `ScoredCandidate`、标题/链接/去重/低质量/合集预过滤和分辨率/片源/做种数/体积/编码/字幕组打分；`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py` 得到通过。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线切到 BT 共享确定性评分器，不回退 cleanup 和 shared delivery 已确认的协议与结论。
@@ -64,8 +66,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前三条 BT 路径仍各自有一套简化选源逻辑：`pure_bt.py`、`manage_bt_subscription.py` 和媒体型 BT 候选展示还没共用同一套确定性评分 helper。
-- 当前主线第一闭环还没落地：`app/services/bt_candidate_scorer.py`、`tests/test_bt_candidate_scorer.py` 和可选规则文件都还不存在。
+- 当前三条 BT 路径仍各自有一套简化选源逻辑：`pure_bt.py`、`manage_bt_subscription.py` 和媒体型 BT 候选展示还没真正接到共享评分器。
+- 当前评分器还是内置规则；`app/services/bt_scoring_rules.yml` 可选加载和字段损坏 warning 还没落地。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 BT 评分器主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
@@ -81,6 +83,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前主线 focused verification：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`184 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_sources.py tests/test_import_to_library.py`）
+- 当前主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py`）
 - 当前主线 focused verification：2026-04-19，`4 passed`（`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`46 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
@@ -104,6 +107,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 更早主线切换审计：2026-04-18，`passed`（`.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py`；`rg -n "lark_ws_client_module\\.loop|_disconnect|_auto_reconnect|_cache" app/bot/feishu_long_connection.py` 命中 `0`）
 - 更早主线切换审计：2026-04-18，`passed`（`bash -lc "git grep -n 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot | wc -l"`，命中 `0`）
 - 当前主线蓝图：`docs/BT_SCORING_PLAN.md`
+- 当前主线详细台账：`docs/BT_SCORING_LOG.md`
 - 刚完成部署主线蓝图：`docs/QUICK_START_PLAN.md`
 - 刚完成部署主线交付物：`docs/DEPLOY_CHECKLIST.md`
 - 更早主线详细台账：`docs/SHARED_DELIVERY_UX_LOG.md`
