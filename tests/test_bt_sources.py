@@ -216,6 +216,17 @@ def test_resolve_supported_web_source_page_request_appends_page_number() -> None
     assert resolve_supported_web_source_page_request("https://example.com/list/42 p=2") is None
 
 
+def test_is_supported_web_source_page_url_accepts_uncategorized_user_sort_page_number() -> None:
+    assert is_supported_web_source_page_url("https://nyaa.si/?u=subsplease&s=seeders&o=desc&p=2")
+
+
+def test_resolve_supported_web_source_page_request_appends_uncategorized_user_sort_page_number() -> None:
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?u=subsplease&s=seeders&o=desc p=2")
+        == "https://nyaa.si/?u=subsplease&s=seeders&o=desc&p=2"
+    )
+
+
 def test_web_source_client_search_page_rejects_unsupported_url() -> None:
     client = WebSourceClient(rule=NYAA_RULE)
 
