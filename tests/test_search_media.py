@@ -320,6 +320,43 @@ def test_search_bt_batch_preview_and_format_uses_page_fetch_for_allowlist_home_p
     assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="1") in text
 
 
+def test_search_bt_batch_preview_and_format_uses_page_fetch_for_allowlist_sort_page_url() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist sort page preview")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?s=seeders&o=desc"
+        return [
+            {
+                "title": "Frieren S01E05 1080p",
+                "source": "magnet:?xt=urn:btih:ffffffffffffffffffffffffffffffffffffffff",
+                "seeders": 16,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(
+                query="https://nyaa.si/?s=seeders&o=desc",
+                selected_indexes=(1,),
+                selection_text="1",
+            )
+        )
+    )
+
+    assert "BT 批量预览结果：https://nyaa.si/?s=seeders&o=desc" in text
+    assert "1. Frieren S01E05 1080p" in text
+    assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="1") in text
+
+
 def test_search_bt_batch_preview_and_format_uses_page_fetch_for_page_number_syntax() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for allowlist page number syntax")

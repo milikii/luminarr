@@ -189,13 +189,17 @@ def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:
         return False
 
     query = parse_qs(parsed.query, keep_blank_values=False)
-    if any(key.lower() not in {"f", "c", "q", "u", "p"} for key in query):
+    if any(key.lower() not in {"f", "c", "q", "u", "p", "s", "o"} for key in query):
         return False
     user_name = next((item.strip() for item in query.get("u", ()) if item.strip()), "")
     search_text = next((item.strip() for item in query.get("q", ()) if item.strip()), "")
     category_text = next((item.strip() for item in query.get("c", ()) if item.strip()), "")
     page_number = next((item.strip() for item in query.get("p", ()) if item.strip()), "")
-    return bool(user_name or search_text or category_text or _PAGE_NUMBER_TOKEN_PATTERN.fullmatch(f"p={page_number}"))
+    sort_field = next((item.strip() for item in query.get("s", ()) if item.strip()), "")
+    sort_order = next((item.strip() for item in query.get("o", ()) if item.strip()), "")
+    has_page_number = _PAGE_NUMBER_TOKEN_PATTERN.fullmatch(f"p={page_number}") is not None
+    has_sort_page = bool(sort_field and sort_order)
+    return bool(user_name or search_text or category_text or has_page_number or has_sort_page)
 
 
 def _extract_title(row_html: str) -> str:

@@ -1,9 +1,10 @@
-# Next step (v224)
+# Next step (v225)
 
 ## Current goal
 
-- 当前进行中的 promoted 主线是 **BT 更多 allowlist 列表页类型**。2026-04-19 冷启动审计已确认：上一条 **BT 用户页 / 编号范围页能力** 已满足退出条件，当前继续从 `After this step` 第 1 项推进。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；BT 上一条主线也已经站稳，首页翻页页 `https://nyaa.si/?p=2` 已补齐，眼下更保守的剩余缺口只剩排序列表页。
+- 当前进行中的 promoted 主线改为 **BT 更多 allowlist 页面类型再评估**。2026-04-19 当前批次已补齐首页翻页页 `https://nyaa.si/?p=2` 和排序列表页 `https://nyaa.si/?s=seeders&o=desc`，上一条 **BT 更多 allowlist 列表页类型** 已满足退出条件。
+- 更早一条 **BT 用户页 / 编号范围页能力** 主线已在同日冷启动审计中确认满足退出条件，当前保持完成态。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；BT 这一批页面类型也已经站稳，眼下更保守的下一步只剩“是否还值得继续扩更多 allowlist 页面类型”的再评估。
 - 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前不再重复施工这些已收口项。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
@@ -34,7 +35,8 @@
 ## Only do
 
 - 当前优先交付：
-  - 在不放宽站点 allowlist 的前提下，补齐排序列表页这类更省输入的 BT 页面 URL，并保持首页翻页页不回退
+  - 保持首页翻页页、排序列表页、category/list 页面和 `p=<页码>` 语法不回退
+  - 如果继续 BT，只允许从现有站点 allowlist 里再挑一个更小页面类型评估，不扩站点、不放宽抓站边界
   - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -54,10 +56,10 @@
 
 ## Done when
 
-当前 BT 更多 allowlist 列表页类型主线视为 **已收口**，满足以下任一条即可：
+当前 BT 更多 allowlist 页面类型再评估主线视为 **已收口**，满足以下任一条即可：
 
-1. `bt批量 https://nyaa.si/?p=2 1-3` 这类首页翻页页已能返回只读批量预览，且候选可继续被 `bt批量确认` 复用进现有下载确认链，并有 focused tests 证明不回退；
-2. `bt批量 https://nyaa.si/?s=seeders&o=desc 1-3` 这类排序列表页已能返回只读批量预览，且未声明页面类型仍保持中文 fail-closed，并有 focused tests 证明不回退；
+1. 已明确下一个值得补的 allowlist 页面类型，并把它收成一个单一最小闭环写回 `docs/BT_PAGE_RANGE_PLAN.md`；
+2. 已明确当前 allowlist 页面类型先维持现状更稳妥，且既有 focused tests 能证明首页翻页页、排序列表页与 fail-closed 边界不回退；
 3. 本轮代码变更 `< 20` 行且只是对同一个 page/range helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
@@ -67,5 +69,5 @@
 
 ## After this step
 
-1. 在首页翻页页和排序列表页站稳后，再看是否还要补更多 allowlist 页面类型
+1. 如果再继续 BT，就从现有 allowlist 里挑一个更小页面类型单独开主线
 2. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
