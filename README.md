@@ -52,7 +52,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - TMDB
   - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 使用）
   - Transmission + qBittorrent
-  - Emby
+  - Emby / Jellyfin / Plex（按配置选择 refresh provider）
   - SQLite
   - Docker Compose
   - 单实例 / 单进程 / 单机
@@ -75,7 +75,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
   - filename normalization
   - metadata scraping（TMDB + Fanart.tv）
   - subtitle auto-translation（当前仅 `.srt`）
-  - Emby refresh
+  - 媒体服务器 refresh（Emby / Jellyfin / Plex）
 - cleanup 最小闭环：
   - `cleanup inspect`
   - `cleanup`
@@ -108,16 +108,18 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
 - cleanup 当前还没有 PT 做种状态 / `pt_min_seed_hours` 保护校验；cleanup 验证窗口退出前必须把这条风险确认清楚。
-- 当前最稳的是 movie-first；quick start 主线已完成，当前缺口转到 BT 共享确定性评分器。
+- 当前最稳的是 movie-first；quick start、BT 共享确定性评分器、Jellyfin / Plex refresh provider 支持都已完成。
 - 字幕翻译当前仍只处理 `.srt`；`.ass` 继续保留为后续能力缺口，不阻塞当前主线切换。
-- BT 路线已可用，但还没升级成共享确定性评分器。
+- BT 路线已可用，并已升级成共享确定性评分器。
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：BT 共享确定性评分器，按 `docs/BT_SCORING_PLAN.md` 推进。
+- **当前唯一主线**：Jellyfin / Plex 支持已基本完成；当前没有新的 promoted 主线，继续以 `docs/NEXT_STEP.md` 为准守住完成态，不自动拉起 plugin 体系。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/BT_SCORING_PLAN.md`
+- **当前主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
+- **刚完成主线蓝图**：`docs/BT_SCORING_PLAN.md`
+- **刚完成主线台账**：`docs/BT_SCORING_LOG.md`
 - **刚完成的部署主线蓝图**：`docs/QUICK_START_PLAN.md`
 - **刚完成的部署主线交付物**：`docs/DEPLOY_CHECKLIST.md`
 - **上一条主线台账**：`docs/SERIES_ANIME_NAMING_LOG.md`（`series / anime` 名称解析主线已在 2026-04-19 达到退出条件 1）
@@ -134,16 +136,16 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
 - **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前主线入口看 `docs/BT_SCORING_PLAN.md`；刚完成的部署主线入口看 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`。
-- 这一步只允许收 BT 候选预过滤、确定性评分和共享 helper 接入，不顺手改 approval、dispatch、import、cleanup 或其他 workflow 真相。
-- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（Jellyfin / Plex → plugin 体系后置）。
+- **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器入口看 `docs/BT_SCORING_PLAN.md`；部署入口看 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`。
+- 这一步只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起 plugin 体系或改 workflow 真相。
+- 当前主线已满足退出条件 1；`After this step` 仍是 plugin 体系继续后置，不自动启动新施工。
 
 ## 6. 当前明确不做
 
 - 通用 AI 助手
 - 通用 Agent 平台
 - 通用 plugin / skill / MCP 平台化
-- Jellyfin / Plex 并行主线支持（当前不做，后续再补）
+- Jellyfin / Plex 全量媒体管理能力对齐
 - Web UI / 桌面端
 - Telegram / 微信群聊主线
 - Redis / MQ / PostgreSQL

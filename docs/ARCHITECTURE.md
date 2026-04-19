@@ -35,7 +35,7 @@
 | `app/config.py` | 把环境变量读成 `Settings` | `app/config.py` |
 | `app/bot/` | 四个渠道入口 + shared private-chat runtime | `telegram_bot.py`、`personal_wechat_text.py`、`feishu_adapter.py`、`wecom_adapter.py`、`private_chat_runtime.py` |
 | `app/services/` | 具体业务动作 | `search_media.py`、`add_to_downloader.py`、`import_to_library.py`、`cleanup_downloaded_source.py` |
-| `app/clients/` | 调外部系统的最小协议封装 | `tmdb.py`、`prowlarr.py`、`transmission.py`、`qbittorrent.py`、`emby.py` |
+| `app/clients/` | 调外部系统的最小协议封装 | `tmdb.py`、`prowlarr.py`、`transmission.py`、`qbittorrent.py`、`emby.py`、`jellyfin.py`、`plex.py` |
 | `app/db/` | SQLite 真相层 | `sqlite.py`、`job_repo.py`、`job_event_repo.py`、`approval_repo.py` |
 | `app/runtime/` | 运行时规则、执行边界 | `execution_policy.py` |
 | `tests/` | 行为回归和协议保护 | `test_cleanup_cross_channel_smoke.py`、`test_import_to_library.py` 等 |
@@ -55,7 +55,7 @@ SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
 - TMDB / Fanart：提供元数据。
 - Prowlarr / WebSource：提供搜索候选。
 - Transmission / qBittorrent：提供下载动作和状态。
-- Emby：提供刷新动作。
+- Emby / Jellyfin / Plex：提供媒体库刷新动作。
 
 ## 5. 几条主链
 
@@ -65,7 +65,7 @@ SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
 
 ### 下载完成到入库
 
-`下载状态 -> post_download_auto_import -> import_to_library -> job_event(import.succeeded) -> metadata_scraper -> subtitle_translator -> refresh_media_server`
+`下载状态 -> post_download_auto_import -> import_to_library -> job_event(import.succeeded) -> metadata_scraper -> subtitle_translator -> refresh_media_server(Emby/Jellyfin/Plex)`
 
 ### cleanup
 

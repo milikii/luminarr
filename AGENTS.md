@@ -87,7 +87,7 @@ Current mainline profile:
 - TMDB
 - Prowlarr（current main source） + minimal BT WebSource（BT-only）
 - Transmission + qBittorrent
-- Emby
+- Emby / Jellyfin / Plex（按配置选择 refresh provider）
 - SQLite
 - Docker Compose
 - single instance / single process / single host
@@ -106,7 +106,7 @@ Do not expand into:
 - generic AI assistant behavior
 - generic agent platform features
 - generic plugin / skill / MCP platformization
-- Jellyfin / Plex mainline support in the current step
+- Jellyfin / Plex full media-management parity or auto-detection in the current step
 - auto-download watchlist in the current mainline
 
 Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
@@ -114,7 +114,7 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 ## 8. Current priority
 
-当前唯一主线是**最小人类可用入口继续补齐**；详细目标、Phase 顺序和退出条件看 `docs/NEXT_STEP.md` 与 `docs/QUICK_START_PLAN.md`，当前快照看 `docs/STATUS.md`，刚完成的 `shared private-chat` 交付体验详细闭环看 `docs/SHARED_DELIVERY_UX_LOG.md`，上一条已完成的 `series / anime` 独立名称解析详细闭环看 `docs/SERIES_ANIME_NAMING_LOG.md`，再上一条已完成的 `app/main.py` 启动装配 / 下载器路由 helper 瘦身详细闭环看 `docs/APP_MAIN_SLIMMING_LOG.md`，更早完成的 `private_chat_runtime.py` shared runtime 编排层瘦身详细闭环看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`，更早完成的 cleanup 编排层瘦身详细闭环看 `docs/CLEANUP_SLIMMING_LOG.md`，更早完成的 BT 订阅编排层瘦身详细闭环看 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`，更早完成的搜索编排层瘦身详细闭环看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`，更早完成的下载编排层瘦身详细闭环看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，更早完成的导入编排层瘦身详细闭环看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`，更早完成的 Telegram 渠道层瘦身详细闭环看 `docs/TELEGRAM_BOT_SLIMMING_LOG.md`，更早完成的持久化吞错收口详细闭环看 `docs/PERSISTENCE_CLOSURE_LOG.md`，cleanup 已完成证据看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+当前唯一主线是**Jellyfin / Plex 支持已基本完成后的完成态守护**；详细目标、Phase 顺序和退出条件看 `docs/NEXT_STEP.md` 与 `docs/JELLYFIN_PLEX_PLAN.md`，当前快照看 `docs/STATUS.md`，刚完成的 BT 共享确定性评分器详细闭环看 `docs/BT_SCORING_LOG.md`，刚完成的部署主线蓝图 / 交付物看 `docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，更早完成的 `shared private-chat` 交付体验详细闭环看 `docs/SHARED_DELIVERY_UX_LOG.md`，上一条已完成的 `series / anime` 独立名称解析详细闭环看 `docs/SERIES_ANIME_NAMING_LOG.md`，再上一条已完成的 `app/main.py` 启动装配 / 下载器路由 helper 瘦身详细闭环看 `docs/APP_MAIN_SLIMMING_LOG.md`，更早完成的 `private_chat_runtime.py` shared runtime 编排层瘦身详细闭环看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`，更早完成的 cleanup 编排层瘦身详细闭环看 `docs/CLEANUP_SLIMMING_LOG.md`，更早完成的 BT 订阅编排层瘦身详细闭环看 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`，更早完成的搜索编排层瘦身详细闭环看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`，更早完成的下载编排层瘦身详细闭环看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，更早完成的导入编排层瘦身详细闭环看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`，更早完成的 Telegram 渠道层瘦身详细闭环看 `docs/TELEGRAM_BOT_SLIMMING_LOG.md`，更早完成的持久化吞错收口详细闭环看 `docs/PERSISTENCE_CLOSURE_LOG.md`，cleanup 已完成证据看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 
 **诊断分流递减自检**：若本轮候选闭环的代码变更 < 20 行、只是对同一个 repo 方法再拆一条 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，则视为收益递减；本轮完成并提交后**直接停止**，把"当前主线可宣告完成"汇报给用户，不要自动进入下一轮再拆一条分流。
 

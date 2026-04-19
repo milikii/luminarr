@@ -35,7 +35,7 @@
   - TMDB
   - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 支线）
   - Transmission + qBittorrent
-  - Emby
+  - Emby / Jellyfin / Plex（按 `MEDIA_SERVER_PROVIDER` 选择 refresh provider）
   - SQLite
   - Docker Compose
   - 单实例 / 单进程 / 单机
@@ -118,7 +118,7 @@
     - 规范化命名
     - metadata scraping（TMDB + Fanart.tv）
     - subtitle auto-translation（当前仅 `.srt`）
-    - Emby refresh
+    - 媒体服务器 refresh（Emby / Jellyfin / Plex）
   - refresh 失败不回滚 import success。
   - metadata / subtitle 失败必须显式记录并打印可读错误，但不回滚 confirmed import success。
 - **原因**：
@@ -181,7 +181,7 @@
   当前主线不做：
   - personal WeChat 群聊、图片、文件、卡片、按钮、多账号编排
   - Feishu / WeCom 群聊、图片、卡片、按钮回调、通用多渠道平台化
-  - Jellyfin / Plex 并行主线支持
+  - Jellyfin / Plex 全量媒体管理能力对齐
   - 通用 plugin / skill / MCP 平台化
   - React TUI / Web UI / 桌面端
   - Redis / MQ / PostgreSQL
