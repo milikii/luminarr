@@ -172,6 +172,11 @@ def test_resolve_supported_web_source_page_request_appends_page_number() -> None
         resolve_supported_web_source_page_request("https://nyaa.si/?s=seeders&o=desc p=2")
         == "https://nyaa.si/?s=seeders&o=desc&p=2"
     )
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?c=1_2&s=seeders&o=desc p=2")
+        == "https://nyaa.si/?c=1_2&s=seeders&o=desc&p=2"
+    )
+    assert resolve_supported_web_source_page_request("https://nyaa.si/?c=1_2&s=seeders p=2") is None
     assert resolve_supported_web_source_page_request("https://example.com/list/42 p=2") is None
 
 
