@@ -2,7 +2,7 @@
 
 ## Current goal
 
-- 当前唯一主线：**`private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化**
+- 当前唯一主线：**`private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化**（已在 2026-04-19 通过 `_log_private_chat_inbound()` / `_wrap_reply_with_trace()` helper + focused tests 满足退出条件 2；下一次施工切到 `After this step` 第 1 项 `app/main.py`）
 - 上一条主线完成态：**`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已在 2026-04-19 通过 `app/services/cleanup_correlation_lookup.py` helper 抽离满足退出条件 1**
 - 更早完成态：**`manage_bt_subscription.py` 订阅编排层瘦身 / 模块化已完成**
 - 更早完成态：**`search_media.py` 搜索编排层瘦身 / 模块化已完成**
@@ -28,7 +28,7 @@
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 已完成窗口的详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
-- 当前最小闭环：每轮只收 `private_chat_runtime.py` 里的一个连贯切片，优先处理 frustration reset / pending state gate、命令分发，或 shared reply 包装 / trace 中的一组，不改四渠道共用协议、approval、`jobs` 和 SQLite 真相
+- 当前最小闭环：本轮已通过 shared reply 包装 / trace helper 抽离满足退出条件 2；`private_chat_runtime.py` 不再继续拆零碎小口，下一次施工直接进入 `After this step` 第 1 项 `app/main.py`
 
 ## Source of truth
 

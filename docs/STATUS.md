@@ -41,7 +41,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 当前快照按主题归纳；当前主线具体路径、focused tests 和风险分组统一只看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`，上一条主线详细闭环继续只看 `docs/CLEANUP_SLIMMING_LOG.md`，更早主线继续只看 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 和 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
 
-- `cleanup_downloaded_source.py` cleanup 编排层瘦身主线已在 2026-04-19 通过 `app/services/cleanup_correlation_lookup.py` helper 抽离 + focused tests 满足 `Done when` 第 1 条；当前唯一主线已切到 `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化。
+- `private_chat_runtime.py` shared runtime 编排层瘦身主线已在 2026-04-19 通过 `_log_private_chat_inbound()` / `_wrap_reply_with_trace()` helper 抽离 + focused tests 满足 `Done when` 第 2 条；按 `docs/NEXT_STEP.md` 应切到 `After this step` 第 1 项 `app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 shared runtime 编排层瘦身，不回退 cleanup 已确认的协议和 guardrail。
@@ -50,7 +50,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前主风险是 `app/bot/private_chat_runtime.py` 仍把 frustration reset、pending state gate、命令分发、shared reply 包装和部分 trace / stop-path 文案揉在同一入口函数里；下一步只能拆一个连贯切片，不能顺手大改。
+- `private_chat_runtime.py` shared runtime 编排层瘦身已达到可测量退出条件；剩余 pending gate / 命令分发内联分支不再继续拆零碎小口，下一步直接切到 `app/main.py` 主线。
 - 当前必须继续守住已经落下来的 fail-closed 方向，不能在做 `private_chat_runtime.py` 瘦身时回退四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 近 20 条提交标题仍主要停在 `manage_bt_subscription` 完成态和后续规划文档，尚未单独命名 cleanup/runtime 主线切换；冷启动时应以 `docs/NEXT_STEP.md`、当前代码树和 focused tests 为准。
@@ -59,10 +59,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Latest verification
 
-- 窗口活性快照：已切换到新主线
-- 当前状态快照：进行中
-- 当前结论快照：`cleanup_downloaded_source.py` cleanup 编排层瘦身主线已在 2026-04-19 通过 `app/services/cleanup_correlation_lookup.py` helper 抽离 + focused tests 满足退出条件 1；当前主线已切到 `private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化。
+- 窗口活性快照：runtime 主线已完成，待切到下一条主线
+- 当前状态快照：待切换
+- 当前结论快照：`private_chat_runtime.py` shared runtime 编排层瘦身主线已在 2026-04-19 通过 `_log_private_chat_inbound()` / `_wrap_reply_with_trace()` helper 抽离 + focused tests 满足退出条件 2；下一步按 `docs/NEXT_STEP.md` 切到 `After this step` 第 1 项 `app/main.py`。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
+- 当前主线 focused verification：2026-04-19，`34 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py -k "routes_search_without_telegram_update or routes_bt_prompt_without_telegram_update or routes_cleanup or routes_bare_cleanup or personal_wechat_login or writes_trace_log or replies_service_not_ready"`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`46 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - cleanup focused exit-condition tests：2026-04-19，`18 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"`）
