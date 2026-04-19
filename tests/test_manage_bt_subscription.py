@@ -6,6 +6,7 @@ from pathlib import Path
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
 from app.services.bt_subscription_command import (
     ParsedBtSubscriptionAddRequest,
     format_bt_subscription_add_result,
@@ -469,6 +470,62 @@ def test_bt_subscription_run_once_prefers_new_ranked_candidate(tmp_path: Path) -
     item = repo.list_items(chat_id=1001)[0]
     assert item.last_seen_source == "https://example.com/1080p.torrent"
     assert item.last_seen_title == "Frieren S01E01 1080p"
+
+
+def test_bt_subscription_run_once_uses_shared_bt_scoring_rules(tmp_path: Path, monkeypatch) -> None:
+    async def _ranked_search(_: str) -> list[dict[str, object]]:
+        return [
+            {
+                "title": "Frieren S01E01 1080p",
+                "downloadUrl": "https://example.com/1080p.torrent",
+                "seeders": 20,
+                "size": 2_200_000_000,
+            },
+            {
+                "title": "Frieren S01E01 720p",
+                "downloadUrl": "https://example.com/720p.torrent",
+                "seeders": 20,
+                "size": 1_500_000_000,
+            },
+        ]
+
+    custom_rules = BTScoringRules(
+        weights=dict(DEFAULT_BT_SCORING_RULES.weights),
+        resolution_scores={
+            "2160p": 0.0,
+            "1080p": 0.1,
+            "720p": 1.0,
+            None: 0.0,
+        },
+        source_type_scores=dict(DEFAULT_BT_SCORING_RULES.source_type_scores),
+        codec_scores=dict(DEFAULT_BT_SCORING_RULES.codec_scores),
+        release_group_preferred=DEFAULT_BT_SCORING_RULES.release_group_preferred,
+    )
+    monkeypatch.setattr("app.services.manage_bt_subscription.load_bt_scoring_rules", lambda: custom_rules)
+
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _ranked_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert "命中资源: Frieren S01E01 720p" in reply
+    item = repo.list_items(chat_id=1001)[0]
+    assert item.last_seen_source == "https://example.com/720p.torrent"
+    assert item.last_seen_title == "Frieren S01E01 720p"
 
 
 def test_bt_subscription_run_once_warns_when_last_seen_truth_is_not_updated(tmp_path: Path, capsys) -> None:

@@ -5,7 +5,7 @@
 
 ## 1. Current line
 
-- 当前主线状态：进行中；2026-04-19 已完成 Phase 1~3 基线，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py` 得到通过，当前最小下一步切到 Phase 4 接 `manage_bt_subscription.py`。
+- 当前主线状态：进行中；2026-04-19 已完成 Phase 1~4 基线，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py tests/test_manage_bt_subscription.py` 得到通过，当前最小下一步切到 Phase 5 接媒体型 BT 候选展示排序。
 - 上一条已完成主线“最小人类可用入口继续补齐”继续看 `docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`。
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/BT_SCORING_PLAN.md`。
 
@@ -21,7 +21,7 @@
 
 当前风险：
 - 规则文件虽然已接进来，但当前只支持项目里约定的最小 YAML 子集；后续改文件时必须守住现有键名和两空格缩进。
-- `manage_bt_subscription.py` 和媒体型 BT 候选展示还没真正调用共享评分器。
+- 媒体型 BT 候选展示还没真正调用共享评分器。
 
 ### 2.2 规则文件加载
 
@@ -31,7 +31,7 @@
 - 已在 `tests/test_bt_candidate_scorer.py` 补规则文件读取、自定义权重生效、缺文件回退和坏字段回退四类测试。
 
 当前风险：
-- `pure_bt.py`、`manage_bt_subscription.py` 和媒体型 BT 候选展示还没真正消费这份规则文件。
+- 媒体型 BT 候选展示还没真正消费这份规则文件。
 
 ### 2.3 `pure_bt.py` 接线
 
@@ -41,17 +41,28 @@
 - 现有 Telegram 纯 BT 入口 focused case 继续通过，说明目的地选择入口和服务未就绪保护没有回退。
 
 当前风险：
-- `manage_bt_subscription.py` 仍保留自己的简化排序；Phase 4 还没开始。
+- 媒体型 BT 候选展示排序还没切到共享评分器；Phase 5 还没开始。
+
+### 2.4 `manage_bt_subscription.py` 接线
+
+已完成闭环：
+- 已把 `app/services/manage_bt_subscription.py::_scan_chat_once()` 的订阅选源切到 `bt_candidate_scorer.pick_best()`；当前复用共享低质量过滤和评分排序，不改待确认创建、`last_seen` 回写或 scheduler tick 协议。
+- 订阅扫描上下文当前故意不额外启用标题命中过滤：`btsub` 常见输入是中文订阅名，但来源站点可能返回英文标题；这一步只替换排序，不把中英混合站点结果误判成“当前没有新资源”。
+- 已补 `tests/test_manage_bt_subscription.py`，覆盖默认排序、`last_seen` 跳过、scheduler tick 复用和自定义评分规则生效。
+
+当前风险：
+- 媒体型 BT 候选展示仍未按共享评分器排序，当前主线还差最后一条 BT 路径。
 
 ## 3. Focused verification
 
 - `.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py`
 - `.venv/bin/python -m pytest -q tests/test_pure_bt.py`
+- `.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`
 - `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "handle_message_bt_processing_path_pure_bt_choice_routes_to_destination_prompt or enter_pure_bt_flow_returns_service_not_ready_when_destination_persist_fails"`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 
 ## 4. Maintenance rule
 
-- 新闭环优先按 2.1~2.3 合并；不要新增 dated 小节。
+- 新闭环优先按 2.1~2.4 合并；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
 - 当前主线完成后，在 `docs/NEXT_STEP.md`、`docs/STATUS.md` 和 `docs/INDEX.md` 同步切到下一项。

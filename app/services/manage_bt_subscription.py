@@ -7,6 +7,7 @@ from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
+from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
 from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_ADD_USAGE_TEXT,
     BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
@@ -61,16 +62,6 @@ class BtSubscriptionDispatchContext:
     downloader_name: str
     downloader_type: str
     download_dir: str
-
-
-@dataclass(frozen=True, slots=True)
-class BtSubscriptionCandidate:
-    index: int
-    result: Mapping[str, Any]
-    quality_rank: int
-    preferred: bool
-    seeders: int
-    size_bytes: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -347,6 +338,7 @@ class ManageBtSubscriptionService:
 
         selected_result = _pick_subscription_candidate(
             results,
+            item=item,
             last_seen_source=item.last_seen_source,
         )
         if selected_result is None:
@@ -527,51 +519,31 @@ def _build_subscription_query(item: BtSubscriptionItem) -> str:
 def _pick_subscription_candidate(
     results: Sequence[Mapping[str, Any]],
     *,
+    item: BtSubscriptionItem,
     last_seen_source: str,
 ) -> Mapping[str, Any] | None:
-    ranked_candidates = sorted(
-        _collect_subscription_candidates(results, last_seen_source=last_seen_source),
-        key=_subscription_candidate_sort_key,
-        reverse=True,
-    )
-    if not ranked_candidates:
-        return None
-    return ranked_candidates[0].result
-
-
-def _collect_subscription_candidates(
-    results: Sequence[Mapping[str, Any]],
-    *,
-    last_seen_source: str,
-) -> list[BtSubscriptionCandidate]:
+    candidate_pairs: list[tuple[BTCandidate, Mapping[str, Any]]] = []
     normalized_last_seen_source = last_seen_source.strip()
-    candidates: list[BtSubscriptionCandidate] = []
-    for index, result in enumerate(results):
+    for result in results:
         source = _resolve_candidate_source(result)
         if not source or source == normalized_last_seen_source:
             continue
-        title = str(result.get("title", "")).strip()
-        candidates.append(
-            BtSubscriptionCandidate(
-                index=index,
-                result=result,
-                quality_rank=_subscription_quality_rank(title),
-                preferred=not _is_subscription_low_quality(title),
-                seeders=_safe_int(result.get("seeders")),
-                size_bytes=_safe_int(result.get("size")),
-            )
-        )
-    return candidates
-
-
-def _subscription_candidate_sort_key(candidate: BtSubscriptionCandidate) -> tuple[int, int, int, int, int]:
-    return (
-        1 if candidate.preferred else 0,
-        candidate.quality_rank,
-        candidate.seeders,
-        candidate.size_bytes,
-        -candidate.index,
+        candidate = _build_subscription_bt_candidate(result, item=item)
+        if candidate is not None:
+            candidate_pairs.append((candidate, result))
+    if not candidate_pairs:
+        return None
+    best = pick_best(
+        [candidate for candidate, _ in candidate_pairs],
+        BTScoringContext(query="", media_kind=item.media_kind),
+        rules=load_bt_scoring_rules(),
     )
+    if best is None:
+        return None
+    for candidate, result in candidate_pairs:
+        if candidate is best.candidate:
+            return result
+    return None
 
 
 def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
@@ -586,36 +558,78 @@ def _resolve_candidate_title(candidate: Mapping[str, Any], *, item: BtSubscripti
     return f"{item.title} ({year_text})"
 
 
-def _subscription_quality_rank(title: str) -> int:
+def _build_subscription_bt_candidate(result: Mapping[str, Any], *, item: BtSubscriptionItem) -> BTCandidate | None:
+    source = _resolve_candidate_source(result)
+    title = _resolve_candidate_title(result, item=item)
+    if not source or not title:
+        return None
+    return BTCandidate(
+        source_site=str(result.get("indexerName", "")).strip() or str(result.get("sourceProvider", "")).strip() or "unknown",
+        title=title,
+        magnet_or_torrent_url=source,
+        size_bytes=_safe_optional_int(result.get("size")),
+        seeders=_safe_optional_int(result.get("seeders")),
+        leechers=_safe_optional_int(result.get("peers")),
+        resolution=_extract_resolution(title),
+        codec=_extract_codec(title),
+        source_type=_extract_source_type(title),
+        audio=(),
+        release_group=_extract_release_group(title),
+        age_days=None,
+        media_kind=item.media_kind,
+    )
+
+
+def _extract_resolution(title: str) -> str | None:
     lowered_title = title.strip().lower()
-    if not lowered_title:
-        return 0
     if re.search(r"\b(2160p|4k)\b", lowered_title):
-        return 4
+        return "2160p"
     if re.search(r"\b1080p\b", lowered_title):
-        return 3
+        return "1080p"
     if re.search(r"\b720p\b", lowered_title):
-        return 2
-    if re.search(r"\b480p\b", lowered_title):
-        return 1
-    return 0
+        return "720p"
+    return None
 
 
-def _is_subscription_low_quality(title: str) -> bool:
+def _extract_codec(title: str) -> str | None:
     lowered_title = title.strip().lower()
-    if not lowered_title:
-        return False
-    return re.search(r"\b(cam|hdcam|ts|tc|telesync|telecine|screener)\b", lowered_title) is not None
+    if re.search(r"\b(x265|hevc)\b", lowered_title):
+        return "x265" if "x265" in lowered_title else "HEVC"
+    if re.search(r"\b(x264|avc)\b", lowered_title):
+        return "x264"
+    return None
 
 
-def _safe_int(value: Any) -> int:
+def _extract_source_type(title: str) -> str | None:
+    lowered_title = title.strip().lower()
+    if "remux" in lowered_title:
+        return "Remux"
+    if "bluray" in lowered_title or "blu-ray" in lowered_title:
+        return "BluRay"
+    if "bdrip" in lowered_title:
+        return "BDRip"
+    if "web-dl" in lowered_title or "webdl" in lowered_title:
+        return "WEB-DL"
+    if "webrip" in lowered_title or "web-rip" in lowered_title:
+        return "WEBRip"
+    return None
+
+
+def _extract_release_group(title: str) -> str | None:
+    matched = re.search(r"-([A-Za-z0-9][A-Za-z0-9-]+)$", title.strip())
+    if matched is None:
+        return None
+    return str(matched.group(1) or "").strip() or None
+
+
+def _safe_optional_int(value: Any) -> int | None:
     try:
         resolved = int(value)
     except (TypeError, ValueError):
-        return 0
+        return None
     if resolved > 0:
         return resolved
-    return 0
+    return None
 
 
 def _log_bt_subscription_scan_error(

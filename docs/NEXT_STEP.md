@@ -8,7 +8,7 @@
 - 再上一条完成主线：**`series / anime` 独立名称解析最小实现已完成**；详细闭环继续写在 `docs/SERIES_ANIME_NAMING_LOG.md`
 - 更早完成主线：**`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已完成**；详细闭环继续写在 `docs/CLEANUP_SLIMMING_LOG.md`
 - 更早完成主线：`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退
-- 当前最小闭环：按 `docs/BT_SCORING_PLAN.md` Phase 4 把 `manage_bt_subscription.py::_scan_chat_once()` 的选源切到共享评分器，先只替换排序，不动待确认创建、`last_seen` 或 scheduler tick 协议
+- 当前最小闭环：按 `docs/BT_SCORING_PLAN.md` Phase 5 把媒体型 BT 候选展示切到共享评分器排序，先只替换展示顺序，不动用户选择、approval 或后续 workflow 真相
 - 当前主线蓝图统一写在 `docs/BT_SCORING_PLAN.md`
 
 ## Source of truth
