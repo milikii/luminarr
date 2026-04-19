@@ -95,7 +95,7 @@
 
 当前主线视为 **已基本完成**，触发以下任一可测量条件即停止，并通知用户切换到下面 `After this step` 第 1 项：
 
-1. `docs/SERIES_ANIME_NAMING_PLAN.md` §6 四处集成点都已切到 `ParsedMediaName`，且 `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_post_download_auto_import.py tests/test_subtitle_translator.py` 全绿；
+1. `docs/SERIES_ANIME_NAMING_PLAN.md` §6 四处集成点都已切到 `ParsedMediaName`，且 `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_subtitle_translator.py` 全绿；
 2. 或者 `docs/SERIES_ANIME_NAMING_PLAN.md` Phase 1-5 已完成 3 个，剩余 2 个都涉及产品决策（例如 clarification 分流文案），此时停下来请用户确认；
 3. 或者本轮代码改动 **< 20 行**、只是对同一个规则表再加一条 `strip_tag` / `alt_title`（收益递减），此时走 `AGENTS.md §11` 停机规则。
 

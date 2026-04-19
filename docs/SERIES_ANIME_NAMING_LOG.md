@@ -30,7 +30,7 @@
 - 已把 `import_to_library` 里的导入命名 helper 和 metadata 标题提取 helper 接到统一 parser，但电影命名仍保留原有格式化逻辑，避免这一步把 movie-first 行为改坏。
 
 当前风险：
-- `search_media`、BT source adapter、`post_download_auto_import`、`import_to_library` 还没统一读同一个 `ParsedMediaName`；切换时必须守住现有 movie-first 行为不回退。
+- `search_request_context`、BT source adapter、`import_to_library` 里的下载完成文件名 / 命名真相入口还没统一读同一个 `ParsedMediaName`；切换时必须守住现有 movie-first 行为不回退。
 - 当前只收了 3 个低风险消费点；下载完成后的剩余消费点和 Phase 3 全量 focused suite 还没闭环，暂时不能视为“四处集成点都已切完”。
 
 ### 2.3 `.ass` 最小支持
@@ -43,7 +43,7 @@
 - `.venv/bin/python -m pytest -q tests/test_media_name_parser.py`
 - `.venv/bin/python -m pytest -q tests/test_media_name_parser.py`（当前 15 条）
 - `.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_sources.py tests/test_import_to_library.py`
-- `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_post_download_auto_import.py tests/test_subtitle_translator.py`
+- `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_subtitle_translator.py`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 
 ## 4. Maintenance rule

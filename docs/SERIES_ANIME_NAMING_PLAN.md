@@ -108,10 +108,10 @@ class ParsedMediaName:
 
 以下四处必须改成调用统一解析：
 
-- `app/services/search_media.py::parse_query()` — 用户输入
+- `app/services/search_request_context.py::parse_movie_query()`（由 `search_media.py` 复用） — 用户输入
 - BT shared source adapter 里的候选标题清洗（当前在 `bt_sources.py`） — 来源候选
-- `app/services/post_download_auto_import.py::_resolve_target_name()` — 下载完成文件名
-- `app/services/import_to_library.py::_resolve_normalized_naming_truth()` — 命名真相
+- `app/services/import_to_library.py::_build_normalized_target_name()` — 下载完成文件名
+- `app/services/import_to_library.py::_resolve_normalized_naming_truth()` / `_extract_title_year_from_text()` — 命名真相
 
 ## 7. `.ass` 字幕同步评估
 
@@ -137,7 +137,7 @@ Codex 按这个顺序推，每阶段一个 commit：
 
 ## 9. 可测量退出条件（任一触发即停）
 
-1. §6 四处集成点都已切到 `ParsedMediaName`，且 `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_post_download_auto_import.py tests/test_subtitle_translator.py` 全绿。
+1. §6 四处集成点都已切到 `ParsedMediaName`，且 `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_subtitle_translator.py` 全绿。
 2. 或 Phase 1-5 已完成 3 个，剩余 2 个都涉及产品决策（例如 clarification 分流文案），此时停下来请用户确认。
 3. 或本轮代码改动 < 20 行、只是对同一个规则表再加一条 `strip_tag` / `alt_title`，视为收益递减（走 `AGENTS.md §11` 停机规则）。
 
