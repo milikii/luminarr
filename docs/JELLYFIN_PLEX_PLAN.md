@@ -35,9 +35,17 @@
 
 当前最小下一步切到 Phase 3，只做 **Plex refresh baseline**：
 
+2026-04-19 已补最小 Plex refresh client baseline：
+
 - 新增 `app/clients/plex.py`
 - 新增 `tests/test_plex_client.py`
+- `.venv/bin/python -m pytest -q tests/test_plex_client.py tests/test_refresh_media_server.py` 得到 `5 passed`
+
+当前最小下一步缩成 Phase 3 的最后一步：
+
 - 把 `app/main.py` 的 provider 选择补到 `plex`
+- 把 `app/config.py` 的 provider 校验放宽到 `plex`
+- 补齐 `tests/test_main.py` / `tests/test_config.py` 的 Plex 装配断言
 
 这一阶段不做：
 

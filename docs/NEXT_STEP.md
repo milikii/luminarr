@@ -8,7 +8,7 @@
 - 再上一条完成主线：**`series / anime` 独立名称解析最小实现已完成**；详细闭环继续写在 `docs/SERIES_ANIME_NAMING_LOG.md`
 - 更早完成主线：**`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已完成**；详细闭环继续写在 `docs/CLEANUP_SLIMMING_LOG.md`
 - 更早完成主线：`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退
-- 当前最小闭环：按 `docs/JELLYFIN_PLEX_PLAN.md` Phase 3 补 Plex refresh baseline，把 provider 选择补齐到 Emby / Jellyfin / Plex，不改导入成功真相
+- 当前最小闭环：按 `docs/JELLYFIN_PLEX_PLAN.md` Phase 3 最后一步把 Plex 接进 `app/main.py` / `app/config.py` 的 provider 选择，不改导入成功真相
 - 当前主线蓝图统一写在 `docs/JELLYFIN_PLEX_PLAN.md`
 
 ## Source of truth
@@ -27,10 +27,10 @@
 
 - 只推进 Jellyfin / Plex 支持的一个最小 Phase；每轮只做一个最小闭环，不顺手改 approval、dispatch、import、cleanup 或 workflow 真相
 - 当前优先交付：
-  - `app/clients/plex.py`
-  - `tests/test_plex_client.py`
   - `app/main.py`
   - `app/config.py`
+  - `tests/test_main.py`
+  - `tests/test_config.py`
   - 后续补 current docs snapshot，不扩真实 Plex 联调
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
