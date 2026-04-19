@@ -4,6 +4,7 @@
 > 它记录端点、路径、健康检查和配置占位；不要把真实凭据提交到 Git。
 > 真实用户名、密码、API Key、Library ID 应保存在本地 `.env` 或本地配置覆盖中。
 > 当前仓库默认假设：Transmission 与 Emby 已作为 WSL 本机 Docker 常驻测试依赖运行。
+> 当前正式本地真实 refresh 测试栈只有 Emby；Jellyfin / Plex 仍处在 readiness 评估阶段，不视为本仓库现成可用的固定容器入口。
 
 ---
 
