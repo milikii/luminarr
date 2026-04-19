@@ -110,7 +110,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - focused config truth tests：`4 passed, 21 deselected`（2026-04-19，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
-- docs consistency check：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- docs consistency check：2026-04-19，`11 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - 上一条主线 focused verification：2026-04-19，`17 passed, 20 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "parse_bt_subscription_query or add or list or remove or clear"`）
 - 上一条主线 focused verification：2026-04-19，`20 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py -k "run_once or scheduler_tick or last_seen"`）
 - 上一条主线 focused verification：2026-04-19，`37 passed`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`）
