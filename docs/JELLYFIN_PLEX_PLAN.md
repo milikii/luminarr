@@ -33,7 +33,7 @@
 - 保持 Emby 兼容默认值，不要求现有部署立刻改 env
 - `.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py` 得到 `52 passed`
 
-当前最小下一步切到 Phase 3，只做 **Plex refresh baseline**：
+进入 Phase 3 前的最后一个最小闭环是 **Plex refresh baseline**：
 
 2026-04-19 已补最小 Plex refresh client baseline：
 
@@ -53,6 +53,7 @@
 - `app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client
 - Emby 兼容默认值仍保留，Jellyfin / Plex 入口都已接到独立 client
 - 当前不继续外扩真实 Jellyfin / Plex 联调，`After this step` 仍保持 plugin 体系后置
+- 当前这份蓝图只保留完成态入口和阶段轨迹，不再作为新的进行中施工计划
 
 这一阶段不做：
 

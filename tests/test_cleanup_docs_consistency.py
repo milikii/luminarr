@@ -125,6 +125,9 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "plugin 体系继续后置" in readme_text
     assert "当前主线已满足 `Done when` 第 1 条" in jellyfin_plex_plan_text
     assert "plugin 体系后置" in jellyfin_plex_plan_text
+    assert "进入 Phase 3 前的最后一个最小闭环是 **Plex refresh baseline**" in jellyfin_plex_plan_text
+    assert "当前这份蓝图只保留完成态入口和阶段轨迹，不再作为新的进行中施工计划" in jellyfin_plex_plan_text
+    assert "当前最小下一步切到 Phase 3" not in jellyfin_plex_plan_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in index_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in getting_started_text
