@@ -108,6 +108,7 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
     getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
     architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    bt_page_range_plan_text = Path("docs/BT_PAGE_RANGE_PLAN.md").read_text(encoding="utf-8")
     bt_batch_plan_text = Path("docs/BT_BATCH_PLAN.md").read_text(encoding="utf-8")
     jellyfin_plex_plan_text = Path("docs/JELLYFIN_PLEX_PLAN.md").read_text(encoding="utf-8")
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
@@ -120,6 +121,10 @@ def test_current_completion_state_docs_do_not_regress() -> None:
 
     assert "Emby / Jellyfin / Plex" in architecture_text
     assert "Jellyfin / Plex" in next_step_text
+    assert "BT 用户页 / 编号范围页能力" in readme_text
+    assert "BT 用户页 / 编号范围页能力" in status_text
+    assert "BT 用户页 / 编号范围页能力" in next_step_text
+    assert "BT 用户页 / 编号范围页能力" in agents_text
     assert "Plex 真实 refresh smoke 值得性重评估" in readme_text
     assert "Plex 真实 refresh smoke 值得性重评估" in status_text
     assert "Plex 真实 refresh smoke 值得性重评估" in next_step_text
@@ -141,19 +146,27 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "当前没有进行中的 promoted 主线" not in next_step_text
     assert "当前切线规则与下一条主线入口" in readme_text
     assert "详细目标与可测量退出条件" not in readme_text
-    assert "docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md" in readme_text
-    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in index_text
-    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in next_step_text
-    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in agents_text
+    assert "docs/BT_PAGE_RANGE_PLAN.md" in readme_text
+    assert "docs/BT_PAGE_RANGE_PLAN.md" in index_text
+    assert "docs/BT_PAGE_RANGE_PLAN.md" in next_step_text
+    assert "docs/BT_PAGE_RANGE_PLAN.md" in agents_text
     assert "docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md" in readme_text
     assert "docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md" in index_text
     assert "docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md" in next_step_text
     assert "docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md" in agents_text
+    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in readme_text
+    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in index_text
+    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in next_step_text
+    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in agents_text
     assert "docs/BT_BATCH_PLAN.md" in readme_text
     assert "docs/BT_BATCH_PLAN.md" in index_text
+    assert "docs/BT_BATCH_PLAN.md" in next_step_text
     assert "docs/BT_BATCH_PLAN.md" in agents_text
     assert "docs/PT_LIVE_SEEDING_PLAN.md" in readme_text
     assert "docs/PT_LIVE_SEEDING_PLAN.md" in next_step_text
+    assert "allowlist 页面 URL" in bt_page_range_plan_text
+    assert "不做自动 `confirm`" in bt_page_range_plan_text
+    assert "当前主线视为 **已收口**" in bt_page_range_plan_text
     assert "只读，不会 dispatch 下载器" in bt_batch_plan_text
     assert "显式批量确认" in bt_batch_plan_text
     assert "不做自动 `confirm`" in bt_batch_plan_text
@@ -165,8 +178,8 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in index_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in getting_started_text
-    assert "当前主线说明优先收口到 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`" in index_text
-    assert "刚完成的 readiness 主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`" in index_text
+    assert "当前主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`" in index_text
+    assert "刚完成的 Plex 值得性重评估主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`" in index_text
     assert "当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`" in index_text
     assert "当前主线蓝图" in readme_text
     assert "Jellyfin / Plex 并行主线支持（当前不做，后续再补）" not in readme_text

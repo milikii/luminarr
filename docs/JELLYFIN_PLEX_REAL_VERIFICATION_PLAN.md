@@ -1,6 +1,6 @@
-# Jellyfin / Plex real verification plan (v2)
+# Jellyfin / Plex real verification plan (v3)
 
-> 目的：在 Jellyfin 单 provider 真实 smoke 已收口之后，继续回答“Plex 真实 refresh smoke 还值不值得补做”，而不是直接扩成新的媒体服务器大工程。
+> 目的：记录这条“Plex 真实 refresh smoke 还值不值得补做”的主线是如何收口的。当前它已经完成，不再是进行中的施工计划。
 
 ## 1. 要解决的真实问题
 
@@ -34,12 +34,12 @@
 ## 3. Phase 顺序
 
 1. Phase 1：补 provider 选定但配置缺失时的显式中文日志与 focused tests。
-2. Phase 2：基于 Jellyfin smoke 已收口和 Plex 入口探针结果，决定 Plex 是否还值得继续追真实实例。当前进行中。
-3. Phase 3：如果当前批次仍无 Plex 实例，就回到 BT 更大范围能力；只有后续单独拿到实例时才再开 Plex smoke 主线。
+2. Phase 2：基于 Jellyfin smoke 已收口和 Plex 入口探针结果，决定 Plex 是否还值得继续追真实实例。2026-04-19 已按“当前主机无可达 Plex 实例”收口。
+3. Phase 3：当前批次先回到 BT 更大范围能力；只有后续单独拿到实例时才再开 Plex smoke 主线。
 
 ## 4. Done when
 
-当前主线视为 **已收口**，满足以下任一条即可：
+这条主线已按 **Done when 第 2 条** 收口：
 
 1. `MEDIA_SERVER_PROVIDER=jellyfin / plex` 且缺少必填配置时，启动装配会打印显式中文日志和 `[处理建议]`，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"` 全绿；
 2. 当前主机未自动发现到可达 Plex 实例，且 `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` 一致表达“当前批次不继续追 Plex 真实 smoke，下一步回到 BT 更大范围能力”；

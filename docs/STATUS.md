@@ -1,4 +1,4 @@
-# Current status (v314)
+# Current status (v315)
 
 ## Project position
 
@@ -24,8 +24,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：刚完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图
-- `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：当前 Plex 真实 refresh smoke 值得性重评估蓝图
+- `docs/BT_PAGE_RANGE_PLAN.md`：当前 BT 用户页 / 编号范围页能力蓝图
+- `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成的 Plex 真实 refresh smoke 值得性重评估蓝图
+- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：更早完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
 - `docs/BT_SCORING_PLAN.md`：刚完成的 BT 共享确定性评分器蓝图
 - `docs/BT_SCORING_LOG.md`：刚完成的 BT 共享确定性评分器详细台账
@@ -49,9 +50,10 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 当前进行中的 promoted 主线是 Plex 真实 refresh smoke 值得性重评估；上一条 Jellyfin 单 provider 真实 refresh smoke 已按失败可观测性出口收口，并转入完成态。
-- 刚完成的 **Jellyfin / Plex 真实联调重评估** 主线保持完成态：provider 缺配置时的静默关闭 refresh 已收口，focused tests 保持全绿。
-- 再上一条 BT 批量任务显式批量确认主线保持完成态：`bt批量 / bt batch` 的确定性批量预览与 `bt批量确认 / bt batch confirm` 的显式批量确认都已完成，focused tests 保持全绿。
+- 当前进行中的 promoted 主线是 BT 用户页 / 编号范围页能力；上一条 Plex 真实 refresh smoke 值得性重评估已按“当前主机无可达 Plex 实例，先回到 BT”收口，并转入完成态。
+- 刚完成的 **Plex 真实 refresh smoke 值得性重评估** 主线保持完成态：当前主机 `http://127.0.0.1:32400/identity` 返回 `000`，本批次不继续追 Plex 实例。
+- 再上一条 **Jellyfin / Plex 真实联调重评估** 主线保持完成态：provider 缺配置时的静默关闭 refresh 已收口，focused tests 保持全绿。
+- 更早一条 BT 批量任务显式批量确认主线保持完成态：`bt批量 / bt batch` 的确定性批量预览与 `bt批量确认 / bt batch confirm` 的显式批量确认都已完成，focused tests 保持全绿。
 - PT live seeding 真相接入 cleanup 阻断这条主线已在冷启动审计里满足文档出口，当前转入完成态；现有 cleanup PT guard 继续保持 `download_monitor.completion_observed_at` 的保守阻断。
 - Jellyfin / Plex 支持已基本完成：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client；完成态蓝图只看 `docs/JELLYFIN_PLEX_PLAN.md`。
 - quick start、BT 共享确定性评分器、shared delivery、`series / anime`、`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身都保持完成态，不回退成进行中。
@@ -62,18 +64,18 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Jellyfin / Plex 还没有 repo 内固定容器入口。
-- Jellyfin 这条线已经收口；当前更保守的问题是：在本机没有可达 Plex 入口时，是否还值得继续追 Plex 真实 smoke。
-- 2026-04-19 当前主机也没有自动发现到 Plex 本地入口，`http://127.0.0.1:32400/identity` 返回 `000`；在没有真实实例前，继续追 Plex 的收益低于回到 BT 更大范围能力。
+- 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
+- BT 当前已经有关键词只读搜索、批量预览和显式批量确认，但还没有 allowlist 用户页 / 列表页 / 编号范围页这类更大范围输入入口。
+- 当前最小风险是先把 allowlist 页面输入做成确定性只读预览和 fail-closed 中文拒绝，再决定要不要补更省输入的页码语法糖。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 Plex 真实 refresh smoke 值得性重评估（Jellyfin smoke 已收口）
-- 当前状态快照：Jellyfin 单 provider smoke 已按失败可观测性出口收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；本机未自动发现到 Plex 入口，当前更保守的下一步应回到 BT 更大范围能力。
+- 窗口活性快照：当前主线为 BT 用户页 / 编号范围页能力（Plex 值得性重评估已收口）
+- 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；当前更保守的下一步是回到 BT 页面输入能力，而不是继续追 Plex。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
