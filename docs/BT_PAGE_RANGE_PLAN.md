@@ -1,18 +1,18 @@
 # BT page / range plan (v8)
 
-> 目的：在已完成的分类基础页 proof 基础上，再补一个更小的“分类搜索页，但不带排序参数也不带分页参数”基础页 proof，继续复用既有 approval -> confirm -> jobs 真相边界。
+> 目的：在已完成的分类搜索基础页 proof 基础上，再补一个更小的“首页基础页，不带查询参数” proof，继续复用既有 approval -> confirm -> jobs 真相边界。
 
 ## 1. 为什么当前继续留在 BT
 
 - 2026-04-19 已确认当前主机没有可达 Plex 实例，Plex 真实 refresh smoke 值得性重评估按“暂不继续追 Plex，先回到 BT 更大范围能力”收口。
 - 上一条 BT 用户页 / 编号范围页能力主线已经收口：allowlist 页面 URL 预览、聊天缓存、`bt批量确认` 复用、category/list 页面和 `p=<页码>` 语法糖都已补齐。
-- 上一条“分类基础页 proof”已经确认命令入口、页面抓取、聊天缓存和 `bt批量确认` 复用都不回退；当前更小也更保守的缺口，只剩分类搜索页继续去掉排序参数和分页参数后的基础页直达 proof。
+- 上一条“分类搜索基础页 proof”已经确认命令入口、页面抓取、聊天缓存和 `bt批量确认` 复用都不回退；当前更小也更保守的缺口，只剩首页基础页本身继续去掉全部查询参数后的直达 proof。
 
 ## 2. 当前最小闭环
 
 当前先只收一个更保守的入口：
 
-1. 用户发送 `bt批量 https://nyaa.si/?f=0&c=1_2&q=frieren 1-3`；
+1. 用户发送 `bt批量 https://nyaa.si/ 1-3`；
 2. parser / routing 明确识别这仍然是 BT allowlist 页面请求，而不是普通关键词；
 3. 页面抓取成功后，继续复用现有去重、编号范围过滤、批量预览文本和候选缓存；
 4. 后续 `bt批量确认 1-3` 仍复用既有单条 approval / confirm / jobs 边界，不自动 `confirm`。
@@ -40,7 +40,8 @@
 12. Phase 12：已完成搜索页 + `p=<页码>`、但不带分类参数的 focused proof。
 13. Phase 13：已完成搜索页无分类基础页的 focused proof。
 14. Phase 14：已完成分类基础页的 focused proof。
-15. Phase 15：当前只补分类搜索基础页的 focused proof；如果后续还要补更多站点或页面形式，再单独扩规则，不在这一条里顺手平台化。
+15. Phase 15：已完成分类搜索基础页的 focused proof。
+16. Phase 16：当前只补首页基础页的 focused proof；如果后续还要补更多站点或页面形式，再单独扩规则，不在这一条里顺手平台化。
 
 2026-04-19 当前进度：
 
@@ -56,15 +57,16 @@
 - `https://nyaa.si/?q=frieren&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?q=frieren` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?c=1_2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
-- 当前只补 `https://nyaa.si/?f=0&c=1_2&q=frieren` 这条分类搜索基础页 proof；
+- `https://nyaa.si/?f=0&c=1_2&q=frieren` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
+- 当前只补 `https://nyaa.si/` 这条首页基础页 proof；
 - 未声明排序参数、未声明页面、未声明站点和非法范围仍必须显式中文拒绝，不静默去抓未知页面。
 
 ## 4. Done when
 
 当前主线视为 **已收口**，满足以下任一条即可：
 
-1. `bt批量 https://nyaa.si/?f=0&c=1_2&q=frieren 1-3` 已能返回只读批量预览，并证明命令入口会直接走页面抓取；对应 focused tests 全绿；
-2. 上述分类搜索基础页的候选已被证明可继续复用 `bt批量确认` 所需的聊天缓存边界；对应 focused tests 全绿；
+1. `bt批量 https://nyaa.si/ 1-3` 已能返回只读批量预览，并证明命令入口会直接走页面抓取；对应 focused tests 全绿；
+2. 上述首页基础页的候选已被证明可继续复用 `bt批量确认` 所需的聊天缓存边界；对应 focused tests 全绿；
 3. 本轮代码变更 `< 20` 行且只是对同一个 page/range helper 再补一条 `if/elif/log` 诊断分支，触发 `AGENTS.md §11` 停机规则。
 
 ## 5. 不做清单
