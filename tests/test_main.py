@@ -330,6 +330,50 @@ def test_build_refresh_media_server_func_returns_none_without_media_server_setti
     assert _build_refresh_media_server_func(settings) is None
 
 
+def test_build_refresh_media_server_func_logs_missing_jellyfin_settings(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = SimpleNamespace(
+        media_server_provider="jellyfin",
+        emby_base_url="",
+        emby_api_key="",
+        jellyfin_base_url="http://jellyfin:8096",
+        jellyfin_api_key="",
+        plex_base_url="",
+        plex_token="",
+    )
+
+    assert _build_refresh_media_server_func(settings) is None
+
+    captured = capsys.readouterr()
+    assert "[媒体服务器配置缺失]" in captured.out
+    assert "provider=jellyfin" in captured.out
+    assert "JELLYFIN_API_KEY" in captured.out
+    assert "[处理建议]" in captured.out
+
+
+def test_build_refresh_media_server_func_logs_missing_plex_settings(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    settings = SimpleNamespace(
+        media_server_provider="plex",
+        emby_base_url="",
+        emby_api_key="",
+        jellyfin_base_url="",
+        jellyfin_api_key="",
+        plex_base_url="",
+        plex_token="plex-token",
+    )
+
+    assert _build_refresh_media_server_func(settings) is None
+
+    captured = capsys.readouterr()
+    assert "[媒体服务器配置缺失]" in captured.out
+    assert "provider=plex" in captured.out
+    assert "PLEX_BASE_URL" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_build_refresh_media_server_func_wraps_emby_client(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: dict[str, object] = {}
 

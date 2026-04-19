@@ -61,7 +61,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Jellyfin / Plex 还没有 repo 内固定容器入口。
-- `MEDIA_SERVER_PROVIDER` 选成 `jellyfin / plex` 但缺少对应地址或 token 时，当前启动装配还会静默关闭 refresh；这是当前主线首个收口点。
+- `MEDIA_SERVER_PROVIDER` 选成 `jellyfin / plex` 但缺少对应地址或 token 时，启动装配现在已会显式打印中文缺口提示；当前下一步转到“如何用现有 Emby 栈整理真实 refresh baseline”。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
@@ -70,7 +70,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 窗口活性快照：当前主线为 Jellyfin / Plex 真实联调重评估
 - 当前状态快照：BT 批量任务显式批量确认已转入完成态；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；当前主线首个缺口是 provider 选定但配置缺失时仍会静默关闭 refresh。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；当前主线首个代码缺口已补齐，下一步是复用现有 Emby 栈整理真实 refresh baseline。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
@@ -83,6 +83,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - make run env-file guard tests：2026-04-13，`2 passed`（`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-19，`11 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- focused media-server readiness tests：2026-04-19，`10 passed, 46 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"`）
 - BT batch preview focused tests：2026-04-19，`9 passed, 200 deselected`（`.venv/bin/python -m pytest -q tests/test_pure_bt.py tests/test_search_media.py tests/test_telegram_bot.py -k "bt_batch or bt_read_only_helper"`）
 - BT batch confirm focused tests：2026-04-19，`11 passed, 312 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_pure_bt.py tests/test_search_media.py tests/test_telegram_bot.py -k bt_batch`）
 - env readiness snapshot：`four-channel cleanup smoke env ready`（2026-04-14，`bash -lc 'source ~/.bashrc >/dev/null 2>&1; python3 -c "import os; keys=[\"TELEGRAM_BOT_TOKEN\",\"PROWLARR_BASE_URL\",\"PROWLARR_API_KEY\",\"TRANSMISSION_BASE_URL\",\"EMBY_BASE_URL\",\"EMBY_API_KEY\",\"FEISHU_APP_ID\",\"FEISHU_APP_SECRET\",\"FEISHU_ENCRYPT_KEY\",\"WECOM_TOKEN\",\"WECOM_ENCODING_AES_KEY\",\"WECOM_RECEIVE_ID\"]; print(\"\\n\".join(f\"{k}=\" + (\"set\" if os.getenv(k,\"\").strip().strip('\"\\'') else \"missing\") for k in keys))"' ; python3 -c "import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY','TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET','FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; rows=dict(line.split('=', 1) for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if '=' in line); lookup={key.lower(): value.strip().strip('\"\\'') for key, value in rows.items()}; print('\\n'.join(f'{k}=' + ('set' if lookup.get(k.lower(), '') else 'missing') for k in keys))" ; python3 -c "from pathlib import Path; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY','TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET','FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; data={}; env_path=Path('.env'); text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; lines=(line.strip() for line in text.splitlines()); pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); data.update(((key.removeprefix('export ').strip()), value.strip().strip('\"\\'')) for key, _, value in pairs); print('\\n'.join(f'{k}=' + ('set' if data.get(k, '').strip() else 'missing') for k in keys))"`）

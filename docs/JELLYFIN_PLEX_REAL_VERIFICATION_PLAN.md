@@ -24,6 +24,12 @@
 
 在这个最小闭环之后，再用现有 `Transmission + Emby` 测试栈确认当前“真实 refresh baseline”怎么复用；如果连这个入口都不清楚，就不应该贸然把 Jellyfin / Plex 真联调升成大主线。
 
+2026-04-19 已完成 Phase 1：
+
+- `MEDIA_SERVER_PROVIDER=jellyfin / plex` 但缺少必填配置时，`app/main.py` 不再静默返回 `None`
+- 启动装配会打印显式中文 `[媒体服务器配置缺失]` 与 `[处理建议]`
+- `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"` 得到 `10 passed, 46 deselected`
+
 ## 3. Phase 顺序
 
 1. Phase 1：补 provider 选定但配置缺失时的显式中文日志与 focused tests。
