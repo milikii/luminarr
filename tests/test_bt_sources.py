@@ -154,10 +154,12 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pag
     assert is_supported_web_source_page_url("https://nyaa.si/?p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?s=seeders&o=desc")
     assert is_supported_web_source_page_url("https://nyaa.si/?c=1_2&s=seeders&o=desc")
+    assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc")
     assert not is_supported_web_source_page_url("https://nyaa.si/view/123")
     assert not is_supported_web_source_page_url("https://nyaa.si/?offset=32")
     assert not is_supported_web_source_page_url("https://nyaa.si/?s=seeders")
     assert not is_supported_web_source_page_url("https://nyaa.si/?c=1_2&s=seeders")
+    assert not is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders")
     assert not is_supported_web_source_page_url("https://example.com/?q=frieren")
 
 
@@ -176,7 +178,12 @@ def test_resolve_supported_web_source_page_request_appends_page_number() -> None
         resolve_supported_web_source_page_request("https://nyaa.si/?c=1_2&s=seeders&o=desc p=2")
         == "https://nyaa.si/?c=1_2&s=seeders&o=desc&p=2"
     )
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc p=2")
+        == "https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2"
+    )
     assert resolve_supported_web_source_page_request("https://nyaa.si/?c=1_2&s=seeders p=2") is None
+    assert resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders p=2") is None
     assert resolve_supported_web_source_page_request("https://example.com/list/42 p=2") is None
 
 
