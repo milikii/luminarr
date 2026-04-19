@@ -8,7 +8,9 @@ from app.clients.web_source import (
     UnsupportedWebSourcePageError,
     WebSourceClient,
     is_supported_web_source_page_url,
+    looks_like_web_source_page_request,
     parse_web_source_html,
+    resolve_supported_web_source_page_request,
 )
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, build_bt_candidate_dedupe_key
 
@@ -151,6 +153,15 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_and_list_page
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&p=2")
     assert not is_supported_web_source_page_url("https://nyaa.si/view/123")
     assert not is_supported_web_source_page_url("https://example.com/?q=frieren")
+
+
+def test_resolve_supported_web_source_page_request_appends_page_number() -> None:
+    assert looks_like_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
+        == "https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2"
+    )
+    assert resolve_supported_web_source_page_request("https://example.com/list/42 p=2") is None
 
 
 def test_web_source_client_search_page_rejects_unsupported_url() -> None:

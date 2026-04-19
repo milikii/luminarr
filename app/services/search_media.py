@@ -5,7 +5,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.clients.web_source import is_supported_web_source_page_url, looks_like_http_url
+from app.clients.web_source import (
+    looks_like_http_url,
+    looks_like_web_source_page_request,
+    resolve_supported_web_source_page_request,
+)
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
@@ -175,10 +179,13 @@ class SearchMediaService:
         return format_bt_batch_preview_reply(cleaned_query, selected_raw_results, selection_label=selection_label)
 
     async def _search_bt_batch_preview_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
-        if looks_like_http_url(query):
-            if not is_supported_web_source_page_url(query) or self._raw_page_search_func is None:
+        resolved_page_url = resolve_supported_web_source_page_request(query)
+        if resolved_page_url is not None:
+            if self._raw_page_search_func is None:
                 raise UnsupportedBatchPreviewPageUrl(query)
-            return await self._search_raw_page_candidates(query)
+            return await self._search_raw_page_candidates(resolved_page_url)
+        if looks_like_http_url(query) or looks_like_web_source_page_request(query):
+            raise UnsupportedBatchPreviewPageUrl(query)
         return await self.search_raw_candidates(query)
 
     async def _search_raw_page_candidates(self, page_url: str) -> Sequence[Mapping[str, Any]]:

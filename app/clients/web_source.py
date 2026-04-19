@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from html import unescape
 from typing import Any
-from urllib.parse import parse_qs, quote_plus, urljoin, urlparse
+from urllib.parse import parse_qs, parse_qsl, quote_plus, urlencode, urljoin, urlparse, urlunparse
 
 import httpx
 
@@ -23,6 +23,7 @@ _MAGNET_PATTERN = re.compile(r"""href=["'](?P<link>magnet:\?[^"']+)["']""", re.I
 _TORRENT_PATTERN = re.compile(r"""href=["'](?P<link>[^"']+\.torrent(?:\?[^"']*)?)["']""", re.IGNORECASE)
 _TAG_PATTERN = re.compile(r"<[^>]+>")
 _SIZE_PATTERN = re.compile(r"(?P<number>\d+(?:\.\d+)?)\s*(?P<unit>tib|gib|mib|kib|tb|gb|mb|kb|b)\b", re.IGNORECASE)
+_PAGE_NUMBER_TOKEN_PATTERN = re.compile(r"^p=(?P<page>[1-9]\d*)$", re.IGNORECASE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +111,8 @@ def looks_like_http_url(text: str) -> bool:
     cleaned_text = text.strip()
     if not cleaned_text:
         return False
+    if any(character.isspace() for character in cleaned_text):
+        return False
     parsed = urlparse(cleaned_text)
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
@@ -122,6 +125,33 @@ def is_supported_web_source_page_url(url: str, *, rule: WebSourceRule | None = N
     if rule is not None:
         return _is_supported_page_url_for_rule(cleaned_url, rule=rule)
     return any(_is_supported_page_url_for_rule(cleaned_url, rule=item) for item in SUPPORTED_WEB_SOURCE_RULES.values())
+
+
+def looks_like_web_source_page_request(text: str) -> bool:
+    cleaned_text = text.strip()
+    if looks_like_http_url(cleaned_text):
+        return True
+
+    base_url, separator, page_token = cleaned_text.rpartition(" ")
+    return bool(separator and looks_like_http_url(base_url) and _PAGE_NUMBER_TOKEN_PATTERN.fullmatch(page_token))
+
+
+def resolve_supported_web_source_page_request(text: str) -> str | None:
+    cleaned_text = text.strip()
+    if not cleaned_text:
+        return None
+    if looks_like_http_url(cleaned_text):
+        return cleaned_text if is_supported_web_source_page_url(cleaned_text) else None
+
+    base_url, separator, page_token = cleaned_text.rpartition(" ")
+    if not separator or not looks_like_http_url(base_url):
+        return None
+    matched = _PAGE_NUMBER_TOKEN_PATTERN.fullmatch(page_token)
+    if matched is None:
+        return None
+
+    resolved_page_url = _replace_page_number(base_url, page_number=str(matched.group("page") or "").strip())
+    return resolved_page_url if is_supported_web_source_page_url(resolved_page_url) else None
 
 
 def parse_web_source_html(html: str, *, rule: WebSourceRule) -> list[dict[str, Any]]:
@@ -139,6 +169,13 @@ def parse_web_source_html(html: str, *, rule: WebSourceRule) -> list[dict[str, A
         candidate.update(_extract_metadata(row_html))
         candidates.append(candidate)
     return candidates
+
+
+def _replace_page_number(url: str, *, page_number: str) -> str:
+    parsed = urlparse(url.strip())
+    query_pairs = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=False) if key.lower() != "p"]
+    query_pairs.append(("p", page_number))
+    return urlunparse(parsed._replace(query=urlencode(query_pairs)))
 
 
 def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:

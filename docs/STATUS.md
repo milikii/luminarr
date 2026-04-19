@@ -65,8 +65,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
-- BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof，以及 category/list 页面类型都已落地。
-- 当前最小风险是保持页面 URL 只读预览、category/list 页面支持和中文拒绝不回退，再决定要不要补更省输入的页码语法糖。
+- BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地。
+- 当前最小风险是保持页面 URL 只读预览、category/list 页面支持、`p=<页码>` 语法和中文拒绝不回退；如果后续继续 BT，再评估是否扩更多 allowlist 页面类型。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
@@ -92,8 +92,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - focused jellyfin-provider refresh tests：2026-04-19，`9 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"`）
 - real jellyfin refresh smoke probe：2026-04-19，`failed with direct target/request_url observability`（一次性临时脚本已执行并删除）
 - plex local endpoint probe：2026-04-19，`000`（`curl -sS -o /tmp/plex_probe.out -w "%{http_code}" http://127.0.0.1:32400/identity`）
-- BT page preview focused tests：2026-04-19，`12 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page or bt_batch"`）
+- BT page preview focused tests：2026-04-19，`15 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page or bt_batch"`）
 - BT list page focused tests：2026-04-19，`5 passed, 54 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page and (list or allowlist or unsupported)"`）
+- BT page syntax focused tests：2026-04-19，`7 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page and (syntax or list or allowlist or unsupported)"`）
 - BT page preview route/cache focused tests：2026-04-19，`5 passed, 203 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "bt_batch and page"`）
 - BT page preview -> batch confirm focused tests：2026-04-19，`2 passed, 155 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "bt_batch and page"`）
 - BT batch preview focused tests：2026-04-19，`9 passed, 200 deselected`（`.venv/bin/python -m pytest -q tests/test_pure_bt.py tests/test_search_media.py tests/test_telegram_bot.py -k "bt_batch or bt_read_only_helper"`）
