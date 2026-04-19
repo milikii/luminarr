@@ -3773,6 +3773,26 @@ def test_build_normalized_target_name_uses_parser_for_episode_file(tmp_path: Pat
     assert result == "Frieren S01E01.mkv"
 
 
+def test_extract_title_year_for_scrape_uses_parser_for_episode_file(tmp_path: Path) -> None:
+    target_path = tmp_path / "Frieren.S01E01.1080p.WEB-DL.mkv"
+    target_path.write_bytes(b"demo")
+
+    title, year = import_module._extract_title_year_for_scrape(target_path)
+
+    assert title == "Frieren"
+    assert year == ""
+
+
+def test_extract_title_year_for_scrape_uses_parser_for_bracket_episode_directory(tmp_path: Path) -> None:
+    target_path = tmp_path / "[SweetSub][Frieren][01][WebRip][1080p][CHS]"
+    target_path.mkdir(parents=True)
+
+    title, year = import_module._extract_title_year_for_scrape(target_path)
+
+    assert title == "Frieren"
+    assert year == ""
+
+
 def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

@@ -2045,11 +2045,14 @@ def _extract_title_year_for_scrape(target_path: Path) -> tuple[str, str]:
     else:
         base_name = target_path.name
     normalized = _normalize_name_tokens(base_name)
-    year = _extract_movie_year(normalized)
-    if year:
-        title = _trim_title_before_year(normalized, year)
+    parsed_name = parse_media_name(base_name)
+    year = str(parsed_name.year) if parsed_name.year is not None else _extract_movie_year(normalized)
+    if parsed_name.season is not None or parsed_name.episode is not None:
+        title = _normalize_name_tokens(parsed_name.title) or normalized
+    elif year:
+        title = _normalize_name_tokens(parsed_name.title) or _trim_title_before_year(normalized, year)
     else:
-        title = normalized
+        title = _normalize_name_tokens(parsed_name.title) or normalized
     title = _sanitize_target_component(title)
     if not title:
         title = _sanitize_target_component(base_name)

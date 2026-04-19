@@ -106,17 +106,18 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
 - cleanup 当前还没有 PT 做种状态 / `pt_min_seed_hours` 保护校验；cleanup 验证窗口退出前必须把这条风险确认清楚。
-- 当前最稳的是 movie-first；`series / anime` 独立名称解析还没实现。
-- 字幕翻译当前仅处理 `.srt`；`series / anime` 落地时需同步评估 `.ass`。
+- 当前最稳的是 movie-first；`series / anime` 独立名称解析最小接点已完成，当前缺口转到 shared private-chat 交付体验。
+- 字幕翻译当前仍只处理 `.srt`；`.ass` 继续保留为后续能力缺口，不阻塞当前主线切换。
 - BT 路线已可用，但还没升级成共享确定性评分器。
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：`series / anime` 独立名称解析最小实现（含 `.ass` 最小支持评估），按 `docs/SERIES_ANIME_NAMING_PLAN.md` 的 parser-first 蓝图推进。
+- **当前唯一主线**：shared private-chat 交付体验收口，按 `docs/SHARED_DELIVERY_UX_PLAN.md` 的内容模型/renderer 蓝图推进。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/SERIES_ANIME_NAMING_PLAN.md`
-- **当前主线台账**：`docs/SERIES_ANIME_NAMING_LOG.md`
+- **当前主线蓝图**：`docs/SHARED_DELIVERY_UX_PLAN.md`
+- **当前主线台账**：`docs/SHARED_DELIVERY_UX_LOG.md`
+- **上一条主线台账**：`docs/SERIES_ANIME_NAMING_LOG.md`（`series / anime` 名称解析主线已在 2026-04-19 达到退出条件 1）
 - **上一条主线台账**：`docs/APP_MAIN_SLIMMING_LOG.md`（`app/main.py` 瘦身主线已在 2026-04-19 达到退出条件 1）
 - **再上一条主线台账**：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（shared runtime 编排层瘦身主线已在 2026-04-19 达到退出条件 2）
 - **更早主线台账**：`docs/CLEANUP_SLIMMING_LOG.md`（cleanup 编排层瘦身主线已在 2026-04-19 达到退出条件 1）
@@ -130,9 +131,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
 - **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前主线入口看 `docs/SERIES_ANIME_NAMING_LOG.md` 和 `docs/SERIES_ANIME_NAMING_PLAN.md`；已完成的 `app/main.py` / runtime / cleanup 主线回归入口继续见对应 log。
-- 这一步只允许收 parser、四处集成点和 `.ass` 最小支持，不顺手重构 runtime、cleanup、下载器或其他编排层。
-- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（shared private-chat 交付体验收口 → 最小人类可用入口 → BT 共享确定性评分器 → 等等）。
+- **本地回归命令**：当前主线入口看 `docs/SHARED_DELIVERY_UX_LOG.md` 和 `docs/SHARED_DELIVERY_UX_PLAN.md`；刚完成的 `series / anime` 主线回归入口见 `docs/SERIES_ANIME_NAMING_LOG.md`。
+- 这一步只允许收内容模型、四渠道 renderer 和分层文本协议，不顺手改 workflow 真相、下载器、cleanup 或其他编排层。
+- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（最小人类可用入口 → BT 共享确定性评分器 → 等等）。
 
 ## 6. 当前明确不做
 
@@ -182,8 +183,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/SERIES_ANIME_NAMING_PLAN.md`：当前主线蓝图
-- `docs/SERIES_ANIME_NAMING_LOG.md`：当前主线详细闭环
+- `docs/SHARED_DELIVERY_UX_PLAN.md`：当前主线蓝图
+- `docs/SHARED_DELIVERY_UX_LOG.md`：当前主线详细闭环
+- `docs/SERIES_ANIME_NAMING_LOG.md`：刚完成的上一条主线详细闭环
 - `docs/APP_MAIN_SLIMMING_LOG.md`：上一条主线详细闭环
 - `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：再上一条主线详细闭环
 - `docs/CLEANUP_SLIMMING_LOG.md`：更早主线详细闭环

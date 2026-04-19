@@ -5,7 +5,7 @@
 
 ## 1. Current line
 
-- 当前主线状态：2026-04-19 已在 `app/main.py` 主线完成后正式切到 `series / anime` 独立名称解析最小实现
+- 当前主线状态：2026-04-19 已在 `app/main.py` 主线完成后切入，并在同日通过 `_extract_title_year_for_scrape()` 接入统一 parser + focused suite `245 passed` 满足 `Done when` 第 1 条；当前唯一主线已切到 `docs/SHARED_DELIVERY_UX_PLAN.md`
 - 上一条已完成主线“`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化”已在 2026-04-19 通过 `app/downloader_route_lookup.py` helper 抽离满足 `Done when` 第 1 条，focused tests `16 passed, 1 deselected`
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/SERIES_ANIME_NAMING_PLAN.md`
 
@@ -20,7 +20,7 @@
 - 已把 `tests/test_media_name_parser.py` 扩到 15 条回归，覆盖 repo 规则文件生效、别名补全、自定义质量标签和缺文件 fallback。
 
 当前风险：
-- Phase 1 / 2 已落地，但四处集成点切换和 `.ass` 最小支持还没做，TMDB 关联、追更和导入命名暂时仍没真正共用这一结构。
+- 当前主线已完成；后续若要继续扩 parser 规则或补 `.ass`，应另立闭环，不要回退已达成的 Phase 1-3 最小出口。
 
 ### 2.2 四处集成点切换
 
@@ -29,9 +29,13 @@
 - 已把 `bt_sources.normalize_bt_candidate()` 接到统一 parser，候选结果现在会额外带 `parsedMediaName` 供后续 Phase 3 / Phase 4 继续消费，不回退现有展示标题和去重键。
 - 已把 `import_to_library` 里的导入命名 helper 和 metadata 标题提取 helper 接到统一 parser，但电影命名仍保留原有格式化逻辑，避免这一步把 movie-first 行为改坏。
 
+已完成闭环：
+- 已把 `import_to_library._extract_title_year_for_scrape()` 的下载完成文件名 fallback 也切到统一 parser；当 job_event 里暂时没有稳定命名真相时，metadata scraping 仍会先从统一 `ParsedMediaName` 提取标题。
+- 已新增 `tests/test_import_to_library.py` 回归，覆盖 `S01E01` 文件名和 `[SweetSub][Frieren][01]` 目录名 fallback 进入 TMDB 标题提取。
+- 已跑通 Phase 3 focused suite：`.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_subtitle_translator.py` 得到 `245 passed`。
+
 当前风险：
-- `search_request_context`、BT source adapter、`import_to_library` 里的下载完成文件名 / 命名真相入口还没统一读同一个 `ParsedMediaName`；切换时必须守住现有 movie-first 行为不回退。
-- 当前只收了 3 个低风险消费点；下载完成后的剩余消费点和 Phase 3 全量 focused suite 还没闭环，暂时不能视为“四处集成点都已切完”。
+- 当前主线已通过 `Done when` 第 1 条完成；后续若补 `.ass` 或 clarification 分流，应按新主线优先级另开闭环，不在已完成主线上继续堆改动。
 
 ### 2.3 `.ass` 最小支持
 
