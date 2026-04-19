@@ -387,9 +387,10 @@ def test_build_refresh_media_server_func_wraps_emby_client(monkeypatch: pytest.M
             return None
 
     class FakeRefreshService:
-        def __init__(self, refresh_func, *, provider_name: str) -> None:
+        def __init__(self, refresh_func, *, provider_name: str, target_url: str) -> None:
             calls["refresh_func"] = refresh_func
             calls["provider_name"] = provider_name
+            calls["target_url"] = target_url
             self.refresh_text = object()
 
     monkeypatch.setattr("app.main.EmbyClient", FakeEmbyClient)
@@ -410,6 +411,7 @@ def test_build_refresh_media_server_func_wraps_emby_client(monkeypatch: pytest.M
     assert calls["base_url"] == "http://emby:8096"
     assert calls["api_key"] == "emby-key"
     assert calls["provider_name"] == "emby"
+    assert calls["target_url"] == "http://emby:8096"
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakeEmbyClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None
@@ -428,9 +430,10 @@ def test_build_refresh_media_server_func_wraps_jellyfin_client(monkeypatch: pyte
             return None
 
     class FakeRefreshService:
-        def __init__(self, refresh_func, *, provider_name: str) -> None:
+        def __init__(self, refresh_func, *, provider_name: str, target_url: str) -> None:
             calls["refresh_func"] = refresh_func
             calls["provider_name"] = provider_name
+            calls["target_url"] = target_url
             self.refresh_text = object()
 
     monkeypatch.setattr("app.main.JellyfinClient", FakeJellyfinClient)
@@ -451,6 +454,7 @@ def test_build_refresh_media_server_func_wraps_jellyfin_client(monkeypatch: pyte
     assert calls["base_url"] == "http://jellyfin:8096"
     assert calls["api_key"] == "jelly-key"
     assert calls["provider_name"] == "jellyfin"
+    assert calls["target_url"] == "http://jellyfin:8096"
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakeJellyfinClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None
@@ -469,9 +473,10 @@ def test_build_refresh_media_server_func_wraps_plex_client(monkeypatch: pytest.M
             return None
 
     class FakeRefreshService:
-        def __init__(self, refresh_func, *, provider_name: str) -> None:
+        def __init__(self, refresh_func, *, provider_name: str, target_url: str) -> None:
             calls["refresh_func"] = refresh_func
             calls["provider_name"] = provider_name
+            calls["target_url"] = target_url
             self.refresh_text = object()
 
     monkeypatch.setattr("app.main.PlexClient", FakePlexClient)
@@ -492,6 +497,7 @@ def test_build_refresh_media_server_func_wraps_plex_client(monkeypatch: pytest.M
     assert calls["base_url"] == "http://plex:32400"
     assert calls["token"] == "plex-token"
     assert calls["provider_name"] == "plex"
+    assert calls["target_url"] == "http://plex:32400"
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakePlexClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None

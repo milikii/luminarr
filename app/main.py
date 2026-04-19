@@ -145,6 +145,7 @@ def _log_media_server_config_missing(provider: str, missing_keys: tuple[str, ...
 
 def _build_refresh_media_server_func(settings):
     provider_name = settings.media_server_provider
+    target_url = ""
     if settings.media_server_provider == "jellyfin":
         missing_keys: list[str] = []
         if not settings.jellyfin_base_url:
@@ -154,6 +155,7 @@ def _build_refresh_media_server_func(settings):
         if missing_keys:
             _log_media_server_config_missing("jellyfin", tuple(missing_keys))
             return None
+        target_url = settings.jellyfin_base_url
         refresh_func = JellyfinClient(
             base_url=settings.jellyfin_base_url,
             api_key=settings.jellyfin_api_key,
@@ -167,6 +169,7 @@ def _build_refresh_media_server_func(settings):
         if missing_keys:
             _log_media_server_config_missing("plex", tuple(missing_keys))
             return None
+        target_url = settings.plex_base_url
         refresh_func = PlexClient(
             base_url=settings.plex_base_url,
             token=settings.plex_token,
@@ -174,11 +177,16 @@ def _build_refresh_media_server_func(settings):
     else:
         if not settings.emby_base_url or not settings.emby_api_key:
             return None
+        target_url = settings.emby_base_url
         refresh_func = EmbyClient(
             base_url=settings.emby_base_url,
             api_key=settings.emby_api_key,
         ).refresh_library
-    refresh_service = RefreshMediaServerService(refresh_func, provider_name=provider_name)
+    refresh_service = RefreshMediaServerService(
+        refresh_func,
+        provider_name=provider_name,
+        target_url=target_url,
+    )
     return refresh_service.refresh_text
 
 

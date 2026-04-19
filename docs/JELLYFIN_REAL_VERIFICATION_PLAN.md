@@ -31,11 +31,12 @@
 - `RefreshMediaServerService` 的失败日志现在会带 `provider=jellyfin / plex / emby`
 - `app/main.py` 在装配 refresh service 时会把当前 provider 传进去
 - `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"` 得到 `9 passed, 17 deselected`
+- 同日追加真实 smoke 失败探针（一次性临时脚本已删除）：命中 `provider=jellyfin target=http://127.0.0.1:8096 request_url=http://127.0.0.1:8096/Library/Refresh 错误=All connection attempts failed`，当前失败点已可直接定位到目标地址和请求路径
 
 ## 3. Phase 顺序
 
 1. Phase 1：补 refresh 失败日志里的 provider 可观测性。已完成。
-2. Phase 2：用现有 Jellyfin 实例做单 provider 真实 refresh smoke。当前进行中。
+2. Phase 2：用现有 Jellyfin 实例做单 provider 真实 refresh smoke。2026-04-19 已完成一次真实失败探针，当前失败点已可直接定位；该条主线可按失败可观测性出口收口。
 3. Phase 3：根据 Jellyfin 真实 smoke 结果，再决定是否值得继续扩到 Plex。
 
 ## 4. Done when
