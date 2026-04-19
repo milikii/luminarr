@@ -119,14 +119,14 @@ def test_current_completion_state_docs_do_not_regress() -> None:
 
     assert "Emby / Jellyfin / Plex" in architecture_text
     assert "Jellyfin / Plex 支持已基本完成" in next_step_text
-    assert "当前没有进行中的 promoted 主线" in readme_text
-    assert "当前没有进行中的 promoted 主线" in status_text
-    assert "当前没有进行中的 promoted 主线" in next_step_text
+    assert "cleanup PT 最小保护窗口" in readme_text
+    assert "cleanup PT 最小保护窗口" in status_text
+    assert "cleanup PT 最小保护窗口" in next_step_text
     assert "当前切线规则与下一条主线入口" in readme_text
     assert "详细目标与可测量退出条件" not in readme_text
-    assert "先在 `docs/NEXT_STEP.md`" in readme_text
-    assert "先更新 `docs/NEXT_STEP.md`" in status_text
-    assert "旧退出条件只保留在历史蓝图 / 台账语境" in readme_text
+    assert "具体 `Only do / Done when` 继续以 `docs/NEXT_STEP.md` 为准" in readme_text
+    assert "download_monitor.completion_observed_at" in status_text
+    assert "保守阻断" in readme_text
     assert "已满足退出条件 1" not in readme_text
     assert "provider 选择 focused tests 为 `56 passed`" in next_step_text
     assert "已满足退出条件 1" not in next_step_text

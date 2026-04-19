@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+from app.clients.transmission import TransmissionTaskStatus
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -87,6 +90,75 @@ def test_inspect_by_task_ref_returns_ready_text_without_deleting_source(tmp_path
     assert source_file.exists()
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert len(events) == 1
+
+
+def test_inspect_by_task_ref_blocks_pt_cleanup_when_seed_window_not_elapsed(tmp_path: Path) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    monitor_repo = DownloadMonitorRepo(database)
+    source_file, target_file = _create_import_correlation(event_repo, tmp_path=tmp_path, task_ref="87")
+    _record_completed_monitor(
+        monitor_repo,
+        task_id="87",
+        task_hash="hash-87",
+    )
+    _set_monitor_completion_observed_at(
+        database,
+        task_id="87",
+        task_hash="hash-87",
+        observed_at=datetime.now(UTC) - timedelta(minutes=30),
+    )
+    service = CleanupDownloadedSourceService(
+        event_repo,
+        download_monitor_repo=monitor_repo,
+        pt_min_seed_hours=2,
+    )
+
+    reply = service.inspect_by_task_ref("87")
+
+    assert f"源路径: {source_file}" in reply
+    assert f"目标路径: {target_file}" in reply
+    assert "当前 guardrail: 拒绝 cleanup" in reply
+    assert "PT 最小保护窗口未满，已拒绝 cleanup" in reply
+    assert "当前先不要执行 cleanup" in reply
+
+
+def test_cleanup_by_task_ref_rejects_when_pt_seed_window_truth_missing(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    monitor_repo = DownloadMonitorRepo(database)
+    _create_import_correlation(event_repo, tmp_path=tmp_path, task_ref="87")
+    service = CleanupDownloadedSourceService(
+        event_repo,
+        download_monitor_repo=monitor_repo,
+        pt_min_seed_hours=1,
+    )
+
+    reply = service.cleanup_by_task_ref("87")
+
+    assert "PT 最小保护窗口真相不可用" in reply
+    captured = capsys.readouterr()
+    assert "[cleanup PT 保护真相缺失]" in captured.out
+    assert "[处理建议]" in captured.out
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert events[-1].event_type == "cleanup.pt_seed_window_state_unavailable"
+
+
+def test_inspect_by_task_ref_skips_pt_seed_window_for_bt_task(tmp_path: Path) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    source_file, target_file = _create_import_correlation(event_repo, tmp_path=tmp_path, task_ref="bt-12345678")
+    service = CleanupDownloadedSourceService(
+        event_repo,
+        pt_min_seed_hours=24,
+    )
+
+    reply = service.inspect_by_task_ref("bt-12345678")
+
+    assert f"源路径: {source_file}" in reply
+    assert f"目标路径: {target_file}" in reply
+    assert "当前 guardrail: 允许 cleanup" in reply
+    assert "PT 最小保护窗口未满" not in reply
 
 
 def test_inspect_by_task_ref_returns_correlation_missing_state(tmp_path: Path) -> None:
@@ -1542,3 +1614,82 @@ def _make_database(tmp_path: Path) -> SqliteDatabase:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
     return database
+
+
+def _create_import_correlation(
+    event_repo: JobEventRepo,
+    *,
+    tmp_path: Path,
+    task_ref: str,
+) -> tuple[Path, Path]:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "Dune (2021).mkv"
+    target_file.hardlink_to(source_file)
+
+    event_repo.append_event(
+        task_ref=task_ref,
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message=str(target_file),
+        source_path=str(source_file),
+        target_path=str(target_file),
+    )
+    return source_file, target_file
+
+
+def _record_completed_monitor(
+    monitor_repo: DownloadMonitorRepo,
+    *,
+    task_id: str,
+    task_hash: str,
+) -> None:
+    monitor_repo.register_download(
+        task_id=task_id,
+        task_hash=task_hash,
+        name="Dune: Part Two",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id=task_id,
+            task_hash=task_hash,
+            name="Dune: Part Two",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+
+
+def _set_monitor_completion_observed_at(
+    database: SqliteDatabase,
+    *,
+    task_id: str,
+    task_hash: str,
+    observed_at: datetime,
+) -> None:
+    with database.connect() as connection:
+        connection.execute(
+            """
+            UPDATE download_monitor
+            SET completion_observed_at = ?, last_observed_at = ?, updated_at = ?
+            WHERE task_id = ? AND task_hash = ?
+            """,
+            (
+                observed_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                observed_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                observed_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S"),
+                task_id,
+                task_hash,
+            ),
+        )
+        connection.commit()

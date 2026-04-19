@@ -317,6 +317,8 @@ def main() -> None:
     cleanup_downloaded_source_service = CleanupDownloadedSourceService(
         job_event_repo=job_event_repo,
         job_repo=job_repo,
+        download_monitor_repo=download_monitor_repo,
+        pt_min_seed_hours=settings.pt_min_seed_hours,
     )
     manage_watchlist_service = ManageWatchlistService(watchlist_repo)
     manage_bt_subscription_service = ManageBtSubscriptionService(

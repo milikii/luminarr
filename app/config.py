@@ -57,6 +57,7 @@ class Settings:
     subtitle_translation_base_url: str
     subtitle_translation_model: str
     subtitle_translation_timeout_seconds: float
+    pt_min_seed_hours: int
     sqlite_db_path: str
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...]
     bt_web_sources: tuple[str, ...]
@@ -127,6 +128,19 @@ def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
         raise ConfigError(f"{key} must be an integer") from error
     if value <= 0:
         raise ConfigError(f"{key} must be a positive integer")
+    return value
+
+
+def _read_optional_non_negative_int(env: Mapping[str, str], key: str, default: int) -> int:
+    raw_value = _read_optional(env, key)
+    if not raw_value:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as error:
+        raise ConfigError(f"{key} must be an integer") from error
+    if value < 0:
+        raise ConfigError(f"{key} must be a non-negative integer")
     return value
 
 
@@ -349,6 +363,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         subtitle_translation_base_url=subtitle_translation_base_url or "https://api.openai.com/v1",
         subtitle_translation_model=_read_optional(env, "SUBTITLE_TRANSLATION_MODEL") or "gpt-5.4",
         subtitle_translation_timeout_seconds=subtitle_translation_timeout_seconds,
+        pt_min_seed_hours=_read_optional_non_negative_int(env, "PT_MIN_SEED_HOURS", 0),
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
         raw_bt_destination_options=_read_raw_bt_destination_options(env),
         bt_web_sources=_read_bt_web_sources(env),

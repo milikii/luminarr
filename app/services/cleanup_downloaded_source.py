@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import re
 import shutil
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
@@ -25,6 +27,12 @@ CLEANUP_SOURCE_MISSING_TEXT = "下载源资产已不存在，无需清理：{sou
 CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT = "下载源不是文件或目录，无法清理。"
 CLEANUP_GUARD_REJECTED_TEXT = "检测到 source/target 路径关系异常，已拒绝清理：{source_path} -> {target_path}"
 CLEANUP_FAILED_TEXT = "清理下载源资产失败：{reason}"
+CLEANUP_PT_SEED_WINDOW_BLOCKED_TEMPLATE = (
+    "PT 最小保护窗口未满，已拒绝 cleanup：当前完成观察仅过去 {elapsed_hours:.1f} 小时，要求至少 {required_hours} 小时。"
+)
+CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT = (
+    "PT 最小保护窗口真相不可用，已拒绝 cleanup：缺少下载完成观察时间，请先刷新下载状态。"
+)
 CLEANUP_FOLLOW_UP_TEMPLATE = (
     "如需复核，可先执行只读预检：\n"
     "cleanup inspect {task_ref} / 清理检查 {task_ref}：只读预检，不删除任何文件\n"
@@ -75,7 +83,14 @@ CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT = (
 CLEANUP_GUARD_REJECTED_FIX_HINT = (
     "检查 source_path 和 target_path 是否指向同一位置或互为父子目录，确认导入关联无误后再重试。"
 )
+CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT = (
+    "等待 PT 最小保护窗口到期后再执行 cleanup；如需刷新当前观察时间，先发送 status <任务ID或Hash>。"
+)
+CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT = (
+    "先发送 status <任务ID或Hash> 刷新下载完成观察；若仍缺少 completion_observed_at，再检查 download_monitor 真相。"
+)
 CLEANUP_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
+_SQLITE_UTC_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 @dataclass(frozen=True, slots=True)
@@ -98,8 +113,12 @@ class CleanupDownloadedSourceService:
         self,
         job_event_repo: JobEventRepo,
         job_repo: JobRepo | None = None,
+        download_monitor_repo: DownloadMonitorRepo | None = None,
+        pt_min_seed_hours: int = 0,
     ) -> None:
         self._job_event_repo = job_event_repo
+        self._download_monitor_repo = download_monitor_repo
+        self._pt_min_seed_hours = max(0, pt_min_seed_hours)
         self._correlation_lookup = CleanupCorrelationLookup(
             job_event_repo=job_event_repo,
             job_repo=job_repo,
@@ -335,8 +354,17 @@ class CleanupDownloadedSourceService:
                 conclusion = guard_rejection
                 cleanup_allowed = False
             else:
-                conclusion = "已通过 cleanup 预检，可执行清理下载源资产。"
-                cleanup_allowed = True
+                pt_seed_guard_conclusion = self._evaluate_pt_seed_window(
+                    task_ref=correlation.task_ref.strip() or resolved_identity.task_ref or task_ref,
+                    task_id=correlation.task_id.strip() or resolved_identity.task_id,
+                    task_hash=correlation.task_hash.strip() or resolved_identity.task_hash,
+                )
+                if pt_seed_guard_conclusion is not None:
+                    conclusion = pt_seed_guard_conclusion
+                    cleanup_allowed = False
+                else:
+                    conclusion = "已通过 cleanup 预检，可执行清理下载源资产。"
+                    cleanup_allowed = True
 
         return CleanupInspection(
             query_ref=task_ref,
@@ -406,6 +434,64 @@ class CleanupDownloadedSourceService:
                 )
             return
 
+    def _evaluate_pt_seed_window(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+    ) -> str | None:
+        cleaned_task_ref = task_ref.strip().lower()
+        if self._pt_min_seed_hours <= 0 or cleaned_task_ref.startswith("bt-"):
+            return None
+        if self._download_monitor_repo is None:
+            _print_cleanup_pt_seed_guard_state_unavailable_log(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                reason="download_monitor_repo missing",
+            )
+            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
+
+        try:
+            record = self._download_monitor_repo.get_record(task_id=task_id, task_hash=task_hash)
+        except Exception as error:
+            _print_cleanup_pt_seed_guard_lookup_failed_log(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                error=error,
+            )
+            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
+
+        if record is None or not record.completion_observed_at.strip():
+            _print_cleanup_pt_seed_guard_state_unavailable_log(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                reason="completion_observed_at missing",
+            )
+            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
+
+        try:
+            completion_observed_at = datetime.strptime(record.completion_observed_at, _SQLITE_UTC_FORMAT).replace(tzinfo=UTC)
+        except ValueError:
+            _print_cleanup_pt_seed_guard_state_unavailable_log(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                reason=f"invalid completion_observed_at: {record.completion_observed_at}",
+            )
+            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
+
+        elapsed_hours = max(0.0, (datetime.now(UTC) - completion_observed_at).total_seconds() / 3600.0)
+        if elapsed_hours < float(self._pt_min_seed_hours):
+            return CLEANUP_PT_SEED_WINDOW_BLOCKED_TEMPLATE.format(
+                elapsed_hours=elapsed_hours,
+                required_hours=self._pt_min_seed_hours,
+            )
+        return None
+
 
 def _is_cleanup_event_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
@@ -472,6 +558,10 @@ def _preferred_cleanup_ref(inspection: CleanupInspection) -> str:
 
 
 def _resolve_cleanup_blocked_event_details(inspection: CleanupInspection) -> tuple[str, str]:
+    if inspection.conclusion.startswith("PT 最小保护窗口未满"):
+        return "cleanup.pt_seed_window_blocked", CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT
+    if inspection.conclusion == CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT:
+        return "cleanup.pt_seed_window_state_unavailable", CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT
     if inspection.conclusion == CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT:
         return "cleanup.source_type_unsupported", CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT
     return "cleanup.guard_rejected", CLEANUP_GUARD_REJECTED_FIX_HINT
@@ -626,5 +716,41 @@ def _print_cleanup_event_append_row_corrupted_log(
     print(
         "\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 是否仍是完整真相；"
         "当前 cleanup 文本结果已返回，但不会把这条坏事件当成已稳定落盘。",
+        flush=True,
+    )
+
+
+def _print_cleanup_pt_seed_guard_lookup_failed_log(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    error: Exception,
+) -> None:
+    print(
+        f"\033[31m[cleanup PT 保护查询失败]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
+        f"task_hash={task_hash or '-'} 错误={error}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT}",
+        flush=True,
+    )
+
+
+def _print_cleanup_pt_seed_guard_state_unavailable_log(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup PT 保护真相缺失]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
+        f"task_hash={task_hash or '-'} 原因={reason}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT}",
         flush=True,
     )

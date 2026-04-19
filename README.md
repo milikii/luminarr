@@ -26,6 +26,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 如果 WSL 机器不能直连公网，可额外填写 `OUTBOUND_PROXY_URL` 给 Telegram / TMDB / Fanart / BT 外站 / 字幕翻译出站请求复用；Transmission / Emby / Prowlarr 这类本地地址仍直连
 - `TMDB_API_KEY` 当前不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
 - `DOWNLOADER_INSTANCES` 当前只是多实例路由补充配置，不能替代 `TRANSMISSION_BASE_URL`
+- `PT_MIN_SEED_HOURS` 当前是可选保护项；大于 `0` 时，PT 任务的 `cleanup inspect` / `cleanup` 会按完成观察时间窗做保守阻断
 - `make run` 现在会先检查 `ENV_FILE` 指向的环境文件是否存在；缺失时会打印红色中文 `[环境文件缺失]` 和 `[处理建议]`
 - 如果环境文件不在仓库根目录，可用 `ENV_FILE=/绝对路径 make run` 指向已有配置
 
@@ -114,7 +115,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前没有进行中的 promoted 主线；Jellyfin / Plex 支持是上一条已完成主线。后续若要继续做其他事项，先以 `docs/NEXT_STEP.md` 完成切线，再开工。
+- **当前施工状态**：当前 promoted 主线是 cleanup PT 最小保护窗口；这一步只补保守阻断，不改 cleanup 删除范围、四渠道协议或 BT / raw_bt 边界。Jellyfin / Plex 支持是上一条已完成主线。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
 - **当前完成态主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
@@ -123,8 +124,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
 - **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；更细的验证入口和历史闭环看 `docs/STATUS.md`
-- 这一步只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起 plugin 体系或改 workflow 真相。
-- 当前上一条主线已完成；旧退出条件只保留在历史蓝图 / 台账语境。后续继续其他事项前，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
+- 这一步只允许给 PT cleanup 补最小保护窗口，不顺手改删除范围、四渠道文本协议、BT / raw_bt 边界或 workflow 真相。
+- 当前上一条主线已完成；这次新主线的具体 `Only do / Done when` 继续以 `docs/NEXT_STEP.md` 为准。
 
 ## 6. 当前明确不做
 

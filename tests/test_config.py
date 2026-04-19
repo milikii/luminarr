@@ -361,6 +361,20 @@ def test_load_settings_defaults_role_binding_to_first_instance() -> None:
     assert settings.downloader_role_binding.bt_downloader == "tr-main"
 
 
+def test_load_settings_reads_pt_min_seed_hours() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "PT_MIN_SEED_HOURS": "24",
+        }
+    )
+
+    assert settings.pt_min_seed_hours == 24
+
+
 def test_load_settings_rejects_unknown_role_binding_instance() -> None:
     with pytest.raises(ConfigError):
         load_settings(
@@ -371,6 +385,19 @@ def test_load_settings_rejects_unknown_role_binding_instance() -> None:
                 "TRANSMISSION_BASE_URL": "http://transmission:9091/",
                 "DOWNLOADER_INSTANCES": "tr-main|transmission|http://transmission:9091|/data/downloads/tr",
                 "BT_DOWNLOADER": "missing-instance",
+            }
+        )
+
+
+def test_load_settings_rejects_negative_pt_min_seed_hours() -> None:
+    with pytest.raises(ConfigError):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "PT_MIN_SEED_HOURS": "-1",
             }
         )
 
