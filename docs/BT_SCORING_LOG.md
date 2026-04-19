@@ -5,7 +5,7 @@
 
 ## 1. Current line
 
-- 当前主线状态：进行中；2026-04-19 已完成 Phase 1 和 Phase 2 基线，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py` 得到通过，当前最小下一步切到 Phase 3 接 `pure_bt.py`。
+- 当前主线状态：进行中；2026-04-19 已完成 Phase 1~3 基线，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py` 得到通过，当前最小下一步切到 Phase 4 接 `manage_bt_subscription.py`。
 - 上一条已完成主线“最小人类可用入口继续补齐”继续看 `docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`。
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/BT_SCORING_PLAN.md`。
 
@@ -21,7 +21,7 @@
 
 当前风险：
 - 规则文件虽然已接进来，但当前只支持项目里约定的最小 YAML 子集；后续改文件时必须守住现有键名和两空格缩进。
-- 三条 BT 路径还没真正调用共享评分器，当前只是把 helper 和测试基线先落稳。
+- `manage_bt_subscription.py` 和媒体型 BT 候选展示还没真正调用共享评分器。
 
 ### 2.2 规则文件加载
 
@@ -33,9 +33,21 @@
 当前风险：
 - `pure_bt.py`、`manage_bt_subscription.py` 和媒体型 BT 候选展示还没真正消费这份规则文件。
 
+### 2.3 `pure_bt.py` 接线
+
+已完成闭环：
+- 已把 `app/services/pure_bt.py` 的单片优选改成走 `bt_candidate_scorer.pick_best()`；纯 BT 路径不再自己维护一套分辨率/做种数排序。
+- 已补 `tests/test_pure_bt.py`，覆盖文本提取、低质量/合集过滤、共享评分器默认排序和自定义规则生效。
+- 现有 Telegram 纯 BT 入口 focused case 继续通过，说明目的地选择入口和服务未就绪保护没有回退。
+
+当前风险：
+- `manage_bt_subscription.py` 仍保留自己的简化排序；Phase 4 还没开始。
+
 ## 3. Focused verification
 
 - `.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py`
+- `.venv/bin/python -m pytest -q tests/test_pure_bt.py`
+- `.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "handle_message_bt_processing_path_pure_bt_choice_routes_to_destination_prompt or enter_pure_bt_flow_returns_service_not_ready_when_destination_persist_fails"`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 
 ## 4. Maintenance rule

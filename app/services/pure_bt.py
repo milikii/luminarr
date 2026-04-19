@@ -2,21 +2,10 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any
 
+from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
 from app.services.bt_sources import resolve_bt_source
-
-
-@dataclass(frozen=True, slots=True)
-class PureBtCandidate:
-    index: int
-    result: Mapping[str, Any]
-    title: str
-    source: str
-    quality_rank: int
-    seeders: int
-    size_bytes: int
 
 
 def extract_bt_search_query(text: str) -> str:
@@ -35,134 +24,101 @@ def pick_single_item_candidate(
     *,
     query: str,
 ) -> Mapping[str, Any] | None:
-    ranked_candidates = sorted(
-        _collect_single_item_candidates(results, query=query),
-        key=_candidate_sort_key,
-        reverse=True,
-    )
-    if not ranked_candidates:
+    candidate_pairs: list[tuple[BTCandidate, Mapping[str, Any]]] = []
+    for result in results:
+        candidate = _build_bt_candidate(result)
+        if candidate is not None:
+            candidate_pairs.append((candidate, result))
+
+    if not candidate_pairs:
         return None
-    return ranked_candidates[0].result
 
-
-def _collect_single_item_candidates(
-    results: Sequence[Mapping[str, Any]],
-    *,
-    query: str,
-) -> list[PureBtCandidate]:
-    candidates: list[PureBtCandidate] = []
-    for index, result in enumerate(results):
-        source = _resolve_candidate_source(result)
-        if not source:
-            continue
-
-        title = str(result.get("title", "")).strip()
-        if not title:
-            continue
-        if not _title_matches_query(title=title, query=query):
-            continue
-        if _is_low_quality_title(title):
-            continue
-        if _looks_like_multi_item_release(title):
-            continue
-
-        candidates.append(
-            PureBtCandidate(
-                index=index,
-                result=result,
-                title=title,
-                source=source,
-                quality_rank=_quality_rank(title),
-                seeders=_safe_int(result.get("seeders")),
-                size_bytes=_safe_int(result.get("size")),
-            )
-        )
-    return candidates
-
-
-def _candidate_sort_key(candidate: PureBtCandidate) -> tuple[int, int, int, int]:
-    return (
-        candidate.quality_rank,
-        candidate.seeders,
-        candidate.size_bytes,
-        -candidate.index,
+    best = pick_best(
+        [candidate for candidate, _ in candidate_pairs],
+        BTScoringContext(query=query, media_kind="raw_bt", single_item_mode=True),
+        rules=load_bt_scoring_rules(),
     )
+    if best is None:
+        return None
+    for candidate, result in candidate_pairs:
+        if candidate is best.candidate:
+            return result
+    return None
 
 
 def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
     return resolve_bt_source(candidate)
 
 
-def _title_matches_query(*, title: str, query: str) -> bool:
-    normalized_title = _normalize_for_match(title)
-    normalized_query = _normalize_for_match(query)
-    if not normalized_title or not normalized_query:
-        return False
-    if normalized_query in normalized_title:
-        return True
-
-    query_tokens = [token for token in normalized_query.split() if len(token) >= 2 or token.isdigit()]
-    if not query_tokens:
-        return True
-
-    matched_count = sum(1 for token in query_tokens if token in normalized_title)
-    required_count = 1 if len(query_tokens) == 1 else 2
-    return matched_count >= required_count
-
-
-def _normalize_for_match(text: str) -> str:
-    normalized = re.sub(r"[^0-9a-z\u4e00-\u9fff]+", " ", text.strip().lower())
-    return re.sub(r"\s+", " ", normalized).strip()
-
-
-def _is_low_quality_title(title: str) -> bool:
-    lowered_title = title.strip().lower()
-    if not lowered_title:
-        return False
-    return re.search(r"\b(cam|hdcam|ts|tc|telesync|telecine|screener)\b", lowered_title) is not None
-
-
-def _looks_like_multi_item_release(title: str) -> bool:
-    lowered_title = title.strip().lower()
-    if not lowered_title:
-        return False
-    patterns = (
-        r"\bcomplete\b",
-        r"\bcollection\b",
-        r"\bbatch\b",
-        r"\bpack\b",
-        r"\b全集\b",
-        r"\b合集\b",
-        r"\b全季\b",
-        r"\b打包\b",
-        r"\bseason\s*\d+\b",
-        r"\bs\d{1,2}\b(?!\s*e\d{1,3})",
-        r"\be\d{1,3}\s*-\s*e?\d{1,3}\b",
-        r"\b\d{1,3}\s*-\s*\d{1,3}\b",
+def _build_bt_candidate(result: Mapping[str, Any]) -> BTCandidate | None:
+    source = _resolve_candidate_source(result)
+    title = str(result.get("title", "")).strip()
+    if not source or not title:
+        return None
+    return BTCandidate(
+        source_site=str(result.get("indexerName", "")).strip() or str(result.get("sourceProvider", "")).strip() or "unknown",
+        title=title,
+        magnet_or_torrent_url=source,
+        size_bytes=_safe_optional_int(result.get("size")),
+        seeders=_safe_optional_int(result.get("seeders")),
+        leechers=_safe_optional_int(result.get("peers")),
+        resolution=_extract_resolution(title),
+        codec=_extract_codec(title),
+        source_type=_extract_source_type(title),
+        audio=(),
+        release_group=_extract_release_group(title),
+        age_days=None,
+        media_kind="raw_bt",
     )
-    return any(re.search(pattern, lowered_title) is not None for pattern in patterns)
 
 
-def _quality_rank(title: str) -> int:
-    lowered_title = title.strip().lower()
-    if not lowered_title:
-        return 0
+def _extract_resolution(title: str) -> str | None:
+    lowered_title = title.lower()
     if re.search(r"\b(2160p|4k)\b", lowered_title):
-        return 4
+        return "2160p"
     if re.search(r"\b1080p\b", lowered_title):
-        return 3
+        return "1080p"
     if re.search(r"\b720p\b", lowered_title):
-        return 2
-    if re.search(r"\b480p\b", lowered_title):
-        return 1
-    return 0
+        return "720p"
+    return None
 
 
-def _safe_int(value: Any) -> int:
+def _extract_codec(title: str) -> str | None:
+    lowered_title = title.lower()
+    if re.search(r"\b(x265|hevc)\b", lowered_title):
+        return "x265" if "x265" in lowered_title else "HEVC"
+    if re.search(r"\b(x264|avc)\b", lowered_title):
+        return "x264"
+    return None
+
+
+def _extract_source_type(title: str) -> str | None:
+    lowered_title = title.lower()
+    if "remux" in lowered_title:
+        return "Remux"
+    if "bluray" in lowered_title or "blu-ray" in lowered_title:
+        return "BluRay"
+    if "bdrip" in lowered_title:
+        return "BDRip"
+    if "web-dl" in lowered_title or "webdl" in lowered_title:
+        return "WEB-DL"
+    if "webrip" in lowered_title or "web-rip" in lowered_title:
+        return "WEBRip"
+    return None
+
+
+def _extract_release_group(title: str) -> str | None:
+    matched = re.search(r"-([A-Za-z0-9][A-Za-z0-9-]+)$", title.strip())
+    if matched is None:
+        return None
+    return str(matched.group(1) or "").strip() or None
+
+
+def _safe_optional_int(value: Any) -> int | None:
     try:
         resolved = int(value)
     except (TypeError, ValueError):
-        return 0
+        return None
     if resolved > 0:
         return resolved
-    return 0
+    return None
