@@ -26,15 +26,21 @@
 - 把 `app/main.py` 里“创建媒体服务器 refresh client”收成单独 helper，当前仍保持 Emby 默认路径不变
 - `RefreshMediaServerService` 的故障提示从“检查 Emby”收窄成“检查媒体服务器”，不改导入成功真相
 
-当前最小下一步切到 Phase 2，只做 **provider 选择配置**：
+2026-04-19 已完成 Phase 2：
 
 - 给 `app/main.py` 增加媒体服务器 provider 选择入口
+- `app/config.py` 新增 `MEDIA_SERVER_PROVIDER`、`JELLYFIN_BASE_URL`、`JELLYFIN_API_KEY`
 - 保持 Emby 兼容默认值，不要求现有部署立刻改 env
-- focused tests 先锁配置读取和启动装配，不扩到真实 Jellyfin / Plex 联调
+- `.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py` 得到 `52 passed`
+
+当前最小下一步切到 Phase 3，只做 **Plex refresh baseline**：
+
+- 新增 `app/clients/plex.py`
+- 新增 `tests/test_plex_client.py`
+- 把 `app/main.py` 的 provider 选择补到 `plex`
 
 这一阶段不做：
 
-- Plex client
 - 新 approval / import / cleanup 流程
 - 自动探测媒体服务器类型
 - 真实 Jellyfin / Plex 联调

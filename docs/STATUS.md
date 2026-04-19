@@ -64,6 +64,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已把 `app/services/manage_bt_subscription.py::_scan_chat_once()` 的订阅选源切到共享评分器，并补 `tests/test_manage_bt_subscription.py`；订阅扫描现在复用统一低质量过滤、排序和规则文件，但仍保持原有待确认创建、`last_seen` 回写和 scheduler tick 协议不变。
 - 2026-04-19 已把 `app/services/search_media.py` 的媒体型 BT 候选展示切到共享评分器排序，并补 `tests/test_search_media.py`；候选展示顺序与 `candidate_mapping` 缓存顺序现在保持一致，BT 评分器主线已满足退出条件 1。
 - 2026-04-19 已落 Jellyfin Phase 1 基线：新增 `app/clients/jellyfin.py`、`tests/test_jellyfin_client.py`，并把 `app/main.py` 的媒体服务器 refresh client 创建抽成单独 helper；当前仍保持 Emby 默认路径不变，下一步切到 provider 选择。
+- 2026-04-19 已完成 Jellyfin / Plex 主线 Phase 2：`app/config.py` 新增 `MEDIA_SERVER_PROVIDER`、`JELLYFIN_BASE_URL`、`JELLYFIN_API_KEY`，`app/main.py` 已能在 Emby 默认路径之外切到 Jellyfin refresh client；`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py` 得到 `52 passed`，当前最小下一步切到 Plex baseline。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线已切到 Jellyfin / Plex 支持，不回退 cleanup 和 shared delivery 已确认的协议与结论。
@@ -72,8 +73,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前唯一主线已切到 Jellyfin / Plex 支持；最小下一步先补 provider 选择入口，保持 Emby 兼容默认值，不改导入成功真相。
-- 当前风险已从 BT 选源排序转移到媒体服务器边界：虽然 Jellyfin refresh client baseline 已有，但 `app/main.py` 仍只认 Emby 默认入口，Jellyfin / Plex provider 选择还没接进配置。
+- 当前唯一主线已切到 Jellyfin / Plex 支持；provider 选择入口已落地，最小下一步改成 Plex refresh baseline。
+- 当前风险已从“只认 Emby”收窄到 Plex 缺口：`app/main.py` 现在可在 Emby / Jellyfin 间切换，但 Plex refresh client 和对应测试还没接进来。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 BT 评分器主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
@@ -87,6 +88,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - 当前主线 focused verification：2026-04-19，`16 passed, 1 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`）
 - 当前主线 focused verification：2026-04-19，`24 passed`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py`）
+- 当前主线 focused verification：2026-04-19，`52 passed`（`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py`）
 - 当前主线 focused verification：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`184 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_sources.py tests/test_import_to_library.py`）

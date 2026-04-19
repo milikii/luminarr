@@ -22,6 +22,7 @@ from app.bot.telegram_bot import build_application
 from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
+from app.clients.jellyfin import JellyfinClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
@@ -133,10 +134,21 @@ def _build_bt_source_providers(
 
 
 def _build_refresh_media_server_func(settings):
-    if not settings.emby_base_url or not settings.emby_api_key:
-        return None
-    emby_client = EmbyClient(base_url=settings.emby_base_url, api_key=settings.emby_api_key)
-    refresh_service = RefreshMediaServerService(emby_client.refresh_library)
+    if settings.media_server_provider == "jellyfin":
+        if not settings.jellyfin_base_url or not settings.jellyfin_api_key:
+            return None
+        refresh_func = JellyfinClient(
+            base_url=settings.jellyfin_base_url,
+            api_key=settings.jellyfin_api_key,
+        ).refresh_library
+    else:
+        if not settings.emby_base_url or not settings.emby_api_key:
+            return None
+        refresh_func = EmbyClient(
+            base_url=settings.emby_base_url,
+            api_key=settings.emby_api_key,
+        ).refresh_library
+    refresh_service = RefreshMediaServerService(refresh_func)
     return refresh_service.refresh_text
 
 

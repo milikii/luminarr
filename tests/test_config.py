@@ -28,8 +28,11 @@ def test_load_settings_reads_token() -> None:
     assert settings.transmission_username == "tr-user"
     assert settings.transmission_password == "tr-pass"
     assert settings.library_target_dir == "/data/library/movies"
+    assert settings.media_server_provider == "emby"
     assert settings.emby_base_url == ""
     assert settings.emby_api_key == ""
+    assert settings.jellyfin_base_url == ""
+    assert settings.jellyfin_api_key == ""
     assert settings.subtitle_translation_api_key == ""
     assert settings.subtitle_translation_base_url == "https://api.openai.com/v1"
     assert settings.subtitle_translation_model == "gpt-5.4"
@@ -103,6 +106,36 @@ def test_load_settings_reads_emby_settings() -> None:
     )
     assert settings.emby_base_url == "http://emby:8096"
     assert settings.emby_api_key == "emby-api-key"
+
+
+def test_load_settings_reads_jellyfin_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "MEDIA_SERVER_PROVIDER": "jellyfin",
+            "JELLYFIN_BASE_URL": "http://jellyfin:8096/",
+            "JELLYFIN_API_KEY": "jellyfin-api-key",
+        }
+    )
+    assert settings.media_server_provider == "jellyfin"
+    assert settings.jellyfin_base_url == "http://jellyfin:8096"
+    assert settings.jellyfin_api_key == "jellyfin-api-key"
+
+
+def test_load_settings_rejects_unknown_media_server_provider() -> None:
+    with pytest.raises(ConfigError, match="MEDIA_SERVER_PROVIDER"):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "MEDIA_SERVER_PROVIDER": "plex",
+            }
+        )
 
 
 def test_load_settings_reads_tmdb_settings() -> None:

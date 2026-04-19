@@ -46,8 +46,11 @@ class Settings:
     transmission_username: str
     transmission_password: str
     library_target_dir: str
+    media_server_provider: str
     emby_base_url: str
     emby_api_key: str
+    jellyfin_base_url: str
+    jellyfin_api_key: str
     subtitle_translation_api_key: str
     subtitle_translation_base_url: str
     subtitle_translation_model: str
@@ -96,6 +99,15 @@ def _read_feishu_inbound_mode(env: Mapping[str, str]) -> str:
         return "webhook"
     if raw_value not in {"webhook", "long_connection"}:
         raise ConfigError("FEISHU_INBOUND_MODE must be webhook or long_connection")
+    return raw_value
+
+
+def _read_media_server_provider(env: Mapping[str, str]) -> str:
+    raw_value = _read_optional(env, "MEDIA_SERVER_PROVIDER").strip().lower()
+    if not raw_value:
+        return "emby"
+    if raw_value not in {"emby", "jellyfin"}:
+        raise ConfigError("MEDIA_SERVER_PROVIDER must be emby or jellyfin")
     return raw_value
 
 
@@ -278,6 +290,7 @@ def _read_downloader_role_binding(
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
     emby_base_url = _read_optional(env, "EMBY_BASE_URL").rstrip("/")
+    jellyfin_base_url = _read_optional(env, "JELLYFIN_BASE_URL").rstrip("/")
     tmdb_base_url = _read_optional(env, "TMDB_BASE_URL").rstrip("/")
     fanart_base_url = _read_optional(env, "FANART_BASE_URL").rstrip("/")
     subtitle_translation_base_url = _read_optional(env, "SUBTITLE_TRANSLATION_BASE_URL").rstrip("/")
@@ -322,8 +335,11 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         transmission_username=_read_optional(env, "TRANSMISSION_USERNAME"),
         transmission_password=_read_optional(env, "TRANSMISSION_PASSWORD"),
         library_target_dir=_read_optional(env, "LIBRARY_TARGET_DIR") or "/data/library/movies",
+        media_server_provider=_read_media_server_provider(env),
         emby_base_url=emby_base_url,
         emby_api_key=_read_optional(env, "EMBY_API_KEY"),
+        jellyfin_base_url=jellyfin_base_url,
+        jellyfin_api_key=_read_optional(env, "JELLYFIN_API_KEY"),
         subtitle_translation_api_key=_read_optional(env, "SUBTITLE_TRANSLATION_API_KEY"),
         subtitle_translation_base_url=subtitle_translation_base_url or "https://api.openai.com/v1",
         subtitle_translation_model=_read_optional(env, "SUBTITLE_TRANSLATION_MODEL") or "gpt-5.4",

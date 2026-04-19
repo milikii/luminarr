@@ -316,8 +316,14 @@ def test_resolve_downloader_client_for_dispatch_logs_missing_client(
     assert "[处理建议]" in captured.out
 
 
-def test_build_refresh_media_server_func_returns_none_without_emby_settings() -> None:
-    settings = SimpleNamespace(emby_base_url="", emby_api_key="")
+def test_build_refresh_media_server_func_returns_none_without_media_server_settings() -> None:
+    settings = SimpleNamespace(
+        media_server_provider="emby",
+        emby_base_url="",
+        emby_api_key="",
+        jellyfin_base_url="",
+        jellyfin_api_key="",
+    )
 
     assert _build_refresh_media_server_func(settings) is None
 
@@ -342,13 +348,56 @@ def test_build_refresh_media_server_func_wraps_emby_client(monkeypatch: pytest.M
     monkeypatch.setattr("app.main.EmbyClient", FakeEmbyClient)
     monkeypatch.setattr("app.main.RefreshMediaServerService", FakeRefreshService)
 
-    settings = SimpleNamespace(emby_base_url="http://emby:8096", emby_api_key="emby-key")
+    settings = SimpleNamespace(
+        media_server_provider="emby",
+        emby_base_url="http://emby:8096",
+        emby_api_key="emby-key",
+        jellyfin_base_url="",
+        jellyfin_api_key="",
+    )
 
     refresh_func = _build_refresh_media_server_func(settings)
 
     assert calls["base_url"] == "http://emby:8096"
     assert calls["api_key"] == "emby-key"
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakeEmbyClient
+    assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
+    assert refresh_func is not None
+
+
+def test_build_refresh_media_server_func_wraps_jellyfin_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    class FakeJellyfinClient:
+        def __init__(self, *, base_url: str, api_key: str) -> None:
+            calls["base_url"] = base_url
+            calls["api_key"] = api_key
+            calls["refresh_library"] = self.refresh_library
+
+        async def refresh_library(self) -> None:
+            return None
+
+    class FakeRefreshService:
+        def __init__(self, refresh_func) -> None:
+            calls["refresh_func"] = refresh_func
+            self.refresh_text = object()
+
+    monkeypatch.setattr("app.main.JellyfinClient", FakeJellyfinClient)
+    monkeypatch.setattr("app.main.RefreshMediaServerService", FakeRefreshService)
+
+    settings = SimpleNamespace(
+        media_server_provider="jellyfin",
+        emby_base_url="",
+        emby_api_key="",
+        jellyfin_base_url="http://jellyfin:8096",
+        jellyfin_api_key="jelly-key",
+    )
+
+    refresh_func = _build_refresh_media_server_func(settings)
+
+    assert calls["base_url"] == "http://jellyfin:8096"
+    assert calls["api_key"] == "jelly-key"
+    assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakeJellyfinClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None
 
