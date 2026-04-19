@@ -187,6 +187,8 @@ def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:
         return False
     if parsed.path not in {"", "/"}:
         return False
+    if not parsed.query:
+        return True
 
     query = parse_qs(parsed.query, keep_blank_values=False)
     if any(key.lower() not in {"f", "c", "q", "u", "p", "s", "o"} for key in query):
