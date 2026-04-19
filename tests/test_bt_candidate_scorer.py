@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, pick_best
+from app.services.bt_candidate_scorer import DEFAULT_BT_SCORING_RULES, load_bt_scoring_rules
 
 
 def test_filter_candidates_drops_invalid_source() -> None:
@@ -184,6 +187,70 @@ def test_pick_best_returns_none_when_all_candidates_are_dropped() -> None:
     best = pick_best((_make_candidate(title="Dune 2021 CAM"),), _movie_context())
 
     assert best is None
+
+
+def test_load_bt_scoring_rules_reads_repo_defaults() -> None:
+    rules = load_bt_scoring_rules()
+
+    assert rules == DEFAULT_BT_SCORING_RULES
+
+
+def test_load_bt_scoring_rules_warns_and_falls_back_when_file_missing(tmp_path: Path, capsys) -> None:
+    rules = load_bt_scoring_rules(tmp_path / "missing.yml")
+
+    assert rules == DEFAULT_BT_SCORING_RULES
+    captured = capsys.readouterr()
+    assert "[BT 评分规则文件回退]" in captured.out
+    assert "[处理建议]" in captured.out
+    assert "规则文件缺失" in captured.out
+
+
+def test_load_bt_scoring_rules_warns_and_keeps_defaults_for_invalid_field(tmp_path: Path, capsys) -> None:
+    path = tmp_path / "broken.yml"
+    path.write_text(
+        "weights:\n"
+        "  seeders: fast\n"
+        "release_group_preferred:\n"
+        "  - CHD\n",
+        encoding="utf-8",
+    )
+
+    rules = load_bt_scoring_rules(path)
+
+    assert rules.weights["seeders"] == DEFAULT_BT_SCORING_RULES.weights["seeders"]
+    assert rules.release_group_preferred == ("CHD",)
+    captured = capsys.readouterr()
+    assert "[BT 评分规则文件回退]" in captured.out
+    assert "weights.seeders 不是数字" in captured.out
+
+
+def test_pick_best_can_use_loaded_custom_rules(tmp_path: Path) -> None:
+    path = tmp_path / "custom.yml"
+    path.write_text(
+        "weights:\n"
+        "  resolution: 1.0\n"
+        "  source_type: 1.0\n"
+        "  seeders: 8.0\n"
+        "  size_fit: 1.0\n"
+        "  codec: 1.0\n"
+        "  release_group: 0.0\n"
+        "release_group_preferred:\n"
+        "  - CHD\n",
+        encoding="utf-8",
+    )
+    custom_rules = load_bt_scoring_rules(path)
+
+    best = pick_best(
+        (
+            _make_candidate(title="Dune 2021 1080p WEB-DL", seeders=3),
+            _make_candidate(title="Dune 2021 720p WEBRip", resolution="720p", source_type="WEBRip", seeders=60),
+        ),
+        _movie_context(),
+        rules=custom_rules,
+    )
+
+    assert best is not None
+    assert best.candidate.title == "Dune 2021 720p WEBRip"
 
 
 def _make_candidate(

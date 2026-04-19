@@ -4,6 +4,7 @@ import math
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 _INFO_HASH_PATTERN = re.compile(r"xt=urn:btih:([0-9a-z]{32,40})", re.IGNORECASE)
 _NORMALIZED_TEXT_PATTERN = re.compile(r"[^0-9a-z\u4e00-\u9fff]+", re.IGNORECASE)
@@ -99,6 +100,27 @@ DEFAULT_BT_SCORING_RULES = BTScoringRules(
     },
     release_group_preferred=("VCB-Studio", "SweetSub", "CHD", "WiKi", "FRDS"),
 )
+DEFAULT_BT_SCORING_RULES_PATH = Path(__file__).with_name("bt_scoring_rules.yml")
+
+
+def load_bt_scoring_rules(path: Path | None = None) -> BTScoringRules:
+    resolved_path = path or DEFAULT_BT_SCORING_RULES_PATH
+    try:
+        raw_text = resolved_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        _log_bt_scoring_rules_warning(path=resolved_path, reason="规则文件缺失，继续使用内置规则。")
+        return DEFAULT_BT_SCORING_RULES
+
+    try:
+        raw_data = _parse_rules_yaml(raw_text)
+        rules, warnings = _build_rules_from_data(raw_data)
+    except ValueError as error:
+        _log_bt_scoring_rules_warning(path=resolved_path, reason=f"规则文件解析失败：{error}；继续使用内置规则。")
+        return DEFAULT_BT_SCORING_RULES
+
+    if warnings:
+        _log_bt_scoring_rules_warning(path=resolved_path, reason="；".join(warnings))
+    return rules
 
 
 def filter_candidates(
@@ -149,6 +171,172 @@ def pick_best(
         if scored_candidate.drop_reason is None:
             return scored_candidate
     return None
+
+
+def _parse_rules_yaml(text: str) -> dict[str, object]:
+    parsed: dict[str, object] = {}
+    current_key: str | None = None
+    for line_number, raw_line in enumerate(text.splitlines(), start=1):
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        if indent == 0:
+            if not stripped.endswith(":"):
+                raise ValueError(f"第 {line_number} 行缺少段落冒号")
+            current_key = _parse_yaml_key(stripped[:-1].strip(), line_number=line_number)
+            parsed[current_key] = parsed.get(current_key, None)
+            continue
+        if indent != 2 or current_key is None:
+            raise ValueError(f"第 {line_number} 行缩进不合法")
+        if stripped.startswith("- "):
+            bucket = parsed.get(current_key)
+            if bucket is None:
+                bucket = []
+                parsed[current_key] = bucket
+            if not isinstance(bucket, list):
+                raise ValueError(f"第 {line_number} 行与上一段类型冲突")
+            bucket.append(_parse_yaml_scalar(stripped[2:].strip()))
+            continue
+        if ":" not in stripped:
+            raise ValueError(f"第 {line_number} 行缺少键值分隔符")
+        child_key_text, _, child_value_text = stripped.partition(":")
+        bucket = parsed.get(current_key)
+        if bucket is None:
+            bucket = {}
+            parsed[current_key] = bucket
+        if not isinstance(bucket, dict):
+            raise ValueError(f"第 {line_number} 行与上一段类型冲突")
+        child_key = _parse_yaml_mapping_key(child_key_text.strip())
+        child_value = _parse_yaml_scalar(child_value_text.strip())
+        bucket[child_key] = child_value
+    return parsed
+
+
+def _build_rules_from_data(raw_data: dict[str, object]) -> tuple[BTScoringRules, list[str]]:
+    warnings: list[str] = []
+    weights = dict(DEFAULT_BT_SCORING_RULES.weights)
+    resolution_scores = dict(DEFAULT_BT_SCORING_RULES.resolution_scores)
+    source_type_scores = dict(DEFAULT_BT_SCORING_RULES.source_type_scores)
+    codec_scores = dict(DEFAULT_BT_SCORING_RULES.codec_scores)
+    release_group_preferred = list(DEFAULT_BT_SCORING_RULES.release_group_preferred)
+
+    weights, weight_warnings = _merge_score_mapping(
+        raw_data=raw_data,
+        section_name="weights",
+        default_values=weights,
+        allow_null_key=False,
+    )
+    warnings.extend(weight_warnings)
+    resolution_scores, resolution_warnings = _merge_score_mapping(
+        raw_data=raw_data,
+        section_name="resolution_scores",
+        default_values=resolution_scores,
+        allow_null_key=True,
+    )
+    warnings.extend(resolution_warnings)
+    source_type_scores, source_type_warnings = _merge_score_mapping(
+        raw_data=raw_data,
+        section_name="source_type_scores",
+        default_values=source_type_scores,
+        allow_null_key=True,
+    )
+    warnings.extend(source_type_warnings)
+    codec_scores, codec_warnings = _merge_score_mapping(
+        raw_data=raw_data,
+        section_name="codec_scores",
+        default_values=codec_scores,
+        allow_null_key=True,
+    )
+    warnings.extend(codec_warnings)
+
+    release_group_raw = raw_data.get("release_group_preferred")
+    if release_group_raw is None:
+        warnings.append("release_group_preferred 缺失，继续使用内置默认值")
+    elif not isinstance(release_group_raw, list):
+        warnings.append("release_group_preferred 不是列表，继续使用内置默认值")
+    else:
+        release_group_preferred = [str(item).strip() for item in release_group_raw if str(item).strip()]
+        if not release_group_preferred:
+            warnings.append("release_group_preferred 为空，继续使用内置默认值")
+            release_group_preferred = list(DEFAULT_BT_SCORING_RULES.release_group_preferred)
+
+    return (
+        BTScoringRules(
+            weights=weights,
+            resolution_scores=resolution_scores,
+            source_type_scores=source_type_scores,
+            codec_scores=codec_scores,
+            release_group_preferred=tuple(release_group_preferred),
+        ),
+        warnings,
+    )
+
+
+def _merge_score_mapping(
+    *,
+    raw_data: dict[str, object],
+    section_name: str,
+    default_values: dict[str | None, float],
+    allow_null_key: bool,
+) -> tuple[dict[str | None, float], list[str]]:
+    warnings: list[str] = []
+    merged_values = dict(default_values)
+    section = raw_data.get(section_name)
+    if section is None:
+        warnings.append(f"{section_name} 缺失，继续使用内置默认值")
+        return merged_values, warnings
+    if not isinstance(section, dict):
+        warnings.append(f"{section_name} 不是映射，继续使用内置默认值")
+        return merged_values, warnings
+
+    for key, value in section.items():
+        if key is None and not allow_null_key:
+            warnings.append(f"{section_name} 包含 null key，已忽略")
+            continue
+        if key is not None and not isinstance(key, str):
+            warnings.append(f"{section_name} 包含非法 key，已忽略")
+            continue
+        if not isinstance(value, (int, float)):
+            warnings.append(f"{section_name}.{key} 不是数字，已忽略")
+            continue
+        merged_values[key] = float(value)
+    return merged_values, warnings
+
+
+def _parse_yaml_key(text: str, *, line_number: int) -> str:
+    key = _parse_yaml_scalar(text)
+    if not isinstance(key, str) or not key:
+        raise ValueError(f"第 {line_number} 行段落名非法")
+    return key
+
+
+def _parse_yaml_mapping_key(text: str) -> str | None:
+    key = _parse_yaml_scalar(text)
+    if key is None:
+        return None
+    return str(key)
+
+
+def _parse_yaml_scalar(text: str) -> str | float | None:
+    if not text:
+        return ""
+    if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
+        return text[1:-1]
+    lowered_text = text.lower()
+    if lowered_text == "null":
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return text
+
+
+def _log_bt_scoring_rules_warning(*, path: Path, reason: str) -> None:
+    print(
+        f"\033[33m[BT 评分规则文件回退]\033[0m 文件={path} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 YAML 键名、缩进和数值格式；修正后重新运行相关 BT 评分测试。"
+    )
 
 
 def _resolve_drop_reason(

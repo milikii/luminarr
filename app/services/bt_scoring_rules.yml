@@ -1,0 +1,34 @@
+weights:
+  resolution: 3.0
+  source_type: 2.5
+  seeders: 2.0
+  size_fit: 1.5
+  codec: 1.0
+  release_group: 0.5
+
+resolution_scores:
+  "2160p": 1.0
+  "1080p": 0.8
+  "720p": 0.4
+  null: 0.2
+
+source_type_scores:
+  "Remux": 1.0
+  "BluRay": 0.9
+  "BDRip": 0.8
+  "WEB-DL": 0.7
+  "WEBRip": 0.5
+  null: 0.3
+
+codec_scores:
+  "x265": 0.9
+  "HEVC": 0.9
+  "x264": 0.8
+  null: 0.4
+
+release_group_preferred:
+  - VCB-Studio
+  - SweetSub
+  - CHD
+  - WiKi
+  - FRDS
