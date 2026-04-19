@@ -697,6 +697,7 @@ async def handle_private_chat_query_text(
                 chat_id,
                 query,
                 user_id=user_id,
+                channel=channel,
                 downloader_name=downloader_execution.name if downloader_execution is not None else "",
                 downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
                 download_dir=downloader_execution.download_dir if downloader_execution is not None else "",

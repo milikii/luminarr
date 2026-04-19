@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTask
-from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, ApprovalRepo
+from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, DEFAULT_PENDING_TIMEOUT_SECONDS, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError
@@ -62,6 +62,21 @@ def test_add_by_selection_returns_pending_approval() -> None:
 
     assert reply == ADD_APPROVAL_PENDING_TEXT.format(title="Dune: Part Two", task_ref="1")
     add_torrent.assert_not_awaited()
+
+
+def test_add_by_selection_uses_delivery_renderer_for_personal_wechat_channel() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    service = AddToDownloaderService(search_service=search_service, add_torrent_func=AsyncMock())
+
+    reply = _run(service.add_by_selection(1001, "1", channel="personal_wechat"))
+
+    assert reply.startswith("【待确认：下载】 ⏳")
+    assert "▸ 任务信息" in reply
+    assert "片名：Dune: Part Two" in reply
+    assert "确认下载：发送 confirm 1" in reply
+    assert reply.endswith(f"过期时间：{DEFAULT_PENDING_TIMEOUT_SECONDS // 60} 分钟后")
 
 
 def test_confirm_add_by_task_ref_dispatches_download() -> None:

@@ -136,6 +136,30 @@ def test_dispatch_private_chat_text_routes_search_with_channel_delivery_renderer
     assert "▸ 候选结果" in sent_text
 
 
+def test_dispatch_private_chat_text_routes_add_pending_with_channel_delivery_renderer() -> None:
+    reply_text = AsyncMock()
+    bot_data = _build_bot_data()
+    search_service = bot_data[SEARCH_SERVICE_KEY]
+    assert isinstance(search_service, SearchMediaService)
+    asyncio.run(search_service.search_and_format("dune", chat_id=1001))
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="1",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            channel="personal_wechat",
+            bot_data=bot_data,
+        )
+    )
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert sent_text.startswith("【待确认：下载】 ⏳")
+    assert "确认下载：发送 confirm 1" in sent_text
+
+
 def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -> None:
     reply_text = AsyncMock()
 

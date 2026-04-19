@@ -51,6 +51,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已把 `series / anime` 主线的最后一个下载完成文件名 fallback 接点 `import_to_library._extract_title_year_for_scrape()` 切到统一 parser；`.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_subtitle_translator.py` 得到 `245 passed`，该主线满足 `Done when` 第 1 条并已切到 shared private-chat 交付体验主线。
 - 2026-04-19 已落 `app/runtime/delivery.py` Phase 1 基线：统一定义 `DeliveryItem` 内容模型和四渠道纯文本 fallback renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py` 得到 `4 passed`。
 - 2026-04-19 已把 `search_media` 成功候选回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py tests/test_search_media.py tests/test_private_chat_runtime.py -k "delivery or routes_search or writes_trace_log"` 得到通过，四渠道搜索回复开始按 `channel` 分开展示。
+- 2026-04-19 已把 `add_to_downloader` 的待确认下载回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_runtime.py -k "delivery_renderer or add_pending"` 得到通过，四渠道审批提示开始按 `channel` 分层展示。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 shared private-chat 内容模型、四渠道 renderer 和分层文本协议，不回退 cleanup 已确认的协议和 guardrail。
@@ -59,7 +60,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前 bot 回复仍主要来自字符串常量；`DeliveryItem` 和四渠道 fallback renderer 骨架虽已落地，但搜索结果 / 审批 / 状态回复还没真正接进现有 shared runtime。
+- 当前 bot 回复仍主要来自字符串常量；搜索结果和下载审批已接到 `DeliveryItem`，但状态回复和剩余 fail-closed 错误还没真正接进现有 shared runtime。
 - Telegram / Feishu / personal WeChat / WeCom 仍主要共享同一份裸文本，交付层次和渠道差异还没收口。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在交付体验主线里把展示层改成第二套业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。

@@ -14,6 +14,7 @@ from app.db.approval_repo import (
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.add_pending_context import (
     CANDIDATE_SOURCE_MISSING_TEXT,
     SELECT_LOOKUP_FAILED_TEXT,
@@ -86,6 +87,7 @@ APPROVAL_ROW_CORRUPTED_REASONS = frozenset(
         "approval row executed version corrupted after read",
     }
 )
+SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +163,7 @@ class AddToDownloaderService:
         selection_text: str,
         *,
         user_id: int | None = None,
+        channel: str | None = None,
         downloader_name: str = "",
         downloader_type: str = "transmission",
         download_dir: str = "",
@@ -174,7 +177,12 @@ class AddToDownloaderService:
         )
         if build_result.pending_add is None:
             return build_result.error_text
-        return self._persist_pending_add(chat_id=chat_id, user_id=user_id, pending_add=build_result.pending_add)
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=build_result.pending_add,
+            channel=channel,
+        )
 
     async def add_bt_source(
         self,
@@ -183,6 +191,7 @@ class AddToDownloaderService:
         source: str,
         title: str,
         user_id: int | None = None,
+        channel: str | None = None,
         downloader_name: str = "",
         downloader_type: str = "transmission",
         download_dir: str = "",
@@ -197,6 +206,7 @@ class AddToDownloaderService:
             source=cleaned_source,
             title=title,
             user_id=user_id,
+            channel=channel,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
@@ -210,6 +220,7 @@ class AddToDownloaderService:
         source: str,
         title: str,
         user_id: int | None = None,
+        channel: str | None = None,
         downloader_name: str = "",
         downloader_type: str = "transmission",
         download_dir: str = "",
@@ -225,7 +236,12 @@ class AddToDownloaderService:
         )
         if build_result.pending_add is None:
             return build_result.error_text
-        return self._persist_pending_add(chat_id=chat_id, user_id=user_id, pending_add=build_result.pending_add)
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=build_result.pending_add,
+            channel=channel,
+        )
 
     async def confirm_add_by_task_ref(
         self,
@@ -965,6 +981,7 @@ class AddToDownloaderService:
         chat_id: int,
         user_id: int | None,
         pending_add: PendingAddContext,
+        channel: str | None = None,
     ) -> str:
         expected_lease_version = self._record_pending_approval(
             task_ref=pending_add.task_ref,
@@ -1001,6 +1018,8 @@ class AddToDownloaderService:
             task_hash=pending_add.task_hash,
             detail=pending_add.title,
         )
+        if channel in SUPPORTED_DELIVERY_CHANNELS:
+            return render_add_pending_reply(pending_add=pending_add, channel=channel)
         return ADD_APPROVAL_PENDING_TEXT.format(title=pending_add.title, task_ref=pending_add.task_ref)
 
     def _record_pending_job(
@@ -1541,6 +1560,34 @@ class AddToDownloaderService:
             f"原因={error}\n"
             "\033[33m[处理建议]\033[0m 检查下载器地址、认证信息、目标目录和磁力链接后重试。"
         )
+
+
+def render_add_pending_reply(*, pending_add: PendingAddContext, channel: str) -> str:
+    return render_delivery_item(build_add_pending_delivery_item(pending_add), channel=channel)
+
+
+def build_add_pending_delivery_item(pending_add: PendingAddContext) -> DeliveryItem:
+    expire_minutes = max(1, DEFAULT_PENDING_TIMEOUT_SECONDS // 60)
+    return DeliveryItem(
+        header=DeliveryHeader(kind="approval", title="待确认：下载"),
+        sections=(
+            DeliverySection(
+                label="任务信息",
+                lines=(
+                    f"片名：{pending_add.title}",
+                    f"选择序号：{pending_add.task_ref}",
+                ),
+            ),
+        ),
+        actions=(
+            DeliveryAction(label="确认下载", hint=f"发送 confirm {pending_add.task_ref}", kind="primary"),
+            DeliveryAction(label="取消下载", hint=f"发送 cancel {pending_add.task_ref}", kind="secondary"),
+        ),
+        footer=f"过期时间：{expire_minutes} 分钟后",
+        status="pending",
+    )
+
+
 def _is_download_monitor_register_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
 

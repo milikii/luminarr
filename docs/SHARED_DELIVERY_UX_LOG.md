@@ -23,13 +23,16 @@
 
 ### 2.2 四渠道 renderer
 
+已完成闭环：
+- 已把 `add_to_downloader` 的待确认下载回复接到 `DeliveryItem`：shared runtime 在序号选片后会按 `channel` 输出分层审批提示，保留原有 approval / jobs / SQLite 真相和 fail-closed 文本常量不变。
+
 当前风险：
 - Telegram / personal WeChat / Feishu / WeCom 还没有按同一内容模型分开的 renderer；渠道差异目前主要靠裸文本常量承接。
 
 ### 2.3 错误与动作分层
 
 当前风险：
-- 失败原因、处理建议和下一步动作仍经常揉在同一段字符串里；本轮要先把可读层次拉出来，不改 workflow 真相。
+- `get_download_status` 和剩余 fail-closed 错误文本还没接到 `DeliveryItem`；失败原因、处理建议和下一步动作仍经常揉在同一段字符串里。
 
 ## 3. Focused verification
 
