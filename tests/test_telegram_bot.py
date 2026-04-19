@@ -3114,6 +3114,61 @@ def test_handle_message_bt_batch_preview_routes_to_raw_search() -> None:
     assert "当前预览范围：1,2" in sent_text
 
 
+def test_handle_message_bt_batch_confirm_routes_to_pending_downloads() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "Frieren S01E01"
+        return [
+            {
+                "title": "title-Frieren S01E01",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+            {
+                "title": "title-Frieren S01E02",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+        ]
+
+    search_service = SearchMediaService(_fake_search, raw_search_func=fake_raw_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                DOWNLOADER_ROLE_BINDING_KEY: DownloaderRoleBinding(pt_downloader="", bt_downloader=""),
+                DOWNLOADER_INSTANCES_KEY: (
+                    DownloaderInstanceConfig(name="", downloader_type="transmission", base_url="", download_dir="/downloads"),
+                ),
+            }
+        )
+    )
+
+    preview_update, preview_reply = _build_update("bt批量 Frieren S01E01 1-2")
+    asyncio.run(handle_message(preview_update, context))
+    assert preview_reply.await_count == 1
+
+    confirm_update, confirm_reply = _build_update("bt批量确认 1-2")
+    asyncio.run(handle_message(confirm_update, context))
+
+    confirm_reply.assert_awaited_once()
+    sent_text = confirm_reply.await_args.args[0]
+    assert sent_text.count("待确认：下载 ⏳") == 2
+    assert "片名：title-Frieren S01E01" in sent_text
+    assert "片名：title-Frieren S01E02" in sent_text
+    assert "确认下载：发送 confirm 1" in sent_text
+    assert "确认下载：发送 confirm 2" in sent_text
+
+
 def test_handle_message_confirm_routes_to_import_service() -> None:
     update, reply_text = _build_update("confirm 87")
     search_service = SearchMediaService(_fake_search)

@@ -2,7 +2,7 @@
 
 ## Current goal
 
-- 当前进行中的 promoted 主线是 **BT 批量任务显式批量确认**。上一阶段 `bt批量 / bt batch` 的确定性批量预览已落地，当前阶段只补“显式批量确认 -> 复用既有下载确认链”这一条最小闭环。
+- 当前进行中的 promoted 主线是 **BT 批量任务显式批量确认**。2026-04-19 已满足 `Done when` 第 1 条：`bt批量确认 / bt batch confirm` 已能把已预览候选映射回现有下载确认链；本轮闭环已完成，下一次继续时按 `After this step` 第 1 项重开新主线，不在这份文件继续拆微分流。
 - 2026-04-19 已完成上一阶段 **BT 批量任务最小预览**：`bt批量 / bt batch` 已能解析范围、读取 BT 候选并回只读批量预览文本；focused tests 为 `9 passed, 200 deselected`。
 - 再上一条已完成主线是 **PT live seeding 真相接入 cleanup 阻断**。冷启动审计已确认它满足文档出口；详细蓝图继续看 `docs/PT_LIVE_SEEDING_PLAN.md`。
 - 更早一条已完成主线是 **`.ass` 字幕最小支持**。2026-04-19 已补齐 `.srt` + 最小 `.ass` 字幕翻译路径，focused tests 为 `10 passed`，导入后字幕 focused tests 为 `2 passed, 140 deselected`；详细闭环继续看 `docs/SERIES_ANIME_NAMING_LOG.md` 2.3。

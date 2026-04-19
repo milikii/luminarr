@@ -115,7 +115,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前进行中的 promoted 主线是 BT 批量任务显式批量确认；`bt批量 / bt batch` 的确定性批量预览已完成，当前补“显式批量确认 -> 复用既有下载确认链”。
+- **当前施工状态**：当前进行中的 promoted 主线是 BT 批量任务显式批量确认；`bt批量 / bt batch` 预览和 `bt批量确认 / bt batch confirm` 显式批量确认都已落地，当前主线已满足 focused exit。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
 - **当前主线蓝图**：`docs/BT_BATCH_PLAN.md`

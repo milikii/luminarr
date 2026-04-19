@@ -47,6 +47,7 @@ class AddPendingContextBuilder:
         downloader_name: str = "",
         downloader_type: str = "transmission",
         download_dir: str = "",
+        auto_import_enabled: bool = True,
     ) -> PendingAddBuildResult:
         index = _parse_selection_index(selection_text)
         if index is None:
@@ -77,6 +78,7 @@ class AddPendingContextBuilder:
                 downloader_name=downloader_name,
                 downloader_type=downloader_type,
                 download_dir=download_dir,
+                auto_import_enabled=auto_import_enabled,
             )
         )
 

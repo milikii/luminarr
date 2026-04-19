@@ -238,6 +238,32 @@ def test_search_bt_batch_preview_and_format_empty_query() -> None:
     assert text == BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT
 
 
+def test_search_bt_batch_preview_and_format_for_chat_caches_candidates() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "dune bt"
+        return [
+            {
+                "title": "Dune 2021 1080p",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            },
+            {
+                "title": "Dune 2021 720p",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            },
+        ]
+
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=fake_raw_search)
+    _run(
+        service.search_bt_batch_preview_and_format_for_chat(
+            BTBatchPreviewRequest(query="dune bt", selected_indexes=(1, 2), selection_text="1-2"),
+            chat_id=1001,
+        )
+    )
+
+    assert service.get_cached_candidate(1001, 1) is not None
+    assert service.get_cached_candidate(1001, 2) is not None
+
+
 def test_search_bt_read_only_and_format_logs_raw_search_failure(capsys) -> None:
     async def fake_raw_search(_: str) -> list[dict[str, object]]:
         raise RuntimeError("bt source unavailable")

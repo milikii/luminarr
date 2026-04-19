@@ -27,6 +27,13 @@ class BTBatchPreviewSelectionResult:
     out_of_range: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class BTBatchConfirmRequest:
+    selection_text: str
+    selected_indexes: tuple[int, ...] = ()
+    invalid_selection: bool = False
+
+
 def extract_bt_search_query(text: str) -> str:
     cleaned_text = text.strip()
     if not cleaned_text or cleaned_text.lower().startswith("magnet:?"):
@@ -82,6 +89,27 @@ def select_batch_preview_candidates(
         available_count=len(deduplicated_results),
         selected_indexes=tuple(range(1, len(limited_candidates) + 1)),
     )
+
+
+def extract_bt_batch_confirm_request(text: str) -> BTBatchConfirmRequest | None:
+    cleaned_text = re.sub(r"\s+", " ", text.strip())
+    if not cleaned_text:
+        return None
+
+    lowered_text = cleaned_text.lower()
+    for prefix in ("bt批量确认 ", "bt batch confirm "):
+        if lowered_text.startswith(prefix):
+            selection_text = cleaned_text[len(prefix) :].strip()
+            if not selection_text:
+                return BTBatchConfirmRequest(selection_text="")
+            selected_indexes = _parse_bt_batch_selection(selection_text)
+            if selected_indexes is None:
+                return BTBatchConfirmRequest(selection_text=selection_text, invalid_selection=True)
+            return BTBatchConfirmRequest(
+                selection_text=selection_text,
+                selected_indexes=selected_indexes,
+            )
+    return None
 
 
 def pick_single_item_candidate(

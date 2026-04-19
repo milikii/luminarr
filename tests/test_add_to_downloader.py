@@ -79,6 +79,27 @@ def test_add_by_selection_uses_delivery_renderer_for_personal_wechat_channel() -
     assert reply.endswith(f"过期时间：{DEFAULT_PENDING_TIMEOUT_SECONDS // 60} 分钟后")
 
 
+def test_add_by_batch_selection_returns_multiple_pending_approvals_for_bt_batch() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    search_service._recent_candidates_by_chat[1001] = [
+        {
+            "title": "Dune: Part Two",
+            "downloadUrl": "https://example.com/dune.torrent",
+        },
+        {
+            "title": "Dune: Part One",
+            "downloadUrl": "https://example.com/dune-1.torrent",
+        },
+    ]
+
+    service = AddToDownloaderService(search_service=search_service, add_torrent_func=AsyncMock())
+
+    reply = _run(service.add_by_batch_selection(1001, (1, 2), auto_import_enabled=False))
+
+    assert ADD_APPROVAL_PENDING_TEXT.format(title="Dune: Part Two", task_ref="1") in reply
+    assert ADD_APPROVAL_PENDING_TEXT.format(title="Dune: Part One", task_ref="2") in reply
+
+
 def test_confirm_add_by_task_ref_dispatches_download() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     _run(search_service.search_and_format("dune", chat_id=1001))

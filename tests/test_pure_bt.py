@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from app.services.bt_candidate_scorer import BTScoringRules
 from app.services.pure_bt import (
+    BTBatchConfirmRequest,
     BTBatchPreviewRequest,
+    extract_bt_batch_confirm_request,
     extract_bt_batch_preview_request,
     extract_bt_search_query,
     pick_single_item_candidate,
@@ -32,6 +34,15 @@ def test_extract_bt_batch_preview_request_marks_invalid_selection() -> None:
         query="Frieren",
         selection_text="3-1",
         invalid_selection=True,
+    )
+
+
+def test_extract_bt_batch_confirm_request_parses_selection() -> None:
+    request = extract_bt_batch_confirm_request("bt批量确认 1-3")
+
+    assert request == BTBatchConfirmRequest(
+        selection_text="1-3",
+        selected_indexes=(1, 2, 3),
     )
 
 

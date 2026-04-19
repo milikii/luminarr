@@ -338,12 +338,53 @@ async def handle_private_chat_query_text(
         try:
             reply = await execution_gate.run(
                 tg.ACTION_BT_READ_ONLY_HELPER,
-                lambda: search_service.search_bt_batch_preview_and_format(bt_batch_preview_request),
+                lambda: search_service.search_bt_batch_preview_and_format_for_chat(
+                    bt_batch_preview_request,
+                    chat_id=chat_id,
+                ),
             )
         except Exception as error:
             tg._log_bt_read_only_helper_error(query=bt_batch_preview_request.query, error=error)
             await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
             return
+        await reply_func(reply)
+        return
+
+    bt_batch_confirm_request = tg._extract_bt_batch_confirm_request(query)
+    if bt_batch_confirm_request is not None:
+        if not bt_batch_confirm_request.selection_text:
+            await reply_func("BT 批量确认格式：bt批量确认 1-3")
+            return
+        if bt_batch_confirm_request.invalid_selection:
+            await reply_func(
+                f"BT 批量确认编号格式无效：{bt_batch_confirm_request.selection_text}\n"
+                "请使用 1-3 或 2,4,6 这类范围表达。"
+            )
+            return
+        add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+        if not isinstance(add_service, tg.AddToDownloaderService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        if chat_id is None:
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        downloader_execution, resolution_error = tg._resolve_bound_downloader_execution(context=context, role="bt")
+        if resolution_error is not None:
+            await reply_func(resolution_error)
+            return
+        reply = await execution_gate.run(
+            tg.ACTION_ADD_TO_DOWNLOADER,
+            lambda: add_service.add_by_batch_selection(
+                chat_id,
+                bt_batch_confirm_request.selected_indexes,
+                user_id=user_id,
+                channel=channel,
+                downloader_name=downloader_execution.name if downloader_execution is not None else "",
+                downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+                download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
+                auto_import_enabled=False,
+            ),
+        )
         await reply_func(reply)
         return
 

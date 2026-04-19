@@ -91,7 +91,14 @@ from app.services.import_to_library import (
 )
 from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
 from app.services.post_download_auto_import import PostDownloadAutoImportService
-from app.services.pure_bt import BTBatchPreviewRequest, extract_bt_batch_preview_request, extract_bt_search_query, pick_single_item_candidate
+from app.services.pure_bt import (
+    BTBatchConfirmRequest,
+    BTBatchPreviewRequest,
+    extract_bt_batch_confirm_request,
+    extract_bt_batch_preview_request,
+    extract_bt_search_query,
+    pick_single_item_candidate,
+)
 from app.services.search_media import SearchMediaService, parse_movie_query
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
@@ -913,6 +920,10 @@ def _extract_bt_read_only_query(text: str) -> str:
 
 def _extract_bt_batch_preview_request(text: str) -> BTBatchPreviewRequest | None:
     return extract_bt_batch_preview_request(text)
+
+
+def _extract_bt_batch_confirm_request(text: str) -> BTBatchConfirmRequest | None:
+    return extract_bt_batch_confirm_request(text)
 
 
 def _log_telegram_update_record_failed(

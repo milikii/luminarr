@@ -132,6 +132,14 @@ class SearchMediaService:
         return format_bt_read_only_reply(cleaned_query, selected_raw_results)
 
     async def search_bt_batch_preview_and_format(self, request: BTBatchPreviewRequest) -> str:
+        return await self.search_bt_batch_preview_and_format_for_chat(request, chat_id=None)
+
+    async def search_bt_batch_preview_and_format_for_chat(
+        self,
+        request: BTBatchPreviewRequest,
+        *,
+        chat_id: int | None,
+    ) -> str:
         cleaned_query = normalize_spaces(request.query)
         if not cleaned_query:
             return BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT
@@ -146,6 +154,10 @@ class SearchMediaService:
                 available_count=selection.available_count,
             )
         selected_raw_results = [_to_candidate_dict(item) for item in selection.candidates]
+        if chat_id is not None:
+            persist_error_text = self._cache_bt_batch_preview_candidates(chat_id=chat_id, candidates=selected_raw_results)
+            if persist_error_text:
+                return persist_error_text
         selection_label = _format_bt_batch_preview_selection_label(selection.selected_indexes)
         return format_bt_batch_preview_reply(cleaned_query, selected_raw_results, selection_label=selection_label)
 
@@ -278,6 +290,34 @@ class SearchMediaService:
 
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
         return self.get_cached_candidate_load_result(chat_id, index).candidate
+
+    def _cache_bt_batch_preview_candidates(self, *, chat_id: int, candidates: list[dict[str, Any]]) -> str:
+        self._recent_candidates_by_chat[chat_id] = candidates
+        if self._candidate_repo is None:
+            return ""
+        try:
+            self._candidate_repo.save_candidates(chat_id, candidates)
+        except Exception as error:
+            print(
+                f"\033[31m[BT 批量预览候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 写入是否正常；"
+                "当前会直接返回候选状态写入失败，避免把坏候选继续暴露给批量确认入口。",
+                flush=True,
+            )
+            self._recent_candidates_by_chat.pop(chat_id, None)
+            try:
+                cleared_result = self._candidate_repo.clear_candidates(chat_id)
+                if cleared_result is None:
+                    raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
+            except Exception as rollback_error:
+                print(
+                    f"\033[31m[BT 批量预览候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
+                    "\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 删除是否正常；"
+                    "当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
+                    flush=True,
+                )
+            return CANDIDATE_STATE_UNAVAILABLE_TEXT
+        return ""
 
     def get_cached_candidate_load_result(self, chat_id: int, index: int) -> CandidateLoadResult:
         if index < 1:

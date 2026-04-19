@@ -167,6 +167,7 @@ class AddToDownloaderService:
         downloader_name: str = "",
         downloader_type: str = "transmission",
         download_dir: str = "",
+        auto_import_enabled: bool = True,
     ) -> str:
         build_result = self._pending_context_builder.build_from_selection(
             chat_id=chat_id,
@@ -174,6 +175,7 @@ class AddToDownloaderService:
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
         )
         if build_result.pending_add is None:
             return build_result.error_text
@@ -183,6 +185,44 @@ class AddToDownloaderService:
             pending_add=build_result.pending_add,
             channel=channel,
         )
+
+    async def add_by_batch_selection(
+        self,
+        chat_id: int,
+        selection_indexes: tuple[int, ...],
+        *,
+        user_id: int | None = None,
+        channel: str | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> str:
+        pending_adds: list[PendingAddContext] = []
+        for index in selection_indexes:
+            build_result = self._pending_context_builder.build_from_selection(
+                chat_id=chat_id,
+                selection_text=str(index),
+                downloader_name=downloader_name,
+                downloader_type=downloader_type,
+                download_dir=download_dir,
+                auto_import_enabled=auto_import_enabled,
+            )
+            if build_result.pending_add is None:
+                return build_result.error_text
+            pending_adds.append(build_result.pending_add)
+
+        replies: list[str] = []
+        for pending_add in pending_adds:
+            replies.append(
+                self._persist_pending_add(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    pending_add=pending_add,
+                    channel=channel,
+                )
+            )
+        return "\n\n".join(replies)
 
     async def add_bt_source(
         self,
