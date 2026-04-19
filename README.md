@@ -12,10 +12,12 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 2. `docs/GETTING_STARTED.md`
 3. `docs/ARCHITECTURE.md`
 
+想直接部署，先看 `docs/DEPLOY_CHECKLIST.md`。
+
 如果你想直接跑：
 
 1. 复制 `.env.example` 为 `.env`
-2. 按 `docs/GETTING_STARTED.md` 填配置
+2. 先按 `docs/DEPLOY_CHECKLIST.md` 的 Phase 0-3 走最短路径；需要细节时再翻 `docs/GETTING_STARTED.md`
 3. 用 `make run` / `docker compose up -d`，或 `set -a && . ./.env && set +a && .venv/bin/python -m app.main` 启动
 
 当前最小启动真相：
@@ -106,17 +108,18 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
 - cleanup 当前还没有 PT 做种状态 / `pt_min_seed_hours` 保护校验；cleanup 验证窗口退出前必须把这条风险确认清楚。
-- 当前最稳的是 movie-first；`shared private-chat` 交付体验主线已完成，当前缺口转到最小人类可用入口（quick start / 配置模板 / 首个渠道 10 分钟跑通）。
+- 当前最稳的是 movie-first；quick start 主线已完成，当前缺口转到 BT 共享确定性评分器。
 - 字幕翻译当前仍只处理 `.srt`；`.ass` 继续保留为后续能力缺口，不阻塞当前主线切换。
 - BT 路线已可用，但还没升级成共享确定性评分器。
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：最小人类可用入口继续补齐，按 `docs/QUICK_START_PLAN.md` 推进。
+- **当前唯一主线**：BT 共享确定性评分器，按 `docs/BT_SCORING_PLAN.md` 推进。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/QUICK_START_PLAN.md`
-- **当前主线交付物**：`docs/DEPLOY_CHECKLIST.md`
+- **当前主线蓝图**：`docs/BT_SCORING_PLAN.md`
+- **刚完成的部署主线蓝图**：`docs/QUICK_START_PLAN.md`
+- **刚完成的部署主线交付物**：`docs/DEPLOY_CHECKLIST.md`
 - **上一条主线台账**：`docs/SERIES_ANIME_NAMING_LOG.md`（`series / anime` 名称解析主线已在 2026-04-19 达到退出条件 1）
 - **上一条主线台账**：`docs/APP_MAIN_SLIMMING_LOG.md`（`app/main.py` 瘦身主线已在 2026-04-19 达到退出条件 1）
 - **再上一条主线台账**：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（shared runtime 编排层瘦身主线已在 2026-04-19 达到退出条件 2）
@@ -131,9 +134,9 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
 - **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前主线入口看 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`；刚完成的 `series / anime` 主线回归入口见 `docs/SERIES_ANIME_NAMING_LOG.md`。
-- 这一步只允许收部署入口、配置模板和部署者文档，不顺手改 workflow 真相、下载器、cleanup 或其他编排层。
-- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（BT 共享确定性评分器 → 等等）。
+- **本地回归命令**：当前主线入口看 `docs/BT_SCORING_PLAN.md`；刚完成的部署主线入口看 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`。
+- 这一步只允许收 BT 候选预过滤、确定性评分和共享 helper 接入，不顺手改 approval、dispatch、import、cleanup 或其他 workflow 真相。
+- 当前主线完成后，按 `docs/NEXT_STEP.md` 的 `After this step` 编号顺序推进（Jellyfin / Plex → plugin 体系后置）。
 
 ## 6. 当前明确不做
 
@@ -183,10 +186,11 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/QUICK_START_PLAN.md`：当前主线蓝图
-- `docs/DEPLOY_CHECKLIST.md`：当前主线交付物
-- `docs/SHARED_DELIVERY_UX_PLAN.md`：刚完成主线蓝图
-- `docs/SHARED_DELIVERY_UX_LOG.md`：刚完成主线详细闭环
+- `docs/BT_SCORING_PLAN.md`：当前主线蓝图
+- `docs/QUICK_START_PLAN.md`：刚完成的部署主线蓝图
+- `docs/DEPLOY_CHECKLIST.md`：刚完成的部署主线交付物
+- `docs/SHARED_DELIVERY_UX_PLAN.md`：更早完成主线蓝图
+- `docs/SHARED_DELIVERY_UX_LOG.md`：更早完成主线详细闭环
 - `docs/SERIES_ANIME_NAMING_LOG.md`：刚完成的上一条主线详细闭环
 - `docs/APP_MAIN_SLIMMING_LOG.md`：上一条主线详细闭环
 - `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：再上一条主线详细闭环

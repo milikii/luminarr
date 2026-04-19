@@ -43,66 +43,19 @@ cp .env.example .env
 
 然后手动编辑 `.env`。
 
-如果你只想让应用先跑起来并做最小本地测试，至少填这些：
+如果你只想走最短路径，不要在这里重复抄配置清单，直接看 `docs/DEPLOY_CHECKLIST.md` 的 `Phase 0-3`，再按 `.env.example` 分组填值。
 
-- `TELEGRAM_BOT_TOKEN`
-- `PROWLARR_BASE_URL`
-- `PROWLARR_API_KEY`
-- `TRANSMISSION_BASE_URL`
+这里只补几个最容易忘的约束：
 
-说明：
+- 当前启动硬必填仍是 `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL`
+- 如果你还要跑 import / refresh 联调，再补 `LIBRARY_TARGET_DIR`、`EMBY_BASE_URL`、`EMBY_API_KEY`
+- 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
+- `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；如果你填了多实例但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
+- Feishu / WeCom 三元组都必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
 
-- 当前 `TELEGRAM_BOT_TOKEN` 是启动硬必填，不是“只在你要用 Telegram 时才需要”
-- 如果你在 WSL 里启动，但 Telegram / TMDB / Fanart / OpenAI / BT 外站 这类公网请求不能直连，可以额外填写 `OUTBOUND_PROXY_URL`
-- `OUTBOUND_PROXY_URL` 当前支持 `http://...`、`https://...`、`socks5://...`；例如 `http://192.168.2.110:7890`
-- 这条代理当前只给 Telegram 和公网 HTTP client 使用；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
-- 当前 `TMDB_API_KEY` 不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
-- 当前 `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；它只是多实例路由补充配置
-- 如果你配置了 `DOWNLOADER_INSTANCES` 但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
-
-如果你还要跑 import / refresh 联调，再补这些：
-
-- `LIBRARY_TARGET_DIR`
-- `EMBY_BASE_URL`
-- `EMBY_API_KEY`
-
-如果你还要用 Telegram 私聊入口，再补：
-
-- `TELEGRAM_BOT_TOKEN`
-
-如果你现在的本机状态就是：
-
-- Transmission 已在 `http://127.0.0.1:19091` 跑着
-- Emby 已在 `http://127.0.0.1:18096` 跑着
-- 你只想先打通 Telegram 私聊最小链路
-
-那 `.env` 最小组合就是：
-
-- `TELEGRAM_BOT_TOKEN`
-- `PROWLARR_BASE_URL`
-- `PROWLARR_API_KEY`
-- `TRANSMISSION_BASE_URL=http://127.0.0.1:19091`
-
-如果这台 WSL 机器不能直接连 Telegram Bot API，但你宿主机或旁路由已经提供了 HTTP / SOCKS5 代理，再额外补：
-
-- `OUTBOUND_PROXY_URL=http://192.168.2.110:7890`
-
-如果你还想顺手验证 import / refresh，再在上面补：
-
-- `LIBRARY_TARGET_DIR=/data/library/movies`
-- `EMBY_BASE_URL=http://127.0.0.1:18096`
-- `EMBY_API_KEY`
-
-如果你要补 Feishu / WeCom 真实私聊 smoke，再补各自 webhook 三元组。
-这两组三元组都必须“要么都空，要么都填”，不能只填一部分。
-personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动。
 补 WeCom 真实私聊 smoke 前，可以先在 `app.main` 已运行的前提下，用 `curl -si http://127.0.0.1:18889/wecom/callback` 确认本地 callback 已经监听；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 里的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于入口已就绪，不等于真实私聊 smoke 已完成；如果直接拿到 `connection refused`，先回头确认应用是否真的已启动。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改，不要死抄这里的样例。
 
-如果你要跑 Feishu，但不想额外折腾公网 HTTPS 回调，可以把：
-
-- `FEISHU_INBOUND_MODE=long_connection`
-
-这样 Feishu 入站会改走官方 SDK 长连接；这时 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET` 仍然必填，但 `FEISHU_ENCRYPT_KEY` 可以留空。
+如果你要跑 Feishu，但不想额外折腾公网 HTTPS 回调，可以把 `FEISHU_INBOUND_MODE=long_connection`；这时 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET` 仍然必填，但 `FEISHU_ENCRYPT_KEY` 可以留空。
 
 ## 4. 启动本地测试栈（需要真实 import / refresh 时）
 
@@ -354,5 +307,5 @@ make run
 - 想理解“代码为什么这么分”：读 `docs/ARCHITECTURE.md`
 - 想知道“当前正在做什么”：读 `docs/NEXT_STEP.md`
 - 想知道“现在做到哪里”：先读 `docs/STATUS.md`
-- 想看“当前主线蓝图和部署者最短路径”：先读 `docs/QUICK_START_PLAN.md`，再读 `docs/DEPLOY_CHECKLIST.md`；刚完成的 shared delivery 主线看 `docs/SHARED_DELIVERY_UX_LOG.md`；刚完成的 `series / anime` 主线看 `docs/SERIES_ANIME_NAMING_LOG.md`；更早完成的 `app/main.py` 主线看 `docs/APP_MAIN_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
+- 想看“当前主线蓝图和刚完成的部署入口”：先读 `docs/BT_SCORING_PLAN.md`，再读 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`；更早完成的 shared delivery 主线看 `docs/SHARED_DELIVERY_UX_LOG.md`；更早完成的 `series / anime` 主线看 `docs/SERIES_ANIME_NAMING_LOG.md`；更早完成的 `app/main.py` 主线看 `docs/APP_MAIN_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - 想看“所有文档地图”：读 `docs/INDEX.md`
