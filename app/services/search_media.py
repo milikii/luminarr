@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.clients.web_source import is_supported_web_source_page_url, looks_like_http_url
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
@@ -26,7 +27,11 @@ NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
 BT_READ_ONLY_EMPTY_QUERY_TEXT = "BT 只读探索格式：bt搜 <关键词>"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
 BT_READ_ONLY_NOTICE_TEXT = "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。"
-BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT = "BT 批量预览格式：bt批量 <关键词> [1-3,5]"
+BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT = "BT 批量预览格式：bt批量 <关键词或 allowlist 页面 URL> [1-3,5]"
+BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE = (
+    "BT 批量预览暂不支持这个页面：{query}\n"
+    "请提供当前 allowlist 站点已声明的用户页或搜索结果页 URL。"
+)
 BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE = (
     "BT 批量预览编号格式无效：{selection}\n"
     "请使用 1-3 或 2,4,6 这类范围表达。"
@@ -64,6 +69,10 @@ CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON = "candidate clear result 
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 
 
+class UnsupportedBatchPreviewPageUrl(ValueError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class Candidate:
     title: str
@@ -95,6 +104,7 @@ class SearchMediaService:
         self,
         search_func: SearchFunc,
         raw_search_func: SearchFunc | None = None,
+        raw_page_search_func: SearchFunc | None = None,
         limit: int = 5,
         candidate_repo: CandidateMappingRepo | None = None,
         clarification_repo: ClarificationRepo | None = None,
@@ -102,6 +112,7 @@ class SearchMediaService:
     ) -> None:
         self._search_func = search_func
         self._raw_search_func = raw_search_func or search_func
+        self._raw_page_search_func = raw_page_search_func
         self._limit = max(1, limit)
         self._candidate_repo = candidate_repo
         self._clarification_repo = clarification_repo
@@ -145,8 +156,10 @@ class SearchMediaService:
             return BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT
         if request.invalid_selection:
             return BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE.format(selection=request.selection_text or "-")
-
-        raw_results = await self.search_raw_candidates(cleaned_query)
+        try:
+            raw_results = await self._search_bt_batch_preview_candidates(cleaned_query)
+        except UnsupportedBatchPreviewPageUrl:
+            return BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE.format(query=cleaned_query)
         selection = select_batch_preview_candidates(raw_results, request=request, default_limit=self._limit)
         if selection.out_of_range:
             return BT_BATCH_PREVIEW_OUT_OF_RANGE_TEMPLATE.format(
@@ -160,6 +173,31 @@ class SearchMediaService:
                 return persist_error_text
         selection_label = _format_bt_batch_preview_selection_label(selection.selected_indexes)
         return format_bt_batch_preview_reply(cleaned_query, selected_raw_results, selection_label=selection_label)
+
+    async def _search_bt_batch_preview_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
+        if looks_like_http_url(query):
+            if not is_supported_web_source_page_url(query) or self._raw_page_search_func is None:
+                raise UnsupportedBatchPreviewPageUrl(query)
+            return await self._search_raw_page_candidates(query)
+        return await self.search_raw_candidates(query)
+
+    async def _search_raw_page_candidates(self, page_url: str) -> Sequence[Mapping[str, Any]]:
+        cleaned_page_url = page_url.strip()
+        if not cleaned_page_url:
+            return ()
+        if self._raw_page_search_func is None:
+            raise UnsupportedBatchPreviewPageUrl(cleaned_page_url)
+        try:
+            return await self._raw_page_search_func(cleaned_page_url)
+        except UnsupportedBatchPreviewPageUrl:
+            raise
+        except Exception as error:
+            print(
+                f"\033[31m[BT 页面预览失败]\033[0m 页面={cleaned_page_url} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
+                flush=True,
+            )
+            raise
 
     async def search_and_format(
         self,

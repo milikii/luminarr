@@ -3,7 +3,13 @@ from __future__ import annotations
 import asyncio
 import httpx
 
-from app.clients.web_source import NYAA_RULE, WebSourceClient, parse_web_source_html
+from app.clients.web_source import (
+    NYAA_RULE,
+    UnsupportedWebSourcePageError,
+    WebSourceClient,
+    is_supported_web_source_page_url,
+    parse_web_source_html,
+)
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, build_bt_candidate_dedupe_key
 
 
@@ -137,3 +143,49 @@ def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
     assert result == []
     assert client_kwargs
     assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
+
+
+def test_is_supported_web_source_page_url_accepts_nyaa_user_and_search_pages() -> None:
+    assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease")
+    assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&p=2")
+    assert not is_supported_web_source_page_url("https://nyaa.si/view/123")
+    assert not is_supported_web_source_page_url("https://example.com/?q=frieren")
+
+
+def test_web_source_client_search_page_rejects_unsupported_url() -> None:
+    client = WebSourceClient(rule=NYAA_RULE)
+
+    try:
+        asyncio.run(client.search_page("https://example.com/?q=frieren"))
+    except UnsupportedWebSourcePageError as error:
+        assert str(error) == "https://example.com/?q=frieren"
+    else:
+        raise AssertionError("expected UnsupportedWebSourcePageError")
+
+
+def test_bt_source_adapter_search_page_uses_page_provider() -> None:
+    async def unexpected_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("search provider should not be used for page preview")
+
+    async def page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?f=0&c=1_2&u=subsplease"
+        return [
+            {
+                "title": "Frieren S01E01 1080p",
+                "downloadUrl": "https://example.com/frieren-e01.torrent",
+                "seeders": 10,
+            }
+        ]
+
+    adapter = BtSourceAdapter(
+        (
+            BtSourceProvider(name="prowlarr", search_func=unexpected_search),
+            BtSourceProvider(name="websource", search_func=unexpected_search, page_search_func=page_search),
+        )
+    )
+
+    results = asyncio.run(adapter.search_page("https://nyaa.si/?f=0&c=1_2&u=subsplease"))
+
+    assert len(results) == 1
+    assert results[0]["title"] == "Frieren S01E01 1080p"
+    assert results[0]["indexerName"] == "websource"

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from html import unescape
 from typing import Any
-from urllib.parse import quote_plus, urljoin
+from urllib.parse import parse_qs, quote_plus, urljoin, urlparse
 
 import httpx
 
@@ -30,6 +30,10 @@ class WebSourceRule:
     name: str
     base_url: str
     search_path_template: str
+
+
+class UnsupportedWebSourcePageError(ValueError):
+    pass
 
 
 NYAA_RULE = WebSourceRule(
@@ -71,6 +75,21 @@ class WebSourceClient:
 
         return parse_web_source_html(response.text, rule=self._rule)
 
+    async def search_page(self, page_url: str) -> list[Mapping[str, Any]]:
+        cleaned_page_url = page_url.strip()
+        if not cleaned_page_url:
+            return []
+        if not is_supported_web_source_page_url(cleaned_page_url, rule=self._rule):
+            raise UnsupportedWebSourcePageError(cleaned_page_url)
+
+        try:
+            response = await self._get(cleaned_page_url)
+        except Exception as error:
+            _log_web_source_error(source_name=self._rule.name, query=cleaned_page_url, error=error)
+            return []
+
+        return parse_web_source_html(response.text, rule=self._rule)
+
     def _build_search_url(self, query: str) -> str:
         encoded_query = quote_plus(query)
         path = self._rule.search_path_template.format(query=encoded_query)
@@ -85,6 +104,24 @@ class WebSourceClient:
             response = await client.get(url)
         response.raise_for_status()
         return response
+
+
+def looks_like_http_url(text: str) -> bool:
+    cleaned_text = text.strip()
+    if not cleaned_text:
+        return False
+    parsed = urlparse(cleaned_text)
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def is_supported_web_source_page_url(url: str, *, rule: WebSourceRule | None = None) -> bool:
+    cleaned_url = url.strip()
+    if not looks_like_http_url(cleaned_url):
+        return False
+
+    if rule is not None:
+        return _is_supported_page_url_for_rule(cleaned_url, rule=rule)
+    return any(_is_supported_page_url_for_rule(cleaned_url, rule=item) for item in SUPPORTED_WEB_SOURCE_RULES.values())
 
 
 def parse_web_source_html(html: str, *, rule: WebSourceRule) -> list[dict[str, Any]]:
@@ -102,6 +139,22 @@ def parse_web_source_html(html: str, *, rule: WebSourceRule) -> list[dict[str, A
         candidate.update(_extract_metadata(row_html))
         candidates.append(candidate)
     return candidates
+
+
+def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:
+    parsed = urlparse(url.strip())
+    rule_host = urlparse(rule.base_url).netloc.lower()
+    if parsed.netloc.lower() != rule_host:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    if parsed.path not in {"", "/"}:
+        return False
+
+    query = parse_qs(parsed.query, keep_blank_values=False)
+    user_name = next((item.strip() for item in query.get("u", ()) if item.strip()), "")
+    search_text = next((item.strip() for item in query.get("q", ()) if item.strip()), "")
+    return bool(user_name or search_text)
 
 
 def _extract_title(row_html: str) -> str:

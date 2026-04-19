@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.clients.web_source import UnsupportedWebSourcePageError
 from app.services.media_name_parser import parse_media_name
 
 BtSourceSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -18,12 +19,17 @@ _MAGNET_INFO_HASH_PATTERN = re.compile(r"xt=urn:btih:([0-9a-z]{32,40})", re.IGNO
 class BtSourceProvider:
     name: str
     search_func: BtSourceSearchFunc
+    page_search_func: BtSourceSearchFunc | None = None
 
 
 class BtSourceAdapter:
     def __init__(self, providers: Sequence[BtSourceProvider]) -> None:
         self._providers = tuple(
-            BtSourceProvider(name=provider.name.strip(), search_func=provider.search_func)
+            BtSourceProvider(
+                name=provider.name.strip(),
+                search_func=provider.search_func,
+                page_search_func=provider.page_search_func,
+            )
             for provider in providers
             if provider.name.strip()
         )
@@ -58,6 +64,47 @@ class BtSourceAdapter:
                 merged_results.append(normalized_candidate)
         if merged_results or last_error is None:
             return merged_results
+        raise last_error
+
+    async def search_page(self, page_url: str) -> list[dict[str, Any]]:
+        cleaned_page_url = page_url.strip()
+        if not cleaned_page_url or not self._providers:
+            return []
+
+        merged_results: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        last_error: Exception | None = None
+        matched_provider = False
+        for provider in self._providers:
+            if provider.page_search_func is None:
+                continue
+            try:
+                raw_results = await provider.page_search_func(cleaned_page_url)
+            except UnsupportedWebSourcePageError:
+                continue
+            except Exception as error:
+                matched_provider = True
+                last_error = error
+                _log_bt_source_provider_page_error(provider_name=provider.name, page_url=cleaned_page_url, error=error)
+                continue
+            matched_provider = True
+            for index, candidate in enumerate(raw_results):
+                normalized_candidate = normalize_bt_candidate(
+                    candidate,
+                    provider_name=provider.name,
+                    provider_index=index,
+                )
+                if normalized_candidate is None:
+                    continue
+                dedupe_key = build_bt_candidate_dedupe_key(normalized_candidate)
+                if dedupe_key in seen_keys:
+                    continue
+                seen_keys.add(dedupe_key)
+                merged_results.append(normalized_candidate)
+        if merged_results or (matched_provider and last_error is None):
+            return merged_results
+        if not matched_provider:
+            raise UnsupportedWebSourcePageError(cleaned_page_url)
         raise last_error
 
 
@@ -166,4 +213,11 @@ def _log_bt_source_provider_error(*, provider_name: str, query: str, error: Exce
     print(
         f"\033[31m[BT 来源搜索失败]\033[0m 来源={provider_name} 查询={query} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查对应来源配置、站点可达性和网络连通性后重试。"
+    )
+
+
+def _log_bt_source_provider_page_error(*, provider_name: str, page_url: str, error: Exception) -> None:
+    print(
+        f"\033[31m[BT 页面预览失败]\033[0m 来源={provider_name} 页面={page_url} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。"
     )

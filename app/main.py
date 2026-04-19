@@ -130,7 +130,7 @@ def _build_bt_source_providers(
             )
             continue
         client = WebSourceClient(rule=rule, proxy_url=outbound_proxy_url)
-        providers.append(BtSourceProvider(name=rule.name, search_func=client.search))
+        providers.append(BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page))
     return tuple(providers)
 
 
@@ -243,6 +243,7 @@ def main() -> None:
     search_service = SearchMediaService(
         search_func=prowlarr_client.search,
         raw_search_func=bt_source_adapter.search,
+        raw_page_search_func=bt_source_adapter.search_page,
         candidate_repo=candidate_repo,
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
