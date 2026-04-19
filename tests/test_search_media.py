@@ -579,6 +579,43 @@ def test_search_bt_batch_preview_and_format_uses_page_fetch_for_user_sort_page_n
     assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="1") in text
 
 
+def test_search_bt_batch_preview_and_format_uses_page_fetch_for_search_sort_page() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist search sort page")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc"
+        return [
+            {
+                "title": "Frieren S01E20 1080p",
+                "source": "magnet:?xt=urn:btih:2020202020202020202020202020202020202020",
+                "seeders": 28,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(
+                query="https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc",
+                selected_indexes=(1,),
+                selection_text="1",
+            )
+        )
+    )
+
+    assert "BT 批量预览结果：https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc" in text
+    assert "1. Frieren S01E20 1080p" in text
+    assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="1") in text
+
+
 def test_search_bt_batch_preview_and_format_rejects_unsupported_page_url() -> None:
     service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
     text = _run(
@@ -625,6 +662,21 @@ def test_search_bt_batch_preview_and_format_rejects_user_sort_page_missing_order
     )
 
     assert text == "BT 批量预览暂不支持这个页面：https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders\n请提供当前 allowlist 站点已声明的用户页、列表页或搜索结果页 URL。"
+
+
+def test_search_bt_batch_preview_and_format_rejects_search_sort_page_missing_order() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(
+                query="https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders",
+                selected_indexes=(1,),
+                selection_text="1",
+            )
+        )
+    )
+
+    assert text == "BT 批量预览暂不支持这个页面：https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders\n请提供当前 allowlist 站点已声明的用户页、列表页或搜索结果页 URL。"
 
 
 def test_search_bt_batch_preview_and_format_rejects_category_sort_page_number_syntax_missing_order() -> None:

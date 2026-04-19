@@ -150,6 +150,7 @@ def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
 def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages() -> None:
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&p=2")
+    assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?s=seeders&o=desc")
@@ -159,6 +160,7 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pag
     assert not is_supported_web_source_page_url("https://nyaa.si/?offset=32")
     assert not is_supported_web_source_page_url("https://nyaa.si/?s=seeders")
     assert not is_supported_web_source_page_url("https://nyaa.si/?c=1_2&s=seeders")
+    assert not is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders")
     assert not is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders")
     assert not is_supported_web_source_page_url("https://example.com/?q=frieren")
 
