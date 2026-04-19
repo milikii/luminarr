@@ -5,7 +5,7 @@
 
 ## 1. Current line
 
-- 当前主线状态：2026-04-19 已把 `.ass` 字幕最小支持重新提升成进行中的 promoted 主线；本轮只允许在 2.3 里继续补“识别 `.ass` -> 提取 `Dialogue:` 文本 -> 回写 `.zh.ass`”这一条最小闭环，不回退 2.1 / 2.2 已完成出口。
+- 当前主线状态：2026-04-19 `.ass` 字幕最小支持已通过 focused tests 收口；当前唯一主线已切到 `docs/PT_LIVE_SEEDING_PLAN.md`。
 - 上一条已完成主线“`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化”已在 2026-04-19 通过 `app/downloader_route_lookup.py` helper 抽离满足 `Done when` 第 1 条，focused tests `16 passed, 1 deselected`
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/SERIES_ANIME_NAMING_PLAN.md`
 

@@ -115,16 +115,16 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前进行中的 promoted 主线是 `.ass` 字幕最小支持；目标是在不放大边界的前提下，把导入后字幕翻译从 `.srt` 补到 `.srt` + 最小 `.ass`。
+- **当前施工状态**：当前进行中的 promoted 主线是 PT live seeding 真相接入 cleanup 阻断；目标是在不放宽 fail-closed 的前提下，把 downloader 当前做种真相接到 `pt_min_seed_hours` 判断。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/SERIES_ANIME_NAMING_PLAN.md`（看 §7 `.ass` 字幕同步评估）
+- **当前主线蓝图**：`docs/PT_LIVE_SEEDING_PLAN.md`
 - **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
 - **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前 `.ass` 主线入口看 `docs/NEXT_STEP.md`；更细的验证入口和历史闭环看 `docs/STATUS.md` 与 `docs/SERIES_ANIME_NAMING_LOG.md`
-- 当前只允许围绕 `.ass` 最小支持施工，不顺手放大到 `.ssa`、OCR、嵌入字幕或新的 workflow 真相。
+- **本地回归命令**：当前 PT live seeding 主线入口看 `docs/NEXT_STEP.md`；`.ass` 历史闭环继续看 `docs/SERIES_ANIME_NAMING_LOG.md`
+- 当前只允许围绕 PT live seeding 真相施工，不顺手放大到 cleanup 自动化、乐观放行或新的 workflow 真相。
 
 ## 6. 当前明确不做
 
