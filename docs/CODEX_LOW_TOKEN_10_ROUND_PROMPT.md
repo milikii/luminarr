@@ -22,8 +22,9 @@
 第 1 轮先做冷启动一致性检查：
 1. 读取 `AGENTS.md`、`docs/INDEX.md`、`docs/ARCHITECTURE.md`、`docs/NEXT_STEP.md`、`docs/DECISIONS.md`、`docs/STATUS.md`
 2. 运行 `git log --oneline -20`
-3. 对比 `docs/STATUS.md`
-4. 如果发现文档漂移，第 1 轮只补文档，不改业务代码
+3. 对比 `docs/STATUS.md` 与近 20 条提交是否一致
+4. 核对 `docs/NEXT_STEP.md` 当前 `Done when` 可测量退出条件是否已满足，不要把旧主线的专用检查项硬套到新主线
+5. 如果发现文档漂移，第 1 轮只补文档，不改业务代码
 
 第 2-10 轮不要机械重读全文。默认只读：
 1. `AGENTS.md`
@@ -51,7 +52,7 @@
 文档写作要求：
 1. 不要把长台账再写回 `docs/STATUS.md`
 2. `docs/STATUS.md` 只保留当前快照
-3. 当前主线的详细闭环、focused tests、commit 轨迹优先写入 `docs/PERSISTENCE_CLOSURE_LOG.md`
+3. 当前主线的详细闭环、focused tests、commit 轨迹写回对应主线 plan / log；只有明确要求合并进 `docs/PERSISTENCE_CLOSURE_LOG.md` 既有分组时，才继续合并，不新开逐日小节
 4. cleanup 已完成窗口的详细证据只写入 `docs/CLEANUP_VERIFICATION_WINDOW.md`
 5. 不要在汇报里大段复述文档原文，只用 1-2 句中文概括当前真相
 
