@@ -77,4 +77,4 @@
 - 新开会话时直接把上面的 `Prompt` 整段贴给 Codex。
 - 每跑完 10 轮就新开一次会话；新会话只补 `最新 commit hash + docs/STATUS.md + docs/PERSISTENCE_CLOSURE_LOG.md`，不要把旧线程全文当上下文继续叠。
 - 如果当前任务和 cleanup 已完成窗口无关，不要额外要求它重读 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- 如果只想跑 3-5 轮，把首段里的“默认连续执行 10 轮”改成对应轮数即可。
+- 如果只想跑 3 轮，优先直接使用 `docs/CODEX_3_ROUND_PROMPT.md`；如果只想跑 5 轮，可把首段里的“默认连续执行 10 轮”改成对应轮数。

@@ -22,6 +22,8 @@
 | `docs/ARCHITECTURE.md` | 一条消息从哪里进、到哪里去、谁写数据库 | 结构说明 |
 | `docs/NEXT_STEP.md` | 当前唯一主线是什么，不该顺手做什么 | 当前施工目标 |
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
+| `docs/CODEX_3_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 3 轮连续推进这个仓库 | 会话模板 |
+| `docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 10 轮连续推进并控制 token 消耗 | 会话模板 |
 | `docs/SLIMMING_RULES.md` | 编排层瘦身 / 模块化主线的共用纪律 | 施工纪律 |
 | `docs/JELLYFIN_PLEX_PLAN.md` | 当前 Jellyfin / Plex 支持主线的设计蓝图 | 当前主线蓝图 |
 | `docs/BT_SCORING_PLAN.md` | 刚完成的 BT 共享确定性评分器主线设计蓝图 | 已完成主线蓝图 |
@@ -96,6 +98,13 @@
 
 1. `docs/DECISIONS.md`
 2. `AGENTS.md`
+
+### 想继续让 Codex 连续推进
+
+读：
+
+1. `docs/CODEX_3_ROUND_PROMPT.md`（默认短批次推进）
+2. `docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md`（需要长批次低 token 推进时）
 
 ### 想把项目跑起来
 
