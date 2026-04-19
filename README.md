@@ -117,26 +117,12 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **当前施工状态**：Jellyfin / Plex 支持已基本完成；当前没有进行中的 promoted 主线。后续若要继续做其他事项，先以 `docs/NEXT_STEP.md` 完成切线，再开工。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
-- **刚完成主线蓝图**：`docs/BT_SCORING_PLAN.md`
-- **刚完成主线台账**：`docs/BT_SCORING_LOG.md`
-- **刚完成的部署主线蓝图**：`docs/QUICK_START_PLAN.md`
-- **刚完成的部署主线交付物**：`docs/DEPLOY_CHECKLIST.md`
-- **上一条主线台账**：`docs/SERIES_ANIME_NAMING_LOG.md`（`series / anime` 名称解析主线已在 2026-04-19 达到退出条件 1）
-- **上一条主线台账**：`docs/APP_MAIN_SLIMMING_LOG.md`（`app/main.py` 瘦身主线已在 2026-04-19 达到退出条件 1）
-- **再上一条主线台账**：`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（shared runtime 编排层瘦身主线已在 2026-04-19 达到退出条件 2）
-- **更早主线台账**：`docs/CLEANUP_SLIMMING_LOG.md`（cleanup 编排层瘦身主线已在 2026-04-19 达到退出条件 1）
-- **更早主线台账**：`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`（BT 订阅编排层瘦身主线已在 2026-04-19 达到退出条件 1）
-- **更早主线台账**：`docs/SEARCH_MEDIA_SLIMMING_LOG.md`（搜索编排层瘦身主线已在 2026-04-19 达到退出条件 1）
-- **更早主线台账**：`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`（下载编排层瘦身主线已在 2026-04-19 达到退出条件 1）
-- **更早主线台账**：`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`（导入编排层瘦身主线已在 2026-04-19 达到退出条件 1）
-- **更早主线台账**：`docs/TELEGRAM_BOT_SLIMMING_LOG.md`（Telegram 渠道层瘦身主线已在 2026-04-19 达到退出条件 1）
-- **更早主线台账**：`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（下载完成轮询主线已在 2026-04-18 达到退出条件 1）
-- **更早主线台账**：`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（Feishu 私聊事件解析器去重已在 2026-04-18 达到退出条件 3）
-- **更早主线台账**：`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（Feishu 长连接私有 API 风险收口已在 2026-04-18 达到退出条件 1）
-- **更早主线台账**：`docs/PERSISTENCE_CLOSURE_LOG.md`（持久化吞错收口已在 2026-04-18 冷启动审计中达到退出条件 3）
+- **当前完成态主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
+- **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
+- **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
+- **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器入口看 `docs/BT_SCORING_PLAN.md`；部署入口看 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`。
+- **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；更细的验证入口和历史闭环看 `docs/STATUS.md`
 - 这一步只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起 plugin 体系或改 workflow 真相。
 - 当前上一条主线已满足退出条件 1；后续继续其他事项前，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
 
