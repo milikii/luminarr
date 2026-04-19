@@ -62,8 +62,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- `docs/DEPLOY_CHECKLIST.md` 骨架已落地，但 `.env.example`、`README.md`、`docs/GETTING_STARTED.md` 之间还没完成按阶段去重，当前从 clone 到 10 分钟跑通的最短路径还没完全收口。
-- `.env.example`、`README.md`、`docs/GETTING_STARTED.md` 之间仍有重复说明，部署者一眼抓重点还不够快。
+- `docs/DEPLOY_CHECKLIST.md` 骨架和 `.env.example` 分组都已落地，但 `docs/GETTING_STARTED.md` 与 README 还没把最短路径说明收得更短，当前从 clone 到 10 分钟跑通的入口还差最后一轮精简。
+- README §0 还没加 checklist 指针；部署者第一眼仍要在 `README.md`、`docs/GETTING_STARTED.md`、`docs/DEPLOY_CHECKLIST.md` 之间自己来回跳。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 quick start 主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
@@ -85,7 +85,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - cleanup focused exit-condition tests：2026-04-19，`18 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"`）
 - focused cleanup tests：`526 passed, 93 deselected`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
 - cleanup verification docs gate：`384 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
-- focused config truth tests：`4 passed, 21 deselected`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
+- focused config truth tests：`4 passed, 21 deselected`（2026-04-19，`.venv/bin/python -m pytest -q tests/test_config.py -k "requires_token or requires_transmission_base_url or defaults_role_binding_to_first_instance or reads_tmdb_settings"`）
 - make run env-file guard tests：`2 passed`（2026-04-13，`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）

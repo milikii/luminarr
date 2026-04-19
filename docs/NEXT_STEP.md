@@ -7,7 +7,7 @@
 - 上一条完成主线：**`series / anime` 独立名称解析最小实现已完成**；详细闭环继续写在 `docs/SERIES_ANIME_NAMING_LOG.md`
 - 更早完成主线：**`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已完成**；详细闭环继续写在 `docs/CLEANUP_SLIMMING_LOG.md`
 - 更早完成主线：`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退
-- 当前最小闭环：按 `docs/QUICK_START_PLAN.md` Phase 1 先补 `docs/DEPLOY_CHECKLIST.md` 骨架，覆盖部署前检查、首次启动 5 步冒烟和半年后唤醒入口
+- 当前最小闭环：按 `docs/QUICK_START_PLAN.md` Phase 3 精简 `docs/GETTING_STARTED.md`，把和 `docs/DEPLOY_CHECKLIST.md` 重复的最短路径说明收掉，只保留 bring-up 细节和失败排查
 - 当前主线蓝图统一写在 `docs/QUICK_START_PLAN.md`
 
 ## Source of truth
