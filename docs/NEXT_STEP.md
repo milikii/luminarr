@@ -1,9 +1,9 @@
-# Next step (v223)
+# Next step (v224)
 
 ## Current goal
 
-- 当前进行中的 promoted 主线改为 **BT 更多 allowlist 列表页类型**。2026-04-19 冷启动审计已确认：上一条 **BT 用户页 / 编号范围页能力** 已满足退出条件，当前应从 `After this step` 第 1 项继续推进。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；BT 上一条主线也已经站稳，眼下更保守的缺口只剩 allowlist 里还未声明的首页翻页页和排序列表页。
+- 当前进行中的 promoted 主线是 **BT 更多 allowlist 列表页类型**。2026-04-19 冷启动审计已确认：上一条 **BT 用户页 / 编号范围页能力** 已满足退出条件，当前继续从 `After this step` 第 1 项推进。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；BT 上一条主线也已经站稳，首页翻页页 `https://nyaa.si/?p=2` 已补齐，眼下更保守的剩余缺口只剩排序列表页。
 - 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前不再重复施工这些已收口项。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
@@ -34,7 +34,7 @@
 ## Only do
 
 - 当前优先交付：
-  - 在不放宽站点 allowlist 的前提下，补齐首页翻页页与排序列表页这两类更省输入的 BT 页面 URL
+  - 在不放宽站点 allowlist 的前提下，补齐排序列表页这类更省输入的 BT 页面 URL，并保持首页翻页页不回退
   - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线

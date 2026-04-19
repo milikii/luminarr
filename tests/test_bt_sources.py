@@ -147,11 +147,13 @@ def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
     assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
 
 
-def test_is_supported_web_source_page_url_accepts_nyaa_user_search_and_list_pages() -> None:
+def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_and_home_pagination_pages() -> None:
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&p=2")
+    assert is_supported_web_source_page_url("https://nyaa.si/?p=2")
     assert not is_supported_web_source_page_url("https://nyaa.si/view/123")
+    assert not is_supported_web_source_page_url("https://nyaa.si/?offset=32")
     assert not is_supported_web_source_page_url("https://example.com/?q=frieren")
 
 
@@ -161,6 +163,7 @@ def test_resolve_supported_web_source_page_request_appends_page_number() -> None
         resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
         == "https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2"
     )
+    assert resolve_supported_web_source_page_request("https://nyaa.si/ p=2") == "https://nyaa.si/?p=2"
     assert resolve_supported_web_source_page_request("https://example.com/list/42 p=2") is None
 
 
