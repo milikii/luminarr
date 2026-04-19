@@ -1,12 +1,64 @@
 from __future__ import annotations
 
 from app.services.bt_candidate_scorer import BTScoringRules
-from app.services.pure_bt import extract_bt_search_query, pick_single_item_candidate
+from app.services.pure_bt import (
+    BTBatchPreviewRequest,
+    extract_bt_batch_preview_request,
+    extract_bt_search_query,
+    pick_single_item_candidate,
+    select_batch_preview_candidates,
+)
 
 
 def test_extract_bt_search_query_returns_clean_query() -> None:
     assert extract_bt_search_query("下载这个 BT 沙丘 2021") == "沙丘 2021"
     assert extract_bt_search_query("magnet:?xt=urn:btih:abc") == ""
+
+
+def test_extract_bt_batch_preview_request_parses_query_and_range() -> None:
+    request = extract_bt_batch_preview_request("bt批量 Frieren S01E01 1-3")
+
+    assert request == BTBatchPreviewRequest(
+        query="Frieren S01E01",
+        selected_indexes=(1, 2, 3),
+        selection_text="1-3",
+    )
+
+
+def test_extract_bt_batch_preview_request_marks_invalid_selection() -> None:
+    request = extract_bt_batch_preview_request("bt batch Frieren 3-1")
+
+    assert request == BTBatchPreviewRequest(
+        query="Frieren",
+        selection_text="3-1",
+        invalid_selection=True,
+    )
+
+
+def test_select_batch_preview_candidates_deduplicates_and_applies_indexes() -> None:
+    selection = select_batch_preview_candidates(
+        (
+            {
+                "title": "Frieren S01E01 1080p",
+                "source": "magnet:?xt=urn:btih:aaaa",
+            },
+            {
+                "title": "Frieren S01E01 1080p duplicate",
+                "source": "magnet:?xt=urn:btih:aaaa",
+            },
+            {
+                "title": "Frieren S01E02 1080p",
+                "source": "magnet:?xt=urn:btih:bbbb",
+            },
+        ),
+        request=BTBatchPreviewRequest(query="Frieren", selected_indexes=(2,)),
+    )
+
+    assert selection.available_count == 2
+    assert selection.selected_indexes == (2,)
+    assert not selection.out_of_range
+    assert len(selection.candidates) == 1
+    assert selection.candidates[0]["title"] == "Frieren S01E02 1080p"
 
 
 def test_pick_single_item_candidate_uses_shared_scoring_baseline() -> None:

@@ -19,12 +19,27 @@ from app.services.search_request_context import (
     normalize_spaces,
     parse_movie_query,
 )
+from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
 BT_READ_ONLY_EMPTY_QUERY_TEXT = "BT 只读探索格式：bt搜 <关键词>"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
 BT_READ_ONLY_NOTICE_TEXT = "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。"
+BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT = "BT 批量预览格式：bt批量 <关键词> [1-3,5]"
+BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE = (
+    "BT 批量预览编号格式无效：{selection}\n"
+    "请使用 1-3 或 2,4,6 这类范围表达。"
+)
+BT_BATCH_PREVIEW_OUT_OF_RANGE_TEMPLATE = (
+    "BT 批量预览编号超出范围：{selection}\n"
+    "当前可选范围：1-{available_count}"
+)
+BT_BATCH_PREVIEW_NO_RESULT_TEXT_TEMPLATE = "BT 批量预览未找到候选：{query}"
+BT_BATCH_PREVIEW_NOTICE_TEMPLATE = (
+    "只读说明：当前批量预览只用于确认候选范围，不会创建审批或下载任务。\n"
+    "当前预览范围：{selection}"
+)
 AMBIGUOUS_QUERY_TEXT_TEMPLATE = (
     "片名可能有多个版本：{query}\n"
     "请补充更具体信息后再搜索，例如：\n"
@@ -115,6 +130,24 @@ class SearchMediaService:
         raw_results = await self.search_raw_candidates(cleaned_query)
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         return format_bt_read_only_reply(cleaned_query, selected_raw_results)
+
+    async def search_bt_batch_preview_and_format(self, request: BTBatchPreviewRequest) -> str:
+        cleaned_query = normalize_spaces(request.query)
+        if not cleaned_query:
+            return BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT
+        if request.invalid_selection:
+            return BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE.format(selection=request.selection_text or "-")
+
+        raw_results = await self.search_raw_candidates(cleaned_query)
+        selection = select_batch_preview_candidates(raw_results, request=request, default_limit=self._limit)
+        if selection.out_of_range:
+            return BT_BATCH_PREVIEW_OUT_OF_RANGE_TEMPLATE.format(
+                selection=request.selection_text or "-",
+                available_count=selection.available_count,
+            )
+        selected_raw_results = [_to_candidate_dict(item) for item in selection.candidates]
+        selection_label = _format_bt_batch_preview_selection_label(selection.selected_indexes)
+        return format_bt_batch_preview_reply(cleaned_query, selected_raw_results, selection_label=selection_label)
 
     async def search_and_format(
         self,
@@ -546,6 +579,29 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
     return "\n".join(lines)
 
 
+def format_bt_batch_preview_reply(
+    query: str,
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    selection_label: str,
+) -> str:
+    if not candidates:
+        return BT_BATCH_PREVIEW_NO_RESULT_TEXT_TEMPLATE.format(query=query)
+
+    lines = [f"BT 批量预览结果：{query}"]
+    for index, item in enumerate(candidates, start=1):
+        title = _safe_text(item.get("title"), default="(no title)")
+        indexer = _safe_indexer(item.get("indexer"), item.get("indexerName"))
+        provider = _safe_text(item.get("sourceProvider"), default=indexer)
+        seeders = _format_seeder_count(item.get("seeders"))
+        size = _format_size(item.get("size"))
+        lines.append(f"{index}. {title}")
+        lines.append(f"   站点: {indexer} | 来源入口: {provider} | 做种: {seeders} | 大小: {size}")
+        lines.append(f"   链接参考: {_format_bt_source_reference(item)}")
+    lines.append(BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection=selection_label))
+    return "\n".join(lines)
+
+
 def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> str:
     card_title, card_year, card_alias = _resolve_movie_card_fields(parsed_query, tmdb_movie)
     lines = [
@@ -587,6 +643,12 @@ def _safe_text(value: Any, default: str) -> str:
     if not text:
         return default
     return text
+
+
+def _format_bt_batch_preview_selection_label(selected_indexes: Sequence[int]) -> str:
+    if not selected_indexes:
+        return "-"
+    return ",".join(str(index) for index in selected_indexes)
 
 
 def _safe_year(value: Any) -> str:

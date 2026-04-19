@@ -329,6 +329,24 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
+    bt_batch_preview_request = tg._extract_bt_batch_preview_request(query)
+    if bt_batch_preview_request is not None:
+        search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
+        if not isinstance(search_service, tg.SearchMediaService):
+            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+            return
+        try:
+            reply = await execution_gate.run(
+                tg.ACTION_BT_READ_ONLY_HELPER,
+                lambda: search_service.search_bt_batch_preview_and_format(bt_batch_preview_request),
+            )
+        except Exception as error:
+            tg._log_bt_read_only_helper_error(query=bt_batch_preview_request.query, error=error)
+            await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
+            return
+        await reply_func(reply)
+        return
+
     bt_classification = tg._parse_bt_classification_choice(query)
     bt_processing_path = tg._parse_bt_processing_path_choice(query)
     bt_processing_shortcut = tg._parse_bt_processing_path_legacy_shortcut(query)

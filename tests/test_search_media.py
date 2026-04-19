@@ -11,6 +11,10 @@ from app.db.clarification_repo import ClarificationPersistenceError, Clarificati
 from app.db.sqlite import SqliteDatabase
 from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
 from app.services.search_media import (
+    BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT,
+    BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE,
+    BT_BATCH_PREVIEW_NOTICE_TEMPLATE,
+    BT_BATCH_PREVIEW_OUT_OF_RANGE_TEMPLATE,
     BT_READ_ONLY_EMPTY_QUERY_TEXT,
     BT_READ_ONLY_NOTICE_TEXT,
     BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE,
@@ -22,6 +26,7 @@ from app.services.search_media import (
     SearchMediaService,
     parse_movie_query,
 )
+from app.services.pure_bt import BTBatchPreviewRequest
 
 
 async def _fake_search_with_results(query: str) -> list[dict[str, object]]:
@@ -167,6 +172,70 @@ def test_search_bt_read_only_and_format_no_result() -> None:
     text = _run(service.search_bt_read_only_and_format("unknown"))
 
     assert text == BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
+
+
+def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "dune bt"
+        return [
+            {
+                "title": "Dune 2021 1080p",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+            {
+                "title": "Dune 2021 720p",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 5,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+        ]
+
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=fake_raw_search)
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(query="dune bt", selected_indexes=(2,), selection_text="2")
+        )
+    )
+
+    assert "BT 批量预览结果：dune bt" in text
+    assert "1. Dune 2021 720p" in text
+    assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="2") in text
+
+
+def test_search_bt_batch_preview_and_format_rejects_invalid_selection() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(query="dune bt", selection_text="3-1", invalid_selection=True)
+        )
+    )
+
+    assert text == BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE.format(selection="3-1")
+
+
+def test_search_bt_batch_preview_and_format_rejects_out_of_range_selection() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(query="dune bt", selected_indexes=(2, 3), selection_text="2-3")
+        )
+    )
+
+    assert text == BT_BATCH_PREVIEW_OUT_OF_RANGE_TEMPLATE.format(selection="2-3", available_count=1)
+
+
+def test_search_bt_batch_preview_and_format_empty_query() -> None:
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=_fake_raw_search)
+    text = _run(service.search_bt_batch_preview_and_format(BTBatchPreviewRequest(query="")))
+
+    assert text == BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT
 
 
 def test_search_bt_read_only_and_format_logs_raw_search_failure(capsys) -> None:

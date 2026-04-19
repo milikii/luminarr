@@ -120,10 +120,10 @@ def test_current_completion_state_docs_do_not_regress() -> None:
 
     assert "Emby / Jellyfin / Plex" in architecture_text
     assert "Jellyfin / Plex" in next_step_text
-    assert "BT 批量任务最小预览" in readme_text
-    assert "BT 批量任务最小预览" in status_text
-    assert "BT 批量任务最小预览" in next_step_text
-    assert "BT 批量任务最小预览" in agents_text
+    assert "BT 批量任务显式批量确认" in readme_text
+    assert "BT 批量任务显式批量确认" in status_text
+    assert "BT 批量任务显式批量确认" in next_step_text
+    assert "BT 批量任务显式批量确认" in agents_text
     assert "当前没有进行中的 promoted 主线" not in readme_text
     assert "当前没有进行中的 promoted 主线" not in status_text
     assert "当前没有进行中的 promoted 主线" not in next_step_text
@@ -135,8 +135,8 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "docs/PT_LIVE_SEEDING_PLAN.md" in readme_text
     assert "docs/PT_LIVE_SEEDING_PLAN.md" in next_step_text
     assert "只读，不会 dispatch 下载器" in bt_batch_plan_text
-    assert "不做批量 approval / 批量 `confirm`" in bt_batch_plan_text
-    assert "范围非法、为空或越界" in bt_batch_plan_text
+    assert "显式批量确认" in bt_batch_plan_text
+    assert "不做自动 `confirm`" in bt_batch_plan_text
     assert "当前主线已满足 `Done when` 第 1 条" in jellyfin_plex_plan_text
     assert "plugin 体系后置" in jellyfin_plex_plan_text
     assert "进入 Phase 3 前的最后一个最小闭环是 **Plex refresh baseline**" in jellyfin_plex_plan_text

@@ -3068,6 +3068,52 @@ def test_handle_message_bt_read_only_helper_search_failure_returns_safe_text() -
     reply_text.assert_awaited_once_with(BT_READ_ONLY_HELPER_FAILED_TEXT)
 
 
+def test_handle_message_bt_batch_preview_routes_to_raw_search() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "Frieren S01E01"
+        return [
+            {
+                "title": "title-Frieren S01E01",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+            {
+                "title": "title-Frieren S01E02",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+        ]
+
+    update, reply_text = _build_update("bt批量 Frieren S01E01 1-2")
+    search_service = SearchMediaService(_fake_search, raw_search_func=fake_raw_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "BT 批量预览结果：Frieren S01E01" in sent_text
+    assert "title-Frieren S01E01" in sent_text
+    assert "title-Frieren S01E02" in sent_text
+    assert "当前预览范围：1,2" in sent_text
+
+
 def test_handle_message_confirm_routes_to_import_service() -> None:
     update, reply_text = _build_update("confirm 87")
     search_service = SearchMediaService(_fake_search)
