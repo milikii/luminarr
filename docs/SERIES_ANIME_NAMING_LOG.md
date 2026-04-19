@@ -1,4 +1,4 @@
-# Series anime naming log (v1)
+# Series anime naming log (v2)
 
 > 目的：承接当前“`series / anime` 独立名称解析最小实现（含 `.ass` 最小支持评估）”主线的详细台账。
 > 约束：蓝图看 `docs/SERIES_ANIME_NAMING_PLAN.md`；`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -13,8 +13,12 @@
 
 ### 2.1 统一解析结构
 
+已完成闭环：
+- 已新增 `app/services/media_name_parser.py`，先把用户文本 / 候选标题 / 文件名会共用的最小输出结构 `ParsedMediaName` 和 Phase 1 内置解析规则落地；当前先不切四处集成点。
+- 已新增 `tests/test_media_name_parser.py` 10 条典型输入回归，覆盖年份、`S01E01`、`第2季`、方括号集号、发布组、画质标签、容器和中英混合标题。
+
 当前风险：
-- 用户输入、来源候选标题、下载完成文件名现在还不是同一个结构；如果不先收口成统一 parser，TMDB 关联、追更和导入命名会继续各写各的规则。
+- Phase 1 只落了内置最小集；跨语言别名、噪音词裁剪和后续四处集成点切换还没做，TMDB 关联、追更和导入命名暂时仍没真正共用这一结构。
 
 ### 2.2 四处集成点切换
 
@@ -28,6 +32,7 @@
 
 ## 3. Focused verification
 
+- `.venv/bin/python -m pytest -q tests/test_media_name_parser.py`
 - `.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_post_download_auto_import.py tests/test_subtitle_translator.py`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 

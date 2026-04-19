@@ -1,4 +1,4 @@
-# Current status (v309)
+# Current status (v310)
 
 ## Project position
 
@@ -45,6 +45,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 当前快照按主题归纳；当前主线具体路径、focused tests 和风险分组统一只看 `docs/SERIES_ANIME_NAMING_PLAN.md` 与 `docs/SERIES_ANIME_NAMING_LOG.md`，上一条主线详细闭环继续只看 `docs/APP_MAIN_SLIMMING_LOG.md`，再上一条主线继续只看 `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`，更早主线继续只看 `docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md` 和 `docs/PERSISTENCE_CLOSURE_LOG.md`，状态页不逐天或逐字段追加条目。
 
 - 2026-04-19 已通过 `app/downloader_route_lookup.py` 抽离把 `app/main.py` 主线的下载器路由 helper 收成独立边界；`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"` 得到 `16 passed, 1 deselected`，`app/main.py` 主线满足退出条件 1 并已切到 `series / anime` 解析主线。
+- 2026-04-19 已落 `app/services/media_name_parser.py` Phase 1 基线：统一输出 `ParsedMediaName`，覆盖年份、季集、方括号集号、发布组、画质标签、容器和中英混合标题的最小解析；`.venv/bin/python -m pytest -q tests/test_media_name_parser.py` 得到 `10 passed`。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 `series / anime` parser、四处集成点和 `.ass` 最小支持，不回退 cleanup 已确认的协议和 guardrail。
@@ -53,7 +54,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- `series / anime` 现在还没有统一 `ParsedMediaName` parser；用户输入、来源候选和下载完成文件名仍没收口到同一结构。
+- `series / anime` 已有独立 `ParsedMediaName` parser 基线，但四处集成点还没切到统一结构；当前仍要继续补 Phase 2 规则文件和后续 Phase 3 集成切换。
 - 当前必须继续守住 movie-first 行为、四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 parser 主线里回退它们。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
@@ -66,6 +67,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前结论快照：`app/main.py` 主线已在 2026-04-19 满足退出条件 1；当前唯一主线已切到 `series / anime` 独立名称解析最小实现。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - 当前主线 focused verification：2026-04-19，`16 passed, 1 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`）
+- 当前主线 focused verification：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`46 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - cleanup focused exit-condition tests：2026-04-19，`18 passed, 28 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"`）
