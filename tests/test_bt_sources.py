@@ -149,6 +149,7 @@ def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
 
 def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages() -> None:
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease")
+    assert is_supported_web_source_page_url("https://nyaa.si/?q=frieren&p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc&p=2")
@@ -168,6 +169,7 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pag
 
 def test_resolve_supported_web_source_page_request_appends_page_number() -> None:
     assert looks_like_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
+    assert resolve_supported_web_source_page_request("https://nyaa.si/?q=frieren&p=2") == "https://nyaa.si/?q=frieren&p=2"
     assert (
         resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
         == "https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2"

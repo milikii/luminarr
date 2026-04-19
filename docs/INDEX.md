@@ -24,7 +24,7 @@
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
 | `docs/CODEX_3_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 3 轮连续推进这个仓库 | 会话模板 |
 | `docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 10 轮连续推进并控制 token 消耗 | 会话模板 |
-| `docs/BT_PAGE_RANGE_PLAN.md` | 当前 BT allowlist 搜索页无分类分页组合页 proof 主线的最小蓝图 | 当前主线蓝图 |
+| `docs/BT_PAGE_RANGE_PLAN.md` | 当前 BT allowlist 搜索页无分类基础页 proof 主线的最小蓝图 | 当前主线蓝图 |
 | `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md` | 刚完成的 Plex 真实 refresh smoke 值得性重评估主线蓝图 | 已完成主线蓝图 |
 | `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md` | 更早完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图 | 已完成主线蓝图 |
 | `docs/BT_BATCH_PLAN.md` | 再上一条 BT 批量任务显式批量确认主线蓝图 | 已完成主线蓝图 |
