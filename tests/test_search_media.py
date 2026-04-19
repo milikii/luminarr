@@ -312,6 +312,43 @@ def test_search_bt_batch_preview_and_format_for_chat_caches_candidates() -> None
     assert service.get_cached_candidate(1001, 2) is not None
 
 
+def test_search_bt_batch_preview_and_format_for_chat_caches_page_preview_candidates() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist page preview")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?f=0&c=1_2&u=subsplease"
+        return [
+            {
+                "title": "Frieren S01E01 1080p",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            },
+            {
+                "title": "Frieren S01E02 1080p",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            },
+        ]
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    _run(
+        service.search_bt_batch_preview_and_format_for_chat(
+            BTBatchPreviewRequest(
+                query="https://nyaa.si/?f=0&c=1_2&u=subsplease",
+                selected_indexes=(1, 2),
+                selection_text="1-2",
+            ),
+            chat_id=1001,
+        )
+    )
+
+    assert service.get_cached_candidate(1001, 1) is not None
+    assert service.get_cached_candidate(1001, 2) is not None
+
+
 def test_search_bt_read_only_and_format_logs_raw_search_failure(capsys) -> None:
     async def fake_raw_search(_: str) -> list[dict[str, object]]:
         raise RuntimeError("bt source unavailable")
