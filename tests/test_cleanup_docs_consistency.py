@@ -164,6 +164,7 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
 
     assert "cold-start consistency audit" not in status_text
     assert "git log --oneline -20" not in status_text
+    assert "git grep -n 'except Exception" not in status_text
     assert "bt subscription invalid-kind write guard tests" not in status_text
     assert "search clarification pending persist fail-closed tests" not in status_text
     assert "search candidate persist fail-closed tests" not in status_text

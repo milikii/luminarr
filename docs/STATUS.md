@@ -121,7 +121,6 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 更早主线真实联调验证：2026-04-18，`passed`（复用 Transmission task_id=`1` task_hash=`e93d696a3e980458765f8016ce39f61437cc9543`；验证其从待轮询列表推进到 `downloader.completed_observed + auto_import boundary`；Emby=`9f4635e04057`）
 - 更早主线切换审计：2026-04-18，`15 passed, 34 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_feishu_long_connection.py -k "handle_feishu_private_text_event or routes_sdk_event"`）
 - 更早主线切换审计：2026-04-18，`passed`（`.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py`；`rg -n "lark_ws_client_module\\.loop|_disconnect|_auto_reconnect|_cache" app/bot/feishu_long_connection.py` 命中 `0`）
-- 更早主线切换审计：2026-04-18，`passed`（`bash -lc "git grep -n 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot | wc -l"`，命中 `0`）
 - 当前主线蓝图：`docs/JELLYFIN_PLEX_PLAN.md`
 - 刚完成主线蓝图：`docs/BT_SCORING_PLAN.md`
 - 刚完成主线详细台账：`docs/BT_SCORING_LOG.md`
