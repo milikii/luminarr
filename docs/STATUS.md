@@ -1,4 +1,4 @@
-# Current status (v315)
+# Current status (v316)
 
 ## Project position
 
@@ -50,7 +50,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 当前进行中的 promoted 主线是 BT 用户页 / 编号范围页能力；上一条 Plex 真实 refresh smoke 值得性重评估已按“当前主机无可达 Plex 实例，先回到 BT”收口，并转入完成态。
+- 上一条 BT 用户页 / 编号范围页能力主线已在 2026-04-19 冷启动审计中确认满足退出条件；当前 promoted 主线已切到 BT 更多 allowlist 列表页类型。
 - 刚完成的 **Plex 真实 refresh smoke 值得性重评估** 主线保持完成态：当前主机 `http://127.0.0.1:32400/identity` 返回 `000`，本批次不继续追 Plex 实例。
 - 再上一条 **Jellyfin / Plex 真实联调重评估** 主线保持完成态：provider 缺配置时的静默关闭 refresh 已收口，focused tests 保持全绿。
 - 更早一条 BT 批量任务显式批量确认主线保持完成态：`bt批量 / bt batch` 的确定性批量预览与 `bt批量确认 / bt batch confirm` 的显式批量确认都已完成，focused tests 保持全绿。
@@ -66,16 +66,16 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
 - BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地。
-- 当前最小风险是保持页面 URL 只读预览、category/list 页面支持、`p=<页码>` 语法和中文拒绝不回退；如果后续继续 BT，再评估是否扩更多 allowlist 页面类型。
+- 当前最小风险是保持既有页面 URL 只读预览、category/list 页面支持、`p=<页码>` 语法和中文拒绝不回退，并补齐首页翻页页与排序列表页。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 BT 用户页 / 编号范围页能力（Plex 值得性重评估已收口）
+- 窗口活性快照：当前主线为 BT 更多 allowlist 列表页类型（上一条 BT 用户页 / 编号范围页能力已收口）
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；当前更保守的下一步是回到 BT 页面输入能力，而不是继续追 Plex。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；当前更保守的下一步是补 BT 首页翻页页与排序列表页，而不是继续追 Plex。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）

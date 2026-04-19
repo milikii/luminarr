@@ -1,10 +1,10 @@
-# Next step (v222)
+# Next step (v223)
 
 ## Current goal
 
-- 当前进行中的 promoted 主线是 **BT 更大范围的用户页 / 编号范围页能力**。2026-04-19 已确认上一条 **Plex 真实 refresh smoke 值得性重评估** 满足退出条件：当前主机 `curl http://127.0.0.1:32400/identity` 返回 `000`，本批次暂不继续追 Plex，先回到 BT。
-- 当前转回 BT 而不是继续拆 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；现在更保守也更直接的缺口，是 BT 还缺用户页 / 列表页 / 编号范围页这类更大范围输入能力。
-- allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；如果下次还继续 BT，这一批次之后更保守的候选才是再评估更多 allowlist 页面类型。
+- 当前进行中的 promoted 主线改为 **BT 更多 allowlist 列表页类型**。2026-04-19 冷启动审计已确认：上一条 **BT 用户页 / 编号范围页能力** 已满足退出条件，当前应从 `After this step` 第 1 项继续推进。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；BT 上一条主线也已经站稳，眼下更保守的缺口只剩 allowlist 里还未声明的首页翻页页和排序列表页。
+- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前不再重复施工这些已收口项。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
@@ -34,7 +34,7 @@
 ## Only do
 
 - 当前优先交付：
-  - 保持 allowlist BT 页面输入的确定性只读预览，不让它回退到关键词搜索
+  - 在不放宽站点 allowlist 的前提下，补齐首页翻页页与排序列表页这两类更省输入的 BT 页面 URL
   - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -54,10 +54,10 @@
 
 ## Done when
 
-当前 BT 用户页 / 编号范围页能力主线视为 **已收口**，满足以下任一条即可：
+当前 BT 更多 allowlist 列表页类型主线视为 **已收口**，满足以下任一条即可：
 
-1. `bt批量 <allowlist 页面 URL> 1-3` 已能返回只读批量预览，且候选可继续被 `bt批量确认` 复用进现有下载确认链，并有 focused tests 证明不回退；
-2. 当前 allowlist 页面输入的 fail-closed 边界、中文拒绝和处理建议已经补齐，且 focused tests 能证明不会静默降级成未知抓站；
+1. `bt批量 https://nyaa.si/?p=2 1-3` 这类首页翻页页已能返回只读批量预览，且候选可继续被 `bt批量确认` 复用进现有下载确认链，并有 focused tests 证明不回退；
+2. `bt批量 https://nyaa.si/?s=seeders&o=desc 1-3` 这类排序列表页已能返回只读批量预览，且未声明页面类型仍保持中文 fail-closed，并有 focused tests 证明不回退；
 3. 本轮代码变更 `< 20` 行且只是对同一个 page/range helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
@@ -67,5 +67,5 @@
 
 ## After this step
 
-1. 在用户页 / 编号范围页站稳后，再看是否要补更省输入的页码语法或更多 allowlist 页面类型
+1. 在首页翻页页和排序列表页站稳后，再看是否还要补更多 allowlist 页面类型
 2. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
