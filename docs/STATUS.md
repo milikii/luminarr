@@ -50,7 +50,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 上一条 BT allowlist 无分类用户显式分页 URL proof 主线已在 2026-04-20 同批次确认满足退出条件；focused tests 已证明 `https://nyaa.si/?u=subsplease&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界，当前 promoted 主线已切到 BT allowlist 带分类用户显式分页 URL proof。
+- 上一条 BT allowlist 带分类用户显式分页 URL proof 主线已在 2026-04-20 同批次确认满足退出条件；focused tests 已证明 `https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界，当前 promoted 主线已切到 BT allowlist 带分类用户排序显式分页 URL proof。
 - 更早一条 BT 用户页 / 编号范围页能力主线已在同日冷启动审计中确认满足退出条件，当前继续保持完成态。
 - 刚完成的 **Plex 真实 refresh smoke 值得性重评估** 主线保持完成态：当前主机 `http://127.0.0.1:32400/identity` 返回 `000`，本批次不继续追 Plex 实例。
 - 再上一条 **Jellyfin / Plex 真实联调重评估** 主线保持完成态：provider 缺配置时的静默关闭 refresh 已收口，focused tests 保持全绿。
@@ -67,16 +67,17 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
 - BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地。
-- 当前最小风险是保持既有页面 URL 只读预览、category/list 页面支持、首页基础页 `https://nyaa.si/`、首页翻页页 `https://nyaa.si/?p=2`、排序列表页 `https://nyaa.si/?s=seeders&o=desc`、分类基础页 `https://nyaa.si/?c=1_2`、分类搜索基础页 `https://nyaa.si/?f=0&c=1_2&q=frieren`、分类排序组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc`、分类排序分页组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc p=2`、用户页基础页 `https://nyaa.si/?u=subsplease`、用户页分页组合页 `https://nyaa.si/?u=subsplease p=2`、用户页显式分页组合页 `https://nyaa.si/?u=subsplease&p=2`、用户页排序组合页 `https://nyaa.si/?u=subsplease&s=seeders&o=desc`、用户页排序分页组合页 `https://nyaa.si/?u=subsplease&s=seeders&o=desc p=2`、带分类用户页排序分页组合页 `https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc p=2`、搜索页排序组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc`、搜索页排序分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc p=2`、搜索页分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2`、无分类搜索页分页组合页 `https://nyaa.si/?q=frieren&p=2`、无分类搜索基础页 `https://nyaa.si/?q=frieren`、`p=<页码>` 语法和中文拒绝不回退；当前只补带分类用户显式分页 URL proof，不继续扩 allowlist 页面家族。
+- 当前最小风险是保持既有页面 URL 只读预览、category/list 页面支持、首页基础页 `https://nyaa.si/`、首页翻页页 `https://nyaa.si/?p=2`、排序列表页 `https://nyaa.si/?s=seeders&o=desc`、分类基础页 `https://nyaa.si/?c=1_2`、分类搜索基础页 `https://nyaa.si/?f=0&c=1_2&q=frieren`、分类排序组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc`、分类排序分页组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc p=2`、用户页基础页 `https://nyaa.si/?u=subsplease`、用户页分页组合页 `https://nyaa.si/?u=subsplease p=2`、用户页显式分页组合页 `https://nyaa.si/?u=subsplease&p=2`、用户页排序组合页 `https://nyaa.si/?u=subsplease&s=seeders&o=desc`、用户页排序分页组合页 `https://nyaa.si/?u=subsplease&s=seeders&o=desc p=2`、带分类用户页显式分页组合页 `https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2`、带分类用户页排序分页组合页 `https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc p=2`、搜索页排序组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc`、搜索页排序分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc p=2`、搜索页分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2`、无分类搜索页分页组合页 `https://nyaa.si/?q=frieren&p=2`、无分类搜索基础页 `https://nyaa.si/?q=frieren`、`p=<页码>` 语法和中文拒绝不回退；当前只补带分类用户排序显式分页 URL proof，不继续扩 allowlist 页面家族。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 BT allowlist 带分类用户显式分页 URL proof
+- 窗口活性快照：当前主线为 BT allowlist 带分类用户排序显式分页 URL proof
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；当前更保守的下一步是补带分类用户显式分页 URL proof，而不是继续追 Plex 或继续扩 allowlist 页面家族。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；当前更保守的下一步是补带分类用户排序显式分页 URL proof，而不是继续追 Plex 或继续扩 allowlist 页面家族。
+- BT 带分类用户显式分页 URL focused tests：2026-04-20，`6 passed`（bt_sources + search_media + telegram_bot 最小 nodeid 组合）
 - BT 无分类用户显式分页 URL focused tests：2026-04-20，`8 passed, 279 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "uncategorized_user_page_number_url or uncategorized_user_page_number"`）
 - BT 无分类用户排序显式分页 URL focused tests：2026-04-20，`8 passed, 275 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "uncategorized_user_sort_page_number_url or uncategorized_user_sort_page_number"`）
 - BT 无分类用户排序分页组合页 focused tests：2026-04-20，`10 passed, 280 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "uncategorized_user_sort_page_number or uncategorized_user_sort_page or is_supported_web_source_page_url_accepts_uncategorized_user_sort_page_number or resolve_supported_web_source_page_request_appends_uncategorized_user_sort_page_number"`）
@@ -92,8 +93,6 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - BT 用户页排序分页组合页 focused tests：2026-04-19，`5 passed, 235 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "user_sort_page_number or user_sort_page_number_syntax or resolve_supported_web_source_page_request_appends_page_number"`）
 - BT 用户页排序组合页 focused tests：2026-04-19，`6 passed, 230 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "user_sort_page or resolve_supported_web_source_page_request_appends_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or reuses_user_sort_page_preview_candidates"`）
 - BT 分类排序分页组合页 focused tests：2026-04-19，`5 passed, 227 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "category_sort_page_number or category_sort_page_number_syntax or category_sort_page_number_syntax_missing_order or resolve_supported_web_source_page_request_appends_page_number"`）
-- BT 排序页分页语法 focused tests：2026-04-19，`4 passed, 53 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py -k "sort_page_number_syntax or sort_page_url or page_number_syntax"`）
-- BT 排序页分页语法 Telegram focused tests：2026-04-19，`3 passed, 156 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "sort_page_number_syntax or bt_batch_confirm_reuses_page_preview_candidates"`）
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
@@ -110,9 +109,6 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - focused jellyfin-provider refresh tests：2026-04-19，`9 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"`）
 - real jellyfin refresh smoke probe：2026-04-19，`failed with direct target/request_url observability`（一次性临时脚本已执行并删除）
 - plex local endpoint probe：2026-04-19，`000`（`curl -sS -o /tmp/plex_probe.out -w "%{http_code}" http://127.0.0.1:32400/identity`）
-- BT page preview focused tests：2026-04-19，`15 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page or bt_batch"`）
-- BT list page focused tests：2026-04-19，`5 passed, 54 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page and (list or allowlist or unsupported)"`）
-- BT page syntax focused tests：2026-04-19，`7 passed, 55 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page and (syntax or list or allowlist or unsupported)"`）
 - BT home pagination focused tests：2026-04-19，`16 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page or bt_batch"`）
 - BT sort page focused tests：2026-04-19，`17 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page or bt_batch"`）
 - BT page preview route/cache focused tests：2026-04-19，`5 passed, 203 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "bt_batch and page"`）
