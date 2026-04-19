@@ -115,7 +115,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 5. 当前 next step
 
 - **当前施工状态**：Jellyfin / Plex 支持已基本完成；当前没有进行中的 promoted 主线。后续若要继续做其他事项，先以 `docs/NEXT_STEP.md` 完成切线，再开工。
-- **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
+- **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
 - **当前完成态主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
 - **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
