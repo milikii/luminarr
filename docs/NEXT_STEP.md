@@ -2,9 +2,9 @@
 
 ## Current goal
 
-- 当前进行中的 promoted 主线是 **Jellyfin 单 provider 真实联调预备**。2026-04-19 已满足 `Done when` 第 1 条：refresh 失败日志已带 `provider=jellyfin / plex / emby` 显式字段；本轮闭环已完成，下一次继续时按 `After this step` 第 1 项进入 Jellyfin 单 provider 真实 refresh smoke，不在这条线上继续拆微分流。
+- 当前进行中的 promoted 主线是 **Jellyfin 单 provider 真实 refresh smoke**。上一条 **Jellyfin 单 provider 真实联调预备** 已在 2026-04-19 满足退出条件并转入完成态：refresh 失败日志已带 `provider=jellyfin / plex / emby` 显式字段。
 - 当前选择 Jellyfin 而不是 Plex：`app/clients/jellyfin.py` 与 `app/clients/emby.py` 都走 `POST /Library/Refresh`，协议形状更接近，风险更低；Plex 继续留在后续再评估。
-- 当前最小缺口是：refresh 成功/失败日志还只写泛化的“媒体库刷新”，还没有把 provider 名称显式打出来；后续真联调时排障信息不够聚焦。
+- 当前最小缺口是：仓库已经能选 Jellyfin provider，也已补齐失败日志里的 provider 可观测性，但还没有一条 repo 内已记录的 Jellyfin 单 provider 真实 refresh smoke 证据。
 - 2026-04-19 刚完成的主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 再上一条刚完成主线是 **BT 批量任务显式批量确认**：`bt批量 / bt batch` 的只读批量预览与 `bt批量确认 / bt batch confirm` 的显式批量确认都已落地，focused tests 为 `11 passed, 312 deselected`。
 - 再上一条已完成主线是 **PT live seeding 真相接入 cleanup 阻断**。冷启动审计已确认它满足文档出口；详细蓝图继续看 `docs/PT_LIVE_SEEDING_PLAN.md`。
@@ -31,9 +31,10 @@
 ## Only do
 
 - 当前优先交付：
-  - 补 refresh 成功/失败日志里的 provider 可观测性，优先把 Jellyfin 路径打清楚
+  - 在已有 Jellyfin 实例前提下完成一次单 provider 真实 refresh smoke，优先验证请求能否真实打到 Jellyfin
+  - 如果真实 smoke 失败，先把 provider / base_url / HTTP 结果或异常原因打清楚，保证排障可继续推进
   - 保持用户侧 refresh 成功/失败文本边界不变，不改导入成功真相
-  - 继续保留“当前正式本地真实 refresh 栈只有 Emby”这条边界，不伪装成 Jellyfin 已有现成真机入口
+  - 继续保留“repo 内固定 Docker refresh 栈仍只有 Emby”这条边界，不把这一步扩成新测试栈编排
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
 - 文档继续分层：`STATUS.md` 只保留当前快照；当前主线细节写在 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`；刚完成的 readiness 评估继续留在 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
@@ -49,10 +50,10 @@
 
 ## Done when
 
-当前 Jellyfin 单 provider 真实联调预备主线视为 **已收口**，满足以下任一条即可：
+当前 Jellyfin 单 provider 真实 refresh smoke 主线视为 **已收口**，满足以下任一条即可：
 
-1. refresh 失败日志已带 `provider=jellyfin` 等显式字段，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"` 全绿；
-2. `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` / `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md` 一致表达“当前主线是 Jellyfin 单 provider 真实联调预备”；
+1. 在已有 Jellyfin 实例上完成一次真实 refresh smoke，并把成功证据写回当前快照或主线蓝图；
+2. 真实 refresh smoke 失败，但 provider / base_url / HTTP 结果或异常原因已经可直接定位，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"` 全绿；
 3. 本轮代码变更 `< 20` 行且只是对同一个 refresh 路径补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
@@ -62,5 +63,5 @@
 
 ## After this step
 
-1. 如果后续拿到 Jellyfin 实例，继续做单 provider 真实 refresh smoke
-2. 如果 Jellyfin 继续缺实例或价值不足，再评估 Plex 或回到 BT 更大范围的用户页 / 编号范围页能力
+1. 如果 Jellyfin smoke 已收口，再评估 Plex 真实 refresh smoke 是否值得补做
+2. 如果 Jellyfin 继续缺实例或价值不足，再回到 BT 更大范围的用户页 / 编号范围页能力

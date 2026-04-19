@@ -1,6 +1,6 @@
-# Jellyfin real verification plan (v1)
+# Jellyfin real verification plan (v2)
 
-> 目的：把 Jellyfin 从“已能选 provider、但还没进入真实联调”推进到一个更具体、可继续施工的单 provider 主线，同时不把 Plex 一起绑进来。
+> 目的：把 Jellyfin 从“已能选 provider、失败日志已带 provider”推进到“有一条真实 refresh smoke 证据，或失败已可直接定位”的单 provider 主线，同时不把 Plex 一起绑进来。
 
 ## 1. 为什么先选 Jellyfin
 
@@ -14,16 +14,17 @@
 
 ## 2. 当前最小闭环
 
-当前最小缺口不是新协议，而是**可观测性仍太泛**：
+当前最小缺口不是新协议，而是**还缺一条真实 smoke 证据**：
 
-- refresh 成功/失败日志还只写“媒体库刷新”
-- 后续如果用户真的把 provider 切到 Jellyfin，排障时仍要先回头猜“这次失败到底是哪一个 provider”
+- 当前代码已经能按配置切到 Jellyfin refresh client
+- 失败日志也已经带 `provider=jellyfin / plex / emby`
+- 但仓库里还没有一条“Jellyfin 单 provider 真实 refresh 已打通 / 或失败点已收清”的最新闭环记录
 
 所以这一步先只做：
 
-- 把 refresh service 的失败日志带上 provider 名称
+- 用已有 Jellyfin 实例做一次单 provider 真实 refresh smoke
+- 如果 smoke 失败，先把 provider / base_url / HTTP 结果或异常原因打清楚
 - 保持返回给用户的成功/失败文本边界不变，不改导入成功真相
-- focused tests 继续覆盖 `app/main.py -> RefreshMediaServerService` 这条装配线
 
 2026-04-19 已完成 Phase 1：
 
@@ -33,16 +34,16 @@
 
 ## 3. Phase 顺序
 
-1. Phase 1：补 refresh 失败日志里的 provider 可观测性。
-2. Phase 2：如果后续有 Jellyfin 实例，再做单 provider 真实 refresh smoke。
+1. Phase 1：补 refresh 失败日志里的 provider 可观测性。已完成。
+2. Phase 2：用现有 Jellyfin 实例做单 provider 真实 refresh smoke。当前进行中。
 3. Phase 3：根据 Jellyfin 真实 smoke 结果，再决定是否值得继续扩到 Plex。
 
 ## 4. Done when
 
 当前主线视为 **已收口**，满足以下任一条即可：
 
-1. refresh 失败日志已带 `provider=jellyfin` 等显式字段，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"` 全绿；
-2. `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` / `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md` 一致表达“当前主线是 Jellyfin 单 provider 真实联调预备”；
+1. 在已有 Jellyfin 实例上完成一次真实 refresh smoke，并把成功证据写回当前快照或当前蓝图；
+2. 真实 refresh smoke 失败，但 provider / base_url / HTTP 结果或异常原因已经可直接定位，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"` 全绿；
 3. 本轮代码变更 `< 20` 行且只是对同一个 refresh 路径补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 ## 5. 不做清单

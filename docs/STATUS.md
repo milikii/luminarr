@@ -24,7 +24,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：当前 Jellyfin 单 provider 真实联调预备蓝图
+- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：当前 Jellyfin 单 provider 真实 refresh smoke 蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成的 Jellyfin / Plex readiness 评估蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
 - `docs/BT_SCORING_PLAN.md`：刚完成的 BT 共享确定性评分器蓝图
@@ -49,7 +49,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 当前进行中的 promoted 主线是 Jellyfin 单 provider 真实联调预备；本会话已补齐 refresh 失败日志里的 provider 可观测性，当前主线已满足 focused exit。
+- 当前进行中的 promoted 主线是 Jellyfin 单 provider 真实 refresh smoke；上一条 Jellyfin 单 provider 真实联调预备已补齐 refresh 失败日志里的 provider 可观测性，并转入完成态。
 - 刚完成的 **Jellyfin / Plex 真实联调重评估** 主线保持完成态：provider 缺配置时的静默关闭 refresh 已收口，focused tests 保持全绿。
 - 再上一条 BT 批量任务显式批量确认主线保持完成态：`bt批量 / bt batch` 的确定性批量预览与 `bt批量确认 / bt batch confirm` 的显式批量确认都已完成，focused tests 保持全绿。
 - PT live seeding 真相接入 cleanup 阻断这条主线已在冷启动审计里满足文档出口，当前转入完成态；现有 cleanup PT guard 继续保持 `download_monitor.completion_observed_at` 的保守阻断。
@@ -63,16 +63,16 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Main risks and gaps
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Jellyfin / Plex 还没有 repo 内固定容器入口。
-- Jellyfin 单 provider 真实联调预备这一条线已补齐 provider 可观测性；下一步如果继续推进，将转到实际 Jellyfin refresh smoke 入口，而不是继续拆日志微分流。
+- 当前最小缺口不是再补日志分支，而是补一条真实 Jellyfin refresh smoke 证据；如果失败，也要把 provider / base_url / HTTP 结果或异常原因收清楚。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 Jellyfin 单 provider 真实联调预备（已满足 focused exit）
+- 窗口活性快照：当前主线为 Jellyfin 单 provider 真实 refresh smoke（上一条预备线已收口）
 - 当前状态快照：Jellyfin / Plex readiness 评估已转入完成态；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；Jellyfin 单 provider 预备线已收口，下一次继续时应切到实际 Jellyfin refresh smoke。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；上一条 Jellyfin 单 provider 预备线已收口，本轮文档已切到实际 Jellyfin refresh smoke。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
