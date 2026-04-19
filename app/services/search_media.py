@@ -30,7 +30,7 @@ BT_READ_ONLY_NOTICE_TEXT = "只读说明：当前结果仅供手动 BT 探索和
 BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT = "BT 批量预览格式：bt批量 <关键词或 allowlist 页面 URL> [1-3,5]"
 BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE = (
     "BT 批量预览暂不支持这个页面：{query}\n"
-    "请提供当前 allowlist 站点已声明的用户页或搜索结果页 URL。"
+    "请提供当前 allowlist 站点已声明的用户页、列表页或搜索结果页 URL。"
 )
 BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE = (
     "BT 批量预览编号格式无效：{selection}\n"

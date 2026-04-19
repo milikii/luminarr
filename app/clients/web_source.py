@@ -154,7 +154,8 @@ def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:
     query = parse_qs(parsed.query, keep_blank_values=False)
     user_name = next((item.strip() for item in query.get("u", ()) if item.strip()), "")
     search_text = next((item.strip() for item in query.get("q", ()) if item.strip()), "")
-    return bool(user_name or search_text)
+    category_text = next((item.strip() for item in query.get("c", ()) if item.strip()), "")
+    return bool(user_name or search_text or category_text)
 
 
 def _extract_title(row_html: str) -> str:

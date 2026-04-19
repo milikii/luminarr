@@ -4,7 +4,7 @@
 
 - 当前进行中的 promoted 主线是 **BT 更大范围的用户页 / 编号范围页能力**。2026-04-19 已确认上一条 **Plex 真实 refresh smoke 值得性重评估** 满足退出条件：当前主机 `curl http://127.0.0.1:32400/identity` 返回 `000`，本批次暂不继续追 Plex，先回到 BT。
 - 当前转回 BT 而不是继续拆 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；现在更保守也更直接的缺口，是 BT 还缺用户页 / 列表页 / 编号范围页这类更大范围输入能力。
-- allowlist 页面 URL 的只读批量预览、聊天缓存和 `bt批量确认` 复用 proof 已补齐；这一条主线本轮已满足 `Done when` 第 1 条，下一轮切到 `After this step` 第 1 项。
+- allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof 和 category/list 页面类型都已补齐；当前更保守的下一小步收窄到更省输入的页码语法。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
