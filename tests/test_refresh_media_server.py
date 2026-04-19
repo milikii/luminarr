@@ -22,23 +22,25 @@ def test_refresh_text_success() -> None:
 
 def test_refresh_text_failure_with_reason(capsys) -> None:
     refresh = AsyncMock(side_effect=RuntimeError("connection timeout"))
-    service = RefreshMediaServerService(refresh)
+    service = RefreshMediaServerService(refresh, provider_name="jellyfin")
 
     text = asyncio.run(service.refresh_text())
     assert text == REFRESH_FAILED_TEXT_TEMPLATE.format(reason="connection timeout")
     output = capsys.readouterr().out
     assert "[媒体库刷新失败]" in output
+    assert "provider=jellyfin" in output
     assert "connection timeout" in output
     assert "[处理建议]" in output
 
 
 def test_refresh_text_failure_with_unknown_reason(capsys) -> None:
     refresh = AsyncMock(side_effect=RuntimeError(""))
-    service = RefreshMediaServerService(refresh)
+    service = RefreshMediaServerService(refresh, provider_name="plex")
 
     text = asyncio.run(service.refresh_text())
     assert text == REFRESH_FAILED_TEXT_TEMPLATE.format(reason=REFRESH_FAILED_UNKNOWN_REASON)
     output = capsys.readouterr().out
     assert "[媒体库刷新失败]" in output
+    assert "provider=plex" in output
     assert REFRESH_FAILED_UNKNOWN_REASON in output
     assert "[处理建议]" in output

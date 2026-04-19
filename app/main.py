@@ -144,6 +144,7 @@ def _log_media_server_config_missing(provider: str, missing_keys: tuple[str, ...
 
 
 def _build_refresh_media_server_func(settings):
+    provider_name = settings.media_server_provider
     if settings.media_server_provider == "jellyfin":
         missing_keys: list[str] = []
         if not settings.jellyfin_base_url:
@@ -177,7 +178,7 @@ def _build_refresh_media_server_func(settings):
             base_url=settings.emby_base_url,
             api_key=settings.emby_api_key,
         ).refresh_library
-    refresh_service = RefreshMediaServerService(refresh_func)
+    refresh_service = RefreshMediaServerService(refresh_func, provider_name=provider_name)
     return refresh_service.refresh_text
 
 
