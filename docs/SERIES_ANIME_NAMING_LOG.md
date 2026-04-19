@@ -5,7 +5,7 @@
 
 ## 1. Current line
 
-- 当前主线状态：2026-04-19 已在 `app/main.py` 主线完成后切入，并在同日通过 `_extract_title_year_for_scrape()` 接入统一 parser + focused suite `245 passed` 满足 `Done when` 第 1 条；当前唯一主线已切到 `docs/SHARED_DELIVERY_UX_PLAN.md`
+- 当前主线状态：2026-04-19 已把 `.ass` 字幕最小支持重新提升成进行中的 promoted 主线；本轮只允许在 2.3 里继续补“识别 `.ass` -> 提取 `Dialogue:` 文本 -> 回写 `.zh.ass`”这一条最小闭环，不回退 2.1 / 2.2 已完成出口。
 - 上一条已完成主线“`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化”已在 2026-04-19 通过 `app/downloader_route_lookup.py` helper 抽离满足 `Done when` 第 1 条，focused tests `16 passed, 1 deselected`
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/SERIES_ANIME_NAMING_PLAN.md`
 
@@ -39,8 +39,11 @@
 
 ### 2.3 `.ass` 最小支持
 
+当前施工目标：
+- 当前字幕翻译只处理 `.srt`；本轮 promoted 主线只补 `.ass` 最小支持：识别 `.ass`、提取 `Dialogue:` 文本、复用现有翻译 API，并回写 `.zh.ass`。
+
 当前风险：
-- 当前字幕翻译只处理 `.srt`；动漫主线落地时必须同步评估 `.ass`，但只允许做最小文本替换，不扩大到嵌入字幕或复杂样式改写。
+- 这一步只允许替换 `Dialogue:` 文本字段；若把 Style、时间轴、特效标签或其他 header 结构改坏，就会直接破坏播放器兼容性。
 
 ## 3. Focused verification
 

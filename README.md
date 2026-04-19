@@ -110,22 +110,21 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
 - cleanup 已补 `pt_min_seed_hours` 基于完成观察时间窗的保守阻断；这还不是 downloader live seeding 秒数能力。
 - 当前最稳的是 movie-first；quick start、BT 共享确定性评分器、Jellyfin / Plex refresh provider 支持都已完成。
-- 字幕翻译当前仍只处理 `.srt`；`.ass` 继续保留为后续能力缺口，不阻塞当前主线切换。
+- 字幕翻译当前正式进入 `.ass` 最小支持主线；目标是补齐 `.ass` 文本替换，不扩成 `.ssa`、嵌入字幕或复杂样式改写。
 - BT 路线已可用，并已升级成共享确定性评分器。
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前没有进行中的 promoted 主线；刚完成的主线是 cleanup PT 最小保护窗口，Jellyfin / Plex 支持是上一条已完成主线。后续若要继续做其他事项，先以 `docs/NEXT_STEP.md` 完成切线，再开工。
+- **当前施工状态**：当前进行中的 promoted 主线是 `.ass` 字幕最小支持；目标是在不放大边界的前提下，把导入后字幕翻译从 `.srt` 补到 `.srt` + 最小 `.ass`。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前完成态主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
+- **当前主线蓝图**：`docs/SERIES_ANIME_NAMING_PLAN.md`（看 §7 `.ass` 字幕同步评估）
 - **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
 - **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；更细的验证入口和历史闭环看 `docs/STATUS.md`
-- 当前只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起新 promoted 主线或改 workflow 真相。
-- cleanup PT 最小保护窗口已收口；后续若要继续其他事项，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
+- **本地回归命令**：当前 `.ass` 主线入口看 `docs/NEXT_STEP.md`；更细的验证入口和历史闭环看 `docs/STATUS.md` 与 `docs/SERIES_ANIME_NAMING_LOG.md`
+- 当前只允许围绕 `.ass` 最小支持施工，不顺手放大到 `.ssa`、OCR、嵌入字幕或新的 workflow 真相。
 
 ## 6. 当前明确不做
 
