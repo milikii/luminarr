@@ -3614,6 +3614,51 @@ def test_handle_message_bt_batch_preview_user_sort_page_number_syntax_routes_to_
     assert "当前预览范围：1" in sent_text
 
 
+def test_handle_message_bt_batch_preview_user_sort_page_number_url_routes_to_page_fetch() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist user sort page number url")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2"
+        return [
+            {
+                "title": "title-Frieren S01E18",
+                "source": "magnet:?xt=urn:btih:1818181818181818181818181818181818181818",
+                "infoHash": "1818181818181818181818181818181818181818",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    update, reply_text = _build_update("bt批量 https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2 1-1")
+    search_service = SearchMediaService(
+        _fake_search,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "BT 批量预览结果：https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2" in sent_text
+    assert "title-Frieren S01E18" in sent_text
+    assert "当前预览范围：1" in sent_text
+
+
 def test_handle_message_bt_batch_preview_uncategorized_user_page_number_routes_to_page_fetch() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for uncategorized user page number syntax")
@@ -4432,6 +4477,68 @@ def test_handle_message_bt_batch_confirm_reuses_user_sort_page_number_syntax_pre
     )
 
     preview_update, preview_reply = _build_update("bt批量 https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc p=2 1-2")
+    asyncio.run(handle_message(preview_update, context))
+    assert preview_reply.await_count == 1
+
+    confirm_update, confirm_reply = _build_update("bt批量确认 1-2")
+    asyncio.run(handle_message(confirm_update, context))
+
+    confirm_reply.assert_awaited_once()
+    sent_text = confirm_reply.await_args.args[0]
+    assert sent_text.count("待确认：下载 ⏳") == 2
+    assert "片名：title-Frieren S01E18" in sent_text
+    assert "片名：title-Frieren S01E19" in sent_text
+    assert "确认下载：发送 confirm 1" in sent_text
+    assert "确认下载：发送 confirm 2" in sent_text
+
+
+def test_handle_message_bt_batch_confirm_reuses_user_sort_page_number_url_preview_candidates() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist user sort page number url")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2"
+        return [
+            {
+                "title": "title-Frieren S01E18",
+                "source": "magnet:?xt=urn:btih:1818181818181818181818181818181818181818",
+                "infoHash": "1818181818181818181818181818181818181818",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+            {
+                "title": "title-Frieren S01E19",
+                "source": "magnet:?xt=urn:btih:1919191919191919191919191919191919191919",
+                "infoHash": "1919191919191919191919191919191919191919",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+        ]
+
+    search_service = SearchMediaService(
+        _fake_search,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                DOWNLOADER_ROLE_BINDING_KEY: DownloaderRoleBinding(pt_downloader="", bt_downloader=""),
+                DOWNLOADER_INSTANCES_KEY: (
+                    DownloaderInstanceConfig(name="", downloader_type="transmission", base_url="", download_dir="/downloads"),
+                ),
+            }
+        )
+    )
+
+    preview_update, preview_reply = _build_update("bt批量 https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2 1-2")
     asyncio.run(handle_message(preview_update, context))
     assert preview_reply.await_count == 1
 
