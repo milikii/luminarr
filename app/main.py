@@ -132,6 +132,14 @@ def _build_bt_source_providers(
     return tuple(providers)
 
 
+def _build_refresh_media_server_func(settings):
+    if not settings.emby_base_url or not settings.emby_api_key:
+        return None
+    emby_client = EmbyClient(base_url=settings.emby_base_url, api_key=settings.emby_api_key)
+    refresh_service = RefreshMediaServerService(emby_client.refresh_library)
+    return refresh_service.refresh_text
+
+
 def main() -> None:
     settings = load_settings()
     trace_log_dir = Path((os.getenv("LUMINARR_LOG_DIR", "./logs") or "./logs").strip()).expanduser()
@@ -253,11 +261,7 @@ def main() -> None:
         download_monitor_repo=download_monitor_repo,
         trace_log_path=trace_log_path,
     )
-    refresh_media_server_func = None
-    if settings.emby_base_url and settings.emby_api_key:
-        emby_client = EmbyClient(base_url=settings.emby_base_url, api_key=settings.emby_api_key)
-        refresh_service = RefreshMediaServerService(emby_client.refresh_library)
-        refresh_media_server_func = refresh_service.refresh_text
+    refresh_media_server_func = _build_refresh_media_server_func(settings)
     import_to_library_service = ImportToLibraryService(
         get_import_source_func=get_torrent_import_source_with_routing,
         library_target_dir=settings.library_target_dir,

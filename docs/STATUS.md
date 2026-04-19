@@ -24,8 +24,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_SCORING_PLAN.md`：当前 BT 共享确定性评分器蓝图
-- `docs/BT_SCORING_LOG.md`：当前 BT 共享确定性评分器详细台账
+- `docs/JELLYFIN_PLEX_PLAN.md`：当前 Jellyfin / Plex 支持蓝图
+- `docs/BT_SCORING_PLAN.md`：刚完成的 BT 共享确定性评分器蓝图
+- `docs/BT_SCORING_LOG.md`：刚完成的 BT 共享确定性评分器详细台账
 - `docs/QUICK_START_PLAN.md`：刚完成的 quick start 蓝图
 - `docs/DEPLOY_CHECKLIST.md`：刚完成的部署者最短路径 checklist
 - `docs/SHARED_DELIVERY_UX_LOG.md`：更早完成的“shared private-chat 交付体验收口”详细台账
@@ -61,34 +62,39 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已落 `app/services/bt_scoring_rules.yml` 和最小 YAML 加载：评分器现在可从仓库规则文件读权重；缺文件或坏字段时打印中文 warning 并回退内置默认值；`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py` 继续通过。
 - 2026-04-19 已把 `app/services/pure_bt.py` 的单片优选切到共享评分器，并补 `tests/test_pure_bt.py`；纯 BT 现在复用统一 drop/filter/score 规则，不再自己维护排序分支；`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py` 得到通过。
 - 2026-04-19 已把 `app/services/manage_bt_subscription.py::_scan_chat_once()` 的订阅选源切到共享评分器，并补 `tests/test_manage_bt_subscription.py`；订阅扫描现在复用统一低质量过滤、排序和规则文件，但仍保持原有待确认创建、`last_seen` 回写和 scheduler tick 协议不变。
+- 2026-04-19 已把 `app/services/search_media.py` 的媒体型 BT 候选展示切到共享评分器排序，并补 `tests/test_search_media.py`；候选展示顺序与 `candidate_mapping` 缓存顺序现在保持一致，BT 评分器主线已满足退出条件 1。
+- 2026-04-19 已落 Jellyfin Phase 1 基线：新增 `app/clients/jellyfin.py`、`tests/test_jellyfin_client.py`，并把 `app/main.py` 的媒体服务器 refresh client 创建抽成单独 helper；当前仍保持 Emby 默认路径不变，下一步切到 provider 选择。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
-- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线切到 BT 共享确定性评分器，不回退 cleanup 和 shared delivery 已确认的协议与结论。
+- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线已切到 Jellyfin / Plex 支持，不回退 cleanup 和 shared delivery 已确认的协议与结论。
 - 上一条 BT 订阅主线已把命令解析、媒体类型前缀解析、标题年份抽取和清单增删回复文本抽到 `app/services/bt_subscription_command.py`；扫描候选筛选、`last_seen` 更新和 scheduler tick 继续保留在 service 内，作为已完成主线的剩余结构证据。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
 
-- 当前还没接到共享评分器的 BT 路径只剩一条：媒体型 BT 候选展示。
-- 当前下一步已经收窄到媒体型 BT 候选展示：只改候选排序，不改用户选择、approval 或后续 workflow 真相。
+- 当前唯一主线已切到 Jellyfin / Plex 支持；最小下一步先补 provider 选择入口，保持 Emby 兼容默认值，不改导入成功真相。
+- 当前风险已从 BT 选源排序转移到媒体服务器边界：虽然 Jellyfin refresh client baseline 已有，但 `app/main.py` 仍只认 Emby 默认入口，Jellyfin / Plex provider 选择还没接进配置。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 BT 评分器主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
-- quick start 主线已在 2026-04-19 满足 `Done when` 第 1 条；当前唯一主线已切到 BT 共享确定性评分器。
+- quick start 主线已在 2026-04-19 满足 `Done when` 第 1 条；当前唯一主线已先后切到 BT 共享确定性评分器，并已继续切到 Jellyfin / Plex 支持。
 
 ## Latest verification
 
-- 窗口活性快照：`bt scoring` 主线进行中
+- 窗口活性快照：`jellyfin / plex` 主线已切换
 - 当前状态快照：已切换
-- 当前结论快照：quick start 主线已在 2026-04-19 满足退出条件 1；当前唯一主线已切到 BT 共享确定性评分器。
+- 当前结论快照：BT 共享确定性评分器主线已在 2026-04-19 满足退出条件 1；当前唯一主线已切到 Jellyfin / Plex 支持。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - 当前主线 focused verification：2026-04-19，`16 passed, 1 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`）
+- 当前主线 focused verification：2026-04-19，`24 passed`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py`）
 - 当前主线 focused verification：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`184 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_sources.py tests/test_import_to_library.py`）
-- 当前主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py`）
-- 当前主线 focused verification：2026-04-19，`5 passed`（`.venv/bin/python -m pytest -q tests/test_pure_bt.py`）
-- 当前主线 focused verification：2026-04-19，`38 passed`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`）
+- 刚完成主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py`）
+- 刚完成主线 focused verification：2026-04-19，`5 passed`（`.venv/bin/python -m pytest -q tests/test_pure_bt.py`）
+- 刚完成主线 focused verification：2026-04-19，`38 passed`（`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py`）
+- 刚完成主线 focused verification：2026-04-19，`43 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py`）
+- 刚完成主线 focused verification：2026-04-19，`62 passed`（`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py tests/test_manage_bt_subscription.py`）
 - 当前主线 focused verification：2026-04-19，`4 passed`（`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py`）
 - four-channel cleanup smoke tests：`376 passed`（2026-04-14，`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`46 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
@@ -111,8 +117,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 更早主线切换审计：2026-04-18，`15 passed, 34 deselected`（`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py tests/test_feishu_long_connection.py -k "handle_feishu_private_text_event or routes_sdk_event"`）
 - 更早主线切换审计：2026-04-18，`passed`（`.venv/bin/python -m pytest -q tests/test_feishu_long_connection.py`；`rg -n "lark_ws_client_module\\.loop|_disconnect|_auto_reconnect|_cache" app/bot/feishu_long_connection.py` 命中 `0`）
 - 更早主线切换审计：2026-04-18，`passed`（`bash -lc "git grep -n 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot | wc -l"`，命中 `0`）
-- 当前主线蓝图：`docs/BT_SCORING_PLAN.md`
-- 当前主线详细台账：`docs/BT_SCORING_LOG.md`
+- 当前主线蓝图：`docs/JELLYFIN_PLEX_PLAN.md`
+- 刚完成主线蓝图：`docs/BT_SCORING_PLAN.md`
+- 刚完成主线详细台账：`docs/BT_SCORING_LOG.md`
 - 刚完成部署主线蓝图：`docs/QUICK_START_PLAN.md`
 - 刚完成部署主线交付物：`docs/DEPLOY_CHECKLIST.md`
 - 更早主线详细台账：`docs/SHARED_DELIVERY_UX_LOG.md`

@@ -20,7 +20,7 @@ class RefreshMediaServerService:
             reason = str(exc).strip() or REFRESH_FAILED_UNKNOWN_REASON
             print(
                 f"\033[31m[媒体库刷新失败]\033[0m 错误={reason}\n"
-                "\033[33m[处理建议]\033[0m 检查 Emby 地址、API Key 和网络连通性；当前会返回刷新失败文本，但导入成功不会回滚。",
+                "\033[33m[处理建议]\033[0m 检查媒体服务器地址、API Key 和网络连通性；当前会返回刷新失败文本，但导入成功不会回滚。",
                 flush=True,
             )
             return REFRESH_FAILED_TEXT_TEMPLATE.format(reason=reason)

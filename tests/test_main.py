@@ -8,6 +8,7 @@ from telegram.error import NetworkError
 
 from app.main import (
     DownloaderRouteLookupError,
+    _build_refresh_media_server_func,
     _get_torrent_import_source_with_routing,
     _get_torrent_status_with_routing,
     _resolve_downloader_client_for_dispatch,
@@ -313,6 +314,43 @@ def test_resolve_downloader_client_for_dispatch_logs_missing_client(
     assert "downloader_type=transmission" in captured.out
     assert "原因=client not configured" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_build_refresh_media_server_func_returns_none_without_emby_settings() -> None:
+    settings = SimpleNamespace(emby_base_url="", emby_api_key="")
+
+    assert _build_refresh_media_server_func(settings) is None
+
+
+def test_build_refresh_media_server_func_wraps_emby_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    class FakeEmbyClient:
+        def __init__(self, *, base_url: str, api_key: str) -> None:
+            calls["base_url"] = base_url
+            calls["api_key"] = api_key
+            calls["refresh_library"] = self.refresh_library
+
+        async def refresh_library(self) -> None:
+            return None
+
+    class FakeRefreshService:
+        def __init__(self, refresh_func) -> None:
+            calls["refresh_func"] = refresh_func
+            self.refresh_text = object()
+
+    monkeypatch.setattr("app.main.EmbyClient", FakeEmbyClient)
+    monkeypatch.setattr("app.main.RefreshMediaServerService", FakeRefreshService)
+
+    settings = SimpleNamespace(emby_base_url="http://emby:8096", emby_api_key="emby-key")
+
+    refresh_func = _build_refresh_media_server_func(settings)
+
+    assert calls["base_url"] == "http://emby:8096"
+    assert calls["api_key"] == "emby-key"
+    assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakeEmbyClient
+    assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
+    assert refresh_func is not None
 
 
 async def _return_async(value):
