@@ -53,6 +53,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前主风险是 `app/bot/private_chat_runtime.py` 仍把 frustration reset、pending state gate、命令分发、shared reply 包装和部分 trace / stop-path 文案揉在同一入口函数里；下一步只能拆一个连贯切片，不能顺手大改。
 - 当前必须继续守住已经落下来的 fail-closed 方向，不能在做 `private_chat_runtime.py` 瘦身时回退四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+- `git log --oneline -20` 近 20 条提交标题仍主要停在 `manage_bt_subscription` 完成态和后续规划文档，尚未单独命名 cleanup/runtime 主线切换；冷启动时应以 `docs/NEXT_STEP.md`、当前代码树和 focused tests 为准。
 - `private_chat_runtime.py`、`app/main.py` 已列入当前主线与后续编排层瘦身计划；`cleanup_downloaded_source.py` 已转入已完成主线台账。
 - `series / anime` 名称解析、`.ass` 字幕支持仍是更后面的工作，不提前并行展开。
 
