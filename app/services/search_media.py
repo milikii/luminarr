@@ -8,6 +8,7 @@ from typing import Any
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
+from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.search_request_context import (
     LookupMovieFunc,
     ParsedMovieQuery,
@@ -43,6 +44,7 @@ CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON = "candidate_mapping count miss
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
 CANDIDATE_CLEAR_RESULT_MISSING_REASON = "candidate clear result missing"
 CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON = "candidate clear result missing during persist rollback"
+SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,7 +114,13 @@ class SearchMediaService:
         selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
         return format_bt_read_only_reply(cleaned_query, selected_raw_results)
 
-    async def search_and_format(self, query: str, chat_id: int | None = None) -> str:
+    async def search_and_format(
+        self,
+        query: str,
+        chat_id: int | None = None,
+        *,
+        channel: str | None = None,
+    ) -> str:
         cleaned_query = query.strip()
         if not cleaned_query:
             return EMPTY_QUERY_TEXT
@@ -219,6 +227,14 @@ class SearchMediaService:
                     return CANDIDATE_STATE_UNAVAILABLE_TEXT
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
+        if channel in SUPPORTED_DELIVERY_CHANNELS and candidates:
+            return render_search_results_reply(
+                query=cleaned_query,
+                parsed_query=parsed_query,
+                tmdb_movie=tmdb_movie,
+                candidates=candidates,
+                channel=channel,
+            )
         return format_movie_query_reply(cleaned_query, parsed_query, tmdb_movie, candidates)
 
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
@@ -453,6 +469,59 @@ def format_movie_query_reply(
     return f"{card_text}\n\n{candidates_text}"
 
 
+def render_search_results_reply(
+    *,
+    query: str,
+    parsed_query: ParsedMovieQuery,
+    tmdb_movie: TmdbMovie | None,
+    candidates: Sequence[Candidate],
+    channel: str,
+) -> str:
+    item = build_search_results_delivery_item(
+        query=query,
+        parsed_query=parsed_query,
+        tmdb_movie=tmdb_movie,
+        candidates=candidates,
+    )
+    return render_delivery_item(item, channel=channel)
+
+
+def build_search_results_delivery_item(
+    *,
+    query: str,
+    parsed_query: ParsedMovieQuery,
+    tmdb_movie: TmdbMovie | None,
+    candidates: Sequence[Candidate],
+) -> DeliveryItem:
+    if not candidates:
+        raise ValueError("search results delivery requires at least one candidate")
+    card_title, card_year, card_alias = _resolve_movie_card_fields(parsed_query, tmdb_movie)
+    candidate_lines: list[str] = []
+    for index, item in enumerate(candidates, start=1):
+        candidate_lines.append(f"{index}. {item.title} ({item.year})")
+        candidate_lines.append(f"画质：{item.quality} ｜ 大小：{item.size} ｜ 站点：{item.indexer}")
+    return DeliveryItem(
+        header=DeliveryHeader(kind="search_results", title=f"搜索：{query}", subtitle=f"候选结果（{len(candidates)} 条）"),
+        sections=(
+            DeliverySection(
+                label="电影信息",
+                lines=(
+                    f"片名：{card_title}",
+                    f"年份：{card_year}",
+                    f"别名：{card_alias}",
+                    "海报：暂未接入图片",
+                ),
+            ),
+            DeliverySection(label="候选结果", lines=tuple(candidate_lines)),
+        ),
+        actions=(
+            DeliveryAction(label="开始下载", hint="发送 select 1", kind="primary"),
+            DeliveryAction(label="换关键词", hint=f"发送 search {query}", kind="secondary"),
+        ),
+        status="success",
+    )
+
+
 def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]]) -> str:
     if not candidates:
         return BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query=query)
@@ -472,6 +541,18 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
 
 
 def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> str:
+    card_title, card_year, card_alias = _resolve_movie_card_fields(parsed_query, tmdb_movie)
+    lines = [
+        "电影海报卡片",
+        f"片名: {card_title}",
+        f"年份: {card_year}",
+        f"别名: {card_alias}",
+        "海报: 暂未接入图片",
+    ]
+    return "\n".join(lines)
+
+
+def _resolve_movie_card_fields(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> tuple[str, str, str]:
     card_title = parsed_query.title or "-"
     card_year = parsed_query.year.strip() or "-"
     card_alias = "-"
@@ -490,15 +571,7 @@ def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMov
 
         if english_title and english_title != card_title:
             card_alias = english_title
-
-    lines = [
-        "电影海报卡片",
-        f"片名: {card_title}",
-        f"年份: {card_year}",
-        f"别名: {card_alias}",
-        "海报: 暂未接入图片",
-    ]
-    return "\n".join(lines)
+    return card_title, card_year, card_alias
 
 
 def _safe_text(value: Any, default: str) -> str:

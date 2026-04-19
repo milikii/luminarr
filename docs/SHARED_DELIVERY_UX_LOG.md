@@ -15,6 +15,7 @@
 
 已完成闭环：
 - 已新增 `app/runtime/delivery.py`，落下 `DeliveryHeader` / `DeliverySection` / `DeliveryAction` / `DeliveryItem` 四个 dataclass，以及 Telegram / Feishu / personal WeChat / WeCom 四个纯文本 fallback renderer 骨架。
+- 已把 `search_media` 成功候选回复接到 `DeliveryItem`：shared runtime 现在会按 `channel` 选择 Telegram / Feishu / personal WeChat / WeCom 文本 renderer，搜索结果不再只复用同一份裸字符串。
 - 已新增 `tests/test_delivery_renderers.py`，先锁 `search_results` / `approval` / `status` / `error` 四类核心消息在四渠道 fallback 渲染的最小排版输出。
 
 当前风险：

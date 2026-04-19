@@ -50,6 +50,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已落 `app/services/naming_rules.yml` 和可选规则加载：parser 现在会把静态噪音词、跨语言别名和质量白名单从规则文件读进来，缺文件或格式错误时回退内置最小集；`.venv/bin/python -m pytest -q tests/test_media_name_parser.py` 得到 `15 passed`。
 - 2026-04-19 已把 `series / anime` 主线的最后一个下载完成文件名 fallback 接点 `import_to_library._extract_title_year_for_scrape()` 切到统一 parser；`.venv/bin/python -m pytest -q tests/test_media_name_parser.py tests/test_search_media.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_subtitle_translator.py` 得到 `245 passed`，该主线满足 `Done when` 第 1 条并已切到 shared private-chat 交付体验主线。
 - 2026-04-19 已落 `app/runtime/delivery.py` Phase 1 基线：统一定义 `DeliveryItem` 内容模型和四渠道纯文本 fallback renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py` 得到 `4 passed`。
+- 2026-04-19 已把 `search_media` 成功候选回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py tests/test_search_media.py tests/test_private_chat_runtime.py -k "delivery or routes_search or writes_trace_log"` 得到通过，四渠道搜索回复开始按 `channel` 分开展示。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 shared private-chat 内容模型、四渠道 renderer 和分层文本协议，不回退 cleanup 已确认的协议和 guardrail。

@@ -78,6 +78,17 @@ def render_wecom_text(item: DeliveryItem) -> str:
     )
 
 
+def render_delivery_item(item: DeliveryItem, *, channel: str) -> str:
+    channel_name = channel.strip().lower()
+    if channel_name == "personal_wechat":
+        return render_personal_wechat_text(item)
+    if channel_name == "wecom":
+        return render_wecom_text(item)
+    if channel_name == "feishu":
+        return render_feishu_text(item)
+    return render_telegram_text(item)
+
+
 def _render_text_item(item: DeliveryItem, style: _RenderStyle) -> str:
     lines: list[str] = []
     header_line = _format_header_line(item.header, status=item.status, style=style)

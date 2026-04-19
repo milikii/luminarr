@@ -724,6 +724,7 @@ async def handle_private_chat_query_text(
             search_service=search_service,
             query=query,
             chat_id=chat_id,
+            channel=channel,
         ),
     )
     await reply_func(reply)

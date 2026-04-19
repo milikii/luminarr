@@ -2425,9 +2425,10 @@ async def _search_with_reactive_recovery(
     search_service: SearchMediaService,
     query: str,
     chat_id: int | None,
+    channel: str = "telegram",
 ) -> str:
     try:
-        return await search_service.search_and_format(query, chat_id=chat_id)
+        return await search_service.search_and_format(query, chat_id=chat_id, channel=channel)
     except Exception as error:
         if not _is_llm_physical_failure(error):
             raise
@@ -2435,7 +2436,7 @@ async def _search_with_reactive_recovery(
     recovery_context = _build_recovery_context(query=query, chat_id=chat_id)
     compact_query = recovery_context["current_job_context"]
     try:
-        return await search_service.search_and_format(compact_query, chat_id=chat_id)
+        return await search_service.search_and_format(compact_query, chat_id=chat_id, channel=channel)
     except Exception as error:
         if _is_llm_physical_failure(error):
             return LLM_PHYSICAL_FAILURE_SAFE_TEXT

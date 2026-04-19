@@ -113,7 +113,27 @@ def test_dispatch_private_chat_text_writes_trace_log_when_configured(tmp_path: P
     assert parsed_entries[0].channel == "telegram"
     assert parsed_entries[0].query == "dune"
     assert parsed_entries[1] is not None
-    assert parsed_entries[1].reply_head == "电影海报卡片"
+    assert parsed_entries[1].reply_head == "搜索：dune ✓"
+
+
+def test_dispatch_private_chat_text_routes_search_with_channel_delivery_renderer() -> None:
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="dune",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            channel="personal_wechat",
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert sent_text.startswith("【搜索：dune】 ✓")
+    assert "▸ 候选结果" in sent_text
 
 
 def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -> None:

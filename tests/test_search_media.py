@@ -84,6 +84,30 @@ def test_search_and_format_with_results() -> None:
     assert text.index("电影海报卡片") < text.index("搜索结果：dune")
 
 
+def test_search_and_format_uses_delivery_renderer_for_personal_wechat_channel() -> None:
+    service = SearchMediaService(_fake_search_with_results)
+
+    text = _run(service.search_and_format("dune", chat_id=1001, channel="personal_wechat"))
+
+    assert text.startswith("【搜索：dune】 ✓")
+    assert "▸ 电影信息" in text
+    assert "▸ 候选结果" in text
+    assert "1. Dune: Part Two (2024)" in text
+    assert "画质：2160p ｜ 大小：8.0 GB ｜ 站点：IndexerA" in text
+    assert "开始下载：发送 select 1" in text
+
+
+def test_search_and_format_uses_delivery_renderer_for_wecom_channel() -> None:
+    service = SearchMediaService(_fake_search_with_results)
+
+    text = _run(service.search_and_format("dune", chat_id=1001, channel="wecom"))
+
+    assert text.startswith("搜索：dune ✓")
+    assert "- 电影信息" in text
+    assert "- 候选结果" in text
+    assert "换关键词：发送 search dune" in text
+
+
 def test_search_and_format_empty_query() -> None:
     service = SearchMediaService(_fake_search_with_results)
     text = _run(service.search_and_format("   "))
