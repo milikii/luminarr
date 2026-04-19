@@ -47,8 +47,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 当前进行中的 promoted 主线是 PT live seeding 真相接入 cleanup 阻断；目标是在不放宽 fail-closed 的前提下，把 downloader 当前做种真相接到 `pt_min_seed_hours` 判断。
-- 当 `PT_MIN_SEED_HOURS` > 0 时，PT 任务的 `cleanup inspect` / `cleanup` 已会按 `download_monitor.completion_observed_at` 做保守时间窗阻断；缺少必要真相时显式拒绝。
+- 当前进行中的 promoted 主线是 BT 批量任务最小预览；当前只做 `raw_bt / pure_bt` 的确定性批量预览，不做批量 dispatch。
+- PT live seeding 真相接入 cleanup 阻断这条主线已在冷启动审计里满足文档出口，当前转入完成态；现有 cleanup PT guard 继续保持 `download_monitor.completion_observed_at` 的保守阻断。
 - Jellyfin / Plex 支持已基本完成：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client；完成态蓝图只看 `docs/JELLYFIN_PLEX_PLAN.md`。
 - quick start、BT 共享确定性评分器、shared delivery、`series / anime`、`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身都保持完成态，不回退成进行中。
 - 四个正式私聊入口继续共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
@@ -58,17 +58,17 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前 PT live seeding 主线刚提升完成，代码尚未补齐；后续施工必须守住“优先读 live seeding 真相，拿不到就继续 fail-closed”边界。
-- cleanup PT 最小保护窗口这一步只基于 `download_monitor.completion_observed_at` 做保守阻断；还不是 downloader live seeding 秒数能力。
+- 当前 BT 批量任务主线还没有 parser / range preview 最小实现；后续施工必须守住“先预览、后确认、当前不 dispatch”边界。
+- Jellyfin / Plex 真实联调还没有本仓库正式本地测试栈入口；在当前冷启动里优先级低于 BT 批量预览。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
-- cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；但这还不是 downloader live seeding 秒数能力。
+- cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 PT live seeding 真相接入 cleanup 阻断
-- 当前状态快照：`.ass` 字幕最小支持已通过 focused tests 收口，并已切到 PT live seeding 真相主线。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；`.ass` 字幕 focused tests 已通过，下一步优先补 downloader live seeding 真相而不是继续放大字幕能力边界。
+- 窗口活性快照：当前主线为 BT 批量任务最小预览
+- 当前状态快照：PT live seeding 文档出口已满足，当前已切到 BT 批量任务最小预览主线。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；Jellyfin / Plex 真实联调暂不优先，下一步先补 BT 批量预览最小闭环。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）

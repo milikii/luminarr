@@ -24,7 +24,8 @@
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
 | `docs/CODEX_3_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 3 轮连续推进这个仓库 | 会话模板 |
 | `docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 10 轮连续推进并控制 token 消耗 | 会话模板 |
-| `docs/PT_LIVE_SEEDING_PLAN.md` | 当前 PT live seeding 真相主线的最小蓝图 | 当前主线蓝图 |
+| `docs/BT_BATCH_PLAN.md` | 当前 BT 批量任务最小预览主线的最小蓝图 | 当前主线蓝图 |
+| `docs/PT_LIVE_SEEDING_PLAN.md` | 刚完成的 PT live seeding 真相主线蓝图 | 已完成主线蓝图 |
 | `docs/SLIMMING_RULES.md` | 编排层瘦身 / 模块化主线的共用纪律 | 施工纪律 |
 | `docs/JELLYFIN_PLEX_PLAN.md` | 已完成的 Jellyfin / Plex 支持主线设计蓝图 | 已完成主线蓝图 |
 | `docs/BT_SCORING_PLAN.md` | 刚完成的 BT 共享确定性评分器主线设计蓝图 | 已完成主线蓝图 |
@@ -70,28 +71,29 @@
 
 1. `docs/NEXT_STEP.md`
 2. `docs/STATUS.md`
-3. `docs/PT_LIVE_SEEDING_PLAN.md`（需要看当前主线蓝图时）
-4. `docs/BT_SCORING_PLAN.md`（需要看刚完成主线蓝图时）
-5. `docs/BT_SCORING_LOG.md`（需要看刚完成主线细节时）
-6. `docs/QUICK_START_PLAN.md`（需要看刚完成部署主线蓝图时）
-7. `docs/DEPLOY_CHECKLIST.md`（需要看刚完成部署主线交付物时）
-8. `docs/SHARED_DELIVERY_UX_PLAN.md`（需要看更早完成主线蓝图时）
-9. `docs/SHARED_DELIVERY_UX_LOG.md`（需要看更早完成主线细节时）
-10. `docs/SERIES_ANIME_NAMING_PLAN.md`（需要看再上一条主线蓝图时）
-11. `docs/SERIES_ANIME_NAMING_LOG.md`（需要看再上一条主线细节时）
-12. `docs/APP_MAIN_SLIMMING_LOG.md`（需要看上一条更早主线闭环时）
-13. `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（需要看再上一条主线闭环时）
-14. `docs/CLEANUP_SLIMMING_LOG.md`（需要看更早主线闭环时）
-15. `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`（需要看更早主线闭环时）
-16. `docs/SEARCH_MEDIA_SLIMMING_LOG.md`（需要看更早主线闭环时）
-17. `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`（需要看更早主线闭环时）
-18. `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`（需要看更早主线闭环时）
-19. `docs/TELEGRAM_BOT_SLIMMING_LOG.md`（需要看更早主线闭环时）
-20. `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（需要看更早主线闭环时）
-21. `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（需要看更早主线闭环时）
-22. `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（需要看再更早主线闭环时）
-23. `docs/PERSISTENCE_CLOSURE_LOG.md`（需要看更早完成主线闭环时）
-24. `docs/CLEANUP_VERIFICATION_WINDOW.md`（需要看 cleanup 已完成证据时）
+3. `docs/BT_BATCH_PLAN.md`（需要看当前主线蓝图时）
+4. `docs/PT_LIVE_SEEDING_PLAN.md`（需要看刚完成主线蓝图时）
+5. `docs/BT_SCORING_PLAN.md`（需要看更早完成主线蓝图时）
+6. `docs/BT_SCORING_LOG.md`（需要看更早完成主线细节时）
+7. `docs/QUICK_START_PLAN.md`（需要看刚完成部署主线蓝图时）
+8. `docs/DEPLOY_CHECKLIST.md`（需要看刚完成部署主线交付物时）
+9. `docs/SHARED_DELIVERY_UX_PLAN.md`（需要看更早完成主线蓝图时）
+10. `docs/SHARED_DELIVERY_UX_LOG.md`（需要看更早完成主线细节时）
+11. `docs/SERIES_ANIME_NAMING_PLAN.md`（需要看再上一条主线蓝图时）
+12. `docs/SERIES_ANIME_NAMING_LOG.md`（需要看再上一条主线细节时）
+13. `docs/APP_MAIN_SLIMMING_LOG.md`（需要看上一条更早主线闭环时）
+14. `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`（需要看再上一条主线闭环时）
+15. `docs/CLEANUP_SLIMMING_LOG.md`（需要看更早主线闭环时）
+16. `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`（需要看更早主线闭环时）
+17. `docs/SEARCH_MEDIA_SLIMMING_LOG.md`（需要看更早主线闭环时）
+18. `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`（需要看更早主线闭环时）
+19. `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`（需要看更早主线闭环时）
+20. `docs/TELEGRAM_BOT_SLIMMING_LOG.md`（需要看更早主线闭环时）
+21. `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`（需要看更早主线闭环时）
+22. `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`（需要看更早主线闭环时）
+23. `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`（需要看再更早主线闭环时）
+24. `docs/PERSISTENCE_CLOSURE_LOG.md`（需要看更早完成主线闭环时）
+25. `docs/CLEANUP_VERIFICATION_WINDOW.md`（需要看 cleanup 已完成证据时）
 
 ### 想理解“为什么不能随便改”
 

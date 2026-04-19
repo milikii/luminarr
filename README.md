@@ -115,16 +115,17 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前进行中的 promoted 主线是 PT live seeding 真相接入 cleanup 阻断；目标是在不放宽 fail-closed 的前提下，把 downloader 当前做种真相接到 `pt_min_seed_hours` 判断。
+- **当前施工状态**：当前进行中的 promoted 主线是 BT 批量任务最小预览；先只做 `raw_bt / pure_bt` 的确定性批量预览，不做批量 dispatch。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/PT_LIVE_SEEDING_PLAN.md`
+- **当前主线蓝图**：`docs/BT_BATCH_PLAN.md`
+- **刚完成主线蓝图**：`docs/PT_LIVE_SEEDING_PLAN.md`
 - **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
 - **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前 PT live seeding 主线入口看 `docs/NEXT_STEP.md`；`.ass` 历史闭环继续看 `docs/SERIES_ANIME_NAMING_LOG.md`
-- 当前只允许围绕 PT live seeding 真相施工，不顺手放大到 cleanup 自动化、乐观放行或新的 workflow 真相。
+- **本地回归命令**：当前 BT 批量任务主线入口看 `docs/NEXT_STEP.md`；PT live seeding 历史蓝图继续看 `docs/PT_LIVE_SEEDING_PLAN.md`
+- 当前只允许围绕 BT 批量预览施工，不顺手放大到批量 approval、批量 dispatch、Jellyfin / Plex 真实联调或新的 workflow 真相。
 
 ## 6. 当前明确不做
 
@@ -181,6 +182,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
+- `docs/BT_BATCH_PLAN.md`：当前主线蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
 - `docs/BT_SCORING_PLAN.md`：刚完成的 BT 评分器主线蓝图
 - `docs/QUICK_START_PLAN.md`：刚完成的部署主线蓝图
