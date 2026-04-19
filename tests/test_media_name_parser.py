@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from app.services.media_name_parser import parse_media_name
+from app.services.media_name_parser import load_naming_rules, parse_media_name
 
 
 @pytest.mark.parametrize(
@@ -44,7 +46,7 @@ from app.services.media_name_parser import parse_media_name
             "鬼灭之刃 S01E01",
             {
                 "title": "鬼灭之刃",
-                "alt_titles": (),
+                "alt_titles": ("Demon Slayer", "Kimetsu no Yaiba"),
                 "year": None,
                 "season": 1,
                 "episode": 1,
@@ -60,7 +62,7 @@ from app.services.media_name_parser import parse_media_name
             "进击的巨人 第2季",
             {
                 "title": "进击的巨人",
-                "alt_titles": (),
+                "alt_titles": ("Attack on Titan", "Shingeki no Kyojin", "進撃の巨人"),
                 "year": None,
                 "season": 2,
                 "episode": None,
@@ -92,7 +94,7 @@ from app.services.media_name_parser import parse_media_name
             "[SweetSub][Frieren][01][WebRip][1080p][AVC AAC][CHS][MP4]",
             {
                 "title": "Frieren",
-                "alt_titles": (),
+                "alt_titles": ("葬送的芙莉莲", "Sousou no Frieren"),
                 "year": None,
                 "season": None,
                 "episode": 1,
@@ -108,7 +110,7 @@ from app.services.media_name_parser import parse_media_name
             "鬼灭之刃.Demon.Slayer.S01E01.1080p.WEB-DL.x264-GROUP",
             {
                 "title": "鬼灭之刃",
-                "alt_titles": ("Demon Slayer",),
+                "alt_titles": ("Demon Slayer", "Kimetsu no Yaiba"),
                 "year": None,
                 "season": 1,
                 "episode": 1,
@@ -124,7 +126,7 @@ from app.services.media_name_parser import parse_media_name
             "Frieren.S01E01-03.2160p.BluRay.10bit.mkv",
             {
                 "title": "Frieren",
-                "alt_titles": (),
+                "alt_titles": ("葬送的芙莉莲", "Sousou no Frieren"),
                 "year": None,
                 "season": 1,
                 "episode": 1,
@@ -140,7 +142,7 @@ from app.services.media_name_parser import parse_media_name
             "Attack on Titan EP 07 1080p",
             {
                 "title": "Attack on Titan",
-                "alt_titles": (),
+                "alt_titles": ("进击的巨人", "Shingeki no Kyojin", "進撃の巨人"),
                 "year": None,
                 "season": None,
                 "episode": 7,
@@ -156,7 +158,7 @@ from app.services.media_name_parser import parse_media_name
             "【葬送的芙莉莲】.ass",
             {
                 "title": "葬送的芙莉莲",
-                "alt_titles": (),
+                "alt_titles": ("Frieren", "Sousou no Frieren"),
                 "year": None,
                 "season": None,
                 "episode": None,
@@ -185,3 +187,60 @@ def test_parse_media_name_typical_inputs(raw: str, expected: dict[str, object]) 
     assert parsed.media_kind == expected["media_kind"]
     min_confidence, max_confidence = expected["confidence_range"]
     assert min_confidence <= parsed.parser_confidence <= max_confidence
+
+
+def test_parse_media_name_uses_repo_rules_for_primary_title_aliases() -> None:
+    parsed = parse_media_name("进击的巨人 第2季 繁中")
+
+    assert parsed.title == "进击的巨人"
+    assert "Attack on Titan" in parsed.alt_titles
+    assert "Shingeki no Kyojin" in parsed.alt_titles
+    assert "繁中" not in parsed.title
+
+
+def test_parse_media_name_uses_repo_rules_for_alias_title() -> None:
+    parsed = parse_media_name("Attack on Titan EP 07")
+
+    assert parsed.title == "Attack on Titan"
+    assert "进击的巨人" in parsed.alt_titles
+    assert "Shingeki no Kyojin" in parsed.alt_titles
+
+
+def test_parse_media_name_uses_repo_rules_to_strip_noise_tags() -> None:
+    parsed = parse_media_name("鬼灭之刃 国配 1080p")
+
+    assert parsed.title == "鬼灭之刃"
+    assert parsed.quality_tags == ("1080p",)
+    assert "Demon Slayer" in parsed.alt_titles
+
+
+def test_parse_media_name_uses_custom_quality_whitelist(tmp_path: Path) -> None:
+    rules_path = tmp_path / "naming_rules.yml"
+    rules_path.write_text(
+        "\n".join(
+            [
+                "strip_tags:",
+                "  - 国配",
+                "alt_titles:",
+                '  - primary: "葬送的芙莉莲"',
+                '    aliases: ["Frieren"]',
+                "quality_whitelist:",
+                "  - Remux",
+                "  - 1080p",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    parsed = parse_media_name("Frieren Remux 国配", naming_rules=load_naming_rules(rules_path))
+
+    assert parsed.title == "Frieren"
+    assert parsed.quality_tags == ("Remux",)
+    assert "葬送的芙莉莲" in parsed.alt_titles
+
+
+def test_load_naming_rules_falls_back_to_builtin_defaults_for_missing_file(tmp_path: Path) -> None:
+    parsed = parse_media_name("Dune CHS 1080p", naming_rules=load_naming_rules(tmp_path / "missing.yml"))
+
+    assert parsed.title == "Dune"
+    assert parsed.quality_tags == ("1080p",)

@@ -1,0 +1,31 @@
+strip_tags:
+  - 国配
+  - 繁中
+  - 无字幕
+  - 中日双语
+  - 简繁
+  - CHT
+  - CHS
+
+alt_titles:
+  - primary: "进击的巨人"
+    aliases: ["Attack on Titan", "Shingeki no Kyojin", "進撃の巨人"]
+  - primary: "鬼灭之刃"
+    aliases: ["Demon Slayer", "Kimetsu no Yaiba"]
+  - primary: "葬送的芙莉莲"
+    aliases: ["Frieren", "Sousou no Frieren"]
+
+quality_whitelist:
+  - 2160p
+  - 1080p
+  - 720p
+  - WEB-DL
+  - WEBRip
+  - BluRay
+  - BDRip
+  - HDR
+  - DV
+  - 10bit
+  - HEVC
+  - x264
+  - x265

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import ast
 import re
 import unicodedata
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 _SEASON_EPISODE_RE = re.compile(
@@ -22,33 +25,46 @@ _CONTAINER_SUFFIX_RE = re.compile(r"\.(?P<container>mkv|mp4|ass|srt)\s*$", flags
 _CONTAINER_TOKEN_RE = re.compile(r"(?<![A-Za-z0-9])(?P<container>mkv|mp4|ass|srt)(?![A-Za-z0-9])", flags=re.IGNORECASE)
 _CHINESE_PHRASE_RE = re.compile(r"[\u3400-\u9fff][\u3400-\u9fff0-9·・\s'’:：-]{0,80}")
 _LATIN_PHRASE_RE = re.compile(r"[A-Za-z][A-Za-z0-9'’:&+\s-]{0,80}")
+_DEFAULT_RULES_PATH = Path(__file__).with_name("naming_rules.yml")
+_DEFAULT_STRIP_TAGS = (
+    "国配",
+    "繁中",
+    "简中",
+    "简繁",
+    "无字幕",
+    "中日双语",
+    "双语",
+    "CHS",
+    "CHT",
+)
+_DEFAULT_QUALITY_WHITELIST = (
+    "2160p",
+    "1080p",
+    "720p",
+    "WEB-DL",
+    "WEBRip",
+    "BluRay",
+    "BDRip",
+    "HDR",
+    "DV",
+    "10bit",
+    "HEVC",
+    "x264",
+    "x265",
+)
 
-_STRIP_TAG_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("国配", re.compile(r"(?<![\w\u3400-\u9fff])国配(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("繁中", re.compile(r"(?<![\w\u3400-\u9fff])繁中(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("简中", re.compile(r"(?<![\w\u3400-\u9fff])简中(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("简繁", re.compile(r"(?<![\w\u3400-\u9fff])简繁(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("无字幕", re.compile(r"(?<![\w\u3400-\u9fff])无字幕(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("中日双语", re.compile(r"(?<![\w\u3400-\u9fff])中日双语(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("双语", re.compile(r"(?<![\w\u3400-\u9fff])双语(?![\w\u3400-\u9fff])", flags=re.IGNORECASE)),
-    ("CHS", re.compile(r"(?<![A-Za-z0-9])CHS(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("CHT", re.compile(r"(?<![A-Za-z0-9])CHT(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-)
-_QUALITY_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("2160p", re.compile(r"(?<![A-Za-z0-9])2160p(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("1080p", re.compile(r"(?<![A-Za-z0-9])1080p(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("720p", re.compile(r"(?<![A-Za-z0-9])720p(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("WEB-DL", re.compile(r"(?<![A-Za-z0-9])WEB[-_. ]?DL(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("WEBRip", re.compile(r"(?<![A-Za-z0-9])WEB[-_. ]?Rip(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("BluRay", re.compile(r"(?<![A-Za-z0-9])BluRay(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("BDRip", re.compile(r"(?<![A-Za-z0-9])BDRip(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("HDR", re.compile(r"(?<![A-Za-z0-9])HDR(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("DV", re.compile(r"(?<![A-Za-z0-9])DV(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("10bit", re.compile(r"(?<![A-Za-z0-9])10bit(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("HEVC", re.compile(r"(?<![A-Za-z0-9])HEVC(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("x264", re.compile(r"(?<![A-Za-z0-9])x264(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-    ("x265", re.compile(r"(?<![A-Za-z0-9])x265(?![A-Za-z0-9])", flags=re.IGNORECASE)),
-)
+
+@dataclass(frozen=True, slots=True)
+class AltTitleRule:
+    primary: str
+    aliases: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class NamingRules:
+    strip_tags: tuple[str, ...]
+    quality_whitelist: tuple[str, ...]
+    alt_titles: tuple[AltTitleRule, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +93,37 @@ class _EpisodeParseResult:
     loose_match: bool
 
 
-def parse_media_name(raw: str) -> ParsedMediaName:
+_DEFAULT_NAMING_RULES = NamingRules(
+    strip_tags=_DEFAULT_STRIP_TAGS,
+    quality_whitelist=_DEFAULT_QUALITY_WHITELIST,
+    alt_titles=(),
+)
+
+
+def load_naming_rules(config_path: Path | None = None) -> NamingRules:
+    resolved_path = (config_path or _DEFAULT_RULES_PATH).expanduser()
+    if not resolved_path.exists():
+        return _DEFAULT_NAMING_RULES
+    return _load_naming_rules_cached(str(resolved_path.resolve()))
+
+
+@lru_cache(maxsize=8)
+def _load_naming_rules_cached(config_path: str) -> NamingRules:
+    path = Path(config_path)
+    try:
+        return _parse_naming_rules_yaml(path.read_text(encoding="utf-8"))
+    except Exception as error:
+        print(
+            f"\033[31m[命名规则文件读取失败]\033[0m path={path} 错误={error}\n"
+            "\033[33m[处理建议]\033[0m 检查 app/services/naming_rules.yml 缩进、引号和 aliases 列表格式；"
+            "当前会回退到内置最小规则，避免把解析链直接卡死。",
+            flush=True,
+        )
+        return _DEFAULT_NAMING_RULES
+
+
+def parse_media_name(raw: str, *, naming_rules: NamingRules | None = None) -> ParsedMediaName:
+    resolved_rules = naming_rules or load_naming_rules()
     normalized_raw = _normalize_text(raw)
     if not normalized_raw:
         return ParsedMediaName(
@@ -101,14 +147,15 @@ def parse_media_name(raw: str) -> ParsedMediaName:
     year, working_text = _extract_year(working_text)
     episode_result = _extract_episode_context(working_text)
     working_text = episode_result.text
-    quality_tags, working_text = _extract_quality_tags(working_text)
-    stripped_tags, working_text = _strip_noise_tags(working_text)
+    quality_tags, working_text = _extract_quality_tags(working_text, resolved_rules.quality_whitelist)
+    stripped_tags, working_text = _strip_noise_tags(working_text, resolved_rules.strip_tags)
     if container is None:
         container, working_text = _extract_container_token(working_text)
     if source_group is None:
         source_group, working_text = _extract_trailing_group(working_text)
 
     title, alt_titles = _extract_titles(working_text)
+    alt_titles = _apply_alt_title_rules(title=title, alt_titles=alt_titles, alt_title_rules=resolved_rules.alt_titles)
     media_kind = _infer_media_kind(
         title=title,
         year=year,
@@ -174,9 +221,9 @@ def _looks_like_source_group(value: str) -> bool:
         return False
     if _SEASON_EPISODE_RE.fullmatch(value) or _SEASON_TEXT_RE.fullmatch(value) or _EPISODE_TEXT_RE.fullmatch(value):
         return False
-    if any(pattern.fullmatch(value) for _, pattern in _QUALITY_PATTERNS):
+    if any(pattern.fullmatch(value) for pattern in _build_quality_patterns(_DEFAULT_QUALITY_WHITELIST).values()):
         return False
-    if any(pattern.fullmatch(value) for _, pattern in _STRIP_TAG_PATTERNS):
+    if any(pattern.fullmatch(value) for pattern in _build_strip_tag_patterns(_DEFAULT_STRIP_TAGS).values()):
         return False
     if value.lower() in {"mkv", "mp4", "ass", "srt"}:
         return False
@@ -302,10 +349,10 @@ def _find_loose_episode(text: str) -> tuple[int, str] | None:
     return candidate, remaining
 
 
-def _extract_quality_tags(text: str) -> tuple[tuple[str, ...], str]:
+def _extract_quality_tags(text: str, quality_whitelist: tuple[str, ...]) -> tuple[tuple[str, ...], str]:
     quality_tags: list[str] = []
     working_text = text
-    for label, pattern in _QUALITY_PATTERNS:
+    for label, pattern in _build_quality_patterns(quality_whitelist).items():
         if pattern.search(working_text) is None:
             continue
         working_text = pattern.sub(" ", working_text)
@@ -313,10 +360,10 @@ def _extract_quality_tags(text: str) -> tuple[tuple[str, ...], str]:
     return tuple(quality_tags), _normalize_text(working_text)
 
 
-def _strip_noise_tags(text: str) -> tuple[tuple[str, ...], str]:
+def _strip_noise_tags(text: str, strip_tags: tuple[str, ...]) -> tuple[tuple[str, ...], str]:
     removed_tags: list[str] = []
     working_text = text
-    for label, pattern in _STRIP_TAG_PATTERNS:
+    for label, pattern in _build_strip_tag_patterns(strip_tags).items():
         if pattern.search(working_text) is None:
             continue
         working_text = pattern.sub(" ", working_text)
@@ -362,6 +409,31 @@ def _extract_titles(text: str) -> tuple[str, tuple[str, ...]]:
     return fallback, ()
 
 
+def _apply_alt_title_rules(
+    *,
+    title: str,
+    alt_titles: tuple[str, ...],
+    alt_title_rules: tuple[AltTitleRule, ...],
+) -> tuple[str, ...]:
+    if not title:
+        return alt_titles
+    normalized_seen = {_normalize_compare_key(title), *(_normalize_compare_key(item) for item in alt_titles)}
+    merged_alt_titles = list(alt_titles)
+    for rule in alt_title_rules:
+        candidates = (rule.primary, *rule.aliases)
+        if not any(_normalize_compare_key(candidate) in normalized_seen for candidate in candidates):
+            continue
+        for candidate in candidates:
+            normalized_candidate = _normalize_compare_key(candidate)
+            if not normalized_candidate or normalized_candidate == _normalize_compare_key(title):
+                continue
+            if normalized_candidate in normalized_seen:
+                continue
+            merged_alt_titles.append(candidate)
+            normalized_seen.add(normalized_candidate)
+    return tuple(merged_alt_titles)
+
+
 def _unique_phrases(values: list[str]) -> list[str]:
     phrases: list[str] = []
     for value in values:
@@ -381,6 +453,12 @@ def _clean_phrase(value: str) -> str:
     cleaned = value.strip(" -._:：[](){}")
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip()
+
+
+def _normalize_compare_key(value: str) -> str:
+    normalized = _normalize_text(value)
+    normalized = re.sub(r"[^0-9A-Za-z\u3400-\u9fff]+", " ", normalized)
+    return normalized.casefold().strip()
 
 
 def _phrase_sort_key(value: str) -> tuple[int, int]:
@@ -437,3 +515,134 @@ def _compute_confidence(
         confidence -= 0.2
 
     return max(0.0, min(1.0, round(confidence, 2)))
+
+
+def _build_strip_tag_patterns(strip_tags: tuple[str, ...]) -> dict[str, re.Pattern[str]]:
+    patterns: dict[str, re.Pattern[str]] = {}
+    for tag in strip_tags:
+        cleaned_tag = _clean_phrase(tag)
+        if not cleaned_tag or cleaned_tag in patterns:
+            continue
+        patterns[cleaned_tag] = _build_keyword_pattern(cleaned_tag)
+    return patterns
+
+
+def _build_quality_patterns(quality_whitelist: tuple[str, ...]) -> dict[str, re.Pattern[str]]:
+    patterns: dict[str, re.Pattern[str]] = {}
+    for label in quality_whitelist:
+        cleaned_label = _clean_phrase(label)
+        if not cleaned_label or cleaned_label in patterns:
+            continue
+        patterns[cleaned_label] = _build_keyword_pattern(cleaned_label)
+    return patterns
+
+
+def _build_keyword_pattern(value: str) -> re.Pattern[str]:
+    pieces = [re.escape(piece) for piece in re.split(r"[-_. ]+", value) if piece]
+    body = r"[-_. ]?".join(pieces) if pieces else re.escape(value)
+    return re.compile(rf"(?<![A-Za-z0-9]){body}(?![A-Za-z0-9])", flags=re.IGNORECASE)
+
+
+def _parse_naming_rules_yaml(text: str) -> NamingRules:
+    strip_tags: list[str] = []
+    quality_whitelist: list[str] = []
+    alt_titles: list[AltTitleRule] = []
+    current_section = ""
+    lines = text.splitlines()
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            index += 1
+            continue
+
+        if not line.startswith(" "):
+            if not stripped.endswith(":"):
+                raise ValueError(f"top-level section malformed: {stripped}")
+            current_section = stripped[:-1]
+            if current_section not in {"strip_tags", "quality_whitelist", "alt_titles"}:
+                raise ValueError(f"unsupported section: {current_section}")
+            index += 1
+            continue
+
+        if current_section in {"strip_tags", "quality_whitelist"}:
+            if not line.startswith("  - "):
+                raise ValueError(f"list item malformed under {current_section}: {stripped}")
+            value = _parse_yaml_scalar(stripped[2:].strip())
+            target = strip_tags if current_section == "strip_tags" else quality_whitelist
+            target.append(value)
+            index += 1
+            continue
+
+        if current_section == "alt_titles":
+            if not line.startswith("  - "):
+                raise ValueError(f"alt_titles item malformed: {stripped}")
+            item = stripped[2:].strip()
+            if not item.startswith("primary:"):
+                raise ValueError(f"alt_titles primary missing: {stripped}")
+            primary = _parse_yaml_scalar(item.partition(":")[2].strip())
+            aliases: list[str] = []
+            index += 1
+            while index < len(lines):
+                nested_line = lines[index]
+                nested_stripped = nested_line.strip()
+                if not nested_stripped or nested_stripped.startswith("#"):
+                    index += 1
+                    continue
+                if not nested_line.startswith("    "):
+                    break
+                if nested_stripped.startswith("aliases:"):
+                    alias_body = nested_stripped.partition(":")[2].strip()
+                    if alias_body:
+                        aliases.extend(_parse_inline_yaml_list(alias_body))
+                        index += 1
+                        continue
+                    index += 1
+                    while index < len(lines):
+                        alias_line = lines[index]
+                        alias_stripped = alias_line.strip()
+                        if not alias_stripped or alias_stripped.startswith("#"):
+                            index += 1
+                            continue
+                        if not alias_line.startswith("      - "):
+                            break
+                        aliases.append(_parse_yaml_scalar(alias_stripped[2:].strip()))
+                        index += 1
+                    continue
+                raise ValueError(f"unsupported alt_titles field: {nested_stripped}")
+            alt_titles.append(AltTitleRule(primary=primary, aliases=tuple(aliases)))
+            continue
+
+        raise ValueError(f"content outside supported section: {stripped}")
+
+    return NamingRules(
+        strip_tags=tuple(strip_tags or _DEFAULT_STRIP_TAGS),
+        quality_whitelist=tuple(quality_whitelist or _DEFAULT_QUALITY_WHITELIST),
+        alt_titles=tuple(alt_titles),
+    )
+
+
+def _parse_yaml_scalar(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError("empty scalar is not allowed")
+    if cleaned[0] in {"'", '"'} and cleaned[-1] == cleaned[0]:
+        return str(ast.literal_eval(cleaned))
+    return cleaned
+
+
+def _parse_inline_yaml_list(value: str) -> list[str]:
+    try:
+        parsed = ast.literal_eval(value)
+    except Exception as error:
+        raise ValueError(f"inline list malformed: {value}") from error
+    if not isinstance(parsed, list):
+        raise ValueError(f"inline list malformed: {value}")
+    result: list[str] = []
+    for item in parsed:
+        if not isinstance(item, str):
+            raise ValueError(f"inline list contains non-string: {value}")
+        result.append(item)
+    return result

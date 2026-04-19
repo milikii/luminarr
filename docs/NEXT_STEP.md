@@ -1,4 +1,4 @@
-# Next step (v213)
+# Next step (v214)
 
 ## Current goal
 
@@ -32,7 +32,7 @@
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 已完成窗口的详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
-- 当前最小闭环：按 `docs/SERIES_ANIME_NAMING_PLAN.md` Phase 2 加载可选 `app/services/naming_rules.yml` 规则文件和 5 条跨语言 / 噪音输入 unit test，不提前切四处集成点
+- 当前最小闭环：按 `docs/SERIES_ANIME_NAMING_PLAN.md` Phase 3 把 `search_media`、BT source adapter、`post_download_auto_import`、`import_to_library` 四处集成点切到统一 parser，不改现有 movie-first 行为
 
 ## Source of truth
 
