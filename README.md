@@ -124,7 +124,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
 - **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；更细的验证入口和历史闭环看 `docs/STATUS.md`
 - 这一步只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起 plugin 体系或改 workflow 真相。
-- 当前上一条主线已满足退出条件 1；后续继续其他事项前，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
+- 当前上一条主线已完成；旧退出条件只保留在历史蓝图 / 台账语境。后续继续其他事项前，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
 
 ## 6. 当前明确不做
 
