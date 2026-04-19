@@ -23,6 +23,7 @@ from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
 from app.clients.jellyfin import JellyfinClient
+from app.clients.plex import PlexClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
@@ -140,6 +141,13 @@ def _build_refresh_media_server_func(settings):
         refresh_func = JellyfinClient(
             base_url=settings.jellyfin_base_url,
             api_key=settings.jellyfin_api_key,
+        ).refresh_library
+    elif settings.media_server_provider == "plex":
+        if not settings.plex_base_url or not settings.plex_token:
+            return None
+        refresh_func = PlexClient(
+            base_url=settings.plex_base_url,
+            token=settings.plex_token,
         ).refresh_library
     else:
         if not settings.emby_base_url or not settings.emby_api_key:

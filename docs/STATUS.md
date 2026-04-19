@@ -66,6 +66,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已落 Jellyfin Phase 1 基线：新增 `app/clients/jellyfin.py`、`tests/test_jellyfin_client.py`，并把 `app/main.py` 的媒体服务器 refresh client 创建抽成单独 helper；当前仍保持 Emby 默认路径不变，下一步切到 provider 选择。
 - 2026-04-19 已完成 Jellyfin / Plex 主线 Phase 2：`app/config.py` 新增 `MEDIA_SERVER_PROVIDER`、`JELLYFIN_BASE_URL`、`JELLYFIN_API_KEY`，`app/main.py` 已能在 Emby 默认路径之外切到 Jellyfin refresh client；`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py` 得到 `52 passed`，当前最小下一步切到 Plex baseline。
 - 2026-04-19 已补 Plex refresh client baseline：新增 `app/clients/plex.py`、`tests/test_plex_client.py`，当前已锁定 Plex refresh URL 和 token 传递方式；`.venv/bin/python -m pytest -q tests/test_plex_client.py tests/test_refresh_media_server.py` 得到 `5 passed`，剩余缺口只剩把 Plex 接进 provider 选择。
+- 2026-04-19 已完成 Jellyfin / Plex 主线最后一步：`app/config.py` 新增 `PLEX_BASE_URL`、`PLEX_TOKEN`，`MEDIA_SERVER_PROVIDER` 已放宽到 `plex`，`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client；`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`，本线已满足 `Done when` 第 1 条。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
 - cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线已切到 Jellyfin / Plex 支持，不回退 cleanup 和 shared delivery 已确认的协议与结论。
@@ -74,8 +75,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
-- 当前唯一主线已切到 Jellyfin / Plex 支持；Jellyfin provider 入口和 Plex client baseline 都已落地，最小下一步只剩 Plex 接线。
-- 当前风险已从“缺 Plex 协议”收窄到“缺 Plex 装配”：`app/main.py` / `app/config.py` 还没让 `MEDIA_SERVER_PROVIDER=plex` 走到新 client。
+- 当前 Jellyfin / Plex 主线已满足退出条件 1；当前没有新的 promoted 主线，`After this step` 仍保持 plugin 体系后置。
+- 当前剩余关注点不是媒体服务器 provider 装配，而是保持完成态文档、cleanup 证据和四渠道协议边界不回退。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 BT 评分器主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
@@ -91,6 +92,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前主线 focused verification：2026-04-19，`24 passed`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py`）
 - 当前主线 focused verification：2026-04-19，`52 passed`（`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py`）
 - 当前主线 focused verification：2026-04-19，`5 passed`（`.venv/bin/python -m pytest -q tests/test_plex_client.py tests/test_refresh_media_server.py`）
+- 当前主线 focused verification：2026-04-19，`56 passed`（`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py`）
 - 当前主线 focused verification：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`15 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
 - 当前主线 focused verification：2026-04-19，`184 passed`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_sources.py tests/test_import_to_library.py`）

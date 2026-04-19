@@ -33,6 +33,8 @@ def test_load_settings_reads_token() -> None:
     assert settings.emby_api_key == ""
     assert settings.jellyfin_base_url == ""
     assert settings.jellyfin_api_key == ""
+    assert settings.plex_base_url == ""
+    assert settings.plex_token == ""
     assert settings.subtitle_translation_api_key == ""
     assert settings.subtitle_translation_base_url == "https://api.openai.com/v1"
     assert settings.subtitle_translation_model == "gpt-5.4"
@@ -133,9 +135,26 @@ def test_load_settings_rejects_unknown_media_server_provider() -> None:
                 "PROWLARR_BASE_URL": "http://prowlarr:9696/",
                 "PROWLARR_API_KEY": "api-key",
                 "TRANSMISSION_BASE_URL": "http://transmission:9091/",
-                "MEDIA_SERVER_PROVIDER": "plex",
+                "MEDIA_SERVER_PROVIDER": "kodi",
             }
         )
+
+
+def test_load_settings_reads_plex_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "MEDIA_SERVER_PROVIDER": "plex",
+            "PLEX_BASE_URL": "http://plex:32400/",
+            "PLEX_TOKEN": "plex-token",
+        }
+    )
+    assert settings.media_server_provider == "plex"
+    assert settings.plex_base_url == "http://plex:32400"
+    assert settings.plex_token == "plex-token"
 
 
 def test_load_settings_reads_tmdb_settings() -> None:

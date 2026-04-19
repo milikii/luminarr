@@ -41,11 +41,18 @@
 - 新增 `tests/test_plex_client.py`
 - `.venv/bin/python -m pytest -q tests/test_plex_client.py tests/test_refresh_media_server.py` 得到 `5 passed`
 
-当前最小下一步缩成 Phase 3 的最后一步：
+2026-04-19 已完成 Phase 3 最后一步：
 
 - 把 `app/main.py` 的 provider 选择补到 `plex`
 - 把 `app/config.py` 的 provider 校验放宽到 `plex`
 - 补齐 `tests/test_main.py` / `tests/test_config.py` 的 Plex 装配断言
+- `.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`
+
+当前主线已满足 `Done when` 第 1 条：
+
+- `app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client
+- Emby 兼容默认值仍保留，Jellyfin / Plex 入口都已接到独立 client
+- 当前不继续外扩真实 Jellyfin / Plex 联调，`After this step` 仍保持 plugin 体系后置
 
 这一阶段不做：
 

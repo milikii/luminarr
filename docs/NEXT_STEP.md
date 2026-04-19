@@ -2,13 +2,13 @@
 
 ## Current goal
 
-- 当前唯一主线：**Jellyfin / Plex 支持**（2026-04-19 BT 共享确定性评分器主线已满足退出条件 1：三条 BT 路径都已接入共享评分器，`.venv/bin/python -m pytest -q tests/test_bt_candidate_scorer.py tests/test_pure_bt.py tests/test_manage_bt_subscription.py` 得到 `62 passed`，现切到本线）
+- 当前唯一主线：**Jellyfin / Plex 支持已基本完成**（2026-04-19 已满足退出条件 1：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client，`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`）
 - 刚完成主线：**最小人类可用入口继续补齐已完成**；部署蓝图继续看 `docs/QUICK_START_PLAN.md`，交付物继续看 `docs/DEPLOY_CHECKLIST.md`
 - 上一条完成主线：**shared private-chat 交付体验收口已完成**；详细闭环继续写在 `docs/SHARED_DELIVERY_UX_LOG.md`
 - 再上一条完成主线：**`series / anime` 独立名称解析最小实现已完成**；详细闭环继续写在 `docs/SERIES_ANIME_NAMING_LOG.md`
 - 更早完成主线：**`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已完成**；详细闭环继续写在 `docs/CLEANUP_SLIMMING_LOG.md`
 - 更早完成主线：`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退
-- 当前最小闭环：按 `docs/JELLYFIN_PLEX_PLAN.md` Phase 3 最后一步把 Plex 接进 `app/main.py` / `app/config.py` 的 provider 选择，不改导入成功真相
+- 当前最小闭环：本线已满足 `Done when` 第 1 条；`After this step` 仍是 plugin 体系继续后置，暂不自动扩成新施工
 - 当前主线蓝图统一写在 `docs/JELLYFIN_PLEX_PLAN.md`
 
 ## Source of truth
@@ -27,11 +27,8 @@
 
 - 只推进 Jellyfin / Plex 支持的一个最小 Phase；每轮只做一个最小闭环，不顺手改 approval、dispatch、import、cleanup 或 workflow 真相
 - 当前优先交付：
-  - `app/main.py`
-  - `app/config.py`
-  - `tests/test_main.py`
-  - `tests/test_config.py`
-  - 后续补 current docs snapshot，不扩真实 Plex 联调
+  - 保持当前完成态文档一致
+  - 不把 plugin 体系提前拉回主线
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
 - 文档继续分层：`STATUS.md` 只保留当前快照，`BT_SCORING_PLAN.md` 承接当前主线蓝图，`QUICK_START_PLAN.md` / `DEPLOY_CHECKLIST.md` 保持刚完成部署主线的蓝图与交付物定位，其余完成台账继续只作历史闭环入口

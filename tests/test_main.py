@@ -323,6 +323,8 @@ def test_build_refresh_media_server_func_returns_none_without_media_server_setti
         emby_api_key="",
         jellyfin_base_url="",
         jellyfin_api_key="",
+        plex_base_url="",
+        plex_token="",
     )
 
     assert _build_refresh_media_server_func(settings) is None
@@ -354,6 +356,8 @@ def test_build_refresh_media_server_func_wraps_emby_client(monkeypatch: pytest.M
         emby_api_key="emby-key",
         jellyfin_base_url="",
         jellyfin_api_key="",
+        plex_base_url="",
+        plex_token="",
     )
 
     refresh_func = _build_refresh_media_server_func(settings)
@@ -391,6 +395,8 @@ def test_build_refresh_media_server_func_wraps_jellyfin_client(monkeypatch: pyte
         emby_api_key="",
         jellyfin_base_url="http://jellyfin:8096",
         jellyfin_api_key="jelly-key",
+        plex_base_url="",
+        plex_token="",
     )
 
     refresh_func = _build_refresh_media_server_func(settings)
@@ -398,6 +404,45 @@ def test_build_refresh_media_server_func_wraps_jellyfin_client(monkeypatch: pyte
     assert calls["base_url"] == "http://jellyfin:8096"
     assert calls["api_key"] == "jelly-key"
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakeJellyfinClient
+    assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
+    assert refresh_func is not None
+
+
+def test_build_refresh_media_server_func_wraps_plex_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: dict[str, object] = {}
+
+    class FakePlexClient:
+        def __init__(self, *, base_url: str, token: str) -> None:
+            calls["base_url"] = base_url
+            calls["token"] = token
+            calls["refresh_library"] = self.refresh_library
+
+        async def refresh_library(self) -> None:
+            return None
+
+    class FakeRefreshService:
+        def __init__(self, refresh_func) -> None:
+            calls["refresh_func"] = refresh_func
+            self.refresh_text = object()
+
+    monkeypatch.setattr("app.main.PlexClient", FakePlexClient)
+    monkeypatch.setattr("app.main.RefreshMediaServerService", FakeRefreshService)
+
+    settings = SimpleNamespace(
+        media_server_provider="plex",
+        emby_base_url="",
+        emby_api_key="",
+        jellyfin_base_url="",
+        jellyfin_api_key="",
+        plex_base_url="http://plex:32400",
+        plex_token="plex-token",
+    )
+
+    refresh_func = _build_refresh_media_server_func(settings)
+
+    assert calls["base_url"] == "http://plex:32400"
+    assert calls["token"] == "plex-token"
+    assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakePlexClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None
 
