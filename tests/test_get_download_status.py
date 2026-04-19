@@ -62,6 +62,29 @@ def test_get_status_text_success() -> None:
     assert "预计剩余: 02:01" in text
 
 
+def test_get_status_text_uses_delivery_renderer_for_personal_wechat_channel() -> None:
+    get_status = AsyncMock(
+        return_value=TransmissionTaskStatus(
+            task_id="87",
+            task_hash="b305bf",
+            name="Dune 1984",
+            status_code=4,
+            percent_done=0.56,
+            rate_download=1048576,
+            eta_seconds=121,
+        )
+    )
+    service = GetDownloadStatusService(get_status)
+
+    text = _run(service.get_status_text("87", channel="personal_wechat"))
+
+    assert text.startswith("【下载状态】 ⏳")
+    assert "查询对象：87" in text
+    assert "▸ 当前进度" in text
+    assert "任务：Dune 1984" in text
+    assert "刷新状态：发送 status 87" in text
+
+
 def test_get_status_text_not_found() -> None:
     service = GetDownloadStatusService(AsyncMock(return_value=None))
     text = _run(service.get_status_text("missing"))
@@ -141,6 +164,30 @@ def test_get_status_text_updates_download_monitor_truth_and_completion_event(tmp
     assert monitor_repo.list_pending_completion() == []
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
+
+
+def test_get_status_text_renders_follow_up_section_when_channel_delivery_enabled() -> None:
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        )
+    )
+    service._record_status_observation = AsyncMock(return_value="注意：下载状态观察落盘失败。\n\n自动导入已进入队列。")  # type: ignore[method-assign]
+
+    text = _run(service.get_status_text("87", channel="wecom"))
+
+    assert text.startswith("下载状态 ✓")
+    assert "- 当前进度" in text
+    assert "- 后续处理" in text
+    assert "自动导入已进入队列。" in text
 
 
 def test_get_status_text_logs_download_monitor_persistence_failure(capsys) -> None:

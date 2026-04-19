@@ -5,7 +5,7 @@
 
 ## 1. Current line
 
-- 当前主线状态：2026-04-19 已在 `series / anime` 独立名称解析主线通过 `Done when` 第 1 条后，正式切到 `shared private-chat` 交付体验收口
+- 当前主线状态：2026-04-19 已完成；通过 `.venv/bin/python -m pytest -q tests/test_delivery_renderers.py tests/test_search_media.py tests/test_add_to_downloader.py tests/test_get_download_status.py` 得到 `198 passed`，满足 `Done when` 第 1 条后已切到 `docs/QUICK_START_PLAN.md`
 - 上一条已完成主线“`series / anime` 独立名称解析最小实现”已在 2026-04-19 通过 `_extract_title_year_for_scrape()` 接入统一 parser 满足 `Done when` 第 1 条，focused suite `245 passed`
 - 当前这一步的设计蓝图、Phase 顺序和退出条件统一看 `docs/SHARED_DELIVERY_UX_PLAN.md`
 
@@ -25,6 +25,7 @@
 
 已完成闭环：
 - 已把 `add_to_downloader` 的待确认下载回复接到 `DeliveryItem`：shared runtime 在序号选片后会按 `channel` 输出分层审批提示，保留原有 approval / jobs / SQLite 真相和 fail-closed 文本常量不变。
+- 已把 `get_download_status` 的成功状态回复接到 `DeliveryItem`：shared runtime 现在会按 `channel` 输出状态摘要和后续处理分区，下载状态持久化与自动导入跟进逻辑不变。
 
 当前风险：
 - Telegram / personal WeChat / Feishu / WeCom 还没有按同一内容模型分开的 renderer；渠道差异目前主要靠裸文本常量承接。
@@ -32,7 +33,7 @@
 ### 2.3 错误与动作分层
 
 当前风险：
-- `get_download_status` 和剩余 fail-closed 错误文本还没接到 `DeliveryItem`；失败原因、处理建议和下一步动作仍经常揉在同一段字符串里。
+- 剩余 fail-closed 错误文本还没接到 `DeliveryItem`；失败原因、处理建议和下一步动作仍经常揉在同一段字符串里。
 
 ## 3. Focused verification
 

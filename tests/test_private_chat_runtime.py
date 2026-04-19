@@ -160,6 +160,41 @@ def test_dispatch_private_chat_text_routes_add_pending_with_channel_delivery_ren
     assert "确认下载：发送 confirm 1" in sent_text
 
 
+def test_dispatch_private_chat_text_routes_status_with_channel_delivery_renderer() -> None:
+    reply_text = AsyncMock()
+    bot_data = _build_bot_data()
+    status_service = bot_data[GET_DOWNLOAD_STATUS_SERVICE_KEY]
+    assert isinstance(status_service, GetDownloadStatusService)
+    status_service._get_status_func = AsyncMock(  # type: ignore[attr-defined]
+        return_value=SimpleNamespace(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 1984",
+            status_code=4,
+            percent_done=0.56,
+            rate_download=1024,
+            eta_seconds=30,
+        )
+    )
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="status 87",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            channel="personal_wechat",
+            bot_data=bot_data,
+        )
+    )
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert sent_text.startswith("【下载状态】 ⏳")
+    assert "查询对象：87" in sent_text
+    assert "刷新状态：发送 status 87" in sent_text
+
+
 def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -> None:
     reply_text = AsyncMock()
 

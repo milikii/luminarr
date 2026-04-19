@@ -426,7 +426,7 @@ async def handle_private_chat_query_text(
             return
         reply = await execution_gate.run(
             tg.ACTION_GET_DOWNLOAD_STATUS,
-            lambda: status_service.get_status_text(task_ref, chat_id=chat_id),
+            lambda: status_service.get_status_text(task_ref, chat_id=chat_id, channel=channel),
         )
         await reply_func(reply)
         return

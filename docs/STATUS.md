@@ -24,8 +24,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/SHARED_DELIVERY_UX_PLAN.md`：当前“shared private-chat 交付体验收口”蓝图
-- `docs/SHARED_DELIVERY_UX_LOG.md`：当前“shared private-chat 交付体验收口”详细台账
+- `docs/QUICK_START_PLAN.md`：当前“最小人类可用入口继续补齐”蓝图
+- `docs/SHARED_DELIVERY_UX_LOG.md`：刚完成的“shared private-chat 交付体验收口”详细台账
 - `docs/SERIES_ANIME_NAMING_LOG.md`：刚完成的“`series / anime` 独立名称解析最小实现”详细台账
 - `docs/APP_MAIN_SLIMMING_LOG.md`：已完成的“`app/main.py` 启动装配 / 下载器路由 helper 瘦身 / 模块化”详细台账
 - `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：已完成的“`private_chat_runtime.py` shared runtime 编排层瘦身 / 模块化”详细台账
@@ -52,26 +52,27 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已落 `app/runtime/delivery.py` Phase 1 基线：统一定义 `DeliveryItem` 内容模型和四渠道纯文本 fallback renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py` 得到 `4 passed`。
 - 2026-04-19 已把 `search_media` 成功候选回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py tests/test_search_media.py tests/test_private_chat_runtime.py -k "delivery or routes_search or writes_trace_log"` 得到通过，四渠道搜索回复开始按 `channel` 分开展示。
 - 2026-04-19 已把 `add_to_downloader` 的待确认下载回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_runtime.py -k "delivery_renderer or add_pending"` 得到通过，四渠道审批提示开始按 `channel` 分层展示。
+- 2026-04-19 已把 `get_download_status` 的成功状态回复接到 shared delivery renderer；`.venv/bin/python -m pytest -q tests/test_delivery_renderers.py tests/test_search_media.py tests/test_add_to_downloader.py tests/test_get_download_status.py` 得到通过，shared private-chat 主线满足当前 `Done when` 第 1 条。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
-- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线只做 shared private-chat 内容模型、四渠道 renderer 和分层文本协议，不回退 cleanup 已确认的协议和 guardrail。
+- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；当前新主线切到 quick start 入口补齐，不回退 cleanup 和 shared delivery 已确认的协议与结论。
 - 上一条 BT 订阅主线已把命令解析、媒体类型前缀解析、标题年份抽取和清单增删回复文本抽到 `app/services/bt_subscription_command.py`；扫描候选筛选、`last_seen` 更新和 scheduler tick 继续保留在 service 内，作为已完成主线的剩余结构证据。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
 
-- 当前 bot 回复仍主要来自字符串常量；搜索结果和下载审批已接到 `DeliveryItem`，但状态回复和剩余 fail-closed 错误还没真正接进现有 shared runtime。
-- Telegram / Feishu / personal WeChat / WeCom 仍主要共享同一份裸文本，交付层次和渠道差异还没收口。
-- 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在交付体验主线里把展示层改成第二套业务真相。
+- `docs/DEPLOY_CHECKLIST.md` 还不存在；当前从 clone 到 10 分钟跑通的最短路径还没真正收口。
+- `.env.example`、`README.md`、`docs/GETTING_STARTED.md` 之间仍有重复说明，部署者一眼抓重点还不够快。
+- 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 quick start 主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 - `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
-- shared private-chat 交付体验现已提升为当前唯一主线。
+- shared private-chat 交付体验主线已在 2026-04-19 满足 `Done when` 第 1 条；当前唯一主线已切到 quick start。
 
 ## Latest verification
 
-- 窗口活性快照：`shared private-chat` 主线进行中
+- 窗口活性快照：`quick start` 主线进行中
 - 当前状态快照：已切换
-- 当前结论快照：`series / anime` 主线已在 2026-04-19 满足退出条件 1；当前唯一主线已切到 shared private-chat 交付体验收口。
+- 当前结论快照：`shared private-chat` 主线已在 2026-04-19 满足退出条件 1；当前唯一主线已切到最小人类可用入口继续补齐。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - 当前主线 focused verification：2026-04-19，`16 passed, 1 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`）
 - 当前主线 focused verification：2026-04-19，`10 passed`（`.venv/bin/python -m pytest -q tests/test_media_name_parser.py`）
