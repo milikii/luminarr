@@ -170,7 +170,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 9. 文档入口
 
-开始任何新任务前，先读：
+第一次接手这个仓库时，先读：
 
 1. `docs/INDEX.md`
 2. `docs/GETTING_STARTED.md`
@@ -178,9 +178,16 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 4. `docs/DECISIONS.md`
 5. `docs/NEXT_STEP.md`
 6. `docs/STATUS.md`
-7. `docs/PERSISTENCE_CLOSURE_LOG.md`
-8. `AGENTS.md`
-9. `docs/HISTORY.md`（只看背景，不看当前执行真相）
+7. `AGENTS.md`
+
+同一会话里继续收尾时，默认只看：
+
+1. `AGENTS.md`
+2. `docs/NEXT_STEP.md`
+3. `docs/STATUS.md`
+4. 本轮直接相关的代码、测试和最近提交
+
+需要追旧闭环细节时，再按需看 `docs/PERSISTENCE_CLOSURE_LOG.md`；`docs/HISTORY.md` 只看背景，不看当前执行真相。
 
 常用入口：
 
