@@ -1,6 +1,6 @@
-# Jellyfin / Plex real verification plan (v1)
+# Jellyfin / Plex real verification plan (v2)
 
-> 目的：先把 “Jellyfin / Plex 真实联调值不值得升成下一条 promoted 主线” 这件事收成一个可执行的小闭环，而不是直接扩成新的媒体服务器大工程。
+> 目的：在 Jellyfin 单 provider 真实 smoke 已收口之后，继续回答“Plex 真实 refresh smoke 还值不值得补做”，而不是直接扩成新的媒体服务器大工程。
 
 ## 1. 要解决的真实问题
 
@@ -29,20 +29,21 @@
 - `MEDIA_SERVER_PROVIDER=jellyfin / plex` 但缺少必填配置时，`app/main.py` 不再静默返回 `None`
 - 启动装配会打印显式中文 `[媒体服务器配置缺失]` 与 `[处理建议]`
 - `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"` 得到 `10 passed, 46 deselected`
+- 同日追加当前主机 Plex 探针：`curl http://127.0.0.1:32400/identity` 返回 `000`，说明本机没有自动发现到可达 Plex 实例；在没有真实实例前，继续追 Plex smoke 的收益低于回到 BT 更大范围能力
 
 ## 3. Phase 顺序
 
 1. Phase 1：补 provider 选定但配置缺失时的显式中文日志与 focused tests。
-2. Phase 2：复用现有 Emby 测试栈整理真实 refresh baseline，不新增 Jellyfin / Plex 容器。
-3. Phase 3：基于 Phase 1-2 的证据，决定下一条 promoted 主线是“单 provider 真实联调”还是回到 BT 更大范围能力。
+2. Phase 2：基于 Jellyfin smoke 已收口和 Plex 入口探针结果，决定 Plex 是否还值得继续追真实实例。当前进行中。
+3. Phase 3：如果当前批次仍无 Plex 实例，就回到 BT 更大范围能力；只有后续单独拿到实例时才再开 Plex smoke 主线。
 
 ## 4. Done when
 
 当前主线视为 **已收口**，满足以下任一条即可：
 
 1. `MEDIA_SERVER_PROVIDER=jellyfin / plex` 且缺少必填配置时，启动装配会打印显式中文日志和 `[处理建议]`，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"` 全绿；
-2. `docs/TEST_ENV.md` / `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` 一致表达“当前正式本地真实 refresh 栈只有 Emby；Jellyfin / Plex 先做 readiness 评估”；
-3. 使用现有 Emby 测试栈完成一条真实 refresh baseline 记录，并能明确回答“下一条 promoted 主线是否值得切到 Jellyfin 或 Plex 单 provider 联调”。
+2. 当前主机未自动发现到可达 Plex 实例，且 `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` 一致表达“当前批次不继续追 Plex 真实 smoke，下一步回到 BT 更大范围能力”；
+3. 如果后续单独拿到 Plex 实例，再完成一次真实 Plex refresh smoke，并明确记录成功或失败证据。
 
 ## 5. 不做清单
 

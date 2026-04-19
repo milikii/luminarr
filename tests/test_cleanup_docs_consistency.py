@@ -120,10 +120,14 @@ def test_current_completion_state_docs_do_not_regress() -> None:
 
     assert "Emby / Jellyfin / Plex" in architecture_text
     assert "Jellyfin / Plex" in next_step_text
-    assert "Jellyfin 单 provider 真实联调预备" in readme_text
-    assert "Jellyfin 单 provider 真实联调预备" in status_text
-    assert "Jellyfin 单 provider 真实联调预备" in next_step_text
-    assert "Jellyfin 单 provider 真实联调预备" in agents_text
+    assert "Plex 真实 refresh smoke 值得性重评估" in readme_text
+    assert "Plex 真实 refresh smoke 值得性重评估" in status_text
+    assert "Plex 真实 refresh smoke 值得性重评估" in next_step_text
+    assert "Plex 真实 refresh smoke 值得性重评估" in agents_text
+    assert "Jellyfin 单 provider 真实 refresh smoke" in readme_text
+    assert "Jellyfin 单 provider 真实 refresh smoke" in status_text
+    assert "Jellyfin 单 provider 真实 refresh smoke" in next_step_text
+    assert "Jellyfin 单 provider 真实 refresh smoke" in agents_text
     assert "Jellyfin / Plex 真实联调重评估" in readme_text
     assert "Jellyfin / Plex 真实联调重评估" in status_text
     assert "Jellyfin / Plex 真实联调重评估" in next_step_text
@@ -137,7 +141,7 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "当前没有进行中的 promoted 主线" not in next_step_text
     assert "当前切线规则与下一条主线入口" in readme_text
     assert "详细目标与可测量退出条件" not in readme_text
-    assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in readme_text
+    assert "docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md" in readme_text
     assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in index_text
     assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in next_step_text
     assert "docs/JELLYFIN_REAL_VERIFICATION_PLAN.md" in agents_text

@@ -115,19 +115,19 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前进行中的 promoted 主线是 Jellyfin 单 provider 真实 refresh smoke；上一条 Jellyfin 单 provider 真实联调预备已补齐 refresh 失败日志里的 provider 可观测性，并转入完成态。刚完成的主线就是 **Jellyfin / Plex 真实联调重评估**。
+- **当前施工状态**：当前进行中的 promoted 主线是 Plex 真实 refresh smoke 值得性重评估；上一条 Jellyfin 单 provider 真实 refresh smoke 已按失败可观测性出口收口。刚完成的主线就是 **Jellyfin / Plex 真实联调重评估**。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
-- **刚完成主线蓝图**：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- **当前主线蓝图**：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- **刚完成主线蓝图**：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
 - **再上一条主线蓝图**：`docs/BT_BATCH_PLAN.md`（对应已完成主线：**BT 批量任务显式批量确认**）
 - **更早主线蓝图**：`docs/PT_LIVE_SEEDING_PLAN.md`
 - **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
 - **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前 Jellyfin 单 provider 主线入口看 `docs/NEXT_STEP.md`；Jellyfin / Plex readiness 与 BT 批量历史蓝图继续看 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`、`docs/BT_BATCH_PLAN.md`
-- 当前只允许围绕 Jellyfin 单 provider 真实 refresh smoke 施工，不顺手放大到新 Docker 栈、Plex 并行、自动探测、全量媒体管理能力或新的 workflow 真相。
+- **本地回归命令**：当前 Plex 评估主线入口看 `docs/NEXT_STEP.md`；刚完成的 Jellyfin smoke 与 BT 批量历史蓝图继续看 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`、`docs/BT_BATCH_PLAN.md`
+- 当前只允许围绕 Plex 是否值得继续做真实 refresh smoke 施工；如果没有真实 Plex 实例，就回到 BT 更大范围能力，不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
 
 ## 6. 当前明确不做
 
@@ -184,8 +184,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：当前主线蓝图
-- `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成主线蓝图
+- `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：当前主线蓝图
+- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：刚完成主线蓝图
 - `docs/BT_BATCH_PLAN.md`：再上一条主线蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
 - `docs/BT_SCORING_PLAN.md`：刚完成的 BT 评分器主线蓝图

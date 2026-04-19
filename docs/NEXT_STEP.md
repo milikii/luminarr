@@ -2,23 +2,23 @@
 
 ## Current goal
 
-- 当前进行中的 promoted 主线是 **Jellyfin 单 provider 真实 refresh smoke**。上一条 **Jellyfin 单 provider 真实联调预备** 已在 2026-04-19 满足退出条件并转入完成态：refresh 失败日志已带 `provider=jellyfin / plex / emby` 显式字段。
-- 当前选择 Jellyfin 而不是 Plex：`app/clients/jellyfin.py` 与 `app/clients/emby.py` 都走 `POST /Library/Refresh`，协议形状更接近，风险更低；Plex 继续留在后续再评估。
-- 当前最小缺口是：仓库已经能选 Jellyfin provider，也已补齐失败日志里的 provider 可观测性，但还没有一条 repo 内已记录的 Jellyfin 单 provider 真实 refresh smoke 证据。
+- 当前进行中的 promoted 主线是 **Plex 真实 refresh smoke 值得性重评估**。上一条 **Jellyfin 单 provider 真实 refresh smoke** 已在 2026-04-19 按失败可观测性出口收口：真实探针命中 `provider=jellyfin target=http://127.0.0.1:8096 request_url=http://127.0.0.1:8096/Library/Refresh 错误=All connection attempts failed`，失败点已可直接定位。
+- 当前转到 Plex 而不是继续拆 Jellyfin：Jellyfin 这条线已经证明当前主机缺少可达实例；下一步更保守的判断是，Plex 是否值得为了单 provider 真实 smoke 再继续投入。
+- 当前最小缺口是：本机也没有自动发现到 Plex 本地入口，`curl http://127.0.0.1:32400/identity` 返回 `000`；在没有真实 Plex 实例前，先把“值不值得继续做”这件事收口成明确结论。
 - 2026-04-19 刚完成的主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 再上一条刚完成主线是 **BT 批量任务显式批量确认**：`bt批量 / bt batch` 的只读批量预览与 `bt批量确认 / bt batch confirm` 的显式批量确认都已落地，focused tests 为 `11 passed, 312 deselected`。
 - 再上一条已完成主线是 **PT live seeding 真相接入 cleanup 阻断**。冷启动审计已确认它满足文档出口；详细蓝图继续看 `docs/PT_LIVE_SEEDING_PLAN.md`。
 - 更早一条已完成主线是 **`.ass` 字幕最小支持**。2026-04-19 已补齐 `.srt` + 最小 `.ass` 字幕翻译路径，focused tests 为 `10 passed`，导入后字幕 focused tests 为 `2 passed, 140 deselected`；详细闭环继续看 `docs/SERIES_ANIME_NAMING_LOG.md` 2.3。
 - 更早完成主线：cleanup PT 最小保护窗口、Jellyfin / Plex provider 选择、最小人类可用入口补齐、shared private-chat 交付体验收口、`series / anime` 独立名称解析最小实现、`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退。
-- 当前主线蓝图统一写在 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`。
+- 当前主线蓝图统一回到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`。
 
 ## Source of truth
 
 - 长期边界：`docs/DECISIONS.md`
 - 当前目标：`docs/NEXT_STEP.md`
 - 当前快照：`docs/STATUS.md`
-- 当前主线蓝图：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
-- 刚完成主线蓝图：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- 当前主线蓝图：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- 刚完成主线蓝图：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
 - 再上一条主线蓝图：`docs/BT_BATCH_PLAN.md`
 - 更早主线蓝图：`docs/PT_LIVE_SEEDING_PLAN.md`
 - 刚完成主线蓝图 / 台账：`docs/SERIES_ANIME_NAMING_PLAN.md`、`docs/SERIES_ANIME_NAMING_LOG.md`
@@ -31,13 +31,13 @@
 ## Only do
 
 - 当前优先交付：
-  - 在已有 Jellyfin 实例前提下完成一次单 provider 真实 refresh smoke，优先验证请求能否真实打到 Jellyfin
-  - 如果真实 smoke 失败，先把 provider / base_url / HTTP 结果或异常原因打清楚，保证排障可继续推进
-  - 保持用户侧 refresh 成功/失败文本边界不变，不改导入成功真相
+  - 先确认当前主机有没有值得继续追的 Plex 真实 smoke 入口，不在没有实例的前提下空转新诊断
+  - 如果当前主机仍没有 Plex 实例，就明确写清“回到 BT 更大范围能力比继续追 Plex 更划算”
+  - 保持已有 refresh 失败日志里的 provider / target / request_url 可观测性，不回退
   - 继续保留“repo 内固定 Docker refresh 栈仍只有 Emby”这条边界，不把这一步扩成新测试栈编排
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
-- 文档继续分层：`STATUS.md` 只保留当前快照；当前主线细节写在 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`；刚完成的 readiness 评估继续留在 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- 文档继续分层：`STATUS.md` 只保留当前快照；当前主线细节写在 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；刚完成的 Jellyfin smoke 细节继续留在 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
 
 ## Do not do
 
@@ -50,10 +50,10 @@
 
 ## Done when
 
-当前 Jellyfin 单 provider 真实 refresh smoke 主线视为 **已收口**，满足以下任一条即可：
+当前 Plex 真实 refresh smoke 值得性重评估主线视为 **已收口**，满足以下任一条即可：
 
-1. 在已有 Jellyfin 实例上完成一次真实 refresh smoke，并把成功证据写回当前快照或主线蓝图；
-2. 真实 refresh smoke 失败，但 provider / base_url / HTTP 结果或异常原因已经可直接定位，且 `.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"` 全绿；
+1. 当前主机已明确没有可达 Plex 实例，且 `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` / `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md` 一致表达“暂不继续追 Plex 真实 smoke，下一步回到 BT 更大范围能力”；
+2. 如果后续拿到 Plex 实例，完成一次真实 Plex refresh smoke，并把成功或失败证据写回当前快照或主线蓝图；
 3. 本轮代码变更 `< 20` 行且只是对同一个 refresh 路径补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
@@ -63,5 +63,5 @@
 
 ## After this step
 
-1. 如果 Jellyfin smoke 已收口，再评估 Plex 真实 refresh smoke 是否值得补做
-2. 如果 Jellyfin 继续缺实例或价值不足，再回到 BT 更大范围的用户页 / 编号范围页能力
+1. 回到 BT 更大范围的用户页 / 编号范围页能力
+2. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
