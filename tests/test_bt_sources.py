@@ -183,6 +183,11 @@ def test_resolve_supported_web_source_page_request_appends_page_number() -> None
     assert looks_like_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
     assert resolve_supported_web_source_page_request("https://nyaa.si/?q=frieren") == "https://nyaa.si/?q=frieren"
     assert resolve_supported_web_source_page_request("https://nyaa.si/?q=frieren&p=2") == "https://nyaa.si/?q=frieren&p=2"
+    assert looks_like_web_source_page_request("https://nyaa.si/?u=subsplease p=2")
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?u=subsplease p=2")
+        == "https://nyaa.si/?u=subsplease&p=2"
+    )
     assert (
         resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
         == "https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2"
