@@ -110,7 +110,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
 - cleanup 已补 `pt_min_seed_hours` 基于完成观察时间窗的保守阻断；这还不是 downloader live seeding 秒数能力。
 - 当前最稳的是 movie-first；quick start、BT 共享确定性评分器、Jellyfin / Plex refresh provider 支持都已完成。
-- 字幕翻译当前正式进入 `.ass` 最小支持主线；目标是补齐 `.ass` 文本替换，不扩成 `.ssa`、嵌入字幕或复杂样式改写。
+- 字幕翻译当前已支持 `.srt` + 最小 `.ass`；`.ass` 只做文本替换，不扩成 `.ssa`、嵌入字幕或复杂样式改写。
 - BT 路线已可用，并已升级成共享确定性评分器。
 
 ## 5. 当前 next step

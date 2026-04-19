@@ -48,6 +48,49 @@ def test_translate_for_import_creates_zh_subtitle_for_file_target(tmp_path: Path
     assert "专业译文：hello movie" in payload
 
 
+def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Frieren - 01.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Frieren - 01.ass"
+    subtitle_file.write_text(
+        "[Script Info]\n"
+        "Title: Frieren\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,hello mage\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-88",
+            task_id="88",
+            task_hash="hash-88",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Frieren - 01.zh.ass"
+    assert result.success is True
+    assert result.skipped is False
+    assert translated_file.exists()
+    payload = translated_file.read_text(encoding="utf-8")
+    assert "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,专业译文：hello mage" in payload
+    assert "[Script Info]" in payload
+
+
 def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
@@ -67,6 +110,37 @@ def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path) -> Non
     assert result.success is False
     assert result.skipped is True
     assert "已跳过" in result.message
+
+
+def test_translate_for_import_fails_when_ass_file_is_invalid(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Frieren - 01.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Frieren - 01.ass"
+    subtitle_file.write_text("Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,hello\n", encoding="utf-8")
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [str(line) for line in source_lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-89",
+            task_id="89",
+            task_hash="hash-89",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is False
+    assert "不是有效 ASS" in result.message
 
 
 def test_translate_for_import_fails_when_missing_api_key(tmp_path: Path) -> None:

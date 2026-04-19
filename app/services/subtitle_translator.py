@@ -33,6 +33,20 @@ class _SrtBlock:
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class _SubtitleFile:
+    source_path: Path
+    translated_path: Path
+    kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class _AssDialogueLine:
+    line_index: int
+    prefix: str
+    text: str
+
+
 class SubtitleTranslatorService:
     def __init__(
         self,
@@ -59,7 +73,7 @@ class SubtitleTranslatorService:
 
         subtitle_files = _find_source_subtitle_files(target_path)
         if not subtitle_files:
-            message = "字幕翻译已跳过：未找到可翻译的 .srt 字幕文件。"
+            message = "字幕翻译已跳过：未找到可翻译的 .srt / .ass 字幕文件。"
             return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
 
         if not self._api_key:
@@ -73,12 +87,10 @@ class SubtitleTranslatorService:
         movie_title = _read_metadata_title(Path(translate_input.metadata_path))
         translated_count = 0
         for subtitle_file in subtitle_files:
-            translated_path = subtitle_file.with_suffix(".zh.srt")
-            if translated_path.exists():
+            if subtitle_file.translated_path.exists():
                 continue
             result = self._translate_single_file(
                 subtitle_file=subtitle_file,
-                translated_path=translated_path,
                 movie_title=movie_title,
             )
             if not result.success:
@@ -103,55 +115,83 @@ class SubtitleTranslatorService:
     def _translate_single_file(
         self,
         *,
-        subtitle_file: Path,
-        translated_path: Path,
+        subtitle_file: _SubtitleFile,
         movie_title: str,
     ) -> SubtitleTranslateResult:
         try:
-            source_text = subtitle_file.read_text(encoding="utf-8")
+            source_text = subtitle_file.source_path.read_text(encoding="utf-8")
         except Exception as exc:
-            message = f"读取字幕文件失败：{subtitle_file}，原因：{exc}"
+            message = f"读取字幕文件失败：{subtitle_file.source_path}，原因：{exc}"
             _print_colored_error(
                 problem=message,
                 fix="确认字幕是 UTF-8 编码，必要时先转码后再重试。",
             )
             return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
 
+        if subtitle_file.kind == "srt":
+            rendered_output, error_message = self._translate_srt_text(
+                source_text=source_text,
+                movie_title=movie_title,
+                subtitle_path=subtitle_file.source_path,
+            )
+        elif subtitle_file.kind == "ass":
+            rendered_output, error_message = self._translate_ass_text(
+                source_text=source_text,
+                movie_title=movie_title,
+                subtitle_path=subtitle_file.source_path,
+            )
+        else:
+            message = f"字幕翻译失败：暂不支持的字幕格式：{subtitle_file.source_path}"
+            _print_colored_error(
+                problem=message,
+                fix="确认字幕是 `.srt` 或 `.ass` 文件，再重试导入。",
+            )
+            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        if rendered_output is None:
+            return SubtitleTranslateResult(
+                success=False,
+                message=error_message or "字幕翻译失败。",
+                translated_count=0,
+                skipped=False,
+            )
+
+        try:
+            subtitle_file.translated_path.write_text(rendered_output, encoding="utf-8")
+        except Exception as exc:
+            message = f"写入字幕文件失败：{subtitle_file.translated_path}，原因：{exc}"
+            _print_colored_error(
+                problem=message,
+                fix="检查导入目录写权限和磁盘空间，再重试 confirm 导入。",
+            )
+            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
+
+    def _translate_srt_text(
+        self,
+        *,
+        source_text: str,
+        movie_title: str,
+        subtitle_path: Path,
+    ) -> tuple[str | None, str | None]:
         blocks = _parse_srt_blocks(source_text)
         if not blocks:
-            message = f"字幕翻译失败：{subtitle_file} 不是有效 SRT 或内容为空。"
+            message = f"字幕翻译失败：{subtitle_path} 不是有效 SRT 或内容为空。"
             _print_colored_error(
                 problem=message,
                 fix="确认字幕是标准 SubRip(.srt) 格式，包含序号、时间轴和文本。",
             )
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+            return None, message
 
         translated_blocks: list[_SrtBlock] = []
         for chunk in _chunk_blocks(blocks, size=60):
-            source_lines = [block.text for block in chunk]
-            try:
-                translated_lines = self._translate_lines_professional(
-                    source_lines=source_lines,
-                    movie_title=movie_title,
-                )
-            except Exception as exc:
-                message = f"模型翻译失败：{subtitle_file}，原因：{exc}"
-                _print_colored_error(
-                    problem=message,
-                    fix="检查 API Key、模型名、网络和余额；必要时稍后重试。",
-                )
-                return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-
-            if len(translated_lines) != len(chunk):
-                message = (
-                    f"模型返回行数不一致：源={len(chunk)}，译文={len(translated_lines)}，文件={subtitle_file}"
-                )
-                _print_colored_error(
-                    problem=message,
-                    fix="检查模型输出格式约束，确保返回严格 JSON translations 数组。",
-                )
-                return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-
+            translated_lines, error_message = self._translate_chunk_lines(
+                source_lines=[block.text for block in chunk],
+                movie_title=movie_title,
+                subtitle_path=subtitle_path,
+            )
+            if translated_lines is None:
+                return None, error_message
             for block, translated_text in zip(chunk, translated_lines):
                 translated_blocks.append(
                     _SrtBlock(
@@ -160,18 +200,66 @@ class SubtitleTranslatorService:
                         text=translated_text.strip(),
                     )
                 )
+        return _render_srt(translated_blocks), None
 
-        output = _render_srt(translated_blocks)
-        try:
-            translated_path.write_text(output, encoding="utf-8")
-        except Exception as exc:
-            message = f"写入字幕文件失败：{translated_path}，原因：{exc}"
+    def _translate_ass_text(
+        self,
+        *,
+        source_text: str,
+        movie_title: str,
+        subtitle_path: Path,
+    ) -> tuple[str | None, str | None]:
+        lines, dialogue_lines = _parse_ass_dialogue_lines(source_text)
+        if not dialogue_lines:
+            message = f"字幕翻译失败：{subtitle_path} 不是有效 ASS 或没有可翻译对话。"
             _print_colored_error(
                 problem=message,
-                fix="检查导入目录写权限和磁盘空间，再重试 confirm 导入。",
+                fix="确认字幕是标准 Advanced SubStation Alpha(.ass) 文件，包含 `[Script Info]` 和 `Dialogue:` 行。",
             )
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-        return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
+            return None, message
+
+        for chunk in _chunk_blocks(dialogue_lines, size=60):
+            translated_lines, error_message = self._translate_chunk_lines(
+                source_lines=[line.text for line in chunk],
+                movie_title=movie_title,
+                subtitle_path=subtitle_path,
+            )
+            if translated_lines is None:
+                return None, error_message
+            for dialogue_line, translated_text in zip(chunk, translated_lines):
+                lines[dialogue_line.line_index] = dialogue_line.prefix + translated_text.strip()
+        return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
+
+    def _translate_chunk_lines(
+        self,
+        *,
+        source_lines: list[str],
+        movie_title: str,
+        subtitle_path: Path,
+    ) -> tuple[list[str] | None, str | None]:
+        try:
+            translated_lines = self._translate_lines_professional(
+                source_lines=source_lines,
+                movie_title=movie_title,
+            )
+        except Exception as exc:
+            message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
+            _print_colored_error(
+                problem=message,
+                fix="检查 API Key、模型名、网络和余额；必要时稍后重试。",
+            )
+            return None, message
+
+        if len(translated_lines) != len(source_lines):
+            message = (
+                f"模型返回行数不一致：源={len(source_lines)}，译文={len(translated_lines)}，文件={subtitle_path}"
+            )
+            _print_colored_error(
+                problem=message,
+                fix="检查模型输出格式约束，确保返回严格 JSON translations 数组。",
+            )
+            return None, message
+        return translated_lines, None
 
     def _translate_lines_professional(self, *, source_lines: list[str], movie_title: str) -> list[str]:
         system_prompt = (
@@ -235,18 +323,35 @@ class SubtitleTranslatorService:
         return text
 
 
-def _find_source_subtitle_files(target_path: Path) -> list[Path]:
+def _find_source_subtitle_files(target_path: Path) -> list[_SubtitleFile]:
     if target_path.is_file():
-        file_candidate = target_path.with_suffix(".srt")
-        if file_candidate.exists() and file_candidate.is_file():
-            return [file_candidate]
-        return []
+        return [candidate for suffix in (".srt", ".ass") if (candidate := _build_subtitle_file(target_path.with_suffix(suffix)))]
 
     if not target_path.is_dir():
         return []
 
-    candidates = sorted(target_path.rglob("*.srt"))
-    return [candidate for candidate in candidates if candidate.is_file() and not candidate.name.endswith(".zh.srt")]
+    candidates = sorted(candidate for pattern in ("*.srt", "*.ass") for candidate in target_path.rglob(pattern))
+    files: list[_SubtitleFile] = []
+    for candidate in candidates:
+        subtitle_file = _build_subtitle_file(candidate)
+        if subtitle_file is not None:
+            files.append(subtitle_file)
+    return files
+
+
+def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
+    if not path.exists() or not path.is_file():
+        return None
+    suffix = path.suffix.lower()
+    if suffix == ".srt":
+        if path.name.endswith(".zh.srt"):
+            return None
+        return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.srt"), kind="srt")
+    if suffix == ".ass":
+        if path.name.endswith(".zh.ass"):
+            return None
+        return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.ass"), kind="ass")
+    return None
 
 
 def _parse_srt_blocks(content: str) -> list[_SrtBlock]:
@@ -281,6 +386,38 @@ def _render_srt(blocks: list[_SrtBlock]) -> str:
     for block in blocks:
         rendered_chunks.append(f"{block.index}\n{block.timecode}\n{block.text.strip()}")
     return "\n\n".join(rendered_chunks).strip() + "\n"
+
+
+def _parse_ass_dialogue_lines(content: str) -> tuple[list[str], list[_AssDialogueLine]]:
+    lines = [line.rstrip("\r") for line in content.splitlines()]
+    if not any(line.strip() == "[Script Info]" for line in lines):
+        return lines, []
+
+    dialogue_lines: list[_AssDialogueLine] = []
+    for index, line in enumerate(lines):
+        if not line.startswith("Dialogue:"):
+            continue
+        parts = line.split(",", 9)
+        if len(parts) != 10:
+            continue
+        text = parts[9].strip()
+        if not text:
+            continue
+        dialogue_lines.append(
+            _AssDialogueLine(
+                line_index=index,
+                prefix=",".join(parts[:9]) + ",",
+                text=text,
+            )
+        )
+    return lines, dialogue_lines
+
+
+def _render_ass_lines(lines: list[str], *, had_trailing_newline: bool) -> str:
+    rendered = "\n".join(lines)
+    if had_trailing_newline:
+        return rendered + "\n"
+    return rendered
 
 
 def _is_timecode_line(line: str) -> bool:

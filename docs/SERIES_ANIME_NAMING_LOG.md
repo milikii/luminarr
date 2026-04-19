@@ -39,8 +39,14 @@
 
 ### 2.3 `.ass` 最小支持
 
+已完成闭环：
+- 已把 `app/services/subtitle_translator.py` 从“只支持 `.srt`”补到“`.srt` + 最小 `.ass`”：现在会识别 `.ass` 文件、提取 `Dialogue:` 文本字段、复用现有翻译 API，并回写 `.zh.ass`。
+- `.ass` 回写继续保留原 `[Script Info]`、`[Events]`、时间轴和 `Dialogue:` 前缀字段；当前只替换最后一个文本字段，不新增 `.ssa`、嵌入字幕或复杂样式改写。
+- 已新增 `tests/test_subtitle_translator.py` 覆盖 `.ass` 成功回写和无效 `.ass` 失败分支；`.srt` 既有测试不回退。
+- `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 得到 `10 passed`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k subtitle` 得到 `2 passed, 140 deselected`。
+
 当前施工目标：
-- 当前字幕翻译只处理 `.srt`；本轮 promoted 主线只补 `.ass` 最小支持：识别 `.ass`、提取 `Dialogue:` 文本、复用现有翻译 API，并回写 `.zh.ass`。
+- 当前 promoted 主线的最小目标已达成：字幕翻译已从“只处理 `.srt`”补到“`.srt` + 最小 `.ass`”，并继续只替换 `Dialogue:` 文本字段。
 
 当前风险：
 - 这一步只允许替换 `Dialogue:` 文本字段；若把 Style、时间轴、特效标签或其他 header 结构改坏，就会直接破坏播放器兼容性。
