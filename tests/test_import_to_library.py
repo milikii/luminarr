@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import errno
+import json
 import os
 from collections.abc import Awaitable
 from pathlib import Path
@@ -3539,6 +3540,14 @@ def test_confirm_import_by_task_ref_rejects_expired_pending(tmp_path: Path) -> N
         approval_repo=approval_repo,
         job_repo=job_repo,
     )
+    job_repo.upsert_downloader_job_pending(
+        chat_id=1001,
+        user_id=2001,
+        task_ref="87",
+        task_id="87",
+        task_hash="hash-87",
+        payload_json=json.dumps({"auto_import_enabled": True}),
+    )
 
     pending_text = _run(service.import_by_task_ref("87", chat_id=1001, user_id=2001))
     assert "导入待确认" in pending_text
@@ -3750,6 +3759,18 @@ def test_resolve_normalized_naming_truth_logs_row_corruption(capsys: pytest.Capt
     assert "task_id=87" in output
     assert "task_hash=hash-87" in output
     assert "[处理建议]" in output
+
+
+def test_build_normalized_target_name_uses_parser_for_episode_file(tmp_path: Path) -> None:
+    source_path = tmp_path / "Frieren.S01E01.1080p.WEB-DL.mkv"
+    source_path.write_bytes(b"demo")
+
+    result = import_module._build_normalized_target_name(
+        source_path=source_path,
+        naming_truth="Frieren.S01E01.1080p.WEB-DL.mkv",
+    )
+
+    assert result == "Frieren S01E01.mkv"
 
 
 def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:

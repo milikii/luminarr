@@ -19,6 +19,7 @@ from app.db.approval_repo import (
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
+from app.services.media_name_parser import parse_media_name
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 from app.trace_logging import log_trace_event
@@ -2057,11 +2058,15 @@ def _extract_title_year_for_scrape(target_path: Path) -> tuple[str, str]:
 
 def _extract_title_year_from_text(value: str) -> tuple[str, str]:
     normalized = _normalize_name_tokens(value)
-    year = _extract_movie_year(normalized)
-    if year:
-        title = _trim_title_before_year(normalized, year)
+    legacy_year = _extract_movie_year(normalized)
+    parsed_name = parse_media_name(value)
+    if parsed_name.season is not None or parsed_name.episode is not None:
+        title = _normalize_name_tokens(parsed_name.title) or normalized
+    elif legacy_year:
+        title = _trim_title_before_year(normalized, legacy_year)
     else:
         title = normalized
+    year = str(parsed_name.year) if parsed_name.year is not None else legacy_year
     title = title.strip()
     return title, year
 
@@ -2083,6 +2088,14 @@ def _build_normalized_target_name(*, source_path: Path, naming_truth: str) -> st
     raw_truth = naming_truth.strip() or source_base_name
     if suffix and raw_truth.lower().endswith(suffix.lower()):
         raw_truth = raw_truth[: -len(suffix)]
+
+    parsed_truth = parse_media_name(raw_truth)
+    if parsed_truth.season is not None or parsed_truth.episode is not None:
+        parsed_truth_base = _build_target_base_from_parsed_name(parsed_truth)
+        if parsed_truth_base:
+            sanitized_base = _sanitize_target_component(parsed_truth_base)
+            if sanitized_base:
+                return f"{sanitized_base}{suffix}" if suffix else sanitized_base
 
     normalized_truth = _normalize_name_tokens(raw_truth)
     normalized_source = _normalize_name_tokens(source_base_name)
@@ -2108,6 +2121,40 @@ def _build_normalized_target_name(*, source_path: Path, naming_truth: str) -> st
     if suffix:
         return f"{sanitized_base}{suffix}"
     return sanitized_base
+
+
+def _build_target_base_from_parsed_name(parsed_name) -> str:
+    title = _normalize_name_tokens(parsed_name.title)
+    if not title:
+        return ""
+    episode_marker = _build_episode_marker(
+        season=parsed_name.season,
+        episode=parsed_name.episode,
+        episode_end=parsed_name.episode_end,
+    )
+    if episode_marker:
+        return f"{title} {episode_marker}".strip()
+    if parsed_name.year is not None:
+        return f"{title} ({parsed_name.year})"
+    return title
+
+
+def _build_episode_marker(*, season: int | None, episode: int | None, episode_end: int | None) -> str:
+    if season is None and episode is None:
+        return ""
+    if season is not None and episode is not None:
+        start = f"S{season:02d}E{episode:02d}" if episode < 100 else f"S{season:02d}E{episode}"
+        if episode_end is None:
+            return start
+        end = f"{episode_end:02d}" if episode_end < 100 else str(episode_end)
+        return f"{start}-{end}"
+    if season is not None:
+        return f"S{season:02d}"
+    start = f"E{episode:02d}" if episode is not None and episode < 100 else f"E{episode}"
+    if episode_end is None:
+        return start
+    end = f"{episode_end:02d}" if episode_end < 100 else str(episode_end)
+    return f"{start}-{end}"
 
 
 def _normalize_name_tokens(value: str) -> str:

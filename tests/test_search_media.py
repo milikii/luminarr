@@ -727,6 +727,12 @@ def test_parse_movie_query_keeps_title_when_no_year() -> None:
     assert parsed.year == ""
 
 
+def test_parse_movie_query_uses_media_name_parser_for_episode_query() -> None:
+    parsed = parse_movie_query("鬼灭之刃 S01E01")
+    assert parsed.title == "鬼灭之刃"
+    assert parsed.year == ""
+
+
 def _run(coroutine: Awaitable[str]) -> str:
     import asyncio
 

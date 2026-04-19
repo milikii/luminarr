@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.clients.tmdb import TmdbMovie
+from app.services.media_name_parser import parse_media_name
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
@@ -33,24 +34,10 @@ def parse_movie_query(query: str) -> ParsedMovieQuery:
     if not cleaned_query:
         return ParsedMovieQuery(title="", year="")
 
-    matched_parentheses = re.match(
-        r"^(?P<title>.+?)\s*[\(（](?P<year>(?:19|20)\d{2})[\)）]\s*$",
-        cleaned_query,
-    )
-    if matched_parentheses is not None:
-        title = normalize_spaces(matched_parentheses.group("title"))
-        year = matched_parentheses.group("year")
-        if title:
-            return ParsedMovieQuery(title=title, year=year)
-
-    matched_suffix = re.match(r"^(?P<title>.+?)\s+(?P<year>(?:19|20)\d{2})\s*$", cleaned_query)
-    if matched_suffix is not None:
-        title = normalize_spaces(matched_suffix.group("title"))
-        year = matched_suffix.group("year")
-        if title:
-            return ParsedMovieQuery(title=title, year=year)
-
-    return ParsedMovieQuery(title=cleaned_query, year="")
+    parsed_name = parse_media_name(cleaned_query)
+    title = normalize_spaces(parsed_name.title or cleaned_query)
+    year = str(parsed_name.year) if parsed_name.year is not None else ""
+    return ParsedMovieQuery(title=title, year=year)
 
 
 async def build_search_request_context(

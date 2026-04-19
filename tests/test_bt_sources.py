@@ -54,6 +54,9 @@ def test_bt_source_adapter_normalizes_candidates_and_deduplicates_by_info_hash()
     assert first["seeders"] == 12
     assert first["size"] == 2048
     assert first["indexerName"] == "Prowlarr-A"
+    assert first["parsedMediaName"].title == "Frieren"
+    assert first["parsedMediaName"].season == 1
+    assert first["parsedMediaName"].episode == 1
     assert build_bt_candidate_dedupe_key(first) == "info_hash:abcdef1234567890abcdef1234567890abcdef12"
 
     second = results[1]
@@ -61,6 +64,7 @@ def test_bt_source_adapter_normalizes_candidates_and_deduplicates_by_info_hash()
     assert second["source"] == "https://example.com/frieren-e02.torrent"
     assert second["downloadUrl"] == "https://example.com/frieren-e02.torrent"
     assert second["indexerName"] == "websource"
+    assert second["parsedMediaName"].episode == 2
 
 
 def test_bt_source_adapter_skips_candidates_without_title_or_source() -> None:

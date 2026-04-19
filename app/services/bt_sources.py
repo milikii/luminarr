@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.media_name_parser import parse_media_name
+
 BtSourceSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 
 _SOURCE_KEYS = ("source", "downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid", "link", "url")
@@ -77,6 +79,7 @@ def normalize_bt_candidate(
     normalized_candidate["size"] = _safe_int(candidate.get("size"))
     normalized_candidate["sourceProvider"] = provider_name.strip() or "unknown"
     normalized_candidate["providerIndex"] = provider_index
+    normalized_candidate["parsedMediaName"] = parse_media_name(title)
 
     indexer_name = _resolve_indexer_name(candidate, default=normalized_candidate["sourceProvider"])
     if indexer_name:

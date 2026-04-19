@@ -1,4 +1,4 @@
-# Next step (v214)
+# Next step (v215)
 
 ## Current goal
 
@@ -32,7 +32,7 @@
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`
 - 更早主线的详细闭环和 focused tests 继续写在 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - cleanup 已完成窗口的详细台账和证据统一写在 `docs/CLEANUP_VERIFICATION_WINDOW.md`
-- 当前最小闭环：按 `docs/SERIES_ANIME_NAMING_PLAN.md` Phase 3 把 `search_media`、BT source adapter、`post_download_auto_import`、`import_to_library` 四处集成点切到统一 parser，不改现有 movie-first 行为
+- 当前最小闭环：继续收口 `docs/SERIES_ANIME_NAMING_PLAN.md` Phase 3 剩余接点；当前已把 `search_request_context`、BT source adapter、`import_to_library` 命名 helper 接到统一 parser，下一步补下载完成后的剩余消费点并跑 Phase 3 focused suite，不改现有 movie-first 行为
 
 ## Source of truth
 
