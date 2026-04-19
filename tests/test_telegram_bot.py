@@ -3589,6 +3589,51 @@ def test_handle_message_bt_batch_preview_uncategorized_search_page_number_routes
     assert "当前预览范围：1" in sent_text
 
 
+def test_handle_message_bt_batch_preview_uncategorized_search_page_routes_to_page_fetch() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist uncategorized search page")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?q=frieren"
+        return [
+            {
+                "title": "title-Frieren S01E26",
+                "source": "magnet:?xt=urn:btih:2626262626262626262626262626262626262626",
+                "infoHash": "2626262626262626262626262626262626262626",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    update, reply_text = _build_update("bt批量 https://nyaa.si/?q=frieren 1-1")
+    search_service = SearchMediaService(
+        _fake_search,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once()
+    sent_text = reply_text.await_args.args[0]
+    assert "BT 批量预览结果：https://nyaa.si/?q=frieren" in sent_text
+    assert "title-Frieren S01E26" in sent_text
+    assert "当前预览范围：1" in sent_text
+
+
 def test_handle_message_bt_batch_preview_search_sort_page_number_syntax_routes_to_page_fetch() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for allowlist search sort page number syntax")
@@ -4002,6 +4047,68 @@ def test_handle_message_bt_batch_confirm_reuses_uncategorized_search_page_number
     assert sent_text.count("待确认：下载 ⏳") == 2
     assert "片名：title-Frieren S01E24" in sent_text
     assert "片名：title-Frieren S01E25" in sent_text
+    assert "确认下载：发送 confirm 1" in sent_text
+    assert "确认下载：发送 confirm 2" in sent_text
+
+
+def test_handle_message_bt_batch_confirm_reuses_uncategorized_search_page_preview_candidates() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist uncategorized search page")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?q=frieren"
+        return [
+            {
+                "title": "title-Frieren S01E26",
+                "source": "magnet:?xt=urn:btih:2626262626262626262626262626262626262626",
+                "infoHash": "2626262626262626262626262626262626262626",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+            {
+                "title": "title-Frieren S01E27",
+                "source": "magnet:?xt=urn:btih:2727272727272727272727272727272727272727",
+                "infoHash": "2727272727272727272727272727272727272727",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+        ]
+
+    search_service = SearchMediaService(
+        _fake_search,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                DOWNLOADER_ROLE_BINDING_KEY: DownloaderRoleBinding(pt_downloader="", bt_downloader=""),
+                DOWNLOADER_INSTANCES_KEY: (
+                    DownloaderInstanceConfig(name="", downloader_type="transmission", base_url="", download_dir="/downloads"),
+                ),
+            }
+        )
+    )
+
+    preview_update, preview_reply = _build_update("bt批量 https://nyaa.si/?q=frieren 1-2")
+    asyncio.run(handle_message(preview_update, context))
+    assert preview_reply.await_count == 1
+
+    confirm_update, confirm_reply = _build_update("bt批量确认 1-2")
+    asyncio.run(handle_message(confirm_update, context))
+
+    confirm_reply.assert_awaited_once()
+    sent_text = confirm_reply.await_args.args[0]
+    assert sent_text.count("待确认：下载 ⏳") == 2
+    assert "片名：title-Frieren S01E26" in sent_text
+    assert "片名：title-Frieren S01E27" in sent_text
     assert "确认下载：发送 confirm 1" in sent_text
     assert "确认下载：发送 confirm 2" in sent_text
 
