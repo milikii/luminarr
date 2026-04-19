@@ -79,7 +79,6 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 当前剩余关注点不是媒体服务器 provider 装配，而是保持完成态文档、cleanup 证据和四渠道协议边界不回退。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 BT 评分器主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
-- `git log --oneline -20` 已包含 `5ad5ba0 Extract downloader route lookup helper`，`app/main.py` 主线完成态已和代码一致。
 - quick start、BT 共享确定性评分器、Jellyfin / Plex 三条主线都已在 2026-04-19 收口；当前剩余工作是守住完成态文档、cleanup 证据和四渠道协议边界。
 
 ## Latest verification
