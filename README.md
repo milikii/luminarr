@@ -188,7 +188,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_SCORING_PLAN.md`：当前主线蓝图
+- `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
+- `docs/BT_SCORING_PLAN.md`：刚完成的 BT 评分器主线蓝图
 - `docs/QUICK_START_PLAN.md`：刚完成的部署主线蓝图
 - `docs/DEPLOY_CHECKLIST.md`：刚完成的部署主线交付物
 - `docs/SHARED_DELIVERY_UX_PLAN.md`：更早完成主线蓝图

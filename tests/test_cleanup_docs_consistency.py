@@ -105,6 +105,8 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
 
 def test_current_completion_state_docs_do_not_regress() -> None:
     readme_text = Path("README.md").read_text(encoding="utf-8")
+    index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
+    getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
     architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
     jellyfin_plex_plan_text = Path("docs/JELLYFIN_PLEX_PLAN.md").read_text(encoding="utf-8")
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
@@ -124,7 +126,12 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "当前主线已满足 `Done when` 第 1 条" in jellyfin_plex_plan_text
     assert "plugin 体系后置" in jellyfin_plex_plan_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
+    assert "docs/JELLYFIN_PLEX_PLAN.md" in index_text
+    assert "docs/JELLYFIN_PLEX_PLAN.md" in getting_started_text
+    assert "当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`" in index_text
+    assert "当前完成态主线蓝图" in readme_text
     assert "Jellyfin / Plex 并行主线支持（当前不做，后续再补）" not in readme_text
+    assert "`docs/BT_SCORING_PLAN.md`：当前主线蓝图" not in readme_text
     assert "最小人类可用入口继续补齐**" not in agents_text
 
 

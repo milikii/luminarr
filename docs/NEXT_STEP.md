@@ -31,7 +31,7 @@
   - 不把 plugin 体系提前拉回主线
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
-- 文档继续分层：`STATUS.md` 只保留当前快照，`BT_SCORING_PLAN.md` 承接当前主线蓝图，`QUICK_START_PLAN.md` / `DEPLOY_CHECKLIST.md` 保持刚完成部署主线的蓝图与交付物定位，其余完成台账继续只作历史闭环入口
+- 文档继续分层：`STATUS.md` 只保留当前快照，`JELLYFIN_PLEX_PLAN.md` 承接当前完成态主线蓝图，`BT_SCORING_PLAN.md` / `QUICK_START_PLAN.md` / `DEPLOY_CHECKLIST.md` 保持刚完成主线与部署主线的蓝图和交付物定位，其余完成台账继续只作历史闭环入口
 - 保持 cleanup 完成态证据、docs gate、quick start 完成态和 shared delivery 完成态结论稳定，不回退成“仍在进行中”
 
 ## Do not do

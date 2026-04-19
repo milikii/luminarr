@@ -109,7 +109,7 @@
 ## 4. 文档维护规则
 
 - 同一条事实尽量只写一处；其他文档用“引用/跳转”，不要复制粘贴。
-- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前主线说明优先收口到 `docs/BT_SCORING_PLAN.md`；刚完成的部署主线继续保留在 `docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，已完成主线的详细闭环继续留在各自主线台账，不要把活动台账全文抄进去。
+- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器与部署主线继续保留在 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，已完成主线的详细闭环继续留在各自主线台账，不要把活动台账全文抄进去。
 - **`STATUS.md` 和 `PERSISTENCE_CLOSURE_LOG.md` 不再逐天或逐字段追加 `截至 20xx-xx-xx 分流缺口` 条目**：新闭环优先合并进 `PERSISTENCE_CLOSURE_LOG.md` 的已有主题分组（2.1~2.5），`STATUS.md` 最多补一句当前结论或风险；commit 轨迹看 `git log`，不再重复粘贴。
 - 运行方式、环境变量、启动入口一律收口到 `docs/GETTING_STARTED.md` 和 `.env.example`。
 - 系统结构解释一律收口到 `docs/ARCHITECTURE.md`。

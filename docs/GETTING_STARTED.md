@@ -307,5 +307,5 @@ make run
 - 想理解“代码为什么这么分”：读 `docs/ARCHITECTURE.md`
 - 想知道“当前正在做什么”：读 `docs/NEXT_STEP.md`
 - 想知道“现在做到哪里”：先读 `docs/STATUS.md`
-- 想看“当前主线蓝图和刚完成的部署入口”：先读 `docs/BT_SCORING_PLAN.md`，再读 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`；更早完成的 shared delivery 主线看 `docs/SHARED_DELIVERY_UX_LOG.md`；更早完成的 `series / anime` 主线看 `docs/SERIES_ANIME_NAMING_LOG.md`；更早完成的 `app/main.py` 主线看 `docs/APP_MAIN_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
+- 想看“当前完成态主线蓝图和刚完成的部署入口”：先读 `docs/JELLYFIN_PLEX_PLAN.md`，再读 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`；更早完成的 shared delivery 主线看 `docs/SHARED_DELIVERY_UX_LOG.md`；更早完成的 `series / anime` 主线看 `docs/SERIES_ANIME_NAMING_LOG.md`；更早完成的 `app/main.py` 主线看 `docs/APP_MAIN_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - 想看“所有文档地图”：读 `docs/INDEX.md`
