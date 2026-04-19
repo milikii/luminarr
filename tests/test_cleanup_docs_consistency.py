@@ -119,10 +119,11 @@ def test_current_completion_state_docs_do_not_regress() -> None:
 
     assert "Emby / Jellyfin / Plex" in architecture_text
     assert "Jellyfin / Plex 支持已基本完成" in next_step_text
-    assert "当前没有新的 promoted 主线" in readme_text
-    assert "当前没有新的 promoted 主线" in status_text
-    assert "plugin 体系继续后置" in next_step_text
-    assert "plugin 体系继续后置" in readme_text
+    assert "当前没有进行中的 promoted 主线" in readme_text
+    assert "当前没有进行中的 promoted 主线" in status_text
+    assert "当前没有进行中的 promoted 主线" in next_step_text
+    assert "先在 `docs/NEXT_STEP.md`" in readme_text
+    assert "先更新 `docs/NEXT_STEP.md`" in status_text
     assert "当前主线已满足 `Done when` 第 1 条" in jellyfin_plex_plan_text
     assert "plugin 体系后置" in jellyfin_plex_plan_text
     assert "进入 Phase 3 前的最后一个最小闭环是 **Plex refresh baseline**" in jellyfin_plex_plan_text

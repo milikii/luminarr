@@ -114,7 +114,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前唯一主线**：Jellyfin / Plex 支持已基本完成；当前没有新的 promoted 主线，继续以 `docs/NEXT_STEP.md` 为准守住完成态，不自动拉起 plugin 体系。
+- **当前施工状态**：Jellyfin / Plex 支持已基本完成；当前没有进行中的 promoted 主线。后续若要继续做其他事项，先以 `docs/NEXT_STEP.md` 完成切线，再开工。
 - **详细目标与可测量退出条件**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
 - **当前主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
@@ -138,7 +138,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
 - **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器入口看 `docs/BT_SCORING_PLAN.md`；部署入口看 `docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`。
 - 这一步只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起 plugin 体系或改 workflow 真相。
-- 当前主线已满足退出条件 1；`After this step` 仍是 plugin 体系继续后置，不自动启动新施工。
+- 当前上一条主线已满足退出条件 1；后续继续其他事项前，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
 
 ## 6. 当前明确不做
 

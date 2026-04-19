@@ -2,13 +2,13 @@
 
 ## Current goal
 
-- 当前唯一主线：**Jellyfin / Plex 支持已基本完成**（2026-04-19 已满足退出条件 1：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client，`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`）
+- 当前没有进行中的 promoted 主线；上一条完成主线是 **Jellyfin / Plex 支持已基本完成**（2026-04-19 已满足退出条件 1：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client，`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`）
 - 刚完成主线：**最小人类可用入口继续补齐已完成**；部署蓝图继续看 `docs/QUICK_START_PLAN.md`，交付物继续看 `docs/DEPLOY_CHECKLIST.md`
 - 上一条完成主线：**shared private-chat 交付体验收口已完成**；详细闭环继续写在 `docs/SHARED_DELIVERY_UX_LOG.md`
 - 再上一条完成主线：**`series / anime` 独立名称解析最小实现已完成**；详细闭环继续写在 `docs/SERIES_ANIME_NAMING_LOG.md`
 - 更早完成主线：**`cleanup_downloaded_source.py` cleanup 编排层瘦身 / 模块化已完成**；详细闭环继续写在 `docs/CLEANUP_SLIMMING_LOG.md`
 - 更早完成主线：`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退
-- 当前最小闭环：本线已满足 `Done when` 第 1 条；`After this step` 仍是 plugin 体系继续后置，暂不自动扩成新施工
+- 当前最小闭环：本轮只保留文档切线和交接整理；后续若要继续做“其他事情”，必须先把候选事项提升成新的 promoted 主线，再开工
 - 当前主线蓝图统一写在 `docs/JELLYFIN_PLEX_PLAN.md`
 
 ## Source of truth
@@ -25,10 +25,10 @@
 
 ## Only do
 
-- 只推进 Jellyfin / Plex 支持的一个最小 Phase；每轮只做一个最小闭环，不顺手改 approval、dispatch、import、cleanup 或 workflow 真相
+- 当前不自动启动新施工；只维护完成态文档一致性和交接入口
 - 当前优先交付：
   - 保持当前完成态文档一致
-  - 不把 plugin 体系提前拉回主线
+  - 后续若要继续做其他事项，先在本文写清新的 `Current goal / Only do / Done when`
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
 - 文档继续分层：`STATUS.md` 只保留当前快照，`JELLYFIN_PLEX_PLAN.md` 承接当前完成态主线蓝图，`BT_SCORING_PLAN.md` / `QUICK_START_PLAN.md` / `DEPLOY_CHECKLIST.md` 保持刚完成主线与部署主线的蓝图和交付物定位，其余完成台账继续只作历史闭环入口
@@ -40,13 +40,14 @@
 - 不放宽现有 pending state gate、approval、`jobs` / `job_event` / lease/version / SQLite 真相边界
 - 不在这一步引入自动 `confirm`、自动下载、新 workflow、媒体库自动探测或其他新集成
 - 不把这一步变成站点白名单平台、偏好学习器或自动 confirm 一条龙
+- 不在本文还没切线前直接启动任何新的 promoted 主线
 
 ## Done when
 
-当前主线视为 **已基本完成**，触发以下任一可测量条件即停止，并通知用户切到下面 `After this step` 第 1 项：
+当前文档切线状态视为 **已收口**，满足以下两点即可：
 
-1. `app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client，`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 全绿；
-2. 或者本轮代码变更 `< 20` 行、只是为同一个 weight key 再加一条微调，触发 `AGENTS.md §11` 停机规则。
+1. `docs/NEXT_STEP.md` / `docs/STATUS.md` / `README.md` / `AGENTS.md` 一致表达“当前没有进行中的 promoted 主线，后续继续其他事项前先切线”；
+2. Jellyfin / Plex、quick start、BT 评分器、shared delivery、`series / anime` 等已完成主线的蓝图 / 台账入口保持不变。
 
 附加约束（不算退出条件，只是不得违反）：
 
@@ -56,4 +57,5 @@
 
 ## After this step
 
-1. plugin 体系继续后置
+1. 由用户明确下一条要做的事项
+2. 把该事项提升成新的 promoted 主线，并在本文件补齐 `Current goal / Only do / Done when`

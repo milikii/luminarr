@@ -47,7 +47,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-当前快照按主题归纳；当前 Jellyfin / Plex 主线已满足退出条件 1，当前没有新的 promoted 主线。当前完成态蓝图统一只看 `docs/JELLYFIN_PLEX_PLAN.md`，刚完成的 BT 评分器与部署主线继续只看 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，更早完成的 shared delivery / `series-anime` / 各条瘦身与持久化主线继续只看各自台账，状态页不逐天或逐字段追加条目。
+当前快照按主题归纳；当前没有进行中的 promoted 主线，上一条完成主线是 Jellyfin / Plex。当前完成态蓝图统一只看 `docs/JELLYFIN_PLEX_PLAN.md`，刚完成的 BT 评分器与部署主线继续只看 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，更早完成的 shared delivery / `series-anime` / 各条瘦身与持久化主线继续只看各自台账，状态页不逐天或逐字段追加条目。
 
 - 2026-04-19 已通过 `app/downloader_route_lookup.py` 抽离把 `app/main.py` 主线的下载器路由 helper 收成独立边界；`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"` 得到 `16 passed, 1 deselected`，`app/main.py` 主线满足退出条件 1 并已切到 `series / anime` 解析主线。
 - 2026-04-19 已落 `app/services/media_name_parser.py` Phase 1 基线：统一输出 `ParsedMediaName`，覆盖年份、季集、方括号集号、发布组、画质标签、容器和中英混合标题的最小解析；`.venv/bin/python -m pytest -q tests/test_media_name_parser.py` 得到 `10 passed`。
@@ -69,13 +69,13 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - 2026-04-19 已完成 Jellyfin / Plex 主线最后一步：`app/config.py` 新增 `PLEX_BASE_URL`、`PLEX_TOKEN`，`MEDIA_SERVER_PROVIDER` 已放宽到 `plex`，`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client；`.venv/bin/python -m pytest -q tests/test_config.py tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py tests/test_plex_client.py` 得到 `56 passed`，本线已满足 `Done when` 第 1 条。
 - 四个正式私聊入口（Telegram / personal WeChat / Feishu / WeCom）共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相；渠道层只负责验签 / 解密 / 投影 `chat_id / user_id` / 回包。
 - 最小可追溯 trace baseline 已落地：shared 入站回包和下载/导入 confirm 关键节点会追加到 `logs/trace.log`，不替代中文故障日志。
-- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；Jellyfin / Plex 主线已完成，当前没有新的 promoted 主线，不回退 cleanup 和 shared delivery 已确认的协议与结论。
+- cleanup 完成态、四渠道真实 smoke 证据和窗口 gate 继续只维护在 `docs/CLEANUP_VERIFICATION_WINDOW.md`；Jellyfin / Plex 主线已完成，当前没有进行中的 promoted 主线，不回退 cleanup 和 shared delivery 已确认的协议与结论。
 - 上一条 BT 订阅主线已把命令解析、媒体类型前缀解析、标题年份抽取和清单增删回复文本抽到 `app/services/bt_subscription_command.py`；扫描候选筛选、`last_seen` 更新和 scheduler tick 继续保留在 service 内，作为已完成主线的剩余结构证据。
 - 当前本地联调基线保持 Transmission `http://127.0.0.1:19091`、BT Transmission `http://127.0.0.1:19092`、Emby `http://127.0.0.1:18096`。
 
 ## Main risks and gaps
 
-- 当前 Jellyfin / Plex 主线已满足退出条件 1；当前没有新的 promoted 主线，`After this step` 仍保持 plugin 体系后置。
+- 当前 Jellyfin / Plex 主线已满足退出条件 1；当前没有进行中的 promoted 主线。后续若要继续做其他事项，先更新 `docs/NEXT_STEP.md` 完成切线。
 - 当前剩余关注点不是媒体服务器 provider 装配，而是保持完成态文档、cleanup 证据和四渠道协议边界不回退。
 - 当前必须继续守住四渠道共用协议、approval、`jobs`、`job_event` 和 SQLite 真相边界，不能在 BT 评分器主线里借机改业务真相。
 - cleanup 完成态、四渠道 smoke 证据和 docs gate 仍必须持续稳定；这部分详细证据继续看 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
@@ -84,8 +84,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 ## Latest verification
 
 - 窗口活性快照：`jellyfin / plex` 主线已完成，当前无新 promoted 主线
-- 当前状态快照：完成态守护中
-- 当前结论快照：Jellyfin / Plex 主线已在 2026-04-19 满足退出条件 1；plugin 体系继续后置，不自动启动新施工。
+- 当前状态快照：等待下一条 promoted 主线
+- 当前结论快照：Jellyfin / Plex 主线已在 2026-04-19 满足退出条件 1；后续继续其他事项前，先更新 `docs/NEXT_STEP.md` 完成切线。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - 当前主线 focused verification：2026-04-19，`16 passed, 1 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py -k "resolve_downloader_name_for_task or resolve_downloader_client_for_lookup or resolve_downloader_client_for_dispatch or get_torrent_status_with_routing or get_torrent_import_source_with_routing"`）
 - 当前主线 focused verification：2026-04-19，`24 passed`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_jellyfin_client.py`）
