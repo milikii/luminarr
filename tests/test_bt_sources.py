@@ -151,6 +151,7 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pag
     assert is_supported_web_source_page_url("https://nyaa.si/")
     assert is_supported_web_source_page_url("https://nyaa.si/?c=1_2")
     assert is_supported_web_source_page_url("https://nyaa.si/?u=subsplease")
+    assert is_supported_web_source_page_url("https://nyaa.si/?u=subsplease&s=seeders&o=desc")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren")
     assert is_supported_web_source_page_url("https://nyaa.si/?q=frieren")
