@@ -593,8 +593,8 @@
   - `docs/DECISIONS.md` 只保留当前仍有效的长期规则和边界。
   - `docs/NEXT_STEP.md` 只保留当前唯一施工路径、明确退出条件和本 step 的禁止项。
   - `docs/STATUS.md` 只保留当前实现真相、主要风险和最新验证快照，不再堆完整历史流水。
-  - 对应主线的 slimming / closure log 承接当前主线的详细闭环、focused tests 和 commit 轨迹（当前为 `docs/CLEANUP_SLIMMING_LOG.md`）；更早完成的持久化收口细节继续保留在 `docs/PERSISTENCE_CLOSURE_LOG.md`，避免把 `docs/STATUS.md` 重新写胖。
-  - `README.md` 只保留项目定位、当前结构、能力概览和当前路线，作为仓库入口；cleanup 窗口的详细证据仍收口到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，当前主线的详细收口台账收口到对应主线 log（当前为 `docs/CLEANUP_SLIMMING_LOG.md`）。
+  - 对应主线的 slimming / closure log 承接当前主线的详细闭环、focused tests 和 commit 轨迹（当前为 `docs/APP_MAIN_SLIMMING_LOG.md`）；更早完成的持久化收口细节继续保留在 `docs/PERSISTENCE_CLOSURE_LOG.md`，避免把 `docs/STATUS.md` 重新写胖。
+  - `README.md` 只保留项目定位、当前结构、能力概览和当前路线，作为仓库入口；cleanup 窗口的详细证据仍收口到 `docs/CLEANUP_VERIFICATION_WINDOW.md`，当前主线的详细收口台账收口到对应主线 log（当前为 `docs/APP_MAIN_SLIMMING_LOG.md`）。
   - `AGENTS.md` 负责把以上主线同步给编码代理，但不是当前执行真相的首要来源。
   - 阶段演进和历史验证若需要保留，放到 `docs/HISTORY.md`，不再反向污染当前文档。
 - **原因**：
