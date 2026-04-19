@@ -103,6 +103,27 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "Cleanup verification window" in cleanup_window_text
 
 
+def test_current_completion_state_docs_do_not_regress() -> None:
+    readme_text = Path("README.md").read_text(encoding="utf-8")
+    architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
+    status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
+    decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
+    agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+
+    for text in (readme_text, status_text, decisions_text, agents_text):
+        assert "Emby / Jellyfin / Plex" in text
+
+    assert "Emby / Jellyfin / Plex" in architecture_text
+    assert "Jellyfin / Plex 支持已基本完成" in next_step_text
+    assert "当前没有新的 promoted 主线" in readme_text
+    assert "当前没有新的 promoted 主线" in status_text
+    assert "plugin 体系继续后置" in next_step_text
+    assert "plugin 体系继续后置" in readme_text
+    assert "Jellyfin / Plex 并行主线支持（当前不做，后续再补）" not in readme_text
+    assert "最小人类可用入口继续补齐**" not in agents_text
+
+
 def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
 
