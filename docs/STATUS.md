@@ -47,7 +47,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 当前 promoted 主线是 cleanup PT 最小保护窗口：只补保守阻断，不改 cleanup 删除范围、四渠道协议或 BT / raw_bt 边界。
+- 当前没有进行中的 promoted 主线；刚完成主线是 cleanup PT 最小保护窗口。后续若要继续做其他事项，先更新 `docs/NEXT_STEP.md` 完成切线，再开工。
 - 当 `PT_MIN_SEED_HOURS` > 0 时，PT 任务的 `cleanup inspect` / `cleanup` 已会按 `download_monitor.completion_observed_at` 做保守时间窗阻断；缺少必要真相时显式拒绝。
 - Jellyfin / Plex 支持已基本完成：`app/main.py` 已能按配置选择 Emby / Jellyfin / Plex refresh client；完成态蓝图只看 `docs/JELLYFIN_PLEX_PLAN.md`。
 - quick start、BT 共享确定性评分器、shared delivery、`series / anime`、`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身都保持完成态，不回退成进行中。
@@ -58,22 +58,23 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## Main risks and gaps
 
+- 当前没有新 promoted 主线；如果不先在 `docs/NEXT_STEP.md` 里把下一条事项提升成主线，就不应继续改业务边界。
 - cleanup PT 最小保护窗口这一步只基于 `download_monitor.completion_observed_at` 做保守阻断；还不是 downloader live seeding 秒数能力。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
-- cleanup 已完成窗口证据仍成立，但 `pt_min_seed_hours` 保护正在作为新主线补最小基线。
+- cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；但这还不是 downloader live seeding 秒数能力。
 - 字幕翻译当前仍只处理 `.srt`；`.ass` 继续留作后续能力缺口，不影响当前完成态。
 
 ## Latest verification
 
-- 窗口活性快照：`cleanup PT 最小保护窗口` 进行中
-- 当前状态快照：PT cleanup 保守阻断主线已启动
-- 当前结论快照：2026-04-19 冷启动审计已确认旧“无 promoted 主线”切线收口；当前已切到新的 cleanup PT 最小保护窗口主线。
+- 窗口活性快照：当前无进行中的 promoted 主线
+- 当前状态快照：cleanup PT 最小保护窗口已收口，等待下一条 promoted 主线
+- 当前结论快照：2026-04-19 冷启动审计、cleanup PT guard focused tests、focused cleanup 回归、docs gate 与本地最小验证已确认 cleanup PT 最小保护窗口满足 `docs/NEXT_STEP.md` 现行退出条件；文档与近 20 条提交一致进入“无进行中的 promoted 主线”切线状态。
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
 - cleanup PT guard focused tests：2026-04-19，`4 passed, 45 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py -k "pt_seed_window or cleanup_by_task_ref_removes_source_file_and_keeps_target or inspect_by_task_ref_returns_ready_text_without_deleting_source"`）
-- focused cleanup tests：2026-04-14，`526 passed, 93 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
-- cleanup verification docs gate：2026-04-14，`384 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
+- focused cleanup tests：2026-04-19，`537 passed, 203 deselected`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`）
+- cleanup verification docs gate：2026-04-19，`394 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`）
 - focused config truth tests：2026-04-19，`5 passed, 25 deselected`（`.venv/bin/python -m pytest -q tests/test_config.py -k "pt_min_seed_hours or defaults_role_binding_to_first_instance or requires_transmission_base_url or requires_token"`）
 - make run env-file guard tests：2026-04-13，`2 passed`（`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）

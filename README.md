@@ -108,14 +108,14 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 交付形态继续以私聊 bot 为主；后续体验优化优先走渠道内更美观的图片/信息卡片/字符排版，不做 Web UI。
 - cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
 - cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
-- cleanup 当前还没有 PT 做种状态 / `pt_min_seed_hours` 保护校验；cleanup 验证窗口退出前必须把这条风险确认清楚。
+- cleanup 已补 `pt_min_seed_hours` 基于完成观察时间窗的保守阻断；这还不是 downloader live seeding 秒数能力。
 - 当前最稳的是 movie-first；quick start、BT 共享确定性评分器、Jellyfin / Plex refresh provider 支持都已完成。
 - 字幕翻译当前仍只处理 `.srt`；`.ass` 继续保留为后续能力缺口，不阻塞当前主线切换。
 - BT 路线已可用，并已升级成共享确定性评分器。
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前 promoted 主线是 cleanup PT 最小保护窗口；这一步只补保守阻断，不改 cleanup 删除范围、四渠道协议或 BT / raw_bt 边界。Jellyfin / Plex 支持是上一条已完成主线。
+- **当前施工状态**：当前没有进行中的 promoted 主线；刚完成的主线是 cleanup PT 最小保护窗口，Jellyfin / Plex 支持是上一条已完成主线。后续若要继续做其他事项，先以 `docs/NEXT_STEP.md` 完成切线，再开工。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
 - **当前完成态主线蓝图**：`docs/JELLYFIN_PLEX_PLAN.md`
@@ -124,8 +124,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
 - **本地回归命令**：当前完成态入口看 `docs/JELLYFIN_PLEX_PLAN.md`；更细的验证入口和历史闭环看 `docs/STATUS.md`
-- 这一步只允许给 PT cleanup 补最小保护窗口，不顺手改删除范围、四渠道文本协议、BT / raw_bt 边界或 workflow 真相。
-- 当前上一条主线已完成；这次新主线的具体 `Only do / Done when` 继续以 `docs/NEXT_STEP.md` 为准。
+- 当前只允许守住完成态文档、cleanup 证据和四渠道共享协议，不顺手拉起新 promoted 主线或改 workflow 真相。
+- cleanup PT 最小保护窗口已收口；后续若要继续其他事项，先在 `docs/NEXT_STEP.md` 写清新的 `Current goal / Only do / Done when`。
 
 ## 6. 当前明确不做
 
