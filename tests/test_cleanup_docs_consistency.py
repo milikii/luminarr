@@ -106,6 +106,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
 def test_current_completion_state_docs_do_not_regress() -> None:
     readme_text = Path("README.md").read_text(encoding="utf-8")
     architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    jellyfin_plex_plan_text = Path("docs/JELLYFIN_PLEX_PLAN.md").read_text(encoding="utf-8")
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
@@ -120,6 +121,9 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "当前没有新的 promoted 主线" in status_text
     assert "plugin 体系继续后置" in next_step_text
     assert "plugin 体系继续后置" in readme_text
+    assert "当前主线已满足 `Done when` 第 1 条" in jellyfin_plex_plan_text
+    assert "plugin 体系后置" in jellyfin_plex_plan_text
+    assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
     assert "Jellyfin / Plex 并行主线支持（当前不做，后续再补）" not in readme_text
     assert "最小人类可用入口继续补齐**" not in agents_text
 
