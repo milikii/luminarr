@@ -1,6 +1,6 @@
-# BT 真实 dispatch smoke (v1)
+# BT 真实 dispatch smoke (v2)
 
-> 目的：把当前 promoted 主线从“BT 页面 URL proof”切到“BT 真实下载器投递 smoke”，先验证现有 BT 主链是否真的能把任务投递到 BT Transmission，而不是继续围着页面变体打转。
+> 目的：保留这条刚完成的主线蓝图。2026-04-20 已用 direct `magnet:? -> 纯 BT 下载链 -> raw_bt 目录选择 -> confirm` 在 `BT Transmission(http://127.0.0.1:19092)` 观察到真实任务，当前不再把它当作 promoted 主线继续推进。
 
 ## 1. 要解决的真实问题
 
@@ -37,13 +37,22 @@
 2. Phase 2：写一次性 `tmp_tests/` 真实验证脚本，驱动 “magnet -> 纯 BT 下载链 -> raw_bt 目录 -> approval -> confirm”。
 3. Phase 3：验证 `19092` 出现任务，并把真实成功或失败证据写回当前主线文档与 `STATUS.md`。
 
-## 4. Done when
+## 4. 完成证据
 
-当前主线视为 **已收口**，满足以下任一条即可：
+- 2026-04-20 真实验证脚本 `tmp_tests/verify_bt_real_dispatch_smoke.py` 已成功跑通：
+  - direct `magnet:?` 先进入 BT 处理链问询；
+  - 选择 `纯 BT 下载链` 后进入 `raw_bt` 目录选择；
+  - 选择目录键 `smoke`，目标路径为 `/downloads/complete/raw_bt_smoke`；
+  - 生成待确认 `task_ref=bt-ffe44b7b`；
+  - `confirm bt-ffe44b7b` 后返回 `任务 ID: 1`、`任务 Hash: 03c970d927a04ef5a784fa1f9472c19e298fa754`；
+  - 在 `http://127.0.0.1:19092/transmission/rpc` 观察到该任务，且 `downloadDir=/downloads/complete/raw_bt_smoke`。
+- approval / jobs 真相均已落稳：
+  - pending approval 能正常创建；
+  - confirm 后 approval 进入 `approved` 且 `executed_version > 0`；
+  - jobs 进入 `completed`，并保留 `downloader_name=tr-bt` 与 `download_dir=/downloads/complete/raw_bt_smoke`。
+- 这条链当前是 `raw_bt + auto_import_enabled=False`，因此 **不会登记 `download_monitor`**；这不是回归，而是现有边界本身。
 
-1. 真实 BT dispatch smoke 成功：`confirm` 后能在 `http://127.0.0.1:19092/transmission/rpc` 观察到新任务，且任务真相继续落在现有 approval / `jobs` / download_monitor 边界；
-2. 真实 BT dispatch smoke 失败，但失败点已被收口到明确的 `downloader_name / request_url / 配置缺口`，并有显式中文日志与 `[处理建议]`；
-3. 本轮代码变更 `< 20` 行且只是对同一个 dispatch / route helper 再补一条诊断分支，触发 `AGENTS.md §11` 停机规则。
+按 2026-04-20 当时的退出条件，这条主线已满足“真实 BT dispatch smoke 成功”。
 
 ## 5. 不做清单
 

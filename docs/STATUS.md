@@ -1,4 +1,4 @@
-# Current status (v327)
+# Current status (v328)
 
 ## Project position
 
@@ -24,8 +24,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：当前 BT 真实 dispatch smoke 蓝图
-- `docs/BT_PAGE_RANGE_PLAN.md`：刚完成的 BT 页面 proof 蓝图
+- `docs/BT_BATCH_PLAN.md`：当前 BT 批量确认真实 dispatch smoke 蓝图
+- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：刚完成的 BT 真实 dispatch smoke 蓝图
+- `docs/BT_PAGE_RANGE_PLAN.md`：更早完成的 BT 页面 proof 蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成的 Plex 真实 refresh smoke 值得性重评估蓝图
 - `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：更早完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
@@ -51,7 +52,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 当前 promoted 主线已切到 **BT 真实 dispatch smoke**：现有 BT 页面 URL 预览、聊天缓存和 `bt批量确认` 复用 proof 家族已收口，当前只差一条 direct `magnet:?` 到 `BT Transmission(http://127.0.0.1:19092)` 的真实投递证据。
+- 当前 promoted 主线已切到 **BT 批量确认真实 dispatch smoke**：单条 direct `magnet:?` 的真实投递证据已在 2026-04-20 收口，当前只差把 `bt批量确认` 产出的任务继续送到 `BT Transmission(http://127.0.0.1:19092)`。
+- 刚完成的 **BT 真实 dispatch smoke** 已在 2026-04-20 收口：一次性真实脚本已证明 direct `magnet:? -> 纯 BT 下载链 -> raw_bt 目录选择 -> confirm` 能投递到 `BT Transmission(http://127.0.0.1:19092)`，观测到 `任务 ID: 1 / Hash: 03c970d927a04ef5a784fa1f9472c19e298fa754 / downloadDir=/downloads/complete/raw_bt_smoke`。
 - BT allowlist 分类排序列表 exact URL 聊天缓存 proof 已在 2026-04-20 当前批次确认满足退出条件；focused tests 已证明 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 能继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。
 - 再上一条 BT allowlist 分类搜索显式分页 URL proof 主线也继续保持完成态；focused tests 已证明 `https://nyaa.si/?c=1_2&q=frieren&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界。
 - 更早一条 BT 用户页 / 编号范围页能力主线已在同日冷启动审计中确认满足退出条件，当前继续保持完成态。
@@ -70,16 +72,17 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
 - BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地。
-- 当前最小风险是：BT 页面 proof 家族虽然已完成，但还缺 `magnet:? -> 纯 BT 下载链 -> raw_bt 目录选择 -> approval -> confirm -> BT Transmission(19092)` 的真实 dispatch smoke；当前 promoted 主线只收这条真实 side-effect 证据，不再继续补 URL 微变体。
+- 当前最小风险是：单条 `magnet:?` 真实 dispatch 已完成，但 `bt批量确认` 产出的待确认任务还缺一条真实 `confirm -> BT Transmission(19092)` 证据；当前 promoted 主线只收这条真实 side-effect 证据，不再继续补 URL 微变体或重复单条 smoke。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 BT 真实 dispatch smoke
+- 窗口活性快照：当前主线为 BT 批量确认真实 dispatch smoke
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；BT 页面 URL proof 家族已完成，当前 promoted 主线切到 BT 真实 dispatch smoke，不再继续拆更小页面形式。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；BT 页面 URL proof 与单条 BT 真实 dispatch 都已完成，当前 promoted 主线切到 BT 批量确认真实 dispatch smoke。
+- real BT dispatch smoke：2026-04-20，`tmp_tests/verify_bt_real_dispatch_smoke.py` 成功观察到 `confirm bt-ffe44b7b -> BT Transmission(19092)`，并确认 approval / jobs 真相已落稳；`raw_bt` 因 `auto_import_enabled=False` 不登记 `download_monitor`
 - BT 页面 proof 家族 focused tests：2026-04-20，排序列表 / 分类搜索基础页 / 分类排序列表 exact URL 等代表性组合继续全绿（详细清单继续看 `docs/BT_PAGE_RANGE_PLAN.md`）
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）

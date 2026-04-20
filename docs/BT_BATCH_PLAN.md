@@ -1,6 +1,6 @@
-# docs/BT_BATCH_PLAN.md (v2)
+# docs/BT_BATCH_PLAN.md (v3)
 
-> 目的：给 BT 批量任务保留一份连续蓝图。2026-04-19 已完成 **确定性批量预览**，当前阶段切到 **显式批量确认**，继续复用既有 approval -> confirm -> jobs 真相边界。
+> 目的：给 BT 批量任务保留一份连续蓝图。2026-04-19 已完成 **确定性批量预览** 与 **显式批量确认** 的只读/待确认闭环；2026-04-20 当前 promoted 主线切到 **BT 批量确认真实 dispatch smoke**，继续复用既有 approval -> confirm -> jobs 真相边界。
 >
 > 本文件是**蓝图**，不是台账。落地后的详细闭环继续收口到后续主线台账；当前先不给 `STATUS.md` 回灌长记录。
 >
@@ -37,15 +37,25 @@
 
 这一阶段已经落地，focused tests 入口见 `docs/NEXT_STEP.md`。
 
-### Phase 2（当前进行中）：显式批量确认
+### Phase 2（已完成）：显式批量确认
 
-当前 promoted 主线只做下面这一条最小闭环：
+上一条主线已经收口这条最小闭环：
 
 1. 用户先拿到 `bt批量 / bt batch` 的只读预览；
 2. 用户显式发送批量确认请求；
 3. 系统按编号范围把候选映射回现有下载确认链；
 4. 每一条下载仍复用既有 approval / confirm / jobs / job_event 真相边界；
 5. 不自动 `confirm`，也不绕过单条下载确认。
+
+### Phase 3（当前进行中）：批量确认真实 dispatch smoke
+
+当前 promoted 主线只做下面这一条最小真实闭环：
+
+1. 用户先拿到一组可复用的 BT 预览候选；
+2. 用户发送 `bt批量确认` / `bt batch confirm`，让系统生成多条既有单条下载确认；
+3. 用户显式 `confirm <task_ref>` 其中一条；
+4. 真实验证该任务是否落到 `BT Transmission(http://127.0.0.1:19092)`；
+5. 失败时直接收口到明确的下载器路由、RPC 请求或配置缺口。
 
 ## 4. 最小输入协议
 
@@ -85,13 +95,15 @@
 
 当前阶段视为 **已收口**，满足以下任一条即可：
 
-1. `bt批量确认` / `bt batch confirm` 已能把已预览候选映射回现有下载确认链，且 `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_pure_bt.py tests/test_search_media.py tests/test_telegram_bot.py -k "bt_batch"` 全绿；
-2. 或本轮代码改动 `< 20` 行、只是为同一个 batch confirm parser / 映射 helper 再补一条 `if/elif/log` 诊断分支，触发 `AGENTS.md §11` 停机规则。
+1. `bt批量确认` / `bt batch confirm` 产出的至少 1 条待确认任务，在显式 `confirm` 后能在 `http://127.0.0.1:19092/transmission/rpc` 观察到真实任务，且 approval / `jobs` 真相不回退；
+2. 真实 BT 批量确认 dispatch smoke 失败，但失败点已被收口到明确的 `downloader_name / request_url / 配置缺口`，并有显式中文日志与 `[处理建议]`；
+3. 或本轮代码改动 `< 20` 行、只是为同一个 batch confirm dispatch / route helper 再补一条 `if/elif/log` 诊断分支，触发 `AGENTS.md §11` 停机规则。
 
 ## 8. 不做清单
 
 - 不做 BT 批量自动下载
 - 不做自动 `confirm`
+- 不把这一步扩成“一次性真实确认多条任务”
 - 不把这一步扩成 Jellyfin / Plex 真实联调
 - 不接未知站点、动态站点、CAPTCHA 或登录态站点
 - 不让 LLM 决定抓哪一页、选哪几条、是否直接投递
