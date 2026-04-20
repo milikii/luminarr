@@ -1,4 +1,4 @@
-# Persistence closure log (v46)
+# Persistence closure log (v47)
 
 > 目的：承接已完成的“持久化吞错收口”主线详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环按主题合并进下面分组，**不再逐天或逐字段追加 `### 2026-04-xx 分流缺口` 条目**。具体 commit 轨迹看 `git log`；原始逐条台账已在 v43 做最后一次保留，此后收敛为主题视图。
@@ -55,6 +55,7 @@ focused tests 入口：
 - Telegram update / callback 去重写入的结果缺失分流，对应入口停路。
 - 所有分流不改已投递下载副作用边界。
 - 2026-04-20 worthiness 评估结论：这组共享职责值得单开结构降本主线。当前稳定调用方已经固定为 `StatusFollowUpRecorder.record()`、`PostDownloadAutoImportService.run_for_record()`、`telegram_bot._poll_pending_download_completion_once()`；三处都围绕同一份 `download_monitor` / `job_event` 真相推进“状态观察落盘 -> 完成事件查询/追加 -> 自动导入消费”，并共用 `AutoImportStateUnavailableError`、显式中文日志、fail-closed 停路边界。下一条 promoted 主线应优先抽这条 follow-up 推进链，而不是继续让渠道层通过 `get_status_text()` 间接触发共享副作用。
+- 2026-04-20 冷启动审计结论：`GetDownloadStatusService.get_status_text()` 已只保留状态查询和回复组装，实际共享 follow-up 已委托给 `StatusFollowUpRecorder.record()`；因此上一条“共享状态 follow-up helper 结构降本”主线已满足 `docs/NEXT_STEP.md` 的退出条件 1/2/3。下一条同职责族最小收口点改成让 `telegram_bot._poll_pending_download_completion_once()` 直接复用共享 helper，不再借 `get_status_text()` 间接推进共享副作用。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "register_download_monitor"`
