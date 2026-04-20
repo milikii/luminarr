@@ -351,18 +351,12 @@ def test_import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails(capsys
     assert "当前请求会直接返回查询失败" in output
 
 
-def test_is_raw_bt_task_logs_missing_job_result(capsys: pytest.CaptureFixture[str]) -> None:
+def test_is_raw_bt_task_treats_missing_job_as_not_raw_bt(capsys: pytest.CaptureFixture[str]) -> None:
     job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: None})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
 
-    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is None
-
-    output = capsys.readouterr().out
-    assert "[导入 raw_bt 判定结果缺失]" in output
-    assert "chat_id=1001" in output
-    assert "task_ref=87" in output
-    assert "downloader job missing during raw_bt check" in output
-    assert "[处理建议]" in output
+    assert service._is_raw_bt_task(chat_id=1001, task_ref="87") is False
+    assert capsys.readouterr().out == ""
 
 
 def test_is_raw_bt_task_logs_row_corruption(capsys: pytest.CaptureFixture[str]) -> None:
@@ -387,20 +381,35 @@ def test_is_raw_bt_task_logs_row_corruption(capsys: pytest.CaptureFixture[str]) 
     assert "[处理建议]" in output
 
 
-def test_import_by_task_ref_returns_query_failed_when_raw_bt_job_result_is_missing(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: None})()
-    get_import_source = AsyncMock()
-    service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
+def test_import_by_task_ref_allows_pending_when_raw_bt_job_result_is_missing(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+
+    class MissingDownloaderJobRepo(JobRepo):
+        def get_downloader_job_for_chat_ref(self, *, chat_id: int, task_ref: str):
+            _ = chat_id, task_ref
+            return None
+
+    job_repo = MissingDownloaderJobRepo(database)
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    get_import_source = AsyncMock(return_value=import_source)
+    service = ImportToLibraryService(get_import_source, str(tmp_path / "library"), job_repo=job_repo)
 
     text = _run(service.import_by_task_ref("87", chat_id=1001))
 
-    assert text == IMPORT_QUERY_FAILED_TEXT
-    get_import_source.assert_not_awaited()
-    output = capsys.readouterr().out
-    assert "[导入 raw_bt 判定结果缺失]" in output
-    assert "当前请求会直接返回查询失败" in output
+    assert "导入待确认" in text
+    get_import_source.assert_awaited_once_with("87", 1001)
 
 
 def test_import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupted(

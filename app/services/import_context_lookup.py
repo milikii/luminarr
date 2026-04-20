@@ -107,7 +107,7 @@ class ImportContextLookup:
             error_kind = "row_corrupted" if self._is_job_row_corrupted_error(error) else "lookup_failed"
             return RawBtTaskLookupResult(is_raw_bt=None, error_kind=error_kind, detail=str(error))
         if downloader_job is None:
-            return RawBtTaskLookupResult(is_raw_bt=None, error_kind="result_missing")
+            return RawBtTaskLookupResult(is_raw_bt=False)
 
         cleaned_payload = downloader_job.payload_json.strip()
         if not cleaned_payload:
