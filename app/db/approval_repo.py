@@ -230,6 +230,22 @@ class ApprovalRepo:
             executed_lease_version=executed_lease_version,
         )
 
+    def move_downloader_approval_identity(
+        self,
+        *,
+        current_task_id: str,
+        current_task_hash: str,
+        new_task_id: str,
+        new_task_hash: str,
+    ) -> None:
+        self._move_approval_identity(
+            action_type=ACTION_ADD_TO_DOWNLOADER,
+            current_task_id=current_task_id,
+            current_task_hash=current_task_hash,
+            new_task_id=new_task_id,
+            new_task_hash=new_task_hash,
+        )
+
     def get_downloader_approval(self, *, task_id: str, task_hash: str) -> ApprovalRecord | None:
         return self._get_approval(
             action_type=ACTION_ADD_TO_DOWNLOADER,
@@ -570,6 +586,70 @@ class ApprovalRepo:
             connection.commit()
         if cursor.rowcount != 1:
             raise ApprovalPersistenceError("approval_record missing during executed version update")
+
+    def _move_approval_identity(
+        self,
+        *,
+        action_type: str,
+        current_task_id: str,
+        current_task_hash: str,
+        new_task_id: str,
+        new_task_hash: str,
+    ) -> None:
+        cleaned_current_task_id = current_task_id.strip()
+        cleaned_current_task_hash = current_task_hash.strip()
+        cleaned_new_task_id = new_task_id.strip()
+        cleaned_new_task_hash = new_task_hash.strip()
+        if (
+            not cleaned_current_task_id
+            or not cleaned_current_task_hash
+            or not cleaned_new_task_id
+            or not cleaned_new_task_hash
+        ):
+            raise ApprovalPersistenceError("approval task identity missing for identity move")
+        if (
+            cleaned_current_task_id == cleaned_new_task_id
+            and cleaned_current_task_hash == cleaned_new_task_hash
+        ):
+            approval_record = self._get_exact_approval_record(
+                action_type=action_type,
+                task_id=cleaned_current_task_id,
+                task_hash=cleaned_current_task_hash,
+            )
+            if approval_record is None:
+                raise ApprovalPersistenceError("approval_record missing during identity move")
+            return
+
+        with self._database.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE approval_record
+                SET
+                    task_id = ?,
+                    task_hash = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE action_type = ? AND task_id = ? AND task_hash = ?
+                """,
+                (
+                    cleaned_new_task_id,
+                    cleaned_new_task_hash,
+                    action_type,
+                    cleaned_current_task_id,
+                    cleaned_current_task_hash,
+                ),
+            )
+            connection.commit()
+        if cursor.rowcount == 1:
+            return
+
+        target_record = self._get_exact_approval_record(
+            action_type=action_type,
+            task_id=cleaned_new_task_id,
+            task_hash=cleaned_new_task_hash,
+        )
+        if target_record is not None:
+            return
+        raise ApprovalPersistenceError("approval_record missing during identity move")
 
     def _get_approval(
         self,

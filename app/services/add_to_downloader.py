@@ -513,10 +513,18 @@ class AddToDownloaderService:
         )
         if lease_recorded is not True:
             finalization_warning = ADD_FINALIZATION_WARNING_TEXT
+        approval_identity_moved = self._move_completed_approval_identity(
+            current_task_id=pending_add.task_id,
+            current_task_hash=pending_add.task_hash,
+            new_task_id=pending_add.task_id,
+            new_task_hash=result.task_hash,
+        )
+        if approval_identity_moved is not True:
+            finalization_warning = ADD_FINALIZATION_WARNING_TEXT
         if claimed_job:
             completed_context = to_completed_pending_add_context(
                 pending_add,
-                actual_task_id=result.task_id,
+                actual_task_id=pending_add.task_id,
                 actual_task_hash=result.task_hash,
             )
             job_completed = self._mark_completed_job(
@@ -1014,6 +1022,31 @@ class AddToDownloaderService:
         key = (chat_id, pending_add.task_ref)
         self._pending_add_contexts_by_chat_ref[key] = pending_add
         self._latest_pending_task_ref_by_chat[chat_id] = pending_add.task_ref
+
+    def _move_completed_approval_identity(
+        self,
+        *,
+        current_task_id: str,
+        current_task_hash: str,
+        new_task_id: str,
+        new_task_hash: str,
+    ) -> bool | None:
+        if self._approval_repo is None:
+            return True
+        try:
+            self._approval_repo.move_downloader_approval_identity(
+                current_task_id=current_task_id,
+                current_task_hash=current_task_hash,
+                new_task_id=new_task_id,
+                new_task_hash=new_task_hash,
+            )
+        except Exception as error:
+            print(
+                f"\033[31m[下载审批身份迁移失败]\033[0m current_task_id={current_task_id} current_task_hash={current_task_hash} new_task_id={new_task_id} new_task_hash={new_task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的下载审批是否仍存在，并确认 confirm 后审批主键已切到真实下载任务身份；当前下载已执行，但重启后的 stale confirm 保护可能不稳。",
+                flush=True,
+            )
+            return None
+        return True
 
     def _persist_pending_add(
         self,
