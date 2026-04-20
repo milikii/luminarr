@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.bot.bt_tmdb_association_runtime import handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query
+from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
@@ -35,6 +36,21 @@ def _log_confirm_job_lookup_failed(*, chat_id: int | None, task_ref: str, reason
         f"\033[31m[确认关联任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} "
         f"task_ref={task_ref.strip() or '-'} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前确认任务关联记录是否正常。"
+    )
+
+
+def _resolve_bound_downloader_execution(
+    *,
+    bot_data: MutableMapping[str, object],
+    role: str,
+    tg,
+):
+    return resolve_shared_bound_downloader_execution(
+        bot_data=bot_data,
+        role=role,
+        downloader_role_binding_key=tg.DOWNLOADER_ROLE_BINDING_KEY,
+        downloader_instances_key=tg.DOWNLOADER_INSTANCES_KEY,
+        config_missing_template=tg.DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
     )
 
 
@@ -370,7 +386,7 @@ async def handle_private_chat_query_text(
         if chat_id is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        downloader_execution, resolution_error = tg._resolve_bound_downloader_execution(context=context, role="bt")
+        downloader_execution, resolution_error = _resolve_bound_downloader_execution(bot_data=bot_data, role="bt", tg=tg)
         if resolution_error is not None:
             await reply_func(resolution_error)
             return
@@ -516,7 +532,11 @@ async def handle_private_chat_query_text(
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         if bt_subscription_command.action == "run":
-            downloader_execution, resolution_error = tg._resolve_bound_downloader_execution(context=context, role="bt")
+            downloader_execution, resolution_error = _resolve_bound_downloader_execution(
+                bot_data=bot_data,
+                role="bt",
+                tg=tg,
+            )
             if resolution_error is not None:
                 await reply_func(resolution_error)
                 return
@@ -716,7 +736,11 @@ async def handle_private_chat_query_text(
                 context=context,
                 media_kind=media_kind,
             ),
-            resolve_downloader_execution=lambda: tg._resolve_bound_downloader_execution(context=context, role="bt"),
+            resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+                bot_data=bot_data,
+                role="bt",
+                tg=tg,
+            ),
             log_bt_tmdb_association_error=lambda media_kind, raw_query, error: tg._log_bt_tmdb_association_error(
                 media_kind=media_kind,
                 query=raw_query,
@@ -743,7 +767,11 @@ async def handle_private_chat_query_text(
             add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
             search_service_key=tg.SEARCH_SERVICE_KEY,
             clear_pending=lambda: tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id),
-            resolve_downloader_execution=lambda: tg._resolve_bound_downloader_execution(context=context, role="bt"),
+            resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+                bot_data=bot_data,
+                role="bt",
+                tg=tg,
+            ),
             log_pure_bt_search_error=lambda pure_bt_query, error: tg._log_pure_bt_search_error(
                 query=pure_bt_query,
                 error=error,
@@ -776,7 +804,7 @@ async def handle_private_chat_query_text(
         if chat_id is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        downloader_execution, resolution_error = tg._resolve_bound_downloader_execution(context=context, role="pt")
+        downloader_execution, resolution_error = _resolve_bound_downloader_execution(bot_data=bot_data, role="pt", tg=tg)
         if resolution_error is not None:
             await reply_func(resolution_error)
             return

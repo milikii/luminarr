@@ -4,7 +4,6 @@ import asyncio
 import json
 import re
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TypeVar
 
@@ -29,6 +28,11 @@ from app.bot.bt_tmdb_association_runtime import (
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
     format_bt_tmdb_association_prompt as _format_bt_tmdb_association_prompt,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
+)
+from app.bot.downloader_execution_runtime import (
+    ResolvedDownloaderExecution,
+    resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
+    resolve_downloader_instances as resolve_shared_downloader_instances,
 )
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
@@ -235,13 +239,6 @@ BT_CLASSIFICATION_ALIASES = {
     "动画": "anime",
 }
 BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedDownloaderExecution:
-    name: str
-    downloader_type: str
-    download_dir: str
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1926,7 +1923,10 @@ def _resolve_raw_bt_destination_options(
 def _resolve_downloader_instances(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> dict[str, DownloaderInstanceConfig]:
-    return _resolve_downloader_instances_for_application(context.application)
+    return resolve_shared_downloader_instances(
+        bot_data=context.application.bot_data,
+        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
+    )
 
 
 def _resolve_bound_downloader_execution(
@@ -1934,9 +1934,12 @@ def _resolve_bound_downloader_execution(
     context: ContextTypes.DEFAULT_TYPE,
     role: str,
 ) -> tuple[ResolvedDownloaderExecution | None, str | None]:
-    return _resolve_bound_downloader_execution_for_application(
-        application=context.application,
+    return resolve_shared_bound_downloader_execution(
+        bot_data=context.application.bot_data,
         role=role,
+        downloader_role_binding_key=DOWNLOADER_ROLE_BINDING_KEY,
+        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
+        config_missing_template=DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
     )
 
 
@@ -1945,42 +1948,22 @@ def _resolve_bound_downloader_execution_for_application(
     application: Application,
     role: str,
 ) -> tuple[ResolvedDownloaderExecution | None, str | None]:
-    role_binding = application.bot_data.get(DOWNLOADER_ROLE_BINDING_KEY)
-    if not isinstance(role_binding, DownloaderRoleBinding):
-        return None, None
-
-    role_name = "PT" if role == "pt" else "BT"
-    downloader_name = role_binding.pt_downloader if role == "pt" else role_binding.bt_downloader
-    cleaned_name = downloader_name.strip()
-    if not cleaned_name:
-        return None, None
-
-    instances_by_name = _resolve_downloader_instances_for_application(application)
-    instance = instances_by_name.get(cleaned_name)
-    if instance is None:
-        return None, DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE.format(role=role_name, name=cleaned_name)
-
-    return (
-        ResolvedDownloaderExecution(
-            name=instance.name,
-            downloader_type=instance.downloader_type,
-            download_dir=instance.download_dir,
-        ),
-        None,
+    return resolve_shared_bound_downloader_execution(
+        bot_data=application.bot_data,
+        role=role,
+        downloader_role_binding_key=DOWNLOADER_ROLE_BINDING_KEY,
+        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
+        config_missing_template=DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
     )
 
 
 def _resolve_downloader_instances_for_application(
     application: Application,
 ) -> dict[str, DownloaderInstanceConfig]:
-    raw_instances = application.bot_data.get(DOWNLOADER_INSTANCES_KEY)
-    resolved_instances: dict[str, DownloaderInstanceConfig] = {}
-    if not isinstance(raw_instances, tuple):
-        return resolved_instances
-    for instance in raw_instances:
-        if isinstance(instance, DownloaderInstanceConfig):
-            resolved_instances[instance.name] = instance
-    return resolved_instances
+    return resolve_shared_downloader_instances(
+        bot_data=application.bot_data,
+        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
+    )
 
 
 async def _handle_raw_bt_destination_query(
