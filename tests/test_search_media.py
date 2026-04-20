@@ -1023,6 +1023,43 @@ def test_search_bt_batch_preview_and_format_uses_page_fetch_for_search_page_numb
     assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="1") in text
 
 
+def test_search_bt_batch_preview_and_format_uses_page_fetch_for_category_search_page_number_url() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist category search page number url")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?c=1_2&q=frieren&p=2"
+        return [
+            {
+                "title": "Frieren S01E24 1080p",
+                "source": "magnet:?xt=urn:btih:2424242424242424242424242424242424242424",
+                "seeders": 18,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            }
+        ]
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(
+                query="https://nyaa.si/?c=1_2&q=frieren&p=2",
+                selected_indexes=(1,),
+                selection_text="1",
+            )
+        )
+    )
+
+    assert "BT 批量预览结果：https://nyaa.si/?c=1_2&q=frieren&p=2" in text
+    assert "1. Frieren S01E24 1080p" in text
+    assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="1") in text
+
+
 def test_search_bt_batch_preview_and_format_uses_page_fetch_for_uncategorized_search_page_number() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for allowlist uncategorized search page number")

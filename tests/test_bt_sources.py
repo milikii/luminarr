@@ -154,8 +154,10 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pag
     assert is_supported_web_source_page_url("https://nyaa.si/?u=subsplease&s=seeders&o=desc")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren")
+    assert is_supported_web_source_page_url("https://nyaa.si/?c=1_2&q=frieren")
     assert is_supported_web_source_page_url("https://nyaa.si/?q=frieren")
     assert is_supported_web_source_page_url("https://nyaa.si/?q=frieren&p=2")
+    assert is_supported_web_source_page_url("https://nyaa.si/?c=1_2&q=frieren&p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&p=2")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc")
     assert is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc&p=2")
@@ -183,9 +185,17 @@ def test_resolve_supported_web_source_page_request_appends_page_number() -> None
         resolve_supported_web_source_page_request("https://nyaa.si/?f=0&c=1_2&q=frieren")
         == "https://nyaa.si/?f=0&c=1_2&q=frieren"
     )
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?c=1_2&q=frieren")
+        == "https://nyaa.si/?c=1_2&q=frieren"
+    )
     assert looks_like_web_source_page_request("https://nyaa.si/?f=0&c=1_2&u=subsplease p=2")
     assert resolve_supported_web_source_page_request("https://nyaa.si/?q=frieren") == "https://nyaa.si/?q=frieren"
     assert resolve_supported_web_source_page_request("https://nyaa.si/?q=frieren&p=2") == "https://nyaa.si/?q=frieren&p=2"
+    assert (
+        resolve_supported_web_source_page_request("https://nyaa.si/?c=1_2&q=frieren&p=2")
+        == "https://nyaa.si/?c=1_2&q=frieren&p=2"
+    )
     assert looks_like_web_source_page_request("https://nyaa.si/?u=subsplease p=2")
     assert (
         resolve_supported_web_source_page_request("https://nyaa.si/?u=subsplease p=2")
