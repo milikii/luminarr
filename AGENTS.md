@@ -57,6 +57,7 @@ Use the WSL Docker test stack for real downloader/import/refresh verification wh
 
 Services:
 - Transmission: `http://127.0.0.1:19091`
+- BT Transmission: `http://127.0.0.1:19092`
 - Emby: `http://127.0.0.1:18096`
 
 Read `docs/TEST_ENV.md` before touching these paths.
@@ -114,7 +115,7 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 ## 8. Current priority
 
-2026-04-20 当前批次已确认 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 满足退出条件；focused tests 已证明 `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-2` 会继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。上一条 **BT allowlist 排序列表 exact URL 缓存复用 proof** 主线、再上一条 **BT allowlist 分类搜索基础页 exact URL proof** 主线、**BT allowlist 分类搜索显式分页 URL proof** 主线、**BT allowlist 分类基础页显式分页 URL proof** 主线、**BT allowlist 分类列表显式分页 URL proof** 主线、**BT allowlist 首页显式分页 URL proof** 主线与更早一条 **BT 用户页 / 编号范围页能力** 主线都继续保持完成态。若后续继续 BT，只按 `docs/NEXT_STEP.md` 的 `After this step` 第 1 项，从现有 allowlist 里再挑一个更小页面形式单独开主线，不重做这条已收口 proof，也不放宽站点边界。上一条 **Plex 真实 refresh smoke 值得性重评估** 主线也已满足退出条件，本机 `http://127.0.0.1:32400/identity` 返回 `000`，当前批次暂不继续追 Plex 实例；再上一条 **Jellyfin / Plex 真实联调重评估** 主线保持完成态，provider 缺配置时的静默关闭 refresh 已收口；更早一条 **Jellyfin 单 provider 真实 refresh smoke** 也已通过真实失败探针收口，失败点可直接定位到 `provider + target + request_url`。当前主线蓝图继续看 `docs/BT_PAGE_RANGE_PLAN.md`；刚完成的 Plex 评估蓝图继续看 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；再上一条 Jellyfin smoke 蓝图继续看 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`；更早一条 **BT 批量任务显式批量确认** 蓝图继续看 `docs/BT_BATCH_PLAN.md`；更早的 PT live seeding 蓝图入口继续看 `docs/PT_LIVE_SEEDING_PLAN.md`；`.ass` 详细闭环入口继续看 `docs/SERIES_ANIME_NAMING_LOG.md` 2.3；已完成闭环入口继续看 `docs/JELLYFIN_PLEX_PLAN.md`、`docs/BT_SCORING_LOG.md`、`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`、`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md` 与 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
+当前进行中的 promoted 主线是 **BT 真实 dispatch smoke**。2026-04-20 当前批次已确认上一条 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 满足退出条件；更早一整组 BT allowlist 页面 URL proof 与 **BT 用户页 / 编号范围页能力** 主线也都保持完成态，不再继续拆更小页面形式。当前更小也更有用户价值的下一步，是用 direct `magnet:?` 走现有 BT 分流、`纯 BT 下载链`、`raw_bt` 目录选择、approval 与 `confirm`，验证任务是否真的投递到 `BT Transmission(http://127.0.0.1:19092)`。上一条 **Plex 真实 refresh smoke 值得性重评估** 主线也已满足退出条件，本机 `http://127.0.0.1:32400/identity` 返回 `000`，当前批次暂不继续追 Plex 实例；再上一条 **Jellyfin / Plex 真实联调重评估** 主线保持完成态，provider 缺配置时的静默关闭 refresh 已收口；更早一条 **Jellyfin 单 provider 真实 refresh smoke** 也已通过真实失败探针收口，失败点可直接定位到 `provider + target + request_url`。当前主线蓝图继续看 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`；刚完成的 BT 页面 proof 蓝图继续看 `docs/BT_PAGE_RANGE_PLAN.md`；刚完成的 Plex 评估蓝图继续看 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；再上一条 Jellyfin smoke 蓝图继续看 `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`；更早一条 **BT 批量任务显式批量确认** 蓝图继续看 `docs/BT_BATCH_PLAN.md`；更早的 PT live seeding 蓝图入口继续看 `docs/PT_LIVE_SEEDING_PLAN.md`；`.ass` 详细闭环入口继续看 `docs/SERIES_ANIME_NAMING_LOG.md` 2.3；已完成闭环入口继续看 `docs/JELLYFIN_PLEX_PLAN.md`、`docs/BT_SCORING_LOG.md`、`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`、`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md` 与 `docs/CLEANUP_VERIFICATION_WINDOW.md`。
 
 **诊断分流递减自检**：若本轮候选闭环的代码变更 < 20 行、只是对同一个 repo 方法再拆一条 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，则视为收益递减；本轮完成并提交后**直接停止**，把"当前主线可宣告完成"汇报给用户，不要自动进入下一轮再拆一条分流。
 
@@ -164,6 +165,7 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 - Run verification yourself; do not stop at “here is the command”.
 - After implementation, review the diff for scope creep, debug leftovers, and temporary files.
 - If behavior, rules, or entrypoints changed, update the relevant docs in the same turn.
+- **同能力族 proof 连续上限**：如果同一能力族已经连续完成 2 条 promoted proof-only 主线，且都没有新增副作用验证、用户可感知协议能力或显著结构降本，则下一条主线必须切到以下三类之一：真实 side-effect smoke、结构降本主线、新的用户可感知协议能力；不得继续在同一能力族里再挑更小页面形式。
 - **诊断分流递减停机规则**：本轮代码变更 `< 20 行` 且只是为同一个 repo 方法追加 `if/elif/log` 诊断分支时，视为收益递减。本轮完成并提交后**直接停止**并请用户确认是否宣告当前主线完成、切换到 `After this step` 第 1 项；不要自动连续第 2/3 轮再拆一条分流。
 - 同一会话默认最多连续推进 10 轮；到第 10 轮结束后，下一次继续施工时应新开会话，不要把第 11 轮继续叠在旧线程里。
 - 长会话重开时，优先用“最新 commit hash + 1 段当前快照 + 1 段当前主线详细闭环”做交接，不要把整段历史对话当执行上下文。

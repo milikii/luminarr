@@ -115,13 +115,14 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：上一条 promoted 主线 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 已在 2026-04-20 满足退出条件；如果继续 BT，按 `docs/NEXT_STEP.md` 的 `After this step` 第 1 项，从现有 allowlist 里再挑一个更小页面形式单独开主线。
+- **当前施工状态**：当前 promoted 主线是 **BT 真实 dispatch smoke**；上一条 BT allowlist 页面 proof 家族已经收口，后续不再继续拆更小页面形式。
 - **更早完成主线**：BT 用户页 / 编号范围页能力保持完成态，不回退。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/BT_PAGE_RANGE_PLAN.md`
-- **刚完成主线蓝图**：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
-- **刚完成主线**：`Plex 真实 refresh smoke 值得性重评估`
+- **当前主线蓝图**：`docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`
+- **刚完成主线蓝图**：`docs/BT_PAGE_RANGE_PLAN.md`
+- **更早完成主线蓝图**：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- **更早完成主线**：`Plex 真实 refresh smoke 值得性重评估`
 - **再上一条主线蓝图**：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
 - **再上一条完成主线**：`Jellyfin 单 provider 真实 refresh smoke`
 - **更早完成主线**：`Jellyfin / Plex 真实联调重评估`
@@ -132,7 +133,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
 - **本地回归命令**：当前 BT 页面能力主线入口看 `docs/NEXT_STEP.md`；刚完成的 Plex 评估与更早 BT 批量蓝图继续看 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`、`docs/BT_BATCH_PLAN.md`
-- 当前只允许围绕 BT allowlist 页面输入、编号范围预览和现有确认链复用施工；不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
+- 当前优先围绕 BT 真实下载器投递 smoke 施工；不回到 BT 页面 URL 微变体 proof，也不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
 
 ## 6. 当前明确不做
 
@@ -189,7 +190,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_PAGE_RANGE_PLAN.md`：当前主线蓝图
+- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：当前主线蓝图
+- `docs/BT_PAGE_RANGE_PLAN.md`：刚完成的 BT 页面 proof 主线蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成主线蓝图
 - `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：再上一条主线蓝图
 - `docs/BT_BATCH_PLAN.md`：更早主线蓝图

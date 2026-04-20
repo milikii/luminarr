@@ -1,12 +1,12 @@
-# BT page / range plan (v18)
+# BT page / range plan (v19)
 
-> 目的：在刚完成的排序列表 exact URL 缓存复用 proof 基础上，再补一个更小的“分类排序列表 exact URL 聊天缓存” proof，继续复用既有 approval -> confirm -> jobs 真相边界。
+> 目的：记录这条 BT allowlist 页面 proof 主线是如何收口的。当前它已经完成，不再是进行中的施工计划。
 
 ## 1. 为什么当前继续留在 BT
 
 - 2026-04-19 已确认当前主机没有可达 Plex 实例，Plex 真实 refresh smoke 值得性重评估按“暂不继续追 Plex，先回到 BT 更大范围能力”收口。
 - 上一条 BT 用户页 / 编号范围页能力主线已经收口：allowlist 页面 URL 预览、聊天缓存、`bt批量确认` 复用、category/list 页面和 `p=<页码>` 语法糖都已补齐。
-- 上一条“排序列表 exact URL 缓存复用 proof”已经确认命令入口、页面抓取、聊天缓存和 `bt批量确认` 复用都不回退；当前更小也更保守的缺口，只剩分类排序列表的 exact `?c=1_2&s=seeders&o=desc` URL 聊天缓存 proof，继续证明它也不会脱离现有聊天候选缓存边界。
+- 上一条“排序列表 exact URL 缓存复用 proof”已经确认命令入口、页面抓取、聊天缓存和 `bt批量确认` 复用都不回退；2026-04-20 最后一条分类排序列表 exact `?c=1_2&s=seeders&o=desc` URL 聊天缓存 proof 也已收口，这个能力族不再继续拆更小页面形式。
 
 ## 2. 当前最小闭环
 

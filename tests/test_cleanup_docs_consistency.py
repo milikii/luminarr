@@ -29,6 +29,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    bt_real_dispatch_plan_text = Path("docs/BT_REAL_DISPATCH_SMOKE_PLAN.md").read_text(encoding="utf-8")
     cleanup_slimming_log_text = Path("docs/CLEANUP_SLIMMING_LOG.md").read_text(encoding="utf-8")
     manage_bt_subscription_slimming_log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(
         encoding="utf-8"
@@ -48,6 +49,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/STATUS.md" in readme_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in readme_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" in readme_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in readme_text
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in readme_text
@@ -61,6 +63,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
 
     assert "docs/STATUS.md" in index_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in index_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" in index_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in index_text
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in index_text
@@ -86,6 +89,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/NEXT_STEP.md" in agents_text
     assert "docs/DECISIONS.md" in agents_text
     assert "docs/STATUS.md" in agents_text
+    assert "BT 真实 dispatch smoke" in bt_real_dispatch_plan_text
 
     assert "docs/CLEANUP_SLIMMING_LOG.md" in next_step_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" in status_text
@@ -108,6 +112,7 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     index_text = Path("docs/INDEX.md").read_text(encoding="utf-8")
     getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
     architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    bt_real_dispatch_plan_text = Path("docs/BT_REAL_DISPATCH_SMOKE_PLAN.md").read_text(encoding="utf-8")
     bt_page_range_plan_text = Path("docs/BT_PAGE_RANGE_PLAN.md").read_text(encoding="utf-8")
     bt_batch_plan_text = Path("docs/BT_BATCH_PLAN.md").read_text(encoding="utf-8")
     jellyfin_plex_plan_text = Path("docs/JELLYFIN_PLEX_PLAN.md").read_text(encoding="utf-8")
@@ -146,6 +151,10 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "当前没有进行中的 promoted 主线" not in next_step_text
     assert "当前切线规则与下一条主线入口" in readme_text
     assert "详细目标与可测量退出条件" not in readme_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in readme_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in index_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in next_step_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in agents_text
     assert "docs/BT_PAGE_RANGE_PLAN.md" in readme_text
     assert "docs/BT_PAGE_RANGE_PLAN.md" in index_text
     assert "docs/BT_PAGE_RANGE_PLAN.md" in next_step_text
@@ -167,6 +176,8 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "allowlist 页面 URL" in bt_page_range_plan_text
     assert "不做自动 `confirm`" in bt_page_range_plan_text
     assert "当前主线视为 **已收口**" in bt_page_range_plan_text
+    assert "BT Transmission(http://127.0.0.1:19092)" in bt_real_dispatch_plan_text
+    assert "direct `magnet:?`" in bt_real_dispatch_plan_text
     assert "只读，不会 dispatch 下载器" in bt_batch_plan_text
     assert "显式批量确认" in bt_batch_plan_text
     assert "不做自动 `confirm`" in bt_batch_plan_text
@@ -178,13 +189,15 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in index_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in getting_started_text
-    assert "当前主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`" in index_text
-    assert "刚完成的 Plex 值得性重评估主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`" in index_text
+    assert "当前主线说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`" in index_text
+    assert "刚完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`" in index_text
     assert "当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`" in index_text
     assert "当前主线蓝图" in readme_text
     assert "Jellyfin / Plex 并行主线支持（当前不做，后续再补）" not in readme_text
     assert "`docs/BT_SCORING_PLAN.md`：当前主线蓝图" not in readme_text
     assert "最小人类可用入口继续补齐**" not in agents_text
+    assert "再挑一个更小页面形式" not in next_step_text
+    assert "再挑一个更小页面形式" not in readme_text
 
 
 def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
@@ -207,6 +220,7 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in status_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in status_text
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in status_text
+    assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in status_text
 
     for label in STATUS_SNAPSHOT_LABELS:
         assert f"- {label}：" in status_text
@@ -218,6 +232,14 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     assert "search clarification pending persist fail-closed tests" not in status_text
     assert "search candidate persist fail-closed tests" not in status_text
     assert "search clarification clear fail-closed tests" not in status_text
+
+
+def test_codex_prompt_prevents_returning_to_same_proof_family() -> None:
+    prompt_text = Path("docs/CODEX_3_ROUND_PROMPT.md").read_text(encoding="utf-8")
+
+    assert "不得回到刚收口主线所属能力族里再拆更小 proof" in prompt_text
+    assert "同一能力族如果已经连续完成 2 条 proof-only 主线" in prompt_text
+    assert "必须切到真实 side-effect smoke、结构降本主线或新的用户可感知协议能力" in prompt_text
 
 
 def test_persistence_closure_log_keeps_current_line_detail() -> None:

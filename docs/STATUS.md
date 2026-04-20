@@ -24,7 +24,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_PAGE_RANGE_PLAN.md`：当前 BT allowlist 页面 proof 蓝图
+- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：当前 BT 真实 dispatch smoke 蓝图
+- `docs/BT_PAGE_RANGE_PLAN.md`：刚完成的 BT 页面 proof 蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成的 Plex 真实 refresh smoke 值得性重评估蓝图
 - `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：更早完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
@@ -50,6 +51,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
+- 当前 promoted 主线已切到 **BT 真实 dispatch smoke**：现有 BT 页面 URL 预览、聊天缓存和 `bt批量确认` 复用 proof 家族已收口，当前只差一条 direct `magnet:?` 到 `BT Transmission(http://127.0.0.1:19092)` 的真实投递证据。
 - BT allowlist 分类排序列表 exact URL 聊天缓存 proof 已在 2026-04-20 当前批次确认满足退出条件；focused tests 已证明 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 能继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。
 - 再上一条 BT allowlist 分类搜索显式分页 URL proof 主线也继续保持完成态；focused tests 已证明 `https://nyaa.si/?c=1_2&q=frieren&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界。
 - 更早一条 BT 用户页 / 编号范围页能力主线已在同日冷启动审计中确认满足退出条件，当前继续保持完成态。
@@ -68,31 +70,17 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
 - BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地。
-- 当前最小风险是保持既有页面 URL 只读预览、category/list 页面支持、首页基础页 `https://nyaa.si/`、首页显式分页页 `https://nyaa.si/?p=2`、分类列表显式分页页 `https://nyaa.si/?f=0&c=1_2&p=2`、分类基础页显式分页页 `https://nyaa.si/?c=1_2&p=2`、排序列表页 `https://nyaa.si/?s=seeders&o=desc`、排序显式分页组合页 `https://nyaa.si/?s=seeders&o=desc&p=2`、分类基础页 `https://nyaa.si/?c=1_2`、分类搜索基础页 `https://nyaa.si/?f=0&c=1_2&q=frieren` 与 `https://nyaa.si/?c=1_2&q=frieren`、分类搜索显式分页页 `https://nyaa.si/?c=1_2&q=frieren&p=2`、分类排序组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc`、分类排序分页组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc p=2`、分类排序显式分页组合页 `https://nyaa.si/?c=1_2&s=seeders&o=desc&p=2`、用户页基础页 `https://nyaa.si/?u=subsplease`、用户页分页组合页 `https://nyaa.si/?u=subsplease p=2`、用户页显式分页组合页 `https://nyaa.si/?u=subsplease&p=2`、用户页排序组合页 `https://nyaa.si/?u=subsplease&s=seeders&o=desc`、用户页排序分页组合页 `https://nyaa.si/?u=subsplease&s=seeders&o=desc p=2`、带分类用户页显式分页组合页 `https://nyaa.si/?f=0&c=1_2&u=subsplease&p=2`、带分类用户页排序分页组合页 `https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc p=2`、带分类用户页排序显式分页组合页 `https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2`、搜索页排序组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc`、搜索页排序分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc p=2`、搜索页排序显式分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc&p=2`、搜索页分页组合页 `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2`、无分类搜索页分页组合页 `https://nyaa.si/?q=frieren&p=2`、无分类搜索基础页 `https://nyaa.si/?q=frieren`、`p=<页码>` 语法和中文拒绝不回退；若继续 BT，只另开更小页面形式主线。
+- 当前最小风险是：BT 页面 proof 家族虽然已完成，但还缺 `magnet:? -> 纯 BT 下载链 -> raw_bt 目录选择 -> approval -> confirm -> BT Transmission(19092)` 的真实 dispatch smoke；当前 promoted 主线只收这条真实 side-effect 证据，不再继续补 URL 微变体。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：上一条 BT allowlist 分类排序列表 exact URL 聊天缓存 proof 已收口；若继续 BT 再另开更小页面形式主线
+- 窗口活性快照：当前主线为 BT 真实 dispatch smoke
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；`https://nyaa.si/?c=1_2&s=seeders&o=desc` 这条分类排序列表 exact URL 聊天缓存 proof 已满足退出条件，当前不继续追 Plex，也不重做这条已收口 proof。
-- BT 分类排序列表 exact URL 聊天缓存 focused tests：2026-04-20，`4 passed, 315 deselected`（`tests/test_search_media.py` + `tests/test_telegram_bot.py`，`-k "category_sort_page and not page_number"`）
-- BT 排序列表 exact URL 缓存复用 focused tests：2026-04-20，`2 passed, 317 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "caches_sort_page_url_candidates or reuses_sort_page_url_preview_candidates"`）
-- BT 分类搜索基础页 exact URL focused tests：2026-04-20，`6 passed`（`tests/test_bt_sources.py` + `tests/test_search_media.py` + `tests/test_telegram_bot.py` 精确 nodeid 组合）
-- BT 搜索排序显式分页 URL focused tests：2026-04-20，`9 passed, 306 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "search_sort_page_number_url or search_sort_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or resolve_supported_web_source_page_request_appends_page_number"`）
-- BT 排序显式分页 URL focused tests：2026-04-20，`20 passed, 277 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "sort_page_number_url or sort_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or resolve_supported_web_source_page_request_appends_page_number"`）
-- BT 分类排序显式分页 URL focused tests：2026-04-20，`8 passed, 302 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "category_sort_page_number_url or category_sort_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages"`）
-- BT 带分类用户排序显式分页 URL focused tests：2026-04-20，`6 passed`（bt_sources + search_media + telegram_bot 最小 nodeid 组合）
-- BT 无分类用户显式分页 URL focused tests：2026-04-20，`8 passed, 279 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "uncategorized_user_page_number_url or uncategorized_user_page_number"`）
-- BT 无分类用户排序显式分页 URL focused tests：2026-04-20，`8 passed, 275 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "uncategorized_user_sort_page_number_url or uncategorized_user_sort_page_number"`）
-- BT 分类基础页 focused tests：2026-04-19，`6 passed, 257 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "category_base_page or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or resolve_supported_web_source_page_request_appends_page_number"`）
-- BT 搜索页排序分页组合页 focused tests：2026-04-19，`6 passed, 242 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "search_sort_page_number or search_sort_page_number_syntax or search_sort_page_missing_order or resolve_supported_web_source_page_request_appends_page_number"`）
-- BT 搜索页分页组合页 focused tests：2026-04-19，`3 passed, 240 deselected`（`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_telegram_bot.py -k "search_page_number or reuses_search_page_number_preview_candidates"`）
-- BT 搜索页排序组合页 focused tests：2026-04-19，`5 passed, 239 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "search_sort_page or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or reuses_search_sort_page_preview_candidates"`）
-- BT 用户页排序分页组合页 focused tests：2026-04-19，`5 passed, 235 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "user_sort_page_number or user_sort_page_number_syntax or resolve_supported_web_source_page_request_appends_page_number"`）
-- BT 用户页排序组合页 focused tests：2026-04-19，`6 passed, 230 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "user_sort_page or resolve_supported_web_source_page_request_appends_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or reuses_user_sort_page_preview_candidates"`）
+- 当前结论快照：近 20 条提交与当前完成态记录一致；BT 页面 URL proof 家族已完成，当前 promoted 主线切到 BT 真实 dispatch smoke，不再继续拆更小页面形式。
+- BT 页面 proof 家族 focused tests：2026-04-20，排序列表 / 分类搜索基础页 / 分类排序列表 exact URL 等代表性组合继续全绿（详细清单继续看 `docs/BT_PAGE_RANGE_PLAN.md`）
 - tests：2026-04-14，`858 passed, 2 skipped`（`.venv/bin/python -m pytest -q`）
 - four-channel cleanup smoke tests：2026-04-14，`376 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py`）
 - cleanup service tests：2026-04-19，`49 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_downloaded_source.py`）
@@ -104,15 +92,11 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - import subtitle focused tests：2026-04-19，`2 passed, 140 deselected`（`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k subtitle`）
 - make run env-file guard tests：2026-04-13，`2 passed`（`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
-- docs consistency check：2026-04-19，`11 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- docs consistency check：2026-04-20，`12 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
 - focused media-server readiness tests：2026-04-19，`10 passed, 46 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"`）
 - focused jellyfin-provider refresh tests：2026-04-19，`9 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"`）
 - real jellyfin refresh smoke probe：2026-04-19，`failed with direct target/request_url observability`（一次性临时脚本已执行并删除）
 - plex local endpoint probe：2026-04-19，`000`（`curl -sS -o /tmp/plex_probe.out -w "%{http_code}" http://127.0.0.1:32400/identity`）
-- BT home pagination explicit URL focused tests：2026-04-20，`2 passed, 205 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "home_pagination_url_routes_to_page_fetch or reuses_home_pagination_url_preview_candidates"`）
-- BT category list pagination explicit URL focused tests：2026-04-20，`2 passed, 207 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "category_list_pagination_url_routes_to_page_fetch or reuses_category_list_pagination_url_preview_candidates"`）
-- BT category base pagination explicit URL focused tests：2026-04-20，`2 passed, 209 deselected`（`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "category_base_pagination_url_routes_to_page_fetch or reuses_category_base_pagination_url_preview_candidates"`）
-- BT sort page focused tests：2026-04-19，`17 passed, 47 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py -k "page or bt_batch"`）
 - BT batch preview focused tests：2026-04-19，`9 passed, 200 deselected`（`.venv/bin/python -m pytest -q tests/test_pure_bt.py tests/test_search_media.py tests/test_telegram_bot.py -k "bt_batch or bt_read_only_helper"`）
 - BT batch confirm focused tests：2026-04-19，`16 passed, 312 deselected`（`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_pure_bt.py tests/test_search_media.py tests/test_telegram_bot.py -k bt_batch`）
 - env readiness snapshot：`four-channel cleanup smoke env ready`（2026-04-14，`bash -lc 'source ~/.bashrc >/dev/null 2>&1; python3 -c "import os; keys=[\"TELEGRAM_BOT_TOKEN\",\"PROWLARR_BASE_URL\",\"PROWLARR_API_KEY\",\"TRANSMISSION_BASE_URL\",\"EMBY_BASE_URL\",\"EMBY_API_KEY\",\"FEISHU_APP_ID\",\"FEISHU_APP_SECRET\",\"FEISHU_ENCRYPT_KEY\",\"WECOM_TOKEN\",\"WECOM_ENCODING_AES_KEY\",\"WECOM_RECEIVE_ID\"]; print(\"\\n\".join(f\"{k}=\" + (\"set\" if os.getenv(k,\"\").strip().strip('\"\\'') else \"missing\") for k in keys))"' ; python3 -c "import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY','TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET','FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; rows=dict(line.split('=', 1) for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if '=' in line); lookup={key.lower(): value.strip().strip('\"\\'') for key, value in rows.items()}; print('\\n'.join(f'{k}=' + ('set' if lookup.get(k.lower(), '') else 'missing') for k in keys))" ; python3 -c "from pathlib import Path; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY','TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET','FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; data={}; env_path=Path('.env'); text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; lines=(line.strip() for line in text.splitlines()); pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); data.update(((key.removeprefix('export ').strip()), value.strip().strip('\"\\'')) for key, _, value in pairs); print('\\n'.join(f'{k}=' + ('set' if data.get(k, '').strip() else 'missing') for k in keys))"`）

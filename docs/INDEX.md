@@ -24,7 +24,8 @@
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
 | `docs/CODEX_3_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 3 轮连续推进这个仓库 | 会话模板 |
 | `docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 10 轮连续推进并控制 token 消耗 | 会话模板 |
-| `docs/BT_PAGE_RANGE_PLAN.md` | 当前 BT allowlist 页面 proof 主线的最小蓝图 | 当前主线蓝图 |
+| `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md` | 当前 BT 真实 dispatch smoke 主线的最小蓝图 | 当前主线蓝图 |
+| `docs/BT_PAGE_RANGE_PLAN.md` | 刚完成的 BT allowlist 页面 proof 主线蓝图 | 已完成主线蓝图 |
 | `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md` | 刚完成的 Plex 真实 refresh smoke 值得性重评估主线蓝图 | 已完成主线蓝图 |
 | `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md` | 更早完成的 Jellyfin 单 provider 真实 refresh smoke 蓝图 | 已完成主线蓝图 |
 | `docs/BT_BATCH_PLAN.md` | 再上一条 BT 批量任务显式批量确认主线蓝图 | 已完成主线蓝图 |
@@ -74,15 +75,16 @@
 
 1. `docs/NEXT_STEP.md`
 2. `docs/STATUS.md`
-3. `docs/BT_PAGE_RANGE_PLAN.md`（需要看当前主线蓝图时）
-4. `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`（需要看刚完成主线蓝图时）
-5. `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`（需要看更早完成主线蓝图时）
-6. `docs/BT_BATCH_PLAN.md`（需要看再上一条主线蓝图时）
-7. `docs/PT_LIVE_SEEDING_PLAN.md`（需要看更早主线蓝图时）
-8. `docs/BT_SCORING_PLAN.md`（需要看更早完成主线蓝图时）
-9. `docs/BT_SCORING_LOG.md`（需要看更早完成主线细节时）
-10. `docs/QUICK_START_PLAN.md`（需要看刚完成部署主线蓝图时）
-11. `docs/DEPLOY_CHECKLIST.md`（需要看刚完成部署主线交付物时）
+3. `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`（需要看当前主线蓝图时）
+4. `docs/BT_PAGE_RANGE_PLAN.md`（需要看刚完成的 BT 页面 proof 主线蓝图时）
+5. `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`（需要看更早完成主线蓝图时）
+6. `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`（需要看更早完成主线蓝图时）
+7. `docs/BT_BATCH_PLAN.md`（需要看再上一条主线蓝图时）
+8. `docs/PT_LIVE_SEEDING_PLAN.md`（需要看更早主线蓝图时）
+9. `docs/BT_SCORING_PLAN.md`（需要看更早完成主线蓝图时）
+10. `docs/BT_SCORING_LOG.md`（需要看更早完成主线细节时）
+11. `docs/QUICK_START_PLAN.md`（需要看刚完成部署主线蓝图时）
+12. `docs/DEPLOY_CHECKLIST.md`（需要看刚完成部署主线交付物时）
 12. `docs/SHARED_DELIVERY_UX_PLAN.md`（需要看更早完成主线蓝图时）
 13. `docs/SHARED_DELIVERY_UX_LOG.md`（需要看更早完成主线细节时）
 14. `docs/SERIES_ANIME_NAMING_PLAN.md`（需要看再上一条主线蓝图时）
@@ -127,7 +129,7 @@
 ## 4. 文档维护规则
 
 - 同一条事实尽量只写一处；其他文档用“引用/跳转”，不要复制粘贴。
-- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`；刚完成的 Plex 值得性重评估主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器与部署主线继续保留在 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，已完成主线的详细闭环继续留在各自主线台账，不要把活动台账全文抄进去。
+- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前主线说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`；刚完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`；更早完成的 Plex 值得性重评估主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器与部署主线继续保留在 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，已完成主线的详细闭环继续留在各自主线台账，不要把活动台账全文抄进去。
 - **`STATUS.md` 和 `PERSISTENCE_CLOSURE_LOG.md` 不再逐天或逐字段追加 `截至 20xx-xx-xx 分流缺口` 条目**：新闭环优先合并进 `PERSISTENCE_CLOSURE_LOG.md` 的已有主题分组（2.1~2.5），`STATUS.md` 最多补一句当前结论或风险；commit 轨迹看 `git log`，不再重复粘贴。
 - 运行方式、环境变量、启动入口一律收口到 `docs/GETTING_STARTED.md` 和 `.env.example`。
 - 系统结构解释一律收口到 `docs/ARCHITECTURE.md`。

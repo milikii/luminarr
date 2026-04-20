@@ -2,10 +2,10 @@
 
 ## Current goal
 
-- 2026-04-20 当前批次已确认 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 满足退出条件；focused tests 已证明 `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-2` 会继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。上一条 **BT allowlist 排序列表 exact URL 缓存复用 proof** 主线、再上一条 **BT allowlist 分类搜索基础页 exact URL proof** 主线、**BT allowlist 分类搜索显式分页 URL proof** 主线、**BT allowlist 分类基础页显式分页 URL proof** 主线、**BT allowlist 分类列表显式分页 URL proof** 主线与更早一条 **BT allowlist 首页显式分页 URL proof** 主线也继续保持完成态。
-- 更早一条 **BT 用户页 / 编号范围页能力** 主线已在同日冷启动审计中确认满足退出条件，当前保持完成态。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；这条分类排序列表 exact URL proof 已收口，若后续继续 BT，只按 `After this step` 第 1 项从现有 allowlist 里再挑一个更小页面形式单独开主线，不扩站点、不放宽页面 allowlist。
-- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；排序列表 exact URL 缓存复用 proof 与分类排序列表 exact URL 聊天缓存 proof 也都保持完成态，不重做已收口页面。
+- 当前进行中的 promoted 主线改为 **BT 真实 dispatch smoke**。上一条 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 已在 2026-04-20 收口；再上一条 **BT allowlist 排序列表 exact URL 缓存复用 proof**、**BT allowlist 分类搜索基础页 exact URL proof**、**BT allowlist 分类搜索显式分页 URL proof**、**BT allowlist 分类基础页显式分页 URL proof**、**BT allowlist 分类列表显式分页 URL proof**、**BT allowlist 首页显式分页 URL proof** 与更早一条 **BT 用户页 / 编号范围页能力** 主线也都保持完成态。
+- BT allowlist 页面 proof 家族当前不再继续扩。当前缺的不是新的页面变体，而是一条正式的真实证据：BT 输入、BT 角色绑定、approval、`confirm` 和 `BT Transmission(http://127.0.0.1:19092)` 之间的真实投递链路是否成立。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；现成本地正式测试栈已经有 `BT Transmission + Emby`，所以更小也更有用户价值的下一步是收 BT 真实 dispatch smoke，而不是继续补页面 URL 微闭环。
+- 当前主线固定使用 direct `magnet:?` 作为输入，不把 live `nyaa` 页面可用性带回 promoted 主线；页面 URL 预览、聊天缓存、`bt批量确认` 复用、category/list 页面类型与 `p=<页码>` 语法糖都保持完成态，不重做已收口页面。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
@@ -13,15 +13,16 @@
 - 再上一条已完成主线是 **PT live seeding 真相接入 cleanup 阻断**。冷启动审计已确认它满足文档出口；详细蓝图继续看 `docs/PT_LIVE_SEEDING_PLAN.md`。
 - 更早一条已完成主线是 **`.ass` 字幕最小支持**。2026-04-19 已补齐 `.srt` + 最小 `.ass` 字幕翻译路径，focused tests 为 `10 passed`，导入后字幕 focused tests 为 `2 passed, 140 deselected`；详细闭环继续看 `docs/SERIES_ANIME_NAMING_LOG.md` 2.3。
 - 更早完成主线：cleanup PT 最小保护窗口、Jellyfin / Plex provider 选择、最小人类可用入口补齐、shared private-chat 交付体验收口、`series / anime` 独立名称解析最小实现、`app/main.py` / `private_chat_runtime.py` / cleanup / BT 订阅 / search / add / import / telegram 渠道层瘦身、下载完成轮询、Feishu 风险收口、持久化吞错收口都保持完成态，不回退。
-- 当前主线蓝图统一回到 `docs/BT_PAGE_RANGE_PLAN.md`。
+- 当前主线蓝图统一切到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`。
 
 ## Source of truth
 
 - 长期边界：`docs/DECISIONS.md`
 - 当前目标：`docs/NEXT_STEP.md`
 - 当前快照：`docs/STATUS.md`
-- 当前主线蓝图：`docs/BT_PAGE_RANGE_PLAN.md`
-- 刚完成主线蓝图：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- 当前主线蓝图：`docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`
+- 刚完成主线蓝图：`docs/BT_PAGE_RANGE_PLAN.md`
+- 更早完成主线蓝图：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
 - 再上一条主线蓝图：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
 - 更早主线蓝图：`docs/BT_BATCH_PLAN.md`
 - 更早主线蓝图：`docs/PT_LIVE_SEEDING_PLAN.md`
@@ -35,14 +36,14 @@
 ## Only do
 
 - 当前优先交付：
-  - 保持首页翻页页、排序列表页、分类排序列表 exact URL、category/list 页面和 `p=<页码>` 语法不回退
-  - 若继续 BT，只能从现有 allowlist 里再挑一个更小页面形式单独开主线；本轮不重做 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 这条已收口 proof，也不扩站点、不放宽抓站边界
-  - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
+  - 保持现有 BT 页面 URL 预览、聊天缓存、`bt批量确认` 复用和 `p=<页码>` 语法不回退
+  - 当前只允许补 BT 真实 dispatch smoke：direct `magnet:?` -> `纯 BT 下载链` -> `raw_bt` 目录选择 -> approval -> `confirm` -> `BT Transmission(http://127.0.0.1:19092)`
+  - 保持 BT 角色绑定、approval、`jobs`、download_monitor 和显式中文日志边界不回退
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
 - 保持 Telegram / personal WeChat / Feishu / WeCom 四渠道共用同一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 保持 cleanup / search / approval / import / status / watchlist / btsub 既有协议和 guardrail 不回退
-- 文档继续分层：`STATUS.md` 只保留当前快照；当前主线细节写在 `docs/BT_PAGE_RANGE_PLAN.md`；刚完成的 Plex 值得性重评估细节继续留在 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- 文档继续分层：`STATUS.md` 只保留当前快照；当前主线细节写在 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`；刚完成的 BT 页面 proof 细节继续留在 `docs/BT_PAGE_RANGE_PLAN.md`；更早完成的 Plex 值得性重评估细节继续留在 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
 
 ## Do not do
 
@@ -50,24 +51,25 @@
 - 不放宽现有 pending state gate、approval、`jobs` / `job_event` / lease/version / SQLite 真相边界
 - 不新增 Jellyfin / Plex Docker 测试栈，不把这一步拉回 refresh 环境编排
 - 不把这一步改成自动 `confirm` / 自动 dispatch
+- 不回到 BT allowlist 页面 URL 家族里继续拆更小 proof
 - 不改 cleanup 删除范围、媒体库导入成功真相或字幕主线出口
 - 不把这一步重新放大成 Jellyfin + Plex 双线并行、全量能力对齐、自动探测或新的下载器平台化主线
 - 不接未知站点、动态站点、CAPTCHA、登录态页面或通用抓站平台
 
 ## Done when
 
-当前 BT allowlist 分类排序列表 exact URL 聊天缓存 proof 主线已在 2026-04-20 满足 `Done when` 第 1、2 条；下面保留这条主线的收口判据：
+当前 **BT 真实 dispatch smoke** 主线视为 **已收口**，满足以下任一条即可：
 
-1. `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-3` 的 exact URL 预览候选已被证明会继续写入现有聊天缓存；对应 focused tests 全绿；
-2. 上述分类排序列表 exact URL 的只读批量预览文本已被证明不会破坏现有 `bt批量确认` 复用边界；对应 focused tests 全绿；
-3. 本轮代码变更 `< 20` 行且只是对同一个 page/range helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
+1. 真实 BT dispatch smoke 成功：`confirm` 后能在 `http://127.0.0.1:19092/transmission/rpc` 观察到新任务，且任务真相继续落在现有 approval / `jobs` / download_monitor 边界；
+2. 真实 BT dispatch smoke 失败，但失败点已被收口到明确的 `downloader_name / request_url / 配置缺口`，并有显式中文日志与 `[处理建议]`；
+3. 本轮代码变更 `< 20` 行且只是对同一个 dispatch / route helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
 
 - 四渠道现有 cleanup / search / approval / import / status / watchlist / btsub 协议不回退
-- `docs/STATUS.md` / `docs/NEXT_STEP.md` / `README.md` / `AGENTS.md` / `docs/BT_PAGE_RANGE_PLAN.md` / `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md` / `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md` / `docs/BT_BATCH_PLAN.md` / `docs/PT_LIVE_SEEDING_PLAN.md` / 其余完成台账继续保持分层一致，不重新写回长台账
+- `docs/STATUS.md` / `docs/NEXT_STEP.md` / `README.md` / `AGENTS.md` / `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md` / `docs/BT_PAGE_RANGE_PLAN.md` / `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md` / `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md` / `docs/BT_BATCH_PLAN.md` / `docs/PT_LIVE_SEEDING_PLAN.md` / 其余完成台账继续保持分层一致，不重新写回长台账
 
 ## After this step
 
-1. 如果再继续 BT，就从现有 allowlist 里再挑一个更小页面形式单独开主线
+1. 如果这条主线收口，下一条 promoted 主线切到 **BT 批量确认真实 dispatch smoke**
 2. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
