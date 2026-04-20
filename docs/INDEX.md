@@ -24,7 +24,7 @@
 | `docs/STATUS.md` | 当前已经落到哪里，最近一次验证结果是什么 | 当前快照 |
 | `docs/CODEX_3_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 3 轮连续推进这个仓库 | 会话模板 |
 | `docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md` | 新开 Codex 会话时，如何按 10 轮连续推进并控制 token 消耗 | 会话模板 |
-| `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md` | 当前 `post_download_auto_import.py` 自动导入编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 当前主线台账 |
+| `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md` | 刚完成的 `post_download_auto_import.py` 自动导入编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 刚完成主线台账 |
 | `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md` | 刚完成的 `get_download_status.py` 状态编排层瘦身 / 模块化主线详细闭环、focused tests 和风险分组 | 已完成主线台账 |
 | `docs/BT_BATCH_PLAN.md` | 更早完成的 BT 批量任务显式批量确认主线蓝图 | 已完成主线蓝图 |
 | `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md` | 刚完成的 BT 真实 dispatch smoke 主线蓝图 | 已完成主线蓝图 |
@@ -77,7 +77,7 @@
 
 1. `docs/NEXT_STEP.md`
 2. `docs/STATUS.md`
-3. `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`（需要看当前主线台账时）
+3. `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`（需要看刚完成主线台账时）
 4. `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`（需要看刚完成的状态 service 主线台账时）
 5. `docs/BT_BATCH_PLAN.md`（需要看更早完成的 BT 批量确认主线蓝图时）
 6. `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`（需要看更早完成的 BT 真实 dispatch smoke 主线蓝图时）
@@ -133,7 +133,7 @@
 ## 4. 文档维护规则
 
 - 同一条事实尽量只写一处；其他文档用“引用/跳转”，不要复制粘贴。
-- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照，当前主线说明优先收口到 `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`；刚完成的状态 service 主线说明优先收口到 `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`；更早完成的 BT 批量确认主线说明优先收口到 `docs/BT_BATCH_PLAN.md`；刚完成的 BT 真实 dispatch smoke 说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`；更早完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`；更早完成的 Plex 值得性重评估主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器与部署主线继续保留在 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，已完成主线的详细闭环继续留在各自主线台账，不要把活动台账全文抄进去。
+- `NEXT_STEP` 只写当前目标，`STATUS` 只写当前快照；刚完成的自动导入瘦身说明优先收口到 `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`；刚完成的状态 service 主线说明优先收口到 `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`；更早完成的 BT 批量确认主线说明优先收口到 `docs/BT_BATCH_PLAN.md`；刚完成的 BT 真实 dispatch smoke 说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`；更早完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`；更早完成的 Plex 值得性重评估主线说明优先收口到 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`；当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`；刚完成的 BT 评分器与部署主线继续保留在 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 与 `docs/DEPLOY_CHECKLIST.md`，已完成主线的详细闭环继续留在各自主线台账，不要把活动台账全文抄进去。
 - 历史对照锚点仍保留这句：当前主线说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`。现在它已经从“当前主线入口”转成“刚完成主线入口”，仅用于兼容旧 docs gate 和旧交接语境。
 - 历史对照锚点仍保留这句：刚完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`。现在它已经从“刚完成主线入口”转成“更早完成主线入口”，仅用于兼容旧 docs gate 和旧交接语境。
 - **`STATUS.md` 和 `PERSISTENCE_CLOSURE_LOG.md` 不再逐天或逐字段追加 `截至 20xx-xx-xx 分流缺口` 条目**：新闭环优先合并进 `PERSISTENCE_CLOSURE_LOG.md` 的已有主题分组（2.1~2.5），`STATUS.md` 最多补一句当前结论或风险；commit 轨迹看 `git log`，不再重复粘贴。

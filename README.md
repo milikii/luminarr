@@ -115,11 +115,11 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前 promoted 主线是 **`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化**；上一条 **`get_download_status.py` 状态编排层瘦身 / 模块化** 已完成，当前沿着同一组状态 / 自动导入职责继续做结构降本。
+- **当前施工状态**：当前 promoted 主线是 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估**；刚完成的 **`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化** 已把 `run_once()` 的候选读取 / 逐条推进 helper 抽到 `app/services/auto_import_batch.py`。
 - **更早完成主线**：BT 用户页 / 编号范围页能力保持完成态，不回退。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`
+- **刚完成主线蓝图**：`docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`
 - **刚完成主线蓝图**：`docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`
 - **更早完成主线蓝图**：`docs/BT_BATCH_PLAN.md`
 - **更早完成主线蓝图**：`docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`
@@ -136,7 +136,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
 - **本地回归命令**：当前自动导入主线入口看 `docs/NEXT_STEP.md` 与 `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`；刚完成的状态 service 收口继续看 `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`
-- 当前优先围绕 `post_download_auto_import.py` 的候选读取、逐条任务编排、终态判断与 skip-event 拆分施工；不回到 BT proof 家族，也不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
+- 当前优先先确认状态观察落盘、完成事件查询、自动导入消费这组共享职责是否值得单开结构降本主线；不回到 BT proof 家族，也不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
 
 ## 6. 当前明确不做
 

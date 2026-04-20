@@ -221,7 +221,7 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in index_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in getting_started_text
-    assert "当前主线状态：`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化进行中。" in post_download_auto_import_slimming_log_text
+    assert "当前主线状态：`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化已完成。" in post_download_auto_import_slimming_log_text
     assert "当前主线状态：`get_download_status.py` 状态编排层瘦身 / 模块化已完成。" in get_download_status_slimming_log_text
     assert "当前主线说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`" in index_text
     assert "刚完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`" in index_text

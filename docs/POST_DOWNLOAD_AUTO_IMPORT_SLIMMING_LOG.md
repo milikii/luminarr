@@ -4,16 +4,16 @@
 
 ## 1. Current line
 
-- 当前主线状态：`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化进行中。
+- 当前主线状态：`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化已完成。
 - 上一条已完成主线 **`get_download_status.py` 状态编排层瘦身 / 模块化** 已在 2026-04-20 满足 `Done when` 第 1、2 条：状态展示 helper 已独立到 `app/services/status_delivery.py`，观察落盘 / 完成事件 / 自动导入 follow-up 已独立到 `app/services/status_follow_up.py`，相关 focused tests 已全绿。
-- 当前文件还同时承接“已完成候选读取、逐条任务编排、终态判断、低质量规则跳过、skip-event 落盘”几段职责；当前主线的目标不是改自动导入规则，而是把这些职责拆清楚。
+- 2026-04-20 当前批次已满足 `docs/NEXT_STEP.md` `Done when` 第 1 条：`run_once()` 只保留候选扫描与计数编排，候选读取 / 逐条任务推进 helper 已独立到 `app/services/auto_import_batch.py`，focused tests `8 passed, 34 deselected`，扩展自动导入 / 状态 follow-up focused tests `21 passed, 21 deselected`。
 
 ## 2. Risk groups
 
 ### 2.1 候选读取 / 逐条任务编排
 
-- 保持 `run_once()` 的扫描数量、`progressed` 统计和 `state_unavailable` 语义不回退。
-- 保持已完成候选读取失败 / 结果缺失 / 记录损坏时的显式中文日志不变。
+- `run_once()` 现在只保留扫描数量、`progressed` 统计和 `state_unavailable` 汇总；批量候选读取 / 逐条推进已收口到 `app/services/auto_import_batch.py`。
+- 已完成候选读取失败 / 结果缺失 / 记录损坏时的显式中文日志边界保持不变。
 
 ### 2.2 终态判断 / skip-event / 自动导入 dispatch
 
@@ -28,4 +28,5 @@
 ## 4. Maintenance rule
 
 - 新闭环优先并到这份台账的现有风险分组，不新开按日期拆的小节。
+- 当前主线已完成；下一次施工按 `docs/NEXT_STEP.md` 的 `After this step` 第 1 项切到 `download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估。
 - 若某次施工只是在同一个 helper 上补一条 `< 20 行` 的 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，就按 `AGENTS.md §11` 触发诊断分流递减停机。
