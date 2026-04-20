@@ -24,6 +24,7 @@
 
 - 保持 Telegram / personal WeChat / Feishu / WeCom 继续共用同一套 `DeliveryItem` 渲染边界。
 - 保持非交付渠道继续返回原有纯文本状态，字段顺序、进度/速度/ETA 文本不回退。
+- 第 2 轮已先把展示 helper 抽到 `app/services/status_delivery.py`，`get_download_status.py` 继续只做 service 编排；当前还没动观察落盘 / 自动导入 follow-up。
 
 ## 3. Focused verification
 

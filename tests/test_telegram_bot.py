@@ -663,7 +663,8 @@ def test_handle_message_bt_tmdb_association_allows_status_command_while_pending(
 
     first_reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
     assert "请继续发送片名，可带年份" in second_reply_text.await_args.args[0]
-    assert "任务 ID: 87" in third_reply_text.await_args.args[0]
+    assert "下载状态 ⏳" in third_reply_text.await_args.args[0]
+    assert "任务 ID：87" in third_reply_text.await_args.args[0]
     search_service.search_and_format.assert_not_awaited()
 
 
@@ -2453,8 +2454,9 @@ def test_handle_message_status_routes_to_status_service() -> None:
     asyncio.run(handle_message(update, context))
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "下载状态：" in sent_text
-    assert "任务 ID: 87" in sent_text
+    assert "下载状态 ⏳" in sent_text
+    assert "查询对象：87" in sent_text
+    assert "任务 ID：87" in sent_text
 
 
 def test_handle_message_status_replies_service_not_ready() -> None:
