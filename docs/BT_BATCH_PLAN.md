@@ -1,6 +1,6 @@
-# docs/BT_BATCH_PLAN.md (v3)
+# docs/BT_BATCH_PLAN.md (v4)
 
-> 目的：给 BT 批量任务保留一份连续蓝图。2026-04-19 已完成 **确定性批量预览** 与 **显式批量确认** 的只读/待确认闭环；2026-04-20 当前 promoted 主线切到 **BT 批量确认真实 dispatch smoke**，继续复用既有 approval -> confirm -> jobs 真相边界。
+> 目的：给 BT 批量任务保留一份连续蓝图。2026-04-19 已完成 **确定性批量预览** 与 **显式批量确认** 的只读/待确认闭环；2026-04-20 **BT 批量确认真实 dispatch smoke** 已按明确环境缺口收口，继续保留这里作为刚完成主线蓝图入口。
 >
 > 本文件是**蓝图**，不是台账。落地后的详细闭环继续收口到后续主线台账；当前先不给 `STATUS.md` 回灌长记录。
 >
@@ -47,15 +47,21 @@
 4. 每一条下载仍复用既有 approval / confirm / jobs / job_event 真相边界；
 5. 不自动 `confirm`，也不绕过单条下载确认。
 
-### Phase 3（当前进行中）：批量确认真实 dispatch smoke
+### Phase 3（已收口）：批量确认真实 dispatch smoke
 
-当前 promoted 主线只做下面这一条最小真实闭环：
+当前 promoted 主线最后只做下面这一条最小真实闭环：
 
 1. 用户先拿到一组可复用的 BT 预览候选；
 2. 用户发送 `bt批量确认` / `bt batch confirm`，让系统生成多条既有单条下载确认；
 3. 用户显式 `confirm <task_ref>` 其中一条；
 4. 真实验证该任务是否落到 `BT Transmission(http://127.0.0.1:19092)`；
 5. 失败时直接收口到明确的下载器路由、RPC 请求或配置缺口。
+
+2026-04-20 当前批次真实探针结果：
+
+- 一次性脚本先在当前 `.env` 下收口到 `DOWNLOADER_INSTANCES / BT_DOWNLOADER` 缺失；
+- 按 `docs/TEST_ENV.md` 临时覆盖 `tr-bt -> http://127.0.0.1:19092` 后，再次收口到 `request_url=http://127.0.0.1:19092/transmission/rpc` 不可达；
+- 同批次 `http://127.0.0.1:18096/System/Info/Public` 仍可返回 `ServerName`，说明失败点不在整套 Docker 测试栈，而是本地 BT 下载器角色绑定 / `19092` 可达性。
 
 ## 4. 最小输入协议
 
