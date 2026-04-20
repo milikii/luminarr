@@ -237,7 +237,9 @@ def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
     event, reply_text = reply_text_func.await_args.args
     assert isinstance(event, FeishuPrivateTextEvent)
     assert event.chat_id == "oc_feishu_chat_1"
-    assert "搜索结果：dune" in reply_text
+    assert "搜索：dune ✓" in reply_text
+    assert "候选结果（1 条）" in reply_text
+    assert "开始下载：发送 select 1" in reply_text
     assert "title-dune" in reply_text
 
 

@@ -290,7 +290,9 @@ def test_handle_wecom_private_text_event_routes_into_shared_runtime() -> None:
     event, reply_text = reply_text_func.await_args.args
     assert isinstance(event, WeComPrivateTextEvent)
     assert event.user_id == "zhangsan"
-    assert "搜索结果：dune" in reply_text
+    assert "搜索：dune ✓" in reply_text
+    assert "- 电影信息" in reply_text
+    assert "- 开始下载：发送 select 1" in reply_text
     assert "title-dune" in reply_text
 
 
@@ -547,8 +549,10 @@ def test_handle_wecom_callback_http_request_routes_post_into_shared_runtime_and_
     assert _read_xml_text(reply_root, "ToUserName") == "zhangsan"
     assert _read_xml_text(reply_root, "FromUserName") == _TEST_RECEIVE_ID
     assert _read_xml_text(reply_root, "MsgType") == "text"
-    assert "搜索结果：dune" in _read_xml_text(reply_root, "Content")
-    assert "title-dune" in _read_xml_text(reply_root, "Content")
+    content = _read_xml_text(reply_root, "Content")
+    assert "搜索：dune ✓" in content
+    assert "- 开始下载：发送 select 1" in content
+    assert "title-dune" in content
 
 
 def test_handle_wecom_callback_http_request_routes_cleanup_execution_into_shared_runtime_and_returns_encrypted_reply(

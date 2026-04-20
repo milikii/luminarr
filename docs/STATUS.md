@@ -1,9 +1,9 @@
-# Current status (v335)
+# Current status (v336)
 
 ## Current mainline
 
-- 当前唯一 promoted 主线仍是 **Telegram 后台 completion polling 直连共享 follow-up helper 收口**。
-- 这条主线的目标不变：让 `telegram_bot._poll_pending_download_completion_once()` 直接复用共享 follow-up helper，而不是再通过 `get_status_text()` 的间接副作用推进状态观察、完成事件和自动导入。
+- 当前阶段已切到 **质量硬化**。
+- 本轮 3 个最小闭环已先把默认分支全量回归收绿，再把下一步主线切回 shared runtime / channel 解耦。
 - 非技术操作者入口已单独收口到 `docs/HUMAN_START_HERE.md` 与 `docs/OPERATOR_RUNBOOK.md`；`README.md` 不再承担历史台账索引角色。
 
 ## Current health
@@ -12,18 +12,22 @@
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 等价命令结果为 `24 passed`。
 - 当前主线 focused 验证入口：绿灯；本次 `verify-mainline` 等价命令结果为 `25 passed, 17 deselected` + `12 passed, 204 deselected`。
-- 全量回归：黄灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1597 passed, 16 failed, 2 skipped`，失败集中在跨渠道文案断言和 persistence restart 回归。
+- 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1616 passed, 2 skipped`。
 
 ## Latest verification
 
 - `quality` 等价命令：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
 - `verify-mainline` 等价命令：`tests/test_get_download_status.py` focused 为 `25 passed, 17 deselected`，`tests/test_telegram_bot.py` focused 为 `12 passed, 204 deselected`。
+- 下载审批重启回归：`tests/test_persistence_sqlite.py -k "downloader_pending_approval_persists_for_restart or downloader_confirm_stale_guard_blocks_duplicate_after_restart"` 为 `2 passed`。
+- 导入 restart / copy-fallback 回归：`tests/test_persistence_sqlite.py -k "completed_download_truth_after_restart_can_progress_to_import_pending or confirm_rebuilds_context_from_persisted_job_after_restart or copy_fallback_pending_survives_restart_and_second_confirm_copies or cancel_pending_import_updates_persisted_truth"` 为 `4 passed`。
+- 跨渠道 shared delivery 文案回归：`tests/test_feishu_adapter.py tests/test_personal_wechat_text.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k "handle_feishu_private_text_event_routes_into_shared_runtime or personal_wechat_text_service_polls_single_saved_account_and_replies or handle_wecom_private_text_event_routes_into_shared_runtime or handle_wecom_callback_http_request_routes_post_into_shared_runtime_and_returns_encrypted_reply or handle_message_replies_search_result or handle_message_digit_routes_to_add_service or handle_callback_query_digit_routes_to_add_service or handle_callback_query_digit_uses_callback_context_when_effective_context_missing or handle_message_frustration_without_state_still_routes_to_search or handle_message_frustration_cancels_pending_import"` 为 `10 passed, 314 deselected`。
+- 全量回归：`.venv/bin/python -m pytest -q` 为 `1616 passed, 2 skipped`。
 - 当前真实端点探针：`19091 Transmission` 返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`19092 BT Transmission` 与 `18098 qBittorrent` 当前返回 `000`。
 
 ## Current biggest risk
 
-- 默认分支还不能宣称“全量 pytest 稳绿”；当前最大缺口不是入口文档，而是历史测试现实与当前实现之间还有回归未收口。
-- shared runtime 仍直接复用 Telegram 内部 helper，这会继续抬高 fork 维护成本。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是测试红灯，而是 shared runtime 仍直接复用 `telegram_bot.py` 内部 helper。
+- `app/bot/private_chat_runtime.py`、`app/bot/telegram_bot.py` 仍是热点大文件；继续把渠道私有 helper 从 shared runtime 里拔掉，才能避免后续回归再集中堆在 Telegram 入口。
 
 ## Recommended Next Operator Command
 

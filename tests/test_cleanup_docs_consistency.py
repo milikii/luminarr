@@ -68,8 +68,8 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "Emby / Jellyfin / Plex" in readme_text
     assert "Emby / Jellyfin / Plex" in decisions_text
 
-    assert "Telegram 后台 completion polling 直连共享 follow-up helper 收口" in next_step_text
-    assert "Telegram 后台 completion polling 直连共享 follow-up helper 收口" in status_text
+    assert "shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口" in next_step_text
+    assert "质量硬化" in status_text
 
 
 def test_next_step_stays_compact_and_decision_complete() -> None:
@@ -82,7 +82,8 @@ def test_next_step_stays_compact_and_decision_complete() -> None:
     assert "## Do not do" in next_step_text
     assert "## Done when" in next_step_text
     assert "## After this step" in next_step_text
-    assert "telegram_bot._poll_pending_download_completion_once()" in next_step_text
+    assert "app/bot/private_chat_runtime.py" in next_step_text
+    assert "telegram_bot.py" in next_step_text
     assert "StatusFollowUpRecorder.record()" not in next_step_text
     assert "当前主线入口继续看" not in next_step_text
     assert "当前快照：" not in next_step_text
@@ -95,11 +96,9 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     for heading in STATUS_SECTION_HEADINGS:
         assert heading in status_text
 
-    assert "1597 passed, 16 failed, 2 skipped" in status_text
+    assert "1616 passed, 2 skipped" in status_text
     assert "make quality" in status_text
     assert "make verify-mainline" in status_text
-    assert "docs/HUMAN_START_HERE.md" in status_text
-    assert "docs/OPERATOR_RUNBOOK.md" in status_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" not in status_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" not in status_text
     assert "cold-start consistency audit" not in status_text

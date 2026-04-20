@@ -575,7 +575,9 @@ def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp
     assert len(sent_messages) == 1
     to, text, opts = sent_messages[0]
     assert to == "wx-user-1"
-    assert "搜索结果：dune" in text
+    assert "【搜索：dune】 ✓" in text
+    assert "▸ 电影信息" in text
+    assert "开始下载：发送 select 1" in text
     assert "title-dune" in text
     assert getattr(opts, "base_url", "") == "https://wx.test"
     assert getattr(opts, "token", "") == "bot-token-1"
