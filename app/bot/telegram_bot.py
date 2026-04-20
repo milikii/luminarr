@@ -107,13 +107,6 @@ from app.services.import_to_library import (
 )
 from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
 from app.services.post_download_auto_import import PostDownloadAutoImportService
-from app.services.pure_bt import (
-    BTBatchConfirmRequest,
-    BTBatchPreviewRequest,
-    extract_bt_batch_confirm_request,
-    extract_bt_batch_preview_request,
-    extract_bt_search_query,
-)
 from app.services.search_media import SearchMediaService
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
@@ -204,35 +197,6 @@ BT_PENDING_MISSING_AFTER_UPSERT_REASON = "bt_pending_state missing after upsert"
 BT_PENDING_CLEAR_RESULT_MISSING_REASON = "bt_pending_state clear result missing"
 BT_PENDING_STAGE_EMPTY_AFTER_READ_REASON = "bt_pending_state stage empty after read"
 
-BT_PROCESSING_PATH_ALIASES = {
-    "影视入库链": "media_import",
-    "影视入库": "media_import",
-    "入库链": "media_import",
-    "影视": "media_import",
-    "mediaimport": "media_import",
-    "media-import": "media_import",
-    "media_import": "media_import",
-    "纯bt下载链": "pure_bt",
-    "纯bt下载": "pure_bt",
-    "纯bt": "pure_bt",
-    "纯磁力下载链": "pure_bt",
-    "purebt": "pure_bt",
-    "pure-bt": "pure_bt",
-    "pure_bt": "pure_bt",
-}
-BT_CLASSIFICATION_ALIASES = {
-    "movie": "movie",
-    "film": "movie",
-    "电影": "movie",
-    "series": "series",
-    "tv": "series",
-    "show": "series",
-    "电视剧": "series",
-    "剧集": "series",
-    "anime": "anime",
-    "动漫": "anime",
-    "动画": "anime",
-}
 BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
 
 
@@ -767,52 +731,6 @@ def _resolve_callback_message(update: Update, callback_query: object) -> object 
     if message is not None:
         return message
     return getattr(callback_query, "message", None)
-
-
-def _is_frustration_text(text: str) -> bool:
-    cleaned_text = re.sub(r"\s+", "", text.strip())
-    if not cleaned_text:
-        return False
-    return cleaned_text in {"不对", "停", "重来", "换一个", "算了", "取消"}
-
-
-def _is_bt_direct_intent(text: str) -> bool:
-    stripped_text = text.strip()
-    if not stripped_text:
-        return False
-    lowered_text = stripped_text.lower()
-    if lowered_text.startswith("magnet:?"):
-        return True
-
-    normalized_text = re.sub(r"\s+", "", stripped_text).lower()
-    return normalized_text in {
-        "下载这个bt",
-        "下载这个bt种子",
-        "下载这个磁力",
-        "下载此bt",
-        "下载此bt种子",
-        "下载此磁力",
-    } or bool(extract_bt_search_query(stripped_text))
-
-
-def _extract_bt_read_only_query(text: str) -> str:
-    cleaned_text = re.sub(r"\s+", " ", text.strip())
-    if not cleaned_text:
-        return ""
-
-    lowered_text = cleaned_text.lower()
-    for prefix in ("bt搜 ", "bt search "):
-        if lowered_text.startswith(prefix):
-            return cleaned_text[len(prefix) :].strip()
-    return ""
-
-
-def _extract_bt_batch_preview_request(text: str) -> BTBatchPreviewRequest | None:
-    return extract_bt_batch_preview_request(text)
-
-
-def _extract_bt_batch_confirm_request(text: str) -> BTBatchConfirmRequest | None:
-    return extract_bt_batch_confirm_request(text)
 
 
 def _log_telegram_update_record_failed(
@@ -1774,32 +1692,6 @@ def _clear_raw_bt_destination_pending(
         if pending is not None:
             pending_by_chat[chat_id] = pending
         return None
-
-
-def _parse_bt_classification_choice(text: str) -> str | None:
-    normalized_text = re.sub(r"\s+", "", text.strip()).lower()
-    if not normalized_text:
-        return None
-    return BT_CLASSIFICATION_ALIASES.get(normalized_text)
-
-
-def _parse_bt_processing_path_choice(text: str) -> str | None:
-    normalized_text = re.sub(r"\s+", "", text.strip()).lower()
-    if not normalized_text:
-        return None
-    return BT_PROCESSING_PATH_ALIASES.get(normalized_text)
-
-
-def _parse_bt_processing_path_legacy_shortcut(text: str) -> tuple[str, str | None] | None:
-    normalized_text = re.sub(r"\s+", "", text.strip()).lower()
-    if not normalized_text:
-        return None
-    media_kind = BT_CLASSIFICATION_ALIASES.get(normalized_text)
-    if media_kind is not None:
-        return ("media_import", media_kind)
-    if normalized_text in {"raw_bt", "rawbt", "raw", "其他bt资源", "其他bt"}:
-        return ("pure_bt", None)
-    return None
 
 
 def _format_bt_classification_result(media_kind: str) -> str:

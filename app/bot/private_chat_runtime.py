@@ -12,6 +12,16 @@ from app.bot.execution_runtime import (
     run_sync_with_policy,
     watchlist_policy_action,
 )
+from app.bot.query_text_runtime import (
+    extract_bt_batch_confirm_request,
+    extract_bt_batch_preview_request,
+    extract_bt_read_only_query,
+    is_bt_direct_intent,
+    is_frustration_text,
+    parse_bt_classification_choice,
+    parse_bt_processing_path_choice,
+    parse_bt_processing_path_legacy_shortcut,
+)
 from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
@@ -168,7 +178,7 @@ async def handle_private_chat_query_text(
         user_id=user_id,
         query=query,
     )
-    if tg._is_frustration_text(query):
+    if is_frustration_text(query):
         if chat_id is not None:
             job_repo = bot_data.get(tg.JOB_REPO_KEY)
             if isinstance(job_repo, tg.JobRepo):
@@ -289,7 +299,7 @@ async def handle_private_chat_query_text(
             await reply_func(tg.BT_PROCESSING_PATH_CANCELLED_TEXT)
             return
 
-    if tg._is_bt_direct_intent(query):
+    if is_bt_direct_intent(query):
         cleared_processing_path = tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
         if cleared_processing_path is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
@@ -338,7 +348,7 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    bt_read_only_query = tg._extract_bt_read_only_query(query)
+    bt_read_only_query = extract_bt_read_only_query(query)
     if bt_read_only_query:
         search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
         if not isinstance(search_service, tg.SearchMediaService):
@@ -356,7 +366,7 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    bt_batch_preview_request = tg._extract_bt_batch_preview_request(query)
+    bt_batch_preview_request = extract_bt_batch_preview_request(query)
     if bt_batch_preview_request is not None:
         search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
         if not isinstance(search_service, tg.SearchMediaService):
@@ -377,7 +387,7 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    bt_batch_confirm_request = tg._extract_bt_batch_confirm_request(query)
+    bt_batch_confirm_request = extract_bt_batch_confirm_request(query)
     if bt_batch_confirm_request is not None:
         if not bt_batch_confirm_request.selection_text:
             await reply_func("BT 批量确认格式：bt批量确认 1-3")
@@ -415,9 +425,9 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    bt_classification = tg._parse_bt_classification_choice(query)
-    bt_processing_path = tg._parse_bt_processing_path_choice(query)
-    bt_processing_shortcut = tg._parse_bt_processing_path_legacy_shortcut(query)
+    bt_classification = parse_bt_classification_choice(query)
+    bt_processing_path = parse_bt_processing_path_choice(query)
+    bt_processing_shortcut = parse_bt_processing_path_legacy_shortcut(query)
     bt_processing_path_pending = tg._is_bt_processing_path_pending(context=context, chat_id=chat_id)
     if bt_processing_path_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
