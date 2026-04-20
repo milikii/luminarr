@@ -2,10 +2,10 @@
 
 ## Current goal
 
-- 当前进行中的 promoted 主线改为 **BT allowlist 首页显式分页 URL proof**。2026-04-20 当前批次已确认：上一条 **BT allowlist 搜索排序显式分页 URL proof** 主线满足退出条件，focused tests 已证明 `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界；再上一条 **BT allowlist 排序显式分页 URL proof** 主线也保持完成态，更早一条 **BT allowlist 分类排序显式分页 URL proof** 主线继续保持完成态。
+- 当前进行中的 promoted 主线改为 **BT allowlist 分类列表显式分页 URL proof**。2026-04-20 当前批次已确认：上一条 **BT allowlist 首页显式分页 URL proof** 主线满足退出条件，focused tests 已证明 `https://nyaa.si/?p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界；再上一条 **BT allowlist 搜索排序显式分页 URL proof** 主线也保持完成态，更早一条 **BT allowlist 排序显式分页 URL proof** 主线继续保持完成态。
 - 更早一条 **BT 用户页 / 编号范围页能力** 主线已在同日冷启动审计中确认满足退出条件，当前保持完成态。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；当前更小、更保守的下一步只收 `https://nyaa.si/?p=2` 这种“allowlist 站点首页、直接显式带分页参数的组合页” proof，不扩站点、不放宽页面 allowlist。
-- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前只补这一条首页显式分页 URL proof，不重做已收口页面。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；当前更小、更保守的下一步只收 `https://nyaa.si/?f=0&c=1_2&p=2` 这种“allowlist 站点分类列表页、直接显式带分页参数的组合页” proof，不扩站点、不放宽页面 allowlist。
+- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；当前只补这一条分类列表显式分页 URL proof，不重做已收口页面。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
@@ -36,7 +36,7 @@
 
 - 当前优先交付：
   - 保持首页翻页页、排序列表页、category/list 页面和 `p=<页码>` 语法不回退
-  - 当前只允许补 `https://nyaa.si/?p=2` 这类 allowlist 首页显式分页 URL proof，不扩站点、不放宽抓站边界
+  - 当前只允许补 `https://nyaa.si/?f=0&c=1_2&p=2` 这类 allowlist 分类列表显式分页 URL proof，不扩站点、不放宽抓站边界
   - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -56,10 +56,10 @@
 
 ## Done when
 
-当前 BT allowlist 首页显式分页 URL proof 主线视为 **已收口**，满足以下任一条即可：
+当前 BT allowlist 分类列表显式分页 URL proof 主线视为 **已收口**，满足以下任一条即可：
 
-1. `bt批量 https://nyaa.si/?p=2 1-3` 已能从命令入口稳定路由到 allowlist 页面抓取，而不是退回关键词搜索；对应 focused tests 全绿；
-2. 上述首页显式分页 URL 的只读批量预览文本已被证明可复用现有候选缓存边界；对应 focused tests 全绿；
+1. `bt批量 https://nyaa.si/?f=0&c=1_2&p=2 1-3` 已能从命令入口稳定路由到 allowlist 页面抓取，而不是退回关键词搜索；对应 focused tests 全绿；
+2. 上述分类列表显式分页 URL 的只读批量预览文本已被证明可复用现有候选缓存边界；对应 focused tests 全绿；
 3. 本轮代码变更 `< 20` 行且只是对同一个 page/range helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
