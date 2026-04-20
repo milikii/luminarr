@@ -21,16 +21,20 @@ from app.bot.feishu_long_connection import (
     FEISHU_LONG_CONNECTION_SERVICE_KEY,
     FeishuLongConnectionService,
 )
+from app.bot.bt_tmdb_association_runtime import (
+    BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
+    BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
+    BT_CLASSIFICATION_LABELS,
+    BtTmdbAssociationPending,
+    format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
+    format_bt_tmdb_association_prompt as _format_bt_tmdb_association_prompt,
+    handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
+)
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
-    RAW_BT_DESTINATION_INVALID_TEMPLATE,
-    RAW_BT_DESTINATION_PENDING_REMINDER_TEMPLATE,
-    RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE,
-    RAW_BT_DESTINATION_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
     RawBtDestinationPending,
-    can_dispatch_bt_source as _can_dispatch_bt_source,
     format_raw_bt_destination_prompt as _format_raw_bt_destination_prompt,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
 )
@@ -81,7 +85,6 @@ from app.runtime.execution_policy import (
 )
 from app.services.add_to_downloader import (
     ADD_CANCELLED_TEXT,
-    BT_SOURCE_UNSUPPORTED_TEXT,
     AddToDownloaderService,
 )
 from app.services.cleanup_downloaded_source import (
@@ -110,9 +113,8 @@ from app.services.pure_bt import (
     extract_bt_batch_confirm_request,
     extract_bt_batch_preview_request,
     extract_bt_search_query,
-    pick_single_item_candidate,
 )
-from app.services.search_media import SearchMediaService, parse_movie_query
+from app.services.search_media import SearchMediaService
 
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
@@ -141,35 +143,6 @@ BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE = (
     "已记录本次 BT 媒体类型：{label}（{kind}）。\n"
     "当前这一步只完成媒体类型 follow-up，暂不执行 TMDB 关联或下载投递。"
 )
-BT_TMDB_ASSOCIATION_PROMPT_TEXT_TEMPLATE = (
-    "已记录本次 BT 分类：{label}（{kind}）。\n"
-    "请继续发送片名，可带年份，例如：{example}\n"
-    "当前这一步只做 TMDB 关联，不会执行下载投递。"
-)
-BT_TMDB_ASSOCIATION_PENDING_REMINDER_TEMPLATE = (
-    "当前正在等待 {label} 的 TMDB 关联标题。\n"
-    "请发送：片名 或 片名 + 年份，例如：{example}"
-)
-BT_TMDB_ASSOCIATION_CANCELLED_TEXT = "已取消当前 BT TMDB 关联，请重新发送磁力或 BT 指令。"
-BT_TMDB_ASSOCIATION_NOT_FOUND_TEMPLATE = (
-    "未找到可用的 TMDB 关联：{query}\n"
-    "请补充更准确的片名，可带年份，例如：{example}\n"
-    "如果这不是影视资源，请改选 raw_bt。"
-)
-BT_TMDB_ASSOCIATION_AMBIGUOUS_TEMPLATE = (
-    "TMDB 关联存在多个候选：{query}\n"
-    "请补充年份或更完整片名后重试。\n"
-    "参考候选：\n"
-    "{options}"
-)
-BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE = (
-    "BT {label} TMDB 关联成功。\n"
-    "标题: {title}\n"
-    "原始标题: {original_title}\n"
-    "年份: {year}\n"
-    "TMDB ID: {tmdb_id}"
-)
-BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT = "TMDB 关联服务未就绪，请稍后重试。"
 DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE = "下载器角色 {role} 绑定的实例不存在：{name}。请检查配置后重试。"
 BT_SOURCE_REQUIRED_TEXT = "当前还缺少实际的磁力链接，请直接发送 magnet:? 链接后重试。"
 PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE = (
@@ -261,23 +234,7 @@ BT_CLASSIFICATION_ALIASES = {
     "动漫": "anime",
     "动画": "anime",
 }
-BT_CLASSIFICATION_LABELS = {
-    "movie": "电影",
-    "series": "剧集",
-    "anime": "动漫",
-    "raw_bt": "其他 BT 资源",
-}
-BT_TMDB_ASSOCIATION_EXAMPLES = {
-    "movie": "Dune 2021",
-    "series": "三体 2023",
-    "anime": "葬送的芙莉莲 2023",
-}
-
-
-@dataclass(frozen=True, slots=True)
-class BtTmdbAssociationPending:
-    media_kind: str
-    source: str
+BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1939,18 +1896,6 @@ def _enter_media_import_bt_flow(
     return BT_CLASSIFICATION_PROMPT_TEXT
 
 
-def _format_bt_tmdb_association_prompt(media_kind: str) -> str:
-    label = BT_CLASSIFICATION_LABELS.get(media_kind, media_kind)
-    example = BT_TMDB_ASSOCIATION_EXAMPLES.get(media_kind, "Dune 2021")
-    return BT_TMDB_ASSOCIATION_PROMPT_TEXT_TEMPLATE.format(label=label, kind=media_kind, example=example)
-
-
-def _format_bt_tmdb_association_pending_reminder(media_kind: str) -> str:
-    label = BT_CLASSIFICATION_LABELS.get(media_kind, media_kind)
-    example = BT_TMDB_ASSOCIATION_EXAMPLES.get(media_kind, "Dune 2021")
-    return BT_TMDB_ASSOCIATION_PENDING_REMINDER_TEMPLATE.format(label=label, example=example)
-
-
 def _resolve_bt_tmdb_candidates_lookup(
     *,
     context: ContextTypes.DEFAULT_TYPE,
@@ -1963,38 +1908,6 @@ def _resolve_bt_tmdb_candidates_lookup(
     if callable(lookup_func):
         return lookup_func
     return None
-
-
-def _format_bt_tmdb_association_options(options: list[TmdbMovie]) -> str:
-    lines: list[str] = []
-    for index, option in enumerate(options, start=1):
-        title = option.title or option.original_title or "-"
-        year = option.year or "-"
-        lines.append(f"{index}. {title} ({year}) [TMDB ID: {option.tmdb_id or '-'}]")
-    return "\n".join(lines) if lines else "- 暂无可区分候选，请直接补充年份。"
-
-
-def _format_bt_tmdb_association_success(media_kind: str, match: TmdbMovie) -> str:
-    label = BT_CLASSIFICATION_LABELS.get(media_kind, media_kind)
-    title = match.title or match.original_title or "-"
-    original_title = match.original_title or title
-    year = match.year or "-"
-    tmdb_id = match.tmdb_id or "-"
-    return BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE.format(
-        label=label,
-        title=title,
-        original_title=original_title,
-        year=year,
-        tmdb_id=tmdb_id,
-    )
-
-
-def _format_bt_dispatch_title(match: TmdbMovie) -> str:
-    title = match.title or match.original_title or "(no title)"
-    year = match.year.strip()
-    if not year:
-        return title
-    return f"{title} ({year})"
 
 
 def _resolve_raw_bt_destination_options(
@@ -2220,57 +2133,28 @@ async def _handle_bt_tmdb_association_query(
     user_id: int | None,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> str:
-    if chat_id is None:
-        return SERVICE_NOT_READY_TEXT
-    parsed_query = parse_movie_query(query)
-    if not parsed_query.title:
-        return _format_bt_tmdb_association_pending_reminder(pending.media_kind)
-
-    lookup_func = _resolve_bt_tmdb_candidates_lookup(context=context, media_kind=pending.media_kind)
-    if lookup_func is None:
-        return BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT
-
-    try:
-        matches = await lookup_func(parsed_query.title, parsed_query.year)
-    except Exception as error:
-        _log_bt_tmdb_association_error(media_kind=pending.media_kind, query=query, error=error)
-        return BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT
-
-    if not matches:
-        example = BT_TMDB_ASSOCIATION_EXAMPLES.get(pending.media_kind, "Dune 2021")
-        return BT_TMDB_ASSOCIATION_NOT_FOUND_TEMPLATE.format(query=query.strip(), example=example)
-
-    if not parsed_query.year and len(matches) > 1:
-        return BT_TMDB_ASSOCIATION_AMBIGUOUS_TEMPLATE.format(
-            query=query.strip(),
-            options=_format_bt_tmdb_association_options(matches),
-        )
-
-    cleared_tmdb_association = _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
-    if cleared_tmdb_association is None:
-        return SERVICE_NOT_READY_TEXT
-    association_text = _format_bt_tmdb_association_success(pending.media_kind, matches[0])
-    if not _can_dispatch_bt_source(pending.source):
-        return f"{association_text}\n\n{BT_SOURCE_REQUIRED_TEXT}"
-    add_service = context.application.bot_data.get(ADD_TO_DOWNLOADER_SERVICE_KEY)
-    if not isinstance(add_service, AddToDownloaderService):
-        return SERVICE_NOT_READY_TEXT
-    downloader_execution, resolution_error = _resolve_bound_downloader_execution(context=context, role="bt")
-    if resolution_error is not None:
-        return resolution_error
-    pending_text = await add_service.add_bt_source(
+    return await handle_shared_bt_tmdb_association_query(
+        query=query,
+        pending=pending,
         chat_id=chat_id,
         user_id=user_id,
-        source=pending.source,
-        title=_format_bt_dispatch_title(matches[0]),
-        downloader_name=downloader_execution.name if downloader_execution is not None else "",
-        downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
-        download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
-        auto_import_enabled=True,
+        bot_data=context.application.bot_data,
+        add_to_downloader_service_key=ADD_TO_DOWNLOADER_SERVICE_KEY,
+        clear_pending=lambda: _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id),
+        resolve_candidates_lookup=lambda media_kind: _resolve_bt_tmdb_candidates_lookup(
+            context=context,
+            media_kind=media_kind,
+        ),
+        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(context=context, role="bt"),
+        log_bt_tmdb_association_error=lambda media_kind, raw_query, error: _log_bt_tmdb_association_error(
+            media_kind=media_kind,
+            query=raw_query,
+            error=error,
+        ),
+        service_not_ready_text=SERVICE_NOT_READY_TEXT,
+        bt_tmdb_association_service_not_ready_text=BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
+        bt_source_required_text=BT_SOURCE_REQUIRED_TEXT,
     )
-    if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
-        return pending_text
-    return f"{association_text}\n\n{pending_text}"
 
 
 async def handle_private_chat_query_text(

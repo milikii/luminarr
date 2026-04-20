@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.bot.bt_tmdb_association_runtime import handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query
 from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
@@ -703,12 +704,27 @@ async def handle_private_chat_query_text(
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
     if bt_tmdb_pending is not None:
-        reply = await tg._handle_bt_tmdb_association_query(
+        reply = await handle_shared_bt_tmdb_association_query(
             query=query,
             pending=bt_tmdb_pending,
             chat_id=chat_id,
             user_id=user_id,
-            context=context,
+            bot_data=bot_data,
+            add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
+            clear_pending=lambda: tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id),
+            resolve_candidates_lookup=lambda media_kind: tg._resolve_bt_tmdb_candidates_lookup(
+                context=context,
+                media_kind=media_kind,
+            ),
+            resolve_downloader_execution=lambda: tg._resolve_bound_downloader_execution(context=context, role="bt"),
+            log_bt_tmdb_association_error=lambda media_kind, raw_query, error: tg._log_bt_tmdb_association_error(
+                media_kind=media_kind,
+                query=raw_query,
+                error=error,
+            ),
+            service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
+            bt_tmdb_association_service_not_ready_text=tg.BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
+            bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
         )
         await reply_func(reply)
         return

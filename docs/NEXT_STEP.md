@@ -1,9 +1,9 @@
-# Next step (v246)
+# Next step (v247)
 
 ## Current goal
 
 - 当前质量硬化阶段的下一条最小主线仍是 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**。
-- `raw_bt` 目录问询已经抽成 `app/bot/raw_bt_destination_runtime.py`；当前剩余最小闭环改为 **BT TMDB 关联问询 helper** 的同类收口。
+- `raw_bt` 目录问询和 BT TMDB 关联问询已经分别抽成 `app/bot/raw_bt_destination_runtime.py`、`app/bot/bt_tmdb_association_runtime.py`；当前剩余最小闭环改为 **下载器角色绑定解析 helper** 的同类收口。
 - 这一步继续只做最小边界解耦，不顺手放大成新的渠道平台化或大文件总重写。
 - 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 仍为 `1616 passed, 2 skipped`。
 
@@ -36,6 +36,6 @@
 
 ## After this step
 
-1. 如果这条 BT TMDB helper 解耦完成，就继续沿同一方向挑下一段最小边界收口点。
+1. 如果这条下载器角色绑定解析 helper 解耦完成，就继续沿同一方向挑下一段最小边界收口点。
 2. 如果这条解耦证明不值得继续细拆，就回到同一职责族里再找一个更小、更保守的结构降本点。
 3. 只有在 shared runtime 边界和热点大文件都没有更小闭环可做时，再回到 Makefile / focused tests / 真实 smoke 入口补强。
