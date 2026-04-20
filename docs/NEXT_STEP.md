@@ -1,11 +1,12 @@
-# Next step (v241)
+# Next step (v242)
 
 ## Current goal
 
-- 刚完成的 **`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化** 已在 2026-04-20 满足 `Done when` 第 1 条：`run_once()` 只保留候选扫描与计数编排，候选读取 / 逐条任务推进 helper 已独立到 `app/services/auto_import_batch.py`，focused tests `8 passed, 34 deselected`，扩展自动导入 / 状态 follow-up focused tests `21 passed, 21 deselected`。
+- 刚完成的 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估** 已在 2026-04-20 满足 `Done when` 第 1 条：已明确列出同一组共享职责、调用方和不回退边界，并确认值得单开结构降本主线。当前固定调用方是 `StatusFollowUpRecorder.record()`、`PostDownloadAutoImportService.run_for_record()`、`telegram_bot._poll_pending_download_completion_once()`；三处都围绕 `download_monitor` / `job_event` 真相推进“状态观察落盘 -> 完成事件查询/追加 -> 自动导入消费”。
+- 刚完成的 **`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化** 继续保持完成态：`run_once()` 只保留候选扫描与计数编排，候选读取 / 逐条任务推进 helper 已独立到 `app/services/auto_import_batch.py`，focused tests `8 passed, 34 deselected`，扩展自动导入 / 状态 follow-up focused tests `21 passed, 21 deselected`。
 - 上一条 **`get_download_status.py` 状态编排层瘦身 / 模块化** 继续保持完成态：状态展示 helper 已独立到 `app/services/status_delivery.py`，观察落盘 / 完成事件 / 自动导入 follow-up 已独立到 `app/services/status_follow_up.py`，展示侧 focused tests `4 passed, 38 deselected`、观察 / 自动导入 focused tests `21 passed, 21 deselected`、跨渠道 status 回归 `6 passed, 372 deselected`。
-- 当前进行中的 promoted 主线切到 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估**。
-- 当前更小也更有价值的闭环，是先确认“状态观察落盘 / 完成事件查询 / 自动导入消费”这一组共享职责是否值得单开结构降本主线；这一步先做价值判断和边界盘点，不顺手改协议、不直接放大成新的 service 大重构。
+- 当前进行中的 promoted 主线切到 **共享状态 follow-up helper 结构降本**。
+- 当前更小也更有价值的闭环，是先把“状态观察落盘 / 完成事件推进 / 自动导入消费”这条共享 follow-up 推进链从状态查询入口和 Telegram 后台轮询入口之间继续收拢，避免渠道层再靠 `get_status_text()` 间接触发共享副作用；这一步只做最小 helper 结构降本，不顺手改协议、不放大成新的 service 大重构。
 - 当前主线入口继续看 `docs/NEXT_STEP.md` 与 `docs/STATUS.md`；刚完成的自动导入瘦身台账继续看 `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`；刚完成的状态 service 瘦身继续看 `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`；BT 批量确认、单条真实 dispatch、页面 proof 和 Plex 值得性重评估都保持完成态，不回退成进行中。
 - 更早完成的 **BT 用户页 / 编号范围页能力** 继续保持完成态，不回退。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
@@ -40,8 +41,8 @@
 ## Only do
 
 - 当前优先交付：
-  - 当前只做 `download_monitor_repo.py` / `job_event` 共享状态 helper 的 worthiness 评估，不直接开更大重构
-  - 只盘点状态观察落盘、完成事件读取、自动导入消费三段共享职责的调用方、输入输出和不回退边界
+  - 当前只做共享状态 follow-up helper 的最小结构降本，不直接开更大重构
+  - 优先收拢状态观察落盘、完成事件推进、自动导入消费这条共享链，不再让渠道层依赖 `get_status_text()` 的间接副作用
   - 保持 `download_monitor`、`job_event`、`AutoImportStateUnavailableError`、显式中文日志和现有状态 follow-up 语义不回退
   - 保持 `get_download_status.py`、`post_download_auto_import.py`、`telegram_bot.py` 现有对外协议不变
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -64,11 +65,11 @@
 
 ## Done when
 
-当前 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估** 主线视为 **已收口**，满足以下任一条即可：
+当前 **共享状态 follow-up helper 结构降本** 主线视为 **已收口**，满足以下任一条即可：
 
-1. 能明确列出至少一组共享职责、调用方和不回退边界，并确认值得单开结构降本主线；
-2. 能明确证明这组共享职责暂时不值得单开主线，并把结论同步到 `docs/STATUS.md` / `README.md` / `AGENTS.md`；
-3. 本轮代码变更 `< 20` 行且只是对同一个状态 helper 再补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
+1. 能把状态观察落盘、完成事件推进、自动导入消费里至少一段共享 follow-up 从 `get_download_status.py` / `telegram_bot.py` 的间接触发里收拢到独立 helper，并保持现有中文日志、停路语义和对外协议不变；
+2. focused tests 能继续覆盖状态查询、状态 follow-up、后台 completion polling 与自动导入最小回归；
+3. 文档继续保持分层一致，`STATUS.md` 只写当前快照，详细结论继续收口到 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 
 附加约束（不算退出条件，只是不得违反）：
 
@@ -77,6 +78,6 @@
 
 ## After this step
 
-1. 如果评估结论是“值得单开”，就挑最小一段共享状态 helper 做结构降本闭环
-2. 如果评估结论是“暂不值得”，就回到同一职责族里再找一个更小、更保守的结构降本点
+1. 如果这条共享 follow-up helper 收口完成，就继续在同一职责族里挑下一段最小 repo / orchestration 降本点
+2. 如果这条共享 follow-up helper 证明不值得继续细拆，就回到同一职责族里再找一个更小、更保守的结构降本点
 3. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线

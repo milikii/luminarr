@@ -1,4 +1,4 @@
-# Current status (v332)
+# Current status (v333)
 
 ## Project position
 
@@ -56,7 +56,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 上一条 promoted 主线 **`get_download_status.py` 状态编排层瘦身 / 模块化** 已在 2026-04-20 收口：状态展示 helper 已独立到 `app/services/status_delivery.py`，观察落盘 / 完成事件 / 自动导入 follow-up 已独立到 `app/services/status_follow_up.py`，`GetDownloadStatusService` 只保留状态查询和回复组装。
 - 刚完成的 **`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化** 已在 2026-04-20 收口：`run_once()` 只保留候选扫描与计数编排，候选读取 / 逐条任务推进 helper 已独立到 `app/services/auto_import_batch.py`，focused tests `8 passed, 34 deselected`，扩展自动导入 / 状态 follow-up focused tests `21 passed, 21 deselected`。
-- 当前 promoted 主线已切到 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估**：下一步先确认状态观察落盘、完成事件查询、自动导入消费这组共享职责是否值得单开结构降本主线，不顺手放大到更大的 service 重构。
+- 刚完成的 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估** 已在 2026-04-20 收口：`StatusFollowUpRecorder.record()`、`PostDownloadAutoImportService.run_for_record()`、`telegram_bot._poll_pending_download_completion_once()` 已确认围绕同一份 `download_monitor` / `job_event` 真相推进“状态观察落盘 -> 完成事件查询/追加 -> 自动导入消费”，值得单开下一条共享状态 follow-up helper 结构降本主线。
 - 刚完成的 **BT 真实 dispatch smoke** 已在 2026-04-20 收口：一次性真实脚本已证明 direct `magnet:? -> 纯 BT 下载链 -> raw_bt 目录选择 -> confirm` 能投递到 `BT Transmission(http://127.0.0.1:19092)`，观测到 `任务 ID: 1 / Hash: 03c970d927a04ef5a784fa1f9472c19e298fa754 / downloadDir=/downloads/complete/raw_bt_smoke`。
 - BT allowlist 分类排序列表 exact URL 聊天缓存 proof 已在 2026-04-20 当前批次确认满足退出条件；focused tests 已证明 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 能继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。
 - 再上一条 BT allowlist 分类搜索显式分页 URL proof 主线也继续保持完成态；focused tests 已证明 `https://nyaa.si/?c=1_2&q=frieren&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界。
@@ -76,16 +76,16 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
 - BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地，这一族当前转入完成态，不再作为 promoted 主线继续拆。
-- 当前最小风险改成状态观察 / 完成事件 / 自动导入消费的共享职责仍分散在 `status_follow_up.py`、`post_download_auto_import.py`、`telegram_bot.py` 与 repo 调用点之间；如果不先做 worthiness 评估，下一条结构降本主线容易继续做大。
+- 当前最小风险改成状态观察 / 完成事件 / 自动导入消费的共享职责仍分散在 `status_follow_up.py`、`post_download_auto_import.py`、`telegram_bot.py` 与 repo 调用点之间；下一条 promoted 主线应优先把这条共享 follow-up 推进链继续收拢，避免渠道层再靠 `get_status_text()` 间接触发共享副作用。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 `download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估
+- 窗口活性快照：当前主线为共享状态 follow-up helper 结构降本
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；`PERSISTENCE_CLOSURE_LOG.md` 2.1~2.4 已覆盖 10 个指定 repo 的全部对外方法，`git grep 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot` 命中仍为 `0`；`post_download_auto_import.py` 瘦身线已满足 `Done when` 第 1 条并收口，当前 promoted 主线切到 `download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；`PERSISTENCE_CLOSURE_LOG.md` 2.1~2.4 已覆盖 10 个指定 repo 的全部对外方法，`git grep 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot` 命中仍为 `0`；`download_monitor_repo.py` / `job_event` 共享状态 helper worthiness 评估已满足 `Done when` 第 1 条并收口，下一条 promoted 主线切到共享状态 follow-up helper 结构降本。
 - BT downloader health probe：2026-04-20，`curl -si http://127.0.0.1:19091/transmission/rpc` 返回 `X-Transmission-Session-Id`，`curl -s http://127.0.0.1:18096/System/Info/Public` 返回 `ServerName`，`curl -si http://127.0.0.1:19092/transmission/rpc` 直接失败
 - real BT batch confirm dispatch smoke：2026-04-20，一次性临时脚本先定位到 `.env` 缺少 `DOWNLOADER_INSTANCES / BT_DOWNLOADER`，再按 `docs/TEST_ENV.md` 临时覆盖 `tr-bt -> http://127.0.0.1:19092` 后，继续失败在 `request_url=http://127.0.0.1:19092/transmission/rpc` 不可达；同批次 `curl -s http://127.0.0.1:18096/System/Info/Public` 仍返回 `ServerName`
 - real BT dispatch smoke：2026-04-20，`tmp_tests/verify_bt_real_dispatch_smoke.py` 成功观察到 `confirm bt-ffe44b7b -> BT Transmission(19092)`，并确认 approval / jobs 真相已落稳；`raw_bt` 因 `auto_import_enabled=False` 不登记 `download_monitor`
