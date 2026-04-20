@@ -5,7 +5,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Literal
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
@@ -34,6 +34,7 @@ from app.bot.downloader_execution_runtime import (
     resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
     resolve_downloader_instances as resolve_shared_downloader_instances,
 )
+from app.bot.execution_runtime import resolve_execution_gate
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
@@ -68,8 +69,6 @@ from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
     ACTION_BT_READ_ONLY_HELPER,
-    ACTION_BT_SUBSCRIPTION_LIST,
-    ACTION_BT_SUBSCRIPTION_MUTATION,
     ACTION_BT_SUBSCRIPTION_RUN,
     ACTION_ADD_TO_DOWNLOADER,
     ACTION_CANCEL_PENDING_APPROVAL,
@@ -83,8 +82,6 @@ from app.runtime.execution_policy import (
     ACTION_RESET_CANDIDATES,
     ACTION_RESET_CLARIFICATION,
     ACTION_SEARCH_MEDIA,
-    ACTION_WATCHLIST_LIST,
-    ACTION_WATCHLIST_MUTATION,
     ExecutionGate,
 )
 from app.services.add_to_downloader import (
@@ -98,7 +95,6 @@ from app.services.cleanup_downloaded_source import (
 )
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
 from app.services.manage_bt_subscription import (
-    BtSubscriptionCommand,
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
     parse_bt_subscription_query,
@@ -201,7 +197,6 @@ POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
-T = TypeVar("T")
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
@@ -365,23 +360,11 @@ async def _send_telegram_media(
 def _is_telegram_photo_path(file_path: Path) -> bool:
     return file_path.suffix.lower() in TELEGRAM_PHOTO_SUFFIXES
 
-
-def _resolve_execution_gate(context: ContextTypes.DEFAULT_TYPE) -> ExecutionGate:
-    gate = context.application.bot_data.get(EXECUTION_GATE_KEY)
-    if isinstance(gate, ExecutionGate):
-        return gate
-    resolved_gate = ExecutionGate()
-    context.application.bot_data[EXECUTION_GATE_KEY] = resolved_gate
-    return resolved_gate
-
-
 def _resolve_execution_gate_for_application(application: Application) -> ExecutionGate:
-    gate = application.bot_data.get(EXECUTION_GATE_KEY)
-    if isinstance(gate, ExecutionGate):
-        return gate
-    resolved_gate = ExecutionGate()
-    application.bot_data[EXECUTION_GATE_KEY] = resolved_gate
-    return resolved_gate
+    return resolve_execution_gate(
+        bot_data=application.bot_data,
+        execution_gate_key=EXECUTION_GATE_KEY,
+    )
 
 
 async def _start_bt_subscription_scheduler(application: Application) -> None:
@@ -736,31 +719,6 @@ def _resolve_bt_pending_repo(context: ContextTypes.DEFAULT_TYPE) -> BtPendingRep
     if isinstance(pending_repo, BtPendingRepo):
         return pending_repo
     return None
-
-
-async def _run_sync_with_policy(
-    gate: ExecutionGate,
-    action: str,
-    operation: Callable[[], T],
-) -> T:
-    async def _runner() -> T:
-        return operation()
-
-    return await gate.run(action, _runner)
-
-
-def _watchlist_policy_action(action: str) -> str:
-    if action == "list":
-        return ACTION_WATCHLIST_LIST
-    return ACTION_WATCHLIST_MUTATION
-
-
-def _bt_subscription_policy_action(command: BtSubscriptionCommand) -> str:
-    if command.action == "list":
-        return ACTION_BT_SUBSCRIPTION_LIST
-    if command.action == "run":
-        return ACTION_BT_SUBSCRIPTION_RUN
-    return ACTION_BT_SUBSCRIPTION_MUTATION
 
 
 def _resolve_chat_id(

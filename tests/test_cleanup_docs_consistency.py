@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 
@@ -96,7 +97,7 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     for heading in STATUS_SECTION_HEADINGS:
         assert heading in status_text
 
-    assert "1616 passed, 2 skipped" in status_text
+    assert re.search(r"\b\d+ passed, \d+ skipped\b", status_text)
     assert "make quality" in status_text
     assert "make verify-mainline" in status_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" not in status_text

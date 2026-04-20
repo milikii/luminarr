@@ -6,6 +6,12 @@ from pathlib import Path
 
 from app.bot.bt_tmdb_association_runtime import handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
+from app.bot.execution_runtime import (
+    bt_subscription_policy_action,
+    resolve_execution_gate,
+    run_sync_with_policy,
+    watchlist_policy_action,
+)
 from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
@@ -142,7 +148,10 @@ async def handle_private_chat_query_text(
     context = _PrivateChatRuntimeContext(
         application=_PrivateChatRuntimeApplication(bot_data=bot_data),
     )
-    execution_gate = tg._resolve_execution_gate(context)
+    execution_gate = resolve_execution_gate(
+        bot_data=bot_data,
+        execution_gate_key=tg.EXECUTION_GATE_KEY,
+    )
     trace_log_path = _resolve_trace_log_path(bot_data)
     _log_private_chat_inbound(
         trace_log_path=trace_log_path,
@@ -174,7 +183,7 @@ async def handle_private_chat_query_text(
                     if pending_job.workflow_type == tg.WORKFLOW_IMPORT_TO_LIBRARY:
                         import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
                         if isinstance(import_service, tg.ImportToLibraryService):
-                            cancelled_text = await tg._run_sync_with_policy(
+                            cancelled_text = await run_sync_with_policy(
                                 execution_gate,
                                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                                 lambda: import_service.cancel_pending_import(chat_id),
@@ -185,7 +194,7 @@ async def handle_private_chat_query_text(
                     if pending_job.workflow_type == tg.WORKFLOW_ADD_TO_DOWNLOADER:
                         add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
                         if isinstance(add_service, tg.AddToDownloaderService):
-                            cancelled_text = await tg._run_sync_with_policy(
+                            cancelled_text = await run_sync_with_policy(
                                 execution_gate,
                                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                                 lambda: add_service.cancel_pending_add(chat_id),
@@ -199,7 +208,7 @@ async def handle_private_chat_query_text(
 
         import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
         if isinstance(import_service, tg.ImportToLibraryService) and chat_id is not None:
-            cancelled_text = await tg._run_sync_with_policy(
+            cancelled_text = await run_sync_with_policy(
                 execution_gate,
                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                 lambda: import_service.cancel_pending_import(chat_id),
@@ -210,7 +219,7 @@ async def handle_private_chat_query_text(
 
         add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
         if isinstance(add_service, tg.AddToDownloaderService) and chat_id is not None:
-            cancelled_text = await tg._run_sync_with_policy(
+            cancelled_text = await run_sync_with_policy(
                 execution_gate,
                 tg.ACTION_CANCEL_PENDING_APPROVAL,
                 lambda: add_service.cancel_pending_add(chat_id),
@@ -226,7 +235,7 @@ async def handle_private_chat_query_text(
                 await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
             if clarification_pending:
-                clarification_cleared = await tg._run_sync_with_policy(
+                clarification_cleared = await run_sync_with_policy(
                     execution_gate,
                     tg.ACTION_RESET_CLARIFICATION,
                     lambda: search_service.clear_clarification_pending(chat_id),
@@ -241,7 +250,7 @@ async def handle_private_chat_query_text(
                 await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
             if has_cached_candidates:
-                candidates_cleared = await tg._run_sync_with_policy(
+                candidates_cleared = await run_sync_with_policy(
                     execution_gate,
                     tg.ACTION_RESET_CANDIDATES,
                     lambda: search_service.clear_cached_candidates(chat_id),
@@ -514,9 +523,9 @@ async def handle_private_chat_query_text(
         if not isinstance(watchlist_service, tg.ManageWatchlistService):
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        reply = await tg._run_sync_with_policy(
+        reply = await run_sync_with_policy(
             execution_gate,
-            tg._watchlist_policy_action(watchlist_command.action),
+            watchlist_policy_action(watchlist_command.action),
             lambda: watchlist_service.handle(
                 watchlist_command,
                 chat_id=chat_id,
@@ -544,7 +553,7 @@ async def handle_private_chat_query_text(
                 await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
             reply = await execution_gate.run(
-                tg._bt_subscription_policy_action(bt_subscription_command),
+                bt_subscription_policy_action(bt_subscription_command),
                 lambda: bt_subscription_service.run_once(
                     chat_id=chat_id,
                     user_id=user_id,
@@ -557,9 +566,9 @@ async def handle_private_chat_query_text(
             )
             await reply_func(reply)
             return
-        reply = await tg._run_sync_with_policy(
+        reply = await run_sync_with_policy(
             execution_gate,
-            tg._bt_subscription_policy_action(bt_subscription_command),
+            bt_subscription_policy_action(bt_subscription_command),
             lambda: bt_subscription_service.handle(
                 bt_subscription_command,
                 chat_id=chat_id,
@@ -592,7 +601,7 @@ async def handle_private_chat_query_text(
             tg._log_cleanup_service_not_ready(action="cleanup_inspect", query=query)
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        reply = await tg._run_sync_with_policy(
+        reply = await run_sync_with_policy(
             execution_gate,
             tg.ACTION_CLEANUP_INSPECT,
             lambda: cleanup_service.inspect_by_task_ref(
@@ -617,7 +626,7 @@ async def handle_private_chat_query_text(
             tg._log_cleanup_service_not_ready(action="cleanup", query=query)
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        reply = await tg._run_sync_with_policy(
+        reply = await run_sync_with_policy(
             execution_gate,
             tg.ACTION_CLEANUP_DOWNLOADER_SOURCE,
             lambda: cleanup_service.cleanup_by_task_ref(
