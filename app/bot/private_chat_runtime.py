@@ -23,6 +23,7 @@ from app.bot.query_text_runtime import (
     parse_bt_processing_path_legacy_shortcut,
 )
 from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
+from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, log_trace_event
@@ -857,11 +858,12 @@ async def handle_private_chat_query_text(
 
     reply = await execution_gate.run(
         tg.ACTION_SEARCH_MEDIA,
-        lambda: tg._search_with_reactive_recovery(
+        lambda: search_with_reactive_recovery(
             search_service=search_service,
             query=query,
             chat_id=chat_id,
             channel=channel,
+            safe_text=tg.LLM_PHYSICAL_FAILURE_SAFE_TEXT,
         ),
     )
     await reply_func(reply)
