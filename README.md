@@ -115,7 +115,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前进行中的 promoted 主线是 BT allowlist 分类基础页 proof；上一条 BT allowlist 搜索页无分类基础页 proof 已按“现有 allowlist 页面预览链与 `bt批量确认` 复用已证明”收口。
+- **当前施工状态**：上一条 promoted 主线 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 已在 2026-04-20 满足退出条件；如果继续 BT，按 `docs/NEXT_STEP.md` 的 `After this step` 第 1 项，从现有 allowlist 里再挑一个更小页面形式单独开主线。
 - **更早完成主线**：BT 用户页 / 编号范围页能力保持完成态，不回退。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`

@@ -59,12 +59,12 @@
 31. Phase 31：已完成分类搜索显式分页 URL 的 focused proof。
 32. Phase 32：已完成分类搜索基础页 exact URL 的 focused proof。
 33. Phase 33：已完成排序列表 exact URL 的缓存复用 focused proof。
-34. Phase 34：当前只补分类排序列表 exact URL 的聊天缓存 focused proof；如果后续还要补更多站点或页面形式，再单独扩规则，不在这一条里顺手平台化。
+34. Phase 34：已完成分类排序列表 exact URL 的聊天缓存 focused proof；如果后续还要补更多站点或页面形式，再单独扩规则，不在这一条里顺手平台化。
 
 2026-04-20 当前进度：
 
 - 已完成项保持不回退：allowlist 页面 URL 识别、页面类型校验、只读批量预览、聊天候选缓存、Telegram 路由证明、`bt批量确认` 复用 proof、category/list 页面、首页翻页页、排序列表页，以及 `页面 URL + p=<页码>` 语法糖；
-- 同日 focused tests 已确认：`https://nyaa.si/?s=seeders&o=desc` 已继续写入现有聊天缓存，并继续复用 `bt批量确认` 边界；当前 promoted 主线已切到更小的 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 分类排序列表 exact URL 聊天缓存 proof；
+- 同日 focused tests 已确认：`https://nyaa.si/?s=seeders&o=desc` 已继续写入现有聊天缓存，并继续复用 `bt批量确认` 边界；随后更小的 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 分类排序列表 exact URL 聊天缓存 proof 也已收口；
 - `https://nyaa.si/?c=1_2&q=frieren&p=2` 已完成 focused proof，证明更小的分类搜索显式分页 exact URL 也仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?c=1_2&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?f=0&c=1_2&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
@@ -94,12 +94,13 @@
 - `https://nyaa.si/?u=subsplease&s=seeders&o=desc` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?u=subsplease&s=seeders&o=desc p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?u=subsplease&s=seeders&o=desc&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
-- 当前只补 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 这条分类排序列表 exact URL 的聊天缓存 proof；
+- `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-2` 已完成 focused proof，证明它会继续写入现有聊天缓存，并继续复用 `bt批量确认` 边界；
+- 若后续继续 BT，只按 `docs/NEXT_STEP.md` 的 `After this step` 第 1 项，从现有 allowlist 里再挑一个更小页面形式单独开主线；
 - 未声明排序参数、未声明页面、未声明站点和非法范围仍必须显式中文拒绝，不静默去抓未知页面。
 
 ## 4. Done when
 
-当前主线视为 **已收口**，满足以下任一条即可：
+当前主线视为 **已收口**，并已在 2026-04-20 满足 `Done when` 第 1、2 条；下面保留这条主线的收口判据：
 
 1. `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-3` 的 exact URL 预览候选已被证明会继续写入现有聊天缓存；对应 focused tests 全绿；
 2. 上述分类排序列表 exact URL 的候选已被证明不会破坏现有 `bt批量确认` 复用边界；对应 focused tests 全绿；

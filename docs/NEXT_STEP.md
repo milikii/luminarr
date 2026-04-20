@@ -2,10 +2,10 @@
 
 ## Current goal
 
-- 当前进行中的 promoted 主线改为 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof**。2026-04-20 当前批次已确认：上一条 **BT allowlist 排序列表 exact URL 缓存复用 proof** 主线满足退出条件，focused tests 已证明 `https://nyaa.si/?s=seeders&o=desc` 能继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界；再上一条 **BT allowlist 分类搜索基础页 exact URL proof** 主线、**BT allowlist 分类搜索显式分页 URL proof** 主线、**BT allowlist 分类基础页显式分页 URL proof** 主线、**BT allowlist 分类列表显式分页 URL proof** 主线与更早一条 **BT allowlist 首页显式分页 URL proof** 主线也继续保持完成态。
+- 2026-04-20 当前批次已确认 **BT allowlist 分类排序列表 exact URL 聊天缓存 proof** 满足退出条件；focused tests 已证明 `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-2` 会继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。上一条 **BT allowlist 排序列表 exact URL 缓存复用 proof** 主线、再上一条 **BT allowlist 分类搜索基础页 exact URL proof** 主线、**BT allowlist 分类搜索显式分页 URL proof** 主线、**BT allowlist 分类基础页显式分页 URL proof** 主线、**BT allowlist 分类列表显式分页 URL proof** 主线与更早一条 **BT allowlist 首页显式分页 URL proof** 主线也继续保持完成态。
 - 更早一条 **BT 用户页 / 编号范围页能力** 主线已在同日冷启动审计中确认满足退出条件，当前保持完成态。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；当前更小、更保守的下一步只收 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 这种“allowlist 站点分类排序列表 exact URL、只补聊天缓存写回” proof，不扩站点、不放宽页面 allowlist。
-- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；刚完成的排序列表 exact URL 缓存复用 proof 也保持完成态；当前只补这一条分类排序列表 exact URL 的聊天缓存 proof，不重做已收口页面。
+- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；这条分类排序列表 exact URL proof 已收口，若后续继续 BT，只按 `After this step` 第 1 项从现有 allowlist 里再挑一个更小页面形式单独开主线，不扩站点、不放宽页面 allowlist。
+- 既有 BT 页面能力已保持完成态：allowlist 页面 URL 的只读批量预览、聊天缓存、`bt批量确认` 复用 proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已补齐；排序列表 exact URL 缓存复用 proof 与分类排序列表 exact URL 聊天缓存 proof 也都保持完成态，不重做已收口页面。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
@@ -35,8 +35,8 @@
 ## Only do
 
 - 当前优先交付：
-  - 保持首页翻页页、排序列表页、category/list 页面和 `p=<页码>` 语法不回退
-  - 当前只允许补 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 这类 allowlist 分类排序列表 exact URL 的聊天缓存 proof，不扩站点、不放宽抓站边界
+  - 保持首页翻页页、排序列表页、分类排序列表 exact URL、category/list 页面和 `p=<页码>` 语法不回退
+  - 若继续 BT，只能从现有 allowlist 里再挑一个更小页面形式单独开主线；本轮不重做 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 这条已收口 proof，也不扩站点、不放宽抓站边界
   - 保持“页面预览 -> 聊天候选缓存 -> 现有 `bt批量确认`”这条复用证明不回退，不新开并行确认链
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -56,7 +56,7 @@
 
 ## Done when
 
-当前 BT allowlist 分类排序列表 exact URL 聊天缓存 proof 主线视为 **已收口**，满足以下任一条即可：
+当前 BT allowlist 分类排序列表 exact URL 聊天缓存 proof 主线已在 2026-04-20 满足 `Done when` 第 1、2 条；下面保留这条主线的收口判据：
 
 1. `bt批量 https://nyaa.si/?c=1_2&s=seeders&o=desc 1-3` 的 exact URL 预览候选已被证明会继续写入现有聊天缓存；对应 focused tests 全绿；
 2. 上述分类排序列表 exact URL 的只读批量预览文本已被证明不会破坏现有 `bt批量确认` 复用边界；对应 focused tests 全绿；
