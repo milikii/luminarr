@@ -1,11 +1,11 @@
-# Next step (v238)
+# Next step (v239)
 
 ## Current goal
 
-- 当前进行中的 promoted 主线切到 **BT 批量确认多条连续真实 dispatch smoke 值得性评估**。上一条 **BT 批量确认真实 dispatch smoke** 已在 2026-04-20 按 `Done when` 第 2 条收口：一次性临时脚本先定位到本地 `.env` 缺少 `DOWNLOADER_INSTANCES / BT_DOWNLOADER`，再按 `docs/TEST_ENV.md` 临时覆盖 `tr-bt -> http://127.0.0.1:19092` 后，继续定位到 `request_url=http://127.0.0.1:19092/transmission/rpc` 不可达；同批次 `Emby(http://127.0.0.1:18096)` 仍可返回 `ServerName`。
-- BT allowlist 页面 proof、**BT 用户页 / 编号范围页能力**、单条 BT 真实 dispatch、BT 批量确认真实 dispatch 都已收口。当前需要决定的，不是再补一条同口径单条 smoke，而是评估“多条连续真实 dispatch”是否还有新信息；若只是重复取证，就不要继续拆。
-- 当前继续留在 BT 而不是回 Plex：Plex 这条线已经回答了“当前不值得继续追实例”；当前更小也更有用户价值的下一步，是判断 BT 批量确认多条连续真实 dispatch 是否值得继续投入。
-- 当前主线优先复用现有批量预览 / 聊天缓存 / `bt批量确认`，不回到 direct `magnet:?` 单条真实 smoke，也不重做已收口页面。
+- 当前进行中的 promoted 主线切到 **BT 方向剩余用户价值重评估**。2026-04-20 本轮冷启动审计已确认上一条 **BT 批量确认多条连续真实 dispatch smoke 值得性评估** 满足 `Done when` 第 2 条：`curl -si http://127.0.0.1:19091/transmission/rpc` 仍能返回 `X-Transmission-Session-Id`、`curl -s http://127.0.0.1:18096/System/Info/Public` 仍能返回 `ServerName`，但 `curl -si http://127.0.0.1:19092/transmission/rpc` 继续直接失败，说明再做“多条连续真实 dispatch”只会重复命中同一个 BT 下载器可达性缺口，没有新增副作用真相、协议能力或结构降本。
+- BT allowlist 页面 proof、**BT 用户页 / 编号范围页能力**、单条 BT 真实 dispatch、BT 批量确认真实 dispatch，以及“多条连续真实 dispatch 值得性评估”都已收口。当前需要决定的，不是再拆同能力族 proof，而是判断 BT 方向是否还剩新的副作用真相或新的用户可感知协议能力。
+- 当前继续把 BT 放在 Plex 前面，但目标已经从“再补一条 smoke”切到“判断是否该离开这条能力族”：Plex 这条线已经回答了“当前不值得继续追实例”；BT 这条线也不能在 `19092` 仍不可达时继续靠重复取证假装有增量。
+- 当前主线不回到 direct `magnet:?` 单条真实 smoke，不回到批量确认多条连续 dispatch，也不重做已收口页面；只判断 BT 方向是否还有一个新的、真正更有用户价值的闭环可做。
 - 2026-04-19 刚完成的主线是 **Plex 真实 refresh smoke 值得性重评估**：当前主机没有可达 Plex 实例，这一批次统一收口为“先回到 BT 更大范围能力”。
 - 再上一条完成主线是 **Jellyfin / Plex 真实联调重评估**：provider 缺配置时的静默关闭 refresh 已收口，focused tests 为 `10 passed, 46 deselected`。
 - 更早一条完成主线是 **Jellyfin 单 provider 真实 refresh smoke**：真实失败探针已把失败点定位到 `provider + target + request_url`。
@@ -37,7 +37,7 @@
 
 - 当前优先交付：
   - 保持现有 BT 页面 URL 预览、聊天缓存、`bt批量确认` 复用和 `p=<页码>` 语法不回退
-  - 当前只允许评估 **BT 批量确认多条连续真实 dispatch smoke** 是否还有新增用户价值；若只剩重复取证，就不要继续留在同一能力族里拆更小 proof
+  - 当前只允许评估 **BT 方向是否还剩新的副作用真相或新的用户可感知协议能力**；若没有，就不要继续留在同一能力族里拆更小 proof
   - 保持 BT 角色绑定、approval、`jobs`、download_monitor 和显式中文日志边界不回退
   - 遇到未声明站点、未声明页面类型或非法范围时，显式中文 fail-closed，不静默降级成关键词搜索
   - 保持“repo 内固定 Docker refresh 栈仍只有 Emby；Plex 暂不继续追实例”这条边界，不顺手回到 refresh 大主线
@@ -52,18 +52,18 @@
 - 不新增 Jellyfin / Plex Docker 测试栈，不把这一步拉回 refresh 环境编排
 - 不把这一步改成自动 `confirm` / 自动 dispatch
 - 不回到 BT allowlist 页面 URL 家族里继续拆更小 proof
-- 不回到单条 direct `magnet:?` 真实 smoke 继续重复取证
+- 不回到单条 direct `magnet:?` 真实 smoke 或批量连续真实 dispatch 继续重复取证
 - 不改 cleanup 删除范围、媒体库导入成功真相或字幕主线出口
 - 不把这一步重新放大成 Jellyfin + Plex 双线并行、全量能力对齐、自动探测或新的下载器平台化主线
 - 不接未知站点、动态站点、CAPTCHA、登录态页面或通用抓站平台
 
 ## Done when
 
-当前 **BT 批量确认多条连续真实 dispatch smoke 值得性评估** 主线视为 **已收口**，满足以下任一条即可：
+当前 **BT 方向剩余用户价值重评估** 主线视为 **已收口**，满足以下任一条即可：
 
-1. 明确判断“多条连续真实 dispatch”仍有新的用户可感知信息，并把更小的下一条闭环写清楚；
-2. 明确判断这一步只剩重复取证，没有新增副作用真相、协议能力或结构降本，于是直接停止，不再继续拆更小 proof；
-3. 本轮代码变更 `< 20` 行且只是对同一个 batch confirm dispatch / route helper 补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
+1. 明确找出 BT 方向仍有一个新的副作用真相或新的用户可感知协议能力，并把更小的下一条闭环写清楚；
+2. 明确判断当前 BT 方向已经没有新的副作用真相、协议能力或结构降本，于是停止继续留在 BT proof 家族里拆更小闭环；
+3. 本轮代码变更 `< 20` 行且只是对同一个 BT route helper / batch confirm dispatch 再补一条诊断日志分支，触发 `AGENTS.md §11` 停机规则。
 
 附加约束（不算退出条件，只是不得违反）：
 
@@ -72,5 +72,6 @@
 
 ## After this step
 
-1. 如果这条主线也收口，再回看当前 BT 方向是否还剩新的副作用真相或新的用户可感知协议能力；若没有，就不要继续留在同一能力族里拆 proof
-2. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
+1. 如果 BT 方向确认没有新的副作用真相或新的用户可感知协议能力，就离开 BT proof 家族，改挑新的结构降本主线或新的用户可感知协议能力
+2. 如果 BT 方向找到新的副作用真相，就只开那个更小闭环，不回退到已经收口的页面 proof / 单条 smoke / 批量连续 dispatch proof
+3. 如果后续单独拿到 Plex 实例，再开一条最小 Plex real smoke 主线
