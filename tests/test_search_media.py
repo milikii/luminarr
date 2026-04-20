@@ -1775,6 +1775,43 @@ def test_search_bt_batch_preview_and_format_for_chat_caches_category_base_page_c
     assert service.get_cached_candidate(1001, 2) is not None
 
 
+def test_search_bt_batch_preview_and_format_for_chat_caches_sort_page_url_candidates() -> None:
+    async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("keyword raw search should not be used for allowlist sort page url")
+
+    async def fake_page_search(page_url: str) -> list[dict[str, object]]:
+        assert page_url == "https://nyaa.si/?s=seeders&o=desc"
+        return [
+            {
+                "title": "Frieren S01E05 1080p",
+                "source": "magnet:?xt=urn:btih:0505050505050505050505050505050505050505",
+            },
+            {
+                "title": "Frieren S01E06 1080p",
+                "source": "magnet:?xt=urn:btih:0606060606060606060606060606060606060606",
+            },
+        ]
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=unexpected_raw_search,
+        raw_page_search_func=fake_page_search,
+    )
+    _run(
+        service.search_bt_batch_preview_and_format_for_chat(
+            BTBatchPreviewRequest(
+                query="https://nyaa.si/?s=seeders&o=desc",
+                selected_indexes=(1, 2),
+                selection_text="1-2",
+            ),
+            chat_id=1001,
+        )
+    )
+
+    assert service.get_cached_candidate(1001, 1) is not None
+    assert service.get_cached_candidate(1001, 2) is not None
+
+
 def test_search_bt_batch_preview_and_format_for_chat_caches_uncategorized_user_sort_page_candidates() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for uncategorized user sort page")
