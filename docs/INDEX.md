@@ -54,7 +54,7 @@
 | `docs/PERSISTENCE_CLOSURE_LOG.md` | 更早完成的持久化吞错收口主线详细闭环、focused tests 和 commit 轨迹 | 已完成主线台账 |
 | `docs/DECISIONS.md` | 为什么这么做，哪些边界已经定死 | 长期决策 |
 | `docs/CLEANUP_VERIFICATION_WINDOW.md` | cleanup 验证窗口的详细台账和证据 | 活动台账 |
-| `docs/TEST_ENV.md` | 本地 Transmission / Emby 联调栈怎么检查 | 测试环境说明 |
+| `docs/TEST_ENV.md` | 本地 Transmission / qBittorrent / Emby 联调栈怎么检查 | 测试环境说明 |
 | `docs/HISTORY.md` | 项目怎么演化到今天 | 历史背景 |
 | `AGENTS.md` | 给 Codex 的仓库内执行规则和读文档入口 | AI 操作手册 |
 

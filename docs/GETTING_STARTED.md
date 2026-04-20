@@ -14,7 +14,7 @@
   - Prowlarr
   - Transmission 或 qBittorrent
 - 如果要跑真实 import / refresh：
-  - Transmission 本地测试栈
+  - Transmission / qBittorrent 本地测试栈
   - Emby 本地测试栈
 
 如果你要补**当前 cleanup 验证窗口**里的“四渠道真实私聊 smoke”退出条件，还要额外满足：
@@ -72,13 +72,14 @@ sudo docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -
 启动后先做健康检查：
 
 ```bash
-curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
+curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -fsS http://127.0.0.1:18098/ >/dev/null && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
 ```
 
 说明：
 
 - compose 文件在仓库里：`/home/alex/projects/luminarr/docker-compose.test.yml`
 - Transmission / Emby 的配置目录仍然落在 `/home/alex/luminarr-test/config/...`
+- qBittorrent 的固定测试配置落在仓库内 `docker/test/qbittorrent`
 - 如果这里只想跑纯单元测试，不做真实导入和刷新，可以先跳过这一步
 
 ## 5. 运行应用
@@ -182,7 +183,7 @@ Feishu / WeCom webhook 的入站端口（默认 `18095` / `18097`）已经在 co
 **两个 compose 文件的职责不要搞混**
 
 - `docker-compose.yml`：**部署本体**，只启 Luminarr。你想"让项目跑起来给自己用"就用这个。
-- `docker-compose.test.yml`：**本地联调测试栈**，启 Transmission + BT Transmission + Emby 三个容器，仅用于 `docs/TEST_ENV.md` 的真实 import / refresh 验证。**不要拿来做正式部署**——它的端口、配置路径、卷映射都是测试约定，不是给长期运行用的。
+- `docker-compose.test.yml`：**本地联调测试栈**，启 Transmission + BT Transmission + qBittorrent + Emby 四个容器；其中 `qBittorrent` 是下载器协议辅助实例，`Emby` 仍是当前真实 refresh 固定入口。**不要拿来做正式部署**——它的端口、配置路径、卷映射都是测试约定，不是给长期运行用的。
 
 **personal WeChat 在容器里的限制**
 

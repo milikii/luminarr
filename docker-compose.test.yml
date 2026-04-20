@@ -18,6 +18,12 @@ services:
       - "19091:9091"
       - "15141:51413"
       - "15141:51413/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -si http://127.0.0.1:9091/transmission/rpc | grep -q X-Transmission-Session-Id"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   transmission-bt:
@@ -40,6 +46,37 @@ services:
       - "19092:9091"
       - "15142:51413"
       - "15142:51413/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -si http://127.0.0.1:9091/transmission/rpc | grep -q X-Transmission-Session-Id"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: luminarr-test-qbittorrent
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Asia/Shanghai}
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    volumes:
+      - /home/alex/projects/luminarr/docker/test/qbittorrent:/config
+      - /data/downloads/qb:/data/downloads/qb
+      - /data/downloads/incomplete-qb:/data/downloads/incomplete-qb
+    ports:
+      - "18098:8080"
+      - "15143:6881"
+      - "15143:6881/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/ >/dev/null"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   emby:
@@ -55,4 +92,10 @@ services:
     ports:
       - "18096:8096"
       - "18920:8920"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8096/System/Info/Public | grep -q ServerName"]
+      interval: 20s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped

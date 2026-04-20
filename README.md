@@ -159,6 +159,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - Transmission：`http://127.0.0.1:19091`
 - BT Transmission：`http://127.0.0.1:19092`
+- qBittorrent：`http://127.0.0.1:18098`
 - Emby：`http://127.0.0.1:18096`
 
 详细路径、健康检查、配置占位见 `docs/TEST_ENV.md`。
