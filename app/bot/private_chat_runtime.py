@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, log_trace_event
@@ -717,12 +718,25 @@ async def handle_private_chat_query_text(
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
     if raw_bt_destination_pending is not None:
-        reply = await tg._handle_raw_bt_destination_query(
+        reply = await handle_shared_raw_bt_destination_query(
             query=query,
             pending=raw_bt_destination_pending,
             chat_id=chat_id,
             user_id=user_id,
-            context=context,
+            bot_data=bot_data,
+            add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
+            search_service_key=tg.SEARCH_SERVICE_KEY,
+            clear_pending=lambda: tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id),
+            resolve_downloader_execution=lambda: tg._resolve_bound_downloader_execution(context=context, role="bt"),
+            log_pure_bt_search_error=lambda pure_bt_query, error: tg._log_pure_bt_search_error(
+                query=pure_bt_query,
+                error=error,
+            ),
+            service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
+            bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
+            pure_bt_search_failed_text=tg.PURE_BT_SEARCH_FAILED_TEXT,
+            pure_bt_candidate_selected_template=tg.PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
+            pure_bt_candidate_not_found_template=tg.PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE,
         )
         await reply_func(reply)
         return

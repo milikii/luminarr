@@ -1,0 +1,208 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, MutableMapping
+from dataclasses import dataclass
+from typing import Protocol
+
+from app.config import RawBtDestinationOption
+from app.services.add_to_downloader import BT_SOURCE_UNSUPPORTED_TEXT, AddToDownloaderService
+from app.services.pure_bt import extract_bt_search_query, pick_single_item_candidate
+from app.services.search_media import SearchMediaService
+
+RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE = (
+    "已记录本次 BT 分类：其他 BT 资源（raw_bt）。\n"
+    "请选择预设目标目录：\n"
+    "{options}\n"
+    "请回复目录编号或目录键，例如：1 或 downloads\n"
+    "当前这一步只记录目录 follow-up，不会执行下载投递。"
+)
+RAW_BT_DESTINATION_PENDING_REMINDER_TEMPLATE = (
+    "当前正在等待 raw_bt 目标目录。\n"
+    "请回复目录编号或目录键，例如：{example}"
+)
+RAW_BT_DESTINATION_SELECTED_TEMPLATE = (
+    "已记录 raw_bt 目标目录。\n"
+    "目录键: {key}\n"
+    "目录说明: {label}\n"
+    "目标路径: {target_dir}"
+)
+RAW_BT_DESTINATION_CANCELLED_TEXT = "已取消当前 raw_bt 目录选择，请重新发送磁力或 BT 指令。"
+RAW_BT_DESTINATION_INVALID_TEMPLATE = (
+    "未识别到有效的 raw_bt 目录选项：{query}\n"
+    "请回复目录编号或目录键，例如：{example}\n"
+    "可选目录：\n"
+    "{options}"
+)
+RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT = "raw_bt 目录选择未就绪，请先配置预设目标目录后重试。"
+PURE_BT_CANDIDATE_SELECTED_TEMPLATE = (
+    "pure BT 最小优选已命中单片资源。\n"
+    "搜索词: {query}\n"
+    "命中资源: {title}"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class RawBtDestinationPending:
+    options: tuple[RawBtDestinationOption, ...]
+    source: str
+
+
+class ResolvedDownloaderExecutionLike(Protocol):
+    name: str
+    downloader_type: str
+
+
+def can_dispatch_bt_source(source: str) -> bool:
+    return source.strip().lower().startswith("magnet:?")
+
+
+def format_raw_bt_destination_options(options: tuple[RawBtDestinationOption, ...]) -> str:
+    lines: list[str] = []
+    for index, option in enumerate(options, start=1):
+        lines.append(f"{index}. {option.label} [{option.key}] -> {option.target_dir}")
+    return "\n".join(lines) if lines else "- 暂无可用目录。"
+
+
+def format_raw_bt_destination_prompt(options: tuple[RawBtDestinationOption, ...]) -> str:
+    return RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE.format(
+        options=format_raw_bt_destination_options(options),
+    )
+
+
+def resolve_raw_bt_destination_example(options: tuple[RawBtDestinationOption, ...]) -> str:
+    if not options:
+        return "downloads"
+    first_option = options[0]
+    return first_option.key or "1"
+
+
+def format_raw_bt_destination_selected(option: RawBtDestinationOption) -> str:
+    return RAW_BT_DESTINATION_SELECTED_TEMPLATE.format(
+        key=option.key,
+        label=option.label,
+        target_dir=option.target_dir,
+    )
+
+
+def parse_raw_bt_destination_choice(
+    query: str,
+    options: tuple[RawBtDestinationOption, ...],
+) -> RawBtDestinationOption | None:
+    normalized_text = query.strip().lower()
+    if not normalized_text:
+        return None
+    if normalized_text.isdigit():
+        index = int(normalized_text)
+        if 1 <= index <= len(options):
+            return options[index - 1]
+    for option in options:
+        if normalized_text == option.key.lower():
+            return option
+    return None
+
+
+def format_raw_bt_destination_invalid(
+    query: str,
+    options: tuple[RawBtDestinationOption, ...],
+) -> str:
+    return RAW_BT_DESTINATION_INVALID_TEMPLATE.format(
+        query=query.strip(),
+        example=resolve_raw_bt_destination_example(options),
+        options=format_raw_bt_destination_options(options),
+    )
+
+
+def _resolve_search_candidate_source(candidate: Mapping[str, object]) -> str:
+    for key in ("downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid"):
+        value = candidate.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+async def handle_raw_bt_destination_query(
+    *,
+    query: str,
+    pending: RawBtDestinationPending,
+    chat_id: int | None,
+    user_id: int | None,
+    bot_data: MutableMapping[str, object],
+    add_to_downloader_service_key: str,
+    search_service_key: str,
+    clear_pending: Callable[[], bool | None],
+    resolve_downloader_execution: Callable[[], tuple[ResolvedDownloaderExecutionLike | None, str | None]],
+    log_pure_bt_search_error: Callable[[str, Exception], None],
+    service_not_ready_text: str,
+    bt_source_required_text: str,
+    pure_bt_search_failed_text: str,
+    pure_bt_candidate_selected_template: str,
+    pure_bt_candidate_not_found_template: str,
+) -> str:
+    if chat_id is None:
+        return service_not_ready_text
+    selected_option = parse_raw_bt_destination_choice(query, pending.options)
+    if selected_option is None:
+        return format_raw_bt_destination_invalid(query, pending.options)
+
+    cleared_raw_bt_destination = clear_pending()
+    if cleared_raw_bt_destination is None:
+        return service_not_ready_text
+    selected_text = format_raw_bt_destination_selected(selected_option)
+    add_service = bot_data.get(add_to_downloader_service_key)
+    if not isinstance(add_service, AddToDownloaderService):
+        return service_not_ready_text
+    downloader_execution, resolution_error = resolve_downloader_execution()
+    if resolution_error is not None:
+        return resolution_error
+    if can_dispatch_bt_source(pending.source):
+        pending_text = await add_service.add_bt_source(
+            chat_id=chat_id,
+            user_id=user_id,
+            source=pending.source,
+            title=f"raw_bt -> {selected_option.label}",
+            downloader_name=downloader_execution.name if downloader_execution is not None else "",
+            downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+            download_dir=selected_option.target_dir,
+            auto_import_enabled=False,
+        )
+        if pending_text == BT_SOURCE_UNSUPPORTED_TEXT:
+            return pending_text
+        return f"{selected_text}\n\n{pending_text}"
+
+    pure_bt_query = extract_bt_search_query(pending.source)
+    if not pure_bt_query:
+        return f"{selected_text}\n\n{bt_source_required_text}"
+
+    search_service = bot_data.get(search_service_key)
+    if not isinstance(search_service, SearchMediaService):
+        return service_not_ready_text
+    try:
+        raw_results = await search_service.search_raw_candidates(pure_bt_query)
+    except Exception as error:
+        log_pure_bt_search_error(pure_bt_query, error)
+        return f"{selected_text}\n\n{pure_bt_search_failed_text}"
+
+    selected_candidate = pick_single_item_candidate(raw_results, query=pure_bt_query)
+    if selected_candidate is None:
+        return f"{selected_text}\n\n{pure_bt_candidate_not_found_template.format(query=pure_bt_query)}"
+
+    candidate_source = _resolve_search_candidate_source(selected_candidate)
+    candidate_title = str(selected_candidate.get("title", "")).strip() or pure_bt_query
+    pending_text = await add_service.add_candidate_source(
+        chat_id=chat_id,
+        user_id=user_id,
+        source=candidate_source,
+        title=candidate_title,
+        downloader_name=downloader_execution.name if downloader_execution is not None else "",
+        downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+        download_dir=selected_option.target_dir,
+        auto_import_enabled=False,
+    )
+    return (
+        f"{selected_text}\n\n"
+        f"{pure_bt_candidate_selected_template.format(query=pure_bt_query, title=candidate_title)}\n\n"
+        f"{pending_text}"
+    )
