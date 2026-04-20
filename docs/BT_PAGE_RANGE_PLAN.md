@@ -61,6 +61,7 @@
 2026-04-20 当前进度：
 
 - 已完成项保持不回退：allowlist 页面 URL 识别、页面类型校验、只读批量预览、聊天候选缓存、Telegram 路由证明、`bt批量确认` 复用 proof、category/list 页面、首页翻页页、排序列表页，以及 `页面 URL + p=<页码>` 语法糖；
+- 同日冷启动核对已确认：现有 focused tests 里已经覆盖更严格的 `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2` 变体；但当前 promoted 主线的退出口仍按 `https://nyaa.si/?c=1_2&q=frieren&p=2` 这条更小 URL 计算，不能把两者混写成“已收口”；
 - `https://nyaa.si/?c=1_2&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?f=0&c=1_2&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
@@ -76,7 +77,7 @@
 - `https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders&o=desc&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders&o=desc p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
-- `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
+- `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2` 已完成 focused proof，证明更严格的分类搜索显式分页变体仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?q=frieren&p=2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?q=frieren` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；
 - `https://nyaa.si/?c=1_2` 已完成 focused proof，证明它仍走现有 allowlist 页面预览链，并继续复用 `bt批量确认` 边界；

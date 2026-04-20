@@ -76,7 +76,7 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 窗口活性快照：当前主线为 BT allowlist 分类搜索显式分页 URL proof
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；当前更保守的下一步是补分类搜索显式分页 URL proof，而不是继续追 Plex 或继续扩 allowlist 页面家族。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；冷启动核对还确认现有 focused tests 已覆盖更严格的 `https://nyaa.si/?f=0&c=1_2&q=frieren&p=2` 变体，但当前退出条件仍是补齐 `https://nyaa.si/?c=1_2&q=frieren&p=2` 的 exact proof，而不是继续追 Plex 或继续扩 allowlist 页面家族。
 - BT 搜索排序显式分页 URL focused tests：2026-04-20，`9 passed, 306 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "search_sort_page_number_url or search_sort_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or resolve_supported_web_source_page_request_appends_page_number"`）
 - BT 排序显式分页 URL focused tests：2026-04-20，`20 passed, 277 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "sort_page_number_url or sort_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages or resolve_supported_web_source_page_request_appends_page_number"`）
 - BT 分类排序显式分页 URL focused tests：2026-04-20，`8 passed, 302 deselected`（`.venv/bin/python -m pytest -q tests/test_bt_sources.py tests/test_search_media.py tests/test_telegram_bot.py -k "category_sort_page_number_url or category_sort_page_number or is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages"`）
