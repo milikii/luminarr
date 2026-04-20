@@ -1,6 +1,12 @@
-# docs/GETTING_STARTED.md (v4)
+# docs/GETTING_STARTED.md (v5)
 
 > 目的：让一个不会写代码、但能用命令行的人，也能把仓库在本机跑起来并完成第一次验证。
+
+开始前先看：
+
+1. `docs/HUMAN_START_HERE.md`
+2. `docs/STATUS.md`
+3. `docs/OPERATOR_RUNBOOK.md`（如果你准备让 AI 连续推进）
 
 ## 1. 你需要先准备什么
 
@@ -229,6 +235,8 @@ make help
 最常用的是：
 
 - `make test`：跑全量 pytest
+- `make quality`：跑当前仓库级快速质量入口（compile + Makefile/docs gate）
+- `make verify-mainline`：跑当前主线 focused 验证入口
 - `make test-cleanup-smoke`：跑四渠道 cleanup smoke gate
 - `make test-cleanup-service-not-ready`：跑 cleanup service-not-ready 专项 smoke
 - `make test-cleanup-telegram`：跑 Telegram cleanup 入口回归
@@ -253,11 +261,15 @@ make help
 - 没有 `make` 时，`make test-cleanup-docs-gate` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make test-cleanup-window` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py && .venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup && .venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make sync-cleanup-doc-snapshots` 的等价一行命令是：`.venv/bin/python -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness telegram_bot_api local_smoke_evidence runtime_process`
+- 没有 `make` 时，`make quality` 的等价一行命令是：`python3 -m compileall app tests && .venv/bin/python -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`
+- 没有 `make` 时，`make verify-mainline` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event" && .venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list or download_completion_polling or post_download_auto_import_scheduler"`
 - `make compile`：跑 `compileall`
 - `make run`：读取 `.env` 后启动应用
 - `make docker-build`：构建镜像
 - `make docker-up`：启动 compose
 - `make docker-logs`：看容器日志
+
+跑完最小验证后，回到 `docs/STATUS.md` 看当前健康度，再决定要不要继续施工。
 
 ## 8. 常见问题
 

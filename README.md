@@ -1,225 +1,57 @@
-# Luminarr (v65)
+# Luminarr (v66)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
-它当前同时服务 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口，但不做通用 AI 助手、通用多渠道平台或通用 plugin / skill / MCP 平台。
+它当前服务 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口，负责把“搜索 -> 下载 -> 入库 -> 刷新 -> 状态查询 -> 追更”这条链路稳定跑通；它**不是**通用 AI 助手、通用 Agent 平台或通用多渠道平台。
 
-## 0. 从哪里开始
+## 1. 先看这里
 
-如果你是第一次看这个仓库，先读：
+- 你**不会代码，只想继续推进项目**：看 `docs/HUMAN_START_HERE.md`
+- 你**准备复制一句话让 AI 开工**：看 `docs/OPERATOR_RUNBOOK.md`
+- 你**想把项目跑起来**：看 `docs/GETTING_STARTED.md`
+- 你**想理解系统怎么工作**：看 `docs/ARCHITECTURE.md`
+- 你**想知道当前主线和当前风险**：看 `docs/STATUS.md`、`docs/NEXT_STEP.md`
+- 你**想知道哪些边界已经定死**：看 `docs/DECISIONS.md`
 
-1. `docs/INDEX.md`
-2. `docs/GETTING_STARTED.md`
-3. `docs/ARCHITECTURE.md`
+## 2. 它现在能做什么
 
-想直接部署，先看 `docs/DEPLOY_CHECKLIST.md`。
+- 四个私聊入口共用一套 shared runtime、approval、`jobs` 和 SQLite 真相
+- 媒体主链已覆盖：搜索、下载审批、确认投递、状态查询、导入审批、硬链接导入、metadata、字幕翻译、媒体库刷新
+- BT 支线已覆盖：PT / BT 分流、processing-path inquiry、TMDB 关联、`raw_bt` 目录选择、BT 搜索与最小订阅基线
+- 下载器支持 Transmission + qBittorrent；刷新支持 Emby / Jellyfin / Plex（按配置选择 provider）
 
-如果你想直接跑：
+## 3. 当前边界
 
-1. 复制 `.env.example` 为 `.env`
-2. 先按 `docs/DEPLOY_CHECKLIST.md` 的 Phase 0-3 走最短路径；需要细节时再翻 `docs/GETTING_STARTED.md`
-3. 用 `make run` / `docker compose up -d`，或 `set -a && . ./.env && set +a && .venv/bin/python -m app.main` 启动
+- 只做单机、单进程、单实例的自托管影视自动化
+- 只维护一套业务真相，不为四个渠道各写一份业务协议
+- 不做 Web UI、桌面端、Redis / MQ / PostgreSQL、多机分布式
+- 不把项目扩成通用 AI / 插件 / MCP 平台
 
-当前最小启动真相：
+## 4. 当前健康度怎么看
 
-- `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL` 是当前启动硬必填
-- 如果 WSL 机器不能直连公网，可额外填写 `OUTBOUND_PROXY_URL` 给 Telegram / TMDB / Fanart / BT 外站 / 字幕翻译出站请求复用；Transmission / Emby / Prowlarr 这类本地地址仍直连
-- `TMDB_API_KEY` 当前不是启动硬必填；不填时只会关闭 TMDB 相关增强能力
-- `DOWNLOADER_INSTANCES` 当前只是多实例路由补充配置，不能替代 `TRANSMISSION_BASE_URL`
-- `PT_MIN_SEED_HOURS` 当前是可选保护项；大于 `0` 时，PT 任务的 `cleanup inspect` / `cleanup` 会按完成观察时间窗做保守阻断
-- `make run` 现在会先检查 `ENV_FILE` 指向的环境文件是否存在；缺失时会打印红色中文 `[环境文件缺失]` 和 `[处理建议]`
-- 如果环境文件不在仓库根目录，可用 `ENV_FILE=/绝对路径 make run` 指向已有配置
+- 当前短快照只看 `docs/STATUS.md`
+- 当前唯一施工主线只看 `docs/NEXT_STEP.md`
+- 快速仓库质量入口：`make quality`
+- 当前主线 focused 验证入口：`make verify-mainline`
+- 长期工程闭环和旧主线细节：按 `docs/INDEX.md` 分流去对应台账，不要从 README 开始翻历史
 
-## 1. 它在解决什么问题
+## 5. 如果你不会代码
 
-一个人用手机发一句话，系统完成搜索、审批、下载、入库、刷新，让内容出现在私人媒体库里。
+默认直接用这一句：
 
-## 2. 当前系统长什么样
+```text
+按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
+```
 
-- 四个渠道当前都是正式入口：
-  - Telegram
-  - personal WeChat
-  - Feishu
-  - WeCom
-- 四个渠道共用同一套：
-  - `shared private-chat text runtime`
-  - workflow / approval / `jobs` / SQLite 真相
-- 渠道层只负责：
-  - 验签、解密、轮询或回包
-  - 外部会话标识投影到现有 `chat_id / user_id`
-  - 调用 shared runtime
-  - 把文本、图片/文件或最小信息卡片发回原渠道
-- 当前固定主线：
-  - TMDB
-  - Prowlarr（当前主来源）+ 最小 BT WebSource（仅 BT 使用）
-  - Transmission + qBittorrent
-  - Emby / Jellyfin / Plex（按配置选择 refresh provider）
-  - SQLite
-  - Docker Compose
-  - 单实例 / 单进程 / 单机
-  - movie-first
+如果你只想让 AI 先做冷启动检查或只收口文档，也不要自己手改长提示词，直接去 `docs/OPERATOR_RUNBOOK.md` 复制对应模板。
 
-## 3. 当前已经落地
+## 6. 文档入口
 
-- 控制层：
-  - Telegram runtime + 最小图片/文件发送 + 搜索结果/下载审批/导入审批文本 polish
-  - personal WeChat 二维码登录入口 + PNG 二维码回传 + 单账号私聊文本轮询
-  - Feishu 私聊文本 webhook + 文本回消息 + 事件验签
-  - Feishu 可选 `long_connection` 入站模式
-  - WeCom callback URL 校验 + 验签解密入站 + 加密被动文本回包
-  - `telegram_updates` 去重、`jobs` 执行所有权、approval timeout、confirm wake rebuild
-- 媒体主链：
-  - `search -> select -> downloader approval -> confirm -> dispatch -> status`
-  - `import approval -> confirm -> hardlink import`
-  - cross-filesystem copy-fallback approval
-  - completion-monitor + post-download auto import + 最小后台 auto-import tick
-  - filename normalization
-  - metadata scraping（TMDB + Fanart.tv）
-  - subtitle auto-translation（当前仅 `.srt`）
-  - 媒体服务器 refresh（Emby / Jellyfin / Plex）
-- cleanup 最小闭环：
-  - `cleanup inspect`
-  - `cleanup`
-  - discoverability
-  - rejection guidance
-  - success follow-up
-  - failure observability
-  - chat-scoped `task_ref` 解析
-- BT 主链：
-  - PT / BT 分流
-  - 原始磁力 processing-path inquiry
-  - BT classification
-  - `movie / series / anime` TMDB association
-  - `raw_bt` 目标目录选择
-  - BT shared source adapter（`Prowlarr + WebSource`）
-  - pure BT single-item ranking
-  - BT external web-source
-  - BT WebSource richer metadata extraction
-  - BT-only read-only helper（`bt搜 <关键词>` / `bt search <关键词>`）
-  - `btsub` 手动命令 + scheduler tick + deterministic candidate-selection
-- 其他：
-  - `watchlist` 手动持久化基线
-
-## 4. 当前边界
-
-- 四个渠道都要可用，但业务真相只维护一套；不为同一条协议做四份分叉实现。
-- 当前只支持私聊文本主线；Feishu / WeCom 不做群聊、卡片、按钮回调，personal WeChat 不做多账号编排。
-- personal WeChat 当前回复依赖有效 `context_token`；WeCom 仍只有 callback 被动回包，没有独立主动发消息客户端。
-- 交付形态继续以私聊 bot 为主；后续体验优化优先走渠道内更美观的图片/信息卡片/字符排版，不做 Web UI。
-- cleanup 只清 downloader/source 侧已导入资产，不删除库内目标、sidecar 或其他任务文件。
-- cleanup 当前只对带结构化 `source_path + target_path` 的导入任务可用。
-- cleanup 已补 `pt_min_seed_hours` 基于完成观察时间窗的保守阻断；这还不是 downloader live seeding 秒数能力。
-- 当前最稳的是 movie-first；quick start、BT 共享确定性评分器、Jellyfin / Plex refresh provider 支持都已完成。
-- 字幕翻译当前已支持 `.srt` + 最小 `.ass`；`.ass` 只做文本替换，不扩成 `.ssa`、嵌入字幕或复杂样式改写。
-- BT 路线已可用，并已升级成共享确定性评分器。
-
-## 5. 当前 next step
-
-- **当前施工状态**：刚完成的 promoted 主线是 **`download_monitor_repo.py` / `job_event` 共享状态 helper 值得性评估**；当前已确认 `StatusFollowUpRecorder.record()`、`PostDownloadAutoImportService.run_for_record()`、`telegram_bot._poll_pending_download_completion_once()` 围绕同一份 `download_monitor` / `job_event` 真相推进共享 follow-up 链，下一条 promoted 主线切到这段共享状态 helper 的最小结构降本。
-- **更早完成主线**：BT 用户页 / 编号范围页能力保持完成态，不回退。
-- **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
-- **当前快照**：`docs/STATUS.md`
-- **刚完成主线蓝图**：`docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`
-- **刚完成主线蓝图**：`docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`
-- **更早完成主线蓝图**：`docs/BT_BATCH_PLAN.md`
-- **更早完成主线蓝图**：`docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`
-- **更早完成主线蓝图**：`docs/BT_PAGE_RANGE_PLAN.md`
-- **更早完成主线蓝图**：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
-- **更早完成主线**：`Plex 真实 refresh smoke 值得性重评估`
-- **再上一条主线蓝图**：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
-- **再上一条完成主线**：`Jellyfin 单 provider 真实 refresh smoke`
-- **更早完成主线**：`Jellyfin / Plex 真实联调重评估`
-- **更早主线蓝图**：`docs/BT_BATCH_PLAN.md`（对应已完成主线：**BT 批量任务显式批量确认**）
-- **更早主线蓝图**：`docs/PT_LIVE_SEEDING_PLAN.md`
-- **刚完成主线入口**：`docs/BT_SCORING_PLAN.md`、`docs/BT_SCORING_LOG.md`
-- **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
-- **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
-- **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前自动导入主线入口看 `docs/NEXT_STEP.md` 与 `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`；刚完成的状态 service 收口继续看 `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`
-- 当前优先先把状态观察落盘、完成事件推进、自动导入消费这条共享 follow-up 链继续收拢；不回到 BT proof 家族，也不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
-
-## 6. 当前明确不做
-
-- 通用 AI 助手
-- 通用 Agent 平台
-- 通用 plugin / skill / MCP 平台化
-- Jellyfin / Plex 全量媒体管理能力对齐
-- Web UI / 桌面端
-- Telegram / 微信群聊主线
-- Redis / MQ / PostgreSQL
-- 多机分布式部署
-
-## 7. 工程立场
-
-- parser-first，LLM-fallback
-- 模型不负责幂等、审批校验、执行结果真相、lease/version
-- 背景恢复和 scheduler tick 不依赖 LLM
-- BT helper 只做只读辅助
-
-## 8. 本地集成测试栈
-
-涉及真实 downloader / import / refresh 联调时，使用 WSL Docker 本地测试栈：
-
-- Transmission：`http://127.0.0.1:19091`
-- BT Transmission：`http://127.0.0.1:19092`
-- qBittorrent：`http://127.0.0.1:18098`
-- Emby：`http://127.0.0.1:18096`
-
-详细路径、健康检查、配置占位见 `docs/TEST_ENV.md`。
-
-## 9. 文档入口
-
-第一次接手这个仓库时，先读：
-
-1. `docs/INDEX.md`
-2. `docs/GETTING_STARTED.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/DECISIONS.md`
-5. `docs/NEXT_STEP.md`
-6. `docs/STATUS.md`
-7. `AGENTS.md`
-
-同一会话里继续收尾时，默认只看：
-
-1. `AGENTS.md`
-2. `docs/NEXT_STEP.md`
-3. `docs/STATUS.md`
-4. 本轮直接相关的代码、测试和最近提交
-
-需要追旧闭环细节时，再按需看 `docs/PERSISTENCE_CLOSURE_LOG.md`；`docs/HISTORY.md` 只看背景，不看当前执行真相。
-
-常用入口：
-
-- `docs/INDEX.md`：文档地图
-- `docs/GETTING_STARTED.md`：从零到跑通
-- `docs/ARCHITECTURE.md`：系统怎么工作
+- `docs/HUMAN_START_HERE.md`：非技术操作者总入口
+- `docs/OPERATOR_RUNBOOK.md`：可直接复制给 AI 的短模板
+- `docs/INDEX.md`：按身份分流的文档地图
+- `docs/GETTING_STARTED.md`：安装、启动、最小 smoke
+- `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/STATUS.md`：当前短快照
-- `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`：当前主线蓝图
-- `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`：刚完成的状态 service 主线蓝图
-- `docs/BT_BATCH_PLAN.md`：更早完成的 BT 批量确认主线蓝图
-- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：更早完成的 BT 真实 dispatch smoke 主线蓝图
-- `docs/BT_PAGE_RANGE_PLAN.md`：更早完成的 BT 页面 proof 主线蓝图
-- `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成主线蓝图
-- `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：再上一条主线蓝图
-- `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
-- `docs/BT_SCORING_PLAN.md`：刚完成的 BT 评分器主线蓝图
-- `docs/QUICK_START_PLAN.md`：刚完成的部署主线蓝图
-- `docs/DEPLOY_CHECKLIST.md`：刚完成的部署主线交付物
-- `docs/SHARED_DELIVERY_UX_PLAN.md`：更早完成主线蓝图
-- `docs/SHARED_DELIVERY_UX_LOG.md`：更早完成主线详细闭环
-- `docs/SERIES_ANIME_NAMING_LOG.md`：刚完成的上一条主线详细闭环
-- `docs/APP_MAIN_SLIMMING_LOG.md`：上一条主线详细闭环
-- `docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`：再上一条主线详细闭环
-- `docs/CLEANUP_SLIMMING_LOG.md`：更早主线详细闭环
-- `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`：更早主线详细闭环
-- `docs/SEARCH_MEDIA_SLIMMING_LOG.md`：更早主线详细闭环
-- `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`：更早主线详细闭环
-- `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`：更早主线详细闭环
-- `docs/TELEGRAM_BOT_SLIMMING_LOG.md`：更早主线详细闭环
-- `docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`：更早主线详细闭环
-- `docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`：更早主线详细闭环
-- `docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`：更早主线详细闭环
-- `docs/PERSISTENCE_CLOSURE_LOG.md`：更早完成主线详细闭环
-- `.env.example`：配置模板
-- `Makefile`：常用命令入口
-- `Dockerfile` / `docker-compose.yml`：最小容器启动入口
+- `docs/NEXT_STEP.md`：当前唯一主线
+- `docs/DECISIONS.md`：长期边界

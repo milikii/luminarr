@@ -68,3 +68,27 @@ def test_makefile_run_sources_absolute_env_file_before_start(tmp_path: Path) -> 
     assert result.returncode == 0
     assert result.stdout.strip() == "absolute-path-ok"
     assert result.stderr == ""
+
+
+def test_makefile_help_lists_quality_targets() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "quality" in makefile_text
+    assert "verify-mainline" in makefile_text
+    assert "targets: install test quality verify-mainline" in makefile_text
+
+
+def test_makefile_quality_target_keeps_fast_repo_guards_in_one_place() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+    commands = _extract_makefile_target_commands(makefile_text, "quality")
+
+    assert commands[0] == "$(MAKE) compile"
+    assert commands[1] == "$(PYTHON) -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py"
+
+
+def test_makefile_verify_mainline_target_points_to_current_focused_regressions() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+    commands = _extract_makefile_target_commands(makefile_text, "verify-mainline")
+
+    assert commands[0] == "$(PYTHON) -m pytest -q tests/test_get_download_status.py -k \"parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event\""
+    assert commands[1] == "$(PYTHON) -m pytest -q tests/test_telegram_bot.py -k \"pending_list or download_completion_polling or post_download_auto_import_scheduler\""
