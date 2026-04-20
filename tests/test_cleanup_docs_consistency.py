@@ -29,6 +29,9 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+    get_download_status_slimming_log_text = Path("docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md").read_text(
+        encoding="utf-8"
+    )
     bt_real_dispatch_plan_text = Path("docs/BT_REAL_DISPATCH_SMOKE_PLAN.md").read_text(encoding="utf-8")
     cleanup_slimming_log_text = Path("docs/CLEANUP_SLIMMING_LOG.md").read_text(encoding="utf-8")
     manage_bt_subscription_slimming_log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(
@@ -49,6 +52,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/ARCHITECTURE.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/STATUS.md" in readme_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in readme_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in readme_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" in readme_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in readme_text
@@ -63,6 +67,7 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in readme_text
 
     assert "docs/STATUS.md" in index_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in index_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in index_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" in index_text
     assert "docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md" in index_text
@@ -92,7 +97,11 @@ def test_docs_entrypoints_and_snapshot_roles_stay_in_sync() -> None:
     assert "BT 真实 dispatch smoke" in bt_real_dispatch_plan_text
 
     assert "docs/CLEANUP_SLIMMING_LOG.md" in next_step_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in next_step_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" in status_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in status_text
+    assert "get_download_status.py" in get_download_status_slimming_log_text
+    assert "状态编排层瘦身 / 模块化" in get_download_status_slimming_log_text
     assert "cleanup_downloaded_source.py" in cleanup_slimming_log_text and "cleanup 编排层瘦身 / 模块化" in cleanup_slimming_log_text
     assert "manage_bt_subscription.py" in manage_bt_subscription_slimming_log_text and "订阅编排层瘦身 / 模块化" in manage_bt_subscription_slimming_log_text
     assert "search_media.py" in search_media_slimming_log_text and "搜索编排层瘦身 / 模块化" in search_media_slimming_log_text
@@ -115,6 +124,9 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     bt_real_dispatch_plan_text = Path("docs/BT_REAL_DISPATCH_SMOKE_PLAN.md").read_text(encoding="utf-8")
     bt_page_range_plan_text = Path("docs/BT_PAGE_RANGE_PLAN.md").read_text(encoding="utf-8")
     bt_batch_plan_text = Path("docs/BT_BATCH_PLAN.md").read_text(encoding="utf-8")
+    get_download_status_slimming_log_text = Path("docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md").read_text(
+        encoding="utf-8"
+    )
     jellyfin_plex_plan_text = Path("docs/JELLYFIN_PLEX_PLAN.md").read_text(encoding="utf-8")
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
@@ -151,6 +163,10 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "当前没有进行中的 promoted 主线" not in next_step_text
     assert "当前切线规则与下一条主线入口" in readme_text
     assert "详细目标与可测量退出条件" not in readme_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in readme_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in index_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in next_step_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in agents_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in readme_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in index_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in next_step_text
@@ -189,6 +205,7 @@ def test_current_completion_state_docs_do_not_regress() -> None:
     assert "docs/JELLYFIN_PLEX_PLAN.md" in agents_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in index_text
     assert "docs/JELLYFIN_PLEX_PLAN.md" in getting_started_text
+    assert "当前主线状态：`get_download_status.py` 状态编排层瘦身 / 模块化进行中。" in get_download_status_slimming_log_text
     assert "当前主线说明优先收口到 `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`" in index_text
     assert "刚完成的 BT 页面 proof 主线说明优先收口到 `docs/BT_PAGE_RANGE_PLAN.md`" in index_text
     assert "当前完成态主线说明优先收口到 `docs/JELLYFIN_PLEX_PLAN.md`" in index_text
@@ -220,6 +237,7 @@ def test_status_stays_short_snapshot_and_keeps_syncable_entries() -> None:
     assert "docs/SEARCH_MEDIA_SLIMMING_LOG.md" in status_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in status_text
     assert "docs/CLEANUP_VERIFICATION_WINDOW.md" in status_text
+    assert "docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md" in status_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" in status_text
 
     for label in STATUS_SNAPSHOT_LABELS:

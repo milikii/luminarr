@@ -115,12 +115,14 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 5. 当前 next step
 
-- **当前施工状态**：当前 promoted 主线是 **BT 真实 dispatch smoke**；上一条 BT allowlist 页面 proof 家族已经收口，后续不再继续拆更小页面形式。
+- **当前施工状态**：当前 promoted 主线是 **`get_download_status.py` 状态编排层瘦身 / 模块化**；上一条 **BT 方向剩余用户价值重评估** 已确认 BT proof 家族没有新的副作用真相、协议能力或结构降本，因此当前切到结构降本主线。
 - **更早完成主线**：BT 用户页 / 编号范围页能力保持完成态，不回退。
 - **当前切线规则与下一条主线入口**：`docs/NEXT_STEP.md`
 - **当前快照**：`docs/STATUS.md`
-- **当前主线蓝图**：`docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`
-- **刚完成主线蓝图**：`docs/BT_PAGE_RANGE_PLAN.md`
+- **当前主线蓝图**：`docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`
+- **刚完成主线蓝图**：`docs/BT_BATCH_PLAN.md`
+- **更早完成主线蓝图**：`docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`
+- **更早完成主线蓝图**：`docs/BT_PAGE_RANGE_PLAN.md`
 - **更早完成主线蓝图**：`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
 - **更早完成主线**：`Plex 真实 refresh smoke 值得性重评估`
 - **再上一条主线蓝图**：`docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`
@@ -132,8 +134,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - **刚完成的部署入口**：`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`
 - **更早完成的详细台账入口**：`docs/SHARED_DELIVERY_UX_LOG.md`、`docs/SERIES_ANIME_NAMING_LOG.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/CLEANUP_SLIMMING_LOG.md`、`docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md`、`docs/DOWNLOAD_COMPLETION_POLLING_LOG.md`、`docs/FEISHU_EVENT_PARSER_DEDUPE_LOG.md`、`docs/FEISHU_LONG_CONNECTION_RISK_LOG.md`、`docs/PERSISTENCE_CLOSURE_LOG.md`
 - **cleanup 完成证据**：`docs/CLEANUP_VERIFICATION_WINDOW.md`
-- **本地回归命令**：当前 BT 页面能力主线入口看 `docs/NEXT_STEP.md`；刚完成的 Plex 评估与更早 BT 批量蓝图继续看 `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`、`docs/BT_BATCH_PLAN.md`
-- 当前优先围绕 BT 真实下载器投递 smoke 施工；不回到 BT 页面 URL 微变体 proof，也不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
+- **本地回归命令**：当前状态主线入口看 `docs/NEXT_STEP.md` 与 `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`；刚完成的 BT 与 Plex 收口继续看 `docs/BT_BATCH_PLAN.md`、`docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`
+- 当前优先围绕 `get_download_status.py` 的查询编排、观察落盘 / 自动导入 follow-up、状态渲染拆分施工；不回到 BT proof 家族，也不顺手放大到新 Docker 栈、自动探测、全量媒体管理能力或新的 workflow 真相。
 
 ## 6. 当前明确不做
 
@@ -191,11 +193,12 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：从零到跑通
 - `docs/ARCHITECTURE.md`：系统怎么工作
 - `docs/STATUS.md`：当前短快照
-- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：当前主线蓝图
-- `docs/BT_PAGE_RANGE_PLAN.md`：刚完成的 BT 页面 proof 主线蓝图
+- `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`：当前主线蓝图
+- `docs/BT_BATCH_PLAN.md`：刚完成的 BT 批量确认主线蓝图
+- `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：更早完成的 BT 真实 dispatch smoke 主线蓝图
+- `docs/BT_PAGE_RANGE_PLAN.md`：更早完成的 BT 页面 proof 主线蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成主线蓝图
 - `docs/JELLYFIN_REAL_VERIFICATION_PLAN.md`：再上一条主线蓝图
-- `docs/BT_BATCH_PLAN.md`：更早主线蓝图
 - `docs/JELLYFIN_PLEX_PLAN.md`：当前完成态主线蓝图
 - `docs/BT_SCORING_PLAN.md`：刚完成的 BT 评分器主线蓝图
 - `docs/QUICK_START_PLAN.md`：刚完成的部署主线蓝图
