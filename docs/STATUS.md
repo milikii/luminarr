@@ -1,4 +1,4 @@
-# Current status (v331)
+# Current status (v332)
 
 ## Project position
 
@@ -24,8 +24,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/NEXT_STEP.md`：当前唯一主线
 - `docs/STATUS.md`：当前短快照
-- `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`：当前 `get_download_status.py` 状态编排层瘦身 / 模块化台账
-- `docs/BT_BATCH_PLAN.md`：刚完成的 BT 批量确认真实 dispatch smoke 蓝图
+- `docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md`：当前 `post_download_auto_import.py` 自动导入编排层瘦身 / 模块化台账
+- `docs/GET_DOWNLOAD_STATUS_SLIMMING_LOG.md`：刚完成的 `get_download_status.py` 状态编排层瘦身 / 模块化台账
+- `docs/BT_BATCH_PLAN.md`：更早完成的 BT 批量确认真实 dispatch smoke 蓝图
 - `docs/BT_REAL_DISPATCH_SMOKE_PLAN.md`：更早完成的 BT 真实 dispatch smoke 蓝图
 - `docs/BT_PAGE_RANGE_PLAN.md`：更早完成的 BT 页面 proof 蓝图
 - `docs/JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md`：刚完成的 Plex 真实 refresh smoke 值得性重评估蓝图
@@ -53,8 +54,8 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 ## What is implemented now
 
-- 上一条 promoted 主线 **BT 方向剩余用户价值重评估** 已在 2026-04-20 冷启动审计中按 `Done when` 第 2 条收口：BT proof 家族已没有新的副作用真相、协议能力或结构降本，因此当前批次已离开这条能力族。
-- 当前 promoted 主线已切到 **`get_download_status.py` 状态编排层瘦身 / 模块化**：当前文件还同时承接下载器状态查询、观察落盘 / 完成事件 / 自动导入跟进、四渠道状态渲染三类职责；当前更小闭环是拆清这三段责任，不改协议。
+- 上一条 promoted 主线 **`get_download_status.py` 状态编排层瘦身 / 模块化** 已在 2026-04-20 收口：状态展示 helper 已独立到 `app/services/status_delivery.py`，观察落盘 / 完成事件 / 自动导入 follow-up 已独立到 `app/services/status_follow_up.py`，`GetDownloadStatusService` 只保留状态查询和回复组装。
+- 当前 promoted 主线已切到 **`post_download_auto_import.py` 自动导入编排层瘦身 / 模块化**：当前文件还同时承接已完成候选读取、逐条任务编排、终态判断、低质量规则跳过与 skip-event 落盘；当前更小闭环是拆清这几段责任，不改自动导入规则。
 - 刚完成的 **BT 真实 dispatch smoke** 已在 2026-04-20 收口：一次性真实脚本已证明 direct `magnet:? -> 纯 BT 下载链 -> raw_bt 目录选择 -> confirm` 能投递到 `BT Transmission(http://127.0.0.1:19092)`，观测到 `任务 ID: 1 / Hash: 03c970d927a04ef5a784fa1f9472c19e298fa754 / downloadDir=/downloads/complete/raw_bt_smoke`。
 - BT allowlist 分类排序列表 exact URL 聊天缓存 proof 已在 2026-04-20 当前批次确认满足退出条件；focused tests 已证明 `https://nyaa.si/?c=1_2&s=seeders&o=desc` 能继续写入现有聊天缓存，并复用现有 `bt批量确认` 边界。
 - 再上一条 BT allowlist 分类搜索显式分页 URL proof 主线也继续保持完成态；focused tests 已证明 `https://nyaa.si/?c=1_2&q=frieren&p=2` 能从命令入口直达页面抓取，并复用现有聊天缓存与 `bt批量确认` 边界。
@@ -74,16 +75,16 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 
 - 当前仓库正式本地真实 refresh 测试栈仍只有 Emby；Plex 这条线本批次已收口，不再继续追实例。
 - BT 当前已经有关键词只读搜索、批量预览和显式批量确认；allowlist 页面 URL 的只读预览、聊天缓存、“页面预览候选复用到 `bt批量确认`”的直接 focused proof、category/list 页面类型，以及 `页面 URL + p=<页码>` 的最小语法糖都已落地，这一族当前转入完成态，不再作为 promoted 主线继续拆。
-- 当前最小风险改成 `get_download_status.py` 结构职责仍然偏混：查询编排、观察落盘 / 完成事件 / 自动导入跟进、四渠道状态渲染还在同一文件里；如果不先拆清，后续状态查询与自动导入主线会继续互相牵连。
+- 当前最小风险改成 `post_download_auto_import.py` 结构职责仍然偏混：候选读取、逐条任务编排、终态判断、skip-event 落盘还在同一文件里；如果不先拆清，后续自动导入与状态 follow-up 主线会继续互相牵连。
 - Jellyfin / Plex 当前只完成 provider 选择和最小 refresh baseline，不在这一步扩成自动探测或更完整的媒体管理能力。
 - cleanup 已完成窗口证据仍成立，`pt_min_seed_hours` 保护也已并入完成态；当前不继续把它扩成 live seeding 秒数新主线。
 - 字幕翻译现在已支持 `.srt` + 最小 `.ass`；这一条主线已转入完成态，不再作为当前 promoted 主线。
 
 ## Latest verification
 
-- 窗口活性快照：当前主线为 `get_download_status.py` 状态编排层瘦身 / 模块化
+- 窗口活性快照：当前主线为 `post_download_auto_import.py` 自动导入编排层瘦身 / 模块化
 - 当前状态快照：Plex 这条线已按“当前主机无可达实例”收口；当前真实 refresh 测试栈仍以 Emby 为正式入口。
-- 当前结论快照：近 20 条提交与当前完成态记录一致；`PERSISTENCE_CLOSURE_LOG.md` 2.1~2.4 已覆盖 10 个指定 repo 的全部对外方法，`git grep 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot` 命中仍为 `0`；BT 页面 URL proof、单条 BT 真实 dispatch、BT 批量确认真实 dispatch、“多条连续真实 dispatch 值得性评估”与“BT 方向剩余用户价值重评估”都已收口，当前 promoted 主线切到 `get_download_status.py` 瘦身线。
+- 当前结论快照：近 20 条提交与当前完成态记录一致；`PERSISTENCE_CLOSURE_LOG.md` 2.1~2.4 已覆盖 10 个指定 repo 的全部对外方法，`git grep 'except Exception:\\s*\\(pass\\|return None\\)' app/services app/db app/bot` 命中仍为 `0`；BT 页面 URL proof、单条 BT 真实 dispatch、BT 批量确认真实 dispatch、“多条连续真实 dispatch 值得性评估”、`BT 方向剩余用户价值重评估` 与 `get_download_status.py` 瘦身线都已收口，当前 promoted 主线切到 `post_download_auto_import.py` 瘦身线。
 - BT downloader health probe：2026-04-20，`curl -si http://127.0.0.1:19091/transmission/rpc` 返回 `X-Transmission-Session-Id`，`curl -s http://127.0.0.1:18096/System/Info/Public` 返回 `ServerName`，`curl -si http://127.0.0.1:19092/transmission/rpc` 直接失败
 - real BT batch confirm dispatch smoke：2026-04-20，一次性临时脚本先定位到 `.env` 缺少 `DOWNLOADER_INSTANCES / BT_DOWNLOADER`，再按 `docs/TEST_ENV.md` 临时覆盖 `tr-bt -> http://127.0.0.1:19092` 后，继续失败在 `request_url=http://127.0.0.1:19092/transmission/rpc` 不可达；同批次 `curl -s http://127.0.0.1:18096/System/Info/Public` 仍返回 `ServerName`
 - real BT dispatch smoke：2026-04-20，`tmp_tests/verify_bt_real_dispatch_smoke.py` 成功观察到 `confirm bt-ffe44b7b -> BT Transmission(19092)`，并确认 approval / jobs 真相已落稳；`raw_bt` 因 `auto_import_enabled=False` 不登记 `download_monitor`
@@ -100,6 +101,9 @@ Luminarr 当前是一个同时服务 **Telegram + personal WeChat + Feishu + WeC
 - make run env-file guard tests：2026-04-13，`2 passed`（`.venv/bin/python -m pytest -q tests/test_makefile.py`）
 - compile check：2026-04-14，`passed`（`python3 -m compileall app tests`）
 - docs consistency check：2026-04-20，`12 passed`（`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`）
+- get_download_status render focused tests：2026-04-20，`4 passed, 38 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply"`）
+- get_download_status follow-up focused tests：2026-04-20，`21 passed, 21 deselected`（`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "download_monitor or completion_event or auto_import_terminal or skip_event"`）
+- cross-channel status focused tests：2026-04-20，`6 passed, 372 deselected`（`.venv/bin/python -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py -k "status"`）
 - focused media-server readiness tests：2026-04-19，`10 passed, 46 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py tests/test_config.py -k "media_server or refresh"`）
 - focused jellyfin-provider refresh tests：2026-04-19，`9 passed, 17 deselected`（`.venv/bin/python -m pytest -q tests/test_main.py tests/test_refresh_media_server.py -k "refresh"`）
 - real jellyfin refresh smoke probe：2026-04-19，`failed with direct target/request_url observability`（一次性临时脚本已执行并删除）
