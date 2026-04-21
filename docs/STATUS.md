@@ -3,8 +3,8 @@
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
-- 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 19 条最小直连；本轮最新闭环是把 BT scheduler loop / 日志 / downloader resolution 也并入 `app/bot/telegram_sidecar_runtime.py`，Telegram 生命周期编排现在不再回看 `telegram_bot.py` 内部 helper。
+- 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1636 passed, 2 skipped`。
+- shared runtime / channel 解耦已收掉 20 条最小直连；本轮最新闭环是把 Telegram reply formatter 从 `app/bot/telegram_bot.py` 抽到 `app/bot/telegram_reply_formatter.py`，Telegram update 入口仍走原兼容壳层，不改现有回复语义。
 
 ## Current health
 
@@ -21,14 +21,15 @@
 - personal WeChat 登录回归补测：`tests/test_private_chat_runtime.py::test_dispatch_private_chat_text_routes_personal_wechat_login_without_telegram_context tests/test_telegram_bot.py::test_handle_message_routes_personal_wechat_login_and_sends_qr_result -q` 为 `2 passed`。
 - download follow-up runtime focused 回归：`tests/test_download_follow_up_runtime.py tests/test_telegram_bot.py -k "download_completion or post_download_auto_import_scheduler or bt_subscription_scheduler or build_application_applies_outbound_proxy" -q` 为 `14 passed, 192 deselected`。
 - Telegram adapter focused 回归：`tests/test_telegram_runtime_adapter.py -q` 为 `10 passed`。
+- Telegram reply formatter focused 回归：`tests/test_telegram_reply_formatter.py tests/test_telegram_bot.py -k "import_formats_import_approval_for_telegram or digit_routes_to_add_service or handle_message_replies_search_result or build_telegram_send_media_func" -q` 为 `4 passed, 193 deselected`。
 - Telegram confirm / digit / reminder 相关 focused 回归：`tests/test_telegram_bot.py -k "confirm or digit or pending_returns_reminder or deduplicate or update_id_invalid or callback_id_missing" -q` 为 `45 passed, 161 deselected`。
-- 全量回归：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
+- 全量回归：`.venv/bin/python -m pytest -q` 为 `1636 passed, 2 skipped`。
 - 当前真实端点探针：`19091 Transmission` 返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`19092 BT Transmission` 与 `18098 qBittorrent` 当前返回 `000`。
 
 ## Current biggest risk
 
-- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 Telegram 生命周期编排，而是 `app/bot/private_chat_runtime.py` 仍有 `1421` 行、`app/bot/telegram_bot.py` 仍有 `819` 行，并继续承载 BT 路由与 Telegram 发送 / 格式化细节。
-- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 剩余发送媒资、reply 格式化和 Telegram 特有文案拼接仍挤在同一文件；这块比回头继续拆 `private_chat_runtime.py` 更容易切成新的最小闭环。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 Telegram 生命周期编排，而是 `app/bot/private_chat_runtime.py` 仍有 `1421` 行、`app/bot/telegram_bot.py` 仍有 `708` 行，并继续承载 BT 路由与 Telegram 发送细节。
+- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 剩余发送媒资和 Telegram 特有文案拼接仍挤在同一文件；reply formatter 已经单独抽离，这块比回头继续拆 `private_chat_runtime.py` 更容易切成新的最小闭环。
 
 ## Recommended Next Operator Command
 
