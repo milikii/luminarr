@@ -32,7 +32,6 @@ from app.bot.execution_runtime import (
     bt_subscription_policy_action,
     resolve_execution_gate,
     run_sync_with_policy,
-    watchlist_policy_action,
 )
 from app.bot.query_text_runtime import (
     extract_bt_batch_confirm_request,
@@ -60,6 +59,7 @@ from app.bot.private_chat_import_runtime import handle_import_query as handle_sh
 from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query as handle_shared_personal_wechat_login_query
 from app.bot.private_chat_status_runtime import handle_status_query as handle_shared_status_query
 from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_trace
+from app.bot.private_chat_watchlist_runtime import handle_watchlist_query as handle_shared_watchlist_query
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
@@ -1033,21 +1033,14 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    watchlist_command = tg.parse_watchlist_query(query)
-    if watchlist_command is not None:
-        watchlist_service = bot_data.get(tg.MANAGE_WATCHLIST_SERVICE_KEY)
-        if not isinstance(watchlist_service, tg.ManageWatchlistService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        reply = await run_sync_with_policy(
-            execution_gate,
-            watchlist_policy_action(watchlist_command.action),
-            lambda: watchlist_service.handle(
-                watchlist_command,
-                chat_id=chat_id,
-            ),
-        )
-        await reply_func(reply)
+    if await handle_shared_watchlist_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
         return
 
     bt_subscription_command = tg.parse_bt_subscription_query(query)

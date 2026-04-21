@@ -1,9 +1,10 @@
-# Next step (v264)
+# Next step (v265)
 
 ## Current goal
 
-- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 watchlist 路由边界瘦身**。
-- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 import 路由边界瘦身**：import 路由已抽到 `app/bot/private_chat_import_runtime.py`，并把 import focused tests 补进 `verify-mainline`，当前不回退。
+- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 BT subscription 路由边界瘦身**。
+- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 watchlist 路由边界瘦身**：watchlist 路由已抽到 `app/bot/private_chat_watchlist_runtime.py`，并把 watchlist focused tests 补进 `verify-mainline`，当前不回退。
+- 再上一条主线是 **`private_chat_runtime.py` 的 import 路由边界瘦身**：import 路由已抽到 `app/bot/private_chat_import_runtime.py`，并把 import focused tests 补进 `verify-mainline`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的状态查询路由边界瘦身**：状态查询路由已抽到 `app/bot/private_chat_status_runtime.py`，并把 status focused tests 补进 `verify-mainline`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的 personal WeChat 登录路由边界瘦身**：登录路由已抽到 `app/bot/private_chat_login_runtime.py`，并把 personal WeChat 登录 focused tests 补进 `verify-mainline`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的 trace 包装边界瘦身**：trace 路径解析、入站日志和 reply trace 包装已抽到 `app/bot/private_chat_trace_runtime.py`，`verify-mainline` 已补进 trace focused tests，当前不回退。
@@ -12,7 +13,7 @@
 - 再上一条主线是 **Telegram 发送 helper 边界瘦身**：媒资发送、文本发送和 Telegram 图片/文件判定已抽到 `app/bot/telegram_delivery_runtime.py`，`telegram_runtime_adapter.py` 已直接复用这层发送出口，当前不回退。
 - 再上一条主线是 **Telegram reply formatter 边界瘦身**：搜索卡片、下载审批、导入审批三段 Telegram 特有文本整形已抽到 `app/bot/telegram_reply_formatter.py`，当前不回退。
 - 再上一条主线是 **Telegram 生命周期编排边界瘦身**：sidecar 启停、Application lifecycle 入口、BT scheduler loop / 日志 / downloader resolution 都已收进 `app/bot/telegram_sidecar_runtime.py`，当前不回退。
-- `app/bot/private_chat_runtime.py` 仍保留为当前 `1198` 行热点文件；import 路由已抽离后，下一块更小也更贴近 shared runtime/service 边界的段落，是 watchlist 路由里仍直接读取 `ManageWatchlistService` 并触发持久化写入。
+- `app/bot/private_chat_runtime.py` 仍保留为当前 `1191` 行热点文件；watchlist 路由已抽离后，下一块更小也更贴近 shared runtime/service 边界的段落，是 BT subscription 路由里仍直接读取 `ManageBtSubscriptionService`、做 downloader 解析并拼 dispatch context。
 - 上一条已完成主线是 **`Makefile` / `verify-mainline` 补齐 download follow-up runtime 的固定质量入口**：`app/bot/download_follow_up_runtime.py` focused tests 已纳入固定回归，当前不回退。
 - 再上一条已完成主线是 **`telegram_bot.py` 里的 `post_download_auto_import` / `download_completion_polling` 调度边界瘦身**：下载完成轮询与自动导入调度已抽到 `app/bot/download_follow_up_runtime.py`，当前不回退。
 - 再上一条已完成主线是 **`app/bot/telegram_runtime_adapter.py` 的 message / callback 入口边界收口**：Telegram message / callback 入口共用的 chat/user 解析、去重落盘和 reply 包装已抽到 `app/bot/telegram_update_runtime.py`，当前不回退。
@@ -23,21 +24,21 @@
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 批量确认路由分支瘦身**，当前不回退。
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 只读探索 / cleanup 路由分支瘦身**，当前不回退。
 - 更早一条已完成主线 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- `telegram_bot.py` 的入口边界、follow-up 调度边界、生命周期编排、reply formatter 和发送 helper 都已经补过一轮；`private_chat_runtime.py` 的 import 路由也已收口，当前更小也更直接的下一步，是把 watchlist 这段 shared runtime/service wiring 从主调度里切出去。
-- 这一步继续只做最小边界瘦身，不顺手放大成新的 watchlist 平台、统一订阅总线或大文件总重写。
-- 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1656 passed, 2 skipped`。
+- `telegram_bot.py` 的入口边界、follow-up 调度边界、生命周期编排、reply formatter 和发送 helper 都已经补过一轮；`private_chat_runtime.py` 的 watchlist 路由也已收口，当前更小也更直接的下一步，是把 BT subscription 这段 shared runtime/service wiring 从主调度里切出去。
+- 这一步继续只做最小边界瘦身，不顺手放大成新的订阅平台、统一 scheduler 总线或大文件总重写。
+- 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1660 passed, 2 skipped`。
 
 ## User value
 
-- 在 import 路由已经抽离并补进固定 gate 后，继续收 watchlist 路由，可以让 shared runtime 少直接碰 `ManageWatchlistService` 调用细节和持久化入口。
+- 在 watchlist 路由已经抽离并补进固定 gate 后，继续收 BT subscription 路由，可以让 shared runtime 少直接碰 `ManageBtSubscriptionService`、downloader resolution 和 dispatch context 组装。
 - 在默认分支已经稳绿、固定 gate 已补齐的前提下，优先继续降低热点文件体积和 shared runtime/service 耦合。
-- 避免 `private_chat_runtime.py` 的主调度函数继续同时背负 shared routing 和 watchlist service 调度。
+- 避免 `private_chat_runtime.py` 的主调度函数继续同时背负 shared routing 和 BT 订阅 service 调度。
 
 ## Only do
 
-- 只做一次保守瘦身：围绕 watchlist 路由抽出最小 helper 或 runtime。
+- 只做一次保守瘦身：围绕 BT subscription 路由抽出最小 helper 或 runtime。
 - 保持现有 parser / routing / approval / SQLite 真相边界不变，不新增用户可感知功能，不改渠道外部协议。
-- 保持当前 watchlist 文本、持久化写入边界、中文日志和现有 confirm / cancel / auto-import 语义不回退。
+- 保持当前 BT subscription 文本、审批链、中文日志和现有 downloader dispatch / confirm 语义不回退。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线。
 
 ## Do not do
@@ -45,7 +46,7 @@
 - 不放宽 approval、`jobs` / `job_event` / lease/version / SQLite 真相边界。
 - 不新增功能、不扩协议、不顺手重写整个 `telegram_bot.py` / `private_chat_runtime.py`。
 - 不把 Telegram 渠道调度段直接平台化成新的全局 scheduler 抽象。
-- 不改 watchlist 协议、watchlist 文本语义或 `ManageWatchlistService` 的 SQLite 真相边界。
+- 不改 BT subscription 协议、文本文案或 `ManageBtSubscriptionService` 的 SQLite / approval 真相边界。
 - 不调整 `confirm` / `select` 文本协议，不改 pending add / pending import / candidate mapping / trace 日志内容语义。
 - 不把 Feishu/WeCom webhook、personal WeChat、BT 订阅启动逻辑强行揉成新的“统一 sidecar 平台”。
 - 不因为 shared runtime 解耦而把渠道私有 UX 重新散回各渠道各自拼接。
@@ -53,15 +54,15 @@
 
 ## Done when
 
-当前 **`private_chat_runtime.py` 的 watchlist 路由边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
+当前 **`private_chat_runtime.py` 的 BT subscription 路由边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
 
-1. watchlist 路由里的 service 读取、持久化执行或 reply 分发至少一段从 `private_chat_runtime.py` 抽离，且 watchlist 文本语义不变；
-2. focused tests 能继续覆盖 watchlist 路由和当前 shared runtime 最小回归；
+1. BT subscription 路由里的 service 读取、downloader 解析、dispatch context 组装或 reply 分发至少一段从 `private_chat_runtime.py` 抽离，且 BT 订阅文本语义不变；
+2. focused tests 能继续覆盖 BT subscription 路由和当前 shared runtime 最小回归；
 3. 默认分支全量 pytest 继续保持绿灯；
 4. 文档继续保持分层一致，`STATUS.md` 只写当前快照，`NEXT_STEP.md` 只写当前唯一主线。
 
 ## After this step
 
-1. 如果 watchlist 路由已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补对应 focused gate。
+1. 如果 BT subscription 路由已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补对应 focused gate。
 2. 如果热点文件暂时没有更小闭环，再继续补 Makefile / focused tests / 真实 smoke 的其他缺口。
 3. 只有在 shared runtime 边界和热点大文件都没有更小闭环可做时，才重新考虑次级结构债。
