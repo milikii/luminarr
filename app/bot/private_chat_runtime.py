@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
-from dataclasses import dataclass
 
 from app.bot.bt_classification_runtime import (
     BT_CLASSIFICATION_CANCELLED_TEXT,
-    BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
     clear_bt_classification_pending,
     is_bt_classification_pending,
     pop_bt_classification_pending,
 )
 from app.bot.bt_processing_path_runtime import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
-    BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
     BT_PROCESSING_PATH_PROMPT_TEXT,
     clear_bt_processing_path_pending,
     is_bt_processing_path_pending,
@@ -57,25 +54,15 @@ from app.bot.raw_bt_destination_runtime import (
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
     log_pure_bt_search_error,
 )
-from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.private_chat_import_runtime import handle_import_query as handle_shared_import_query
 from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query as handle_shared_personal_wechat_login_query
+from app.bot.private_chat_search_runtime import handle_search_query_fallback as handle_shared_search_query_fallback
 from app.bot.private_chat_status_runtime import handle_status_query as handle_shared_status_query
 from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_trace
 from app.bot.private_chat_watchlist_runtime import handle_watchlist_query as handle_shared_watchlist_query
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
-
-
-@dataclass(slots=True)
-class _PrivateChatRuntimeApplication:
-    bot_data: MutableMapping[str, object]
-
-
-@dataclass(slots=True)
-class _PrivateChatRuntimeContext:
-    application: _PrivateChatRuntimeApplication
 
 
 def _log_pending_job_lookup_failed(*, chat_id: int | None, reason: str) -> None:
@@ -729,21 +716,6 @@ async def _handle_raw_bt_destination_follow_up(
     return True
 
 
-async def _handle_bt_pending_reminders(
-    *,
-    reply_func: PrivateChatReplyFunc,
-    bt_processing_path_pending: bool,
-    bt_classification_pending: bool,
-) -> bool:
-    if bt_processing_path_pending:
-        await reply_func(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
-        return True
-    if bt_classification_pending:
-        await reply_func(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
-        return True
-    return False
-
-
 async def _handle_confirm_query(
     *,
     bot_data: MutableMapping[str, object],
@@ -789,42 +761,6 @@ async def _handle_digit_selection_query(
     )
 
 
-async def _handle_search_query_fallback(
-    *,
-    bot_data: MutableMapping[str, object],
-    execution_gate,
-    reply_func: PrivateChatReplyFunc,
-    query: str,
-    chat_id: int | None,
-    channel: str,
-    bt_processing_path_pending: bool,
-    bt_classification_pending: bool,
-    tg,
-) -> bool:
-    search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
-    if not isinstance(search_service, tg.SearchMediaService):
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    if await _handle_bt_pending_reminders(
-        reply_func=reply_func,
-        bt_processing_path_pending=bt_processing_path_pending,
-        bt_classification_pending=bt_classification_pending,
-    ):
-        return True
-    reply = await execution_gate.run(
-        tg.ACTION_SEARCH_MEDIA,
-        lambda: search_with_reactive_recovery(
-            search_service=search_service,
-            query=query,
-            chat_id=chat_id,
-            channel=channel,
-            safe_text=tg.LLM_PHYSICAL_FAILURE_SAFE_TEXT,
-        ),
-    )
-    await reply_func(reply)
-    return True
-
-
 async def dispatch_private_chat_text(
     *,
     query: str,
@@ -854,9 +790,6 @@ async def handle_private_chat_query_text(
     bot_data: MutableMapping[str, object],
 ) -> None:
     tg = telegram_runtime
-    context = _PrivateChatRuntimeContext(
-        application=_PrivateChatRuntimeApplication(bot_data=bot_data),
-    )
     execution_gate = resolve_execution_gate(
         bot_data=bot_data,
         execution_gate_key=tg.EXECUTION_GATE_KEY,
@@ -1082,7 +1015,7 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    await _handle_search_query_fallback(
+    await handle_shared_search_query_fallback(
         bot_data=bot_data,
         execution_gate=execution_gate,
         reply_func=reply_func,
