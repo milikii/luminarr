@@ -721,6 +721,127 @@ async def _handle_bt_classification_follow_up(
     return True
 
 
+async def _handle_bt_tmdb_follow_up(
+    *,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    query: str,
+    chat_id: int | None,
+    user_id: int | None,
+    tg,
+) -> bool:
+    bt_tmdb_pending = get_bt_tmdb_association_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if bt_tmdb_pending is False:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    if bt_tmdb_pending is None:
+        return False
+    reply = await handle_shared_bt_tmdb_association_query(
+        query=query,
+        pending=bt_tmdb_pending,
+        chat_id=chat_id,
+        user_id=user_id,
+        bot_data=bot_data,
+        add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
+        clear_pending=lambda: clear_bt_tmdb_association_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        ),
+        resolve_candidates_lookup=lambda media_kind: resolve_bt_tmdb_candidates_lookup(
+            bot_data=bot_data,
+            media_kind=media_kind,
+            bt_tmdb_movie_candidates_lookup_key=tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
+            bt_tmdb_tv_candidates_lookup_key=tg.BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
+        ),
+        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+            bot_data=bot_data,
+            role="bt",
+            tg=tg,
+        ),
+        log_bt_tmdb_association_error=lambda media_kind, raw_query, error: log_bt_tmdb_association_error(
+            media_kind=media_kind,
+            query=raw_query,
+            error=error,
+        ),
+        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
+        bt_tmdb_association_service_not_ready_text=tg.BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
+        bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
+    )
+    await reply_func(reply)
+    return True
+
+
+async def _handle_raw_bt_destination_follow_up(
+    *,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    query: str,
+    chat_id: int | None,
+    user_id: int | None,
+    tg,
+) -> bool:
+    raw_bt_destination_pending = get_raw_bt_destination_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if raw_bt_destination_pending is False:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    if raw_bt_destination_pending is None:
+        return False
+    reply = await handle_shared_raw_bt_destination_query(
+        query=query,
+        pending=raw_bt_destination_pending,
+        chat_id=chat_id,
+        user_id=user_id,
+        bot_data=bot_data,
+        add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
+        search_service_key=tg.SEARCH_SERVICE_KEY,
+        clear_pending=lambda: clear_raw_bt_destination_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        ),
+        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+            bot_data=bot_data,
+            role="bt",
+            tg=tg,
+        ),
+        log_pure_bt_search_error=lambda pure_bt_query, error: log_pure_bt_search_error(
+            query=pure_bt_query,
+            error=error,
+        ),
+        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
+        bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
+        pure_bt_search_failed_text=tg.PURE_BT_SEARCH_FAILED_TEXT,
+        pure_bt_candidate_selected_template=tg.PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
+        pure_bt_candidate_not_found_template=tg.PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE,
+    )
+    await reply_func(reply)
+    return True
+
+
+async def _handle_bt_pending_reminders(
+    *,
+    reply_func: PrivateChatReplyFunc,
+    bt_processing_path_pending: bool,
+    bt_classification_pending: bool,
+) -> bool:
+    if bt_processing_path_pending:
+        await reply_func(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
+        return True
+    if bt_classification_pending:
+        await reply_func(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+        return True
+    return False
+
+
 async def dispatch_private_chat_text(
     *,
     query: str,
@@ -1112,88 +1233,24 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    bt_tmdb_pending = get_bt_tmdb_association_pending(
+    if await _handle_bt_tmdb_follow_up(
         bot_data=bot_data,
+        reply_func=reply_func,
+        query=query,
         chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if bt_tmdb_pending is False:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return
-    if bt_tmdb_pending is not None:
-        reply = await handle_shared_bt_tmdb_association_query(
-            query=query,
-            pending=bt_tmdb_pending,
-            chat_id=chat_id,
-            user_id=user_id,
-            bot_data=bot_data,
-            add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
-            clear_pending=lambda: clear_bt_tmdb_association_pending(
-                bot_data=bot_data,
-                chat_id=chat_id,
-                bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-            ),
-            resolve_candidates_lookup=lambda media_kind: resolve_bt_tmdb_candidates_lookup(
-                bot_data=bot_data,
-                media_kind=media_kind,
-                bt_tmdb_movie_candidates_lookup_key=tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
-                bt_tmdb_tv_candidates_lookup_key=tg.BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
-            ),
-            resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
-                bot_data=bot_data,
-                role="bt",
-                tg=tg,
-            ),
-            log_bt_tmdb_association_error=lambda media_kind, raw_query, error: log_bt_tmdb_association_error(
-                media_kind=media_kind,
-                query=raw_query,
-                error=error,
-            ),
-            service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-            bt_tmdb_association_service_not_ready_text=tg.BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
-            bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
-        )
-        await reply_func(reply)
+        user_id=user_id,
+        tg=tg,
+    ):
         return
 
-    raw_bt_destination_pending = get_raw_bt_destination_pending(
+    if await _handle_raw_bt_destination_follow_up(
         bot_data=bot_data,
+        reply_func=reply_func,
+        query=query,
         chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if raw_bt_destination_pending is False:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return
-    if raw_bt_destination_pending is not None:
-        reply = await handle_shared_raw_bt_destination_query(
-            query=query,
-            pending=raw_bt_destination_pending,
-            chat_id=chat_id,
-            user_id=user_id,
-            bot_data=bot_data,
-            add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
-            search_service_key=tg.SEARCH_SERVICE_KEY,
-            clear_pending=lambda: clear_raw_bt_destination_pending(
-                bot_data=bot_data,
-                chat_id=chat_id,
-                bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-            ),
-            resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
-                bot_data=bot_data,
-                role="bt",
-                tg=tg,
-            ),
-            log_pure_bt_search_error=lambda pure_bt_query, error: log_pure_bt_search_error(
-                query=pure_bt_query,
-                error=error,
-            ),
-            service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-            bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
-            pure_bt_search_failed_text=tg.PURE_BT_SEARCH_FAILED_TEXT,
-            pure_bt_candidate_selected_template=tg.PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
-            pure_bt_candidate_not_found_template=tg.PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE,
-        )
-        await reply_func(reply)
+        user_id=user_id,
+        tg=tg,
+    ):
         return
 
     if query.isdigit():
@@ -1239,12 +1296,11 @@ async def handle_private_chat_query_text(
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
 
-    if bt_processing_path_pending:
-        await reply_func(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
-        return
-
-    if bt_classification_pending:
-        await reply_func(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+    if await _handle_bt_pending_reminders(
+        reply_func=reply_func,
+        bt_processing_path_pending=bt_processing_path_pending,
+        bt_classification_pending=bt_classification_pending,
+    ):
         return
 
     reply = await execution_gate.run(
