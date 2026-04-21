@@ -31,9 +31,11 @@ focused tests 入口：
 本轮收口：
 - `app/services/import_post_processing.py` 已承接 `metadata / subtitle / refresh` 后置链；`import_to_library.py` 现在只保留 `import.succeeded` 事件落盘、reply 文本拼接和 helper 调用，不回退后置动作协议、中文日志或 `job_event` 真相。
 - 这一步把 `import_to_library.py` 从 `2242` 行降到 `2094` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
+- `app/services/import_job_state.py` 已承接 `jobs` pending/claim/release/complete 状态迁移；`import_to_library.py` 只保留 wrapper 和 confirm 编排，不回退 `jobs` 状态机的中文 fail-closed 日志。
+- 这一步把 `import_to_library.py` 从 `1827` 行降到 `1727` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
 
 剩余风险：
-- `import_to_library.py` 仍把 `jobs` claim/release/complete、硬链接 / copy-fallback 和文件系统导入执行压在同一文件；下一条只允许继续拆 jobs helper，不能顺手改 approval helper 或文件导入真相。
+- `import_to_library.py` 仍把硬链接 / copy-fallback 和文件系统导入执行压在同一文件；下一条只允许继续拆 file-transfer helper，不能顺手改 approval helper、jobs helper 或文件导入真相。
 - 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`。
 
 focused tests 入口：
@@ -49,4 +51,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 jobs state transition helper；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，等 jobs / file-transfer helper 真正落地后再回填对应收口。
+- 当前唯一主线已经切到 copy-fallback / file-transfer helper；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，等 file-transfer helper 真正落地后再回填对应收口。
