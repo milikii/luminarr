@@ -134,6 +134,72 @@ async def _resolve_bt_follow_up_precheck(
         bt_classification_pending=bt_classification_pending,
     )
 
+
+async def _handle_execution_gated_shared_routes(
+    *,
+    query: str,
+    bot_data: MutableMapping[str, object],
+    execution_gate,
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    user_id: int | None,
+    channel: str,
+    tg,
+) -> bool:
+    if await handle_shared_status_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        channel=channel,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_watchlist_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_bt_subscription_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_import_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        tg=tg,
+    ):
+        return True
+
+    return await handle_shared_cleanup_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        tg=tg,
+    )
+
 async def handle_private_chat_query_text(
     *,
     query: str,
@@ -245,50 +311,7 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    if await handle_shared_status_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        channel=channel,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_watchlist_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_bt_subscription_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        user_id=user_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_import_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        user_id=user_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_cleanup_query(
+    if await _handle_execution_gated_shared_routes(
         query=query,
         bot_data=bot_data,
         execution_gate=execution_gate,
