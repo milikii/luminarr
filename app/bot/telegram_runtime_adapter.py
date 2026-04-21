@@ -162,6 +162,6 @@ def build_telegram_application(
         application.bot_data[tg.TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
     if job_repo is not None:
         application.bot_data[tg.JOB_REPO_KEY] = job_repo
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, tg.handle_message))
-    application.add_handler(CallbackQueryHandler(tg.handle_callback_query))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_telegram_message))
+    application.add_handler(CallbackQueryHandler(handle_telegram_callback_query))
     return application

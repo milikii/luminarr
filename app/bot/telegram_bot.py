@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from functools import partial
 
-from telegram import Update
 from telegram.ext import Application, ContextTypes
 
 from app.bot.bt_classification_runtime import (
@@ -254,19 +253,6 @@ _COMPAT_REEXPORTS = (
     parse_import_query,
     parse_watchlist_query,
 )
-
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.telegram_runtime_adapter import handle_telegram_message
-
-    await handle_telegram_message(update, context)
-
-
-async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.telegram_runtime_adapter import handle_telegram_callback_query
-
-    await handle_telegram_callback_query(update, context)
-
 
 def build_application(
     token: str,
