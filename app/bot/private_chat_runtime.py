@@ -11,6 +11,9 @@ from app.bot.private_chat_bt_classification_runtime import (
 from app.bot.private_chat_bt_tmdb_runtime import (
     handle_bt_tmdb_follow_up,
 )
+from app.bot.private_chat_downloader_execution_runtime import (
+    resolve_private_chat_bound_downloader_execution,
+)
 from app.bot.private_chat_raw_bt_destination_runtime import (
     handle_raw_bt_destination_follow_up,
 )
@@ -20,7 +23,6 @@ from app.bot.bt_processing_path_runtime import (
 from app.bot.private_chat_bt_processing_runtime import (
     handle_bt_processing_path_follow_up,
 )
-from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
     resolve_execution_gate,
     run_sync_with_policy,
@@ -59,67 +61,6 @@ from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_t
 from app.bot.private_chat_watchlist_runtime import handle_watchlist_query as handle_shared_watchlist_query
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
-
-
-def _resolve_bound_downloader_execution(
-    *,
-    bot_data: MutableMapping[str, object],
-    role: str,
-    tg,
-):
-    return resolve_shared_bound_downloader_execution(
-        bot_data=bot_data,
-        role=role,
-        downloader_role_binding_key=tg.DOWNLOADER_ROLE_BINDING_KEY,
-        downloader_instances_key=tg.DOWNLOADER_INSTANCES_KEY,
-        config_missing_template=tg.DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
-    )
-
-
-async def _handle_confirm_query(
-    *,
-    bot_data: MutableMapping[str, object],
-    execution_gate,
-    reply_func: PrivateChatReplyFunc,
-    confirm_ref: str | None,
-    chat_id: int | None,
-    user_id: int | None,
-    tg,
-) -> bool:
-    return await handle_shared_confirm_query(
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        confirm_ref=confirm_ref,
-        chat_id=chat_id,
-        user_id=user_id,
-        tg=tg,
-    )
-
-
-async def _handle_digit_selection_query(
-    *,
-    bot_data: MutableMapping[str, object],
-    execution_gate,
-    reply_func: PrivateChatReplyFunc,
-    query: str,
-    chat_id: int | None,
-    user_id: int | None,
-    channel: str,
-    tg,
-) -> bool:
-    return await handle_shared_digit_selection_query(
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        query=query,
-        chat_id=chat_id,
-        user_id=user_id,
-        channel=channel,
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(bot_data=bot_data, role="pt", tg=tg),
-        tg=tg,
-    )
-
 
 async def dispatch_private_chat_text(
     *,
@@ -209,7 +150,7 @@ async def handle_private_chat_query_text(
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
             bot_data=bot_data,
             role="bt",
             tg=tg,
@@ -313,7 +254,7 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    if await _handle_confirm_query(
+    if await handle_shared_confirm_query(
         bot_data=bot_data,
         execution_gate=execution_gate,
         reply_func=reply_func,
@@ -330,7 +271,7 @@ async def handle_private_chat_query_text(
         query=query,
         chat_id=chat_id,
         user_id=user_id,
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
             bot_data=bot_data,
             role="bt",
             tg=tg,
@@ -345,7 +286,7 @@ async def handle_private_chat_query_text(
         query=query,
         chat_id=chat_id,
         user_id=user_id,
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
             bot_data=bot_data,
             role="bt",
             tg=tg,
@@ -354,7 +295,7 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    if await _handle_digit_selection_query(
+    if await handle_shared_digit_selection_query(
         bot_data=bot_data,
         execution_gate=execution_gate,
         reply_func=reply_func,
@@ -362,6 +303,11 @@ async def handle_private_chat_query_text(
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
+        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
+            bot_data=bot_data,
+            role="pt",
+            tg=tg,
+        ),
         tg=tg,
     ):
         return
