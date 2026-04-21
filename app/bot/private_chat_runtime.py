@@ -42,7 +42,11 @@ from app.bot.query_text_runtime import (
     parse_bt_processing_path_choice,
     parse_bt_processing_path_legacy_shortcut,
 )
-from app.bot.raw_bt_destination_runtime import handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query
+from app.bot.raw_bt_destination_runtime import (
+    clear_raw_bt_destination_pending,
+    get_raw_bt_destination_pending,
+    handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
+)
 from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
@@ -291,7 +295,11 @@ async def handle_private_chat_query_text(
                     return
                 await reply_func(tg.SERVICE_NOT_READY_TEXT)
                 return
-        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -341,7 +349,11 @@ async def handle_private_chat_query_text(
         if cleared_processing_path is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -501,7 +513,11 @@ async def handle_private_chat_query_text(
         if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -566,7 +582,11 @@ async def handle_private_chat_query_text(
         if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_raw_bt_destination = tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id)
+        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -854,7 +874,11 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    raw_bt_destination_pending = tg._get_raw_bt_destination_pending(context=context, chat_id=chat_id)
+    raw_bt_destination_pending = get_raw_bt_destination_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
     if raw_bt_destination_pending is False:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
@@ -867,7 +891,11 @@ async def handle_private_chat_query_text(
             bot_data=bot_data,
             add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
             search_service_key=tg.SEARCH_SERVICE_KEY,
-            clear_pending=lambda: tg._clear_raw_bt_destination_pending(context=context, chat_id=chat_id),
+            clear_pending=lambda: clear_raw_bt_destination_pending(
+                bot_data=bot_data,
+                chat_id=chat_id,
+                bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+            ),
             resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
                 bot_data=bot_data,
                 role="bt",
