@@ -29,9 +29,11 @@ from app.bot.bt_tmdb_association_runtime import (
 )
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
-    bt_subscription_policy_action,
     resolve_execution_gate,
     run_sync_with_policy,
+)
+from app.bot.private_chat_bt_subscription_runtime import (
+    handle_bt_subscription_query as handle_shared_bt_subscription_query,
 )
 from app.bot.query_text_runtime import (
     extract_bt_batch_confirm_request,
@@ -1043,47 +1045,15 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    bt_subscription_command = tg.parse_bt_subscription_query(query)
-    if bt_subscription_command is not None:
-        bt_subscription_service = bot_data.get(tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
-        if not isinstance(bt_subscription_service, tg.ManageBtSubscriptionService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        if bt_subscription_command.action == "run":
-            downloader_execution, resolution_error = _resolve_bound_downloader_execution(
-                bot_data=bot_data,
-                role="bt",
-                tg=tg,
-            )
-            if resolution_error is not None:
-                await reply_func(resolution_error)
-                return
-            if downloader_execution is None:
-                await reply_func(tg.SERVICE_NOT_READY_TEXT)
-                return
-            reply = await execution_gate.run(
-                bt_subscription_policy_action(bt_subscription_command),
-                lambda: bt_subscription_service.run_once(
-                    chat_id=chat_id,
-                    user_id=user_id,
-                    dispatch_context=tg.BtSubscriptionDispatchContext(
-                        downloader_name=downloader_execution.name,
-                        downloader_type=downloader_execution.downloader_type,
-                        download_dir=downloader_execution.download_dir,
-                    ),
-                ),
-            )
-            await reply_func(reply)
-            return
-        reply = await run_sync_with_policy(
-            execution_gate,
-            bt_subscription_policy_action(bt_subscription_command),
-            lambda: bt_subscription_service.handle(
-                bt_subscription_command,
-                chat_id=chat_id,
-            ),
-        )
-        await reply_func(reply)
+    if await handle_shared_bt_subscription_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        tg=tg,
+    ):
         return
 
     if await handle_shared_import_query(

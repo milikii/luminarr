@@ -89,7 +89,7 @@ from app.services.add_to_downloader import ADD_CANCELLED_TEXT, AddToDownloaderSe
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
-from app.services.manage_bt_subscription import ManageBtSubscriptionService
+from app.services.manage_bt_subscription import BtSubscriptionDispatchContext, ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
 from app.services.search_media import SearchMediaService
 
@@ -2952,6 +2952,52 @@ def test_handle_message_bt_subscription_routes_to_service(tmp_path: Path) -> Non
     sent_text = reply_text.await_args.args[0]
     assert "已加入 BT 订阅" in sent_text
     assert "葬送的芙莉莲" in sent_text
+
+
+def test_handle_message_bt_subscription_run_uses_bound_downloader_context(tmp_path: Path) -> None:
+    update, reply_text = _build_update("btsub run")
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    status_service = GetDownloadStatusService(AsyncMock())
+    import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    bt_subscription_service = ManageBtSubscriptionService(
+        bt_subscription_repo=BtSubscriptionRepo(_make_database(tmp_path)),
+        search_func=_fake_search,
+        add_to_downloader_service=add_service,
+    )
+    bt_subscription_service.run_once = AsyncMock(return_value="BT 订阅扫描完成：共扫描 0 条，当前没有新资源。")
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: search_service,
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+                IMPORT_TO_LIBRARY_SERVICE_KEY: import_service,
+                MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: bt_subscription_service,
+                DOWNLOADER_ROLE_BINDING_KEY: DownloaderRoleBinding(pt_downloader="", bt_downloader="bt"),
+                DOWNLOADER_INSTANCES_KEY: (
+                    DownloaderInstanceConfig(
+                        name="bt",
+                        downloader_type="qbittorrent",
+                        base_url="http://127.0.0.1:18098",
+                        download_dir="/downloads/bt",
+                    ),
+                ),
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+    bt_subscription_service.run_once.assert_awaited_once_with(
+        chat_id=1001,
+        user_id=2001,
+        dispatch_context=BtSubscriptionDispatchContext(
+            downloader_name="bt",
+            downloader_type="qbittorrent",
+            download_dir="/downloads/bt",
+        ),
+    )
+    reply_text.assert_awaited_once_with("BT 订阅扫描完成：共扫描 0 条，当前没有新资源。")
 
 
 def test_handle_message_bt_read_only_helper_routes_to_raw_search() -> None:

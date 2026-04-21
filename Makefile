@@ -26,6 +26,7 @@ verify-mainline:
 	$(PYTHON) -m pytest -q tests/test_private_chat_status_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k status
 	$(PYTHON) -m pytest -q tests/test_private_chat_import_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_import_query or import_routes_to_import_service or import_formats_import_approval_for_telegram or import_replies_service_not_ready"
 	$(PYTHON) -m pytest -q tests/test_private_chat_watchlist_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_watchlist_query or watchlist_routes_to_watchlist_service or watchlist_series_routes_to_watchlist_service or watchlist_replies_service_not_ready"
+	$(PYTHON) -m pytest -q tests/test_private_chat_bt_subscription_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_bt_subscription_query or bt_subscription_routes_to_service or bt_subscription_run_uses_bound_downloader_context or bt_subscription_replies_service_not_ready or bt_subscription_run_replies_config_missing"
 
 test-cleanup-smoke:
 	$(PYTHON) -m pytest -q tests/test_cleanup_cross_channel_smoke.py
