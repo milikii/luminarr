@@ -100,6 +100,66 @@ def _log_cleanup_service_not_ready(*, action: str, query: str) -> None:
     )
 
 
+async def _handle_bt_read_only_request(
+    *,
+    bot_data: MutableMapping[str, object],
+    execution_gate,
+    reply_func: PrivateChatReplyFunc,
+    search_runner: Callable[[object], object],
+    helper_query: str,
+    tg,
+) -> bool:
+    search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
+    if not isinstance(search_service, tg.SearchMediaService):
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    try:
+        reply = await execution_gate.run(
+            tg.ACTION_BT_READ_ONLY_HELPER,
+            lambda: search_runner(search_service),
+        )
+    except Exception as error:
+        _log_bt_read_only_helper_error(query=helper_query, error=error)
+        await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
+        return True
+    await reply_func(reply)
+    return True
+
+
+async def _handle_cleanup_request(
+    *,
+    bot_data: MutableMapping[str, object],
+    execution_gate,
+    reply_func: PrivateChatReplyFunc,
+    action: str,
+    query: str,
+    chat_id: int | None,
+    user_id: int | None,
+    channel: str,
+    cleanup_runner: Callable[[object], str],
+    tg,
+) -> bool:
+    cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
+    if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
+        _log_cleanup_service_not_ready(action=action, query=query)
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    reply = await run_sync_with_policy(
+        execution_gate,
+        action,
+        lambda: cleanup_runner(cleanup_service),
+    )
+    await reply_func(reply)
+    log_cleanup_private_chat_smoke(
+        channel=channel,
+        query=query,
+        reply_text=reply,
+        chat_id=chat_id,
+        user_id=user_id,
+    )
+    return True
+
+
 def _resolve_bound_downloader_execution(
     *,
     bot_data: MutableMapping[str, object],
@@ -428,41 +488,31 @@ async def handle_private_chat_query_text(
 
     bt_read_only_query = extract_bt_read_only_query(query)
     if bt_read_only_query:
-        search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
-        if not isinstance(search_service, tg.SearchMediaService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        if await _handle_bt_read_only_request(
+            bot_data=bot_data,
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            search_runner=lambda search_service: search_service.search_bt_read_only_and_format(bt_read_only_query),
+            helper_query=bt_read_only_query,
+            tg=tg,
+        ):
             return
-        try:
-            reply = await execution_gate.run(
-                tg.ACTION_BT_READ_ONLY_HELPER,
-                lambda: search_service.search_bt_read_only_and_format(bt_read_only_query),
-            )
-        except Exception as error:
-            _log_bt_read_only_helper_error(query=bt_read_only_query, error=error)
-            await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
-            return
-        await reply_func(reply)
         return
 
     bt_batch_preview_request = extract_bt_batch_preview_request(query)
     if bt_batch_preview_request is not None:
-        search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
-        if not isinstance(search_service, tg.SearchMediaService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        if await _handle_bt_read_only_request(
+            bot_data=bot_data,
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            search_runner=lambda search_service: search_service.search_bt_batch_preview_and_format_for_chat(
+                bt_batch_preview_request,
+                chat_id=chat_id,
+            ),
+            helper_query=bt_batch_preview_request.query,
+            tg=tg,
+        ):
             return
-        try:
-            reply = await execution_gate.run(
-                tg.ACTION_BT_READ_ONLY_HELPER,
-                lambda: search_service.search_bt_batch_preview_and_format_for_chat(
-                    bt_batch_preview_request,
-                    chat_id=chat_id,
-                ),
-            )
-        except Exception as error:
-            _log_bt_read_only_helper_error(query=bt_batch_preview_request.query, error=error)
-            await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
-            return
-        await reply_func(reply)
         return
 
     bt_batch_confirm_request = extract_bt_batch_confirm_request(query)
@@ -734,52 +784,42 @@ async def handle_private_chat_query_text(
 
     cleanup_inspect_ref = tg.parse_cleanup_inspect_query(query)
     if cleanup_inspect_ref is not None:
-        cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
-        if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
-            _log_cleanup_service_not_ready(action="cleanup_inspect", query=query)
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        reply = await run_sync_with_policy(
-            execution_gate,
-            tg.ACTION_CLEANUP_INSPECT,
-            lambda: cleanup_service.inspect_by_task_ref(
+        if await _handle_cleanup_request(
+            bot_data=bot_data,
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            action=tg.ACTION_CLEANUP_INSPECT,
+            query=query,
+            chat_id=chat_id,
+            user_id=user_id,
+            channel=channel,
+            cleanup_runner=lambda cleanup_service: cleanup_service.inspect_by_task_ref(
                 cleanup_inspect_ref,
                 chat_id=chat_id,
             ),
-        )
-        await reply_func(reply)
-        log_cleanup_private_chat_smoke(
-            channel="telegram",
-            query=query,
-            reply_text=reply,
-            chat_id=chat_id,
-            user_id=user_id,
-        )
+            tg=tg,
+        ):
+            return
         return
 
     cleanup_ref = tg.parse_cleanup_query(query)
     if cleanup_ref is not None:
-        cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
-        if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
-            _log_cleanup_service_not_ready(action="cleanup", query=query)
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        reply = await run_sync_with_policy(
-            execution_gate,
-            tg.ACTION_CLEANUP_DOWNLOADER_SOURCE,
-            lambda: cleanup_service.cleanup_by_task_ref(
+        if await _handle_cleanup_request(
+            bot_data=bot_data,
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            action=tg.ACTION_CLEANUP_DOWNLOADER_SOURCE,
+            query=query,
+            chat_id=chat_id,
+            user_id=user_id,
+            channel=channel,
+            cleanup_runner=lambda cleanup_service: cleanup_service.cleanup_by_task_ref(
                 cleanup_ref,
                 chat_id=chat_id,
             ),
-        )
-        await reply_func(reply)
-        log_cleanup_private_chat_smoke(
-            channel="telegram",
-            query=query,
-            reply_text=reply,
-            chat_id=chat_id,
-            user_id=user_id,
-        )
+            tg=tg,
+        ):
+            return
         return
 
     confirm_ref = tg.parse_confirm_query(query)
