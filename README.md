@@ -33,6 +33,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 当前唯一施工主线只看 `docs/NEXT_STEP.md`
 - 快速仓库质量入口：`make quality`
 - 当前主线 focused 验证入口：`make verify-mainline`
+- 仓库级 CI 入口：GitHub Actions `Quality` workflow 在 `push` / `pull_request` / `workflow_dispatch` 上运行 `make quality` + `make verify-mainline`
 - 长期工程闭环和旧主线细节：按 `docs/INDEX.md` 分流去对应台账，不要从 README 开始翻历史
 
 ## 5. 如果你不会代码

@@ -1,4 +1,4 @@
-# Current status (v378)
+# Current status (v379)
 
 ## Current mainline
 
@@ -9,7 +9,7 @@
 ## Current health
 
 - 正式入口名：`make quality`、`make verify-mainline`。
-- 仓库级 CI：已补 GitHub Actions `Quality` workflow，在 `push` / `pull_request` 上运行 `make quality` + `make verify-mainline`。
+- 仓库级 CI：已补 GitHub Actions `Quality` workflow，在 `push` / `pull_request` / `workflow_dispatch` 上运行 `make quality` + `make verify-mainline`。
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
 - 当前主线 focused 验证入口：绿灯；本轮 private-chat BT pending focused 为 `20 passed, 45 deselected`。
@@ -18,6 +18,7 @@
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
+- `verify-mainline` 已补进多渠道 shared runtime / Telegram adapter focused：`tests/test_telegram_runtime_adapter.py tests/test_feishu_adapter.py tests/test_personal_wechat_text.py tests/test_wecom_adapter.py -k "routes_into_shared_runtime or routes_through_dispatch_private_chat_text or polls_single_saved_account_and_replies or callback_http_request_routes_post_into_shared_runtime_and_returns_encrypted_reply"`。
 - 当前闭环 focused：`tests/test_private_chat_runtime.py tests/test_private_chat_bt_processing_runtime.py tests/test_private_chat_bt_classification_runtime.py -k "bt_processing_path or bt_classification"` 为 `20 passed, 45 deselected`。
 - 全量回归：`.venv/bin/python -m pytest -q` 为 `1714 passed, 2 skipped`。
 - 当前真实端点探针：`19091 Transmission` 返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`19092 BT Transmission` 与 `18098 qBittorrent` 当前返回 `000`。
