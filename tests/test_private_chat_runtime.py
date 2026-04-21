@@ -12,7 +12,7 @@ from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_STARTED_TEXT,
     PersonalWeChatLoginService,
 )
-from app.bot.private_chat_runtime import dispatch_private_chat_text
+from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
     BT_PENDING_REPO_KEY,

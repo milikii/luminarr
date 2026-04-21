@@ -36,7 +36,7 @@ from app.bot.telegram_update_runtime import (
 
 
 async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.private_chat_runtime import dispatch_private_chat_text
+    from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
     from app.bot import telegram_bot as tg
 
     message = update.effective_message
@@ -63,7 +63,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def handle_telegram_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.private_chat_runtime import dispatch_private_chat_text
+    from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
     from app.bot import telegram_bot as tg
 
     callback_query = getattr(update, "callback_query", None)

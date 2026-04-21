@@ -62,25 +62,6 @@ from app.bot.private_chat_watchlist_runtime import handle_watchlist_query as han
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
-async def dispatch_private_chat_text(
-    *,
-    query: str,
-    reply_func: Callable[[str], Awaitable[object]],
-    chat_id: int | None,
-    user_id: int | None,
-    channel: str = "unknown",
-    bot_data: MutableMapping[str, object],
-) -> None:
-    await handle_private_chat_query_text(
-        query=query,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        user_id=user_id,
-        channel=channel,
-        bot_data=bot_data,
-    )
-
-
 async def handle_private_chat_query_text(
     *,
     query: str,

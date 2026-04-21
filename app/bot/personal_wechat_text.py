@@ -8,7 +8,7 @@ from pathlib import Path
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
-from app.bot.private_chat_runtime import dispatch_private_chat_text
+from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 
 PERSONAL_WECHAT_CHANNEL = "personal_wechat"
 PERSONAL_WECHAT_TEXT_SERVICE_KEY = "personal_wechat_text_service"

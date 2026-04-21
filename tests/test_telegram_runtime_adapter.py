@@ -59,7 +59,7 @@ def test_handle_telegram_message_routes_through_dispatch_private_chat_text(monke
     update, _ = _build_update("dune")
     context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_message(update, context))
 
@@ -76,7 +76,7 @@ def test_handle_telegram_callback_query_routes_through_dispatch_private_chat_tex
     update, _, answer = _build_callback_update("confirm 87")
     context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_callback_query(update, context))
 
@@ -97,7 +97,7 @@ def test_handle_telegram_message_deduplicates_update(tmp_path, monkeypatch) -> N
     update, _ = _build_update("dune", update_id=9001)
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_message(update, context))
     asyncio.run(handle_telegram_message(update, context))
@@ -112,7 +112,7 @@ def test_handle_telegram_callback_query_deduplicates_update(tmp_path, monkeypatc
     update, _, answer = _build_callback_update("dune", callback_query_id="cb-9001")
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_callback_query(update, context))
     asyncio.run(handle_telegram_callback_query(update, context))
@@ -133,7 +133,7 @@ def test_handle_telegram_message_stops_when_update_dedup_persist_fails(tmp_path,
     update, _ = _build_update("dune", update_id=9002)
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_message(update, context))
 
@@ -157,7 +157,7 @@ def test_handle_telegram_message_stops_when_update_dedup_result_missing(tmp_path
     update, _ = _build_update("dune", update_id=9003)
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_message(update, context))
 
@@ -182,7 +182,7 @@ def test_handle_telegram_callback_query_stops_when_update_dedup_persist_fails(tm
     update, _, answer = _build_callback_update("dune", callback_query_id="cb-9002")
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_callback_query(update, context))
 
@@ -207,7 +207,7 @@ def test_handle_telegram_callback_query_stops_when_update_dedup_result_missing(t
     update, _, answer = _build_callback_update("dune", callback_query_id="cb-9003")
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_callback_query(update, context))
 
@@ -228,7 +228,7 @@ def test_handle_telegram_message_stops_when_update_id_invalid(tmp_path, capsys, 
     update, _ = _build_update("dune", update_id=0)
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_message(update, context))
 
@@ -247,7 +247,7 @@ def test_handle_telegram_callback_query_stops_when_callback_id_missing(tmp_path,
     update, _, answer = _build_callback_update("dune", callback_query_id="")
     context = SimpleNamespace(application=SimpleNamespace(bot_data={TELEGRAM_UPDATE_REPO_KEY: update_repo}))
     dispatch_private_chat_text = AsyncMock()
-    monkeypatch.setattr("app.bot.private_chat_runtime.dispatch_private_chat_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
 
     asyncio.run(handle_telegram_callback_query(update, context))
 
