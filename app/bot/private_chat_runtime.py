@@ -209,6 +209,58 @@ async def _handle_bt_batch_confirm_request(
     return True
 
 
+async def _handle_bt_direct_intent(
+    *,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    query: str,
+    tg,
+) -> bool:
+    cleared_processing_path = clear_bt_processing_path_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if cleared_processing_path is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    cleared_raw_bt_destination = clear_raw_bt_destination_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if cleared_raw_bt_destination is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    cleared_tmdb_association = clear_bt_tmdb_association_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if cleared_tmdb_association is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    cleared_classification = clear_bt_classification_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if cleared_classification is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    if not set_bt_processing_path_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        source=query,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    ):
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    await reply_func(BT_PROCESSING_PATH_PROMPT_TEXT)
+    return True
+
+
 def _resolve_bound_downloader_execution(
     *,
     bot_data: MutableMapping[str, object],
@@ -470,47 +522,14 @@ async def handle_private_chat_query_text(
             return
 
     if is_bt_direct_intent(query):
-        cleared_processing_path = clear_bt_processing_path_pending(
+        if await _handle_bt_direct_intent(
             bot_data=bot_data,
+            reply_func=reply_func,
             chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_processing_path is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_raw_bt_destination is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_tmdb_association = clear_bt_tmdb_association_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_tmdb_association is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_classification = clear_bt_classification_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_classification is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        if not set_bt_processing_path_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            source=query,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+            query=query,
+            tg=tg,
         ):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        await reply_func(BT_PROCESSING_PATH_PROMPT_TEXT)
         return
 
     if tg.parse_personal_wechat_login_query(query):

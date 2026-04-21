@@ -4,7 +4,7 @@
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 13 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 里的 BT 批量确认路由抽成执行 helper，并补上 shared runtime 直测，路由主干不再内联编号校验、service 获取、下载器绑定解析和 reply 编排。
+- shared runtime / channel 解耦已收掉 13 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 里的 BT 直接入口 pending 初始化分支抽成执行 helper，路由主干不再内联 pending 清理、processing-path 初始化和提示回复。
 
 ## Current health
 
@@ -35,7 +35,7 @@
 ## Current biggest risk
 
 - 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 shared runtime 直连 Telegram 内部 helper，而是 `app/bot/private_chat_runtime.py`、`app/bot/telegram_bot.py` 这两个热点文件仍承载过多 BT 分支协调。
-- 下一段更小也更中性的结构债，是把 `private_chat_runtime.py` 里的 BT 直接入口 pending 初始化分支继续拆成共享小 helper，减少同一入口里 pending 清理、processing-path 初始化和 reply 编排的混排。
+- 下一段更小也更中性的结构债，是把 `private_chat_runtime.py` 里的 frustration / reset 路由分支继续拆成共享小 helper，减少同一入口里 pending job 查询、approval cancel、搜索候选清理和 BT pending cancel 的混排。
 
 ## Recommended Next Operator Command
 
