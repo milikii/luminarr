@@ -541,6 +541,186 @@ async def _handle_frustration_text(
     )
 
 
+def _clear_bt_follow_up_conflicts(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    tg,
+    clear_classification_pending: bool = False,
+) -> bool | None:
+    cleared_raw_bt_destination = clear_raw_bt_destination_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if cleared_raw_bt_destination is None:
+        return None
+    cleared_tmdb_association = clear_bt_tmdb_association_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if cleared_tmdb_association is None:
+        return None
+    if clear_classification_pending:
+        clear_bt_classification_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
+    return True
+
+
+def _build_media_import_bt_flow_reply(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    source: str,
+    media_kind: str | None,
+    tg,
+) -> str:
+    return enter_media_import_bt_flow(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        source=source,
+        media_kind=media_kind,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
+    )
+
+
+def _build_pure_bt_flow_reply(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    source: str,
+    tg,
+) -> str:
+    return enter_pure_bt_flow(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        source=source,
+        raw_bt_destination_options_key=tg.RAW_BT_DESTINATION_OPTIONS_KEY,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        raw_bt_destination_service_not_ready_text=tg.RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
+    )
+
+
+async def _handle_bt_processing_path_follow_up(
+    *,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    bt_processing_path_pending: bool,
+    bt_processing_path: str | None,
+    bt_processing_shortcut: tuple[str, str | None] | None,
+    tg,
+) -> bool:
+    if not bt_processing_path_pending:
+        return False
+    if bt_processing_path is None and bt_processing_shortcut is None:
+        return False
+    bt_source = pop_bt_processing_path_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if bt_source is False or not bt_source:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    if _clear_bt_follow_up_conflicts(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        tg=tg,
+        clear_classification_pending=True,
+    ) is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    if bt_processing_path == "media_import":
+        await reply_func(
+            _build_media_import_bt_flow_reply(
+                bot_data=bot_data,
+                chat_id=chat_id,
+                source=bt_source,
+                media_kind=None,
+                tg=tg,
+            )
+        )
+        return True
+    if bt_processing_path == "pure_bt":
+        await reply_func(
+            _build_pure_bt_flow_reply(
+                bot_data=bot_data,
+                chat_id=chat_id,
+                source=bt_source,
+                tg=tg,
+            )
+        )
+        return True
+    if bt_processing_shortcut is None:
+        return False
+    shortcut_path, shortcut_media_kind = bt_processing_shortcut
+    if shortcut_path == "pure_bt":
+        await reply_func(
+            _build_pure_bt_flow_reply(
+                bot_data=bot_data,
+                chat_id=chat_id,
+                source=bt_source,
+                tg=tg,
+            )
+        )
+        return True
+    await reply_func(
+        _build_media_import_bt_flow_reply(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            source=bt_source,
+            media_kind=shortcut_media_kind,
+            tg=tg,
+        )
+    )
+    return True
+
+
+async def _handle_bt_classification_follow_up(
+    *,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    bt_classification_pending: bool,
+    bt_classification: str | None,
+    tg,
+) -> bool:
+    if bt_classification is None or not bt_classification_pending:
+        return False
+    bt_source = pop_bt_classification_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if bt_source is False or not bt_source:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    if _clear_bt_follow_up_conflicts(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        tg=tg,
+    ) is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    await reply_func(
+        _build_media_import_bt_flow_reply(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            source=bt_source,
+            media_kind=bt_classification,
+            tg=tg,
+        )
+    )
+    return True
+
+
 async def dispatch_private_chat_text(
     *,
     query: str,
@@ -699,124 +879,25 @@ async def handle_private_chat_query_text(
     if bt_classification_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
-    if bt_processing_path_pending and (
-        bt_processing_path is not None or bt_processing_shortcut is not None
+    if await _handle_bt_processing_path_follow_up(
+        bot_data=bot_data,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        bt_processing_path_pending=bt_processing_path_pending,
+        bt_processing_path=bt_processing_path,
+        bt_processing_shortcut=bt_processing_shortcut,
+        tg=tg,
     ):
-        bt_source = pop_bt_processing_path_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if bt_source is False or not bt_source:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_raw_bt_destination is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_tmdb_association = clear_bt_tmdb_association_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_tmdb_association is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        clear_bt_classification_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if bt_processing_path == "media_import":
-            await reply_func(
-                enter_media_import_bt_flow(
-                    bot_data=bot_data,
-                    chat_id=chat_id,
-                    source=bt_source,
-                    bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-                    service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-                )
-            )
-            return
-        if bt_processing_path == "pure_bt":
-            await reply_func(
-                enter_pure_bt_flow(
-                    bot_data=bot_data,
-                    chat_id=chat_id,
-                    source=bt_source,
-                    raw_bt_destination_options_key=tg.RAW_BT_DESTINATION_OPTIONS_KEY,
-                    bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-                    raw_bt_destination_service_not_ready_text=tg.RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-                    service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-                )
-            )
-            return
-        if bt_processing_shortcut is not None:
-            shortcut_path, shortcut_media_kind = bt_processing_shortcut
-            if shortcut_path == "pure_bt":
-                await reply_func(
-                    enter_pure_bt_flow(
-                        bot_data=bot_data,
-                        chat_id=chat_id,
-                        source=bt_source,
-                        raw_bt_destination_options_key=tg.RAW_BT_DESTINATION_OPTIONS_KEY,
-                        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-                        raw_bt_destination_service_not_ready_text=tg.RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-                        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-                    )
-                )
-                return
-            await reply_func(
-                enter_media_import_bt_flow(
-                    bot_data=bot_data,
-                    chat_id=chat_id,
-                    source=bt_source,
-                    media_kind=shortcut_media_kind,
-                    bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-                    service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-                )
-            )
-            return
+        return
 
-    if bt_classification is not None and bt_classification_pending:
-        bt_source = pop_bt_classification_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if bt_source is False or not bt_source:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_raw_bt_destination = clear_raw_bt_destination_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_raw_bt_destination is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        cleared_tmdb_association = clear_bt_tmdb_association_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-        if cleared_tmdb_association is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        await reply_func(
-            enter_media_import_bt_flow(
-                bot_data=bot_data,
-                chat_id=chat_id,
-                source=bt_source,
-                media_kind=bt_classification,
-                bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-                service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-            )
-        )
+    if await _handle_bt_classification_follow_up(
+        bot_data=bot_data,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        bt_classification_pending=bt_classification_pending,
+        bt_classification=bt_classification,
+        tg=tg,
+    ):
         return
 
     task_ref = tg.parse_status_query(query)
@@ -915,11 +996,11 @@ async def handle_private_chat_query_text(
             bot_data=bot_data,
             execution_gate=execution_gate,
             reply_func=reply_func,
-            action=tg.ACTION_CLEANUP_INSPECT,
-            query=query,
             chat_id=chat_id,
             user_id=user_id,
             channel=channel,
+            action=tg.ACTION_CLEANUP_INSPECT,
+            query=query,
             cleanup_runner=lambda cleanup_service: cleanup_service.inspect_by_task_ref(
                 cleanup_inspect_ref,
                 chat_id=chat_id,
@@ -927,7 +1008,6 @@ async def handle_private_chat_query_text(
             tg=tg,
         ):
             return
-        return
 
     cleanup_ref = tg.parse_cleanup_query(query)
     if cleanup_ref is not None:
@@ -947,7 +1027,6 @@ async def handle_private_chat_query_text(
             tg=tg,
         ):
             return
-        return
 
     confirm_ref = tg.parse_confirm_query(query)
     if confirm_ref is not None:
