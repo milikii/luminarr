@@ -1,10 +1,10 @@
-# Current status (v369)
+# Current status (v370)
 
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1711 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 42 条最小直连；本轮最新闭环是把 `telegram_bot.py` 里的 BT pending helper 抽到 `app/bot/telegram_bt_pending_runtime.py`，并把 Telegram pending focused tests 补进 `verify-mainline`。
+- shared runtime / channel 解耦已收掉 43 条最小直连；本轮最新闭环是删除 `telegram_bot.py` 里已失效的 raw BT destination / BT TMDB follow-up 包装，让 shared runtime 不再保留一段无调用点的 Telegram 死代码。
 
 ## Current health
 
@@ -23,8 +23,8 @@
 
 ## Current biggest risk
 
-- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债仍在 `app/bot/telegram_bot.py`：文件已降到 `515` 行；`app/bot/private_chat_runtime.py` 已降到 `325` 行，当前主要剩 Telegram 侧 BT follow-up handler 薄包装。
-- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 里的 raw BT destination / BT TMDB follow-up helper 仍直接握着 Telegram context、候选 lookup、clear pending 回调和 downloader execution 透传；这块比直接切更大的服务文件更适合作为下一条 shared runtime / channel 解耦闭环。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债仍在 `app/bot/telegram_bot.py`：文件已降到 `415` 行；`app/bot/private_chat_runtime.py` 已降到 `325` 行，当前主要剩 Telegram 侧 BT entry helper 薄包装。
+- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 里的 `_enter_pure_bt_flow()` / `_enter_media_import_bt_flow()` 仍直接握着 Telegram context、pending 初始化和服务未就绪兜底；这块比直接切更大的 service 文件更适合作为下一条 shared runtime / channel 解耦闭环。
 
 ## Recommended Next Operator Command
 

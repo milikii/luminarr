@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from collections.abc import Awaitable, Callable
 from functools import partial
 from pathlib import Path
@@ -23,12 +22,8 @@ from app.bot.bt_tmdb_association_runtime import (
     BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
     BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
     BT_CLASSIFICATION_LABELS,
-    BtTmdbAssociationPending,
     enter_media_import_bt_flow as enter_shared_media_import_bt_flow,
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
-    handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
-    log_bt_tmdb_association_error as log_shared_bt_tmdb_association_error,
-    resolve_bt_tmdb_candidates_lookup as resolve_shared_bt_tmdb_candidates_lookup,
 )
 from app.bot.telegram_bt_pending_runtime import (
     clear_bt_classification_pending as clear_shared_telegram_bt_classification_pending,
@@ -46,17 +41,11 @@ from app.bot.telegram_bt_pending_runtime import (
     set_bt_tmdb_association_pending as set_shared_telegram_bt_tmdb_association_pending,
     set_raw_bt_destination_pending as set_shared_telegram_raw_bt_destination_pending,
 )
-from app.bot.telegram_downloader_execution_runtime import (
-    resolve_telegram_bound_downloader_execution_from_context,
-)
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-    RawBtDestinationPending,
     enter_pure_bt_flow as enter_shared_pure_bt_flow,
-    handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
-    log_pure_bt_search_error as log_shared_pure_bt_search_error,
 )
 from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
@@ -169,7 +158,6 @@ POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
-_TELEGRAM_MODULE = sys.modules[__name__]
 _set_bt_processing_path_pending = partial(
     set_shared_telegram_bt_processing_path_pending,
     bt_pending_repo_key=BT_PENDING_REPO_KEY,
@@ -400,94 +388,6 @@ def _enter_media_import_bt_flow(
         bt_pending_repo_key=BT_PENDING_REPO_KEY,
         service_not_ready_text=SERVICE_NOT_READY_TEXT,
         bt_classification_prompt_text=BT_CLASSIFICATION_PROMPT_TEXT,
-    )
-
-
-def _resolve_bt_tmdb_candidates_lookup(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    media_kind: str,
-) -> LookupTmdbCandidatesFunc | None:
-    return resolve_shared_bt_tmdb_candidates_lookup(
-        bot_data=context.application.bot_data,
-        media_kind=media_kind,
-        bt_tmdb_movie_candidates_lookup_key=BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
-        bt_tmdb_tv_candidates_lookup_key=BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
-    )
-
-
-async def _handle_raw_bt_destination_query(
-    *,
-    query: str,
-    pending: RawBtDestinationPending,
-    chat_id: int | None,
-    user_id: int | None,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> str:
-    return await handle_shared_raw_bt_destination_query(
-        query=query,
-        pending=pending,
-        chat_id=chat_id,
-        user_id=user_id,
-        bot_data=context.application.bot_data,
-        add_to_downloader_service_key=ADD_TO_DOWNLOADER_SERVICE_KEY,
-        search_service_key=SEARCH_SERVICE_KEY,
-        clear_pending=lambda: _clear_raw_bt_destination_pending(context=context, chat_id=chat_id),
-        resolve_downloader_execution=lambda: resolve_telegram_bound_downloader_execution_from_context(
-            context=context,
-            role="bt",
-            tg=_TELEGRAM_MODULE,
-        ),
-        log_pure_bt_search_error=lambda bt_query, error: _log_pure_bt_search_error(query=bt_query, error=error),
-        service_not_ready_text=SERVICE_NOT_READY_TEXT,
-        bt_source_required_text=BT_SOURCE_REQUIRED_TEXT,
-        pure_bt_search_failed_text=PURE_BT_SEARCH_FAILED_TEXT,
-        pure_bt_candidate_selected_template=PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
-        pure_bt_candidate_not_found_template=PURE_BT_CANDIDATE_NOT_FOUND_TEMPLATE,
-    )
-
-
-def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
-    log_shared_bt_tmdb_association_error(media_kind=media_kind, query=query, error=error)
-
-
-def _log_pure_bt_search_error(*, query: str, error: Exception) -> None:
-    log_shared_pure_bt_search_error(query=query, error=error)
-
-
-async def _handle_bt_tmdb_association_query(
-    *,
-    query: str,
-    pending: BtTmdbAssociationPending,
-    chat_id: int | None,
-    user_id: int | None,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> str:
-    return await handle_shared_bt_tmdb_association_query(
-        query=query,
-        pending=pending,
-        chat_id=chat_id,
-        user_id=user_id,
-        bot_data=context.application.bot_data,
-        add_to_downloader_service_key=ADD_TO_DOWNLOADER_SERVICE_KEY,
-        clear_pending=lambda: _clear_bt_tmdb_association_pending(context=context, chat_id=chat_id),
-        resolve_candidates_lookup=lambda media_kind: _resolve_bt_tmdb_candidates_lookup(
-            context=context,
-            media_kind=media_kind,
-        ),
-        resolve_downloader_execution=lambda: resolve_telegram_bound_downloader_execution_from_context(
-            context=context,
-            role="bt",
-            tg=_TELEGRAM_MODULE,
-        ),
-        log_bt_tmdb_association_error=lambda media_kind, raw_query, error: _log_bt_tmdb_association_error(
-            media_kind=media_kind,
-            query=raw_query,
-            error=error,
-        ),
-        service_not_ready_text=SERVICE_NOT_READY_TEXT,
-        bt_tmdb_association_service_not_ready_text=BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
-        bt_source_required_text=BT_SOURCE_REQUIRED_TEXT,
     )
 
 
