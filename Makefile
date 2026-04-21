@@ -29,6 +29,7 @@ verify-mainline:
 	$(PYTHON) -m pytest -q tests/test_private_chat_bt_tmdb_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_bt_tmdb_follow_up or bt_tmdb_association_succeeds_for_movie or bt_tmdb_lookup_failure"
 	$(PYTHON) -m pytest -q tests/test_private_chat_raw_bt_destination_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_raw_bt_destination_follow_up or raw_bt_destination_selection_succeeds or raw_bt_destination_lookup_failure"
 	$(PYTHON) -m pytest -q tests/test_telegram_downloader_execution_runtime.py -k resolve_telegram
+	$(PYTHON) -m pytest -q tests/test_telegram_bot.py -k "bt_processing_path_pending or bt_classification_pending or bt_tmdb_association_pending or raw_bt_destination_pending"
 	$(PYTHON) -m pytest -q tests/test_private_chat_downloader_execution_runtime.py -k resolve_private_chat_bound_downloader_execution
 	$(PYTHON) -m pytest -q tests/test_private_chat_frustration_runtime.py tests/test_private_chat_runtime.py -k "handle_frustration_query or cancel or pending_job_lookup_failure"
 	$(PYTHON) -m pytest -q tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_bt_batch_confirm_query or bt_batch_confirm"

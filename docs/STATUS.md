@@ -1,30 +1,30 @@
-# Current status (v368)
+# Current status (v369)
 
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1711 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 41 条最小直连；本轮最新闭环是把 `telegram_bot.py` 里的 bound downloader execution helper 抽到 `app/bot/telegram_downloader_execution_runtime.py`，并把 Telegram downloader execution focused tests 补进 `verify-mainline`。
+- shared runtime / channel 解耦已收掉 42 条最小直连；本轮最新闭环是把 `telegram_bot.py` 里的 BT pending helper 抽到 `app/bot/telegram_bt_pending_runtime.py`，并把 Telegram pending focused tests 补进 `verify-mainline`。
 
 ## Current health
 
 - 正式入口名：`make quality`、`make verify-mainline`。
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
-- 当前主线 focused 验证入口：绿灯；本次 `verify-mainline` 20 组回归全部通过，其中新增 Telegram downloader execution 组为 `3 passed`。
+- 当前主线 focused 验证入口：绿灯；本次 `verify-mainline` 21 组回归全部通过，其中新增 Telegram pending 组为 `42 passed`。
 - 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1711 passed, 2 skipped`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- `verify-mainline`：status / download follow-up / trace / personal WeChat login / BT direct / BT processing / BT classification / BT TMDB / raw BT destination / Telegram downloader execution / private-chat downloader execution / frustration / BT batch confirm / BT read-only / search / import / watchlist / BT subscription / cleanup 共 20 组 focused 回归全部通过。
+- `verify-mainline`：status / download follow-up / trace / personal WeChat login / BT direct / BT processing / BT classification / BT TMDB / raw BT destination / Telegram downloader execution / Telegram pending / private-chat downloader execution / frustration / BT batch confirm / BT read-only / search / import / watchlist / BT subscription / cleanup 共 21 组 focused 回归全部通过。
 - 全量回归：`.venv/bin/python -m pytest -q` 为 `1711 passed, 2 skipped`。
 - 当前真实端点探针：`19091 Transmission` 返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`19092 BT Transmission` 与 `18098 qBittorrent` 当前返回 `000`。
 
 ## Current biggest risk
 
-- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债仍在 `app/bot/telegram_bot.py`：文件已降到 `637` 行；`app/bot/private_chat_runtime.py` 已降到 `325` 行，当前主要剩 Telegram 侧 BT pending / follow-up 薄包装。
-- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 里成组的 BT pending helper 仍直接握着 `context.application.bot_data` 和 `bt_pending_repo` key；这块比直接切更大的服务文件更适合作为下一条 shared runtime / channel 解耦闭环。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债仍在 `app/bot/telegram_bot.py`：文件已降到 `515` 行；`app/bot/private_chat_runtime.py` 已降到 `325` 行，当前主要剩 Telegram 侧 BT follow-up handler 薄包装。
+- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 里的 raw BT destination / BT TMDB follow-up helper 仍直接握着 Telegram context、候选 lookup、clear pending 回调和 downloader execution 透传；这块比直接切更大的服务文件更适合作为下一条 shared runtime / channel 解耦闭环。
 
 ## Recommended Next Operator Command
 

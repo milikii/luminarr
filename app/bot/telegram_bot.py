@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import sys
 from collections.abc import Awaitable, Callable
+from functools import partial
 from pathlib import Path
-from typing import Literal
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
@@ -13,33 +13,38 @@ from app.bot.bt_classification_runtime import (
     BT_CLASSIFICATION_CANCELLED_TEXT,
     BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
     BT_CLASSIFICATION_PROMPT_TEXT,
-    clear_bt_classification_pending as clear_shared_bt_classification_pending,
-    is_bt_classification_pending as is_shared_bt_classification_pending,
-    pop_bt_classification_pending as pop_shared_bt_classification_pending,
-    set_bt_classification_pending as set_shared_bt_classification_pending,
 )
 from app.bot.bt_processing_path_runtime import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
     BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
     BT_PROCESSING_PATH_PROMPT_TEXT,
-    clear_bt_processing_path_pending as clear_shared_bt_processing_path_pending,
-    is_bt_processing_path_pending as is_shared_bt_processing_path_pending,
-    pop_bt_processing_path_pending as pop_shared_bt_processing_path_pending,
-    set_bt_processing_path_pending as set_shared_bt_processing_path_pending,
 )
 from app.bot.bt_tmdb_association_runtime import (
     BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
     BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
     BT_CLASSIFICATION_LABELS,
     BtTmdbAssociationPending,
-    clear_bt_tmdb_association_pending as clear_shared_bt_tmdb_association_pending,
     enter_media_import_bt_flow as enter_shared_media_import_bt_flow,
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
-    get_bt_tmdb_association_pending as get_shared_bt_tmdb_association_pending,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
     log_bt_tmdb_association_error as log_shared_bt_tmdb_association_error,
     resolve_bt_tmdb_candidates_lookup as resolve_shared_bt_tmdb_candidates_lookup,
-    set_bt_tmdb_association_pending as set_shared_bt_tmdb_association_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    clear_bt_classification_pending as clear_shared_telegram_bt_classification_pending,
+    clear_bt_processing_path_pending as clear_shared_telegram_bt_processing_path_pending,
+    clear_bt_tmdb_association_pending as clear_shared_telegram_bt_tmdb_association_pending,
+    clear_raw_bt_destination_pending as clear_shared_telegram_raw_bt_destination_pending,
+    get_bt_tmdb_association_pending as get_shared_telegram_bt_tmdb_association_pending,
+    get_raw_bt_destination_pending as get_shared_telegram_raw_bt_destination_pending,
+    is_bt_classification_pending as is_shared_telegram_bt_classification_pending,
+    is_bt_processing_path_pending as is_shared_telegram_bt_processing_path_pending,
+    pop_bt_classification_pending as pop_shared_telegram_bt_classification_pending,
+    pop_bt_processing_path_pending as pop_shared_telegram_bt_processing_path_pending,
+    set_bt_classification_pending as set_shared_telegram_bt_classification_pending,
+    set_bt_processing_path_pending as set_shared_telegram_bt_processing_path_pending,
+    set_bt_tmdb_association_pending as set_shared_telegram_bt_tmdb_association_pending,
+    set_raw_bt_destination_pending as set_shared_telegram_raw_bt_destination_pending,
 )
 from app.bot.telegram_downloader_execution_runtime import (
     resolve_telegram_bound_downloader_execution_from_context,
@@ -49,12 +54,9 @@ from app.bot.raw_bt_destination_runtime import (
     RAW_BT_DESTINATION_CANCELLED_TEXT,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
     RawBtDestinationPending,
-    clear_raw_bt_destination_pending as clear_shared_raw_bt_destination_pending,
     enter_pure_bt_flow as enter_shared_pure_bt_flow,
-    get_raw_bt_destination_pending as get_shared_raw_bt_destination_pending,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
     log_pure_bt_search_error as log_shared_pure_bt_search_error,
-    set_raw_bt_destination_pending as set_shared_raw_bt_destination_pending,
 )
 from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
@@ -168,6 +170,62 @@ LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 _TELEGRAM_MODULE = sys.modules[__name__]
+_set_bt_processing_path_pending = partial(
+    set_shared_telegram_bt_processing_path_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_is_bt_processing_path_pending = partial(
+    is_shared_telegram_bt_processing_path_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_clear_bt_processing_path_pending = partial(
+    clear_shared_telegram_bt_processing_path_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_pop_bt_processing_path_pending = partial(
+    pop_shared_telegram_bt_processing_path_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_set_bt_classification_pending = partial(
+    set_shared_telegram_bt_classification_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_is_bt_classification_pending = partial(
+    is_shared_telegram_bt_classification_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_clear_bt_classification_pending = partial(
+    clear_shared_telegram_bt_classification_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_pop_bt_classification_pending = partial(
+    pop_shared_telegram_bt_classification_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_set_bt_tmdb_association_pending = partial(
+    set_shared_telegram_bt_tmdb_association_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_get_bt_tmdb_association_pending = partial(
+    get_shared_telegram_bt_tmdb_association_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_clear_bt_tmdb_association_pending = partial(
+    clear_shared_telegram_bt_tmdb_association_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_set_raw_bt_destination_pending = partial(
+    set_shared_telegram_raw_bt_destination_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_get_raw_bt_destination_pending = partial(
+    get_shared_telegram_raw_bt_destination_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
+_clear_raw_bt_destination_pending = partial(
+    clear_shared_telegram_raw_bt_destination_pending,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+)
 BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
 
 # Compatibility re-exports for existing tests and narrow module consumers.
@@ -302,186 +360,6 @@ async def _download_completion_polling_loop(
         status_service=status_service,
         stop_event=stop_event,
         interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
-    )
-
-
-def _set_bt_processing_path_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-    source: str,
-) -> bool:
-    return set_shared_bt_processing_path_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        source=source,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _is_bt_processing_path_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> bool | None:
-    return is_shared_bt_processing_path_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _clear_bt_processing_path_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> bool | None:
-    return clear_shared_bt_processing_path_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _pop_bt_processing_path_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> str | Literal[False] | None:
-    return pop_shared_bt_processing_path_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _set_bt_classification_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-    query: str,
-) -> bool:
-    return set_shared_bt_classification_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        query=query,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _is_bt_classification_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> bool | None:
-    return is_shared_bt_classification_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _clear_bt_classification_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> bool | None:
-    return clear_shared_bt_classification_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _pop_bt_classification_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> str | Literal[False] | None:
-    return pop_shared_bt_classification_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _set_bt_tmdb_association_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-    media_kind: str,
-    source: str,
-) -> bool:
-    return set_shared_bt_tmdb_association_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        media_kind=media_kind,
-        source=source,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _get_bt_tmdb_association_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> BtTmdbAssociationPending | None | Literal[False]:
-    return get_shared_bt_tmdb_association_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _clear_bt_tmdb_association_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> bool | None:
-    return clear_shared_bt_tmdb_association_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _set_raw_bt_destination_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-    options: tuple[RawBtDestinationOption, ...],
-    source: str,
-) -> bool:
-    return set_shared_raw_bt_destination_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        options=options,
-        source=source,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _get_raw_bt_destination_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> RawBtDestinationPending | None | Literal[False]:
-    return get_shared_raw_bt_destination_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-    )
-
-
-def _clear_raw_bt_destination_pending(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-) -> bool | None:
-    return clear_shared_raw_bt_destination_pending(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
     )
 
 
