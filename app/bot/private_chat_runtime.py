@@ -4,6 +4,15 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.bot.bt_processing_path_runtime import (
+    BT_PROCESSING_PATH_CANCELLED_TEXT,
+    BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
+    BT_PROCESSING_PATH_PROMPT_TEXT,
+    clear_bt_processing_path_pending,
+    is_bt_processing_path_pending,
+    pop_bt_processing_path_pending,
+    set_bt_processing_path_pending,
+)
 from app.bot.bt_tmdb_association_runtime import handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
@@ -292,16 +301,24 @@ async def handle_private_chat_query_text(
         if cleared_classification:
             await reply_func(tg.BT_CLASSIFICATION_CANCELLED_TEXT)
             return
-        cleared_processing_path = tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
+        cleared_processing_path = clear_bt_processing_path_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_processing_path is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         if cleared_processing_path:
-            await reply_func(tg.BT_PROCESSING_PATH_CANCELLED_TEXT)
+            await reply_func(BT_PROCESSING_PATH_CANCELLED_TEXT)
             return
 
     if is_bt_direct_intent(query):
-        cleared_processing_path = tg._clear_bt_processing_path_pending(context=context, chat_id=chat_id)
+        cleared_processing_path = clear_bt_processing_path_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_processing_path is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -317,14 +334,15 @@ async def handle_private_chat_query_text(
         if cleared_classification is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        if not tg._set_bt_processing_path_pending(
-            context=context,
+        if not set_bt_processing_path_pending(
+            bot_data=bot_data,
             chat_id=chat_id,
             source=query,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
         ):
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        await reply_func(tg.BT_PROCESSING_PATH_PROMPT_TEXT)
+        await reply_func(BT_PROCESSING_PATH_PROMPT_TEXT)
         return
 
     if tg.parse_personal_wechat_login_query(query):
@@ -429,7 +447,11 @@ async def handle_private_chat_query_text(
     bt_classification = parse_bt_classification_choice(query)
     bt_processing_path = parse_bt_processing_path_choice(query)
     bt_processing_shortcut = parse_bt_processing_path_legacy_shortcut(query)
-    bt_processing_path_pending = tg._is_bt_processing_path_pending(context=context, chat_id=chat_id)
+    bt_processing_path_pending = is_bt_processing_path_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
     if bt_processing_path_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
@@ -440,7 +462,11 @@ async def handle_private_chat_query_text(
     if bt_processing_path_pending and (
         bt_processing_path is not None or bt_processing_shortcut is not None
     ):
-        bt_source = tg._pop_bt_processing_path_pending(context=context, chat_id=chat_id)
+        bt_source = pop_bt_processing_path_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -849,7 +875,7 @@ async def handle_private_chat_query_text(
         return
 
     if bt_processing_path_pending:
-        await reply_func(tg.BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
+        await reply_func(BT_PROCESSING_PATH_PENDING_REMINDER_TEXT)
         return
 
     if bt_classification_pending:
