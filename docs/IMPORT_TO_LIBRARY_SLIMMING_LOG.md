@@ -19,7 +19,9 @@
 
 本轮收口：
 - `app/services/import_context_lookup.py` 现在承接导入前 confirm 上下文重建、approval 读取和 `raw_bt` 判定；`import_to_library.py` 只保留用户入口、fail-closed 中文日志和后续执行编排，不回退 approval、`jobs`、`job_event` 和导入成功真相。
+- `app/services/import_approval_state.py` 已承接 approval pending/approve/restore/executed、stale-check、pending-expired 和导入目标路径回查；`import_to_library.py` 只保留 wrapper 和 confirm 编排，不回退审批协议或 fail-closed 中文日志。
 - 这一组收口只动导入前真相重建边界；confirm 协议、pending / expired / stale 边界和现有中文日志保持不变。
+- 这一步把 `import_to_library.py` 从 `2094` 行降到 `1827` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt"`
@@ -31,7 +33,7 @@ focused tests 入口：
 - 这一步把 `import_to_library.py` 从 `2242` 行降到 `2094` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
 
 剩余风险：
-- `import_to_library.py` 仍把 approval lease/version、硬链接 / copy-fallback 和文件系统导入执行压在同一文件；下一条只允许继续拆 approval helper，不能顺手改 `jobs` 状态迁移或文件导入真相。
+- `import_to_library.py` 仍把 `jobs` claim/release/complete、硬链接 / copy-fallback 和文件系统导入执行压在同一文件；下一条只允许继续拆 jobs helper，不能顺手改 approval helper 或文件导入真相。
 - 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`。
 
 focused tests 入口：
@@ -47,4 +49,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 approval state helper；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，等 approval / jobs helper 真正落地后再回填对应收口。
+- 当前唯一主线已经切到 jobs state transition helper；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，等 jobs / file-transfer helper 真正落地后再回填对应收口。
