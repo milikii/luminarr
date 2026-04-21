@@ -135,6 +135,70 @@ async def _resolve_bt_follow_up_precheck(
     )
 
 
+async def _handle_opening_routes(
+    *,
+    query: str,
+    bot_data: MutableMapping[str, object],
+    execution_gate,
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    user_id: int | None,
+    channel: str,
+    resolve_bt_downloader_execution,
+    tg,
+) -> bool:
+    if await handle_shared_frustration_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_bt_direct_intent_query(
+        query=query,
+        bot_data=bot_data,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_personal_wechat_login_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_bt_read_only_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
+        return True
+
+    return await handle_shared_bt_batch_confirm_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        resolve_downloader_execution=resolve_bt_downloader_execution,
+        tg=tg,
+    )
+
+
 async def _handle_execution_gated_shared_routes(
     *,
     query: str,
@@ -303,46 +367,7 @@ async def handle_private_chat_query_text(
         role="pt",
         tg=tg,
     )
-    if await handle_shared_frustration_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_bt_direct_intent_query(
-        query=query,
-        bot_data=bot_data,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_personal_wechat_login_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_bt_read_only_query(
-        query=query,
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_bt_batch_confirm_query(
+    if await _handle_opening_routes(
         query=query,
         bot_data=bot_data,
         execution_gate=execution_gate,
@@ -350,7 +375,7 @@ async def handle_private_chat_query_text(
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        resolve_downloader_execution=resolve_bt_downloader_execution,
+        resolve_bt_downloader_execution=resolve_bt_downloader_execution,
         tg=tg,
     ):
         return
