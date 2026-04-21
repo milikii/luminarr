@@ -1150,21 +1150,6 @@ def _log_pure_bt_search_error(*, query: str, error: Exception) -> None:
     log_shared_pure_bt_search_error(query=query, error=error)
 
 
-def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 只读探索失败]\033[0m 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 BT 来源配置、站点可达性和网络连通性后重试。"
-    )
-
-
-def _log_cleanup_service_not_ready(*, action: str, query: str) -> None:
-    print(
-        f"\033[31m[cleanup 服务未就绪]\033[0m 动作={action} 查询={query.strip() or '-'}\n"
-        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 cleanup_downloaded_source_service，"
-        "并确认 CleanupDownloadedSourceService 实例创建成功后重试。"
-    )
-
-
 def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
     print(
         f"\033[31m[BT 订阅后台扫描未启动]\033[0m 原因={reason}\n"

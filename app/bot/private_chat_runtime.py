@@ -85,6 +85,21 @@ def _log_confirm_job_lookup_failed(*, chat_id: int | None, task_ref: str, reason
     )
 
 
+def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
+    print(
+        f"\033[31m[BT 只读探索失败]\033[0m 查询={query} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 BT 来源配置、站点可达性和网络连通性后重试。"
+    )
+
+
+def _log_cleanup_service_not_ready(*, action: str, query: str) -> None:
+    print(
+        f"\033[31m[cleanup 服务未就绪]\033[0m 动作={action} 查询={query.strip() or '-'}\n"
+        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 cleanup_downloaded_source_service，"
+        "并确认 CleanupDownloadedSourceService 实例创建成功后重试。"
+    )
+
+
 def _resolve_bound_downloader_execution(
     *,
     bot_data: MutableMapping[str, object],
@@ -423,7 +438,7 @@ async def handle_private_chat_query_text(
                 lambda: search_service.search_bt_read_only_and_format(bt_read_only_query),
             )
         except Exception as error:
-            tg._log_bt_read_only_helper_error(query=bt_read_only_query, error=error)
+            _log_bt_read_only_helper_error(query=bt_read_only_query, error=error)
             await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
             return
         await reply_func(reply)
@@ -444,7 +459,7 @@ async def handle_private_chat_query_text(
                 ),
             )
         except Exception as error:
-            tg._log_bt_read_only_helper_error(query=bt_batch_preview_request.query, error=error)
+            _log_bt_read_only_helper_error(query=bt_batch_preview_request.query, error=error)
             await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
             return
         await reply_func(reply)
@@ -721,7 +736,7 @@ async def handle_private_chat_query_text(
     if cleanup_inspect_ref is not None:
         cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
         if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
-            tg._log_cleanup_service_not_ready(action="cleanup_inspect", query=query)
+            _log_cleanup_service_not_ready(action="cleanup_inspect", query=query)
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         reply = await run_sync_with_policy(
@@ -746,7 +761,7 @@ async def handle_private_chat_query_text(
     if cleanup_ref is not None:
         cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
         if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
-            tg._log_cleanup_service_not_ready(action="cleanup", query=query)
+            _log_cleanup_service_not_ready(action="cleanup", query=query)
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         reply = await run_sync_with_policy(
