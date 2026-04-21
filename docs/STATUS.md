@@ -1,10 +1,10 @@
-# Current status (v354)
+# Current status (v355)
 
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 19 条最小直连；本轮最新闭环是把 Telegram Application 的 `.post_init/.post_shutdown` 生命周期入口也切到 `app/bot/telegram_sidecar_runtime.py`，`telegram_runtime_adapter.py` 不再直接绑定 `telegram_bot.py` 的私有启停 helper。
+- shared runtime / channel 解耦已收掉 19 条最小直连；本轮最新闭环是把 BT scheduler loop / 日志 / downloader resolution 也并入 `app/bot/telegram_sidecar_runtime.py`，Telegram 生命周期编排现在不再回看 `telegram_bot.py` 内部 helper。
 
 ## Current health
 
@@ -27,8 +27,8 @@
 
 ## Current biggest risk
 
-- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 follow-up runtime 缺固定 gate，而是 `app/bot/private_chat_runtime.py` 仍有 `1421` 行、`app/bot/telegram_bot.py` 仍有 `960` 行，并继续承载 BT 路由、BT scheduler 细节和 Telegram 文案格式化。
-- 当前更小也更直接的下一块热点，是 `app/bot/telegram_sidecar_runtime.py` 仍需通过懒导入回看 `telegram_bot.py` 里的 BT scheduler loop / log / downloader resolution helper；把这层回看切掉后，生命周期编排才算真正站稳在独立 runtime。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 Telegram 生命周期编排，而是 `app/bot/private_chat_runtime.py` 仍有 `1421` 行、`app/bot/telegram_bot.py` 仍有 `819` 行，并继续承载 BT 路由与 Telegram 发送 / 格式化细节。
+- 当前更小也更直接的下一块热点，是 `telegram_bot.py` 剩余发送媒资、reply 格式化和 Telegram 特有文案拼接仍挤在同一文件；这块比回头继续拆 `private_chat_runtime.py` 更容易切成新的最小闭环。
 
 ## Recommended Next Operator Command
 

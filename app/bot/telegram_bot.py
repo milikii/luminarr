@@ -46,7 +46,6 @@ from app.bot.downloader_execution_runtime import (
     resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
     resolve_downloader_instances as resolve_shared_downloader_instances,
 )
-from app.bot.execution_runtime import resolve_execution_gate
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
@@ -69,9 +68,7 @@ from app.bot.download_follow_up_runtime import (
     poll_pending_download_completion_once,
     post_download_auto_import_scheduler_loop,
 )
-from app.bot.telegram_sidecar_runtime import (
-    TelegramSidecarRuntimeConfig,
-)
+from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_config_error, _run_bt_subscription_scheduler_tick_once
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
@@ -82,7 +79,6 @@ from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
     ACTION_BT_READ_ONLY_HELPER,
-    ACTION_BT_SUBSCRIPTION_RUN,
     ACTION_ADD_TO_DOWNLOADER,
     ACTION_CANCEL_PENDING_APPROVAL,
     ACTION_CLEANUP_INSPECT,
@@ -95,7 +91,6 @@ from app.runtime.execution_policy import (
     ACTION_RESET_CANDIDATES,
     ACTION_RESET_CLARIFICATION,
     ACTION_SEARCH_MEDIA,
-    ExecutionGate,
 )
 from app.services.add_to_downloader import (
     ADD_CANCELLED_TEXT,
@@ -107,11 +102,7 @@ from app.services.cleanup_downloaded_source import (
     parse_cleanup_query,
 )
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
-from app.services.manage_bt_subscription import (
-    BtSubscriptionDispatchContext,
-    ManageBtSubscriptionService,
-    parse_bt_subscription_query,
-)
+from app.services.manage_bt_subscription import ManageBtSubscriptionService, parse_bt_subscription_query
 from app.services.import_to_library import (
     IMPORT_CANCELLED_TEXT,
     ImportToLibraryService,
@@ -176,23 +167,7 @@ WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
 TELEGRAM_SEND_TEXT_FUNC_KEY = "telegram_send_text_func"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
-BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
-TELEGRAM_SIDECAR_RUNTIME_CONFIG = TelegramSidecarRuntimeConfig(
-    post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
-    post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
-    post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
-    get_download_status_service_key=GET_DOWNLOAD_STATUS_SERVICE_KEY,
-    download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
-    download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
-    feishu_webhook_server_config_key=FEISHU_WEBHOOK_SERVER_CONFIG_KEY,
-    feishu_webhook_reply_text_func_key=FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY,
-    feishu_webhook_server_runtime_key=FEISHU_WEBHOOK_SERVER_RUNTIME_KEY,
-    wecom_webhook_server_config_key=WECOM_WEBHOOK_SERVER_CONFIG_KEY,
-    wecom_webhook_server_runtime_key=WECOM_WEBHOOK_SERVER_RUNTIME_KEY,
-    personal_wechat_login_service_key=PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
-    post_download_auto_import_interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
-)
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
@@ -352,13 +327,6 @@ async def _send_telegram_media(
 def _is_telegram_photo_path(file_path: Path) -> bool:
     return file_path.suffix.lower() in TELEGRAM_PHOTO_SUFFIXES
 
-def _resolve_execution_gate_for_application(application: Application) -> ExecutionGate:
-    return resolve_execution_gate(
-        bot_data=application.bot_data,
-        execution_gate_key=EXECUTION_GATE_KEY,
-    )
-
-
 async def _post_download_auto_import_scheduler_loop(
     *,
     service: PostDownloadAutoImportService,
@@ -389,66 +357,6 @@ async def _download_completion_polling_loop(
         stop_event=stop_event,
         interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
     )
-
-
-async def _bt_subscription_scheduler_loop(
-    *,
-    application: Application,
-    bt_subscription_service: ManageBtSubscriptionService,
-    execution_gate: ExecutionGate,
-    stop_event: asyncio.Event,
-    dispatch_context: BtSubscriptionDispatchContext,
-) -> None:
-    while not stop_event.is_set():
-        try:
-            await _run_bt_subscription_scheduler_tick_once(
-                application=application,
-                bt_subscription_service=bt_subscription_service,
-                execution_gate=execution_gate,
-                dispatch_context=dispatch_context,
-            )
-        except Exception as error:
-            _log_bt_subscription_scheduler_loop_error(error=error)
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS)
-        except asyncio.TimeoutError:
-            continue
-
-
-async def _run_bt_subscription_scheduler_tick_once(
-    *,
-    application: Application,
-    bt_subscription_service: ManageBtSubscriptionService,
-    execution_gate: ExecutionGate,
-    dispatch_context: BtSubscriptionDispatchContext,
-) -> None:
-    notifications = await execution_gate.run(
-        ACTION_BT_SUBSCRIPTION_RUN,
-        lambda: bt_subscription_service.run_scheduler_tick(
-            dispatch_context=dispatch_context,
-        ),
-    )
-    if notifications is None:
-        _log_bt_subscription_scheduler_result_unavailable()
-        return
-    for chat_id, reply_text in notifications:
-        await _send_bt_subscription_scheduler_message(
-            application=application,
-            chat_id=chat_id,
-            text=reply_text,
-        )
-
-
-async def _send_bt_subscription_scheduler_message(
-    *,
-    application: Application,
-    chat_id: int,
-    text: str,
-) -> None:
-    try:
-        await application.bot.send_message(chat_id=chat_id, text=text)
-    except Exception as error:
-        _log_bt_subscription_scheduler_send_error(chat_id=chat_id, error=error)
 
 
 def _set_bt_processing_path_pending(
@@ -707,20 +615,6 @@ def _resolve_bound_downloader_execution(
     )
 
 
-def _resolve_bound_downloader_execution_for_application(
-    *,
-    application: Application,
-    role: str,
-) -> tuple[ResolvedDownloaderExecution | None, str | None]:
-    return resolve_shared_bound_downloader_execution(
-        bot_data=application.bot_data,
-        role=role,
-        downloader_role_binding_key=DOWNLOADER_ROLE_BINDING_KEY,
-        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
-        config_missing_template=DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
-    )
-
-
 def _resolve_downloader_instances_for_application(
     application: Application,
 ) -> dict[str, DownloaderInstanceConfig]:
@@ -763,34 +657,6 @@ def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Except
 
 def _log_pure_bt_search_error(*, query: str, error: Exception) -> None:
     log_shared_pure_bt_search_error(query=query, error=error)
-
-
-def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅后台扫描未启动]\033[0m 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 BT 下载器角色绑定和下载器实例配置后重启应用。"
-    )
-
-
-def _log_bt_subscription_scheduler_loop_error(*, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 订阅后台扫描失败]\033[0m 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite 和 Telegram 发送链路后等待下一轮自动扫描。"
-    )
-
-
-def _log_bt_subscription_scheduler_result_unavailable() -> None:
-    print(
-        "\033[31m[BT 订阅后台扫描结果不可用]\033[0m 本轮未生成可发送通知。\n"
-        "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite、approval_record/jobs 和前面的后台扫描明细日志；当前这轮通知已跳过，下一轮自动扫描仍会继续尝试。"
-    )
-
-
-def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 订阅后台通知失败]\033[0m chat_id={chat_id} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 Telegram Bot Token、聊天可达性和网络连通性后等待下一轮自动扫描。"
-    )
 
 
 async def _handle_bt_tmdb_association_query(
