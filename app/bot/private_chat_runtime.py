@@ -56,6 +56,7 @@ from app.bot.raw_bt_destination_runtime import (
 from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
+from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query as handle_shared_personal_wechat_login_query
 from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_trace
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
@@ -925,26 +926,14 @@ async def handle_private_chat_query_text(
             return
         return
 
-    if tg.parse_personal_wechat_login_query(query):
-        personal_wechat_login_service = bot_data.get(tg.PERSONAL_WECHAT_LOGIN_SERVICE_KEY)
-        telegram_send_media_func = bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY)
-        telegram_send_text_func = bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY)
-        if (
-            not isinstance(personal_wechat_login_service, tg.PersonalWeChatLoginService)
-            or not callable(telegram_send_media_func)
-            or chat_id is None
-        ):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            tg.ACTION_PERSONAL_WECHAT_LOGIN,
-            lambda: personal_wechat_login_service.start_login(
-                chat_id=chat_id,
-                send_media_func=telegram_send_media_func,
-                send_text_func=telegram_send_text_func if callable(telegram_send_text_func) else None,
-            ),
-        )
-        await reply_func(reply)
+    if await handle_shared_personal_wechat_login_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
         return
 
     bt_read_only_query = extract_bt_read_only_query(query)
