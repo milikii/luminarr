@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from functools import partial
-from pathlib import Path
 
 from telegram import Update
 from telegram.ext import Application, ContextTypes
@@ -54,11 +53,6 @@ from app.bot.personal_wechat_login import (
     PersonalWeChatLoginService,
     parse_personal_wechat_login_query,
 )
-from app.bot.telegram_delivery_runtime import (
-    build_telegram_send_media_func as _shared_build_telegram_send_media_func,
-    build_telegram_send_text_func as _shared_build_telegram_send_text_func,
-)
-from app.bot.telegram_reply_formatter import format_telegram_reply as _shared_format_telegram_reply
 from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_config_error, _run_bt_subscription_scheduler_tick_once
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
@@ -151,8 +145,6 @@ TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
 TELEGRAM_SEND_TEXT_FUNC_KEY = "telegram_send_text_func"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
-TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
-TelegramSendTextFunc = Callable[..., Awaitable[object]]
 _set_bt_processing_path_pending = partial(
     set_shared_telegram_bt_processing_path_pending,
     bt_pending_repo_key=BT_PENDING_REPO_KEY,
@@ -321,15 +313,6 @@ def build_application(
         outbound_proxy_url=outbound_proxy_url,
     )
 
-
-def build_telegram_send_media_func(application: Application) -> TelegramSendMediaFunc:
-    return _shared_build_telegram_send_media_func(application)
-
-
-def build_telegram_send_text_func(application: Application) -> TelegramSendTextFunc:
-    return _shared_build_telegram_send_text_func(application)
-
-
 def _format_bt_classification_result(media_kind: str) -> str:
     label = BT_CLASSIFICATION_LABELS.get(media_kind, BT_CLASSIFICATION_LABELS["raw_bt"])
     return BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label=label, kind=media_kind)
@@ -353,7 +336,3 @@ async def handle_private_chat_query_text(
         channel="telegram",
         bot_data=context.application.bot_data,
     )
-
-
-def _format_telegram_reply(text: str) -> str:
-    return _shared_format_telegram_reply(text)

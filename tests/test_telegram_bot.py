@@ -10,6 +10,7 @@ import pytest
 from telegram.ext import CallbackQueryHandler
 
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
+from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.clients.transmission import TransmissionTaskStatus
@@ -46,7 +47,6 @@ from app.bot.telegram_bot import (
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
     TELEGRAM_SEND_TEXT_FUNC_KEY,
     build_application,
-    build_telegram_send_media_func,
     handle_callback_query,
     handle_message,
     _get_bt_tmdb_association_pending,

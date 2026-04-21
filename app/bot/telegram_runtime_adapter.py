@@ -24,6 +24,7 @@ from app.bot.telegram_delivery_runtime import (
     build_telegram_send_media_func,
     build_telegram_send_text_func,
 )
+from app.bot.telegram_reply_formatter import format_telegram_reply
 from app.bot.telegram_update_runtime import (
     build_telegram_reply_func,
     record_telegram_callback_update,
@@ -53,7 +54,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
 
     await dispatch_private_chat_text(
         query=(message.text or "").strip(),
-        reply_func=build_telegram_reply_func(message.reply_text, formatter=tg._format_telegram_reply),
+        reply_func=build_telegram_reply_func(message.reply_text, formatter=format_telegram_reply),
         chat_id=chat_id,
         user_id=user_id,
         channel="telegram",
@@ -95,7 +96,7 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
 
     await dispatch_private_chat_text(
         query=query,
-        reply_func=build_telegram_reply_func(message.reply_text, formatter=tg._format_telegram_reply),
+        reply_func=build_telegram_reply_func(message.reply_text, formatter=format_telegram_reply),
         chat_id=chat_id,
         user_id=user_id,
         channel="telegram",
