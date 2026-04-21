@@ -41,6 +41,10 @@ from app.bot.telegram_bt_pending_runtime import (
     set_bt_tmdb_association_pending as set_shared_telegram_bt_tmdb_association_pending,
     set_raw_bt_destination_pending as set_shared_telegram_raw_bt_destination_pending,
 )
+from app.bot.telegram_bt_entry_runtime import (
+    enter_media_import_bt_flow as enter_shared_telegram_media_import_bt_flow,
+    enter_pure_bt_flow as enter_shared_telegram_pure_bt_flow,
+)
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
@@ -214,6 +218,21 @@ _clear_raw_bt_destination_pending = partial(
     clear_shared_telegram_raw_bt_destination_pending,
     bt_pending_repo_key=BT_PENDING_REPO_KEY,
 )
+_enter_pure_bt_flow = partial(
+    enter_shared_telegram_pure_bt_flow,
+    enter_shared_pure_bt_flow=enter_shared_pure_bt_flow,
+    raw_bt_destination_options_key=RAW_BT_DESTINATION_OPTIONS_KEY,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    raw_bt_destination_service_not_ready_text=RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+    service_not_ready_text=SERVICE_NOT_READY_TEXT,
+)
+_enter_media_import_bt_flow = partial(
+    enter_shared_telegram_media_import_bt_flow,
+    enter_shared_media_import_bt_flow=enter_shared_media_import_bt_flow,
+    bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    service_not_ready_text=SERVICE_NOT_READY_TEXT,
+    bt_classification_prompt_text=BT_CLASSIFICATION_PROMPT_TEXT,
+)
 BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
 
 # Compatibility re-exports for existing tests and narrow module consumers.
@@ -354,41 +373,6 @@ async def _download_completion_polling_loop(
 def _format_bt_classification_result(media_kind: str) -> str:
     label = BT_CLASSIFICATION_LABELS.get(media_kind, BT_CLASSIFICATION_LABELS["raw_bt"])
     return BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label=label, kind=media_kind)
-
-
-def _enter_pure_bt_flow(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-    source: str,
-) -> str:
-    return enter_shared_pure_bt_flow(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        source=source,
-        raw_bt_destination_options_key=RAW_BT_DESTINATION_OPTIONS_KEY,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-        raw_bt_destination_service_not_ready_text=RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-        service_not_ready_text=SERVICE_NOT_READY_TEXT,
-    )
-
-
-def _enter_media_import_bt_flow(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    chat_id: int | None,
-    source: str,
-    media_kind: str | None = None,
-) -> str:
-    return enter_shared_media_import_bt_flow(
-        bot_data=context.application.bot_data,
-        chat_id=chat_id,
-        source=source,
-        media_kind=media_kind,
-        bt_pending_repo_key=BT_PENDING_REPO_KEY,
-        service_not_ready_text=SERVICE_NOT_READY_TEXT,
-        bt_classification_prompt_text=BT_CLASSIFICATION_PROMPT_TEXT,
-    )
 
 
 async def handle_private_chat_query_text(
