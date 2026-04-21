@@ -1,22 +1,23 @@
-# Current status (v348)
+# Current status (v349)
 
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 16 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 里的 BT TMDB / raw_bt follow-up 与 pending reminder 路由分支抽成独立 helper，路由主干不再内联 pending 读取、共享 handler 调用和 reminder 回复。
+- shared runtime / channel 解耦已收掉 17 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 尾部的 confirm / 数字选项 / 搜索 fallback 路由分支抽成独立 helper，路由主干不再内联 confirm 分流、数字选项投递和搜索 fallback。
 
 ## Current health
 
 - 正式入口名：`make quality`、`make verify-mainline`。
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 等价命令结果为 `24 passed`。
-- 当前主线 focused 验证入口：绿灯；本次 BT TMDB / raw_bt / reminder focused 回归为 `34 passed, 238 deselected`。
+- 当前主线 focused 验证入口：绿灯；本次 confirm / digit / reminder focused 回归为 `50 passed, 222 deselected`。
 - 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
 
 ## Latest verification
 
 - `quality` 等价命令：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
+- confirm / digit / reminder focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "confirm or digit or pending_returns_reminder" -q` 为 `50 passed, 222 deselected`。
 - BT TMDB / raw_bt / reminder focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "bt_tmdb_association or raw_bt_destination or pending_returns_reminder" -q` 为 `34 passed, 238 deselected`。
 - BT processing / classification focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "processing_path or classification" -q` 为 `43 passed, 229 deselected`。
 - `tests/test_get_download_status.py -q` 为 `42 passed`。
@@ -39,7 +40,7 @@
 ## Current biggest risk
 
 - 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 shared runtime 直连 Telegram 内部 helper，而是 `app/bot/private_chat_runtime.py`、`app/bot/telegram_bot.py` 这两个热点文件仍承载过多 BT 分支协调。
-- 下一段更小也更中性的结构债，是把 `private_chat_runtime.py` 尾部的 confirm / 数字选项 / 搜索 fallback 路由分支继续拆成共享小 helper，减少同一入口里 confirm 分流、数字选项投递和搜索 fallback 的混排。
+- `private_chat_runtime.py` 经过连续 4 轮路由瘦身后虽然主干更清楚，但文件体积已涨到 `1421` 行；当前更大的结构风险变成“继续在同一文件里加 helper 是否还值得”，需要先做一次收益递减重评估，再决定是否切到 `app/bot/telegram_runtime_adapter.py` 的入口边界。
 
 ## Recommended Next Operator Command
 
