@@ -2,8 +2,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from functools import partial
 
-from telegram.ext import Application, ContextTypes
-
 from app.bot.bt_classification_runtime import (
     BT_CLASSIFICATION_CANCELLED_TEXT,
     BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
@@ -253,72 +251,6 @@ _COMPAT_REEXPORTS = (
     parse_import_query,
     parse_watchlist_query,
 )
-
-def build_application(
-    token: str,
-    search_service: SearchMediaService,
-    add_to_downloader_service: AddToDownloaderService,
-    get_download_status_service: GetDownloadStatusService,
-    import_to_library_service: ImportToLibraryService,
-    cleanup_downloaded_source_service: CleanupDownloadedSourceService,
-    manage_watchlist_service: ManageWatchlistService,
-    manage_bt_subscription_service: ManageBtSubscriptionService,
-    post_download_auto_import_service: PostDownloadAutoImportService | None = None,
-    telegram_update_repo: TelegramUpdateRepo | None = None,
-    job_repo: JobRepo | None = None,
-    execution_gate: ExecutionGate | None = None,
-    bt_pending_repo: BtPendingRepo | None = None,
-    bt_tmdb_movie_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
-    bt_tmdb_tv_candidates_lookup_func: LookupTmdbCandidatesFunc | None = None,
-    raw_bt_destination_options: tuple[RawBtDestinationOption, ...] = (),
-    downloader_instances: tuple[DownloaderInstanceConfig, ...] = (),
-    downloader_role_binding: DownloaderRoleBinding | None = None,
-    outbound_proxy_url: str = "",
-) -> Application:
-    from app.bot.telegram_runtime_adapter import build_telegram_application
-
-    return build_telegram_application(
-        token=token,
-        search_service=search_service,
-        add_to_downloader_service=add_to_downloader_service,
-        get_download_status_service=get_download_status_service,
-        import_to_library_service=import_to_library_service,
-        cleanup_downloaded_source_service=cleanup_downloaded_source_service,
-        manage_watchlist_service=manage_watchlist_service,
-        manage_bt_subscription_service=manage_bt_subscription_service,
-        post_download_auto_import_service=post_download_auto_import_service,
-        telegram_update_repo=telegram_update_repo,
-        job_repo=job_repo,
-        execution_gate=execution_gate,
-        bt_pending_repo=bt_pending_repo,
-        bt_tmdb_movie_candidates_lookup_func=bt_tmdb_movie_candidates_lookup_func,
-        bt_tmdb_tv_candidates_lookup_func=bt_tmdb_tv_candidates_lookup_func,
-        raw_bt_destination_options=raw_bt_destination_options,
-        downloader_instances=downloader_instances,
-        downloader_role_binding=downloader_role_binding,
-        outbound_proxy_url=outbound_proxy_url,
-    )
-
 def _format_bt_classification_result(media_kind: str) -> str:
     label = BT_CLASSIFICATION_LABELS.get(media_kind, BT_CLASSIFICATION_LABELS["raw_bt"])
     return BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE.format(label=label, kind=media_kind)
-
-
-async def handle_private_chat_query_text(
-    *,
-    query: str,
-    reply_func: Callable[[str], Awaitable[object]],
-    chat_id: int | None,
-    user_id: int | None,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> None:
-    from app.bot.private_chat_runtime import handle_private_chat_query_text as shared_handle_private_chat_query_text
-
-    await shared_handle_private_chat_query_text(
-        query=query,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        user_id=user_id,
-        channel="telegram",
-        bot_data=context.application.bot_data,
-    )

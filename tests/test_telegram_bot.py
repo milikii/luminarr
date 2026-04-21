@@ -12,6 +12,7 @@ from telegram.ext import CallbackQueryHandler
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.bot.telegram_runtime_adapter import (
+    build_telegram_application as build_application,
     handle_telegram_callback_query as handle_callback_query,
     handle_telegram_message as handle_message,
 )
@@ -50,7 +51,6 @@ from app.bot.telegram_bot import (
     SERVICE_NOT_READY_TEXT,
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
     TELEGRAM_SEND_TEXT_FUNC_KEY,
-    build_application,
     _get_bt_tmdb_association_pending,
     _get_raw_bt_destination_pending,
     _clear_bt_classification_pending,

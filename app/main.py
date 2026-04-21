@@ -18,7 +18,7 @@ from app.bot.wecom_adapter import (
     WECOM_TOKEN_BOT_DATA_KEY,
 )
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
-from app.bot.telegram_bot import build_application
+from app.bot.telegram_runtime_adapter import build_telegram_application as build_application
 from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
