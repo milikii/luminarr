@@ -1,23 +1,25 @@
-# Current status (v345)
+# Current status (v346)
 
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 13 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 里的 BT 直接入口 pending 初始化分支抽成执行 helper，路由主干不再内联 pending 清理、processing-path 初始化和提示回复。
+- shared runtime / channel 解耦已收掉 14 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 里的 frustration / reset 路由分支抽成独立 helper，路由主干不再内联 pending job 查询、approval cancel、搜索状态重置和 BT pending cancel。
 
 ## Current health
 
 - 正式入口名：`make quality`、`make verify-mainline`。
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 等价命令结果为 `24 passed`。
-- 当前主线 focused 验证入口：绿灯；本次 `verify-mainline` 等价命令结果为 `25 passed, 17 deselected` + `12 passed, 204 deselected`。
+- 当前主线 focused 验证入口：绿灯；本次 frustration / cancel focused 回归为 `18 passed, 254 deselected`，Telegram frustration focused 为 `7 passed, 209 deselected`。
 - 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
 
 ## Latest verification
 
 - `quality` 等价命令：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- `verify-mainline` 等价命令：`tests/test_get_download_status.py` focused 为 `25 passed, 17 deselected`，`tests/test_telegram_bot.py` focused 为 `12 passed, 204 deselected`。
+- frustration / cancel focused 回归：`tests/test_telegram_bot.py tests/test_private_chat_runtime.py -k "frustration or clear_fails_on_cancel or clear_result_is_missing_on_cancel or cancel_state_unavailable or pending_job_lookup_failure" -q` 为 `18 passed, 254 deselected`。
+- Telegram frustration focused 回归：`tests/test_telegram_bot.py -k "frustration" -q` 为 `7 passed, 209 deselected`。
+- `tests/test_get_download_status.py -q` 为 `42 passed`。
 - BT 批量确认 focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "bt_batch_confirm" -q` 为 `34 passed, 238 deselected`。
 - BT 只读探索 / cleanup focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "bt_read_only or cleanup" -q` 为 `35 passed, 235 deselected`。
 - BT processing path pending focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "processing_path" -q` 为 `20 passed, 250 deselected`。
@@ -35,7 +37,7 @@
 ## Current biggest risk
 
 - 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 shared runtime 直连 Telegram 内部 helper，而是 `app/bot/private_chat_runtime.py`、`app/bot/telegram_bot.py` 这两个热点文件仍承载过多 BT 分支协调。
-- 下一段更小也更中性的结构债，是把 `private_chat_runtime.py` 里的 frustration / reset 路由分支继续拆成共享小 helper，减少同一入口里 pending job 查询、approval cancel、搜索候选清理和 BT pending cancel 的混排。
+- 下一段更小也更中性的结构债，是把 `private_chat_runtime.py` 里的 BT processing-path / classification follow-up 路由分支继续拆成共享小 helper，减少同一入口里 pending pop、跨 stage 清理和流程进入逻辑的混排。
 
 ## Recommended Next Operator Command
 
