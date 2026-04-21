@@ -74,6 +74,15 @@ class _BtFollowUpPrecheck:
     bt_classification_pending: bool
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedPrivateChatRuntime:
+    tg: object
+    execution_gate: object
+    reply_func: PrivateChatReplyFunc
+    resolve_bt_downloader_execution: Callable[[], tuple[object | None, str | None]]
+    resolve_pt_downloader_execution: Callable[[], tuple[object | None, str | None]]
+
+
 def _prepare_private_chat_runtime_bootstrap(
     *,
     query: str,
@@ -82,21 +91,33 @@ def _prepare_private_chat_runtime_bootstrap(
     chat_id: int | None,
     user_id: int | None,
     bot_data: MutableMapping[str, object],
-) -> tuple[object, object, PrivateChatReplyFunc]:
+) -> _PreparedPrivateChatRuntime:
     tg = telegram_runtime
-    return (
-        tg,
-        resolve_execution_gate(
+    return _PreparedPrivateChatRuntime(
+        tg=tg,
+        execution_gate=resolve_execution_gate(
             bot_data=bot_data,
             execution_gate_key=tg.EXECUTION_GATE_KEY,
         ),
-        prepare_private_chat_reply_with_trace(
+        reply_func=prepare_private_chat_reply_with_trace(
             bot_data=bot_data,
             reply_func=reply_func,
             channel=channel,
             chat_id=chat_id,
             user_id=user_id,
             query=query,
+        ),
+        resolve_bt_downloader_execution=partial(
+            resolve_private_chat_bound_downloader_execution,
+            bot_data=bot_data,
+            role="bt",
+            tg=tg,
+        ),
+        resolve_pt_downloader_execution=partial(
+            resolve_private_chat_bound_downloader_execution,
+            bot_data=bot_data,
+            role="pt",
+            tg=tg,
         ),
     )
 
@@ -389,45 +410,33 @@ async def handle_private_chat_query_text(
     channel: str = "unknown",
     bot_data: MutableMapping[str, object],
 ) -> None:
-    tg, execution_gate, reply_func = _prepare_private_chat_runtime_bootstrap(
+    runtime = _prepare_private_chat_runtime_bootstrap(
         query=query,
         reply_func=reply_func,
         channel=channel,
         chat_id=chat_id,
         user_id=user_id,
         bot_data=bot_data,
-    )
-    resolve_bt_downloader_execution = partial(
-        resolve_private_chat_bound_downloader_execution,
-        bot_data=bot_data,
-        role="bt",
-        tg=tg,
-    )
-    resolve_pt_downloader_execution = partial(
-        resolve_private_chat_bound_downloader_execution,
-        bot_data=bot_data,
-        role="pt",
-        tg=tg,
     )
     if await _handle_opening_routes(
         query=query,
         bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
+        execution_gate=runtime.execution_gate,
+        reply_func=runtime.reply_func,
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        resolve_bt_downloader_execution=resolve_bt_downloader_execution,
-        tg=tg,
+        resolve_bt_downloader_execution=runtime.resolve_bt_downloader_execution,
+        tg=runtime.tg,
     ):
         return
 
     bt_follow_up_precheck = await _handle_bt_follow_up_routes(
         query=query,
         bot_data=bot_data,
-        reply_func=reply_func,
+        reply_func=runtime.reply_func,
         chat_id=chat_id,
-        tg=tg,
+        tg=runtime.tg,
     )
     if bt_follow_up_precheck is None:
         return
@@ -435,25 +444,25 @@ async def handle_private_chat_query_text(
     if await _handle_execution_gated_shared_routes(
         query=query,
         bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
+        execution_gate=runtime.execution_gate,
+        reply_func=runtime.reply_func,
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        tg=tg,
+        tg=runtime.tg,
     ):
         return
 
     await _handle_tail_routes(
         query=query,
         bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
+        execution_gate=runtime.execution_gate,
+        reply_func=runtime.reply_func,
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
         bt_follow_up_precheck=bt_follow_up_precheck,
-        resolve_bt_downloader_execution=resolve_bt_downloader_execution,
-        resolve_pt_downloader_execution=resolve_pt_downloader_execution,
-        tg=tg,
+        resolve_bt_downloader_execution=runtime.resolve_bt_downloader_execution,
+        resolve_pt_downloader_execution=runtime.resolve_pt_downloader_execution,
+        tg=runtime.tg,
     )
