@@ -73,6 +73,33 @@ class _BtFollowUpPrecheck:
     bt_classification_pending: bool
 
 
+def _prepare_private_chat_runtime_bootstrap(
+    *,
+    query: str,
+    reply_func: PrivateChatReplyFunc,
+    channel: str,
+    chat_id: int | None,
+    user_id: int | None,
+    bot_data: MutableMapping[str, object],
+) -> tuple[object, object, PrivateChatReplyFunc]:
+    tg = telegram_runtime
+    return (
+        tg,
+        resolve_execution_gate(
+            bot_data=bot_data,
+            execution_gate_key=tg.EXECUTION_GATE_KEY,
+        ),
+        prepare_private_chat_reply_with_trace(
+            bot_data=bot_data,
+            reply_func=reply_func,
+            channel=channel,
+            chat_id=chat_id,
+            user_id=user_id,
+            query=query,
+        ),
+    )
+
+
 async def _resolve_bt_follow_up_precheck(
     *,
     query: str,
@@ -116,18 +143,13 @@ async def handle_private_chat_query_text(
     channel: str = "unknown",
     bot_data: MutableMapping[str, object],
 ) -> None:
-    tg = telegram_runtime
-    execution_gate = resolve_execution_gate(
-        bot_data=bot_data,
-        execution_gate_key=tg.EXECUTION_GATE_KEY,
-    )
-    reply_func = prepare_private_chat_reply_with_trace(
-        bot_data=bot_data,
+    tg, execution_gate, reply_func = _prepare_private_chat_runtime_bootstrap(
+        query=query,
         reply_func=reply_func,
         channel=channel,
         chat_id=chat_id,
         user_id=user_id,
-        query=query,
+        bot_data=bot_data,
     )
     if await handle_shared_frustration_query(
         query=query,
@@ -335,7 +357,7 @@ async def handle_private_chat_query_text(
         query=query,
         chat_id=chat_id,
         channel=channel,
-        bt_processing_path_pending=bt_processing_path_pending,
-        bt_classification_pending=bt_classification_pending,
+        bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
+        bt_classification_pending=bt_follow_up_precheck.bt_classification_pending,
         tg=tg,
     )

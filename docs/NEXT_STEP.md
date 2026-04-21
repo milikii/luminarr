@@ -1,9 +1,10 @@
-# Next step (v286)
+# Next step (v287)
 
 ## Current goal
 
-- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 runtime bootstrap helper 边界瘦身**。
-- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 BT pending 预检 helper 边界瘦身**：BT processing / classification follow-up 前的 query 解析、pending 读取和 service-not-ready 早退已抽到 `_resolve_bt_follow_up_precheck()`，当前不回退。
+- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 downloader execution lambda helper 边界瘦身**。
+- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 runtime bootstrap helper 边界瘦身**：主函数开头的 `tg / execution_gate / traced reply` 装配已抽到 `_prepare_private_chat_runtime_bootstrap()`，当前不回退。
+- 再上一条主线是 **`private_chat_runtime.py` 的 BT pending 预检 helper 边界瘦身**：BT processing / classification follow-up 前的 query 解析、pending 读取和 service-not-ready 早退已抽到 `_resolve_bt_follow_up_precheck()`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的 dispatch wrapper 边界瘦身**：`dispatch_private_chat_text()` 已从 shared runtime 主文件移除，Telegram / Feishu / WeCom / personal WeChat 入口和相关 tests 已直接 alias 到 `handle_private_chat_query_text()`，当前不回退。
 - 再上一条主线是 **`telegram_bot.py` 的剩余纯 wrapper 清零**：`build_application()` 与无调用点的 `handle_private_chat_query_text()` 已从主文件移除，应用构建入口已直接复用 `telegram_runtime_adapter.py`，当前不回退。
 - 再上一条主线是 **`telegram_bot.py` 的 Telegram entry wrapper 边界瘦身**：`handle_message()` / `handle_callback_query()` 已从主文件移除，`telegram_runtime_adapter.py` 已直接挂自己的 message / callback 入口，tests 也已直接复用 runtime adapter 入口，当前不回退。
@@ -35,7 +36,7 @@
 - 再上一条主线是 **Telegram 发送 helper 边界瘦身**：媒资发送、文本发送和 Telegram 图片/文件判定已抽到 `app/bot/telegram_delivery_runtime.py`，`telegram_runtime_adapter.py` 已直接复用这层发送出口，当前不回退。
 - 再上一条主线是 **Telegram reply formatter 边界瘦身**：搜索卡片、下载审批、导入审批三段 Telegram 特有文本整形已抽到 `app/bot/telegram_reply_formatter.py`，当前不回退。
 - 再上一条主线是 **Telegram 生命周期编排边界瘦身**：sidecar 启停、Application lifecycle 入口、BT scheduler loop / 日志 / downloader resolution 都已收进 `app/bot/telegram_sidecar_runtime.py`，当前不回退。
-- `app/bot/telegram_bot.py` 已降到 `256` 行，仅保留 BT 兼容常量与 `_format_bt_classification_result()`；`app/bot/private_chat_runtime.py` 在本轮收掉 BT pending 预检 helper 后已降到 `321` 行，主函数开头的 runtime bootstrap 仍直接手写 `tg / execution_gate / traced reply` 装配。
+- `app/bot/telegram_bot.py` 已降到 `256` 行，仅保留 BT 兼容常量与 `_format_bt_classification_result()`；`app/bot/private_chat_runtime.py` 当前为 `363` 行，runtime bootstrap 已收口，但 BT 批量确认 / BT TMDB / raw BT destination / digit-selection 仍各自内联 downloader execution lambda。
 - 上一条已完成主线是 **`Makefile` / `verify-mainline` 补齐 download follow-up runtime 的固定质量入口**：`app/bot/download_follow_up_runtime.py` focused tests 已纳入固定回归，当前不回退。
 - 再上一条已完成主线是 **`telegram_bot.py` 里的 `post_download_auto_import` / `download_completion_polling` 调度边界瘦身**：下载完成轮询与自动导入调度已抽到 `app/bot/download_follow_up_runtime.py`，当前不回退。
 - 再上一条已完成主线是 **`app/bot/telegram_runtime_adapter.py` 的 message / callback 入口边界收口**：Telegram message / callback 入口共用的 chat/user 解析、去重落盘和 reply 包装已抽到 `app/bot/telegram_update_runtime.py`，当前不回退。
@@ -46,19 +47,19 @@
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 批量确认路由分支瘦身**，当前不回退。
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 只读探索 / cleanup 路由分支瘦身**，当前不回退。
 - 更早一条已完成主线 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- `telegram_bot.py` 纯 wrapper 已基本清空，当前更小也更直接的下一步，是继续留在 `private_chat_runtime.py` 把 runtime bootstrap 这段 `tg / execution_gate / traced reply` 装配收成最小 helper，避免 shared runtime 主函数继续背入口前置准备。
+- `telegram_bot.py` 纯 wrapper 已基本清空，当前更小也更直接的下一步，是继续留在 `private_chat_runtime.py` 收掉重复的 downloader execution lambda，避免 shared runtime 主函数继续背 role + tg 透传细节。
 - 这一步继续只做最小边界瘦身，不顺手放大成新的搜索平台、统一回复总线或大文件总重写。
 - 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1714 passed, 2 skipped`。
 
 ## User value
 
-- 在 BT pending 预检已经收成 helper 后，继续收 `private_chat_runtime.py` 入口最前面的 runtime bootstrap，可以让主函数更接近“只做路由编排”。
+- 在 runtime bootstrap 已收成 helper 后，继续收 `private_chat_runtime.py` 里重复的 downloader execution lambda，可以让主函数进一步靠近“只做路由编排”。
 - 在默认分支已经稳绿、固定 gate 已补齐的前提下，优先继续降低热点文件体积和 shared runtime/service 耦合。
-- 避免 shared runtime 主函数继续手写 `tg / execution_gate / traced reply` 这段入口装配细节。
+- 避免 shared runtime 主函数继续手写多段 `resolve_private_chat_bound_downloader_execution(..., role=..., tg=tg)` 透传细节。
 
 ## Only do
 
-- 只做一次保守瘦身：围绕 `private_chat_runtime.py` 开头的 runtime bootstrap 做最小 helper 收口。
+- 只做一次保守瘦身：围绕 `private_chat_runtime.py` 里重复的 downloader execution lambda 做最小 helper 收口。
 - 保持现有 parser / routing / approval / SQLite 真相边界不变，不新增用户可感知功能，不改渠道外部协议。
 - 保持当前 download follow-up 调度、错误文案和中文日志语义不回退。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线。
@@ -76,15 +77,15 @@
 
 ## Done when
 
-当前 **`private_chat_runtime.py` 的 runtime bootstrap helper 边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
+当前 **`private_chat_runtime.py` 的 downloader execution lambda helper 边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
 
-1. `private_chat_runtime.py` 开头的 `tg / execution_gate / traced reply` 装配至少一段从主函数抽离，且现有文本语义不变；
-2. focused tests 或既有 Telegram / shared runtime 回归能继续覆盖当前 runtime bootstrap 最小回归；
+1. `private_chat_runtime.py` 里至少一段重复的 downloader execution lambda 从主函数抽离，且现有文本语义不变；
+2. focused tests 或既有 Telegram / shared runtime 回归能继续覆盖当前 downloader execution helper 最小回归；
 3. 默认分支全量 pytest 继续保持绿灯；
 4. 文档继续保持分层一致，`STATUS.md` 只写当前快照，`NEXT_STEP.md` 只写当前唯一主线。
 
 ## After this step
 
-1. 如果 `private_chat_runtime.py` 的 runtime bootstrap helper 已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补对应 focused gate。
+1. 如果 `private_chat_runtime.py` 的 downloader execution lambda helper 已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补对应 focused gate。
 2. 如果热点文件暂时没有更小闭环，再继续补 Makefile / focused tests / 真实 smoke 的其他缺口。
 3. 只有在 shared runtime 边界和热点大文件都没有更小闭环可做时，才重新考虑次级结构债。
