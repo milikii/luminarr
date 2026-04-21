@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
+from functools import partial
 
 from app.bot.bt_classification_runtime import (
     is_bt_classification_pending,
@@ -99,7 +100,6 @@ def _prepare_private_chat_runtime_bootstrap(
         ),
     )
 
-
 async def _resolve_bt_follow_up_precheck(
     *,
     query: str,
@@ -151,6 +151,18 @@ async def handle_private_chat_query_text(
         user_id=user_id,
         bot_data=bot_data,
     )
+    resolve_bt_downloader_execution = partial(
+        resolve_private_chat_bound_downloader_execution,
+        bot_data=bot_data,
+        role="bt",
+        tg=tg,
+    )
+    resolve_pt_downloader_execution = partial(
+        resolve_private_chat_bound_downloader_execution,
+        bot_data=bot_data,
+        role="pt",
+        tg=tg,
+    )
     if await handle_shared_frustration_query(
         query=query,
         bot_data=bot_data,
@@ -198,11 +210,7 @@ async def handle_private_chat_query_text(
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
-            bot_data=bot_data,
-            role="bt",
-            tg=tg,
-        ),
+        resolve_downloader_execution=resolve_bt_downloader_execution,
         tg=tg,
     ):
         return
@@ -309,11 +317,7 @@ async def handle_private_chat_query_text(
         query=query,
         chat_id=chat_id,
         user_id=user_id,
-        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
-            bot_data=bot_data,
-            role="bt",
-            tg=tg,
-        ),
+        resolve_downloader_execution=resolve_bt_downloader_execution,
         tg=tg,
     ):
         return
@@ -324,11 +328,7 @@ async def handle_private_chat_query_text(
         query=query,
         chat_id=chat_id,
         user_id=user_id,
-        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
-            bot_data=bot_data,
-            role="bt",
-            tg=tg,
-        ),
+        resolve_downloader_execution=resolve_bt_downloader_execution,
         tg=tg,
     ):
         return
@@ -341,11 +341,7 @@ async def handle_private_chat_query_text(
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        resolve_downloader_execution=lambda: resolve_private_chat_bound_downloader_execution(
-            bot_data=bot_data,
-            role="pt",
-            tg=tg,
-        ),
+        resolve_downloader_execution=resolve_pt_downloader_execution,
         tg=tg,
     ):
         return
