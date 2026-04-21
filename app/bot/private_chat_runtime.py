@@ -20,10 +20,11 @@ from app.bot.bt_processing_path_runtime import (
     pop_bt_processing_path_pending,
     set_bt_processing_path_pending,
 )
-from app.bot.bt_tmdb_association_runtime import handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query
 from app.bot.bt_tmdb_association_runtime import (
     clear_bt_tmdb_association_pending,
+    enter_media_import_bt_flow,
     get_bt_tmdb_association_pending,
+    handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
 )
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
@@ -44,6 +45,7 @@ from app.bot.query_text_runtime import (
 )
 from app.bot.raw_bt_destination_runtime import (
     clear_raw_bt_destination_pending,
+    enter_pure_bt_flow,
     get_raw_bt_destination_pending,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
 )
@@ -536,19 +538,25 @@ async def handle_private_chat_query_text(
         )
         if bt_processing_path == "media_import":
             await reply_func(
-                tg._enter_media_import_bt_flow(
-                    context=context,
+                enter_media_import_bt_flow(
+                    bot_data=bot_data,
                     chat_id=chat_id,
                     source=bt_source,
+                    bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+                    service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
                 )
             )
             return
         if bt_processing_path == "pure_bt":
             await reply_func(
-                tg._enter_pure_bt_flow(
-                    context=context,
+                enter_pure_bt_flow(
+                    bot_data=bot_data,
                     chat_id=chat_id,
                     source=bt_source,
+                    raw_bt_destination_options_key=tg.RAW_BT_DESTINATION_OPTIONS_KEY,
+                    bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+                    raw_bt_destination_service_not_ready_text=tg.RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+                    service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
                 )
             )
             return
@@ -556,19 +564,25 @@ async def handle_private_chat_query_text(
             shortcut_path, shortcut_media_kind = bt_processing_shortcut
             if shortcut_path == "pure_bt":
                 await reply_func(
-                    tg._enter_pure_bt_flow(
-                        context=context,
+                    enter_pure_bt_flow(
+                        bot_data=bot_data,
                         chat_id=chat_id,
                         source=bt_source,
+                        raw_bt_destination_options_key=tg.RAW_BT_DESTINATION_OPTIONS_KEY,
+                        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+                        raw_bt_destination_service_not_ready_text=tg.RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+                        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
                     )
                 )
                 return
             await reply_func(
-                tg._enter_media_import_bt_flow(
-                    context=context,
+                enter_media_import_bt_flow(
+                    bot_data=bot_data,
                     chat_id=chat_id,
                     source=bt_source,
                     media_kind=shortcut_media_kind,
+                    bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+                    service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
                 )
             )
             return
@@ -599,11 +613,13 @@ async def handle_private_chat_query_text(
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         await reply_func(
-            tg._enter_media_import_bt_flow(
-                context=context,
+            enter_media_import_bt_flow(
+                bot_data=bot_data,
                 chat_id=chat_id,
                 source=bt_source,
                 media_kind=bt_classification,
+                bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+                service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
             )
         )
         return

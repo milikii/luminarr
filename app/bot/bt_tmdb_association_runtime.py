@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from app.bot.bt_classification_runtime import BT_CLASSIFICATION_PROMPT_TEXT, set_bt_classification_pending
 from app.bot.raw_bt_destination_runtime import can_dispatch_bt_source
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
@@ -302,6 +303,36 @@ def clear_bt_tmdb_association_pending(
         if pending is not None:
             pending_by_chat[chat_id] = pending
         return None
+
+
+def enter_media_import_bt_flow(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    source: str,
+    media_kind: str | None = None,
+    bt_pending_repo_key: str = "bt_pending_repo",
+    service_not_ready_text: str,
+    bt_classification_prompt_text: str = BT_CLASSIFICATION_PROMPT_TEXT,
+) -> str:
+    if media_kind is not None:
+        if not set_bt_tmdb_association_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            media_kind=media_kind,
+            source=source,
+            bt_pending_repo_key=bt_pending_repo_key,
+        ):
+            return service_not_ready_text
+        return format_bt_tmdb_association_prompt(media_kind)
+    if not set_bt_classification_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        query=source,
+        bt_pending_repo_key=bt_pending_repo_key,
+    ):
+        return service_not_ready_text
+    return bt_classification_prompt_text
 
 
 def format_bt_tmdb_association_prompt(media_kind: str) -> str:

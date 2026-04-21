@@ -334,6 +334,32 @@ def clear_raw_bt_destination_pending(
         return None
 
 
+def enter_pure_bt_flow(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    source: str,
+    raw_bt_destination_options_key: str,
+    bt_pending_repo_key: str = "bt_pending_repo",
+    raw_bt_destination_service_not_ready_text: str = RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+    service_not_ready_text: str,
+) -> str:
+    options = bot_data.get(raw_bt_destination_options_key)
+    if not isinstance(options, tuple) or not all(isinstance(option, RawBtDestinationOption) for option in options):
+        return raw_bt_destination_service_not_ready_text
+    if not options:
+        return raw_bt_destination_service_not_ready_text
+    if not set_raw_bt_destination_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        options=options,
+        source=source,
+        bt_pending_repo_key=bt_pending_repo_key,
+    ):
+        return service_not_ready_text
+    return format_raw_bt_destination_prompt(options)
+
+
 def can_dispatch_bt_source(source: str) -> bool:
     return source.strip().lower().startswith("magnet:?")
 

@@ -43,8 +43,8 @@ from app.bot.bt_tmdb_association_runtime import (
     BT_CLASSIFICATION_LABELS,
     BtTmdbAssociationPending,
     clear_bt_tmdb_association_pending as clear_shared_bt_tmdb_association_pending,
+    enter_media_import_bt_flow as enter_shared_media_import_bt_flow,
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
-    format_bt_tmdb_association_prompt as _format_bt_tmdb_association_prompt,
     get_bt_tmdb_association_pending as get_shared_bt_tmdb_association_pending,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
     set_bt_tmdb_association_pending as set_shared_bt_tmdb_association_pending,
@@ -58,11 +58,10 @@ from app.bot.execution_runtime import resolve_execution_gate
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
-    RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
     RawBtDestinationPending,
     clear_raw_bt_destination_pending as clear_shared_raw_bt_destination_pending,
-    format_raw_bt_destination_prompt as _format_raw_bt_destination_prompt,
+    enter_pure_bt_flow as enter_shared_pure_bt_flow,
     get_raw_bt_destination_pending as get_shared_raw_bt_destination_pending,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
     set_raw_bt_destination_pending as set_shared_raw_bt_destination_pending,
@@ -1025,17 +1024,15 @@ def _enter_pure_bt_flow(
     chat_id: int | None,
     source: str,
 ) -> str:
-    raw_bt_destination_options = _resolve_raw_bt_destination_options(context)
-    if not raw_bt_destination_options:
-        return RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT
-    if not _set_raw_bt_destination_pending(
-        context=context,
+    return enter_shared_pure_bt_flow(
+        bot_data=context.application.bot_data,
         chat_id=chat_id,
-        options=raw_bt_destination_options,
         source=source,
-    ):
-        return SERVICE_NOT_READY_TEXT
-    return _format_raw_bt_destination_prompt(raw_bt_destination_options)
+        raw_bt_destination_options_key=RAW_BT_DESTINATION_OPTIONS_KEY,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+        raw_bt_destination_service_not_ready_text=RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+        service_not_ready_text=SERVICE_NOT_READY_TEXT,
+    )
 
 
 def _enter_media_import_bt_flow(
@@ -1045,22 +1042,15 @@ def _enter_media_import_bt_flow(
     source: str,
     media_kind: str | None = None,
 ) -> str:
-    if media_kind is not None:
-        if not _set_bt_tmdb_association_pending(
-            context=context,
-            chat_id=chat_id,
-            media_kind=media_kind,
-            source=source,
-        ):
-            return SERVICE_NOT_READY_TEXT
-        return _format_bt_tmdb_association_prompt(media_kind)
-    if not _set_bt_classification_pending(
-        context=context,
+    return enter_shared_media_import_bt_flow(
+        bot_data=context.application.bot_data,
         chat_id=chat_id,
-        query=source,
-    ):
-        return SERVICE_NOT_READY_TEXT
-    return BT_CLASSIFICATION_PROMPT_TEXT
+        source=source,
+        media_kind=media_kind,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+        service_not_ready_text=SERVICE_NOT_READY_TEXT,
+        bt_classification_prompt_text=BT_CLASSIFICATION_PROMPT_TEXT,
+    )
 
 
 def _resolve_bt_tmdb_candidates_lookup(
@@ -1075,19 +1065,6 @@ def _resolve_bt_tmdb_candidates_lookup(
     if callable(lookup_func):
         return lookup_func
     return None
-
-
-def _resolve_raw_bt_destination_options(
-    context: ContextTypes.DEFAULT_TYPE,
-) -> tuple[RawBtDestinationOption, ...]:
-    options = context.application.bot_data.get(RAW_BT_DESTINATION_OPTIONS_KEY)
-    if not isinstance(options, tuple):
-        return ()
-    resolved_options: list[RawBtDestinationOption] = []
-    for option in options:
-        if isinstance(option, RawBtDestinationOption):
-            resolved_options.append(option)
-    return tuple(resolved_options)
 
 
 def _resolve_downloader_instances(
