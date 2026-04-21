@@ -1,23 +1,24 @@
-# Current status (v349)
+# Current status (v350)
 
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 17 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 尾部的 confirm / 数字选项 / 搜索 fallback 路由分支抽成独立 helper，路由主干不再内联 confirm 分流、数字选项投递和搜索 fallback。
+- shared runtime / channel 解耦已收掉 18 条最小直连；本轮最新闭环是把 Telegram message / callback 入口共用的 chat/user 解析、去重落盘和 reply 包装从 `telegram_bot.py` 抽到 `app/bot/telegram_update_runtime.py`，`telegram_runtime_adapter.py` 不再直接反查 `telegram_bot.py` 的这组内部 helper。
 
 ## Current health
 
 - 正式入口名：`make quality`、`make verify-mainline`。
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 等价命令结果为 `24 passed`。
-- 当前主线 focused 验证入口：绿灯；本次 confirm / digit / reminder focused 回归为 `50 passed, 222 deselected`。
+- 当前主线 focused 验证入口：绿灯；本次 Telegram adapter focused 回归为 `10 passed`，Telegram confirm / digit / reminder 相关回归为 `45 passed, 161 deselected`。
 - 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1632 passed, 2 skipped`。
 
 ## Latest verification
 
 - `quality` 等价命令：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- confirm / digit / reminder focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "confirm or digit or pending_returns_reminder" -q` 为 `50 passed, 222 deselected`。
+- Telegram adapter focused 回归：`tests/test_telegram_runtime_adapter.py -q` 为 `10 passed`。
+- Telegram confirm / digit / reminder 相关 focused 回归：`tests/test_telegram_bot.py -k "confirm or digit or pending_returns_reminder or deduplicate or update_id_invalid or callback_id_missing" -q` 为 `45 passed, 161 deselected`。
 - BT TMDB / raw_bt / reminder focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "bt_tmdb_association or raw_bt_destination or pending_returns_reminder" -q` 为 `34 passed, 238 deselected`。
 - BT processing / classification focused 回归：`tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "processing_path or classification" -q` 为 `43 passed, 229 deselected`。
 - `tests/test_get_download_status.py -q` 为 `42 passed`。
@@ -39,8 +40,8 @@
 
 ## Current biggest risk
 
-- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 shared runtime 直连 Telegram 内部 helper，而是 `app/bot/private_chat_runtime.py`、`app/bot/telegram_bot.py` 这两个热点文件仍承载过多 BT 分支协调。
-- `private_chat_runtime.py` 经过连续 4 轮路由瘦身后虽然主干更清楚，但文件体积已涨到 `1421` 行；当前更大的结构风险变成“继续在同一文件里加 helper 是否还值得”，需要先做一次收益递减重评估，再决定是否切到 `app/bot/telegram_runtime_adapter.py` 的入口边界。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债不再是 Telegram message / callback 入口边界，而是 `app/bot/private_chat_runtime.py` 仍有 `1421` 行、`app/bot/telegram_bot.py` 仍有 `1221` 行，并继续承载 BT 路由与 follow-up 调度细节。
+- 其中更高风险的是 `telegram_bot.py` 内的 `post_download_auto_import` / `download_completion_polling` 调度段还和 Telegram 渠道启动/停止逻辑挤在同一文件；这条链直接触达 `download_monitor_repo`、状态 follow-up 和自动导入，适合继续做最小边界收口。
 
 ## Recommended Next Operator Command
 

@@ -87,7 +87,6 @@ from app.db.bt_pending_repo import (
 )
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
-from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
     ACTION_BT_READ_ONLY_HELPER,
     ACTION_BT_SUBSCRIPTION_RUN,
@@ -268,15 +267,6 @@ def build_telegram_send_text_func(application: Application) -> TelegramSendTextF
         return await application.bot.send_message(chat_id=chat_id, text=text)
 
     return send_text
-
-
-def _build_telegram_reply_func(
-    reply_func: Callable[[str], Awaitable[object]],
-) -> Callable[[str], Awaitable[object]]:
-    async def wrapped(text: str) -> object:
-        return await reply_func(_format_telegram_reply(text))
-
-    return wrapped
 
 
 async def _send_telegram_media(
@@ -670,171 +660,6 @@ async def _send_bt_subscription_scheduler_message(
     except Exception as error:
         _log_bt_subscription_scheduler_send_error(chat_id=chat_id, error=error)
 
-
-def _resolve_chat_id(
-    update: Update,
-    *,
-    callback_query: object | None = None,
-) -> int | None:
-    chat = getattr(update, "effective_chat", None)
-    chat_id = getattr(chat, "id", None)
-    if isinstance(chat_id, int):
-        return chat_id
-
-    if callback_query is None:
-        return None
-
-    message = getattr(callback_query, "message", None)
-    callback_chat = getattr(message, "chat", None)
-    callback_chat_id = getattr(callback_chat, "id", None)
-    if isinstance(callback_chat_id, int):
-        return callback_chat_id
-    return None
-
-
-def _resolve_user_id(
-    update: Update,
-    *,
-    callback_query: object | None = None,
-) -> int | None:
-    user = getattr(update, "effective_user", None)
-    user_id = getattr(user, "id", None)
-    if isinstance(user_id, int):
-        return user_id
-
-    if callback_query is None:
-        return None
-
-    callback_user = getattr(callback_query, "from_user", None)
-    callback_user_id = getattr(callback_user, "id", None)
-    if isinstance(callback_user_id, int):
-        return callback_user_id
-    return None
-
-
-def _resolve_callback_message(update: Update, callback_query: object) -> object | None:
-    message = getattr(update, "effective_message", None)
-    if message is not None:
-        return message
-    return getattr(callback_query, "message", None)
-
-
-def _log_telegram_update_record_failed(
-    *,
-    source_type: str,
-    source_id: str,
-    chat_id: int | None,
-    user_id: int | None,
-    reason: str,
-) -> None:
-    print(
-        f"\033[31m[Telegram 更新去重落盘失败]\033[0m source_type={source_type} "
-        f"source_id={source_id.strip() or '-'} chat_id={chat_id if chat_id is not None else '-'} "
-        f"user_id={user_id if user_id is not None else '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/telegram_updates 表写入是否正常；"
-        "当前 update 会停止继续处理，避免在去重真相缺失时重复执行副作用。",
-        flush=True,
-    )
-
-
-def _log_telegram_update_record_result_missing(
-    *,
-    source_type: str,
-    source_id: str,
-    chat_id: int | None,
-    user_id: int | None,
-    reason: str,
-) -> None:
-    print(
-        f"\033[31m[Telegram 更新去重结果缺失]\033[0m source_type={source_type} "
-        f"source_id={source_id.strip() or '-'} chat_id={chat_id if chat_id is not None else '-'} "
-        f"user_id={user_id if user_id is not None else '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 telegram_updates 写入返回是否仍带有明确布尔结果；"
-        "当前 update 会停止继续处理，避免把去重真相缺口误判成普通重复消息。",
-        flush=True,
-    )
-
-
-def _record_message_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
-    if not isinstance(update_repo, TelegramUpdateRepo):
-        return True
-
-    update_id = getattr(update, "update_id", 0)
-    if not isinstance(update_id, int):
-        return True
-
-    chat = getattr(update, "effective_chat", None)
-    user = getattr(update, "effective_user", None)
-    chat_id = chat.id if chat is not None else None
-    user_id = user.id if user is not None else None
-    try:
-        recorded = update_repo.record_message_update(
-            update_id=update_id,
-            chat_id=chat_id,
-            user_id=user_id,
-        )
-        if recorded is None:
-            raise RuntimeError("telegram update record result missing")
-        return recorded
-    except Exception as error:
-        if str(error) == "telegram update record result missing":
-            _log_telegram_update_record_result_missing(
-                source_type="message",
-                source_id=str(update_id),
-                chat_id=chat_id,
-                user_id=user_id,
-                reason=str(error),
-            )
-        else:
-            _log_telegram_update_record_failed(
-                source_type="message",
-                source_id=str(update_id),
-                chat_id=chat_id,
-                user_id=user_id,
-                reason=str(error),
-            )
-        return False
-
-
-def _record_callback_update(
-    *,
-    callback_query_id: str,
-    chat_id: int | None,
-    user_id: int | None,
-    context: ContextTypes.DEFAULT_TYPE,
-) -> bool:
-    update_repo = context.application.bot_data.get(TELEGRAM_UPDATE_REPO_KEY)
-    if not isinstance(update_repo, TelegramUpdateRepo):
-        return True
-
-    try:
-        recorded = update_repo.record_callback_update(
-            callback_query_id=callback_query_id,
-            chat_id=chat_id,
-            user_id=user_id,
-        )
-        if recorded is None:
-            raise RuntimeError("telegram update record result missing")
-        return recorded
-    except Exception as error:
-        if str(error) == "telegram update record result missing":
-            _log_telegram_update_record_result_missing(
-                source_type="callback",
-                source_id=callback_query_id,
-                chat_id=chat_id,
-                user_id=user_id,
-                reason=str(error),
-            )
-        else:
-            _log_telegram_update_record_failed(
-                source_type="callback",
-                source_id=callback_query_id,
-                chat_id=chat_id,
-                user_id=user_id,
-                reason=str(error),
-            )
-        return False
 
 def _set_bt_processing_path_pending(
     *,

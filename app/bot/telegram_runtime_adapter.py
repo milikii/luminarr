@@ -16,6 +16,14 @@ from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.search_media import SearchMediaService
+from app.bot.telegram_update_runtime import (
+    build_telegram_reply_func,
+    record_telegram_callback_update,
+    record_telegram_message_update,
+    resolve_telegram_callback_message,
+    resolve_telegram_chat_id,
+    resolve_telegram_user_id,
+)
 
 
 async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -26,14 +34,18 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
     if message is None:
         return
 
-    chat_id = tg._resolve_chat_id(update)
-    user_id = tg._resolve_user_id(update)
-    if not tg._record_message_update(update=update, context=context):
+    chat_id = resolve_telegram_chat_id(update)
+    user_id = resolve_telegram_user_id(update)
+    if not record_telegram_message_update(
+        update=update,
+        context=context,
+        telegram_update_repo_key=tg.TELEGRAM_UPDATE_REPO_KEY,
+    ):
         return
 
     await dispatch_private_chat_text(
         query=(message.text or "").strip(),
-        reply_func=tg._build_telegram_reply_func(message.reply_text),
+        reply_func=build_telegram_reply_func(message.reply_text, formatter=tg._format_telegram_reply),
         chat_id=chat_id,
         user_id=user_id,
         channel="telegram",
@@ -49,14 +61,15 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
     if callback_query is None:
         return
 
-    chat_id = tg._resolve_chat_id(update, callback_query=callback_query)
-    user_id = tg._resolve_user_id(update, callback_query=callback_query)
+    chat_id = resolve_telegram_chat_id(update, callback_query=callback_query)
+    user_id = resolve_telegram_user_id(update, callback_query=callback_query)
     callback_query_id = str(getattr(callback_query, "id", "") or "").strip()
-    if not tg._record_callback_update(
+    if not record_telegram_callback_update(
         callback_query_id=callback_query_id,
         chat_id=chat_id,
         user_id=user_id,
         context=context,
+        telegram_update_repo_key=tg.TELEGRAM_UPDATE_REPO_KEY,
     ):
         return
 
@@ -64,7 +77,7 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
     if callable(answer_func):
         await answer_func()
 
-    message = tg._resolve_callback_message(update, callback_query)
+    message = resolve_telegram_callback_message(update, callback_query)
     if message is None:
         return
 
@@ -74,7 +87,7 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
 
     await dispatch_private_chat_text(
         query=query,
-        reply_func=tg._build_telegram_reply_func(message.reply_text),
+        reply_func=build_telegram_reply_func(message.reply_text, formatter=tg._format_telegram_reply),
         chat_id=chat_id,
         user_id=user_id,
         channel="telegram",
