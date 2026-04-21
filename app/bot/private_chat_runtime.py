@@ -160,6 +160,55 @@ async def _handle_cleanup_request(
     return True
 
 
+async def _handle_bt_batch_confirm_request(
+    *,
+    bot_data: MutableMapping[str, object],
+    execution_gate,
+    reply_func: PrivateChatReplyFunc,
+    batch_confirm_request,
+    chat_id: int | None,
+    user_id: int | None,
+    channel: str,
+    tg,
+) -> bool:
+    if not batch_confirm_request.selection_text:
+        await reply_func("BT 批量确认格式：bt批量确认 1-3")
+        return True
+    if batch_confirm_request.invalid_selection:
+        await reply_func(
+            f"BT 批量确认编号格式无效：{batch_confirm_request.selection_text}\n"
+            "请使用 1-3 或 2,4,6 这类范围表达。"
+        )
+        return True
+    add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+    if not isinstance(add_service, tg.AddToDownloaderService) or chat_id is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return True
+    downloader_execution, resolution_error = _resolve_bound_downloader_execution(
+        bot_data=bot_data,
+        role="bt",
+        tg=tg,
+    )
+    if resolution_error is not None:
+        await reply_func(resolution_error)
+        return True
+    reply = await execution_gate.run(
+        tg.ACTION_ADD_TO_DOWNLOADER,
+        lambda: add_service.add_by_batch_selection(
+            chat_id,
+            batch_confirm_request.selected_indexes,
+            user_id=user_id,
+            channel=channel,
+            downloader_name=downloader_execution.name if downloader_execution is not None else "",
+            downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+            download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
+            auto_import_enabled=False,
+        ),
+    )
+    await reply_func(reply)
+    return True
+
+
 def _resolve_bound_downloader_execution(
     *,
     bot_data: MutableMapping[str, object],
@@ -517,40 +566,17 @@ async def handle_private_chat_query_text(
 
     bt_batch_confirm_request = extract_bt_batch_confirm_request(query)
     if bt_batch_confirm_request is not None:
-        if not bt_batch_confirm_request.selection_text:
-            await reply_func("BT 批量确认格式：bt批量确认 1-3")
+        if await _handle_bt_batch_confirm_request(
+            bot_data=bot_data,
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            batch_confirm_request=bt_batch_confirm_request,
+            chat_id=chat_id,
+            user_id=user_id,
+            channel=channel,
+            tg=tg,
+        ):
             return
-        if bt_batch_confirm_request.invalid_selection:
-            await reply_func(
-                f"BT 批量确认编号格式无效：{bt_batch_confirm_request.selection_text}\n"
-                "请使用 1-3 或 2,4,6 这类范围表达。"
-            )
-            return
-        add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
-        if not isinstance(add_service, tg.AddToDownloaderService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        if chat_id is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        downloader_execution, resolution_error = _resolve_bound_downloader_execution(bot_data=bot_data, role="bt", tg=tg)
-        if resolution_error is not None:
-            await reply_func(resolution_error)
-            return
-        reply = await execution_gate.run(
-            tg.ACTION_ADD_TO_DOWNLOADER,
-            lambda: add_service.add_by_batch_selection(
-                chat_id,
-                bt_batch_confirm_request.selected_indexes,
-                user_id=user_id,
-                channel=channel,
-                downloader_name=downloader_execution.name if downloader_execution is not None else "",
-                downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
-                download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
-                auto_import_enabled=False,
-            ),
-        )
-        await reply_func(reply)
         return
 
     bt_classification = parse_bt_classification_choice(query)

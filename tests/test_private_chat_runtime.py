@@ -18,6 +18,8 @@ from app.bot.telegram_bot import (
     BT_PENDING_REPO_KEY,
     BT_PROCESSING_PATH_PROMPT_TEXT,
     CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
+    DOWNLOADER_INSTANCES_KEY,
+    DOWNLOADER_ROLE_BINDING_KEY,
     GET_DOWNLOAD_STATUS_SERVICE_KEY,
     IMPORT_TO_LIBRARY_SERVICE_KEY,
     JOB_REPO_KEY,
@@ -26,6 +28,7 @@ from app.bot.telegram_bot import (
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
     TELEGRAM_SEND_TEXT_FUNC_KEY,
 )
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.bt_pending_repo import BtPendingRepo
@@ -57,17 +60,25 @@ async def _fake_search(query: str) -> list[dict[str, object]]:
 
 def _build_bot_data(
     *,
+    search_service: SearchMediaService | None = None,
+    add_service: AddToDownloaderService | None = None,
     cleanup_service: CleanupDownloadedSourceService | None = None,
+    downloader_role_binding: DownloaderRoleBinding | None = None,
+    downloader_instances: tuple[DownloaderInstanceConfig, ...] | None = None,
 ) -> dict[str, object]:
-    search_service = SearchMediaService(_fake_search)
+    resolved_search_service = search_service or SearchMediaService(_fake_search)
     bot_data = {
-        SEARCH_SERVICE_KEY: search_service,
-        ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
+        SEARCH_SERVICE_KEY: resolved_search_service,
+        ADD_TO_DOWNLOADER_SERVICE_KEY: add_service or AddToDownloaderService(resolved_search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
     }
     if cleanup_service is not None:
         bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
+    if downloader_role_binding is not None:
+        bot_data[DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
+    if downloader_instances is not None:
+        bot_data[DOWNLOADER_INSTANCES_KEY] = downloader_instances
     return bot_data
 
 
@@ -134,6 +145,92 @@ def test_dispatch_private_chat_text_routes_search_with_channel_delivery_renderer
     sent_text = reply_text.await_args.args[0]
     assert sent_text.startswith("【搜索：dune】 ✓")
     assert "▸ 候选结果" in sent_text
+
+
+def test_dispatch_private_chat_text_routes_bt_batch_confirm_without_telegram_update() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "Frieren S01E01"
+        return [
+            {
+                "title": "title-Frieren S01E01",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+            {
+                "title": "title-Frieren S01E02",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "indexerName": "Nyaa",
+                "sourceProvider": "nyaa",
+            },
+        ]
+
+    search_service = SearchMediaService(_fake_search, raw_search_func=fake_raw_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    downloader_role_binding = DownloaderRoleBinding(pt_downloader="", bt_downloader="")
+    downloader_instances = (
+        DownloaderInstanceConfig(name="", downloader_type="transmission", base_url="", download_dir="/downloads"),
+    )
+    preview_reply = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="bt批量 Frieren S01E01 1-2",
+            reply_func=preview_reply,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(
+                search_service=search_service,
+                add_service=add_service,
+                downloader_role_binding=downloader_role_binding,
+                downloader_instances=downloader_instances,
+            ),
+        )
+    )
+
+    confirm_reply = AsyncMock()
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="bt批量确认 1-2",
+            reply_func=confirm_reply,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(
+                search_service=search_service,
+                add_service=add_service,
+                downloader_role_binding=downloader_role_binding,
+                downloader_instances=downloader_instances,
+            ),
+        )
+    )
+
+    confirm_reply.assert_awaited_once()
+    sent_text = confirm_reply.await_args.args[0]
+    assert sent_text.count("下载待确认：") == 2
+    assert "title-Frieren S01E01" in sent_text
+    assert "title-Frieren S01E02" in sent_text
+    assert "请发送 confirm 1 执行下载。" in sent_text
+    assert "请发送 confirm 2 执行下载。" in sent_text
+
+
+def test_dispatch_private_chat_text_replies_invalid_bt_batch_confirm_selection_without_telegram_update() -> None:
+    reply_text = AsyncMock()
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="bt批量确认 1-a",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    reply_text.assert_awaited_once_with(
+        "BT 批量确认编号格式无效：1-a\n请使用 1-3 或 2,4,6 这类范围表达。"
+    )
 
 
 def test_dispatch_private_chat_text_routes_add_pending_with_channel_delivery_renderer() -> None:
