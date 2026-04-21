@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
+from dataclasses import dataclass
 
 from app.bot.bt_classification_runtime import (
     is_bt_classification_pending,
@@ -61,6 +62,50 @@ from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_t
 from app.bot.private_chat_watchlist_runtime import handle_watchlist_query as handle_shared_watchlist_query
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
+
+
+@dataclass(frozen=True, slots=True)
+class _BtFollowUpPrecheck:
+    bt_classification: str | None
+    bt_processing_path: str | None
+    bt_processing_shortcut: str | None
+    bt_processing_path_pending: bool
+    bt_classification_pending: bool
+
+
+async def _resolve_bt_follow_up_precheck(
+    *,
+    query: str,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    tg,
+) -> _BtFollowUpPrecheck | None:
+    bt_processing_path_pending = is_bt_processing_path_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if bt_processing_path_pending is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return None
+
+    bt_classification_pending = is_bt_classification_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
+    if bt_classification_pending is None:
+        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+        return None
+
+    return _BtFollowUpPrecheck(
+        bt_classification=parse_bt_classification_choice(query),
+        bt_processing_path=parse_bt_processing_path_choice(query),
+        bt_processing_shortcut=parse_bt_processing_path_legacy_shortcut(query),
+        bt_processing_path_pending=bt_processing_path_pending,
+        bt_classification_pending=bt_classification_pending,
+    )
 
 async def handle_private_chat_query_text(
     *,
@@ -140,32 +185,22 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    bt_classification = parse_bt_classification_choice(query)
-    bt_processing_path = parse_bt_processing_path_choice(query)
-    bt_processing_shortcut = parse_bt_processing_path_legacy_shortcut(query)
-    bt_processing_path_pending = is_bt_processing_path_pending(
+    bt_follow_up_precheck = await _resolve_bt_follow_up_precheck(
+        query=query,
         bot_data=bot_data,
+        reply_func=reply_func,
         chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        tg=tg,
     )
-    if bt_processing_path_pending is None:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return
-    bt_classification_pending = is_bt_classification_pending(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if bt_classification_pending is None:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
+    if bt_follow_up_precheck is None:
         return
     if await handle_bt_processing_path_follow_up(
         bot_data=bot_data,
         reply_func=reply_func,
         chat_id=chat_id,
-        bt_processing_path_pending=bt_processing_path_pending,
-        bt_processing_path=bt_processing_path,
-        bt_processing_shortcut=bt_processing_shortcut,
+        bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
+        bt_processing_path=bt_follow_up_precheck.bt_processing_path,
+        bt_processing_shortcut=bt_follow_up_precheck.bt_processing_shortcut,
         tg=tg,
     ):
         return
@@ -174,8 +209,8 @@ async def handle_private_chat_query_text(
         bot_data=bot_data,
         reply_func=reply_func,
         chat_id=chat_id,
-        bt_classification_pending=bt_classification_pending,
-        bt_classification=bt_classification,
+        bt_classification_pending=bt_follow_up_precheck.bt_classification_pending,
+        bt_classification=bt_follow_up_precheck.bt_classification,
         tg=tg,
     ):
         return
