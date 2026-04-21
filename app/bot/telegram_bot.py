@@ -20,9 +20,17 @@ from app.bot.feishu_long_connection import (
     FEISHU_LONG_CONNECTION_SERVICE_KEY,
     FeishuLongConnectionService,
 )
+from app.bot.bt_classification_runtime import (
+    BT_CLASSIFICATION_CANCELLED_TEXT,
+    BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
+    BT_CLASSIFICATION_PROMPT_TEXT,
+    clear_bt_classification_pending as clear_shared_bt_classification_pending,
+    is_bt_classification_pending as is_shared_bt_classification_pending,
+    pop_bt_classification_pending as pop_shared_bt_classification_pending,
+    set_bt_classification_pending as set_shared_bt_classification_pending,
+)
 from app.bot.bt_processing_path_runtime import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
-    BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY,
     BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
     BT_PROCESSING_PATH_PROMPT_TEXT,
     clear_bt_processing_path_pending as clear_shared_bt_processing_path_pending,
@@ -67,8 +75,6 @@ from app.bot.wecom_webhook_server import (
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
-    BT_PENDING_STAGE_PROCESSING_PATH,
-    BT_PENDING_STAGE_CLASSIFICATION,
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
     BtPendingPersistenceError,
@@ -122,16 +128,6 @@ from app.services.search_media import SearchMediaService
 FRUSTRATION_RESET_TEXT = "已清除当前候选，请重新搜索。"
 CLARIFICATION_RESET_TEXT = "已取消当前澄清，请重新描述片名后搜索。"
 CLARIFICATION_SELECTION_BLOCKED_TEXT = "当前处于片名澄清中，请先补充片名或年份后再搜索。"
-BT_CLASSIFICATION_PROMPT_TEXT = (
-    "已记录后续处理链：影视入库链。\n"
-    "请回复以下媒体类型之一：movie / series / anime\n"
-    "对应含义：电影 / 剧集 / 动漫"
-)
-BT_CLASSIFICATION_CANCELLED_TEXT = "已取消当前 BT 媒体类型选择，请重新发送磁力或 BT 指令。"
-BT_CLASSIFICATION_PENDING_REMINDER_TEXT = (
-    "当前正在等待 BT 媒体类型选择。\n"
-    "请回复：movie / series / anime"
-)
 BT_CLASSIFICATION_RESULT_TEXT_TEMPLATE = (
     "已记录本次 BT 媒体类型：{label}（{kind}）。\n"
     "当前这一步只完成媒体类型 follow-up，暂不执行 TMDB 关联或下载投递。"
@@ -164,7 +160,6 @@ JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
 BT_PENDING_REPO_KEY = "bt_pending_repo"
-BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
 BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
 BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY = "bt_tmdb_movie_candidates_lookup_func"
 BT_TMDB_TV_CANDIDATES_LOOKUP_KEY = "bt_tmdb_tv_candidates_lookup_func"
@@ -849,16 +844,6 @@ def _record_callback_update(
             )
         return False
 
-
-def _resolve_bt_classification_pending_by_chat(context: ContextTypes.DEFAULT_TYPE) -> dict[int, str]:
-    pending_by_chat = context.application.bot_data.get(BT_CLASSIFICATION_PENDING_BY_CHAT_KEY)
-    if isinstance(pending_by_chat, dict):
-        return pending_by_chat
-    resolved_pending_by_chat: dict[int, str] = {}
-    context.application.bot_data[BT_CLASSIFICATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
-    return resolved_pending_by_chat
-
-
 def _serialize_bt_pending_payload(payload: dict[str, object]) -> str:
     try:
         return json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -995,44 +980,12 @@ def _set_bt_classification_pending(
     chat_id: int | None,
     query: str,
 ) -> bool:
-    if chat_id is None or chat_id <= 0:
-        return False
-    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    cleaned_query = query.strip()
-    pending_by_chat[chat_id] = cleaned_query
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return True
-    try:
-        pending_repo.upsert_pending(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_CLASSIFICATION,
-            payload_json=_serialize_bt_pending_payload({"query": cleaned_query}),
-        )
-    except BtPendingPersistenceError as error:
-        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
-            _log_bt_pending_missing_after_upsert(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_persist_failed(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        pending_by_chat.pop(chat_id, None)
-        return False
-    except Exception as error:
-        _log_bt_pending_persist_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_CLASSIFICATION,
-            reason=str(error),
-        )
-        pending_by_chat.pop(chat_id, None)
-        return False
-    return True
+    return set_shared_bt_classification_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        query=query,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _is_bt_classification_pending(
@@ -1040,46 +993,11 @@ def _is_bt_classification_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> bool | None:
-    if chat_id is None or chat_id <= 0:
-        return False
-    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    if chat_id in pending_by_chat:
-        return True
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return False
-    try:
-        pending_state = pending_repo.get_pending(chat_id=chat_id)
-    except Exception as error:
-        if _is_bt_pending_row_corrupted_reason(str(error)):
-            _log_bt_pending_row_corrupted(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_read_failed(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        return None
-    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
-        return False
-    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
-    if payload_error is not None:
-        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return None
-    pending_query = str(payload.get("query", "")).strip()
-    if not pending_query:
-        _log_bt_pending_payload_corruption(
-            chat_id=chat_id,
-            stage=pending_state.stage,
-            reason="payload.query missing",
-        )
-        return None
-    pending_by_chat[chat_id] = pending_query
-    return True
+    return is_shared_bt_classification_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _clear_bt_classification_pending(
@@ -1087,31 +1005,11 @@ def _clear_bt_classification_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> bool | None:
-    if chat_id is None or chat_id <= 0:
-        return False
-    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    pending_query = pending_by_chat.pop(chat_id, None)
-    cleared = pending_query is not None
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return cleared
-    try:
-        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
-        if cleared_result is None:
-            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
-        return cleared_result or cleared
-    except Exception as error:
-        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
-            _log_bt_pending_clear_result_missing(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
-        if isinstance(pending_query, str):
-            pending_by_chat[chat_id] = pending_query
-        return None
+    return clear_shared_bt_classification_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _pop_bt_classification_pending(
@@ -1119,86 +1017,11 @@ def _pop_bt_classification_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> str | Literal[False] | None:
-    if chat_id is None or chat_id <= 0:
-        return None
-    pending_by_chat = _resolve_bt_classification_pending_by_chat(context)
-    pending_query = pending_by_chat.pop(chat_id, None)
-    if isinstance(pending_query, str):
-        pending_repo = _resolve_bt_pending_repo(context)
-        if pending_repo is not None:
-            try:
-                cleared_result = pending_repo.clear_pending(
-                    chat_id=chat_id,
-                    expected_stage=BT_PENDING_STAGE_CLASSIFICATION,
-                )
-                if cleared_result is None:
-                    raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
-            except Exception as error:
-                pending_by_chat[chat_id] = pending_query
-                if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
-                    _log_bt_pending_clear_result_missing(
-                        chat_id=chat_id,
-                        stage=BT_PENDING_STAGE_CLASSIFICATION,
-                        reason=str(error),
-                    )
-                else:
-                    _log_bt_pending_clear_failed(
-                        chat_id=chat_id,
-                        stage=BT_PENDING_STAGE_CLASSIFICATION,
-                        reason=str(error),
-                    )
-                return False
-        return pending_query
-
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return None
-    try:
-        pending_state = pending_repo.get_pending(chat_id=chat_id)
-    except Exception as error:
-        if _is_bt_pending_row_corrupted_reason(str(error)):
-            _log_bt_pending_row_corrupted(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_read_failed(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        return None
-    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_CLASSIFICATION:
-        return None
-    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
-    if payload_error is not None:
-        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return None
-    pending_query = str(payload.get("query", "")).strip()
-    if not pending_query:
-        _log_bt_pending_payload_corruption(
-            chat_id=chat_id,
-            stage=pending_state.stage,
-            reason="payload.query missing",
-        )
-        return None
-    try:
-        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
-        if cleared_result is None:
-            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
-    except Exception as error:
-        pending_by_chat[chat_id] = pending_query
-        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
-            _log_bt_pending_clear_result_missing(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_CLASSIFICATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_CLASSIFICATION, reason=str(error))
-        return False
-    return pending_query
+    return pop_shared_bt_classification_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _resolve_bt_tmdb_association_pending_by_chat(

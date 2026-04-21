@@ -4,6 +4,13 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.bot.bt_classification_runtime import (
+    BT_CLASSIFICATION_CANCELLED_TEXT,
+    BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
+    clear_bt_classification_pending,
+    is_bt_classification_pending,
+    pop_bt_classification_pending,
+)
 from app.bot.bt_processing_path_runtime import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
     BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
@@ -294,12 +301,16 @@ async def handle_private_chat_query_text(
         if cleared_tmdb_association:
             await reply_func(tg.BT_TMDB_ASSOCIATION_CANCELLED_TEXT)
             return
-        cleared_classification = tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
+        cleared_classification = clear_bt_classification_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_classification is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
         if cleared_classification:
-            await reply_func(tg.BT_CLASSIFICATION_CANCELLED_TEXT)
+            await reply_func(BT_CLASSIFICATION_CANCELLED_TEXT)
             return
         cleared_processing_path = clear_bt_processing_path_pending(
             bot_data=bot_data,
@@ -330,7 +341,11 @@ async def handle_private_chat_query_text(
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_classification = tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
+        cleared_classification = clear_bt_classification_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_classification is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -455,7 +470,11 @@ async def handle_private_chat_query_text(
     if bt_processing_path_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
-    bt_classification_pending = tg._is_bt_classification_pending(context=context, chat_id=chat_id)
+    bt_classification_pending = is_bt_classification_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
     if bt_classification_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
@@ -478,7 +497,11 @@ async def handle_private_chat_query_text(
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        tg._clear_bt_classification_pending(context=context, chat_id=chat_id)
+        clear_bt_classification_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if bt_processing_path == "media_import":
             await reply_func(
                 tg._enter_media_import_bt_flow(
@@ -519,7 +542,11 @@ async def handle_private_chat_query_text(
             return
 
     if bt_classification is not None and bt_classification_pending:
-        bt_source = tg._pop_bt_classification_pending(context=context, chat_id=chat_id)
+        bt_source = pop_bt_classification_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if bt_source is False or not bt_source:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -879,7 +906,7 @@ async def handle_private_chat_query_text(
         return
 
     if bt_classification_pending:
-        await reply_func(tg.BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
+        await reply_func(BT_CLASSIFICATION_PENDING_REMINDER_TEXT)
         return
 
     reply = await execution_gate.run(
