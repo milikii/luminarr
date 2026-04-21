@@ -43,9 +43,12 @@ from app.bot.bt_tmdb_association_runtime import (
     BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
     BT_CLASSIFICATION_LABELS,
     BtTmdbAssociationPending,
+    clear_bt_tmdb_association_pending as clear_shared_bt_tmdb_association_pending,
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
     format_bt_tmdb_association_prompt as _format_bt_tmdb_association_prompt,
+    get_bt_tmdb_association_pending as get_shared_bt_tmdb_association_pending,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
+    set_bt_tmdb_association_pending as set_shared_bt_tmdb_association_pending,
 )
 from app.bot.downloader_execution_runtime import (
     ResolvedDownloaderExecution,
@@ -76,7 +79,6 @@ from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDes
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
-    BT_PENDING_STAGE_TMDB_ASSOCIATION,
     BtPendingPersistenceError,
     BtPendingRepo,
 )
@@ -160,7 +162,6 @@ JOB_REPO_KEY = "job_repo"
 TELEGRAM_UPDATE_REPO_KEY = "telegram_update_repo"
 EXECUTION_GATE_KEY = "execution_gate"
 BT_PENDING_REPO_KEY = "bt_pending_repo"
-BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
 BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY = "bt_tmdb_movie_candidates_lookup_func"
 BT_TMDB_TV_CANDIDATES_LOOKUP_KEY = "bt_tmdb_tv_candidates_lookup_func"
 RAW_BT_DESTINATION_PENDING_BY_CHAT_KEY = "raw_bt_destination_pending_by_chat"
@@ -1024,17 +1025,6 @@ def _pop_bt_classification_pending(
     )
 
 
-def _resolve_bt_tmdb_association_pending_by_chat(
-    context: ContextTypes.DEFAULT_TYPE,
-) -> dict[int, BtTmdbAssociationPending]:
-    pending_by_chat = context.application.bot_data.get(BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY)
-    if isinstance(pending_by_chat, dict):
-        return pending_by_chat
-    resolved_pending_by_chat: dict[int, BtTmdbAssociationPending] = {}
-    context.application.bot_data[BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
-    return resolved_pending_by_chat
-
-
 def _resolve_raw_bt_destination_pending_by_chat(
     context: ContextTypes.DEFAULT_TYPE,
 ) -> dict[int, RawBtDestinationPending]:
@@ -1053,43 +1043,13 @@ def _set_bt_tmdb_association_pending(
     media_kind: str,
     source: str,
 ) -> bool:
-    if chat_id is None or chat_id <= 0:
-        return False
-    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
-    pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind, source=source.strip())
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return True
-    try:
-        pending_repo.upsert_pending(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-            payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
-        )
-    except BtPendingPersistenceError as error:
-        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
-            _log_bt_pending_missing_after_upsert(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_persist_failed(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-                reason=str(error),
-            )
-        pending_by_chat.pop(chat_id, None)
-        return False
-    except Exception as error:
-        _log_bt_pending_persist_failed(
-            chat_id=chat_id,
-            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-            reason=str(error),
-        )
-        pending_by_chat.pop(chat_id, None)
-        return False
-    return True
+    return set_shared_bt_tmdb_association_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        media_kind=media_kind,
+        source=source,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _get_bt_tmdb_association_pending(
@@ -1097,56 +1057,11 @@ def _get_bt_tmdb_association_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> BtTmdbAssociationPending | None | Literal[False]:
-    if chat_id is None or chat_id <= 0:
-        return None
-    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
-    pending = pending_by_chat.get(chat_id)
-    if isinstance(pending, BtTmdbAssociationPending):
-        return pending
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return None
-    try:
-        pending_state = pending_repo.get_pending(chat_id=chat_id)
-    except Exception as error:
-        if _is_bt_pending_row_corrupted_reason(str(error)):
-            _log_bt_pending_row_corrupted(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_read_failed(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-                reason=str(error),
-            )
-        return False
-    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
-        return None
-    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
-    if payload_error is not None:
-        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
-        return False
-    media_kind = str(payload.get("media_kind", "")).strip()
-    source = str(payload.get("source", "")).strip()
-    if not media_kind:
-        _log_bt_pending_payload_corruption(
-            chat_id=chat_id,
-            stage=pending_state.stage,
-            reason="payload.media_kind missing",
-        )
-        return False
-    if not source:
-        _log_bt_pending_payload_corruption(
-            chat_id=chat_id,
-            stage=pending_state.stage,
-            reason="payload.source missing",
-        )
-        return False
-    resolved_pending = BtTmdbAssociationPending(media_kind=media_kind, source=source)
-    pending_by_chat[chat_id] = resolved_pending
-    return resolved_pending
+    return get_shared_bt_tmdb_association_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _clear_bt_tmdb_association_pending(
@@ -1154,31 +1069,11 @@ def _clear_bt_tmdb_association_pending(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int | None,
 ) -> bool | None:
-    if chat_id is None or chat_id <= 0:
-        return False
-    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(context)
-    pending = pending_by_chat.pop(chat_id, None)
-    cleared = pending is not None
-    pending_repo = _resolve_bt_pending_repo(context)
-    if pending_repo is None:
-        return cleared
-    try:
-        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION)
-        if cleared_result is None:
-            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
-        return cleared_result or cleared
-    except Exception as error:
-        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
-            _log_bt_pending_clear_result_missing(
-                chat_id=chat_id,
-                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
-                reason=str(error),
-            )
-        else:
-            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_TMDB_ASSOCIATION, reason=str(error))
-        if pending is not None:
-            pending_by_chat[chat_id] = pending
-        return None
+    return clear_shared_bt_tmdb_association_pending(
+        bot_data=context.application.bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=BT_PENDING_REPO_KEY,
+    )
 
 
 def _set_raw_bt_destination_pending(

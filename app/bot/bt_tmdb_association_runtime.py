@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from app.bot.raw_bt_destination_runtime import can_dispatch_bt_source
 from app.clients.tmdb import TmdbMovie
+from app.db.bt_pending_repo import (
+    BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingPersistenceError,
+    BtPendingRepo,
+)
 from app.services.add_to_downloader import BT_SOURCE_UNSUPPORTED_TEXT, AddToDownloaderService
 from app.services.search_media import parse_movie_query
 
@@ -38,6 +44,7 @@ BT_TMDB_ASSOCIATION_SUCCESS_TEMPLATE = (
     "TMDB ID: {tmdb_id}"
 )
 BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT = "TMDB 关联服务未就绪，请稍后重试。"
+BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY = "bt_tmdb_association_pending_by_chat"
 BT_TMDB_ASSOCIATION_EXAMPLES = {
     "movie": "Dune 2021",
     "series": "三体 2023",
@@ -60,6 +67,241 @@ class ResolvedDownloaderExecutionLike(Protocol):
     name: str
     downloader_type: str
     download_dir: str
+
+
+def _resolve_bt_tmdb_association_pending_by_chat(
+    bot_data: MutableMapping[str, object],
+) -> dict[int, BtTmdbAssociationPending]:
+    pending_by_chat = bot_data.get(BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY)
+    if isinstance(pending_by_chat, dict):
+        return pending_by_chat
+    resolved_pending_by_chat: dict[int, BtTmdbAssociationPending] = {}
+    bot_data[BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
+    return resolved_pending_by_chat
+
+
+def _resolve_bt_pending_repo(
+    bot_data: MutableMapping[str, object],
+    bt_pending_repo_key: str,
+) -> BtPendingRepo | None:
+    pending_repo = bot_data.get(bt_pending_repo_key)
+    if isinstance(pending_repo, BtPendingRepo):
+        return pending_repo
+    return None
+
+
+def _serialize_bt_pending_payload(payload: dict[str, object]) -> str:
+    try:
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    except TypeError:
+        return "{}"
+
+
+def _deserialize_bt_pending_payload(payload_json: str) -> tuple[dict[str, object], str | None]:
+    if not payload_json.strip():
+        return {}, "payload_json empty"
+    try:
+        payload = json.loads(payload_json)
+    except json.JSONDecodeError:
+        return {}, "payload_json invalid json"
+    if not isinstance(payload, dict):
+        return {}, "payload_json not object"
+    return payload, None
+
+
+def _log_bt_pending_payload_corruption(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理载荷损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.payload_json 是否仍是合法 JSON，且包含当前 stage 需要的字段。",
+        flush=True,
+    )
+
+
+def _log_bt_pending_clear_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理清理失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表删除是否正常；当前进程内待处理状态已尽量清掉，但重启后旧状态可能仍残留。",
+        flush=True,
+    )
+
+
+def _log_bt_pending_clear_result_missing(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理清理结果缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 删除返回是否仍带有明确结果；当前进程内待处理状态已尽量回滚，避免把缺失真相误判成已清理成功。",
+        flush=True,
+    )
+
+
+def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理读取失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表读取是否正常；当前相关入口会按状态不可用处理，避免把 SQLite 读取异常误判成“没有待处理状态”。",
+        flush=True,
+    )
+
+
+def _log_bt_pending_row_corrupted(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理记录损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.stage 是否仍是完整真相；当前相关入口会按状态不可用处理，避免把坏记录误判成“没有待处理状态”。",
+        flush=True,
+    )
+
+
+def _log_bt_pending_persist_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理持久化失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表写入是否正常；当前进程内待处理状态仍保留，但重启后可能丢失这一步的上下文。",
+        flush=True,
+    )
+
+
+def _log_bt_pending_missing_after_upsert(*, chat_id: int | None, stage: str, reason: str) -> None:
+    print(
+        f"\033[31m[BT 待处理写入后记录缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表是否被并发删除或触发器回滚；"
+        "如需继续当前 BT follow-up，请先确认 SQLite 写入后能立即回读该记录。",
+        flush=True,
+    )
+
+
+def set_bt_tmdb_association_pending(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    media_kind: str,
+    source: str,
+    bt_pending_repo_key: str = "bt_pending_repo",
+) -> bool:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(bot_data)
+    pending_by_chat[chat_id] = BtTmdbAssociationPending(media_kind=media_kind, source=source.strip())
+    pending_repo = _resolve_bt_pending_repo(bot_data, bt_pending_repo_key)
+    if pending_repo is None:
+        return True
+    try:
+        pending_repo.upsert_pending(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
+        )
+    except BtPendingPersistenceError as error:
+        if str(error) == "bt_pending_state missing after upsert":
+            _log_bt_pending_missing_after_upsert(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_persist_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        pending_by_chat.pop(chat_id, None)
+        return False
+    except Exception as error:
+        _log_bt_pending_persist_failed(
+            chat_id=chat_id,
+            stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+            reason=str(error),
+        )
+        pending_by_chat.pop(chat_id, None)
+        return False
+    return True
+
+
+def get_bt_tmdb_association_pending(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    bt_pending_repo_key: str = "bt_pending_repo",
+) -> BtTmdbAssociationPending | None | Literal[False]:
+    if chat_id is None or chat_id <= 0:
+        return None
+    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(bot_data)
+    pending = pending_by_chat.get(chat_id)
+    if isinstance(pending, BtTmdbAssociationPending):
+        return pending
+    pending_repo = _resolve_bt_pending_repo(bot_data, bt_pending_repo_key)
+    if pending_repo is None:
+        return None
+    try:
+        pending_state = pending_repo.get_pending(chat_id=chat_id)
+    except Exception as error:
+        if str(error) == "bt_pending_state stage empty after read":
+            _log_bt_pending_row_corrupted(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_read_failed(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        return False
+    if pending_state is None or pending_state.stage != BT_PENDING_STAGE_TMDB_ASSOCIATION:
+        return None
+    payload, payload_error = _deserialize_bt_pending_payload(pending_state.payload_json)
+    if payload_error is not None:
+        _log_bt_pending_payload_corruption(chat_id=chat_id, stage=pending_state.stage, reason=payload_error)
+        return False
+    media_kind = str(payload.get("media_kind", "")).strip()
+    source = str(payload.get("source", "")).strip()
+    if not media_kind:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.media_kind missing",
+        )
+        return False
+    if not source:
+        _log_bt_pending_payload_corruption(
+            chat_id=chat_id,
+            stage=pending_state.stage,
+            reason="payload.source missing",
+        )
+        return False
+    resolved_pending = BtTmdbAssociationPending(media_kind=media_kind, source=source)
+    pending_by_chat[chat_id] = resolved_pending
+    return resolved_pending
+
+
+def clear_bt_tmdb_association_pending(
+    *,
+    bot_data: MutableMapping[str, object],
+    chat_id: int | None,
+    bt_pending_repo_key: str = "bt_pending_repo",
+) -> bool | None:
+    if chat_id is None or chat_id <= 0:
+        return False
+    pending_by_chat = _resolve_bt_tmdb_association_pending_by_chat(bot_data)
+    pending = pending_by_chat.pop(chat_id, None)
+    cleared = pending is not None
+    pending_repo = _resolve_bt_pending_repo(bot_data, bt_pending_repo_key)
+    if pending_repo is None:
+        return cleared
+    try:
+        cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION)
+        if cleared_result is None:
+            raise BtPendingPersistenceError("bt_pending_state clear result missing")
+        return cleared_result or cleared
+    except Exception as error:
+        if str(error) == "bt_pending_state clear result missing":
+            _log_bt_pending_clear_result_missing(
+                chat_id=chat_id,
+                stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
+                reason=str(error),
+            )
+        else:
+            _log_bt_pending_clear_failed(chat_id=chat_id, stage=BT_PENDING_STAGE_TMDB_ASSOCIATION, reason=str(error))
+        if pending is not None:
+            pending_by_chat[chat_id] = pending
+        return None
 
 
 def format_bt_tmdb_association_prompt(media_kind: str) -> str:

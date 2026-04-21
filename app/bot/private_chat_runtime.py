@@ -21,6 +21,10 @@ from app.bot.bt_processing_path_runtime import (
     set_bt_processing_path_pending,
 )
 from app.bot.bt_tmdb_association_runtime import handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query
+from app.bot.bt_tmdb_association_runtime import (
+    clear_bt_tmdb_association_pending,
+    get_bt_tmdb_association_pending,
+)
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
     bt_subscription_policy_action,
@@ -294,7 +298,11 @@ async def handle_private_chat_query_text(
         if cleared_raw_bt_destination:
             await reply_func(tg.RAW_BT_DESTINATION_CANCELLED_TEXT)
             return
-        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = clear_bt_tmdb_association_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -337,7 +345,11 @@ async def handle_private_chat_query_text(
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = clear_bt_tmdb_association_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -493,7 +505,11 @@ async def handle_private_chat_query_text(
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = clear_bt_tmdb_association_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -554,7 +570,11 @@ async def handle_private_chat_query_text(
         if cleared_raw_bt_destination is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
-        cleared_tmdb_association = tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+        cleared_tmdb_association = clear_bt_tmdb_association_pending(
+            bot_data=bot_data,
+            chat_id=chat_id,
+            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+        )
         if cleared_tmdb_association is None:
             await reply_func(tg.SERVICE_NOT_READY_TEXT)
             return
@@ -792,7 +812,11 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    bt_tmdb_pending = tg._get_bt_tmdb_association_pending(context=context, chat_id=chat_id)
+    bt_tmdb_pending = get_bt_tmdb_association_pending(
+        bot_data=bot_data,
+        chat_id=chat_id,
+        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+    )
     if bt_tmdb_pending is False:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
@@ -804,7 +828,11 @@ async def handle_private_chat_query_text(
             user_id=user_id,
             bot_data=bot_data,
             add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
-            clear_pending=lambda: tg._clear_bt_tmdb_association_pending(context=context, chat_id=chat_id),
+            clear_pending=lambda: clear_bt_tmdb_association_pending(
+                bot_data=bot_data,
+                chat_id=chat_id,
+                bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
+            ),
             resolve_candidates_lookup=lambda media_kind: tg._resolve_bt_tmdb_candidates_lookup(
                 context=context,
                 media_kind=media_kind,
