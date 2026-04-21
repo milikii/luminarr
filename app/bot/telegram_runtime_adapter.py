@@ -20,6 +20,10 @@ from app.bot.telegram_sidecar_runtime import (
     start_telegram_application_lifecycle,
     stop_telegram_application_lifecycle,
 )
+from app.bot.telegram_delivery_runtime import (
+    build_telegram_send_media_func,
+    build_telegram_send_text_func,
+)
 from app.bot.telegram_update_runtime import (
     build_telegram_reply_func,
     record_telegram_callback_update,
@@ -144,8 +148,8 @@ def build_telegram_application(
     application.bot_data[tg.EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
     application.bot_data[tg.DOWNLOADER_INSTANCES_KEY] = downloader_instances
     application.bot_data[tg.DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
-    application.bot_data[tg.TELEGRAM_SEND_MEDIA_FUNC_KEY] = tg.build_telegram_send_media_func(application)
-    application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = tg.build_telegram_send_text_func(application)
+    application.bot_data[tg.TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
+    application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = build_telegram_send_text_func(application)
     if bt_tmdb_movie_candidates_lookup_func is not None:
         application.bot_data[tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
     if bt_tmdb_tv_candidates_lookup_func is not None:

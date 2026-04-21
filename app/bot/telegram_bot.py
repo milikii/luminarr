@@ -62,6 +62,10 @@ from app.bot.personal_wechat_login import (
     PersonalWeChatLoginService,
     parse_personal_wechat_login_query,
 )
+from app.bot.telegram_delivery_runtime import (
+    build_telegram_send_media_func as _shared_build_telegram_send_media_func,
+    build_telegram_send_text_func as _shared_build_telegram_send_text_func,
+)
 from app.bot.telegram_reply_formatter import format_telegram_reply as _shared_format_telegram_reply
 from app.bot.download_follow_up_runtime import (
     download_completion_polling_loop,
@@ -161,7 +165,6 @@ TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
 TELEGRAM_SEND_TEXT_FUNC_KEY = "telegram_send_text_func"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
-TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
@@ -264,61 +267,11 @@ def build_application(
 
 
 def build_telegram_send_media_func(application: Application) -> TelegramSendMediaFunc:
-    async def send_media(chat_id: int, file_path: str | Path, caption: str | None = None) -> object:
-        return await _send_telegram_media(
-            application=application,
-            chat_id=chat_id,
-            file_path=Path(file_path).expanduser(),
-            caption=caption,
-        )
-
-    return send_media
+    return _shared_build_telegram_send_media_func(application)
 
 
 def build_telegram_send_text_func(application: Application) -> TelegramSendTextFunc:
-    async def send_text(*, chat_id: int, text: str) -> object:
-        return await application.bot.send_message(chat_id=chat_id, text=text)
-
-    return send_text
-
-
-async def _send_telegram_media(
-    *,
-    application: Application,
-    chat_id: int,
-    file_path: Path,
-    caption: str | None,
-) -> object:
-    if not file_path.is_file():
-        print(
-            f"\033[31m[Telegram 媒资发送失败]\033[0m chat_id={chat_id} 文件不存在={file_path}\n"
-            "\033[33m[处理建议]\033[0m 检查二维码/文件是否已生成到本地路径，并确认当前进程对该路径有读取权限。"
-        )
-        raise FileNotFoundError(str(file_path))
-
-    try:
-        if _is_telegram_photo_path(file_path):
-            return await application.bot.send_photo(
-                chat_id=chat_id,
-                photo=file_path,
-                caption=caption,
-            )
-        return await application.bot.send_document(
-            chat_id=chat_id,
-            document=file_path,
-            caption=caption,
-            filename=file_path.name,
-        )
-    except Exception as error:
-        print(
-            f"\033[31m[Telegram 媒资发送失败]\033[0m chat_id={chat_id} 文件={file_path} 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 Telegram chat_id 是否仍有效、Bot 是否具备发送媒资权限，以及本地文件是否可被 Telegram API 正常读取。"
-        )
-        raise
-
-
-def _is_telegram_photo_path(file_path: Path) -> bool:
-    return file_path.suffix.lower() in TELEGRAM_PHOTO_SUFFIXES
+    return _shared_build_telegram_send_text_func(application)
 
 async def _post_download_auto_import_scheduler_loop(
     *,
