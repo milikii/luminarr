@@ -57,6 +57,7 @@ from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query as handle_shared_personal_wechat_login_query
+from app.bot.private_chat_status_runtime import handle_status_query as handle_shared_status_query
 from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_trace
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
@@ -1020,17 +1021,15 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    task_ref = tg.parse_status_query(query)
-    if task_ref is not None:
-        status_service = bot_data.get(tg.GET_DOWNLOAD_STATUS_SERVICE_KEY)
-        if not isinstance(status_service, tg.GetDownloadStatusService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            tg.ACTION_GET_DOWNLOAD_STATUS,
-            lambda: status_service.get_status_text(task_ref, chat_id=chat_id, channel=channel),
-        )
-        await reply_func(reply)
+    if await handle_shared_status_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        channel=channel,
+        tg=tg,
+    ):
         return
 
     watchlist_command = tg.parse_watchlist_query(query)
