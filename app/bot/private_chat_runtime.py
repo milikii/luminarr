@@ -29,6 +29,9 @@ from app.bot.execution_runtime import (
     resolve_execution_gate,
     run_sync_with_policy,
 )
+from app.bot.private_chat_bt_read_only_runtime import (
+    handle_bt_read_only_query as handle_shared_bt_read_only_query,
+)
 from app.bot.private_chat_bt_subscription_runtime import (
     handle_bt_subscription_query as handle_shared_bt_subscription_query,
 )
@@ -37,8 +40,6 @@ from app.bot.private_chat_cleanup_runtime import (
 )
 from app.bot.query_text_runtime import (
     extract_bt_batch_confirm_request,
-    extract_bt_batch_preview_request,
-    extract_bt_read_only_query,
     is_bt_direct_intent,
     is_frustration_text,
     parse_bt_classification_choice,
@@ -70,39 +71,6 @@ def _log_pending_job_lookup_failed(*, chat_id: int | None, reason: str) -> None:
         f"\033[31m[待处理任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前待处理任务记录是否正常。"
     )
-
-
-def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 只读探索失败]\033[0m 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 BT 来源配置、站点可达性和网络连通性后重试。"
-    )
-
-
-async def _handle_bt_read_only_request(
-    *,
-    bot_data: MutableMapping[str, object],
-    execution_gate,
-    reply_func: PrivateChatReplyFunc,
-    search_runner: Callable[[object], object],
-    helper_query: str,
-    tg,
-) -> bool:
-    search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
-    if not isinstance(search_service, tg.SearchMediaService):
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    try:
-        reply = await execution_gate.run(
-            tg.ACTION_BT_READ_ONLY_HELPER,
-            lambda: search_runner(search_service),
-        )
-    except Exception as error:
-        _log_bt_read_only_helper_error(query=helper_query, error=error)
-        await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
-        return True
-    await reply_func(reply)
-    return True
 
 
 async def _handle_bt_batch_confirm_request(
@@ -833,33 +801,14 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    bt_read_only_query = extract_bt_read_only_query(query)
-    if bt_read_only_query:
-        if await _handle_bt_read_only_request(
-            bot_data=bot_data,
-            execution_gate=execution_gate,
-            reply_func=reply_func,
-            search_runner=lambda search_service: search_service.search_bt_read_only_and_format(bt_read_only_query),
-            helper_query=bt_read_only_query,
-            tg=tg,
-        ):
-            return
-        return
-
-    bt_batch_preview_request = extract_bt_batch_preview_request(query)
-    if bt_batch_preview_request is not None:
-        if await _handle_bt_read_only_request(
-            bot_data=bot_data,
-            execution_gate=execution_gate,
-            reply_func=reply_func,
-            search_runner=lambda search_service: search_service.search_bt_batch_preview_and_format_for_chat(
-                bt_batch_preview_request,
-                chat_id=chat_id,
-            ),
-            helper_query=bt_batch_preview_request.query,
-            tg=tg,
-        ):
-            return
+    if await handle_shared_bt_read_only_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    ):
         return
 
     bt_batch_confirm_request = extract_bt_batch_confirm_request(query)
