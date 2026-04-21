@@ -35,6 +35,9 @@ from app.bot.execution_runtime import (
 from app.bot.private_chat_bt_subscription_runtime import (
     handle_bt_subscription_query as handle_shared_bt_subscription_query,
 )
+from app.bot.private_chat_cleanup_runtime import (
+    handle_cleanup_query as handle_shared_cleanup_query,
+)
 from app.bot.query_text_runtime import (
     extract_bt_batch_confirm_request,
     extract_bt_batch_preview_request,
@@ -56,7 +59,6 @@ from app.bot.raw_bt_destination_runtime import (
 )
 from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
-from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_import_runtime import handle_import_query as handle_shared_import_query
 from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query as handle_shared_personal_wechat_login_query
 from app.bot.private_chat_status_runtime import handle_status_query as handle_shared_status_query
@@ -90,14 +92,6 @@ def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
     )
 
 
-def _log_cleanup_service_not_ready(*, action: str, query: str) -> None:
-    print(
-        f"\033[31m[cleanup 服务未就绪]\033[0m 动作={action} 查询={query.strip() or '-'}\n"
-        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 cleanup_downloaded_source_service，"
-        "并确认 CleanupDownloadedSourceService 实例创建成功后重试。"
-    )
-
-
 async def _handle_bt_read_only_request(
     *,
     bot_data: MutableMapping[str, object],
@@ -121,40 +115,6 @@ async def _handle_bt_read_only_request(
         await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
         return True
     await reply_func(reply)
-    return True
-
-
-async def _handle_cleanup_request(
-    *,
-    bot_data: MutableMapping[str, object],
-    execution_gate,
-    reply_func: PrivateChatReplyFunc,
-    action: str,
-    query: str,
-    chat_id: int | None,
-    user_id: int | None,
-    channel: str,
-    cleanup_runner: Callable[[object], str],
-    tg,
-) -> bool:
-    cleanup_service = bot_data.get(tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY)
-    if not isinstance(cleanup_service, tg.CleanupDownloadedSourceService):
-        _log_cleanup_service_not_ready(action=action, query=query)
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    reply = await run_sync_with_policy(
-        execution_gate,
-        action,
-        lambda: cleanup_runner(cleanup_service),
-    )
-    await reply_func(reply)
-    log_cleanup_private_chat_smoke(
-        channel=channel,
-        query=query,
-        reply_text=reply,
-        chat_id=chat_id,
-        user_id=user_id,
-    )
     return True
 
 
@@ -1067,43 +1027,17 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    cleanup_inspect_ref = tg.parse_cleanup_inspect_query(query)
-    if cleanup_inspect_ref is not None:
-        if await _handle_cleanup_request(
-            bot_data=bot_data,
-            execution_gate=execution_gate,
-            reply_func=reply_func,
-            chat_id=chat_id,
-            user_id=user_id,
-            channel=channel,
-            action=tg.ACTION_CLEANUP_INSPECT,
-            query=query,
-            cleanup_runner=lambda cleanup_service: cleanup_service.inspect_by_task_ref(
-                cleanup_inspect_ref,
-                chat_id=chat_id,
-            ),
-            tg=tg,
-        ):
-            return
-
-    cleanup_ref = tg.parse_cleanup_query(query)
-    if cleanup_ref is not None:
-        if await _handle_cleanup_request(
-            bot_data=bot_data,
-            execution_gate=execution_gate,
-            reply_func=reply_func,
-            action=tg.ACTION_CLEANUP_DOWNLOADER_SOURCE,
-            query=query,
-            chat_id=chat_id,
-            user_id=user_id,
-            channel=channel,
-            cleanup_runner=lambda cleanup_service: cleanup_service.cleanup_by_task_ref(
-                cleanup_ref,
-                chat_id=chat_id,
-            ),
-            tg=tg,
-        ):
-            return
+    if await handle_shared_cleanup_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        tg=tg,
+    ):
+        return
 
     if await _handle_confirm_query(
         bot_data=bot_data,
