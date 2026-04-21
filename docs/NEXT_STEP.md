@@ -1,9 +1,11 @@
-# Next step (v273)
+# Next step (v274)
 
 ## Current goal
 
-- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 BT classification follow-up helper 边界瘦身**。
-- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 BT processing-path follow-up helper 边界瘦身**：pending source 读取、冲突态清理和 media-import / pure-BT reply 组装已抽到 `app/bot/private_chat_bt_processing_runtime.py`，并把 BT processing focused tests 补进 `verify-mainline`，当前不回退。
+- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 raw BT destination follow-up helper 边界瘦身**。
+- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 BT TMDB follow-up helper 边界瘦身**：TMDB pending 读取、候选 lookup 绑定、downloader execution 透传和 reply 回传已抽到 `app/bot/private_chat_bt_tmdb_runtime.py`，并把 BT TMDB focused tests 补进 `verify-mainline`，当前不回退。
+- 再上一条主线是 **`private_chat_runtime.py` 的 BT classification follow-up helper 边界瘦身**：classification pending 读取、冲突态清理和 media-import reply 已抽到 `app/bot/private_chat_bt_classification_runtime.py`，并把 BT classification focused tests 补进 `verify-mainline`，当前不回退。
+- 再上一条主线是 **`private_chat_runtime.py` 的 BT processing-path follow-up helper 边界瘦身**：pending source 读取、冲突态清理和 media-import / pure-BT reply 组装已抽到 `app/bot/private_chat_bt_processing_runtime.py`，并把 BT processing focused tests 补进 `verify-mainline`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的 BT direct-intent pending reset helper 边界瘦身**：磁力 / 直接 BT 入口的 pending 清理与 processing-path 待处理写入已抽到 `app/bot/private_chat_bt_direct_runtime.py`，并把 BT direct focused tests 补进 `verify-mainline`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的 frustration cancel / reset helper 边界瘦身**：取消路由里的 service/repo 分流、执行 gate 和 BT pending 清理已抽到 `app/bot/private_chat_frustration_runtime.py`，并把 frustration focused tests 补进 `verify-mainline`，当前不回退。
 - 再上一条主线是 **`private_chat_runtime.py` 的 BT batch confirm 执行 helper 边界瘦身**：query 解析、格式校验、downloader 绑定解析和执行 gate 已抽到 `app/bot/private_chat_bt_batch_confirm_runtime.py`，并把 BT batch confirm focused tests 补进 `verify-mainline`，当前不回退。
@@ -21,7 +23,7 @@
 - 再上一条主线是 **Telegram 发送 helper 边界瘦身**：媒资发送、文本发送和 Telegram 图片/文件判定已抽到 `app/bot/telegram_delivery_runtime.py`，`telegram_runtime_adapter.py` 已直接复用这层发送出口，当前不回退。
 - 再上一条主线是 **Telegram reply formatter 边界瘦身**：搜索卡片、下载审批、导入审批三段 Telegram 特有文本整形已抽到 `app/bot/telegram_reply_formatter.py`，当前不回退。
 - 再上一条主线是 **Telegram 生命周期编排边界瘦身**：sidecar 启停、Application lifecycle 入口、BT scheduler loop / 日志 / downloader resolution 都已收进 `app/bot/telegram_sidecar_runtime.py`，当前不回退。
-- `app/bot/private_chat_runtime.py` 已降到当前 `520` 行；BT processing-path follow-up helper 抽离后，下一块更小也更贴近 shared runtime/service 边界的段落，是 BT classification follow-up 仍留在主文件里直接 pop pending source、清理冲突态并拼 media-import reply。
+- `app/bot/private_chat_runtime.py` 已降到当前 `431` 行；BT classification 和 TMDB follow-up helper 抽离后，下一块更小也更贴近 shared runtime/service 边界的段落，是 raw BT destination follow-up 仍留在主文件里直接读 pending、绑定 downloader execution 并拼 reply。
 - 上一条已完成主线是 **`Makefile` / `verify-mainline` 补齐 download follow-up runtime 的固定质量入口**：`app/bot/download_follow_up_runtime.py` focused tests 已纳入固定回归，当前不回退。
 - 再上一条已完成主线是 **`telegram_bot.py` 里的 `post_download_auto_import` / `download_completion_polling` 调度边界瘦身**：下载完成轮询与自动导入调度已抽到 `app/bot/download_follow_up_runtime.py`，当前不回退。
 - 再上一条已完成主线是 **`app/bot/telegram_runtime_adapter.py` 的 message / callback 入口边界收口**：Telegram message / callback 入口共用的 chat/user 解析、去重落盘和 reply 包装已抽到 `app/bot/telegram_update_runtime.py`，当前不回退。
@@ -32,21 +34,21 @@
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 批量确认路由分支瘦身**，当前不回退。
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 只读探索 / cleanup 路由分支瘦身**，当前不回退。
 - 更早一条已完成主线 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- `telegram_bot.py` 的入口边界、follow-up 调度边界、生命周期编排、reply formatter 和发送 helper 都已经补过一轮；`private_chat_runtime.py` 的 BT processing-path helper 已收口后，当前更小也更直接的下一步，是把 BT classification follow-up 这段 shared runtime wiring 从主文件里切出去。
+- `telegram_bot.py` 的入口边界、follow-up 调度边界、生命周期编排、reply formatter 和发送 helper 都已经补过一轮；`private_chat_runtime.py` 的 BT processing / classification / TMDB follow-up helper 已收口后，当前更小也更直接的下一步，是把 raw BT destination follow-up 这段 shared runtime wiring 从主文件里切出去。
 - 这一步继续只做最小边界瘦身，不顺手放大成新的搜索平台、统一回复总线或大文件总重写。
-- 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1698 passed, 2 skipped`。
+- 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1705 passed, 2 skipped`。
 
 ## User value
 
-- 在 BT processing-path helper 已经抽离并补进固定 gate 后，继续收 BT classification follow-up，可以让 shared runtime 主文件再少一段直接碰 classification pending source、冲突态清理和 media-import reply 组装。
+- 在 BT processing / classification / TMDB helper 已经抽离并补进固定 gate 后，继续收 raw BT destination follow-up，可以让 shared runtime 主文件再少一段直接碰 raw_bt pending、downloader execution 透传和 reply 回传。
 - 在默认分支已经稳绿、固定 gate 已补齐的前提下，优先继续降低热点文件体积和 shared runtime/service 耦合。
-- 避免 `private_chat_runtime.py` 的主调度函数继续同时背负 shared routing 和 BT classification follow-up 调度。
+- 避免 `private_chat_runtime.py` 的主调度函数继续同时背负 shared routing 和 raw BT destination follow-up 调度。
 
 ## Only do
 
-- 只做一次保守瘦身：围绕 BT classification follow-up helper 抽出最小 helper 或 runtime。
+- 只做一次保守瘦身：围绕 raw BT destination follow-up helper 抽出最小 helper 或 runtime。
 - 保持现有 parser / routing / approval / SQLite 真相边界不变，不新增用户可感知功能，不改渠道外部协议。
-- 保持当前 classification 选择语义、冲突态清理顺序、后续 media-import reply 文案和中文错误语义不回退。
+- 保持当前 raw BT 目录选择语义、downloader execution 绑定、后续 reply 文案和中文错误语义不回退。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线。
 
 ## Do not do
@@ -62,15 +64,15 @@
 
 ## Done when
 
-当前 **`private_chat_runtime.py` 的 BT classification follow-up helper 边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
+当前 **`private_chat_runtime.py` 的 raw BT destination follow-up helper 边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
 
-1. BT classification follow-up 路由里的 pending source 读取、冲突态清理、media-import reply 组装或 reply 至少一段从 `private_chat_runtime.py` 抽离，且现有文本语义不变；
-2. focused tests 能继续覆盖 BT classification follow-up 路由和当前 shared runtime 最小回归；
+1. raw BT destination follow-up 路由里的 pending 读取、downloader execution 透传、reply 组装或 reply 至少一段从 `private_chat_runtime.py` 抽离，且现有文本语义不变；
+2. focused tests 能继续覆盖 raw BT destination follow-up 路由和当前 shared runtime 最小回归；
 3. 默认分支全量 pytest 继续保持绿灯；
 4. 文档继续保持分层一致，`STATUS.md` 只写当前快照，`NEXT_STEP.md` 只写当前唯一主线。
 
 ## After this step
 
-1. 如果 BT classification follow-up helper 已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补对应 focused gate。
+1. 如果 raw BT destination follow-up helper 已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补对应 focused gate。
 2. 如果热点文件暂时没有更小闭环，再继续补 Makefile / focused tests / 真实 smoke 的其他缺口。
 3. 只有在 shared runtime 边界和热点大文件都没有更小闭环可做时，才重新考虑次级结构债。

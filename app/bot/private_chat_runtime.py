@@ -4,22 +4,21 @@ from collections.abc import Awaitable, Callable, MutableMapping
 
 from app.bot.bt_classification_runtime import (
     is_bt_classification_pending,
-    pop_bt_classification_pending,
+)
+from app.bot.private_chat_bt_classification_runtime import (
+    handle_bt_classification_follow_up,
+)
+from app.bot.private_chat_bt_tmdb_runtime import (
+    handle_bt_tmdb_follow_up,
 )
 from app.bot.bt_processing_path_runtime import (
     is_bt_processing_path_pending,
 )
 from app.bot.private_chat_bt_processing_runtime import (
-    build_media_import_bt_flow_reply,
-    clear_bt_follow_up_conflicts,
     handle_bt_processing_path_follow_up,
 )
 from app.bot.bt_tmdb_association_runtime import (
     clear_bt_tmdb_association_pending,
-    get_bt_tmdb_association_pending,
-    handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
-    log_bt_tmdb_association_error,
-    resolve_bt_tmdb_candidates_lookup,
 )
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
@@ -81,99 +80,6 @@ def _resolve_bound_downloader_execution(
         downloader_instances_key=tg.DOWNLOADER_INSTANCES_KEY,
         config_missing_template=tg.DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
     )
-
-
-async def _handle_bt_classification_follow_up(
-    *,
-    bot_data: MutableMapping[str, object],
-    reply_func: PrivateChatReplyFunc,
-    chat_id: int | None,
-    bt_classification_pending: bool,
-    bt_classification: str | None,
-    tg,
-) -> bool:
-    if bt_classification is None or not bt_classification_pending:
-        return False
-    bt_source = pop_bt_classification_pending(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if bt_source is False or not bt_source:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    if clear_bt_follow_up_conflicts(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        tg=tg,
-    ) is None:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    await reply_func(
-        build_media_import_bt_flow_reply(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            source=bt_source,
-            media_kind=bt_classification,
-            tg=tg,
-        )
-    )
-    return True
-
-
-async def _handle_bt_tmdb_follow_up(
-    *,
-    bot_data: MutableMapping[str, object],
-    reply_func: PrivateChatReplyFunc,
-    query: str,
-    chat_id: int | None,
-    user_id: int | None,
-    tg,
-) -> bool:
-    bt_tmdb_pending = get_bt_tmdb_association_pending(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if bt_tmdb_pending is False:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    if bt_tmdb_pending is None:
-        return False
-    reply = await handle_shared_bt_tmdb_association_query(
-        query=query,
-        pending=bt_tmdb_pending,
-        chat_id=chat_id,
-        user_id=user_id,
-        bot_data=bot_data,
-        add_to_downloader_service_key=tg.ADD_TO_DOWNLOADER_SERVICE_KEY,
-        clear_pending=lambda: clear_bt_tmdb_association_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        ),
-        resolve_candidates_lookup=lambda media_kind: resolve_bt_tmdb_candidates_lookup(
-            bot_data=bot_data,
-            media_kind=media_kind,
-            bt_tmdb_movie_candidates_lookup_key=tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
-            bt_tmdb_tv_candidates_lookup_key=tg.BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
-        ),
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
-            bot_data=bot_data,
-            role="bt",
-            tg=tg,
-        ),
-        log_bt_tmdb_association_error=lambda media_kind, raw_query, error: log_bt_tmdb_association_error(
-            media_kind=media_kind,
-            query=raw_query,
-            error=error,
-        ),
-        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-        bt_tmdb_association_service_not_ready_text=tg.BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
-        bt_source_required_text=tg.BT_SOURCE_REQUIRED_TEXT,
-    )
-    await reply_func(reply)
-    return True
 
 
 async def _handle_raw_bt_destination_follow_up(
@@ -399,7 +305,7 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    if await _handle_bt_classification_follow_up(
+    if await handle_bt_classification_follow_up(
         bot_data=bot_data,
         reply_func=reply_func,
         chat_id=chat_id,
@@ -475,12 +381,17 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    if await _handle_bt_tmdb_follow_up(
+    if await handle_bt_tmdb_follow_up(
         bot_data=bot_data,
         reply_func=reply_func,
         query=query,
         chat_id=chat_id,
         user_id=user_id,
+        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
+            bot_data=bot_data,
+            role="bt",
+            tg=tg,
+        ),
         tg=tg,
     ):
         return
