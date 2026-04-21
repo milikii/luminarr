@@ -200,6 +200,80 @@ async def _handle_execution_gated_shared_routes(
         tg=tg,
     )
 
+
+async def _handle_tail_routes(
+    *,
+    query: str,
+    bot_data: MutableMapping[str, object],
+    execution_gate,
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    user_id: int | None,
+    channel: str,
+    bt_follow_up_precheck: _BtFollowUpPrecheck,
+    resolve_bt_downloader_execution,
+    resolve_pt_downloader_execution,
+    tg,
+) -> bool:
+    if await handle_shared_confirm_query(
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        confirm_ref=tg.parse_confirm_query(query),
+        chat_id=chat_id,
+        user_id=user_id,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_bt_tmdb_follow_up(
+        bot_data=bot_data,
+        reply_func=reply_func,
+        query=query,
+        chat_id=chat_id,
+        user_id=user_id,
+        resolve_downloader_execution=resolve_bt_downloader_execution,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_raw_bt_destination_follow_up(
+        bot_data=bot_data,
+        reply_func=reply_func,
+        query=query,
+        chat_id=chat_id,
+        user_id=user_id,
+        resolve_downloader_execution=resolve_bt_downloader_execution,
+        tg=tg,
+    ):
+        return True
+
+    if await handle_shared_digit_selection_query(
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        query=query,
+        chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        resolve_downloader_execution=resolve_pt_downloader_execution,
+        tg=tg,
+    ):
+        return True
+
+    await handle_shared_search_query_fallback(
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        query=query,
+        chat_id=chat_id,
+        channel=channel,
+        bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
+        bt_classification_pending=bt_follow_up_precheck.bt_classification_pending,
+        tg=tg,
+    )
+    return True
+
 async def handle_private_chat_query_text(
     *,
     query: str,
@@ -323,60 +397,16 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    if await handle_shared_confirm_query(
+    await _handle_tail_routes(
+        query=query,
         bot_data=bot_data,
         execution_gate=execution_gate,
         reply_func=reply_func,
-        confirm_ref=tg.parse_confirm_query(query),
-        chat_id=chat_id,
-        user_id=user_id,
-        tg=tg,
-    ):
-        return
-
-    if await handle_bt_tmdb_follow_up(
-        bot_data=bot_data,
-        reply_func=reply_func,
-        query=query,
-        chat_id=chat_id,
-        user_id=user_id,
-        resolve_downloader_execution=resolve_bt_downloader_execution,
-        tg=tg,
-    ):
-        return
-
-    if await handle_raw_bt_destination_follow_up(
-        bot_data=bot_data,
-        reply_func=reply_func,
-        query=query,
-        chat_id=chat_id,
-        user_id=user_id,
-        resolve_downloader_execution=resolve_bt_downloader_execution,
-        tg=tg,
-    ):
-        return
-
-    if await handle_shared_digit_selection_query(
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        query=query,
         chat_id=chat_id,
         user_id=user_id,
         channel=channel,
-        resolve_downloader_execution=resolve_pt_downloader_execution,
-        tg=tg,
-    ):
-        return
-
-    await handle_shared_search_query_fallback(
-        bot_data=bot_data,
-        execution_gate=execution_gate,
-        reply_func=reply_func,
-        query=query,
-        chat_id=chat_id,
-        channel=channel,
-        bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
-        bt_classification_pending=bt_follow_up_precheck.bt_classification_pending,
+        bt_follow_up_precheck=bt_follow_up_precheck,
+        resolve_bt_downloader_execution=resolve_bt_downloader_execution,
+        resolve_pt_downloader_execution=resolve_pt_downloader_execution,
         tg=tg,
     )
