@@ -668,3 +668,25 @@
   - 这条能力也不得包装成通用 plugin / skill / MCP 平台；成人站点或其他 BT 站点若要接入，仍共用同一套主线兼容边界，不存在“题材专项豁免自动 confirm”。
 - **原因**：
   纯 BT 后续确实需要支持“用户页 / 编号范围 / 批量补齐”这类更强的操作，但当前项目的核心仍是“自然语言入口 + 确定性执行 + 可恢复真相”。若把 BT 批量任务做成 LLM 自由抓取和自动投递，会直接破坏既有 approval、recoverability 和主线边界。
+
+## D-039 质量硬化阶段正式收工，切到 services 层数据结构降本阶段
+- **状态**：已决定
+- **日期**：2026-04-22
+- **结论**：
+  - **正式宣告"质量硬化"阶段收工**。该阶段 Done 清单：
+    1. 仓库级 CI：`.github/workflows/quality.yml` 在 `push` / `pull_request` / `workflow_dispatch` 上运行 `make quality` + `make verify-mainline`，最近一次推送绿灯。
+    2. 默认分支全量回归稳绿：`.venv/bin/python -m pytest -q` = `1714 passed, 2 skipped`。
+    3. shared runtime / channel 解耦累计完成 `57+` 条最小直连闭环。
+    4. `app/bot/telegram_bot.py` 从峰值降到 `256` 行，纯 wrapper 已清空。
+    5. `app/bot/private_chat_runtime.py` 从峰值降到 `468` 行，runtime bootstrap / route block / follow-up / preparation 段都已收口。
+    6. `tests/test_cleanup_docs_consistency.py` 锁住 `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/INDEX.md` / `docs/PERSISTENCE_CLOSURE_LOG.md` 的关键字符串与分层规则。
+  - **切到下一阶段 services 层数据结构降本**。该阶段可测量 Done 定义：
+    - `app/services/import_to_library.py` 从当前 `2242` 行降到 `≤ 600` 行；
+    - `app/services/add_to_downloader.py` 从当前 `1669` 行降到 `≤ 600` 行；
+    - `app/services/search_media.py` 从当前 `1018` 行降到 `≤ 600` 行；
+    - 三座大山合并后 focused tests 覆盖率不跌，`make quality` / `make verify-mainline` / CI 持续绿灯；
+    - 每条 service 都留有独立的 `*_SLIMMING_LOG.md` 台账记录结构降本闭环。
+  - 当前主线第 1 步：在 `docs/IMPORT_PIPELINE_REDESIGN.md` 产出路径清单 + 特殊分支 grep 计数 + pipeline 草图；**不允许**在没有该清单的情况下直接动 `import_to_library.py` 业务代码。
+  - 该阶段与"真实 e2e 纵深"、"新协议能力"、"新渠道接入"**不混搭**；后者另起独立阶段。
+- **原因**：
+  "质量硬化"本身没有可测量的 Done 定义，`docs/STATUS.md` 连续 60+ 次复验都标"当前阶段仍在质量硬化"。继续挂在这个模糊阶段名下做结构降本，会让阶段越拖越含糊，也让每条主线的用户价值边界越来越难界定。把阶段名正式换到"services 层数据结构降本"后，Done 以"三座大山行数 ≤ 600 + focused tests 不跌 + CI 绿灯"三个可测量指标锁定，任何后续主线只要不服务这三个指标，就要显式开新阶段而不是偷偷塞进来。
