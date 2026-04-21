@@ -56,6 +56,7 @@ from app.bot.raw_bt_destination_runtime import (
 from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
+from app.bot.private_chat_import_runtime import handle_import_query as handle_shared_import_query
 from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query as handle_shared_personal_wechat_login_query
 from app.bot.private_chat_status_runtime import handle_status_query as handle_shared_status_query
 from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_trace
@@ -1092,21 +1093,15 @@ async def handle_private_chat_query_text(
         await reply_func(reply)
         return
 
-    import_ref = tg.parse_import_query(query)
-    if import_ref is not None:
-        import_service = bot_data.get(tg.IMPORT_TO_LIBRARY_SERVICE_KEY)
-        if not isinstance(import_service, tg.ImportToLibraryService):
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return
-        reply = await execution_gate.run(
-            tg.ACTION_IMPORT_TO_LIBRARY,
-            lambda: import_service.import_by_task_ref(
-                import_ref,
-                chat_id=chat_id,
-                user_id=user_id,
-            ),
-        )
-        await reply_func(reply)
+    if await handle_shared_import_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        tg=tg,
+    ):
         return
 
     cleanup_inspect_ref = tg.parse_cleanup_inspect_query(query)
