@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Literal
@@ -40,10 +41,8 @@ from app.bot.bt_tmdb_association_runtime import (
     resolve_bt_tmdb_candidates_lookup as resolve_shared_bt_tmdb_candidates_lookup,
     set_bt_tmdb_association_pending as set_shared_bt_tmdb_association_pending,
 )
-from app.bot.downloader_execution_runtime import (
-    ResolvedDownloaderExecution,
-    resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
-    resolve_downloader_instances as resolve_shared_downloader_instances,
+from app.bot.telegram_downloader_execution_runtime import (
+    resolve_telegram_bound_downloader_execution_from_context,
 )
 from app.bot.raw_bt_destination_runtime import (
     PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
@@ -168,6 +167,7 @@ POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
+_TELEGRAM_MODULE = sys.modules[__name__]
 BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
 
 # Compatibility re-exports for existing tests and narrow module consumers.
@@ -538,38 +538,6 @@ def _resolve_bt_tmdb_candidates_lookup(
     )
 
 
-def _resolve_downloader_instances(
-    context: ContextTypes.DEFAULT_TYPE,
-) -> dict[str, DownloaderInstanceConfig]:
-    return resolve_shared_downloader_instances(
-        bot_data=context.application.bot_data,
-        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
-    )
-
-
-def _resolve_bound_downloader_execution(
-    *,
-    context: ContextTypes.DEFAULT_TYPE,
-    role: str,
-) -> tuple[ResolvedDownloaderExecution | None, str | None]:
-    return resolve_shared_bound_downloader_execution(
-        bot_data=context.application.bot_data,
-        role=role,
-        downloader_role_binding_key=DOWNLOADER_ROLE_BINDING_KEY,
-        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
-        config_missing_template=DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
-    )
-
-
-def _resolve_downloader_instances_for_application(
-    application: Application,
-) -> dict[str, DownloaderInstanceConfig]:
-    return resolve_shared_downloader_instances(
-        bot_data=application.bot_data,
-        downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
-    )
-
-
 async def _handle_raw_bt_destination_query(
     *,
     query: str,
@@ -587,7 +555,11 @@ async def _handle_raw_bt_destination_query(
         add_to_downloader_service_key=ADD_TO_DOWNLOADER_SERVICE_KEY,
         search_service_key=SEARCH_SERVICE_KEY,
         clear_pending=lambda: _clear_raw_bt_destination_pending(context=context, chat_id=chat_id),
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(context=context, role="bt"),
+        resolve_downloader_execution=lambda: resolve_telegram_bound_downloader_execution_from_context(
+            context=context,
+            role="bt",
+            tg=_TELEGRAM_MODULE,
+        ),
         log_pure_bt_search_error=lambda bt_query, error: _log_pure_bt_search_error(query=bt_query, error=error),
         service_not_ready_text=SERVICE_NOT_READY_TEXT,
         bt_source_required_text=BT_SOURCE_REQUIRED_TEXT,
@@ -625,7 +597,11 @@ async def _handle_bt_tmdb_association_query(
             context=context,
             media_kind=media_kind,
         ),
-        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(context=context, role="bt"),
+        resolve_downloader_execution=lambda: resolve_telegram_bound_downloader_execution_from_context(
+            context=context,
+            role="bt",
+            tg=_TELEGRAM_MODULE,
+        ),
         log_bt_tmdb_association_error=lambda media_kind, raw_query, error: _log_bt_tmdb_association_error(
             media_kind=media_kind,
             query=raw_query,
