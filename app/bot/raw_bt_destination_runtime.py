@@ -62,6 +62,13 @@ class ResolvedDownloaderExecutionLike(Protocol):
     downloader_type: str
 
 
+def log_pure_bt_search_error(*, query: str, error: Exception) -> None:
+    print(
+        f"\033[31m[pure BT 搜索失败]\033[0m 查询={query} 原因={error}\n"
+        "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+    )
+
+
 def _resolve_raw_bt_destination_pending_by_chat(
     bot_data: MutableMapping[str, object],
 ) -> dict[int, RawBtDestinationPending]:

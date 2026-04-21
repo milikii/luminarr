@@ -3,18 +3,18 @@
 ## Current goal
 
 - 当前质量硬化阶段的下一条最小主线仍是 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**。
-- `raw_bt` 目录问询、BT TMDB 关联问询、下载器角色绑定解析、execution gate / sync policy helper、frustration / BT intent / BT choice 文本解析 helper、search reactive recovery helper、BT processing path pending state helper、BT classification pending state helper、BT TMDB association pending state helper、raw BT destination pending state helper、BT 流程入口 helper 已分别抽成 `app/bot/raw_bt_destination_runtime.py`、`app/bot/bt_tmdb_association_runtime.py`、`app/bot/downloader_execution_runtime.py`、`app/bot/execution_runtime.py`、`app/bot/query_text_runtime.py`、`app/bot/search_recovery_runtime.py`、`app/bot/bt_processing_path_runtime.py`、`app/bot/bt_classification_runtime.py`，以及并入 `app/bot/bt_tmdb_association_runtime.py` / `app/bot/raw_bt_destination_runtime.py`；当前剩余最小闭环改为 **BT follow-up lookup / logging helper** 的同类收口。
+- `raw_bt` 目录问询、BT TMDB 关联问询、下载器角色绑定解析、execution gate / sync policy helper、frustration / BT intent / BT choice 文本解析 helper、search reactive recovery helper、BT processing path pending state helper、BT classification pending state helper、BT TMDB association pending state helper、raw BT destination pending state helper、BT 流程入口 helper、BT follow-up lookup / logging helper 已分别抽成 `app/bot/raw_bt_destination_runtime.py`、`app/bot/bt_tmdb_association_runtime.py`、`app/bot/downloader_execution_runtime.py`、`app/bot/execution_runtime.py`、`app/bot/query_text_runtime.py`、`app/bot/search_recovery_runtime.py`、`app/bot/bt_processing_path_runtime.py`、`app/bot/bt_classification_runtime.py`，以及并入 `app/bot/bt_tmdb_association_runtime.py` / `app/bot/raw_bt_destination_runtime.py`；当前剩余最小闭环改为 **BT 只读探索 / cleanup 日志 helper** 的同类收口。
 - 这一步继续只做最小边界解耦，不顺手放大成新的渠道平台化或大文件总重写。
 - 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1630 passed, 2 skipped`。
 
 ## User value
 
-- 把 shared runtime 从 Telegram 内部 BT follow-up lookup / logging 细节里再拔一层，减少后续修改某个渠道入口时误伤全渠道行为的概率。
+- 把 shared runtime 从 Telegram 内部 BT 只读探索 / cleanup 日志细节里再拔一层，减少后续修改某个渠道入口时误伤全渠道行为的概率。
 - 在默认分支已经稳绿的前提下，优先继续降低热点文件耦合，避免未来回归再次堆到 `telegram_bot.py` 和 `private_chat_runtime.py`。
 
 ## Only do
 
-- 只做 shared runtime 与 Telegram BT follow-up lookup / logging helper 边界的最小解耦。
+- 只做 shared runtime 与 Telegram BT 只读探索 / cleanup 日志 helper 边界的最小解耦。
 - 保持现有 parser / routing / approval / SQLite 真相边界不变，不新增用户可感知功能，不改渠道外部协议。
 - 保持当前 shared delivery 文本、中文日志和现有 confirm / cancel / follow-up 语义不回退。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线。
@@ -36,6 +36,6 @@
 
 ## After this step
 
-1. 如果这条 BT follow-up lookup / logging helper 解耦完成，就继续沿同一方向挑下一段最小边界收口点。
+1. 如果这条 BT 只读探索 / cleanup 日志 helper 解耦完成，就继续沿同一方向挑下一段最小边界收口点。
 2. 如果这条解耦证明不值得继续细拆，就回到同一职责族里再找一个更小、更保守的结构降本点。
 3. 只有在 shared runtime 边界和热点大文件都没有更小闭环可做时，再回到 Makefile / focused tests / 真实 smoke 入口补强。

@@ -25,6 +25,8 @@ from app.bot.bt_tmdb_association_runtime import (
     enter_media_import_bt_flow,
     get_bt_tmdb_association_pending,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
+    log_bt_tmdb_association_error,
+    resolve_bt_tmdb_candidates_lookup,
 )
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution
 from app.bot.execution_runtime import (
@@ -48,6 +50,7 @@ from app.bot.raw_bt_destination_runtime import (
     enter_pure_bt_flow,
     get_raw_bt_destination_pending,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
+    log_pure_bt_search_error,
 )
 from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
@@ -869,16 +872,18 @@ async def handle_private_chat_query_text(
                 chat_id=chat_id,
                 bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
             ),
-            resolve_candidates_lookup=lambda media_kind: tg._resolve_bt_tmdb_candidates_lookup(
-                context=context,
+            resolve_candidates_lookup=lambda media_kind: resolve_bt_tmdb_candidates_lookup(
+                bot_data=bot_data,
                 media_kind=media_kind,
+                bt_tmdb_movie_candidates_lookup_key=tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
+                bt_tmdb_tv_candidates_lookup_key=tg.BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
             ),
             resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
                 bot_data=bot_data,
                 role="bt",
                 tg=tg,
             ),
-            log_bt_tmdb_association_error=lambda media_kind, raw_query, error: tg._log_bt_tmdb_association_error(
+            log_bt_tmdb_association_error=lambda media_kind, raw_query, error: log_bt_tmdb_association_error(
                 media_kind=media_kind,
                 query=raw_query,
                 error=error,
@@ -917,7 +922,7 @@ async def handle_private_chat_query_text(
                 role="bt",
                 tg=tg,
             ),
-            log_pure_bt_search_error=lambda pure_bt_query, error: tg._log_pure_bt_search_error(
+            log_pure_bt_search_error=lambda pure_bt_query, error: log_pure_bt_search_error(
                 query=pure_bt_query,
                 error=error,
             ),

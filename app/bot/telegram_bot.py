@@ -47,6 +47,8 @@ from app.bot.bt_tmdb_association_runtime import (
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
     get_bt_tmdb_association_pending as get_shared_bt_tmdb_association_pending,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
+    log_bt_tmdb_association_error as log_shared_bt_tmdb_association_error,
+    resolve_bt_tmdb_candidates_lookup as resolve_shared_bt_tmdb_candidates_lookup,
     set_bt_tmdb_association_pending as set_shared_bt_tmdb_association_pending,
 )
 from app.bot.downloader_execution_runtime import (
@@ -64,6 +66,7 @@ from app.bot.raw_bt_destination_runtime import (
     enter_pure_bt_flow as enter_shared_pure_bt_flow,
     get_raw_bt_destination_pending as get_shared_raw_bt_destination_pending,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
+    log_pure_bt_search_error as log_shared_pure_bt_search_error,
     set_raw_bt_destination_pending as set_shared_raw_bt_destination_pending,
 )
 from app.bot.personal_wechat_login import (
@@ -1058,13 +1061,12 @@ def _resolve_bt_tmdb_candidates_lookup(
     context: ContextTypes.DEFAULT_TYPE,
     media_kind: str,
 ) -> LookupTmdbCandidatesFunc | None:
-    key = BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY
-    if media_kind in {"series", "anime"}:
-        key = BT_TMDB_TV_CANDIDATES_LOOKUP_KEY
-    lookup_func = context.application.bot_data.get(key)
-    if callable(lookup_func):
-        return lookup_func
-    return None
+    return resolve_shared_bt_tmdb_candidates_lookup(
+        bot_data=context.application.bot_data,
+        media_kind=media_kind,
+        bt_tmdb_movie_candidates_lookup_key=BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
+        bt_tmdb_tv_candidates_lookup_key=BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
+    )
 
 
 def _resolve_downloader_instances(
@@ -1141,17 +1143,11 @@ async def _handle_raw_bt_destination_query(
 
 
 def _log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
-    print(
-        f"\033[31m[BT TMDB 关联失败]\033[0m 类型={media_kind} 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。"
-    )
+    log_shared_bt_tmdb_association_error(media_kind=media_kind, query=query, error=error)
 
 
 def _log_pure_bt_search_error(*, query: str, error: Exception) -> None:
-    print(
-        f"\033[31m[pure BT 搜索失败]\033[0m 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
-    )
+    log_shared_pure_bt_search_error(query=query, error=error)
 
 
 def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
