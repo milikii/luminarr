@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Awaitable
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, call
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from telegram.ext import CallbackQueryHandler
@@ -22,8 +22,6 @@ from app.bot.telegram_bot import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
     BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
     BT_PROCESSING_PATH_PROMPT_TEXT,
-    DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
-    DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
     RAW_BT_DESTINATION_CANCELLED_TEXT,
     RAW_BT_DESTINATION_OPTIONS_KEY,
     RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
@@ -43,12 +41,8 @@ from app.bot.telegram_bot import (
     LLM_PHYSICAL_FAILURE_SAFE_TEXT,
     MANAGE_BT_SUBSCRIPTION_SERVICE_KEY,
     MANAGE_WATCHLIST_SERVICE_KEY,
-    POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
-    POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
-    POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
-    TELEGRAM_UPDATE_REPO_KEY,
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
     TELEGRAM_SEND_TEXT_FUNC_KEY,
     build_application,
@@ -71,12 +65,7 @@ from app.bot.telegram_bot import (
     _set_bt_tmdb_association_pending,
     _set_raw_bt_destination_pending,
     _clear_raw_bt_destination_pending,
-    _download_completion_polling_loop,
-    _poll_pending_download_completion_once,
-    _post_download_auto_import_scheduler_loop,
     _run_bt_subscription_scheduler_tick_once,
-    _start_post_download_auto_import_scheduler,
-    _stop_post_download_auto_import_scheduler,
     _log_bt_subscription_scheduler_config_error,
 )
 from app.clients.transmission import TransmissionImportSource
@@ -91,7 +80,7 @@ from app.db.bt_pending_repo import (
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
-from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -102,7 +91,6 @@ from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import IMPORT_CANCELLED_TEXT, ImportToLibraryService
 from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
-from app.services.post_download_auto_import import AutoImportRunResult, PostDownloadAutoImportService
 from app.services.search_media import SearchMediaService
 
 _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
@@ -6962,226 +6950,6 @@ def test_run_bt_subscription_scheduler_tick_once_logs_result_unavailable(capsys:
     assert "[BT 订阅后台扫描结果不可用]" in output
     assert "[处理建议]" in output
     application.bot.send_message.assert_not_awaited()
-
-
-def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
-    stop_event = asyncio.Event()
-
-    async def run_once() -> AutoImportRunResult:
-        stop_event.set()
-        return AutoImportRunResult(scanned=1, progressed=1, replies=("导入待确认",))
-
-    service = SimpleNamespace(run_once=AsyncMock(side_effect=run_once))
-
-    asyncio.run(_post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event))
-
-    service.run_once.assert_awaited_once()
-
-
-def test_post_download_auto_import_scheduler_loop_logs_state_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
-    stop_event = asyncio.Event()
-
-    async def run_once() -> AutoImportRunResult:
-        stop_event.set()
-        return AutoImportRunResult(scanned=2, progressed=0, replies=(), state_unavailable=True)
-
-    service = SimpleNamespace(run_once=AsyncMock(side_effect=run_once))
-
-    asyncio.run(_post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event))
-
-    output = capsys.readouterr().out
-    assert "[下载完成后台轮询状态读取失败]" in output
-    assert "scanned=2" in output
-    assert "[处理建议]" in output
-
-
-def test_poll_pending_download_completion_once_reuses_status_service() -> None:
-    repo = SimpleNamespace(
-        list_pending_completion=Mock(
-            return_value=(SimpleNamespace(task_hash="hash-41", chat_id=1001), SimpleNamespace(task_hash="hash-42", chat_id=1002))
-        )
-    )
-    status_service = SimpleNamespace(get_status_text=AsyncMock())
-    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
-    assert status_service.get_status_text.await_args_list == [call("hash-41", chat_id=1001), call("hash-42", chat_id=1002)]
-
-
-def test_poll_pending_download_completion_once_logs_pending_list_failure(capsys: pytest.CaptureFixture[str]) -> None:
-    repo = SimpleNamespace(list_pending_completion=Mock(side_effect=RuntimeError("db down")))
-    status_service = SimpleNamespace(get_status_text=AsyncMock())
-
-    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
-
-    output = capsys.readouterr().out
-    assert "[下载完成待轮询列表读取失败]" in output
-    assert "db down" in output
-    assert "[处理建议]" in output
-    status_service.get_status_text.assert_not_awaited()
-
-
-def test_poll_pending_download_completion_once_logs_pending_list_missing_result(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    repo = SimpleNamespace(list_pending_completion=Mock(return_value=None))
-    status_service = SimpleNamespace(get_status_text=AsyncMock())
-
-    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
-
-    output = capsys.readouterr().out
-    assert "[下载完成待轮询列表结果缺失]" in output
-    assert "download completion pending list result missing" in output
-    assert "[处理建议]" in output
-    status_service.get_status_text.assert_not_awaited()
-
-
-def test_poll_pending_download_completion_once_logs_pending_list_row_corruption(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    repo = SimpleNamespace(
-        list_pending_completion=Mock(
-            side_effect=DownloadMonitorPersistenceError("download monitor chat identity corrupted after read")
-        )
-    )
-    status_service = SimpleNamespace(get_status_text=AsyncMock())
-
-    asyncio.run(_poll_pending_download_completion_once(download_monitor_repo=repo, status_service=status_service))
-
-    output = capsys.readouterr().out
-    assert "[下载完成待轮询列表记录损坏]" in output
-    assert "download monitor chat identity corrupted after read" in output
-    assert "[处理建议]" in output
-    status_service.get_status_text.assert_not_awaited()
-
-
-def test_download_completion_polling_loop_runs_once_and_stops() -> None:
-    stop_event = asyncio.Event()
-
-    def list_pending_completion():
-        stop_event.set()
-        return ()
-
-    repo = SimpleNamespace(list_pending_completion=Mock(side_effect=list_pending_completion))
-    asyncio.run(
-        _download_completion_polling_loop(
-            download_monitor_repo=repo,
-            status_service=SimpleNamespace(get_status_text=AsyncMock()),
-            stop_event=stop_event,
-        )
-    )
-    repo.list_pending_completion.assert_called_once_with()
-
-
-def test_download_completion_polling_loop_logs_fix_hint_on_error(capsys: pytest.CaptureFixture[str]) -> None:
-    stop_event = asyncio.Event()
-    repo = SimpleNamespace(
-        list_pending_completion=Mock(return_value=(SimpleNamespace(task_hash="hash-41", chat_id=1001),))
-    )
-
-    async def _boom(*args, **kwargs):
-        stop_event.set()
-        raise RuntimeError("boom")
-
-    asyncio.run(
-        _download_completion_polling_loop(
-            download_monitor_repo=repo,
-            status_service=SimpleNamespace(get_status_text=AsyncMock(side_effect=_boom)),
-            stop_event=stop_event,
-        )
-    )
-    captured = capsys.readouterr()
-    assert "[下载完成状态轮询失败]" in captured.out
-    assert "[处理建议]" in captured.out
-
-
-def test_start_post_download_auto_import_scheduler_also_starts_download_completion_polling() -> None:
-    database = SqliteDatabase(":memory:")
-    database.initialize()
-    monitor_repo = DownloadMonitorRepo(database)
-    status_service = GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)
-    app = SimpleNamespace(
-        bot_data={
-            GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
-            POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY: PostDownloadAutoImportService(monitor_repo, JobEventRepo(database), AsyncMock()),
-        },
-        create_task=Mock(return_value=SimpleNamespace()),
-    )
-    _start_post_download_auto_import_scheduler(app)
-    assert [item.kwargs["name"] for item in app.create_task.call_args_list] == [
-        "post_download_auto_import_scheduler",
-        "download_completion_polling_scheduler",
-    ]
-    for item in app.create_task.call_args_list:
-        item.args[0].close()
-
-
-def test_start_post_download_auto_import_scheduler_starts_completion_polling_without_auto_import_service() -> None:
-    database = SqliteDatabase(":memory:")
-    database.initialize()
-    monitor_repo = DownloadMonitorRepo(database)
-    app = SimpleNamespace(
-        bot_data={GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)},
-        create_task=Mock(return_value=SimpleNamespace()),
-    )
-    _start_post_download_auto_import_scheduler(app)
-    assert [item.kwargs["name"] for item in app.create_task.call_args_list] == ["download_completion_polling_scheduler"]
-    app.create_task.call_args_list[0].args[0].close()
-
-
-def test_start_post_download_auto_import_scheduler_logs_fix_hint_when_completion_polling_missing_repo(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    app = SimpleNamespace(
-        bot_data={GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock())},
-        create_task=Mock(return_value=SimpleNamespace()),
-    )
-    _start_post_download_auto_import_scheduler(app)
-    captured = capsys.readouterr()
-    assert "[下载完成状态轮询未启动]" in captured.out
-    assert "[处理建议]" in captured.out
-
-
-def test_stop_post_download_auto_import_scheduler_stops_download_completion_polling_task() -> None:
-    async def run() -> None:
-        first_stop_event = asyncio.Event()
-        first_task = asyncio.create_task(first_stop_event.wait())
-        second_stop_event = asyncio.Event()
-        second_task = asyncio.create_task(second_stop_event.wait())
-        application = SimpleNamespace(
-            bot_data={
-                POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY: first_stop_event,
-                POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY: first_task,
-                DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY: second_stop_event,
-                DOWNLOAD_COMPLETION_POLLING_TASK_KEY: second_task,
-            }
-        )
-        await _stop_post_download_auto_import_scheduler(application)
-        assert first_stop_event.is_set() and second_stop_event.is_set()
-        assert first_task.done() and second_task.done()
-
-    asyncio.run(run())
-
-
-def test_stop_post_download_auto_import_scheduler_logs_fix_hint_when_completion_polling_task_fails(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    async def boom() -> None:
-        raise RuntimeError("boom")
-
-    async def run() -> None:
-        failing_task = asyncio.create_task(boom())
-        application = SimpleNamespace(
-            bot_data={
-                DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY: asyncio.Event(),
-                DOWNLOAD_COMPLETION_POLLING_TASK_KEY: failing_task,
-            }
-        )
-        with pytest.raises(RuntimeError, match="boom"):
-            await _stop_post_download_auto_import_scheduler(application)
-
-    asyncio.run(run())
-    captured = capsys.readouterr()
-    assert "[下载完成状态轮询停止失败]" in captured.out
-    assert "[处理建议]" in captured.out
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:

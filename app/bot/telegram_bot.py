@@ -80,13 +80,21 @@ from app.bot.wecom_webhook_server import (
     start_wecom_webhook_server,
     stop_wecom_webhook_server,
 )
+from app.bot.download_follow_up_runtime import (
+    download_completion_polling_loop,
+    poll_pending_download_completion_once,
+    post_download_auto_import_scheduler_loop,
+    start_download_follow_up_scheduler,
+    stop_download_follow_up_scheduler,
+)
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
     BtPendingRepo,
 )
-from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
+from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
     ACTION_BT_READ_ONLY_HELPER,
     ACTION_BT_SUBSCRIPTION_RUN,
@@ -190,6 +198,43 @@ LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 BT_CLASSIFICATION_LABELS["raw_bt"] = "其他 BT 资源"
+
+# Compatibility re-exports for existing tests and narrow module consumers.
+_COMPAT_REEXPORTS = (
+    BT_CLASSIFICATION_CANCELLED_TEXT,
+    BT_CLASSIFICATION_PENDING_REMINDER_TEXT,
+    BT_PROCESSING_PATH_CANCELLED_TEXT,
+    BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
+    BT_PROCESSING_PATH_PROMPT_TEXT,
+    BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
+    _format_bt_tmdb_association_pending_reminder,
+    RAW_BT_DESTINATION_CANCELLED_TEXT,
+    parse_personal_wechat_login_query,
+    WORKFLOW_ADD_TO_DOWNLOADER,
+    WORKFLOW_IMPORT_TO_LIBRARY,
+    ACTION_BT_READ_ONLY_HELPER,
+    ACTION_ADD_TO_DOWNLOADER,
+    ACTION_CANCEL_PENDING_APPROVAL,
+    ACTION_CLEANUP_INSPECT,
+    ACTION_PERSONAL_WECHAT_LOGIN,
+    ACTION_CONFIRM_ADD_TO_DOWNLOADER,
+    ACTION_CLEANUP_DOWNLOADER_SOURCE,
+    ACTION_CONFIRM_IMPORT_TO_LIBRARY,
+    ACTION_GET_DOWNLOAD_STATUS,
+    ACTION_IMPORT_TO_LIBRARY,
+    ACTION_RESET_CANDIDATES,
+    ACTION_RESET_CLARIFICATION,
+    ACTION_SEARCH_MEDIA,
+    ADD_CANCELLED_TEXT,
+    parse_cleanup_inspect_query,
+    parse_cleanup_query,
+    parse_status_query,
+    parse_bt_subscription_query,
+    IMPORT_CANCELLED_TEXT,
+    parse_confirm_query,
+    parse_import_query,
+    parse_watchlist_query,
+)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -379,54 +424,26 @@ async def _stop_bt_subscription_scheduler(application: Application) -> None:
 
 
 def _start_post_download_auto_import_scheduler(application: Application) -> None:
-    service = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY)
-    existing_task = application.bot_data.get(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY)
-    if isinstance(service, PostDownloadAutoImportService) and not (
-        isinstance(existing_task, asyncio.Task) and not existing_task.done()
-    ):
-        stop_event = asyncio.Event()
-        application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY] = stop_event
-        application.bot_data[POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY] = application.create_task(
-            _post_download_auto_import_scheduler_loop(service=service, stop_event=stop_event),
-            name="post_download_auto_import_scheduler",
+    start_download_follow_up_scheduler(
+        application=application,
+        post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
+        post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
+        post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
+        get_download_status_service_key=GET_DOWNLOAD_STATUS_SERVICE_KEY,
+        download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
+        download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
+        interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
     )
-    status_service = application.bot_data.get(GET_DOWNLOAD_STATUS_SERVICE_KEY)
-    download_monitor_repo = getattr(status_service, "download_monitor_repo", None)
-    existing_task = application.bot_data.get(DOWNLOAD_COMPLETION_POLLING_TASK_KEY)
-    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
-        return
-    if not isinstance(status_service, GetDownloadStatusService):
-        _log_download_completion_polling_config_error(reason="未注入有效的 get_download_status_service。")
-        return
-    if not isinstance(download_monitor_repo, DownloadMonitorRepo):
-        _log_download_completion_polling_config_error(reason="get_download_status_service 未暴露有效的 download_monitor_repo。")
-        return
-    if not (isinstance(existing_task, asyncio.Task) and not existing_task.done()):
-        stop_event = asyncio.Event()
-        application.bot_data[DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY] = stop_event
-        application.bot_data[DOWNLOAD_COMPLETION_POLLING_TASK_KEY] = application.create_task(
-            _download_completion_polling_loop(download_monitor_repo=download_monitor_repo, status_service=status_service, stop_event=stop_event),
-            name="download_completion_polling_scheduler",
-        )
 
 
 async def _stop_post_download_auto_import_scheduler(application: Application) -> None:
-    stop_event = application.bot_data.pop(POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY, None)
-    task = application.bot_data.pop(POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY, None)
-    if isinstance(stop_event, asyncio.Event):
-        stop_event.set()
-    if isinstance(task, asyncio.Task):
-        await task
-    stop_event = application.bot_data.pop(DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY, None)
-    task = application.bot_data.pop(DOWNLOAD_COMPLETION_POLLING_TASK_KEY, None)
-    if isinstance(stop_event, asyncio.Event):
-        stop_event.set()
-    if isinstance(task, asyncio.Task):
-        try:
-            await task
-        except Exception as error:
-            _log_download_completion_polling_stop_error(error=error)
-            raise
+    await stop_download_follow_up_scheduler(
+        application=application,
+        post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
+        post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
+        download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
+        download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
+    )
 
 
 def _start_feishu_webhook_server_if_configured(application: Application) -> None:
@@ -560,45 +577,31 @@ async def _post_download_auto_import_scheduler_loop(
     service: PostDownloadAutoImportService,
     stop_event: asyncio.Event,
 ) -> None:
-    while not stop_event.is_set():
-        try:
-            result = await service.run_once()
-            if result.state_unavailable:
-                _log_post_download_auto_import_scheduler_state_unavailable(scanned=result.scanned)
-        except Exception as error:
-            _log_post_download_auto_import_scheduler_error(error=error)
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS)
-        except asyncio.TimeoutError:
-            continue
+    await post_download_auto_import_scheduler_loop(
+        service=service,
+        stop_event=stop_event,
+        interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
+    )
 
 
 async def _poll_pending_download_completion_once(
     *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService
 ) -> None:
-    try:
-        pending_records = download_monitor_repo.list_pending_completion()
-        if pending_records is None:
-            raise RuntimeError("download completion pending list result missing")
-    except Exception as error:
-        _log_download_completion_pending_list_error(error=error)
-        return
-    for record in pending_records:
-        await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
+    await poll_pending_download_completion_once(
+        download_monitor_repo=download_monitor_repo,
+        status_service=status_service,
+    )
 
 
 async def _download_completion_polling_loop(
     *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService, stop_event: asyncio.Event
 ) -> None:
-    while not stop_event.is_set():
-        try:
-            await _poll_pending_download_completion_once(download_monitor_repo=download_monitor_repo, status_service=status_service)
-        except Exception as error:
-            _log_download_completion_polling_loop_error(error=error)
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS)
-        except asyncio.TimeoutError:
-            continue
+    await download_completion_polling_loop(
+        download_monitor_repo=download_monitor_repo,
+        status_service=status_service,
+        stop_event=stop_event,
+        interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
+    )
 
 
 async def _bt_subscription_scheduler_loop(
@@ -1000,64 +1003,6 @@ def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception)
     print(
         f"\033[31m[BT 订阅后台通知失败]\033[0m chat_id={chat_id} 原因={error}\n"
         "\033[33m[处理建议]\033[0m 检查 Telegram Bot Token、聊天可达性和网络连通性后等待下一轮自动扫描。"
-    )
-
-
-def _log_post_download_auto_import_scheduler_error(*, error: Exception) -> None:
-    print(
-        f"\033[31m[下载完成后台轮询失败]\033[0m 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor、SQLite 和导入审批链路后等待下一轮自动轮询。"
-    )
-
-
-def _log_post_download_auto_import_scheduler_state_unavailable(*, scanned: int) -> None:
-    print(
-        f"\033[31m[下载完成后台轮询状态读取失败]\033[0m scanned={scanned}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor、job_event 和导入审批链路的持久化状态；当前这轮自动导入已跳过异常记录，下一轮仍会继续尝试。",
-    )
-
-
-def _log_download_completion_polling_loop_error(*, error: Exception) -> None:
-    print(
-        f"\033[31m[下载完成状态轮询失败]\033[0m 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查下载器状态查询、download_monitor 和 SQLite 后等待下一轮自动轮询。"
-    )
-
-
-def _log_download_completion_pending_list_error(*, error: Exception) -> None:
-    if str(error) == "download completion pending list result missing":
-        print(
-            f"\033[31m[下载完成待轮询列表结果缺失]\033[0m 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 download_monitor 待轮询列表查询返回是否仍带有完整结果；当前这轮不会继续逐条查状态，避免把缺失真相误判成“当前没有待轮询任务”。"
-        )
-        return
-    if _is_download_completion_pending_list_row_corrupted_error(error):
-        print(
-            f"\033[31m[下载完成待轮询列表记录损坏]\033[0m 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 download_monitor 待轮询记录里的 task_id / task_hash / chat_id 等真相字段；当前这轮不会继续逐条查状态，避免把坏记录混成普通读库失败。"
-        )
-        return
-    print(
-        f"\033[31m[下载完成待轮询列表读取失败]\033[0m 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor 表读取和 SQLite 连通性；当前这轮不会继续逐条查状态，但下一轮轮询仍会继续尝试。"
-    )
-
-
-def _is_download_completion_pending_list_row_corrupted_error(error: Exception) -> bool:
-    return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
-
-
-def _log_download_completion_polling_config_error(*, reason: str) -> None:
-    print(
-        f"\033[31m[下载完成状态轮询未启动]\033[0m 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 get_download_status_service，并确认它携带有效的 download_monitor_repo。"
-    )
-
-
-def _log_download_completion_polling_stop_error(*, error: Exception) -> None:
-    print(
-        f"\033[31m[下载完成状态轮询停止失败]\033[0m 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查下载完成轮询 task 的退出路径、SQLite 连接状态，以及 stop_event 触发后的清理逻辑。"
     )
 
 
