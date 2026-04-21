@@ -23,6 +23,7 @@ verify-mainline:
 	$(PYTHON) -m pytest -q tests/test_download_follow_up_runtime.py tests/test_telegram_bot.py -k "download_completion or post_download_auto_import_scheduler or bt_subscription_scheduler or build_application_applies_outbound_proxy"
 	$(PYTHON) -m pytest -q tests/test_private_chat_trace_runtime.py tests/test_private_chat_runtime.py -k trace
 	$(PYTHON) -m pytest -q tests/test_private_chat_login_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k personal_wechat_login
+	$(PYTHON) -m pytest -q tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_bt_batch_confirm_query or bt_batch_confirm"
 	$(PYTHON) -m pytest -q tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_bt_read_only_query or bt_read_only_helper or bt_batch_preview"
 	$(PYTHON) -m pytest -q tests/test_private_chat_search_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "handle_search_query_fallback or routes_search"
 	$(PYTHON) -m pytest -q tests/test_private_chat_status_runtime.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k status

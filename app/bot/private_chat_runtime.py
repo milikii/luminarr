@@ -29,6 +29,9 @@ from app.bot.execution_runtime import (
     resolve_execution_gate,
     run_sync_with_policy,
 )
+from app.bot.private_chat_bt_batch_confirm_runtime import (
+    handle_bt_batch_confirm_query as handle_shared_bt_batch_confirm_query,
+)
 from app.bot.private_chat_bt_read_only_runtime import (
     handle_bt_read_only_query as handle_shared_bt_read_only_query,
 )
@@ -39,7 +42,6 @@ from app.bot.private_chat_cleanup_runtime import (
     handle_cleanup_query as handle_shared_cleanup_query,
 )
 from app.bot.query_text_runtime import (
-    extract_bt_batch_confirm_request,
     is_bt_direct_intent,
     is_frustration_text,
     parse_bt_classification_choice,
@@ -71,55 +73,6 @@ def _log_pending_job_lookup_failed(*, chat_id: int | None, reason: str) -> None:
         f"\033[31m[待处理任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前待处理任务记录是否正常。"
     )
-
-
-async def _handle_bt_batch_confirm_request(
-    *,
-    bot_data: MutableMapping[str, object],
-    execution_gate,
-    reply_func: PrivateChatReplyFunc,
-    batch_confirm_request,
-    chat_id: int | None,
-    user_id: int | None,
-    channel: str,
-    tg,
-) -> bool:
-    if not batch_confirm_request.selection_text:
-        await reply_func("BT 批量确认格式：bt批量确认 1-3")
-        return True
-    if batch_confirm_request.invalid_selection:
-        await reply_func(
-            f"BT 批量确认编号格式无效：{batch_confirm_request.selection_text}\n"
-            "请使用 1-3 或 2,4,6 这类范围表达。"
-        )
-        return True
-    add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
-    if not isinstance(add_service, tg.AddToDownloaderService) or chat_id is None:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    downloader_execution, resolution_error = _resolve_bound_downloader_execution(
-        bot_data=bot_data,
-        role="bt",
-        tg=tg,
-    )
-    if resolution_error is not None:
-        await reply_func(resolution_error)
-        return True
-    reply = await execution_gate.run(
-        tg.ACTION_ADD_TO_DOWNLOADER,
-        lambda: add_service.add_by_batch_selection(
-            chat_id,
-            batch_confirm_request.selected_indexes,
-            user_id=user_id,
-            channel=channel,
-            downloader_name=downloader_execution.name if downloader_execution is not None else "",
-            downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
-            download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
-            auto_import_enabled=False,
-        ),
-    )
-    await reply_func(reply)
-    return True
 
 
 async def _handle_bt_direct_intent(
@@ -811,19 +764,21 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    bt_batch_confirm_request = extract_bt_batch_confirm_request(query)
-    if bt_batch_confirm_request is not None:
-        if await _handle_bt_batch_confirm_request(
+    if await handle_shared_bt_batch_confirm_query(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(
             bot_data=bot_data,
-            execution_gate=execution_gate,
-            reply_func=reply_func,
-            batch_confirm_request=bt_batch_confirm_request,
-            chat_id=chat_id,
-            user_id=user_id,
-            channel=channel,
+            role="bt",
             tg=tg,
-        ):
-            return
+        ),
+        tg=tg,
+    ):
         return
 
     bt_classification = parse_bt_classification_choice(query)
