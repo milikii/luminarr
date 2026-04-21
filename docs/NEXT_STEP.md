@@ -2,12 +2,13 @@
 
 ## Current goal
 
-- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 digit-selection 路由边界瘦身**。
-- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 confirm 路由边界瘦身**：job 关联查询、workflow 分流和 pending add fallback 已抽到 `app/bot/private_chat_confirm_runtime.py`，并补了 confirm focused tests，当前不回退。
+- 当前质量硬化阶段的下一条最小主线切到 **`private_chat_runtime.py` 的 trace 包装边界瘦身**。
+- 刚完成的上一条主线是 **`private_chat_runtime.py` 的 digit-selection 路由边界瘦身**：澄清态判断、下载器解析和 add 调度已抽到 `app/bot/private_chat_selection_runtime.py`，并补了 digit focused tests，当前不回退。
+- 再上一条主线是 **`private_chat_runtime.py` 的 confirm 路由边界瘦身**：job 关联查询、workflow 分流和 pending add fallback 已抽到 `app/bot/private_chat_confirm_runtime.py`，并补了 confirm focused tests，当前不回退。
 - 再上一条主线是 **Telegram 发送 helper 边界瘦身**：媒资发送、文本发送和 Telegram 图片/文件判定已抽到 `app/bot/telegram_delivery_runtime.py`，`telegram_runtime_adapter.py` 已直接复用这层发送出口，当前不回退。
 - 再上一条主线是 **Telegram reply formatter 边界瘦身**：搜索卡片、下载审批、导入审批三段 Telegram 特有文本整形已抽到 `app/bot/telegram_reply_formatter.py`，当前不回退。
 - 再上一条主线是 **Telegram 生命周期编排边界瘦身**：sidecar 启停、Application lifecycle 入口、BT scheduler loop / 日志 / downloader resolution 都已收进 `app/bot/telegram_sidecar_runtime.py`，当前不回退。
-- `app/bot/private_chat_runtime.py` 仍保留为当前 `1305` 行热点文件；在 confirm 路由抽离后，这轮继续留在同一文件里处理 downloader 审批前的 digit-selection 路由。
+- `app/bot/private_chat_runtime.py` 仍保留为当前 `1280` 行热点文件；在 confirm 和 digit-selection 连续抽离后，这轮继续留在同一文件里处理 trace 包装与入站日志。
 - 上一条已完成主线是 **`Makefile` / `verify-mainline` 补齐 download follow-up runtime 的固定质量入口**：`app/bot/download_follow_up_runtime.py` focused tests 已纳入固定回归，当前不回退。
 - 再上一条已完成主线是 **`telegram_bot.py` 里的 `post_download_auto_import` / `download_completion_polling` 调度边界瘦身**：下载完成轮询与自动导入调度已抽到 `app/bot/download_follow_up_runtime.py`，当前不回退。
 - 再上一条已完成主线是 **`app/bot/telegram_runtime_adapter.py` 的 message / callback 入口边界收口**：Telegram message / callback 入口共用的 chat/user 解析、去重落盘和 reply 包装已抽到 `app/bot/telegram_update_runtime.py`，当前不回退。
@@ -18,19 +19,19 @@
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 批量确认路由分支瘦身**，当前不回退。
 - 更早一条已完成主线是 **`private_chat_runtime.py` 里的 BT 只读探索 / cleanup 路由分支瘦身**，当前不回退。
 - 更早一条已完成主线 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- `telegram_bot.py` 的入口边界、follow-up 调度边界、生命周期编排、reply formatter 和发送 helper 都已经补过一轮；`private_chat_runtime.py` 的 confirm 路由也刚完成抽离，当前更小也更直接的下一步，是继续收掉 digit-selection 这段审批前置编排。
+- `telegram_bot.py` 的入口边界、follow-up 调度边界、生命周期编排、reply formatter 和发送 helper 都已经补过一轮；`private_chat_runtime.py` 的 confirm 和 digit-selection 路由也刚完成抽离，当前更小也更直接的下一步，是把 trace 包装这段共享日志编排从主调度里切出去。
 - 这一步继续只做最小边界瘦身，不顺手放大成新的渠道平台、统一 webhook 框架或大文件总重写。
-- 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1642 passed, 2 skipped`。
+- 质量基线前置条件已满足：默认分支本轮复验 `.venv/bin/python -m pytest -q` 为 `1645 passed, 2 skipped`。
 
 ## User value
 
-- 在 confirm 路由已经抽离并有 focused tests 后，继续收 digit-selection 路由，可以把 downloader 审批前的澄清态判断、下载器解析和 add 调度从同一个热点文件里再切掉一段。
+- 在 confirm 和 digit-selection 都已经抽离并有 focused tests 后，继续收 trace 包装边界，可以让主调度函数不再同时负责入站日志、reply trace 和记业务路由。
 - 在默认分支已经稳绿、固定 gate 已补齐的前提下，优先继续降低热点文件体积和渠道总调度耦合。
-- 避免 `private_chat_runtime.py` 的 digit-selection 路由继续同时背负澄清态判断、下载器解析和 add_to_downloader 调度。
+- 避免 `private_chat_runtime.py` 的主调度函数继续同时背负 trace 记录和业务路由。
 
 ## Only do
 
-- 只做一次保守瘦身：围绕 digit-selection 路由抽出最小 helper 或 runtime。
+- 只做一次保守瘦身：围绕 trace 包装 / 入站日志抽出最小 helper 或 runtime。
 - 保持现有 parser / routing / approval / SQLite 真相边界不变，不新增用户可感知功能，不改渠道外部协议。
 - 保持当前 shared delivery 文本、中文日志和现有 confirm / cancel / follow-up 语义不回退。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线。
@@ -40,22 +41,22 @@
 - 不放宽 approval、`jobs` / `job_event` / lease/version / SQLite 真相边界。
 - 不新增功能、不扩协议、不顺手重写整个 `telegram_bot.py` / `private_chat_runtime.py`。
 - 不把 Telegram 渠道调度段直接平台化成新的全局 scheduler 抽象。
-- 不调整 `confirm` / `select` 文本协议，不改 pending add / pending import / candidate mapping 的判定真相。
+- 不调整 `confirm` / `select` 文本协议，不改 pending add / pending import / candidate mapping / trace 日志内容语义。
 - 不把 Feishu/WeCom webhook、personal WeChat、BT 订阅启动逻辑强行揉成新的“统一 sidecar 平台”。
 - 不因为 shared runtime 解耦而把渠道私有 UX 重新散回各渠道各自拼接。
 - 不回到 BT 页面 proof、BT dispatch 取证或 Plex 实例追查。
 
 ## Done when
 
-当前 **`private_chat_runtime.py` 的 digit-selection 路由边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
+当前 **`private_chat_runtime.py` 的 trace 包装边界瘦身** 主线视为 **已收口**，满足以下任一条即可：
 
-1. digit-selection 相关的澄清态判断、下载器解析或 add reply helper 至少一段从 `private_chat_runtime.py` 抽离，且审批语义不变；
-2. focused tests 能继续覆盖 digit-selection 路由和当前 shared runtime 最小回归；
+1. trace 包装、入站日志或 reply trace helper 至少一段从 `private_chat_runtime.py` 抽离，且日志语义不变；
+2. focused tests 能继续覆盖 trace 包装和当前 shared runtime 最小回归；
 3. 默认分支全量 pytest 继续保持绿灯；
 4. 文档继续保持分层一致，`STATUS.md` 只写当前快照，`NEXT_STEP.md` 只写当前唯一主线。
 
 ## After this step
 
-1. 如果 digit-selection 路由边界已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补 `digit` focused gate。
+1. 如果 trace 包装边界已收口一轮，就继续留在 `private_chat_runtime.py` 选下一条最小瘦身主线，或补 trace focused gate。
 2. 如果热点文件暂时没有更小闭环，再继续补 Makefile / focused tests / 真实 smoke 的其他缺口。
 3. 只有在 shared runtime 边界和热点大文件都没有更小闭环可做时，才重新考虑次级结构债。

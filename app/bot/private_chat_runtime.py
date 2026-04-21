@@ -46,6 +46,7 @@ from app.bot.query_text_runtime import (
     parse_bt_processing_path_legacy_shortcut,
 )
 from app.bot.private_chat_confirm_runtime import handle_confirm_query as handle_shared_confirm_query
+from app.bot.private_chat_selection_runtime import handle_digit_selection_query as handle_shared_digit_selection_query
 from app.bot.raw_bt_destination_runtime import (
     clear_raw_bt_destination_pending,
     enter_pure_bt_flow,
@@ -867,43 +868,17 @@ async def _handle_digit_selection_query(
     channel: str,
     tg,
 ) -> bool:
-    if not query.isdigit():
-        return False
-    search_service = bot_data.get(tg.SEARCH_SERVICE_KEY)
-    if isinstance(search_service, tg.SearchMediaService) and chat_id is not None:
-        clarification_pending = search_service.is_clarification_pending(chat_id)
-        if clarification_pending is None:
-            await reply_func(tg.SERVICE_NOT_READY_TEXT)
-            return True
-        if clarification_pending:
-            await reply_func(tg.CLARIFICATION_SELECTION_BLOCKED_TEXT)
-            return True
-
-    add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
-    if not isinstance(add_service, tg.AddToDownloaderService):
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    if chat_id is None:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    downloader_execution, resolution_error = _resolve_bound_downloader_execution(bot_data=bot_data, role="pt", tg=tg)
-    if resolution_error is not None:
-        await reply_func(resolution_error)
-        return True
-    reply = await execution_gate.run(
-        tg.ACTION_ADD_TO_DOWNLOADER,
-        lambda: add_service.add_by_selection(
-            chat_id,
-            query,
-            user_id=user_id,
-            channel=channel,
-            downloader_name=downloader_execution.name if downloader_execution is not None else "",
-            downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
-            download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
-        ),
+    return await handle_shared_digit_selection_query(
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        query=query,
+        chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        resolve_downloader_execution=lambda: _resolve_bound_downloader_execution(bot_data=bot_data, role="pt", tg=tg),
+        tg=tg,
     )
-    await reply_func(reply)
-    return True
 
 
 async def _handle_search_query_fallback(
