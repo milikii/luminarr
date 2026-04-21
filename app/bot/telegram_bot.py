@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import asyncio
 from collections.abc import Awaitable, Callable
 from functools import partial
 from pathlib import Path
@@ -61,18 +59,12 @@ from app.bot.telegram_delivery_runtime import (
     build_telegram_send_text_func as _shared_build_telegram_send_text_func,
 )
 from app.bot.telegram_reply_formatter import format_telegram_reply as _shared_format_telegram_reply
-from app.bot.download_follow_up_runtime import (
-    download_completion_polling_loop,
-    poll_pending_download_completion_once,
-    post_download_auto_import_scheduler_loop,
-)
 from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_config_error, _run_bt_subscription_scheduler_tick_once
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
     BtPendingRepo,
 )
-from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
@@ -158,7 +150,6 @@ WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
 TELEGRAM_SEND_TEXT_FUNC_KEY = "telegram_send_text_func"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
-POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
@@ -337,37 +328,6 @@ def build_telegram_send_media_func(application: Application) -> TelegramSendMedi
 
 def build_telegram_send_text_func(application: Application) -> TelegramSendTextFunc:
     return _shared_build_telegram_send_text_func(application)
-
-async def _post_download_auto_import_scheduler_loop(
-    *,
-    service: PostDownloadAutoImportService,
-    stop_event: asyncio.Event,
-) -> None:
-    await post_download_auto_import_scheduler_loop(
-        service=service,
-        stop_event=stop_event,
-        interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
-    )
-
-
-async def _poll_pending_download_completion_once(
-    *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService
-) -> None:
-    await poll_pending_download_completion_once(
-        download_monitor_repo=download_monitor_repo,
-        status_service=status_service,
-    )
-
-
-async def _download_completion_polling_loop(
-    *, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService, stop_event: asyncio.Event
-) -> None:
-    await download_completion_polling_loop(
-        download_monitor_repo=download_monitor_repo,
-        status_service=status_service,
-        stop_event=stop_event,
-        interval_seconds=POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS,
-    )
 
 
 def _format_bt_classification_result(media_kind: str) -> str:
