@@ -3,8 +3,8 @@
 ## Current mainline
 
 - 当前阶段已切到 **质量硬化**。
-- 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1639 passed, 2 skipped`。
-- shared runtime / channel 解耦已收掉 21 条最小直连；本轮最新闭环是把 Telegram 媒资 / 文本发送 helper 从 `app/bot/telegram_bot.py` 抽到 `app/bot/telegram_delivery_runtime.py`，`telegram_runtime_adapter.py` 已直接复用这层发送出口，不改现有发送语义。
+- 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1642 passed, 2 skipped`。
+- shared runtime / channel 解耦已收掉 22 条最小直连；本轮最新闭环是把 `private_chat_runtime.py` 里的 confirm 路由抽到 `app/bot/private_chat_confirm_runtime.py`，job 关联查询、workflow 分流和 pending add fallback 现在有独立 focused tests，不改审批语义。
 
 ## Current health
 
@@ -23,14 +23,15 @@
 - Telegram adapter focused 回归：`tests/test_telegram_runtime_adapter.py -q` 为 `10 passed`。
 - Telegram reply formatter focused 回归：`tests/test_telegram_reply_formatter.py tests/test_telegram_bot.py -k "import_formats_import_approval_for_telegram or digit_routes_to_add_service or handle_message_replies_search_result or build_telegram_send_media_func" -q` 为 `4 passed, 193 deselected`。
 - Telegram delivery focused 回归：`tests/test_telegram_delivery_runtime.py tests/test_telegram_bot.py -k "telegram_media_sender or build_application_applies_outbound_proxy or handle_message_routes_personal_wechat_login_and_sends_qr_result" -q` 为 `6 passed, 190 deselected`。
+- private chat confirm focused 回归：`tests/test_private_chat_confirm_runtime.py tests/test_private_chat_runtime.py -k "confirm" -q` 为 `7 passed, 52 deselected`。
 - Telegram confirm / digit / reminder 相关 focused 回归：`tests/test_telegram_bot.py -k "confirm or digit or pending_returns_reminder or deduplicate or update_id_invalid or callback_id_missing" -q` 为 `45 passed, 161 deselected`。
-- 全量回归：`.venv/bin/python -m pytest -q` 为 `1639 passed, 2 skipped`。
+- 全量回归：`.venv/bin/python -m pytest -q` 为 `1642 passed, 2 skipped`。
 - 当前真实端点探针：`19091 Transmission` 返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`19092 BT Transmission` 与 `18098 qBittorrent` 当前返回 `000`。
 
 ## Current biggest risk
 
-- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债已回到 `app/bot/private_chat_runtime.py`：文件仍有 `1421` 行，并继续承载 BT follow-up、confirm 路由、trace 包装和搜索兜底等多段共享逻辑；`app/bot/telegram_bot.py` 已降到 `661` 行。
-- 当前更小也更直接的下一块热点，是 `private_chat_runtime.py` 里 `confirm` 路由仍同时处理 job 关联查询、workflow 分流和 pending add fallback；这条链比继续磨 Telegram 文案更贴近高风险审批边界。
+- 默认分支已恢复“全量 pytest 稳绿”，当前最大结构债仍在 `app/bot/private_chat_runtime.py`：文件已降到 `1305` 行，但仍承载 BT follow-up、digit-selection、trace 包装和搜索兜底等多段共享逻辑；`app/bot/telegram_bot.py` 保持 `661` 行。
+- 当前更小也更直接的下一块热点，是 `private_chat_runtime.py` 的 digit-selection 路由仍同时处理澄清态读取、下载器解析和 add_to_downloader 调度；这条链是 confirm 之后的下一段审批前置编排。
 
 ## Recommended Next Operator Command
 
