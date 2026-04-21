@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
-from pathlib import Path
 
 from app.bot.bt_classification_runtime import (
     BT_CLASSIFICATION_CANCELLED_TEXT,
@@ -57,7 +56,7 @@ from app.bot.raw_bt_destination_runtime import (
 from app.bot.search_recovery_runtime import search_with_reactive_recovery
 from app.bot import telegram_bot as telegram_runtime
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
-from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, log_trace_event
+from app.bot.private_chat_trace_runtime import prepare_private_chat_reply_with_trace
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
@@ -268,62 +267,6 @@ def _resolve_bound_downloader_execution(
         downloader_instances_key=tg.DOWNLOADER_INSTANCES_KEY,
         config_missing_template=tg.DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE,
     )
-
-
-def _resolve_trace_log_path(bot_data: MutableMapping[str, object]) -> Path | None:
-    trace_log_path = bot_data.get(TRACE_LOG_PATH_BOT_DATA_KEY)
-    if isinstance(trace_log_path, Path):
-        return trace_log_path
-    return None
-
-
-def _log_private_chat_inbound(
-    *,
-    trace_log_path: Path | None,
-    channel: str,
-    chat_id: int | None,
-    user_id: int | None,
-    query: str,
-) -> None:
-    log_trace_event(
-        scope="private_chat",
-        event="inbound",
-        result="received",
-        log_path=trace_log_path,
-        channel=channel,
-        action="query",
-        chat_id=chat_id,
-        user_id=user_id,
-        query=query,
-    )
-
-
-def _wrap_reply_with_trace(
-    *,
-    reply_func: PrivateChatReplyFunc,
-    trace_log_path: Path | None,
-    channel: str,
-    chat_id: int | None,
-    user_id: int | None,
-    query: str,
-) -> PrivateChatReplyFunc:
-    async def reply_with_trace(reply_text: str) -> object:
-        result = await reply_func(reply_text)
-        log_trace_event(
-            scope="private_chat",
-            event="reply",
-            result="sent",
-            log_path=trace_log_path,
-            channel=channel,
-            action="reply",
-            chat_id=chat_id,
-            user_id=user_id,
-            query=query,
-            reply_text=reply_text,
-        )
-        return result
-
-    return reply_with_trace
 
 
 async def _cancel_pending_import_for_frustration(
@@ -953,17 +896,9 @@ async def handle_private_chat_query_text(
         bot_data=bot_data,
         execution_gate_key=tg.EXECUTION_GATE_KEY,
     )
-    trace_log_path = _resolve_trace_log_path(bot_data)
-    _log_private_chat_inbound(
-        trace_log_path=trace_log_path,
-        channel=channel,
-        chat_id=chat_id,
-        user_id=user_id,
-        query=query,
-    )
-    reply_func = _wrap_reply_with_trace(
+    reply_func = prepare_private_chat_reply_with_trace(
+        bot_data=bot_data,
         reply_func=reply_func,
-        trace_log_path=trace_log_path,
         channel=channel,
         chat_id=chat_id,
         user_id=user_id,
