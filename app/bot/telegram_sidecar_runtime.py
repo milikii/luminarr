@@ -26,6 +26,10 @@ from app.bot.wecom_webhook_server import (
     start_wecom_webhook_server,
     stop_wecom_webhook_server,
 )
+from app.services.manage_bt_subscription import (
+    BtSubscriptionDispatchContext,
+    ManageBtSubscriptionService,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +64,65 @@ async def stop_telegram_sidecars(application: Application, *, config: TelegramSi
     await _shutdown_personal_wechat_text_service_if_running(application)
     await _shutdown_personal_wechat_login_service_if_running(application, config=config)
     await _stop_post_download_auto_import_scheduler(application, config=config)
+
+
+async def start_telegram_application_lifecycle(application: Application) -> None:
+    from app.bot import telegram_bot as tg
+
+    await start_telegram_sidecars(application, config=tg.TELEGRAM_SIDECAR_RUNTIME_CONFIG)
+
+    existing_task = application.bot_data.get(tg.BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
+    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
+        return
+
+    bt_subscription_service = application.bot_data.get(tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
+    if not isinstance(bt_subscription_service, ManageBtSubscriptionService):
+        return
+
+    downloader_execution, resolution_error = tg._resolve_bound_downloader_execution_for_application(
+        application=application,
+        role="bt",
+    )
+    if resolution_error is not None:
+        tg._log_bt_subscription_scheduler_config_error(reason=resolution_error)
+        return
+    if downloader_execution is None:
+        tg._log_bt_subscription_scheduler_config_error(reason="未配置 BT 下载器角色绑定，后台自动扫描不会启动。")
+        return
+
+    stop_event = asyncio.Event()
+    application.bot_data[tg.BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY] = stop_event
+    application.bot_data[tg.BT_SUBSCRIPTION_SCHEDULER_TASK_KEY] = application.create_task(
+        tg._bt_subscription_scheduler_loop(
+            application=application,
+            bt_subscription_service=bt_subscription_service,
+            execution_gate=tg._resolve_execution_gate_for_application(application),
+            stop_event=stop_event,
+            dispatch_context=BtSubscriptionDispatchContext(
+                downloader_name=downloader_execution.name,
+                downloader_type=downloader_execution.downloader_type,
+                download_dir=downloader_execution.download_dir,
+            ),
+        ),
+        name="bt_subscription_scheduler",
+    )
+
+
+async def stop_telegram_application_lifecycle(application: Application) -> None:
+    from app.bot import telegram_bot as tg
+
+    await stop_telegram_sidecars(application, config=tg.TELEGRAM_SIDECAR_RUNTIME_CONFIG)
+
+    stop_event = application.bot_data.pop(tg.BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
+    task = application.bot_data.pop(tg.BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
+    if isinstance(stop_event, asyncio.Event):
+        stop_event.set()
+    if not isinstance(task, asyncio.Task):
+        return
+    try:
+        await task
+    except Exception as error:
+        tg._log_bt_subscription_scheduler_loop_error(error=error)
 
 
 def _start_post_download_auto_import_scheduler(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:

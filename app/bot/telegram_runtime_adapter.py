@@ -16,6 +16,10 @@ from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.search_media import SearchMediaService
+from app.bot.telegram_sidecar_runtime import (
+    start_telegram_application_lifecycle,
+    stop_telegram_application_lifecycle,
+)
 from app.bot.telegram_update_runtime import (
     build_telegram_reply_func,
     record_telegram_callback_update,
@@ -121,8 +125,8 @@ def build_telegram_application(
     builder = (
         Application.builder()
         .token(token)
-        .post_init(tg._start_bt_subscription_scheduler)
-        .post_shutdown(tg._stop_bt_subscription_scheduler)
+        .post_init(start_telegram_application_lifecycle)
+        .post_shutdown(stop_telegram_application_lifecycle)
     )
     cleaned_proxy_url = outbound_proxy_url.strip()
     if cleaned_proxy_url:
