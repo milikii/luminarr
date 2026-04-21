@@ -3,19 +3,19 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, MutableMapping
 
 from app.bot.bt_classification_runtime import (
-    clear_bt_classification_pending,
     is_bt_classification_pending,
     pop_bt_classification_pending,
 )
 from app.bot.bt_processing_path_runtime import (
-    BT_PROCESSING_PATH_CANCELLED_TEXT,
-    clear_bt_processing_path_pending,
     is_bt_processing_path_pending,
-    pop_bt_processing_path_pending,
+)
+from app.bot.private_chat_bt_processing_runtime import (
+    build_media_import_bt_flow_reply,
+    clear_bt_follow_up_conflicts,
+    handle_bt_processing_path_follow_up,
 )
 from app.bot.bt_tmdb_association_runtime import (
     clear_bt_tmdb_association_pending,
-    enter_media_import_bt_flow,
     get_bt_tmdb_association_pending,
     handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
     log_bt_tmdb_association_error,
@@ -53,7 +53,6 @@ from app.bot.private_chat_confirm_runtime import handle_confirm_query as handle_
 from app.bot.private_chat_selection_runtime import handle_digit_selection_query as handle_shared_digit_selection_query
 from app.bot.raw_bt_destination_runtime import (
     clear_raw_bt_destination_pending,
-    enter_pure_bt_flow,
     get_raw_bt_destination_pending,
     handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
     log_pure_bt_search_error,
@@ -84,148 +83,6 @@ def _resolve_bound_downloader_execution(
     )
 
 
-def _clear_bt_follow_up_conflicts(
-    *,
-    bot_data: MutableMapping[str, object],
-    chat_id: int | None,
-    tg,
-    clear_classification_pending: bool = False,
-) -> bool | None:
-    cleared_raw_bt_destination = clear_raw_bt_destination_pending(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if cleared_raw_bt_destination is None:
-        return None
-    cleared_tmdb_association = clear_bt_tmdb_association_pending(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if cleared_tmdb_association is None:
-        return None
-    if clear_classification_pending:
-        clear_bt_classification_pending(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        )
-    return True
-
-
-def _build_media_import_bt_flow_reply(
-    *,
-    bot_data: MutableMapping[str, object],
-    chat_id: int | None,
-    source: str,
-    media_kind: str | None,
-    tg,
-) -> str:
-    return enter_media_import_bt_flow(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        source=source,
-        media_kind=media_kind,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-    )
-
-
-def _build_pure_bt_flow_reply(
-    *,
-    bot_data: MutableMapping[str, object],
-    chat_id: int | None,
-    source: str,
-    tg,
-) -> str:
-    return enter_pure_bt_flow(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        source=source,
-        raw_bt_destination_options_key=tg.RAW_BT_DESTINATION_OPTIONS_KEY,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-        raw_bt_destination_service_not_ready_text=tg.RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-        service_not_ready_text=tg.SERVICE_NOT_READY_TEXT,
-    )
-
-
-async def _handle_bt_processing_path_follow_up(
-    *,
-    bot_data: MutableMapping[str, object],
-    reply_func: PrivateChatReplyFunc,
-    chat_id: int | None,
-    bt_processing_path_pending: bool,
-    bt_processing_path: str | None,
-    bt_processing_shortcut: tuple[str, str | None] | None,
-    tg,
-) -> bool:
-    if not bt_processing_path_pending:
-        return False
-    if bt_processing_path is None and bt_processing_shortcut is None:
-        return False
-    bt_source = pop_bt_processing_path_pending(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        bt_pending_repo_key=tg.BT_PENDING_REPO_KEY,
-    )
-    if bt_source is False or not bt_source:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    if _clear_bt_follow_up_conflicts(
-        bot_data=bot_data,
-        chat_id=chat_id,
-        tg=tg,
-        clear_classification_pending=True,
-    ) is None:
-        await reply_func(tg.SERVICE_NOT_READY_TEXT)
-        return True
-    if bt_processing_path == "media_import":
-        await reply_func(
-            _build_media_import_bt_flow_reply(
-                bot_data=bot_data,
-                chat_id=chat_id,
-                source=bt_source,
-                media_kind=None,
-                tg=tg,
-            )
-        )
-        return True
-    if bt_processing_path == "pure_bt":
-        await reply_func(
-            _build_pure_bt_flow_reply(
-                bot_data=bot_data,
-                chat_id=chat_id,
-                source=bt_source,
-                tg=tg,
-            )
-        )
-        return True
-    if bt_processing_shortcut is None:
-        return False
-    shortcut_path, shortcut_media_kind = bt_processing_shortcut
-    if shortcut_path == "pure_bt":
-        await reply_func(
-            _build_pure_bt_flow_reply(
-                bot_data=bot_data,
-                chat_id=chat_id,
-                source=bt_source,
-                tg=tg,
-            )
-        )
-        return True
-    await reply_func(
-        _build_media_import_bt_flow_reply(
-            bot_data=bot_data,
-            chat_id=chat_id,
-            source=bt_source,
-            media_kind=shortcut_media_kind,
-            tg=tg,
-        )
-    )
-    return True
-
-
 async def _handle_bt_classification_follow_up(
     *,
     bot_data: MutableMapping[str, object],
@@ -245,7 +102,7 @@ async def _handle_bt_classification_follow_up(
     if bt_source is False or not bt_source:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return True
-    if _clear_bt_follow_up_conflicts(
+    if clear_bt_follow_up_conflicts(
         bot_data=bot_data,
         chat_id=chat_id,
         tg=tg,
@@ -253,7 +110,7 @@ async def _handle_bt_classification_follow_up(
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return True
     await reply_func(
-        _build_media_import_bt_flow_reply(
+        build_media_import_bt_flow_reply(
             bot_data=bot_data,
             chat_id=chat_id,
             source=bt_source,
@@ -531,7 +388,7 @@ async def handle_private_chat_query_text(
     if bt_classification_pending is None:
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return
-    if await _handle_bt_processing_path_follow_up(
+    if await handle_bt_processing_path_follow_up(
         bot_data=bot_data,
         reply_func=reply_func,
         chat_id=chat_id,
