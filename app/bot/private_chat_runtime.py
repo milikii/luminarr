@@ -135,6 +135,48 @@ async def _resolve_bt_follow_up_precheck(
     )
 
 
+async def _handle_bt_follow_up_routes(
+    *,
+    query: str,
+    bot_data: MutableMapping[str, object],
+    reply_func: PrivateChatReplyFunc,
+    chat_id: int | None,
+    tg,
+) -> _BtFollowUpPrecheck | None:
+    bt_follow_up_precheck = await _resolve_bt_follow_up_precheck(
+        query=query,
+        bot_data=bot_data,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        tg=tg,
+    )
+    if bt_follow_up_precheck is None:
+        return None
+
+    if await handle_bt_processing_path_follow_up(
+        bot_data=bot_data,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
+        bt_processing_path=bt_follow_up_precheck.bt_processing_path,
+        bt_processing_shortcut=bt_follow_up_precheck.bt_processing_shortcut,
+        tg=tg,
+    ):
+        return None
+
+    if await handle_bt_classification_follow_up(
+        bot_data=bot_data,
+        reply_func=reply_func,
+        chat_id=chat_id,
+        bt_classification_pending=bt_follow_up_precheck.bt_classification_pending,
+        bt_classification=bt_follow_up_precheck.bt_classification,
+        tg=tg,
+    ):
+        return None
+
+    return bt_follow_up_precheck
+
+
 async def _handle_opening_routes(
     *,
     query: str,
@@ -380,7 +422,7 @@ async def handle_private_chat_query_text(
     ):
         return
 
-    bt_follow_up_precheck = await _resolve_bt_follow_up_precheck(
+    bt_follow_up_precheck = await _handle_bt_follow_up_routes(
         query=query,
         bot_data=bot_data,
         reply_func=reply_func,
@@ -388,26 +430,6 @@ async def handle_private_chat_query_text(
         tg=tg,
     )
     if bt_follow_up_precheck is None:
-        return
-    if await handle_bt_processing_path_follow_up(
-        bot_data=bot_data,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
-        bt_processing_path=bt_follow_up_precheck.bt_processing_path,
-        bt_processing_shortcut=bt_follow_up_precheck.bt_processing_shortcut,
-        tg=tg,
-    ):
-        return
-
-    if await handle_bt_classification_follow_up(
-        bot_data=bot_data,
-        reply_func=reply_func,
-        chat_id=chat_id,
-        bt_classification_pending=bt_follow_up_precheck.bt_classification_pending,
-        bt_classification=bt_follow_up_precheck.bt_classification,
-        tg=tg,
-    ):
         return
 
     if await _handle_execution_gated_shared_routes(
