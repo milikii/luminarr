@@ -19,15 +19,17 @@ from app.db.approval_repo import (
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
+from app.services.import_post_processing import (
+    ImportPostProcessRequest,
+    ImportPostProcessingService,
+    MetadataScrapeFunc,
+    RefreshMediaServerFunc,
+    SubtitleTranslateFunc,
+)
 from app.services.media_name_parser import parse_media_name
-from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
-from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 from app.trace_logging import log_trace_event
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
-RefreshMediaServerFunc = Callable[[], Awaitable[str]]
-MetadataScrapeFunc = Callable[[MetadataScrapeInput], Awaitable[MetadataScrapeResult]]
-SubtitleTranslateFunc = Callable[[SubtitleTranslateInput], SubtitleTranslateResult]
 
 IMPORT_QUERY_USAGE_TEXT = "导入格式：import <任务ID或Hash>"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
@@ -148,6 +150,13 @@ class ImportToLibraryService:
             job_repo=job_repo,
             approval_repo=approval_repo,
             is_job_row_corrupted_error=_is_job_row_corrupted_error,
+        )
+        self._post_processing_service = ImportPostProcessingService(
+            refresh_media_server_func=refresh_media_server_func,
+            scrape_metadata_func=scrape_metadata_func,
+            translate_subtitle_func=translate_subtitle_func,
+            resolve_metadata_title_year_func=self._resolve_metadata_title_year,
+            record_event_func=self._record_event,
         )
 
     def _log_trace(
@@ -1040,166 +1049,15 @@ class ImportToLibraryService:
             source_path=str(source_path),
             target_path=str(target_path),
         )
-        metadata_result = await self._try_scrape_metadata(
-            task_ref=task_ref,
-            import_source=import_source,
-            target_path=target_path,
-        )
-        self._try_translate_subtitle(
-            task_ref=task_ref,
-            import_source=import_source,
-            target_path=target_path,
-            metadata_result=metadata_result,
-        )
-
-        if self._refresh_media_server_func is None:
-            return ImportExecutionResult(reply=import_success_text, imported=True)
-
-        try:
-            refresh_text = await self._refresh_media_server_func()
-        except Exception as error:
-            print(
-                f"\033[31m[媒体库刷新失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查媒体服务器地址、API Key 和网络连通性；当前导入成功不会回滚，但刷新结果会按失败文本返回。",
-                flush=True,
-            )
-            refresh_text = IMPORT_REFRESH_FAILED_TEXT
-            self._record_event(
+        post_process_result = await self._post_processing_service.run(
+            ImportPostProcessRequest(
                 task_ref=task_ref,
                 task_id=import_source.task_id,
                 task_hash=import_source.task_hash,
-                event_type="refresh.failed",
-                message=refresh_text,
+                target_path=target_path,
             )
-            return ImportExecutionResult(reply=f"{import_success_text}\n{refresh_text}", imported=True)
-
-        if refresh_text == IMPORT_REFRESH_SUCCESS_TEXT:
-            self._record_event(
-                task_ref=task_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                event_type="refresh.succeeded",
-                message=refresh_text,
-            )
-        else:
-            self._record_event(
-                task_ref=task_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                event_type="refresh.failed",
-                message=refresh_text,
-            )
-        return ImportExecutionResult(reply=f"{import_success_text}\n{refresh_text}", imported=True)
-
-    async def _try_scrape_metadata(
-        self,
-        *,
-        task_ref: str,
-        import_source: TransmissionImportSource,
-        target_path: Path,
-    ) -> MetadataScrapeResult | None:
-        if self._scrape_metadata_func is None:
-            return None
-
-        title, year = self._resolve_metadata_title_year(
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            target_path=target_path,
         )
-        scrape_input = MetadataScrapeInput(
-            task_ref=task_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            title=title,
-            year=year,
-            target_path=str(target_path),
-        )
-        try:
-            result = await self._scrape_metadata_func(scrape_input)
-        except Exception as exc:
-            message = f"metadata 刮削执行异常：{exc}"
-            self._record_event(
-                task_ref=task_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                event_type="metadata.failed",
-                message=message,
-            )
-            print(f"\033[31m[元数据刮削失败]\033[0m {message}", flush=True)
-            print(
-                "\033[33m[处理建议]\033[0m 检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
-                flush=True,
-            )
-            return None
-
-        event_type = "metadata.succeeded" if result.success else "metadata.failed"
-        self._record_event(
-            task_ref=task_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            event_type=event_type,
-            message=result.message,
-        )
-        return result
-
-    def _try_translate_subtitle(
-        self,
-        *,
-        task_ref: str,
-        import_source: TransmissionImportSource,
-        target_path: Path,
-        metadata_result: MetadataScrapeResult | None,
-    ) -> None:
-        if self._translate_subtitle_func is None:
-            return
-        metadata_path = ""
-        if metadata_result is not None and metadata_result.metadata_path.strip():
-            metadata_path = metadata_result.metadata_path.strip()
-        else:
-            metadata_path = str(_resolve_metadata_sidecar_path(target_path))
-        translate_input = SubtitleTranslateInput(
-            task_ref=task_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            target_path=str(target_path),
-            metadata_path=metadata_path,
-        )
-        try:
-            result = self._translate_subtitle_func(translate_input)
-        except Exception as exc:
-            message = f"subtitle 翻译执行异常：{exc}"
-            self._record_event(
-                task_ref=task_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                event_type="subtitle.failed",
-                message=message,
-            )
-            print(f"\033[31m[字幕翻译失败]\033[0m {message}", flush=True)
-            print(
-                "\033[33m[处理建议]\033[0m 检查字幕文件编码和目录写权限，再重试 confirm 导入。",
-                flush=True,
-            )
-            return
-
-        if result.skipped:
-            event_type = "subtitle.skipped"
-        elif result.success:
-            event_type = "subtitle.succeeded"
-        else:
-            event_type = "subtitle.failed"
-        self._record_event(
-            task_ref=task_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            event_type=event_type,
-            message=result.message,
-        )
-        if event_type == "subtitle.failed":
-            print(f"\033[31m[字幕翻译失败]\033[0m {result.message}", flush=True)
-            print(
-                "\033[33m[处理建议]\033[0m 检查字幕文件内容、编码和目录写权限，再重试 confirm 导入。",
-                flush=True,
-            )
+        return ImportExecutionResult(reply=f"{import_success_text}{post_process_result.reply_suffix}", imported=True)
 
     def _resolve_metadata_title_year(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
         fallback_title, fallback_year = _extract_title_year_for_scrape(target_path)
@@ -2072,12 +1930,6 @@ def _extract_title_year_from_text(value: str) -> tuple[str, str]:
     year = str(parsed_name.year) if parsed_name.year is not None else legacy_year
     title = title.strip()
     return title, year
-
-
-def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
-    if target_path.is_dir():
-        return target_path / ".luminarr.metadata.json"
-    return target_path.with_suffix(".metadata.json")
 
 
 def _build_normalized_target_name(*, source_path: Path, naming_truth: str) -> str:
