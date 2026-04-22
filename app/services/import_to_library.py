@@ -15,6 +15,7 @@ from app.services.import_approval_state import ImportApprovalState, ImportTarget
 from app.services.import_cancel_state import ImportCancelState
 from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
 from app.services.import_confirm_expiry_state import ImportConfirmExpiryState
+from app.services.import_confirm_context_guard import ImportConfirmContextGuard
 from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_event_recorder import ImportEventRecorder
@@ -106,6 +107,7 @@ class ImportToLibraryService:
             approval_repo=approval_repo,
             is_job_row_corrupted_error=_is_job_row_corrupted_error,
         )
+        self._confirm_context_guard = ImportConfirmContextGuard(context_lookup=self._context_lookup)
         self._raw_bt_guard = ImportRawBtGuard(
             context_lookup=self._context_lookup,
             raw_bt_lookup_result_missing_reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
@@ -534,28 +536,7 @@ class ImportToLibraryService:
         task_ref: str,
         chat_id: int | None,
     ) -> tuple[ConfirmExecutionContext | None, bool]:
-        lookup = self._context_lookup.rebuild_confirm_context(task_ref=task_ref, chat_id=chat_id)
-        if lookup.lookup_failed:
-            if lookup.job_error_kind == "row_corrupted":
-                print(
-                    f"\033[31m[导入确认上下文记录损坏]\033[0m chat_id={chat_id or 0} task_ref={task_ref} 错误={lookup.job_error_detail}\n"
-                    "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前导入任务的 job_id / chat_id / task_ref / task_id / task_hash / version 等真相字段；"
-                    "当前 confirm 会直接返回状态读取失败，避免把坏任务记录误判成普通查询失败或“没有待确认导入”。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[导入确认上下文查询失败]\033[0m chat_id={chat_id or 0} task_ref={task_ref} 错误={lookup.job_error_detail}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认导入”或“未找到对应下载任务”。",
-                    flush=True,
-                )
-            return None, True
-        context = lookup.context
-        if context is not None and context.approval_lookup_failed:
-            print(
-                f"\033[31m[导入确认审批查询失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} 错误={lookup.approval_error_detail}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通未确认状态。",
-                flush=True,
-            )
-        return context, False
+        return self._confirm_context_guard.rebuild_confirm_context(task_ref=task_ref, chat_id=chat_id)
 
     def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool | None:
         return self._job_state.claim_pending_job(job=job, lease_owner=lease_owner)
