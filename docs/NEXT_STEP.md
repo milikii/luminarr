@@ -1,4 +1,4 @@
-# Next step (v312)
+# Next step (v313)
 
 ## Current goal
 
@@ -31,23 +31,24 @@
 - 当前阶段第 26 条主线已完成：**`app/services/add_pending_write_through_state.py` 已承接 `_persist_pending_add()` 的 pending write-through 壳**，`add_to_downloader.py` 已从 `627` 行降到 `608` 行。
 - 当前阶段第 27 条主线已完成：**`app/services/import_prepare_state.py` 已承接 `_prepare_import()` 下载器查询 / 完成态判断 / 源目标预检 / 命名真相 / target exists helper`**，`import_to_library.py` 已从 `1392` 行降到 `1087` 行。
 - 当前阶段第 28 条主线已完成：**`app/services/import_confirm_execution_tail.py` 已承接 imported / pending_copy_approval / failed 三岔收尾`**，`import_to_library.py` 已从 `1087` 行降到 `958` 行。
-- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 9 轮 · 评估 confirm approval gate 壳`**。
-- 为什么现在切山：confirm 执行结果收尾已经离开主文件，`import_to_library.py` 再降 `129` 行；当前剩余最大块集中在 `confirm_import_by_task_ref()` 前半段的 context lookup / pending gate / lease claim / stale rejection / approval confirm。相比继续抠分散 wrapper，这一刀更能继续降低 confirm 主流程耦合。
+- 当前阶段第 29 条主线已完成：**`app/services/import_confirm_preparation.py` 已承接 confirm 前半段 context / stale / lease / approval gate`**，`import_to_library.py` 已从 `958` 行降到 `800` 行。
+- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 10 轮 · 评估 confirm expiry helper 壳`**。
+- 为什么现在切山：confirm 主入口已经缩成“usage -> preparation -> dispatch -> tail”薄编排，`import_to_library.py` 再降 `158` 行；当前剩余更值钱的高风险大块，是 `_handle_expired_pending_confirm()` 里 approval cancel / pending job cancel / copy-fallback cleanup / approval_expired event 这一整段过期收口。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `958` 行 / `search_media.py` `460` 行。
-- 质量基线前置条件已满足：本轮 `tests/test_import_to_library.py` 为 `142 passed`、confirm tail focused 为 `36 passed, 106 deselected`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` confirm tail smoke 也已通过。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `800` 行 / `search_media.py` `460` 行。
+- 质量基线前置条件已满足：本轮 `tests/test_import_to_library.py` 为 `142 passed`、confirm gate focused 为 `46 passed, 96 deselected`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` confirm preparation smoke 也已通过。
 
 ## User value
 
-- `app/services/import_confirm_execution_tail.py` 已经把 confirm 结果收尾拿走；`import_to_library.py` 当前 `958` 行，剩余最大结构债已经从“执行后收尾”切到“执行前 gate”。
-- 下一步优先评估 `confirm_import_by_task_ref()` 里 `_execute_import()` 之前的 approval gate，目标是把 context lookup、pending/stale 判定、lease claim、lease version 读取和 approve_import 收口成 helper，不改 confirm 对外协议。
-- 若 helper 抽离会牵动 approval / jobs / lease/version 真相、stale rejection 文本或 confirm 失败回滚边界，主线立即停住；不允许为了降行数改导入协议。
+- `app/services/import_confirm_preparation.py` 已经把 confirm 前半段 gate 拿走；`import_to_library.py` 当前 `800` 行，剩余最大结构债已经切到“过期待确认收口”。
+- 下一步优先评估 `_handle_expired_pending_confirm()`，目标是把 approval cancel、pending job cancel、copy-fallback cleanup 和 `import.approval_expired` 事件收口成 helper，不改 confirm 对外协议。
+- 若 helper 抽离会牵动 approval / jobs / lease/version 真相、超时中文文本或 expired 事件边界，主线立即停住；不允许为了降行数改导入协议。
 
 ## Only do
 
-- 只评估 `import_to_library.py` 里的 confirm approval gate 壳，优先看 `_execute_import()` 之前的 context lookup、pending/stale gate、lease claim、lease version 和 approval confirm。
-- `import_to_library.py` 只继续负责用户入口、confirm 主顺序和 helper 编排；不回退已完成的 `import_prepare_state.py`、`import_confirm_execution_tail.py`、`import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
-- focused 验证优先跑 `tests/test_import_to_library.py -k "confirm_import_by_task_ref or state_unavailable or stale or claim_lease or approval_update"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
+- 只评估 `import_to_library.py` 里的 confirm expiry helper 壳，优先看 `_handle_expired_pending_confirm()` 这段 approval cancel、pending job cancel、copy-fallback cleanup 和 expired event。
+- `import_to_library.py` 只继续负责用户入口、confirm 主顺序和 helper 编排；不回退已完成的 `import_prepare_state.py`、`import_confirm_preparation.py`、`import_confirm_execution_tail.py`、`import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
+- focused 验证优先跑 `tests/test_import_to_library.py -k "expired_pending_confirm or expiry_lookup or cancel_pending_import or confirm_import_by_task_ref_rejects_expired_pending"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；下载链详细台账继续留在 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，导入链详细台账继续看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`。
 
 ## Do not do
@@ -60,16 +61,16 @@
 
 ## Done when
 
-当前 **`import_to_library.py` 数据结构重设计 · 第 9 轮 · 评估 confirm approval gate 壳`** 主线视为 **已收口**，需要同时满足：
+当前 **`import_to_library.py` 数据结构重设计 · 第 10 轮 · 评估 confirm expiry helper 壳`** 主线视为 **已收口**，需要同时满足：
 
-1. helper 已承接 `_execute_import()` 之前至少一整块 context / stale / lease / approval gate，`import_to_library.py` 不再直接持有这组 confirm 前半段大块实现；
-2. `app/services/import_to_library.py` 行数从 `958` 继续下降；
-3. `tests/test_import_to_library.py -k "confirm_import_by_task_ref or state_unavailable or stale or claim_lease or approval_update"` 继续绿灯；
+1. helper 已承接 `_handle_expired_pending_confirm()` 至少一整块 approval cancel / pending job cancel / cleanup / expired event 收口，`import_to_library.py` 不再直接持有这组高风险超时分支大块实现；
+2. `app/services/import_to_library.py` 行数从 `800` 继续下降；
+3. `tests/test_import_to_library.py -k "expired_pending_confirm or expiry_lookup or cancel_pending_import or confirm_import_by_task_ref_rejects_expired_pending"` 继续绿灯；
 4. 若本轮有代码改动，`make quality` 和全量 `pytest` 不被破坏；
 5. `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md` 已同步新的当前真相。
 
 ## After this step
 
-1. 如果 confirm approval gate 抽离成功，下一条继续判断 `confirm_import_by_task_ref()` 里剩余的 prepare / dispatch bridge 哪一段最适合再拆。
-2. 如果 confirm approval gate 被证明会牵动 stale rejection、lease/version 或恢复路径真相，下一条改走更保守的 facade，不在导入链硬拆执行协议。
+1. 如果 confirm expiry helper 抽离成功，下一条继续判断 `import_to_library.py` 里剩余的 event persistence / raw_bt guard 哪一段最适合再拆。
+2. 如果 confirm expiry helper 被证明会牵动 approval / jobs 超时真相或 cleanup 边界，下一条改走更保守的 facade，不在导入链硬拆执行协议。
 3. 只有在 `add_to_downloader.py` 或 `import_to_library.py` 再拿下一座山后，当前阶段才可能逼近“三座大山各 ≤ 600” 的退出条件。
