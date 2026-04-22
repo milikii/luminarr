@@ -11,8 +11,8 @@ from app.db.approval_repo import (
     ApprovalRecord,
     ApprovalRepo,
 )
-from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.add_pending_context import (
@@ -27,6 +27,7 @@ from app.services.add_pending_context import (
     pending_add_to_json,
     to_completed_pending_add_context,
 )
+from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.search_media import SearchMediaService
 from app.trace_logging import log_trace_event
 
@@ -88,15 +89,6 @@ APPROVAL_ROW_CORRUPTED_REASONS = frozenset(
     }
 )
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
-
-
-@dataclass(frozen=True, slots=True)
-class AddResult:
-    task_id: str
-    task_hash: str
-    title: str
-
-
 @dataclass(frozen=True, slots=True)
 class ConfirmExecutionContext:
     job: JobRecord
@@ -128,6 +120,14 @@ class AddToDownloaderService:
         self._pending_add_lease_versions: dict[tuple[str, str], int] = {}
         self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
         self._latest_pending_task_ref_by_chat: dict[int, str] = {}
+        self._execution_follow_up = AddExecutionFollowUpService(
+            add_torrent_func=add_torrent_func,
+            job_event_repo=job_event_repo,
+            download_monitor_repo=download_monitor_repo,
+            log_trace_func=self._log_trace,
+            add_failed_text=ADD_FAILED_TEXT,
+            download_monitor_register_result_missing_reason=DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON,
+        )
 
     def _log_trace(
         self,
@@ -434,28 +434,13 @@ class AddToDownloaderService:
             message=pending_add.title,
         )
 
-        try:
-            task = await self._invoke_add_torrent(pending_add)
-        except Exception as error:
-            self._log_dispatch_error(pending_add=pending_add, error=error)
-            self._record_event(
-                task_ref=cleaned_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                event_type="downloader.dispatch_failed",
-                message=ADD_FAILED_TEXT,
-            )
-            self._log_trace(
-                event="confirm_dispatch",
-                result="failed",
-                stage="dispatch",
-                chat_id=chat_id,
-                user_id=user_id,
-                task_ref=cleaned_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                detail=str(error),
-            )
+        execution = await self._execution_follow_up.dispatch(
+            task_ref=cleaned_ref,
+            pending_add=pending_add,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        if execution.result is None:
             approval_restored = self._restore_pending_approval(
                 task_ref=cleaned_ref,
                 task_id=pending_add.task_id,
@@ -470,40 +455,9 @@ class AddToDownloaderService:
                 )
             if approval_restored is not True:
                 return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-            return ADD_FAILED_TEXT
-
-        result = AddResult(task_id=task.task_id, task_hash=task.task_hash, title=pending_add.title)
-        reply = (
-            f"已添加下载：{result.title}\n"
-            f"任务 ID: {result.task_id}\n"
-            f"任务 Hash: {result.task_hash}"
-        )
-        self._record_event(
-            task_ref=cleaned_ref,
-            task_id=result.task_id,
-            task_hash=result.task_hash,
-            event_type="downloader.succeeded",
-            message=result.title,
-        )
-        self._log_trace(
-            event="confirm_dispatch",
-            result="succeeded",
-            stage="dispatch",
-            chat_id=chat_id,
-            user_id=user_id,
-            task_ref=cleaned_ref,
-            task_id=result.task_id,
-            task_hash=result.task_hash,
-            detail=result.title,
-        )
-        if pending_add.auto_import_enabled:
-            self._register_download_monitor(
-                task_id=result.task_id,
-                task_hash=result.task_hash,
-                title=result.title,
-                chat_id=chat_id,
-                user_id=user_id,
-            )
+            return execution.reply
+        result = execution.result
+        reply = execution.reply
         finalization_warning = ""
         lease_recorded = self._record_executed_lease_version(
             task_ref=cleaned_ref,
@@ -1543,37 +1497,13 @@ class AddToDownloaderService:
         task_id: str = "",
         task_hash: str = "",
     ) -> None:
-        if self._job_event_repo is None:
-            return
-        try:
-            self._job_event_repo.append_event(
-                task_ref=task_ref,
-                task_id=task_id,
-                task_hash=task_hash,
-                event_type=event_type,
-                message=message,
-            )
-        except Exception as error:
-            if str(error) == "job_event missing after append":
-                print(
-                    f"\033[31m[下载事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误=downloader event missing after append\n"
-                    "\033[33m[处理建议]\033[0m 检查 job_event 写入后是否还能立即回读到该条下载事件；"
-                    "当前流程会继续执行，但这条下载事件真相可能没有落稳。",
-                    flush=True,
-                )
-            elif _is_downloader_event_row_corrupted_error(error):
-                print(
-                    f"\033[31m[下载事件记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type 等真相字段是否仍然完整；"
-                    "当前流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
-                    flush=True,
-                )
-            return
+        self._execution_follow_up.record_event(
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            event_type=event_type,
+            message=message,
+        )
 
     def _register_download_monitor(
         self,
@@ -1584,54 +1514,12 @@ class AddToDownloaderService:
         chat_id: int | None,
         user_id: int | None,
     ) -> None:
-        if self._download_monitor_repo is None:
-            return
-        try:
-            self._download_monitor_repo.register_download(
-                task_id=task_id,
-                task_hash=task_hash,
-                name=title,
-                chat_id=chat_id,
-                user_id=user_id,
-            )
-        except Exception as error:
-            if str(error) == DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[下载监控登记结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 download_monitor 写入后回读是否仍能拿到刚登记的任务状态；"
-                    "当前下载已投递，但后续状态跟踪和自动导入真相还没有确认落稳。",
-                    flush=True,
-                )
-            elif _is_download_monitor_register_row_corrupted_error(error):
-                print(
-                    f"\033[31m[下载监控登记记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 download_monitor 读回记录里的 task_id / task_hash / chat_id / user_id 等真相字段是否仍然完整；"
-                    "当前下载已投递，但后续状态跟踪和自动导入不会把这条坏记录当成已稳定登记。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
-                    flush=True,
-                )
-            return
-
-    async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
-        if pending_add.downloader_name.strip() or pending_add.download_dir.strip():
-            return await self._add_torrent_func(
-                pending_add.source,
-                pending_add.downloader_name,
-                pending_add.download_dir,
-            )
-        return await self._add_torrent_func(pending_add.source)
-
-    def _log_dispatch_error(self, *, pending_add: PendingAddContext, error: Exception) -> None:
-        print(
-            "\033[31m[下载投递失败]\033[0m "
-            f"标题={pending_add.title} 下载器={pending_add.downloader_name or 'legacy-transmission'} "
-            f"类型={pending_add.downloader_type or 'transmission'} 目标目录={pending_add.download_dir or '-'} "
-            f"原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查下载器地址、认证信息、目标目录和磁力链接后重试。"
+        self._execution_follow_up.register_download_monitor(
+            task_id=task_id,
+            task_hash=task_hash,
+            title=title,
+            chat_id=chat_id,
+            user_id=user_id,
         )
 
 
@@ -1659,11 +1547,3 @@ def build_add_pending_delivery_item(pending_add: PendingAddContext) -> DeliveryI
         footer=f"过期时间：{expire_minutes} 分钟后",
         status="pending",
     )
-
-
-def _is_download_monitor_register_row_corrupted_error(error: Exception) -> bool:
-    return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
-
-
-def _is_downloader_event_row_corrupted_error(error: Exception) -> bool:
-    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")

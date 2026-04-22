@@ -1,4 +1,4 @@
-# Add to downloader slimming log (v2)
+# Add to downloader slimming log (v3)
 
 > 目的：承接当前“`add_to_downloader.py` 下载编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -30,6 +30,8 @@ focused tests 入口：
 当前主线：
 - `add_to_downloader.py` 里 confirm 上下文重建、lease 抢占、下载器投递、下载监控登记和事件落盘仍在同一文件；当前唯一主线已经切回这一组，优先看是否能抽出 confirm 执行 / monitor / event helper。
 - 这一组继续守住“下载器已投递是真相；后续监控/事件写入失败只记显式中文日志 + `[处理建议]`，不回滚既有下载副作用”的边界。
+- `app/services/add_execution_follow_up.py` 已承接下载器投递、`job_event` 追加、`download_monitor` 登记和成功/失败回复拼装；`add_to_downloader.py` 只保留 confirm 编排、approval/jobs 顺序控制和最终版号/完成态回写，不回退下载副作用真相。
+- 这一步把 `add_to_downloader.py` 从 `1669` 行降到 `1549` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"` 为 `40 passed, 71 deselected`，`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 为 `111 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"`
@@ -38,10 +40,11 @@ focused tests 入口：
 
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "add_by_selection or add_candidate_source or record_pending_approval or record_pending_job"`
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"`
+- `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "cancel_pending_add or cancel_pending_approval or handle_expired_pending_confirm"`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 
 ## 4. Maintenance rule
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切回 2.2 风险组；本文件继续承接 downloader confirm / monitor / event 相关瘦身闭环，不回到 `search_media.py`。
+- 当前唯一主线已经切到 `cancel_pending_add()` 收益重评；本文件继续承接 downloader confirm / cancel 相关瘦身闭环，不回到 `search_media.py`。
