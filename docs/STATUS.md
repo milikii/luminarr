@@ -1,4 +1,4 @@
-# Current status (v407)
+# Current status (v408)
 
 ## Current mainline
 
@@ -28,29 +28,30 @@
 - 当前阶段第 28 条主线已完成：`app/services/import_confirm_execution_tail.py` 已承接 imported / pending_copy_approval / failed 三岔收尾，`import_to_library.py` 已从 `1087` 行降到 `958` 行。
 - 当前阶段第 29 条主线已完成：`app/services/import_confirm_preparation.py` 已承接 confirm 前半段 context / stale / lease / approval gate，`import_to_library.py` 已从 `958` 行降到 `800` 行。
 - 当前阶段第 30 条主线已完成：`app/services/import_confirm_expiry_state.py` 已承接 confirm 过期分支的 approval cancel / pending job cancel / cleanup / expired event，`import_to_library.py` 已从 `800` 行降到 `742` 行。
-- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 11 轮 · 评估 import event recorder helper`**。
+- 当前阶段第 31 条主线已完成：`app/services/import_event_recorder.py` 已承接导入链 `job_event` append / 回读异常 / 中文失败日志，`import_to_library.py` 已从 `742` 行降到 `729` 行。
+- 主线：**`import_to_library.py` 第 12 轮 · raw_bt guard helper`**。
 - 默认分支本轮全量回归继续绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 
 ## Current health
 
 - 仓库级 CI：`make quality` / `make verify-mainline` 绿灯。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
-- 当前导入链 focused 验证：`tests/test_import_to_library.py` 为 `142 passed`；expiry focused 为 `17 passed, 125 deselected`。
-- 当前真实 import smoke：绿灯；confirm expiry 路径通过。
+- 导入链 focused：`tests/test_import_to_library.py` 为 `142 passed`；event focused 为 `45 passed, 97 deselected`。
+- 真实 import smoke：绿灯；event recorder 路径通过。
 - 全量回归：绿灯；`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "expired_pending_confirm or expiry_lookup or cancel_pending_import or confirm_import_by_task_ref_rejects_expired_pending"` 为 `17 passed, 125 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
-- real import smoke：临时 SQLite + 真实 `/data/downloads/tr` confirm expiry 路径继续通过。
+- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_event or confirm_import_by_task_ref or approval_expired or raw_bt"` 为 `45 passed, 97 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
+- real import smoke：临时 SQLite + 真实 event recorder 路径继续通过。
 - 全量回归：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`；补修的 WeCom 真 HTTP 断言已对齐当前 shared runtime 回复协议。
 
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` `256` 行，`app/bot/private_chat_runtime.py` `468` 行，继续在这一层拆分收益有限。
-- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `742` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行；`import_to_library.py` 的 confirm expiry 收口已离开主文件，下一刀继续拿掉 `_record_event()` 这段事件真相落盘收口。
+- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `729` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行；`import_to_library.py` 下一刀继续拿掉 raw_bt guard 这组 fail-closed 判断。
 
 ## Recommended Next Operator Command
 

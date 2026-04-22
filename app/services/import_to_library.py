@@ -17,6 +17,7 @@ from app.services.import_confirm_execution_tail import ImportConfirmExecutionReq
 from app.services.import_confirm_expiry_state import ImportConfirmExpiryState
 from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
+from app.services.import_event_recorder import ImportEventRecorder
 from app.services.import_job_state import ImportJobState
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import (
@@ -176,6 +177,11 @@ class ImportToLibraryService:
             import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
             import_finalization_warning_text=IMPORT_FINALIZATION_WARNING_TEXT,
             import_execution_mode_copy=IMPORT_EXECUTION_MODE_COPY,
+        )
+        self._event_recorder = ImportEventRecorder(
+            job_event_repo=job_event_repo,
+            import_event_result_missing_reason=IMPORT_EVENT_RESULT_MISSING_REASON,
+            is_import_event_row_corrupted_error=_is_import_event_row_corrupted_error,
         )
 
     def _log_trace(
@@ -684,34 +690,15 @@ class ImportToLibraryService:
         source_path: str = "",
         target_path: str = "",
     ) -> None:
-        if self._job_event_repo is None:
-            return
-        try:
-            self._job_event_repo.append_event(
-                task_ref=task_ref,
-                task_id=task_id,
-                task_hash=task_hash,
-                event_type=event_type,
-                message=message,
-                source_path=source_path,
-                target_path=target_path,
-            )
-        except Exception as error:
-            if str(error) == IMPORT_EVENT_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[导入事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误=import event missing after append\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的导入事件；当前导入流程会继续执行，但这次事件真相还没有确认落稳。",
-                    flush=True,
-                )
-            elif _is_import_event_row_corrupted_error(error):
-                print(
-                    f"\033[31m[导入事件记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 等真相字段是否仍然完整；当前导入流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[导入事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
-                    flush=True,
-                )
+        self._event_recorder.record_event(
+            task_ref=task_ref,
+            event_type=event_type,
+            message=message,
+            task_id=task_id,
+            task_hash=task_hash,
+            source_path=source_path,
+            target_path=target_path,
+        )
 
 
 def parse_import_query(text: str) -> str | None:
