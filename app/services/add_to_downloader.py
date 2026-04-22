@@ -4,13 +4,11 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from app.clients.transmission import TransmissionTask
-from app.db.approval_repo import (
-    APPROVAL_STATUS_PENDING,
-    ApprovalRepo,
-)
+from app.db.approval_repo import ApprovalRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.services.add_confirm_availability_state import AddConfirmAvailabilityState
 from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,
     AddConfirmApprovalState,
@@ -107,6 +105,10 @@ class AddToDownloaderService:
         )
         self._confirm_preparation = AddConfirmPreparation(
             pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
+            add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
+            add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
+        )
+        self._confirm_availability_state = AddConfirmAvailabilityState(
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
             add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
         )
@@ -260,56 +262,24 @@ class AddToDownloaderService:
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
-        in_memory_pending: PendingAddContext | None = None
-        confirm_context, confirm_context_unavailable = self._rebuild_confirm_context(
+        availability, rejection_text = self._confirm_availability_state.resolve(
             task_ref=cleaned_ref,
             chat_id=chat_id,
+            job_repo_available=self._job_repo is not None,
+            rebuild_confirm_context=self._rebuild_confirm_context,
+            get_in_memory_pending=self._get_in_memory_pending,
+            log_pending_job_result_missing=self._log_pending_job_result_missing,
+            find_version_stale_rejection_text=self._find_version_stale_rejection_text,
+            handle_expired_pending_confirm=self._handle_expired_pending_confirm,
         )
-        if confirm_context is None:
-            if confirm_context_unavailable:
-                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-            in_memory_pending = self._get_in_memory_pending(chat_id=chat_id, task_ref=cleaned_ref)
-            if in_memory_pending is None:
-                return ADD_CONFIRM_NOT_PENDING_TEXT
-            if self._job_repo is not None and chat_id is not None and chat_id > 0:
-                self._log_pending_job_result_missing(
-                    chat_id=chat_id,
-                    task_ref=cleaned_ref,
-                    task_id=in_memory_pending.task_id,
-                    task_hash=in_memory_pending.task_hash,
-                    stage="confirm",
-                )
-                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-        else:
-            if confirm_context.approval_lookup_failed:
-                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-            if confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
-                stale_text = self._find_version_stale_rejection_text(
-                    task_id=confirm_context.pending_add.task_id,
-                    task_hash=confirm_context.pending_add.task_hash,
-                )
-                return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
-            if (
-                confirm_context.approval_record is None
-                or confirm_context.approval_record.status != APPROVAL_STATUS_PENDING
-            ):
-                stale_text = self._find_version_stale_rejection_text(
-                    task_id=confirm_context.pending_add.task_id,
-                    task_hash=confirm_context.pending_add.task_hash,
-                )
-                return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
-            expired_text = self._handle_expired_pending_confirm(
-                task_ref=cleaned_ref,
-                context=confirm_context,
-                chat_id=chat_id,
-            )
-            if expired_text is not None:
-                return expired_text
+        if availability is None:
+            assert rejection_text is not None
+            return rejection_text
 
         preparation, rejection_text = self._confirm_preparation.prepare(
             task_ref=cleaned_ref,
-            confirm_context=confirm_context,
-            in_memory_pending=in_memory_pending,
+            confirm_context=availability.confirm_context,
+            in_memory_pending=availability.in_memory_pending,
             build_job_lease_owner=self._build_job_lease_owner,
             claim_pending_job=self._claim_pending_job,
             restore_pending_job=self._restore_pending_job,

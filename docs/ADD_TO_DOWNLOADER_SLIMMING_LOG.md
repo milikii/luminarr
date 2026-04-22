@@ -1,4 +1,4 @@
-# Add to downloader slimming log (v10)
+# Add to downloader slimming log (v11)
 
 > 目的：承接当前“`add_to_downloader.py` 下载编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -58,10 +58,12 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `763` 行降到 `698` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 - `app/services/add_confirm_execution_tail.py` 已承接 confirm execution tail；`add_to_downloader.py` 只保留 confirm 可用性判定和 helper 串联，不再直接持有 approval-confirmed event、dispatch、dispatch-failure restore 和 finalize 的长顺序控制，不回退 dispatch / rollback / warning 边界。
 - 这一步把 `add_to_downloader.py` 从 `698` 行降到 `674` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
+- `app/services/add_confirm_availability_state.py` 已承接 confirm availability 壳；`add_to_downloader.py` 只保留 public confirm wrapper、preparation 和 execution tail 串联，不再直接持有 `confirm_context` 重建、approval pending 校验、in-memory pending 兜底和 expired/fail-closed 拒绝路径，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
+- 这一步把 `add_to_downloader.py` 从 `674` 行降到 `644` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `19091 Transmission` confirm smoke（临时 SQLite + 真实 RPC）继续通过。
 
 剩余风险：
-- `add_to_downloader.py` 还把 confirm availability 壳混在主文件里；下一步只允许优先评估 confirm_context 重建、approval pending 校验、in-memory pending 兜底和 fail-closed 拒绝路径这一组 facade，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
-- 这一组继续守住“下载器已投递是真相；approval / jobs / lease 读取失败直接 fail-closed 返回中文提示”的边界，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
+- `add_to_downloader.py` 还把 `has_pending_add()` 这段 pending presence lookup 壳混在主文件里；下一步只允许优先评估 persisted job 查询、in-memory pending 兜底和 fail-closed 返回这一组 facade，不顺手改 confirm / import 路由协议、downloader dispatch 或 jobs 状态机。
+- 这一组继续守住“private_chat_confirm_runtime 只通过 `has_pending_add()` 判断当前 ref 是否仍是下载待确认；jobs 读取失败直接返回 service-not-ready” 的边界，不回退当前 confirm / import 路由协议。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py`
