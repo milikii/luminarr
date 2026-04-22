@@ -18,6 +18,7 @@ from app.services.add_confirm_approval_state import (
     AddConfirmApprovalState,
 )
 from app.services.add_confirm_context_state import AddConfirmContextState, ConfirmExecutionContext
+from app.services.add_confirm_finalization_state import AddConfirmFinalizationState
 from app.services.add_confirm_job_state import AddConfirmJobState
 from app.services.add_cancel_state import AddCancelState
 from app.services import add_pending_context
@@ -25,7 +26,6 @@ from app.services.add_pending_context import (
     AddPendingContextBuilder,
     PendingAddContext,
     pending_add_to_json,
-    to_completed_pending_add_context,
 )
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.search_media import SearchMediaService
@@ -116,6 +116,10 @@ class AddToDownloaderService:
             log_trace_func=self._log_trace,
             add_failed_text=ADD_FAILED_TEXT,
             download_monitor_register_result_missing_reason=DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON,
+        )
+        self._confirm_finalization_state = AddConfirmFinalizationState(
+            add_finalization_warning_text=ADD_FINALIZATION_WARNING_TEXT,
+            log_trace_func=self._log_trace,
         )
         self._confirm_job_state = AddConfirmJobState(job_repo=job_repo)
         self._cancel_state = AddCancelState(
@@ -456,63 +460,23 @@ class AddToDownloaderService:
             return execution.reply
         result = execution.result
         reply = execution.reply
-        finalization_warning = ""
-        lease_recorded = self._record_executed_lease_version(
+        return self._confirm_finalization_state.finalize_confirmation(
             task_ref=cleaned_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            executed_lease_version=expected_lease_version,
-        )
-        if lease_recorded is not True:
-            finalization_warning = ADD_FINALIZATION_WARNING_TEXT
-        approval_identity_moved = self._move_completed_approval_identity(
-            current_task_id=pending_add.task_id,
-            current_task_hash=pending_add.task_hash,
-            new_task_id=pending_add.task_id,
-            new_task_hash=result.task_hash,
-        )
-        if approval_identity_moved is not True:
-            finalization_warning = ADD_FINALIZATION_WARNING_TEXT
-        if claimed_job:
-            completed_context = to_completed_pending_add_context(
-                pending_add,
-                actual_task_id=pending_add.task_id,
-                actual_task_hash=result.task_hash,
-            )
-            job_completed = self._mark_completed_job(
-                job_id=claimed_job_id,
-                expected_version=claimed_job_version,
-                lease_owner=lease_owner,
-                completed_add=completed_context,
-            )
-            if job_completed is not True:
-                finalization_warning = ADD_FINALIZATION_WARNING_TEXT
-        self._clear_pending_context(chat_id=chat_id, task_ref=cleaned_ref)
-        if finalization_warning:
-            self._log_trace(
-                event="confirm_finalize",
-                result="warning",
-                stage="completed",
-                chat_id=chat_id,
-                user_id=user_id,
-                task_ref=cleaned_ref,
-                task_id=result.task_id,
-                task_hash=result.task_hash,
-                detail=ADD_FINALIZATION_WARNING_TEXT,
-            )
-            return f"{reply}\n\n{finalization_warning}"
-        self._log_trace(
-            event="confirm_finalize",
-            result="succeeded",
-            stage="completed",
+            pending_add=pending_add,
+            result=result,
+            reply=reply,
             chat_id=chat_id,
             user_id=user_id,
-            task_ref=cleaned_ref,
-            task_id=result.task_id,
-            task_hash=result.task_hash,
-            detail=result.title,
+            expected_lease_version=expected_lease_version,
+            claimed_job=claimed_job,
+            claimed_job_id=claimed_job_id,
+            claimed_job_version=claimed_job_version,
+            lease_owner=lease_owner,
+            record_executed_lease_version=self._record_executed_lease_version,
+            move_completed_approval_identity=self._move_completed_approval_identity,
+            mark_completed_job=self._mark_completed_job,
+            clear_pending_context=self._clear_pending_context,
         )
-        return reply
 
     def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:
         cleaned_ref = task_ref.strip()
