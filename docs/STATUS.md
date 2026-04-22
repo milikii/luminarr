@@ -21,7 +21,8 @@
 - 当前阶段第 16 条主线已完成：`app/services/add_confirm_approval_state.py` 已继续承接 approval identity move，`tests/test_add_to_downloader.py` 新增 identity move warning guard，`add_to_downloader.py` 已从 `937` 行降到 `927` 行。
 - 当前阶段第 17 条主线已完成：`app/services/add_confirm_finalization_state.py` 已承接 confirm 成功后的 warning 汇总 / job completion 尾部回写 / pending context 清理 / finalize trace，`add_to_downloader.py` 已从 `927` 行降到 `892` 行。
 - 当前阶段第 18 条主线已完成：`app/services/add_pending_context.py` 已继续承接进程内 pending context 记录 / 查询 / 清理 / 缺失日志 helper，`add_to_downloader.py` 已从 `892` 行降到 `866` 行。
-- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 16 轮 · 评估 pure trace wrapper`**。
+- 当前阶段第 19 条主线已完成：`app/services/add_trace_logger.py` 已承接下载链 pure trace wrapper，`add_to_downloader.py` 已从 `866` 行降到 `838` 行。
+- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 17 轮 · 评估 pending reply / persistence 壳`**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；刚完成的上一条主线是 `private_chat_runtime.py` execution gate preparation 收口。
 
@@ -47,8 +48,8 @@
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` 当前 `256` 行（纯 wrapper 已清空），`app/bot/private_chat_runtime.py` 当前 `468` 行（bootstrap / route block / follow-up / preparation 都已收口），继续在这一层拆分收益有限——这也是 **质量硬化** 阶段 D-039 收工的直接依据。
-- 当前最大结构债仍在 services 层两座大山：`app/services/add_to_downloader.py` `866` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization 和 pending runtime state 都已拆出，当前最厚也最危险的是 pure trace wrapper、pending reply/persistence 入口壳，以及 `import_to_library.py` 的剩余执行编排壳。
+- 当前最大结构债仍在 services 层两座大山：`app/services/add_to_downloader.py` `838` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization、pending runtime state 和 pure trace wrapper 都已拆出，当前最厚也最危险的是 pending reply/persistence 入口壳，以及 `import_to_library.py` 的剩余执行编排壳。
 
 ## Recommended Next Operator Command
 

@@ -21,22 +21,23 @@
 - 当前阶段第 16 条主线已完成：**`app/services/add_confirm_approval_state.py` 已继续承接 approval identity move，`tests/test_add_to_downloader.py` 新增 identity move warning guard**，`add_to_downloader.py` 已从 `937` 行降到 `927` 行。
 - 当前阶段第 17 条主线已完成：**`app/services/add_confirm_finalization_state.py` 已承接 confirm 成功后的 warning 汇总 / job completion 尾部回写 / pending context 清理 / finalize trace`**，`add_to_downloader.py` 已从 `927` 行降到 `892` 行。
 - 当前阶段第 18 条主线已完成：**`app/services/add_pending_context.py` 已继续承接进程内 pending context 记录 / 查询 / 清理 / 缺失日志 helper**，`add_to_downloader.py` 已从 `892` 行降到 `866` 行。
-- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 16 轮 · 评估 pure trace wrapper`**。
-- 为什么现在切山：`pending runtime state` 已经离开 `add_to_downloader.py`，继续顺着这条线收 trace wrapper 的收益仍明显；相比之下，现在回头碰 `import_to_library.py` 更容易把本轮切口拉大。
+- 当前阶段第 19 条主线已完成：**`app/services/add_trace_logger.py` 已承接下载链 pure trace wrapper**，`add_to_downloader.py` 已从 `866` 行降到 `838` 行。
+- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 17 轮 · 评估 pending reply / persistence 壳`**。
+- 为什么现在切山：pure trace wrapper 已经离开 `add_to_downloader.py`，下一块仍然成组挂在主文件里的就是 pending reply / persistence 壳；继续顺着同一条山脊收口，切口最小。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `866` 行 / `import_to_library.py` `1392` 行 / `search_media.py` `460` 行。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `838` 行 / `import_to_library.py` `1392` 行 / `search_media.py` `460` 行。
 - 质量基线前置条件已满足：本轮 `tests/test_add_to_downloader.py` 为 `113 passed`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已通过。
 
 ## User value
 
-- `add_to_downloader.py` 里的 jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization 和 pending runtime state 都已经离开主文件，但 pure trace wrapper 和 pending reply/persistence 入口壳还挂在主文件里。
-- 下一步优先评估 pure trace wrapper，目的是继续把“流程壳”和“状态/日志辅助”拆开，先清掉 `_log_trace()` 这类固定协议包装，再判断入口壳是否已经逼近收益递减。
+- `add_to_downloader.py` 里的 jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization、pending runtime state 和 pure trace wrapper 都已经离开主文件，但 pending reply/persistence 入口壳还挂在主文件里。
+- 下一步优先评估 pending reply / persistence 壳，目的是继续把“流程壳”和“待确认落盘/回复拼装辅助”拆开，先判断 `_persist_pending_add()`、`_record_pending_job()` 和 pending reply renderer 是否还能成组外提。
 - 若 helper 抽离会牵动 shared runtime、trace 协议或下载副作用边界，主线立即停住；不允许为了降行数改下载协议。
 
 ## Only do
 
-- 只评估 `add_to_downloader.py` 里的 pure trace wrapper，优先看 `_log_trace()`、它对 `add_execution_follow_up.py` / `add_confirm_finalization_state.py` 的注入方式，以及最外层 pending trace 入口。
-- `add_to_downloader.py` 只继续负责用户入口、confirm 编排和 helper 顺序控制；不回退已完成的 `add_pending_context.py`、`add_execution_follow_up.py`、`add_cancel_state.py`、`add_confirm_job_state.py`、`add_confirm_approval_state.py`、`add_confirm_context_state.py` 和本轮 pending runtime state 边界。
+- 只评估 `add_to_downloader.py` 里的 pending reply / persistence 壳，优先看 `_persist_pending_add()`、`_record_pending_job()`、`render_add_pending_reply()` 和 `build_add_pending_delivery_item()` 这组入口辅助。
+- `add_to_downloader.py` 只继续负责用户入口、confirm 编排和 helper 顺序控制；不回退已完成的 `add_pending_context.py`、`add_trace_logger.py`、`add_execution_follow_up.py`、`add_cancel_state.py`、`add_confirm_job_state.py`、`add_confirm_approval_state.py` 和 `add_confirm_context_state.py` 边界。
 - focused 验证优先跑 `tests/test_add_to_downloader.py`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；搜索链详细台账继续留在 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`，下载链详细台账继续看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`。
 
@@ -49,16 +50,16 @@
 
 ## Done when
 
-当前 **`add_to_downloader.py` 数据结构重设计 · 第 16 轮 · 评估 pure trace wrapper`** 主线视为 **已收口**，需要同时满足：
+当前 **`add_to_downloader.py` 数据结构重设计 · 第 17 轮 · 评估 pending reply / persistence 壳`** 主线视为 **已收口**，需要同时满足：
 
-1. helper 已承接 pure trace wrapper，`add_to_downloader.py` 不再直接持有 `_log_trace()` 这组固定协议包装；
-2. `app/services/add_to_downloader.py` 行数从 `866` 继续下降；
+1. helper 已承接 pending reply / persistence 壳至少一整块边界，`add_to_downloader.py` 不再直接持有这组入口辅助的大块实现；
+2. `app/services/add_to_downloader.py` 行数从 `838` 继续下降；
 3. `tests/test_add_to_downloader.py` 继续绿灯；
 4. 若本轮有代码改动，`make quality` 和全量 `pytest` 不被破坏；
 5. `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md` 已同步新的当前真相。
 
 ## After this step
 
-1. 如果 pure trace wrapper 抽离成功，下一条继续评估 pending reply / persistence 入口壳是否已经接近收益递减。
-2. 如果 pure trace wrapper 被证明会牵动 shared runtime / trace 真相，下一条改走更保守的 facade，不直接外提整组 trace 辅助。
+1. 如果 pending reply / persistence 壳抽离成功，下一条继续评估这座山是否已经逼近收益递减，还是还能再收一块最小入口辅助。
+2. 如果 pending reply / persistence 壳被证明会牵动下载协议或 shared delivery 文本协议，下一条改走更保守的 facade，不直接外提整组入口辅助。
 3. 只有在 `add_to_downloader.py` 或 `import_to_library.py` 再拿下一座山后，当前阶段才可能逼近“三座大山各 ≤ 600” 的退出条件。

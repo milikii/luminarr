@@ -29,8 +29,8 @@ from app.services.add_pending_context import (
     pending_add_to_json,
 )
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
+from app.services.add_trace_logger import AddTraceLogger
 from app.services.search_media import SearchMediaService
-from app.trace_logging import log_trace_event
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 
@@ -90,7 +90,7 @@ class AddToDownloaderService:
         self._job_repo = job_repo
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
-        self._trace_log_path = trace_log_path
+        self._trace_logger = AddTraceLogger(trace_log_path)
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
         self._confirm_approval_state = AddConfirmApprovalState(
@@ -113,13 +113,13 @@ class AddToDownloaderService:
             add_torrent_func=add_torrent_func,
             job_event_repo=job_event_repo,
             download_monitor_repo=download_monitor_repo,
-            log_trace_func=self._log_trace,
+            log_trace_func=self._trace_logger.log,
             add_failed_text=ADD_FAILED_TEXT,
             download_monitor_register_result_missing_reason=DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON,
         )
         self._confirm_finalization_state = AddConfirmFinalizationState(
             add_finalization_warning_text=ADD_FINALIZATION_WARNING_TEXT,
-            log_trace_func=self._log_trace,
+            log_trace_func=self._trace_logger.log,
         )
         self._confirm_job_state = AddConfirmJobState(job_repo=job_repo)
         self._cancel_state = AddCancelState(
@@ -129,34 +129,6 @@ class AddToDownloaderService:
             pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
             downloader_cancel_pending_job_result_missing_reason=DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
             downloader_cancel_pending_job_row_missing_reason=DOWNLOADER_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
-        )
-
-    def _log_trace(
-        self,
-        *,
-        event: str,
-        result: str,
-        stage: str,
-        chat_id: int | None = None,
-        user_id: int | None = None,
-        task_ref: str = "",
-        task_id: str = "",
-        task_hash: str = "",
-        detail: str = "",
-    ) -> None:
-        log_trace_event(
-            scope="workflow",
-            workflow=WORKFLOW_ADD_TO_DOWNLOADER,
-            event=event,
-            result=result,
-            stage=stage,
-            log_path=self._trace_log_path,
-            chat_id=chat_id,
-            user_id=user_id,
-            task_ref=task_ref,
-            task_id=task_id,
-            task_hash=task_hash,
-            detail=detail,
         )
 
     async def add_by_selection(
@@ -634,7 +606,7 @@ class AddToDownloaderService:
             event_type="downloader.approval_pending",
             message=pending_add.title,
         )
-        self._log_trace(
+        self._trace_logger.log(
             event="approval_pending",
             result="created",
             stage="pending",
