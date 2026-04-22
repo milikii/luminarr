@@ -1,4 +1,4 @@
-# Add to downloader slimming log (v7)
+# Add to downloader slimming log (v8)
 
 > 目的：承接当前“`add_to_downloader.py` 下载编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -28,7 +28,7 @@ focused tests 入口：
 ### 2.2 confirm 执行 / 下载监控登记 / 事件落盘
 
 当前主线：
-- `add_to_downloader.py` 里 confirm 上下文重建、lease 抢占、下载器投递、下载监控登记和事件落盘原本混在同一文件；这一组当前唯一主线已经推进到 pending approval persistence helper，优先看 approval 写入 / 回退 / executed-version 回写是否还能继续抽走。
+- `add_to_downloader.py` 里 confirm 上下文重建、lease 抢占、下载器投递、下载监控登记和事件落盘原本混在同一文件；这一组当前唯一主线已经推进到 finalization / approval identity tail helper，优先看 confirm 成功后的尾部回写是否还能继续抽走。
 - 这一组继续守住“下载器已投递是真相；后续监控/事件写入失败只记显式中文日志 + `[处理建议]`，不回滚既有下载副作用”的边界。
 - `app/services/add_execution_follow_up.py` 已承接下载器投递、`job_event` 追加、`download_monitor` 登记和成功/失败回复拼装；`add_to_downloader.py` 只保留 confirm 编排、approval/jobs 顺序控制和最终版号/完成态回写，不回退下载副作用真相。
 - 这一步把 `add_to_downloader.py` 从 `1669` 行降到 `1549` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"` 为 `40 passed, 71 deselected`，`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 为 `111 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
@@ -40,13 +40,15 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `1315` 行降到 `1235` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm or resolve_pending_lease_version or stale_rejection or pending_approval_expired"` 为 `46 passed, 65 deselected`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
 - `app/services/add_confirm_context_state.py` 已承接 confirm context rebuild、approval 查询和 expired confirm 的 approval+job cancel/event 收口；`add_to_downloader.py` 只保留 confirm 编排顺序、approval 写入 wrapper、jobs 状态机 wrapper 和最终版号/完成态回写，不回退中文 fail-closed 日志。
 - 这一步把 `add_to_downloader.py` 从 `1235` 行降到 `1117` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm or resolve_pending_lease_version or stale_rejection or pending_approval_expired"` 继续 `46 passed, 65 deselected`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已通过。
+- `app/services/add_confirm_approval_state.py` 已继续承接 pending approval 写入 / approve / restore / cancel / executed-version 回写；`add_to_downloader.py` 只保留 confirm 编排顺序、approval identity move、finalization warning 汇总和最外层 pending 持久化壳，不回退 approval/lease 中文 fail-closed 日志。
+- 这一步把 `add_to_downloader.py` 从 `1117` 行降到 `937` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 为 `111 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 继续通过。
 
 剩余风险：
-- `add_to_downloader.py` 还把 `_record_pending_approval()`、`_record_downloader_approval()`、`_restore_pending_approval()`、`_cancel_pending_approval()`、`_record_executed_lease_version()` 和 approval identity move 混在主文件里；下一步只允许评估 pending approval persistence helper，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
+- `add_to_downloader.py` 还把 finalization warning 汇总、`_move_completed_approval_identity()`、pending context 记录和 trace wrapper 混在主文件里；下一步只允许评估 finalization / approval identity tail helper，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
 - 这一组继续守住“下载器已投递是真相；approval / jobs / lease 读取失败直接 fail-closed 返回中文提示”的边界，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
 
 focused tests 入口：
-- `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"`
+- `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py`
 
 ## 3. Focused verification
 
