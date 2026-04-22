@@ -18,6 +18,7 @@ from app.services.add_confirm_approval_state import (
 from app.services.add_confirm_context_state import AddConfirmContextState, ConfirmExecutionContext
 from app.services.add_confirm_finalization_state import AddConfirmFinalizationState
 from app.services.add_confirm_job_state import AddConfirmJobState
+from app.services.add_confirm_preparation import AddConfirmPreparation
 from app.services.add_cancel_state import AddCancelState
 from app.services import add_pending_context
 from app.services.add_pending_context import (
@@ -102,6 +103,11 @@ class AddToDownloaderService:
             pending_context_builder=self._pending_context_builder,
             persist_pending_add=self._persist_pending_add,
             bt_source_unsupported_text=BT_SOURCE_UNSUPPORTED_TEXT,
+        )
+        self._confirm_preparation = AddConfirmPreparation(
+            pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
+            add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
+            add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
         )
         self._confirm_approval_state = AddConfirmApprovalState(
             approval_repo=approval_repo,
@@ -248,6 +254,7 @@ class AddToDownloaderService:
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
+        in_memory_pending: PendingAddContext | None = None
         confirm_context, confirm_context_unavailable = self._rebuild_confirm_context(
             task_ref=cleaned_ref,
             chat_id=chat_id,
@@ -293,92 +300,21 @@ class AddToDownloaderService:
             if expired_text is not None:
                 return expired_text
 
-        claimed_job = False
-        claimed_job_id = ""
-        claimed_job_version = 0
-        lease_owner = ""
-        pending_add = confirm_context.pending_add if confirm_context is not None else in_memory_pending
-        assert pending_add is not None
-
-        if confirm_context is not None:
-            lease_owner = self._build_job_lease_owner(cleaned_ref)
-            claimed_job = self._claim_pending_job(job=confirm_context.job, lease_owner=lease_owner)
-            if claimed_job is None:
-                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-            if not claimed_job:
-                stale_text = self._find_version_stale_rejection_text(
-                    task_id=pending_add.task_id,
-                    task_hash=pending_add.task_hash,
-                )
-                return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
-            claimed_job_id = confirm_context.job.job_id
-            claimed_job_version = confirm_context.job.version
-
-        stale_text = self._find_version_stale_rejection_text(
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-        )
-        if stale_text is not None:
-            if claimed_job:
-                self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
-                )
-            return stale_text
-
-        expected_lease_version = 0
-        if confirm_context is not None and confirm_context.approval_record is not None:
-            expected_lease_version = max(0, confirm_context.approval_record.lease_version)
-        if expected_lease_version <= 0:
-            expected_lease_version = self._resolve_pending_lease_version(
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                allow_in_memory_fallback_on_error=False,
-            )
-        if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
-            if claimed_job:
-                self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
-                )
-            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-        if expected_lease_version <= 0:
-            if claimed_job:
-                self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
-                )
-            return ADD_CONFIRM_NOT_PENDING_TEXT
-
-        approved = self._record_downloader_approval(
+        preparation, rejection_text = self._confirm_preparation.prepare(
             task_ref=cleaned_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            expected_lease_version=expected_lease_version,
+            confirm_context=confirm_context,
+            in_memory_pending=in_memory_pending,
+            build_job_lease_owner=self._build_job_lease_owner,
+            claim_pending_job=self._claim_pending_job,
+            restore_pending_job=self._restore_pending_job,
+            find_version_stale_rejection_text=self._find_version_stale_rejection_text,
+            resolve_pending_lease_version=self._resolve_pending_lease_version,
+            record_downloader_approval=self._record_downloader_approval,
         )
-        if approved is None:
-            if claimed_job:
-                self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
-                )
-            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-        if not approved:
-            if claimed_job:
-                self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
-                )
-            stale_text = self._find_version_stale_rejection_text(
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-            )
-            return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
+        if preparation is None:
+            assert rejection_text is not None
+            return rejection_text
+        pending_add = preparation.pending_add
 
         self._record_event(
             task_ref=cleaned_ref,
@@ -399,13 +335,13 @@ class AddToDownloaderService:
                 task_ref=cleaned_ref,
                 task_id=pending_add.task_id,
                 task_hash=pending_add.task_hash,
-                expected_lease_version=expected_lease_version,
+                expected_lease_version=preparation.expected_lease_version,
             )
-            if claimed_job:
+            if preparation.claimed_job:
                 self._restore_pending_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
+                    job_id=preparation.claimed_job_id,
+                    expected_version=preparation.claimed_job_version,
+                    lease_owner=preparation.lease_owner,
                 )
             if approval_restored is not True:
                 return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
@@ -419,11 +355,11 @@ class AddToDownloaderService:
             reply=reply,
             chat_id=chat_id,
             user_id=user_id,
-            expected_lease_version=expected_lease_version,
-            claimed_job=claimed_job,
-            claimed_job_id=claimed_job_id,
-            claimed_job_version=claimed_job_version,
-            lease_owner=lease_owner,
+            expected_lease_version=preparation.expected_lease_version,
+            claimed_job=preparation.claimed_job,
+            claimed_job_id=preparation.claimed_job_id,
+            claimed_job_version=preparation.claimed_job_version,
+            lease_owner=preparation.lease_owner,
             record_executed_lease_version=self._record_executed_lease_version,
             move_completed_approval_identity=self._move_completed_approval_identity,
             mark_completed_job=self._mark_completed_job,
