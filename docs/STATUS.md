@@ -1,4 +1,4 @@
-# Current status (v395)
+# Current status (v396)
 
 ## Current mainline
 
@@ -15,7 +15,8 @@
 - 当前阶段第 10 条主线已完成：`app/services/search_clarification_state.py` 已承接 clarification pending / clear / persisted load 状态 helper，`search_media.py` 已从 `725` 行降到 `616` 行。
 - 当前阶段第 11 条主线已完成：`app/services/search_candidate_state.py` 已承接 candidate save / load / rollback helper，`search_media.py` 已从 `616` 行降到 `460` 行，并率先达到 `≤ 600` 目标。
 - 当前阶段第 12 条主线已完成：`app/services/add_confirm_job_state.py` 已承接 confirm jobs 抢占 / 回退 / 完结与 lease owner helper，`add_to_downloader.py` 已从 `1399` 行降到 `1315` 行。
-- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 10 轮 · 抽 approval / lease helper`**。
+- 当前阶段第 13 条主线已完成：`app/services/add_confirm_approval_state.py` 已承接 approval / lease 查询、stale-check 和 pending expiry helper，`add_to_downloader.py` 已从 `1315` 行降到 `1235` 行。
+- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 11 轮 · 抽 confirm context / expiry helper`**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1716 passed, 0 skipped`。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；刚完成的上一条主线是 `private_chat_runtime.py` execution gate preparation 收口。
 
@@ -25,13 +26,13 @@
 - 仓库级 CI：GitHub Actions `Quality` workflow 在 `push` / `pull_request` / `workflow_dispatch` 上运行 `make quality` + `make verify-mainline`，最近一次推送绿灯。
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
-- 当前 downloader confirm job helper focused 验证：`tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm"` 为 `38 passed, 73 deselected`。
+- 当前 downloader approval / lease helper focused 验证：`tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm or resolve_pending_lease_version or stale_rejection or pending_approval_expired"` 为 `46 passed, 65 deselected`。
 - 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1716 passed, 0 skipped, 4 warnings`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- downloader confirm job helper focused：`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm"` 为 `38 passed, 73 deselected`。
+- downloader approval / lease helper focused：`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm or resolve_pending_lease_version or stale_rejection or pending_approval_expired"` 为 `46 passed, 65 deselected`。
 - real import smoke：`/data/downloads/tr -> /data/library/movies` 真实硬链接 smoke 通过。
 - 全量回归：`.venv/bin/python -m pytest -q` 为 `1716 passed, 0 skipped, 4 warnings`；补修的 WeCom 真 HTTP 断言已对齐当前 shared runtime 回复协议。
 - 当前真实端点探针：`19091 Transmission` 与 `19092 BT Transmission` 都返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`18098 qBittorrent` 当前连接失败。
@@ -39,8 +40,8 @@
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` 当前 `256` 行（纯 wrapper 已清空），`app/bot/private_chat_runtime.py` 当前 `468` 行（bootstrap / route block / follow-up / preparation 都已收口），继续在这一层拆分收益有限——这也是 **质量硬化** 阶段 D-039 收工的直接依据。
-- 当前最大结构债仍在 services 层两座大山：`app/services/add_to_downloader.py` `1315` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 jobs 状态机也已拆出一块，当前最厚也最危险的是 downloader approval / lease 判定和 `import_to_library.py` 的剩余执行编排壳。
+- 当前最大结构债仍在 services 层两座大山：`app/services/add_to_downloader.py` `1235` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 jobs 状态机和 approval / lease 查询都已拆出，当前最厚也最危险的是 confirm context / expiry 编排和 `import_to_library.py` 的剩余执行编排壳。
 
 ## Recommended Next Operator Command
 

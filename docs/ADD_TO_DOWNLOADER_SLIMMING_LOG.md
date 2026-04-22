@@ -1,4 +1,4 @@
-# Add to downloader slimming log (v5)
+# Add to downloader slimming log (v6)
 
 > 目的：承接当前“`add_to_downloader.py` 下载编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -36,9 +36,11 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `1549` 行降到 `1399` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "cancel_pending_add or cancel_pending_approval or handle_expired_pending_confirm"` 为 `19 passed, 92 deselected`，`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `111 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
 - `app/services/add_confirm_job_state.py` 已承接 confirm jobs 抢占 / 回退 / 完结和 lease owner helper；`add_to_downloader.py` 只保留 confirm 编排、approval/lease 判定和下载副作用顺序控制，不回退 jobs 状态机中文 fail-closed 日志。
 - 这一步把 `add_to_downloader.py` 从 `1399` 行降到 `1315` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm"` 为 `38 passed, 73 deselected`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
+- `app/services/add_confirm_approval_state.py` 已承接 approval / lease 查询、stale-check 和 pending expiry helper；`add_to_downloader.py` 只保留 confirm 上下文重建、approval 写入 wrapper 和过期后 cancel/event 收口，不回退 approval/lease 中文 fail-closed 日志。
+- 这一步把 `add_to_downloader.py` 从 `1315` 行降到 `1235` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or handle_expired_pending_confirm or resolve_pending_lease_version or stale_rejection or pending_approval_expired"` 为 `46 passed, 65 deselected`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
 
 剩余风险：
-- `add_to_downloader.py` 还把 `_rebuild_confirm_context()`、`_resolve_pending_lease_version()`、`_find_version_stale_rejection_text()`、`_handle_expired_pending_confirm()` 和 `_is_pending_approval_expired()` 混在主文件里；下一步只允许拆 approval / lease helper，不顺手改 downloader dispatch 或 pending approval 写入协议。
+- `add_to_downloader.py` 还把 `_rebuild_confirm_context()`、`_handle_expired_pending_confirm()` 和过期后 `jobs.cancel_pending_job + event` 收口混在主文件里；下一步只允许拆 confirm context / expiry helper，不顺手改 downloader dispatch 或 pending approval 写入协议。
 - 这一组继续守住“下载器已投递是真相；approval / jobs / lease 读取失败直接 fail-closed 返回中文提示”的边界，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
 
 focused tests 入口：
