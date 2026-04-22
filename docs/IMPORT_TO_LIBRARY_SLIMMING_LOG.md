@@ -1,4 +1,4 @@
-# Import to library slimming log (v4)
+# Import to library slimming log (v5)
 
 > 目的：承接当前“`import_to_library.py` 导入编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -39,8 +39,9 @@ focused tests 入口：
 - 这一步把 `import_to_library.py` 从 `1494` 行降到 `1392` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import or expired_pending_confirm"` 为 `15 passed, 127 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
 
 剩余风险：
-- context / approval / jobs / file-transfer / cancel 五段都已离开主文件，`import_to_library.py` 的剩余厚块不再是当前仓库最有价值的结构债。
-- 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`；当前主线已切去 `add_to_downloader.py`，不再继续在 `import_to_library.py` 微切分。
+- context / approval / jobs / file-transfer / cancel 五段都已离开主文件，但在 `add_to_downloader.py` 连续三条最小瘦身后，当前更值钱的下一刀已经重新回到 `import_to_library.py`。
+- 下一步优先评估 `_prepare_import()` 这段“下载器查询 -> 完成态判断 -> 源/目标预检 -> 命名真相 -> target exists”预检壳；只动导入前 fail-closed 预检，不回退 hardlink/copy-fallback、metadata、subtitle 或 refresh 协议。
+- 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`
@@ -56,4 +57,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，不再继续扩写新的 import 微切分主线。
+- 当前唯一主线已重新切回 import 预检壳；本文件继续承接 import 微切分详细台账，不回到 dated 小节堆叠。

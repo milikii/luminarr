@@ -26,7 +26,8 @@ from app.services.add_pending_context import (
     PendingAddContext,
 )
 from app.services.add_pending_presence_state import AddPendingPresenceState
-from app.services.add_pending_persistence import AddPendingPersistenceState, render_add_pending_reply
+from app.services.add_pending_persistence import AddPendingPersistenceState
+from app.services.add_pending_write_through_state import AddPendingWriteThroughState
 from app.services.add_request_facade import AddPendingRequestFacade
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.add_trace_logger import AddTraceLogger
@@ -98,6 +99,11 @@ class AddToDownloaderService:
             downloader_pending_job_result_missing_reason=DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON,
             downloader_pending_job_none_reason=DOWNLOADER_PENDING_JOB_NONE_REASON,
             job_row_corrupted_reasons=DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS,
+        )
+        self._pending_write_through_state = AddPendingWriteThroughState(
+            add_pending_state_unavailable_text=ADD_PENDING_STATE_UNAVAILABLE_TEXT,
+            add_approval_pending_text_template=ADD_APPROVAL_PENDING_TEXT,
+            supported_delivery_channels=SUPPORTED_DELIVERY_CHANNELS,
         )
         self._pending_presence_state = AddPendingPresenceState(job_repo=job_repo)
         self._pending_request_facade = AddPendingRequestFacade(
@@ -426,44 +432,19 @@ class AddToDownloaderService:
         pending_add: PendingAddContext,
         channel: str | None = None,
     ) -> str:
-        expected_lease_version = self._record_pending_approval(
-            task_ref=pending_add.task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-        )
-        if expected_lease_version <= 0:
-            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_pending_context(chat_id=chat_id, pending_add=pending_add)
-        if not self._record_pending_job(chat_id=chat_id, user_id=user_id, pending_add=pending_add):
-            self._clear_pending_context(chat_id=chat_id, task_ref=pending_add.task_ref)
-            self._cancel_pending_approval(
-                task_ref=pending_add.task_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                expected_lease_version=expected_lease_version,
-            )
-            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_event(
-            task_ref=pending_add.task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            event_type="downloader.approval_pending",
-            message=pending_add.title,
-        )
-        self._trace_logger.log(
-            event="approval_pending",
-            result="created",
-            stage="pending",
+        return self._pending_write_through_state.persist_pending_add(
             chat_id=chat_id,
             user_id=user_id,
-            task_ref=pending_add.task_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            detail=pending_add.title,
+            pending_add=pending_add,
+            channel=channel,
+            record_pending_approval=self._record_pending_approval,
+            record_pending_context=self._record_pending_context,
+            record_pending_job=self._record_pending_job,
+            clear_pending_context=self._clear_pending_context,
+            cancel_pending_approval=self._cancel_pending_approval,
+            record_event=self._record_event,
+            log_trace=self._trace_logger.log,
         )
-        if channel in SUPPORTED_DELIVERY_CHANNELS:
-            return render_add_pending_reply(pending_add=pending_add, channel=channel)
-        return ADD_APPROVAL_PENDING_TEXT.format(title=pending_add.title, task_ref=pending_add.task_ref)
 
     def _record_pending_job(
         self,

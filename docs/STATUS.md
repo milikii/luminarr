@@ -1,4 +1,4 @@
-# Current status (v402)
+# Current status (v403)
 
 ## Current mainline
 
@@ -23,7 +23,8 @@
 - 当前阶段第 23 条主线已完成：`app/services/add_confirm_execution_tail.py` 已承接 confirm execution tail，`add_to_downloader.py` 已从 `698` 行降到 `674` 行。
 - 当前阶段第 24 条主线已完成：`app/services/add_confirm_availability_state.py` 已承接 confirm availability 壳，`add_to_downloader.py` 已从 `674` 行降到 `644` 行。
 - 当前阶段第 25 条主线已完成：`app/services/add_pending_presence_state.py` 已承接 `has_pending_add()` 的 pending presence lookup 壳，`add_to_downloader.py` 已从 `644` 行降到 `627` 行。
-- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 23 轮 · 评估 pending write-through 壳`**。
+- 当前阶段第 26 条主线已完成：`app/services/add_pending_write_through_state.py` 已承接 `_persist_pending_add()` 的 pending write-through 壳，`add_to_downloader.py` 已从 `627` 行降到 `608` 行。
+- 当前唯一主线切回 **`app/services/import_to_library.py` 数据结构重设计 · 第 7 轮 · 评估 prepare import 预检壳`**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 - shared runtime / channel 解耦累计 `57+` 条最小直连。
 
@@ -41,7 +42,7 @@
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
 - add_to_downloader focused：`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 为 `113 passed`。
-- real add confirm smoke：本轮临时 SQLite + 真实 `19091 Transmission` confirm 闭环继续通过，并显式复验 `has_pending_add()` 返回 `True`。
+- real add confirm smoke：本轮临时 SQLite + 真实 `19091 Transmission` confirm 闭环继续通过，并显式复验 `add_by_selection -> pending approval/job/event -> has_pending_add -> confirm`。
 - real import smoke：`/data/downloads/tr -> /data/library/movies` 真实硬链接 smoke 通过。
 - 全量回归：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`；补修的 WeCom 真 HTTP 断言已对齐当前 shared runtime 回复协议。
 - 当前真实端点探针：`19091 Transmission` 与 `19092 BT Transmission` 都返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`18098 qBittorrent` 当前连接失败。
@@ -49,8 +50,8 @@
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` 当前 `256` 行（纯 wrapper 已清空），`app/bot/private_chat_runtime.py` 当前 `468` 行（bootstrap / route block / follow-up / preparation 都已收口），继续在这一层拆分收益有限——这也是 **质量硬化** 阶段 D-039 收工的直接依据。
-- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `627` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 add request facade、confirm availability、pending presence lookup、confirm 前置状态准备、confirm execution tail、jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization、pending runtime state、pure trace wrapper 和 pending persistence/reply helper 都已拆出，当前最厚也最危险的是 `_persist_pending_add()` 那段 pending write-through 壳，以及 `import_to_library.py` 的剩余执行编排壳。
+- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行，剩余主要是薄 bridge / wrapper；继续在这座山上硬拆的收益开始下降。当前更值钱也更稳定的下一刀，是把 `import_to_library.py` 里 `_prepare_import()` 那段“下载器查询 -> 完成态判断 -> 源/目标预检 -> 命名真相 -> target exists”预检壳拿走。
 
 ## Recommended Next Operator Command
 
