@@ -635,22 +635,12 @@ class AddToDownloaderService:
         new_task_id: str,
         new_task_hash: str,
     ) -> bool | None:
-        if self._approval_repo is None:
-            return True
-        try:
-            self._approval_repo.move_downloader_approval_identity(
-                current_task_id=current_task_id,
-                current_task_hash=current_task_hash,
-                new_task_id=new_task_id,
-                new_task_hash=new_task_hash,
-            )
-        except Exception as error:
-            print(
-                f"\033[31m[下载审批身份迁移失败]\033[0m current_task_id={current_task_id} current_task_hash={current_task_hash} new_task_id={new_task_id} new_task_hash={new_task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的下载审批是否仍存在，并确认 confirm 后审批主键已切到真实下载任务身份；当前下载已执行，但重启后的 stale confirm 保护可能不稳。",
-                flush=True,
-            )
-            return None
-        return True
+        return self._confirm_approval_state.move_completed_approval_identity(
+            current_task_id=current_task_id,
+            current_task_hash=current_task_hash,
+            new_task_id=new_task_id,
+            new_task_hash=new_task_hash,
+        )
 
     def _persist_pending_add(
         self,
