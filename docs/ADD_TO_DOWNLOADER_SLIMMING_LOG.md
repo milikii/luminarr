@@ -52,9 +52,11 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `866` 行降到 `838` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 - `app/services/add_pending_persistence.py` 已承接 pending job 落盘失败分流和待确认回复渲染；`add_to_downloader.py` 只保留 pending approval -> in-memory context -> event/trace -> reply 的最外层顺序控制，不再直接持有 jobs 待确认落盘长分支和 delivery item 渲染，不回退待确认文本协议。
 - 这一步把 `add_to_downloader.py` 从 `838` 行降到 `787` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
+- `app/services/add_request_facade.py` 已承接 add request 入口 facade；`add_to_downloader.py` 只保留 facade 注入和最外层 public method wrapper，不再直接持有四条 add request 入口里的 build-result -> persist 重复路径，不回退 BT source 文本边界或选择序号协议。
+- 这一步把 `add_to_downloader.py` 从 `787` 行降到 `763` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 
 剩余风险：
-- `add_to_downloader.py` 还把 add request 入口壳和大块 confirm 编排壳混在主文件里；下一步只允许优先评估 `add_by_selection()`、`add_by_batch_selection()`、`add_candidate_source()`、`add_bt_source()` 这组入口 facade，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
+- `add_to_downloader.py` 还把大块 confirm 编排壳混在主文件里；下一步只允许优先评估 `confirm_add_by_task_ref()` 里的顺序控制 facade，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
 - 这一组继续守住“下载器已投递是真相；approval / jobs / lease 读取失败直接 fail-closed 返回中文提示”的边界，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
 
 focused tests 入口：
