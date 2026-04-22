@@ -25,6 +25,7 @@ APPROVAL_ROW_CORRUPTED_REASONS = frozenset(
 )
 
 IsImportTargetLookupRowCorruptedErrorFunc = Callable[[Exception], bool]
+ClearPendingCopyFallbackFunc = Callable[..., None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +104,23 @@ class ImportApprovalState:
         self.pending_import_lease_versions[identity] = lease_version
         self.pending_import_identities.add(identity)
         return lease_version
+
+    def record_pending_approval_with_copy_fallback_reset(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        clear_pending_copy_fallback: ClearPendingCopyFallbackFunc,
+    ) -> int:
+        identity = (task_id.strip(), task_hash.strip())
+        if identity[0] and identity[1]:
+            clear_pending_copy_fallback(task_id=task_id, task_hash=task_hash)
+        return self.record_pending_approval(
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+        )
 
     def record_import_approval(
         self,

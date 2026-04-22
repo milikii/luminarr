@@ -426,13 +426,11 @@ class ImportToLibraryService:
         )
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
-        identity = (task_id.strip(), task_hash.strip())
-        if identity[0] and identity[1]:
-            self._clear_pending_copy_fallback(task_id=task_id, task_hash=task_hash)
-        return self._approval_state.record_pending_approval(
+        return self._approval_state.record_pending_approval_with_copy_fallback_reset(
             task_ref=task_ref,
             task_id=task_id,
             task_hash=task_hash,
+            clear_pending_copy_fallback=self._clear_pending_copy_fallback,
         )
 
     def _record_import_approval(

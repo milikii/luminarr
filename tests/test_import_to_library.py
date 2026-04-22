@@ -795,6 +795,18 @@ def test_record_pending_approval_logs_row_corruption(capsys) -> None:
     assert "approval_record.lease_version" in output
 
 
+def test_record_pending_approval_clears_in_memory_copy_fallback_pending() -> None:
+    service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
+    service._record_copy_fallback_pending(task_id="87", task_hash="hash-87")
+
+    assert service._resolve_execution_mode(task_id="87", task_hash="hash-87", confirm_context=None) == "copy"
+
+    lease_version = service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87")
+
+    assert lease_version == 1
+    assert service._resolve_execution_mode(task_id="87", task_hash="hash-87", confirm_context=None) == "hardlink"
+
+
 def test_record_import_approval_logs_persistence_failure(capsys) -> None:
     approval_repo = type("ApprovalRepo", (), {"approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)

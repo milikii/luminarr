@@ -1,4 +1,4 @@
-# Next step (v318)
+# Next step (v319)
 
 ## Current goal
 
@@ -37,23 +37,24 @@
 - 当前阶段第 32 条主线已完成：**`app/services/import_raw_bt_guard.py` 已承接 raw_bt lookup / payload fail-closed guard 和中文日志`**，`import_to_library.py` 已从 `729` 行降到 `684` 行。
 - 当前阶段第 33 条主线已完成：**`app/services/import_confirm_context_guard.py` 已承接 confirm context lookup / approval fail-closed guard 和中文日志`**，`import_to_library.py` 已从 `684` 行降到 `665` 行。
 - 当前阶段第 34 条主线已完成：**`app/services/import_metadata_title_year.py` 已承接 metadata title/year fallback glue`**，`import_to_library.py` 已从 `665` 行降到 `656` 行，`tests/test_import_to_library.py` 新增 2 条 metadata title/year 直接断言。
-- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 15 轮 · 评估 pending approval write-through helper`**。
-- 为什么现在切山：metadata title/year 已经离开主文件；当前剩余更值钱、也更适合继续收口的一块，是 `_record_pending_approval()` 里“clear pending copy-fallback + approval write-through” 这组 glue。这一组继续围绕 approval / copy-fallback 真相，不会碰导入协议。
+- 当前阶段第 35 条主线已完成：**`ImportApprovalState.record_pending_approval_with_copy_fallback_reset()` 已承接 pending approval write-through glue`**，`import_to_library.py` 已从 `656` 行降到 `654` 行，`tests/test_import_to_library.py` 新增 1 条 copy-fallback 清理直接断言。
+- 当前唯一主线切到 **`services 层数据结构降本 · 剩余 thin wrapper worth-it 复评估`**。
+- 为什么现在切山：pending approval glue 已经离开主文件；`import_to_library.py` 剩下的大多是 `approval/job/event` 薄 wrapper，`add_to_downloader.py` 也只比门槛多 `8` 行。下一刀必须先证明还能带来真实边界收口，而不是只为了追行数去硬拆。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `656` 行 / `search_media.py` `460` 行。
-- 质量基线前置条件已满足：本轮 metadata focused 为 `8 passed, 136 deselected`，`tests/test_import_to_library.py` 为 `144 passed`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1720 passed, 4 warnings`。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `654` 行 / `search_media.py` `460` 行。
+- 质量基线前置条件已满足：本轮 pending-approval focused 为 `7 passed, 138 deselected`，`tests/test_import_to_library.py` 为 `145 passed`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1721 passed, 4 warnings`。
 
 ## User value
 
-- `app/services/import_metadata_title_year.py` 已经把 metadata title/year 组装拿走；`import_to_library.py` 当前 `656` 行，剩余最大结构债已经切到 pending approval write-through glue。
-- 下一步优先评估 `_record_pending_approval()` 和对应 copy-fallback 清理，目标是把 pending approval write-through 收口成 helper，不改 approval 或 copy-fallback 真相边界。
-- 若 helper 抽离会牵动 approval lease/version、copy-fallback 清理时机或 pending 文本协议，主线立即停住；不允许为了降行数改导入协议。
+- `ImportApprovalState.record_pending_approval_with_copy_fallback_reset()` 已经把 pending approval glue 拿走；`import_to_library.py` 当前 `654` 行，剩余最大结构债已经逼近 thin wrapper 边界。
+- 下一步先复评估：是继续收口 `import_to_library.py` 里剩余的 `event / pending job / approval` wrapper，还是切去 `add_to_downloader.py` 做最后 `8` 行的 worth-it 判断。
+- 若下一刀只剩“换个文件放同一行委托”而没有新增边界清晰度、测试入口或回归收益，就直接停在当前质量状态，不为追 `≤ 600` 硬拆。
 
 ## Only do
 
-- 只评估 `import_to_library.py` 里的 pending approval write-through helper，优先看 `_record_pending_approval()` 和 copy-fallback 清理 glue。
-- `import_to_library.py` 只继续负责用户入口、confirm 主顺序和 helper 编排；不回退已完成的 `import_prepare_state.py`、`import_event_recorder.py`、`import_raw_bt_guard.py`、`import_confirm_context_guard.py`、`import_metadata_title_year.py`、`import_confirm_preparation.py`、`import_confirm_execution_tail.py`、`import_confirm_expiry_state.py`、`import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
-- focused 验证优先跑 `tests/test_import_to_library.py -k \"record_pending_approval or pending_state_unavailable or copy_fallback_pending\"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
+- 只评估两类候选：`import_to_library.py` 里的剩余 thin wrapper，或 `add_to_downloader.py` 最后 `8` 行是否还有真实收口价值。
+- 只有满足“能减少跨 helper 直接耦合、或新增明确 focused 测试入口、或把失败边界收成单点”的候选，才允许继续动代码。
+- 若代码真的变更，导入链 focused 优先跑 `tests/test_import_to_library.py -k \"record_pending_approval or pending_state_unavailable or copy_fallback_pending\"`；下载链若中选，则按对应 focused tests 先跑，再补 `make quality` 和全量 `pytest`。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；下载链详细台账继续留在 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，导入链详细台账继续看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`。
 
 ## Do not do
@@ -66,16 +67,14 @@
 
 ## Done when
 
-当前 **`import_to_library.py` 数据结构重设计 · 第 15 轮 · 评估 pending approval write-through helper`** 主线视为 **已收口**，需要同时满足：
+当前 **`services 层数据结构降本 · 剩余 thin wrapper worth-it 复评估`** 主线视为 **已收口**，需要同时满足：
 
-1. helper 已承接 `_record_pending_approval()` 至少一整块 copy-fallback 清理 + approval write-through glue，`import_to_library.py` 不再直接持有这组 pending approval glue；
-2. `app/services/import_to_library.py` 行数从 `656` 继续下降；
-3. `tests/test_import_to_library.py -k \"record_pending_approval or pending_state_unavailable or copy_fallback_pending\"` 继续绿灯；
-4. 若本轮有代码改动，`make quality` 和全量 `pytest` 不被破坏；
-5. `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md` 已同步新的当前真相。
+1. 已明确下一刀仍有真实结构收益，或者已明确当前服务层已进入薄 wrapper 边界、不值得继续硬拆；
+2. 当前三座大山和全量回归真相已同步到 `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`；
+3. 若本轮有代码改动，对应 focused tests、`make quality` 和全量 `pytest` 不被破坏。
 
 ## After this step
 
-1. 如果 pending approval write-through helper 抽离成功，下一条继续判断 `import_to_library.py` 里剩余的 event glue / pending job wrapper 哪一段最适合再拆。
-2. 如果 pending approval write-through helper 被证明会牵动 approval 或 copy-fallback 真相，下一条改走更保守的 facade，不在导入链硬拆执行协议。
-3. 只有在 `add_to_downloader.py` 或 `import_to_library.py` 再拿下一座山后，当前阶段才可能逼近“三座大山各 ≤ 600” 的退出条件。
+1. 如果复评估后确认 `import_to_library.py` 还有值得拆的 wrapper，下一条只动那一块并保持 focused tests 先行。
+2. 如果复评估后确认 `add_to_downloader.py` 的最后 `8` 行更值钱，下一条切去 downloader 侧，不再继续磨导入链薄 wrapper。
+3. 如果两边都只剩薄委托，没有新的边界收益，本阶段可先停在“默认分支稳定 + 两座大山已逼近门槛”的状态。
