@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
     DEFAULT_PENDING_TIMEOUT_SECONDS,
-    ApprovalRecord,
     ApprovalRepo,
 )
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -20,13 +18,13 @@ from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,
     AddConfirmApprovalState,
 )
+from app.services.add_confirm_context_state import AddConfirmContextState, ConfirmExecutionContext
 from app.services.add_confirm_job_state import AddConfirmJobState
 from app.services.add_cancel_state import AddCancelState
 from app.services import add_pending_context
 from app.services.add_pending_context import (
     AddPendingContextBuilder,
     PendingAddContext,
-    pending_add_from_json,
     pending_add_to_json,
     to_completed_pending_add_context,
 )
@@ -83,12 +81,6 @@ DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS = frozenset(
     }
 )
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
-@dataclass(frozen=True, slots=True)
-class ConfirmExecutionContext:
-    job: JobRecord
-    approval_record: ApprovalRecord | None
-    pending_add: PendingAddContext
-    approval_lookup_failed: bool = False
 
 
 class AddToDownloaderService:
@@ -114,6 +106,15 @@ class AddToDownloaderService:
             approval_repo=approval_repo,
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
             add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
+        )
+        self._confirm_context_state = AddConfirmContextState(
+            job_repo=job_repo,
+            confirm_approval_state=self._confirm_approval_state,
+            add_confirm_expired_text=ADD_CONFIRM_EXPIRED_TEXT,
+            add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
+            job_row_corrupted_reasons=DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS,
+            downloader_cancel_pending_job_result_missing_reason=DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
+            downloader_cancel_pending_job_row_missing_reason=DOWNLOADER_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
         )
         self._pending_add_identities = self._confirm_approval_state.pending_add_identities
         self._pending_add_lease_versions = self._confirm_approval_state.pending_add_lease_versions
@@ -769,12 +770,6 @@ class AddToDownloaderService:
             return False
         return True
 
-    def _log_expired_cancel_pending_job_result_missing(self, *, job: JobRecord, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[下载确认超时任务结果缺失]\033[0m task_ref={task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认任务是否仍存在，以及超时取消后是否还能回读到最新状态；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“下载确认已超时”。",
-            flush=True,
-        )
-
     def _record_executed_lease_version(
         self,
         *,
@@ -946,56 +941,9 @@ class AddToDownloaderService:
         task_ref: str,
         chat_id: int | None,
     ) -> tuple[ConfirmExecutionContext | None, bool]:
-        if self._job_repo is None or chat_id is None or chat_id <= 0:
-            return None, False
-        try:
-            job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception as error:
-            if str(error) in DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[下载确认上下文记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里该待确认下载任务的 job_id / chat_id / task_id / task_hash / version 是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏记录误判成“没有待确认下载”。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载确认上下文查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“没有待确认下载”。",
-                    flush=True,
-                )
-            return None, True
-        if job is None:
-            return None, False
-
-        pending_add, payload_problem = pending_add_from_json(job.payload_json)
-        if pending_add is None:
-            print(
-                f"\033[31m[下载确认上下文载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 载荷={payload_problem or 'unknown'}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整待确认下载上下文；若当前进程里也没有待确认上下文，当前 confirm 会直接返回状态读取失败，避免把持久化坏数据误判成“没有待确认下载”。",
-                flush=True,
-            )
-            return None, True
-
-        approval_record: ApprovalRecord | None = None
-        approval_lookup_failed = False
-        if self._approval_repo is not None:
-            try:
-                approval_record = self._approval_repo.get_downloader_approval(
-                    task_id=job.task_id,
-                    task_hash=job.task_hash,
-                )
-            except Exception as error:
-                print(
-                    f"\033[31m[下载确认审批查询失败]\033[0m task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通未确认状态。",
-                    flush=True,
-                )
-                approval_record = None
-                approval_lookup_failed = True
-        return (
-            ConfirmExecutionContext(
-                job=job,
-                approval_record=approval_record,
-                pending_add=pending_add,
-                approval_lookup_failed=approval_lookup_failed,
-            ),
-            False,
+        return self._confirm_context_state.rebuild_confirm_context(
+            task_ref=task_ref,
+            chat_id=chat_id,
         )
 
     def _get_in_memory_pending(self, *, chat_id: int | None, task_ref: str) -> PendingAddContext | None:
@@ -1099,67 +1047,15 @@ class AddToDownloaderService:
         context: ConfirmExecutionContext,
         chat_id: int | None,
     ) -> str | None:
-        approval_record = context.approval_record
-        if approval_record is None:
-            return None
-        approval_expired = self._is_pending_approval_expired(
-            task_id=context.pending_add.task_id,
-            task_hash=context.pending_add.task_hash,
-            expected_lease_version=approval_record.lease_version,
-        )
-        if approval_expired is None:
-            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-        if not approval_expired:
-            return None
-        approval_cancelled = self._cancel_pending_approval(
+        return self._confirm_context_state.handle_expired_pending_confirm(
             task_ref=task_ref,
-            task_id=context.pending_add.task_id,
-            task_hash=context.pending_add.task_hash,
-            expected_lease_version=approval_record.lease_version,
+            context=context,
+            chat_id=chat_id,
+            is_pending_approval_expired=self._is_pending_approval_expired,
+            cancel_pending_approval=self._cancel_pending_approval,
+            clear_pending_context=self._clear_pending_context,
+            record_event=self._record_event,
         )
-        if not approval_cancelled:
-            return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-        if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
-            try:
-                cancelled = self._job_repo.cancel_pending_job(
-                    job_id=context.job.job_id,
-                    expected_version=context.job.version,
-                    workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
-                )
-                if cancelled is None:
-                    raise RuntimeError(DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON)
-            except Exception as error:
-                if str(error) in {
-                    DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
-                    DOWNLOADER_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
-                }:
-                    self._log_expired_cancel_pending_job_result_missing(
-                        job=context.job,
-                        task_ref=task_ref,
-                        reason=str(error),
-                    )
-                else:
-                    print(
-                        f"\033[31m[下载确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把任务真相缺口误判成普通“下载确认已超时”。",
-                        flush=True,
-                    )
-                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-            else:
-                if not cancelled:
-                    print(
-                        f"\033[31m[下载确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前 confirm 会直接返回状态读取失败，避免把任务状态迁移冲突误判成普通“下载确认已超时”。",
-                        flush=True,
-                    )
-                    return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-        self._clear_pending_context(chat_id=chat_id, task_ref=task_ref)
-        self._record_event(
-            task_ref=task_ref,
-            task_id=context.pending_add.task_id,
-            task_hash=context.pending_add.task_hash,
-            event_type="downloader.approval_expired",
-            message=ADD_CONFIRM_EXPIRED_TEXT,
-        )
-        return ADD_CONFIRM_EXPIRED_TEXT
 
     def _is_pending_approval_expired(
         self,
