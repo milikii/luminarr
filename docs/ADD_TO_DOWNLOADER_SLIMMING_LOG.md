@@ -56,9 +56,11 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `787` 行降到 `763` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 - `app/services/add_confirm_preparation.py` 已承接 confirm 前置状态准备；`add_to_downloader.py` 只保留 confirm 入口校验、approval-confirmed event、dispatch / failure restore 和 finalize 这条 execution tail，不再直接持有 claim / stale-check / lease / approve 的长顺序控制，不回退 approval/jobs 回退边界。
 - 这一步把 `add_to_downloader.py` 从 `763` 行降到 `698` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
+- `app/services/add_confirm_execution_tail.py` 已承接 confirm execution tail；`add_to_downloader.py` 只保留 confirm 可用性判定和 helper 串联，不再直接持有 approval-confirmed event、dispatch、dispatch-failure restore 和 finalize 的长顺序控制，不回退 dispatch / rollback / warning 边界。
+- 这一步把 `add_to_downloader.py` 从 `698` 行降到 `674` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 
 剩余风险：
-- `add_to_downloader.py` 还把 confirm execution tail 混在主文件里；下一步只允许优先评估 approval-confirmed event、dispatch、dispatch-failure restore 和 finalize 这一组顺序控制 facade，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
+- `add_to_downloader.py` 还把 confirm availability 壳混在主文件里；下一步只允许优先评估 confirm_context 重建、approval pending 校验、in-memory pending 兜底和 fail-closed 拒绝路径这一组 facade，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
 - 这一组继续守住“下载器已投递是真相；approval / jobs / lease 读取失败直接 fail-closed 返回中文提示”的边界，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
 
 focused tests 入口：

@@ -16,6 +16,7 @@ from app.services.add_confirm_approval_state import (
     AddConfirmApprovalState,
 )
 from app.services.add_confirm_context_state import AddConfirmContextState, ConfirmExecutionContext
+from app.services.add_confirm_execution_tail import AddConfirmExecutionTail
 from app.services.add_confirm_finalization_state import AddConfirmFinalizationState
 from app.services.add_confirm_job_state import AddConfirmJobState
 from app.services.add_confirm_preparation import AddConfirmPreparation
@@ -136,6 +137,11 @@ class AddToDownloaderService:
         self._confirm_finalization_state = AddConfirmFinalizationState(
             add_finalization_warning_text=ADD_FINALIZATION_WARNING_TEXT,
             log_trace_func=self._trace_logger.log,
+        )
+        self._confirm_execution_tail = AddConfirmExecutionTail(
+            execution_follow_up=self._execution_follow_up,
+            confirm_finalization_state=self._confirm_finalization_state,
+            add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
         )
         self._confirm_job_state = AddConfirmJobState(job_repo=job_repo)
         self._cancel_state = AddCancelState(
@@ -316,43 +322,9 @@ class AddToDownloaderService:
             return rejection_text
         pending_add = preparation.pending_add
 
-        self._record_event(
-            task_ref=cleaned_ref,
-            task_id=pending_add.task_id,
-            task_hash=pending_add.task_hash,
-            event_type="downloader.approval_confirmed",
-            message=pending_add.title,
-        )
-
-        execution = await self._execution_follow_up.dispatch(
+        return await self._confirm_execution_tail.run(
             task_ref=cleaned_ref,
             pending_add=pending_add,
-            chat_id=chat_id,
-            user_id=user_id,
-        )
-        if execution.result is None:
-            approval_restored = self._restore_pending_approval(
-                task_ref=cleaned_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                expected_lease_version=preparation.expected_lease_version,
-            )
-            if preparation.claimed_job:
-                self._restore_pending_job(
-                    job_id=preparation.claimed_job_id,
-                    expected_version=preparation.claimed_job_version,
-                    lease_owner=preparation.lease_owner,
-                )
-            if approval_restored is not True:
-                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
-            return execution.reply
-        result = execution.result
-        reply = execution.reply
-        return self._confirm_finalization_state.finalize_confirmation(
-            task_ref=cleaned_ref,
-            pending_add=pending_add,
-            result=result,
-            reply=reply,
             chat_id=chat_id,
             user_id=user_id,
             expected_lease_version=preparation.expected_lease_version,
@@ -360,6 +332,9 @@ class AddToDownloaderService:
             claimed_job_id=preparation.claimed_job_id,
             claimed_job_version=preparation.claimed_job_version,
             lease_owner=preparation.lease_owner,
+            record_event=self._record_event,
+            restore_pending_approval=self._restore_pending_approval,
+            restore_pending_job=self._restore_pending_job,
             record_executed_lease_version=self._record_executed_lease_version,
             move_completed_approval_identity=self._move_completed_approval_identity,
             mark_completed_job=self._mark_completed_job,

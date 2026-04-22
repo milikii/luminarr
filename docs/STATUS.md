@@ -3,12 +3,7 @@
 ## Current mainline
 
 - **质量硬化** 阶段已按 `docs/DECISIONS.md` D-039 正式宣告收工；当前阶段切到 **services 层数据结构降本**，Done 定义锁在"三座大山各 `≤ 600` 行 + focused tests 不跌 + CI 绿灯"。
-- 当前阶段第 1 条主线已完成：`docs/IMPORT_PIPELINE_REDESIGN.md` 已固化 `import_to_library.py` 的入口路径、`if/elif/except` 分支密度和候选 pipeline 草图。
-- 当前阶段第 2 条主线已完成：`app/services/import_post_processing.py` 已承接 `metadata / subtitle / refresh` 后置链，`import_to_library.py` 已从 `2242` 行降到 `2094` 行。
-- 当前阶段第 3 条主线已完成：`app/services/import_approval_state.py` 已承接 approval lease/version、stale-check、expiry 和目标路径回查，`import_to_library.py` 已从 `2094` 行降到 `1827` 行。
-- 当前阶段第 4 条主线已完成：`app/services/import_job_state.py` 已承接 `jobs` pending/claim/release/complete 状态迁移，`import_to_library.py` 已从 `1827` 行降到 `1727` 行。
-- 当前阶段第 5 条主线已完成：`app/services/import_transfer_execution.py` 已承接 copy-fallback 判定 / payload 解析 / 文件系统导入执行，`import_to_library.py` 已从 `1727` 行降到 `1494` 行。
-- 当前阶段第 6 条主线已完成：`app/services/import_cancel_state.py` 已承接 `cancel_pending_import()` 的 pending job 查询 / lease 读取 / approval+job 取消 / fail-closed 中文日志，`import_to_library.py` 已从 `1494` 行降到 `1392` 行。
+- `import_to_library.py` 前 6 条主线（pipeline 盘点、post_processing、approval_state、job_state、transfer_execution、cancel_state）保持完成态，文件已从 `2242` 行降到 `1392` 行。
 - 当前阶段第 7 条主线已完成：`app/services/add_execution_follow_up.py` 已承接 confirm 执行 / 下载监控登记 / 事件落盘 helper，`add_to_downloader.py` 已从 `1669` 行降到 `1549` 行。
 - 当前阶段第 8 条主线已完成：`app/services/add_cancel_state.py` 已承接 `cancel_pending_add()` 的 pending lookup / lease / approval+job cancel / fail-closed 中文日志，`add_to_downloader.py` 已从 `1549` 行降到 `1399` 行。
 - 当前阶段第 9 条主线已完成：`app/services/search_reply_formatter.py` 已承接 movie reply / delivery item / BT 只读与批量预览回复拼装，`search_media.py` 已从 `1018` 行降到 `725` 行。
@@ -25,7 +20,8 @@
 - 当前阶段第 20 条主线已完成：`app/services/add_pending_persistence.py` 已承接 pending job 落盘失败分流和待确认回复渲染，`add_to_downloader.py` 已从 `838` 行降到 `787` 行。
 - 当前阶段第 21 条主线已完成：`app/services/add_request_facade.py` 已承接 add request 入口 facade，`add_to_downloader.py` 已从 `787` 行降到 `763` 行。
 - 当前阶段第 22 条主线已完成：`app/services/add_confirm_preparation.py` 已承接 confirm 前置状态准备，`add_to_downloader.py` 已从 `763` 行降到 `698` 行。
-- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 20 轮 · 评估 confirm execution tail`**。
+- 当前阶段第 23 条主线已完成：`app/services/add_confirm_execution_tail.py` 已承接 confirm execution tail，`add_to_downloader.py` 已从 `698` 行降到 `674` 行。
+- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 21 轮 · 评估 confirm availability 壳`**。
 - 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 - shared runtime / channel 解耦累计 `57+` 条最小直连。
 
@@ -51,8 +47,8 @@
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` 当前 `256` 行（纯 wrapper 已清空），`app/bot/private_chat_runtime.py` 当前 `468` 行（bootstrap / route block / follow-up / preparation 都已收口），继续在这一层拆分收益有限——这也是 **质量硬化** 阶段 D-039 收工的直接依据。
-- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `698` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 add request facade、confirm 前置状态准备、jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization、pending runtime state、pure trace wrapper 和 pending persistence/reply helper 都已拆出，当前最厚也最危险的是 confirm execution tail，以及 `import_to_library.py` 的剩余执行编排壳。
+- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `674` 行 / `app/services/import_to_library.py` `1392` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 的 add request facade、confirm 前置状态准备、confirm execution tail、jobs 状态机、approval / lease 查询、confirm context / expiry、pending approval persistence、approval identity move、confirm finalization、pending runtime state、pure trace wrapper 和 pending persistence/reply helper 都已拆出，当前最厚也最危险的是 confirm availability 壳，以及 `import_to_library.py` 的剩余执行编排壳。
 
 ## Recommended Next Operator Command
 
