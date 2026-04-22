@@ -11,8 +11,9 @@ from app.clients.web_source import (
     resolve_supported_web_source_page_request,
 )
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
-from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
+from app.db.clarification_repo import ClarificationRepo
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
+from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services.bt_sources import resolve_bt_source
 from app.services import search_reply_formatter
 from app.services import search_request_context
@@ -70,9 +71,6 @@ AMBIGUOUS_MAX_OPTION_COUNT = 3
 CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失败，请稍后重试。"
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
-CLARIFICATION_MISSING_AFTER_UPSERT_REASON = "clarification_state missing after upsert"
-CLARIFICATION_CLEAR_RESULT_MISSING_REASON = "clarification clear result missing"
-CLARIFICATION_QUERY_EMPTY_AFTER_READ_REASON = "clarification_state query empty after read"
 CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON = "candidate_mapping count missing after query"
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
 CANDIDATE_CLEAR_RESULT_MISSING_REASON = "candidate clear result missing"
@@ -89,12 +87,6 @@ class UnsupportedBatchPreviewPageUrl(ValueError):
 class AmbiguousOption:
     title: str
     year: str
-
-
-@dataclass(frozen=True, slots=True)
-class ClarificationQueryLoadResult:
-    query: str | None = None
-    load_failed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,10 +111,10 @@ class SearchMediaService:
         self._raw_page_search_func = raw_page_search_func
         self._limit = max(1, limit)
         self._candidate_repo = candidate_repo
-        self._clarification_repo = clarification_repo
+        self._clarification_state = ClarificationStateStore(repo=clarification_repo)
         self._lookup_movie_func = lookup_movie_func
         self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
-        self._clarification_pending_by_chat: dict[int, str] = {}
+        self._clarification_pending_by_chat = self._clarification_state.pending_by_chat
 
     async def search_raw_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
         cleaned_query = query.strip()
@@ -422,121 +414,19 @@ class SearchMediaService:
             return False
 
     def is_clarification_pending(self, chat_id: int) -> bool | None:
-        if chat_id <= 0:
-            return False
-        if chat_id in self._clarification_pending_by_chat:
-            return True
-        load_result = self._load_persisted_clarification_query(chat_id=chat_id)
-        if load_result.load_failed:
-            return None
-        if load_result.query is None:
-            return False
-        self._clarification_pending_by_chat[chat_id] = load_result.query
-        return True
+        return self._clarification_state.is_pending(chat_id)
 
     def clear_clarification_pending(self, chat_id: int) -> bool:
-        if chat_id <= 0:
-            return False
-        return self._clear_clarification_pending(chat_id=chat_id)
+        return self._clarification_state.clear_pending(chat_id)
 
     def _set_clarification_pending(self, *, chat_id: int, query: str) -> bool:
-        if chat_id <= 0:
-            return False
-        previous_query = self._clarification_pending_by_chat.get(chat_id, "")
-        self._clarification_pending_by_chat[chat_id] = query
-        if self._clarification_repo is None:
-            return True
-        try:
-            self._clarification_repo.upsert_pending(chat_id=chat_id, query=query)
-        except ClarificationPersistenceError as error:
-            if str(error) == CLARIFICATION_MISSING_AFTER_UPSERT_REASON:
-                print(
-                    f"\033[31m[搜索澄清态写入后记录缺失]\033[0m chat_id={chat_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 clarification_state 表是否被并发删除或触发器回滚；"
-                    "如需继续待澄清流程，请先确认 SQLite 写入后能立即回读该记录。",
-                    flush=True,
-                )
-            elif str(error) == CLARIFICATION_QUERY_EMPTY_AFTER_READ_REASON:
-                print(
-                    f"\033[31m[搜索澄清态写入命中坏记录]\033[0m chat_id={chat_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 clarification_state.query 是否在写后被写成空值或脏数据；"
-                    "当前会按待澄清状态写入失败处理，避免把坏记录误判成已成功进入待澄清状态。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",
-                    flush=True,
-                )
-            if previous_query:
-                self._clarification_pending_by_chat[chat_id] = previous_query
-            else:
-                self._clarification_pending_by_chat.pop(chat_id, None)
-            return False
-        except Exception as error:
-            print(
-                f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",
-                flush=True,
-            )
-            if previous_query:
-                self._clarification_pending_by_chat[chat_id] = previous_query
-            else:
-                self._clarification_pending_by_chat.pop(chat_id, None)
-            return False
-        return True
+        return self._clarification_state.set_pending(chat_id=chat_id, query=query)
 
     def _clear_clarification_pending(self, *, chat_id: int) -> bool:
-        cleared = False
-        previous_query = ""
-        if chat_id in self._clarification_pending_by_chat:
-            previous_query = self._clarification_pending_by_chat[chat_id]
-            self._clarification_pending_by_chat.pop(chat_id, None)
-            cleared = True
-        if self._clarification_repo is None:
-            return cleared
-        try:
-            cleared_result = self._clarification_repo.clear_pending(chat_id=chat_id)
-            if cleared_result is None:
-                raise ClarificationPersistenceError(CLARIFICATION_CLEAR_RESULT_MISSING_REASON)
-            return cleared_result or cleared
-        except Exception as error:
-            if str(error) == CLARIFICATION_CLEAR_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[搜索澄清态清理结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 clarification 表删除返回是否仍带有明确结果；"
-                    "当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[搜索澄清态清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表删除是否正常；当前进程内待澄清状态已清掉，但重启后旧查询可能仍残留。",
-                    flush=True,
-                )
-            if previous_query:
-                self._clarification_pending_by_chat[chat_id] = previous_query
-            return False
+        return self._clarification_state.clear_pending(chat_id)
 
     def _load_persisted_clarification_query(self, *, chat_id: int) -> ClarificationQueryLoadResult:
-        if self._clarification_repo is None:
-            return ClarificationQueryLoadResult()
-        try:
-            return ClarificationQueryLoadResult(
-                query=self._clarification_repo.get_pending_query(chat_id=chat_id),
-            )
-        except Exception as error:
-            if str(error) == CLARIFICATION_QUERY_EMPTY_AFTER_READ_REASON:
-                print(
-                    f"\033[31m[搜索澄清态记录损坏]\033[0m chat_id={chat_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 clarification_state.query 是否被写成空值或脏数据；"
-                    "当前相关入口会按状态不可用处理，避免把坏记录误判成“无待澄清记录”。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[搜索澄清态读取失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表读取是否正常；当前相关入口会按状态不可用处理，避免把持久化异常误判成“无待澄清记录”。",
-                    flush=True,
-                )
-            return ClarificationQueryLoadResult(load_failed=True)
+        return self._clarification_state.load_persisted_query(chat_id=chat_id)
 
     def _load_persisted_candidate(self, *, chat_id: int, index: int) -> CandidateLoadResult:
         if self._candidate_repo is None:
