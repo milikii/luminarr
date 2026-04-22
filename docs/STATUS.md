@@ -1,4 +1,4 @@
-# Current status (v404)
+# Current status (v405)
 
 ## Current mainline
 
@@ -25,7 +25,8 @@
 - 当前阶段第 25 条主线已完成：`app/services/add_pending_presence_state.py` 已承接 `has_pending_add()` 的 pending presence lookup 壳，`add_to_downloader.py` 已从 `644` 行降到 `627` 行。
 - 当前阶段第 26 条主线已完成：`app/services/add_pending_write_through_state.py` 已承接 `_persist_pending_add()` 的 pending write-through 壳，`add_to_downloader.py` 已从 `627` 行降到 `608` 行。
 - 当前阶段第 27 条主线已完成：`app/services/import_prepare_state.py` 已承接 `_prepare_import()` 下载器查询、完成态判断、源/目标预检、命名真相与 `target exists` 收口，`import_to_library.py` 已从 `1392` 行降到 `1087` 行。
-- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 8 轮 · 评估 confirm execution tail 壳`**。
+- 当前阶段第 28 条主线已完成：`app/services/import_confirm_execution_tail.py` 已承接 imported / pending_copy_approval / failed 三岔收尾，`import_to_library.py` 已从 `1087` 行降到 `958` 行。
+- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 9 轮 · 评估 confirm approval gate 壳`**。
 - 默认分支本轮全量回归继续绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 
 ## Current health
@@ -33,22 +34,22 @@
 - 正式入口名：`make quality`、`make verify-mainline`。
 - 仓库级 CI：GitHub Actions `Quality` workflow 继续跑 `make quality` + `make verify-mainline`，最近一次推送绿灯。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
-- 当前导入链 focused 验证：`tests/test_import_to_library.py` 为 `142 passed`；prepare focused 为 `48 passed, 94 deselected`。
-- 当前真实 import smoke：绿灯；本轮 `/data/downloads/tr -> /data/library/movies` 真实硬链接导入继续通过。
+- 当前导入链 focused 验证：`tests/test_import_to_library.py` 为 `142 passed`；confirm tail focused 为 `36 passed, 106 deselected`。
+- 当前真实 import smoke：绿灯；本轮 `/data/downloads/tr -> /data/library/movies` 真实 confirm tail 导入继续通过。
 - 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "prepare_import or import_by_task_ref or not_found or not_completed or source_missing or target_exists"` 为 `48 passed, 94 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
-- real import smoke：临时 SQLite + 真实 `/data/downloads/tr -> /data/library/movies` 硬链接导入继续通过，并显式复验 `import_by_task_ref -> pending approval/job/event -> confirm -> import.succeeded`。
+- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "confirm_import_by_task_ref or copy_fallback or hardlink_failure or target_exists_during_execute or refresh_exception"` 为 `36 passed, 106 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
+- real import smoke：临时 SQLite + 真实 `/data/downloads/tr -> /data/library/movies` confirm tail 导入继续通过，并显式复验 `import_by_task_ref -> pending approval/job/event -> confirm -> import.succeeded`。
 - 全量回归：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`；补修的 WeCom 真 HTTP 断言已对齐当前 shared runtime 回复协议。
 
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` `256` 行，`app/bot/private_chat_runtime.py` `468` 行，继续在这一层拆分收益有限。
-- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `1087` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行，剩余主要是薄 bridge / wrapper；`import_to_library.py` 的 `_prepare_import()` 预检壳已经离开主文件，当前更值钱也更稳定的下一刀，是继续拿掉 `confirm_import_by_task_ref()` 里 imported / pending_copy_approval / failed 三段 execution tail。
+- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `958` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行，剩余主要是薄 bridge / wrapper；`import_to_library.py` 的 confirm execution tail 已离开主文件，当前更值钱也更稳定的下一刀，是继续拿掉 `confirm_import_by_task_ref()` 前半段的 context / stale / lease / approval gate。
 
 ## Recommended Next Operator Command
 

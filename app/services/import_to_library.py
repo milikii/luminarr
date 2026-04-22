@@ -14,6 +14,7 @@ from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, Job
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
 from app.services.import_cancel_state import ImportCancelState
+from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_job_state import ImportJobState
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
@@ -154,6 +155,11 @@ class ImportToLibraryService:
             import_copy_approval_pending_text_template=IMPORT_COPY_APPROVAL_PENDING_TEXT,
             import_copy_failed_text_template=IMPORT_COPY_FAILED_TEXT,
             import_hardlink_failed_text_template=IMPORT_HARDLINK_FAILED_TEXT,
+        )
+        self._confirm_execution_tail = ImportConfirmExecutionTail(
+            import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
+            import_finalization_warning_text=IMPORT_FINALIZATION_WARNING_TEXT,
+            import_execution_mode_copy=IMPORT_EXECUTION_MODE_COPY,
         )
 
     def _log_trace(
@@ -470,167 +476,32 @@ class ImportToLibraryService:
             prepared_import,
             execution_mode=execution_mode,
         )
-        if execution.imported:
-            self._log_trace(
-                event="confirm_execute",
-                result="imported",
-                stage="execute",
+        return self._confirm_execution_tail.finalize(
+            request=ImportConfirmExecutionRequest(
+                task_ref=cleaned_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
                 chat_id=chat_id,
                 user_id=user_id,
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                detail=execution.reply,
-            )
-            finalization_warning = ""
-            lease_recorded = self._record_executed_lease_version(
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                executed_lease_version=expected_lease_version,
-            )
-            if lease_recorded is not True:
-                finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
-            self._clear_pending_copy_fallback(
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-            )
-            if claimed_job:
-                job_completed = self._mark_completed_job(
-                    job_id=claimed_job_id,
-                    expected_version=claimed_job_version,
-                    lease_owner=lease_owner,
-                )
-                if job_completed is not True:
-                    finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
-            if finalization_warning:
-                self._log_trace(
-                    event="confirm_finalize",
-                    result="warning",
-                    stage="completed",
-                    chat_id=chat_id,
-                    user_id=user_id,
-                    task_ref=cleaned_ref,
-                    task_id=import_source.task_id,
-                    task_hash=import_source.task_hash,
-                    detail=IMPORT_FINALIZATION_WARNING_TEXT,
-                )
-                return f"{execution.reply}\n\n{finalization_warning}"
-            self._log_trace(
-                event="confirm_finalize",
-                result="succeeded",
-                stage="completed",
-                chat_id=chat_id,
-                user_id=user_id,
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                detail=execution.reply,
-            )
-        elif execution.pending_copy_approval:
-            self._log_trace(
-                event="confirm_execute",
-                result="copy_fallback_pending",
-                stage="execute",
-                chat_id=chat_id,
-                user_id=user_id,
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                detail=execution.reply,
-            )
-            approval_restored = self._restore_pending_approval(
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
+                execution=execution,
+                execution_mode=execution_mode,
                 expected_lease_version=expected_lease_version,
-            )
-            if approval_restored is not True:
-                if claimed_job:
-                    self._restore_pending_job(
-                        job_id=claimed_job_id,
-                        expected_version=claimed_job_version,
-                        lease_owner=lease_owner,
-                    )
-                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-            self._record_copy_fallback_pending(
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-            )
-            if confirm_context is not None:
-                persisted = self._record_pending_job(
-                    chat_id=confirm_context.job.chat_id,
-                    user_id=confirm_context.job.user_id,
-                    task_ref=confirm_context.job.task_ref or cleaned_ref,
-                    task_id=import_source.task_id,
-                    task_hash=import_source.task_hash,
-                    payload_json=self._copy_fallback_pending_to_json(),
-                )
-                if not persisted and claimed_job:
-                    self._restore_pending_job(
-                        job_id=claimed_job_id,
-                        expected_version=claimed_job_version,
-                        lease_owner=lease_owner,
-                    )
-        else:
-            approval_restored = self._restore_pending_approval(
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                expected_lease_version=expected_lease_version,
-            )
-            if approval_restored is not True:
-                if claimed_job:
-                    self._restore_pending_job(
-                        job_id=claimed_job_id,
-                        expected_version=claimed_job_version,
-                        lease_owner=lease_owner,
-                    )
-                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-            if execution_mode == IMPORT_EXECUTION_MODE_COPY:
-                self._record_copy_fallback_pending(
-                    task_id=import_source.task_id,
-                    task_hash=import_source.task_hash,
-                )
-            else:
-                self._clear_pending_copy_fallback(
-                    task_id=import_source.task_id,
-                    task_hash=import_source.task_hash,
-                )
-            if claimed_job:
-                if execution_mode == IMPORT_EXECUTION_MODE_COPY:
-                    persisted = self._record_pending_job(
-                        chat_id=confirm_context.job.chat_id if confirm_context is not None else chat_id,
-                        user_id=confirm_context.job.user_id if confirm_context is not None else user_id,
-                        task_ref=confirm_context.job.task_ref if confirm_context is not None else cleaned_ref,
-                        task_id=import_source.task_id,
-                        task_hash=import_source.task_hash,
-                        payload_json=self._copy_fallback_pending_to_json(),
-                    )
-                    if not persisted:
-                        self._restore_pending_job(
-                            job_id=claimed_job_id,
-                            expected_version=claimed_job_version,
-                            lease_owner=lease_owner,
-                        )
-                else:
-                    self._restore_pending_job(
-                        job_id=claimed_job_id,
-                        expected_version=claimed_job_version,
-                        lease_owner=lease_owner,
-                    )
-            self._log_trace(
-                event="confirm_execute",
-                result="failed",
-                stage="execute",
-                chat_id=chat_id,
-                user_id=user_id,
-                task_ref=cleaned_ref,
-                task_id=import_source.task_id,
-                task_hash=import_source.task_hash,
-                detail=execution.reply,
-            )
-        return execution.reply
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+                confirm_context=confirm_context,
+            ),
+            log_trace=self._log_trace,
+            restore_pending_approval=self._restore_pending_approval,
+            restore_pending_job=self._restore_pending_job,
+            record_executed_lease_version=self._record_executed_lease_version,
+            mark_completed_job=self._mark_completed_job,
+            record_pending_job=self._record_pending_job,
+            record_copy_fallback_pending=self._record_copy_fallback_pending,
+            clear_pending_copy_fallback=self._clear_pending_copy_fallback,
+            copy_fallback_pending_to_json=self._copy_fallback_pending_to_json,
+        )
 
     def cancel_pending_import(self, chat_id: int) -> str | None:
         return self._cancel_state.cancel_pending_import(

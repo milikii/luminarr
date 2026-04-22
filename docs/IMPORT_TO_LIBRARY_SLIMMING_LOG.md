@@ -1,4 +1,4 @@
-# Import to library slimming log (v6)
+# Import to library slimming log (v7)
 
 > 目的：承接当前“`import_to_library.py` 导入编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -39,10 +39,12 @@ focused tests 入口：
 - 这一步把 `import_to_library.py` 从 `1494` 行降到 `1392` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import or expired_pending_confirm"` 为 `15 passed, 127 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1716 passed, 4 warnings`。
 - `app/services/import_prepare_state.py` 已承接 `_prepare_import()` 下载器查询、完成态判断、源/目标预检、命名真相与 `target exists` 收口；`import_to_library.py` 现在只保留 `_prepare_import()` / `_resolve_normalized_naming_truth()` wrapper、metadata title/year 解析和 confirm 编排，不回退 hardlink/copy-fallback、metadata、subtitle、refresh 或 `job_event(import.succeeded)` 边界。
 - 这一步把 `import_to_library.py` 从 `1392` 行降到 `1087` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "prepare_import or import_by_task_ref or not_found or not_completed or source_missing or target_exists"` 为 `48 passed, 94 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 为 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` 硬链接 smoke 继续通过。
+- `app/services/import_confirm_execution_tail.py` 已承接 `_execute_import()` 之后 imported / pending_copy_approval / failed 三岔收尾；`import_to_library.py` 现在只保留 confirm 前半段 gate、dispatch 调用和 tail helper 编排，不回退 approval executed-version、completed job、copy-fallback 或 `job_event(import.succeeded)` 边界。
+- 这一步把 `import_to_library.py` 从 `1087` 行降到 `958` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "confirm_import_by_task_ref or copy_fallback or hardlink_failure or target_exists_during_execute or refresh_exception"` 为 `36 passed, 106 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 为 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` confirm tail smoke 继续通过。
 
 剩余风险：
-- context / approval / jobs / file-transfer / cancel / prepare 六段都已离开主文件；当前剩余最大块集中在 `confirm_import_by_task_ref()` 里 `_execute_import()` 之后的 imported / pending_copy_approval / failed 收尾。
-- 下一步优先评估 confirm execution tail 壳；只动导入后的 approval restore、pending job restore、copy-fallback 标记和 finalize trace，不回退 hardlink/copy-fallback、metadata、subtitle 或 refresh 协议。
+- context / approval / jobs / file-transfer / cancel / prepare / execution-tail 七段都已离开主文件；当前剩余最大块集中在 `confirm_import_by_task_ref()` 前半段的 context lookup、pending/stale gate、lease claim、lease version 和 approval confirm。
+- 下一步优先评估 confirm approval gate 壳；只动 `_execute_import()` 之前的 context / stale / lease / approval gate，不回退 hardlink/copy-fallback、metadata、subtitle 或 refresh 协议。
 - 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`。
 
 focused tests 入口：
@@ -59,4 +61,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已切到 confirm execution tail；本文件继续承接 import 微切分详细台账，不回到 dated 小节堆叠。
+- 当前唯一主线已切到 confirm approval gate；本文件继续承接 import 微切分详细台账，不回到 dated 小节堆叠。
