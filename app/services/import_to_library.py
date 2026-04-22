@@ -26,6 +26,7 @@ from app.services.import_prepare_state import (
     extract_title_year_for_scrape as _extract_title_year_for_scrape,
     extract_title_year_from_text as _extract_title_year_from_text,
 )
+from app.services.import_raw_bt_guard import ImportRawBtGuard
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
 from app.trace_logging import log_trace_event
 
@@ -104,6 +105,10 @@ class ImportToLibraryService:
             job_repo=job_repo,
             approval_repo=approval_repo,
             is_job_row_corrupted_error=_is_job_row_corrupted_error,
+        )
+        self._raw_bt_guard = ImportRawBtGuard(
+            context_lookup=self._context_lookup,
+            raw_bt_lookup_result_missing_reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
         )
         self._approval_state = ImportApprovalState(
             approval_repo=approval_repo,
@@ -384,57 +389,7 @@ class ImportToLibraryService:
         return await self._prepare_state.prepare_import(task_ref=task_ref, chat_id=chat_id)
 
     def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool | None:
-        lookup = self._context_lookup.lookup_raw_bt_task(chat_id=chat_id, task_ref=task_ref)
-        if lookup.error_kind == "row_corrupted":
-            self._log_raw_bt_lookup_row_corrupted(
-                chat_id=chat_id or 0,
-                task_ref=task_ref,
-                reason=lookup.detail,
-            )
-            return None
-        if lookup.error_kind == "lookup_failed":
-            print(
-                f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id or 0} task_ref={task_ref} 错误={lookup.detail}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
-                flush=True,
-            )
-            return None
-        if lookup.error_kind == "result_missing":
-            self._log_raw_bt_lookup_result_missing(
-                chat_id=chat_id or 0,
-                task_ref=task_ref,
-                reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
-            )
-            return None
-        if lookup.error_kind == "payload_corrupted":
-            self._log_raw_bt_payload_corrupted(
-                chat_id=chat_id or 0,
-                task_ref=task_ref,
-                payload_summary=lookup.detail,
-            )
-            return None
-        return lookup.is_raw_bt
-
-    def _log_raw_bt_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
-            flush=True,
-        )
-
-    def _log_raw_bt_lookup_result_missing(self, *, chat_id: int, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
-            "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务是否仍存在，并确认这条任务真相没有被提前清理；"
-            "当前请求会直接返回查询失败，避免把 raw_bt 分类真相缺口误判成普通“不是 raw_bt”。",
-            flush=True,
-        )
-
-    def _log_raw_bt_lookup_row_corrupted(self, *, chat_id: int, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
-            "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务的 job_id / chat_id / task_ref / payload_json 等真相字段；"
-            "当前请求会直接返回查询失败，避免把坏任务记录误判成普通查询失败或普通“不是 raw_bt”。",
-            flush=True,
-        )
+        return self._raw_bt_guard.is_raw_bt_task(chat_id=chat_id, task_ref=task_ref)
 
     def _resolve_normalized_naming_truth(
         self,

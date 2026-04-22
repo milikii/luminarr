@@ -1,9 +1,9 @@
-# Current status (v408)
+# Current status (v409)
 
 ## Current mainline
 
-- **质量硬化** 阶段已按 `docs/DECISIONS.md` D-039 正式宣告收工；当前阶段切到 **services 层数据结构降本**，Done 定义锁在"三座大山各 `≤ 600` 行 + focused tests 不跌 + CI 绿灯"。
-- `import_to_library.py` 前 6 条主线（pipeline 盘点、post_processing、approval_state、job_state、transfer_execution、cancel_state）保持完成态，文件已从 `2242` 行降到 `1392` 行。
+- **质量硬化** 阶段已按 `docs/DECISIONS.md` D-039 收工；当前阶段继续做 **services 层数据结构降本**，Done 仍锁在"三座大山各 `≤ 600` 行 + focused tests 不跌 + CI 绿灯"。
+- `import_to_library.py` 前 6 条主线保持完成态，文件已从 `2242` 行降到 `1392` 行。
 - 当前阶段第 7 条主线已完成：`app/services/add_execution_follow_up.py` 已承接 confirm 执行 / 下载监控登记 / 事件落盘 helper，`add_to_downloader.py` 已从 `1669` 行降到 `1549` 行。
 - 当前阶段第 8 条主线已完成：`app/services/add_cancel_state.py` 已承接 `cancel_pending_add()` 的 pending lookup / lease / approval+job cancel / fail-closed 中文日志，`add_to_downloader.py` 已从 `1549` 行降到 `1399` 行。
 - 当前阶段第 9 条主线已完成：`app/services/search_reply_formatter.py` 已承接 movie reply / delivery item / BT 只读与批量预览回复拼装，`search_media.py` 已从 `1018` 行降到 `725` 行。
@@ -28,30 +28,29 @@
 - 当前阶段第 28 条主线已完成：`app/services/import_confirm_execution_tail.py` 已承接 imported / pending_copy_approval / failed 三岔收尾，`import_to_library.py` 已从 `1087` 行降到 `958` 行。
 - 当前阶段第 29 条主线已完成：`app/services/import_confirm_preparation.py` 已承接 confirm 前半段 context / stale / lease / approval gate，`import_to_library.py` 已从 `958` 行降到 `800` 行。
 - 当前阶段第 30 条主线已完成：`app/services/import_confirm_expiry_state.py` 已承接 confirm 过期分支的 approval cancel / pending job cancel / cleanup / expired event，`import_to_library.py` 已从 `800` 行降到 `742` 行。
-- 当前阶段第 31 条主线已完成：`app/services/import_event_recorder.py` 已承接导入链 `job_event` append / 回读异常 / 中文失败日志，`import_to_library.py` 已从 `742` 行降到 `729` 行。
-- 主线：**`import_to_library.py` 第 12 轮 · raw_bt guard helper`**。
+- 当前阶段第 31/32 条主线已完成：`app/services/import_event_recorder.py`、`app/services/import_raw_bt_guard.py` 已承接事件落盘与 raw_bt fail-closed guard，`import_to_library.py` 已从 `742` 行降到 `684` 行。
+- 主线：**`import_to_library.py` 第 13 轮 · confirm context guard helper`**。
 - 默认分支本轮全量回归继续绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 
 ## Current health
 
 - 仓库级 CI：`make quality` / `make verify-mainline` 绿灯。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
-- 导入链 focused：`tests/test_import_to_library.py` 为 `142 passed`；event focused 为 `45 passed, 97 deselected`。
-- 真实 import smoke：绿灯；event recorder 路径通过。
+- 导入链 focused：raw_bt/context focused 为 `10 passed, 132 deselected`；`tests/test_import_to_library.py` 为 `142 passed`。
+- 真实 import smoke：最新已知绿灯。
 - 全量回归：绿灯；`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_event or confirm_import_by_task_ref or approval_expired or raw_bt"` 为 `45 passed, 97 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
-- real import smoke：临时 SQLite + 真实 event recorder 路径继续通过。
-- 全量回归：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`；补修的 WeCom 真 HTTP 断言已对齐当前 shared runtime 回复协议。
+- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "raw_bt or context_lookup or payload_corrupted or query_failed"` 为 `10 passed, 132 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
+- 全量回归：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`。
 
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` `256` 行，`app/bot/private_chat_runtime.py` `468` 行，继续在这一层拆分收益有限。
-- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `729` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行；`import_to_library.py` 下一刀继续拿掉 raw_bt guard 这组 fail-closed 判断。
+- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `684` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行；`import_to_library.py` 下一刀继续拿掉 confirm context guard 这组 fail-closed 判断。
 
 ## Recommended Next Operator Command
 
