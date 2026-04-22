@@ -1,4 +1,4 @@
-# Next step (v313)
+# Next step (v314)
 
 ## Current goal
 
@@ -32,23 +32,24 @@
 - 当前阶段第 27 条主线已完成：**`app/services/import_prepare_state.py` 已承接 `_prepare_import()` 下载器查询 / 完成态判断 / 源目标预检 / 命名真相 / target exists helper`**，`import_to_library.py` 已从 `1392` 行降到 `1087` 行。
 - 当前阶段第 28 条主线已完成：**`app/services/import_confirm_execution_tail.py` 已承接 imported / pending_copy_approval / failed 三岔收尾`**，`import_to_library.py` 已从 `1087` 行降到 `958` 行。
 - 当前阶段第 29 条主线已完成：**`app/services/import_confirm_preparation.py` 已承接 confirm 前半段 context / stale / lease / approval gate`**，`import_to_library.py` 已从 `958` 行降到 `800` 行。
-- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 10 轮 · 评估 confirm expiry helper 壳`**。
-- 为什么现在切山：confirm 主入口已经缩成“usage -> preparation -> dispatch -> tail”薄编排，`import_to_library.py` 再降 `158` 行；当前剩余更值钱的高风险大块，是 `_handle_expired_pending_confirm()` 里 approval cancel / pending job cancel / copy-fallback cleanup / approval_expired event 这一整段过期收口。
+- 当前阶段第 30 条主线已完成：**`app/services/import_confirm_expiry_state.py` 已承接 confirm 过期分支的 approval cancel / pending job cancel / cleanup / expired event`**，`import_to_library.py` 已从 `800` 行降到 `742` 行。
+- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 11 轮 · 评估 import event recorder helper`**。
+- 为什么现在切山：confirm 过期收口已经离开主文件，`import_to_library.py` 再降 `58` 行；当前剩余更值钱的共享真相块，是 `_record_event()` 里 job_event append / 回读异常 / 中文失败日志这一整段事件落盘收口。相比继续抠零散 guard，先拿走事件真相更能降低后续回归风险。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `800` 行 / `search_media.py` `460` 行。
-- 质量基线前置条件已满足：本轮 `tests/test_import_to_library.py` 为 `142 passed`、confirm gate focused 为 `46 passed, 96 deselected`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` confirm preparation smoke 也已通过。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `742` 行 / `search_media.py` `460` 行。
+- 质量基线前置条件已满足：本轮 `tests/test_import_to_library.py` 为 `142 passed`、expiry focused 为 `17 passed, 125 deselected`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `/data/downloads/tr` confirm expiry smoke 也已通过。
 
 ## User value
 
-- `app/services/import_confirm_preparation.py` 已经把 confirm 前半段 gate 拿走；`import_to_library.py` 当前 `800` 行，剩余最大结构债已经切到“过期待确认收口”。
-- 下一步优先评估 `_handle_expired_pending_confirm()`，目标是把 approval cancel、pending job cancel、copy-fallback cleanup 和 `import.approval_expired` 事件收口成 helper，不改 confirm 对外协议。
-- 若 helper 抽离会牵动 approval / jobs / lease/version 真相、超时中文文本或 expired 事件边界，主线立即停住；不允许为了降行数改导入协议。
+- `app/services/import_confirm_expiry_state.py` 已经把 confirm 过期收口拿走；`import_to_library.py` 当前 `742` 行，剩余最大结构债已经切到事件真相落盘。
+- 下一步优先评估 `_record_event()`，目标是把 job_event append / 回读异常 / 中文失败日志收口成 helper，不改事件协议和 SQLite 真相边界。
+- 若 helper 抽离会牵动 `job_event` 真相、事件类型文本或失败日志边界，主线立即停住；不允许为了降行数改导入协议。
 
 ## Only do
 
-- 只评估 `import_to_library.py` 里的 confirm expiry helper 壳，优先看 `_handle_expired_pending_confirm()` 这段 approval cancel、pending job cancel、copy-fallback cleanup 和 expired event。
-- `import_to_library.py` 只继续负责用户入口、confirm 主顺序和 helper 编排；不回退已完成的 `import_prepare_state.py`、`import_confirm_preparation.py`、`import_confirm_execution_tail.py`、`import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
-- focused 验证优先跑 `tests/test_import_to_library.py -k "expired_pending_confirm or expiry_lookup or cancel_pending_import or confirm_import_by_task_ref_rejects_expired_pending"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
+- 只评估 `import_to_library.py` 里的 import event recorder helper，优先看 `_record_event()` 这段 append / 回读异常 / 中文失败日志。
+- `import_to_library.py` 只继续负责用户入口、confirm 主顺序和 helper 编排；不回退已完成的 `import_prepare_state.py`、`import_confirm_preparation.py`、`import_confirm_execution_tail.py`、`import_confirm_expiry_state.py`、`import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
+- focused 验证优先跑 `tests/test_import_to_library.py -k \"record_event or confirm_import_by_task_ref or approval_expired or raw_bt\"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；下载链详细台账继续留在 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，导入链详细台账继续看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`。
 
 ## Do not do
@@ -61,16 +62,16 @@
 
 ## Done when
 
-当前 **`import_to_library.py` 数据结构重设计 · 第 10 轮 · 评估 confirm expiry helper 壳`** 主线视为 **已收口**，需要同时满足：
+当前 **`import_to_library.py` 数据结构重设计 · 第 11 轮 · 评估 import event recorder helper`** 主线视为 **已收口**，需要同时满足：
 
-1. helper 已承接 `_handle_expired_pending_confirm()` 至少一整块 approval cancel / pending job cancel / cleanup / expired event 收口，`import_to_library.py` 不再直接持有这组高风险超时分支大块实现；
-2. `app/services/import_to_library.py` 行数从 `800` 继续下降；
-3. `tests/test_import_to_library.py -k "expired_pending_confirm or expiry_lookup or cancel_pending_import or confirm_import_by_task_ref_rejects_expired_pending"` 继续绿灯；
+1. helper 已承接 `_record_event()` 至少一整块 event append / 回读异常 / 中文失败日志收口，`import_to_library.py` 不再直接持有这组 job_event 落盘大块实现；
+2. `app/services/import_to_library.py` 行数从 `742` 继续下降；
+3. `tests/test_import_to_library.py -k \"record_event or confirm_import_by_task_ref or approval_expired or raw_bt\"` 继续绿灯；
 4. 若本轮有代码改动，`make quality` 和全量 `pytest` 不被破坏；
 5. `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md` 已同步新的当前真相。
 
 ## After this step
 
-1. 如果 confirm expiry helper 抽离成功，下一条继续判断 `import_to_library.py` 里剩余的 event persistence / raw_bt guard 哪一段最适合再拆。
-2. 如果 confirm expiry helper 被证明会牵动 approval / jobs 超时真相或 cleanup 边界，下一条改走更保守的 facade，不在导入链硬拆执行协议。
+1. 如果 import event recorder helper 抽离成功，下一条继续判断 `import_to_library.py` 里剩余的 raw_bt guard / metadata title-year 哪一段最适合再拆。
+2. 如果 import event recorder helper 被证明会牵动 `job_event` 真相或失败日志边界，下一条改走更保守的 facade，不在导入链硬拆执行协议。
 3. 只有在 `add_to_downloader.py` 或 `import_to_library.py` 再拿下一座山后，当前阶段才可能逼近“三座大山各 ≤ 600” 的退出条件。

@@ -14,6 +14,7 @@ from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
 from app.services.import_cancel_state import ImportCancelState
 from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
+from app.services.import_confirm_expiry_state import ImportConfirmExpiryState
 from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_job_state import ImportJobState
@@ -151,6 +152,16 @@ class ImportToLibraryService:
             import_confirm_not_pending_text=IMPORT_CONFIRM_NOT_PENDING_TEXT,
             import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
             pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
+        )
+        self._confirm_expiry_state = ImportConfirmExpiryState(
+            approval_repo=approval_repo,
+            job_repo=job_repo,
+            import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
+            import_confirm_expired_text=IMPORT_CONFIRM_EXPIRED_TEXT,
+            import_cancel_pending_job_result_missing_reason=IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
+            import_cancel_pending_job_row_missing_reason=IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
+            job_state_pending_approval=JOB_STATE_PENDING_APPROVAL,
+            workflow_import_to_library=WORKFLOW_IMPORT_TO_LIBRARY,
         )
         self._transfer_execution_service = import_transfer_execution.ImportTransferExecutionService(
             post_processing_service=self._post_processing_service,
@@ -640,82 +651,14 @@ class ImportToLibraryService:
         return self._approval_state.find_latest_import_target_path(task_id=task_id, task_hash=task_hash)
 
     def _handle_expired_pending_confirm(self, *, task_ref: str, context: ConfirmExecutionContext) -> str | None:
-        approval_record = context.approval_record
-        if approval_record is None:
-            return None
-        approval_expired = self._is_pending_approval_expired(
-            task_id=context.job.task_id,
-            task_hash=context.job.task_hash,
-            expected_lease_version=approval_record.lease_version,
-        )
-        if approval_expired is None:
-            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-        if not approval_expired:
-            return None
-        if self._approval_repo is not None:
-            try:
-                approval_cancelled = self._approval_repo.cancel_import(
-                    task_id=context.job.task_id,
-                    task_hash=context.job.task_hash,
-                    task_ref=task_ref,
-                    expected_lease_version=approval_record.lease_version,
-                )
-            except Exception as error:
-                print(
-                    f"\033[31m[导入确认超时审批取消失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} lease_version={approval_record.lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“导入确认已超时”。",
-                    flush=True,
-                )
-                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-            if not approval_cancelled:
-                print(
-                    f"\033[31m[导入确认超时审批取消失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} lease_version={approval_record.lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在，或是否已被其他路径抢先取消/确认；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“导入确认已超时”。",
-                    flush=True,
-                )
-                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-        if self._job_repo is not None and context.job.state == JOB_STATE_PENDING_APPROVAL:
-            try:
-                cancelled = self._job_repo.cancel_pending_job(
-                    job_id=context.job.job_id,
-                    expected_version=context.job.version,
-                    workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
-                )
-                if cancelled is None:
-                    raise RuntimeError(IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON)
-            except Exception as error:
-                if str(error) in {
-                    IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
-                    IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
-                }:
-                    self._log_expired_cancel_pending_job_result_missing(
-                        job=context.job,
-                        task_ref=task_ref,
-                        reason=str(error),
-                    )
-                else:
-                    print(
-                        f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把任务真相缺口误判成普通“导入确认已超时”。",
-                        flush=True,
-                    )
-                return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-            else:
-                if not cancelled:
-                    print(
-                        f"\033[31m[导入确认超时任务取消失败]\033[0m task_ref={task_ref} job_id={context.job.job_id} task_id={context.job.task_id} task_hash={context.job.task_hash} version={context.job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前 confirm 会直接返回状态读取失败，避免把任务状态迁移冲突误判成普通“导入确认已超时”。",
-                        flush=True,
-                    )
-                    return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
-        self._clear_pending_copy_fallback(
-            task_id=context.job.task_id,
-            task_hash=context.job.task_hash,
-        )
-        self._record_event(
+        return self._confirm_expiry_state.handle_expired_pending_confirm(
             task_ref=task_ref,
-            task_id=context.job.task_id,
-            task_hash=context.job.task_hash,
-            event_type="import.approval_expired",
-            message=IMPORT_CONFIRM_EXPIRED_TEXT,
+            context=context,
+            is_pending_approval_expired=self._is_pending_approval_expired,
+            clear_pending_copy_fallback=self._clear_pending_copy_fallback,
+            record_event=self._record_event,
+            log_expired_cancel_pending_job_result_missing=self._log_expired_cancel_pending_job_result_missing,
         )
-        return IMPORT_CONFIRM_EXPIRED_TEXT
 
     def _is_pending_approval_expired(
         self,
