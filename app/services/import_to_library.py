@@ -20,13 +20,9 @@ from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_event_recorder import ImportEventRecorder
 from app.services.import_job_state import ImportJobState
+from app.services.import_metadata_title_year import ImportMetadataTitleYearResolver
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
-from app.services.import_prepare_state import (
-    ImportPrepareState,
-    build_normalized_target_name as _build_normalized_target_name,
-    extract_title_year_for_scrape as _extract_title_year_for_scrape,
-    extract_title_year_from_text as _extract_title_year_from_text,
-)
+from app.services.import_prepare_state import ImportPrepareState
 from app.services.import_raw_bt_guard import ImportRawBtGuard
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
 from app.trace_logging import log_trace_event
@@ -184,6 +180,9 @@ class ImportToLibraryService:
             import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
             import_finalization_warning_text=IMPORT_FINALIZATION_WARNING_TEXT,
             import_execution_mode_copy=IMPORT_EXECUTION_MODE_COPY,
+        )
+        self._metadata_title_year_resolver = ImportMetadataTitleYearResolver(
+            resolve_normalized_naming_truth_func=self._resolve_normalized_naming_truth,
         )
         self._event_recorder = ImportEventRecorder(
             job_event_repo=job_event_repo,
@@ -420,19 +419,11 @@ class ImportToLibraryService:
         )
 
     def _resolve_metadata_title_year(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
-        fallback_title, fallback_year = _extract_title_year_for_scrape(target_path)
-        naming_truth = self._resolve_normalized_naming_truth(
+        return self._metadata_title_year_resolver.resolve(
             task_id=task_id,
             task_hash=task_hash,
-            fallback_name="",
+            target_path=target_path,
         )
-        if not naming_truth:
-            return fallback_title, fallback_year
-
-        title_from_truth, year_from_truth = _extract_title_year_from_text(naming_truth)
-        title = title_from_truth or fallback_title
-        year = year_from_truth or fallback_year
-        return title, year
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         identity = (task_id.strip(), task_hash.strip())

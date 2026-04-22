@@ -8,6 +8,7 @@ from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+import app.services.import_prepare_state as import_prepare_module
 import app.services.import_to_library as import_module
 import pytest
 from app.clients.transmission import TransmissionImportSource
@@ -3774,7 +3775,7 @@ def test_build_normalized_target_name_uses_parser_for_episode_file(tmp_path: Pat
     source_path = tmp_path / "Frieren.S01E01.1080p.WEB-DL.mkv"
     source_path.write_bytes(b"demo")
 
-    result = import_module._build_normalized_target_name(
+    result = import_prepare_module.build_normalized_target_name(
         source_path=source_path,
         naming_truth="Frieren.S01E01.1080p.WEB-DL.mkv",
     )
@@ -3786,7 +3787,7 @@ def test_extract_title_year_for_scrape_uses_parser_for_episode_file(tmp_path: Pa
     target_path = tmp_path / "Frieren.S01E01.1080p.WEB-DL.mkv"
     target_path.write_bytes(b"demo")
 
-    title, year = import_module._extract_title_year_for_scrape(target_path)
+    title, year = import_prepare_module.extract_title_year_for_scrape(target_path)
 
     assert title == "Frieren"
     assert year == ""
@@ -3796,10 +3797,57 @@ def test_extract_title_year_for_scrape_uses_parser_for_bracket_episode_directory
     target_path = tmp_path / "[SweetSub][Frieren][01][WebRip][1080p][CHS]"
     target_path.mkdir(parents=True)
 
-    title, year = import_module._extract_title_year_for_scrape(target_path)
+    title, year = import_prepare_module.extract_title_year_for_scrape(target_path)
 
     assert title == "Frieren"
     assert year == ""
+
+
+def test_resolve_metadata_title_year_falls_back_to_target_path_name(tmp_path: Path) -> None:
+    target_path = tmp_path / "Interstellar.2014.1080p.WEB-DL.mkv"
+    target_path.write_bytes(b"demo")
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=None),
+        library_target_dir="/data/library/movies",
+    )
+
+    title, year = service._resolve_metadata_title_year(
+        task_id="87",
+        task_hash="hash-87",
+        target_path=target_path,
+    )
+
+    assert title == "Interstellar"
+    assert year == "2014"
+
+
+def test_resolve_metadata_title_year_prefers_downloader_naming_truth(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="1",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="downloader.succeeded",
+        message="Mission: Impossible - Fallout 2018 1080p",
+    )
+    target_path = tmp_path / "raw.mkv"
+    target_path.write_bytes(b"demo")
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=None),
+        library_target_dir="/data/library/movies",
+        job_event_repo=event_repo,
+    )
+
+    title, year = service._resolve_metadata_title_year(
+        task_id="87",
+        task_hash="hash-87",
+        target_path=target_path,
+    )
+
+    assert title == "Mission: Impossible - Fallout"
+    assert year == "2018"
 
 
 def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:

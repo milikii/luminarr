@@ -1,4 +1,4 @@
-# Current status (v410)
+# Current status (v411)
 
 ## Current mainline
 
@@ -28,30 +28,29 @@
 - 当前阶段第 28 条主线已完成：`app/services/import_confirm_execution_tail.py` 已承接 imported / pending_copy_approval / failed 三岔收尾，`import_to_library.py` 已从 `1087` 行降到 `958` 行。
 - 当前阶段第 29 条主线已完成：`app/services/import_confirm_preparation.py` 已承接 confirm 前半段 context / stale / lease / approval gate，`import_to_library.py` 已从 `958` 行降到 `800` 行。
 - 当前阶段第 30 条主线已完成：`app/services/import_confirm_expiry_state.py` 已承接 confirm 过期分支的 approval cancel / pending job cancel / cleanup / expired event，`import_to_library.py` 已从 `800` 行降到 `742` 行。
-- 当前阶段第 31/32 条主线已完成：`app/services/import_event_recorder.py`、`app/services/import_raw_bt_guard.py` 已承接事件落盘与 raw_bt fail-closed guard，`import_to_library.py` 已从 `742` 行降到 `684` 行。
-- 当前阶段第 33 条主线已完成：`app/services/import_confirm_context_guard.py` 已承接 confirm context lookup / approval fail-closed guard，`import_to_library.py` 已从 `684` 行降到 `665` 行。
-- 主线：**`import_to_library.py` 第 14 轮 · metadata title-year helper`**。
+- 当前阶段第 31-34 条主线已完成：`import_event_recorder.py`、`import_raw_bt_guard.py`、`import_confirm_context_guard.py`、`import_metadata_title_year.py` 已承接事件落盘、raw_bt / confirm context 守卫和 metadata title/year glue，`import_to_library.py` 已从 `742` 行降到 `656` 行。
+- 主线：**`import_to_library.py` 第 15 轮 · pending approval write-through helper`**。
 - 默认分支本轮全量回归继续绿灯：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped`。
 
 ## Current health
 
 - 仓库级 CI：`make quality` / `make verify-mainline` 绿灯。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
-- 导入链 focused：confirm-context focused 为 `4 passed, 138 deselected`；`tests/test_import_to_library.py` 为 `142 passed`。
+- 导入链 focused：metadata focused 为 `8 passed, 136 deselected`；`tests/test_import_to_library.py` 为 `144 passed`。
 - 真实 import smoke：最新已知绿灯。
 - 全量回归：绿灯；`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "rebuild_confirm_context or context_lookup or context_row_corruption"` 为 `4 passed, 138 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
-- 全量回归：`.venv/bin/python -m pytest -q` 为 `1718 passed, 0 skipped, 4 warnings`。
+- import_to_library focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "resolve_normalized_naming_truth or extract_title_year or metadata_scrape"` 为 `8 passed, 136 deselected`；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `144 passed`。
+- 全量回归：`.venv/bin/python -m pytest -q` 为 `1720 passed, 0 skipped, 4 warnings`。
 
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` `256` 行，`app/bot/private_chat_runtime.py` `468` 行，继续在这一层拆分收益有限。
-- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `665` 行；`app/services/search_media.py` 已降到 `460` 行。
-- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行；`import_to_library.py` 下一刀继续拿掉 metadata title-year 这组 glue。
+- 最大结构债仍在 services 两座大山：`app/services/add_to_downloader.py` `608` 行 / `app/services/import_to_library.py` `656` 行；`app/services/search_media.py` 已降到 `460` 行。
+- 风险消除路径：`search_media.py` 已先达标；`add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行；`import_to_library.py` 下一刀继续拿掉 pending approval write-through 这组 glue。
 
 ## Recommended Next Operator Command
 
