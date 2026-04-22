@@ -1,4 +1,4 @@
-# Search media slimming log (v1)
+# Search media slimming log (v2)
 
 > 目的：承接当前“`search_media.py` 搜索编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -45,4 +45,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 `docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md`；本文件只继续保留完成态路径和 focused tests 入口。
+- 当前唯一主线已经切回 2.2 风险组；本文件继续承接 clarification / candidate / reply 相关瘦身闭环，不回到 `manage_bt_subscription.py`。
