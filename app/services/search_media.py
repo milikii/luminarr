@@ -10,9 +10,10 @@ from app.clients.web_source import (
     looks_like_web_source_page_request,
     resolve_supported_web_source_page_request,
 )
-from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
+from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
+from app.services.search_candidate_state import CandidateLoadResult, CandidateStateStore
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services.bt_sources import resolve_bt_source
 from app.services import search_reply_formatter
@@ -71,10 +72,6 @@ AMBIGUOUS_MAX_OPTION_COUNT = 3
 CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失败，请稍后重试。"
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
-CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON = "candidate_mapping count missing after query"
-CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
-CANDIDATE_CLEAR_RESULT_MISSING_REASON = "candidate clear result missing"
-CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON = "candidate clear result missing during persist rollback"
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 parse_movie_query = search_request_context.parse_movie_query
 
@@ -87,12 +84,6 @@ class UnsupportedBatchPreviewPageUrl(ValueError):
 class AmbiguousOption:
     title: str
     year: str
-
-
-@dataclass(frozen=True, slots=True)
-class CandidateLoadResult:
-    candidate: Mapping[str, Any] | None = None
-    load_failed: bool = False
 
 
 class SearchMediaService:
@@ -110,10 +101,10 @@ class SearchMediaService:
         self._raw_search_func = raw_search_func or search_func
         self._raw_page_search_func = raw_page_search_func
         self._limit = max(1, limit)
-        self._candidate_repo = candidate_repo
+        self._candidate_state = CandidateStateStore(repo=candidate_repo)
         self._clarification_state = ClarificationStateStore(repo=clarification_repo)
         self._lookup_movie_func = lookup_movie_func
-        self._recent_candidates_by_chat: dict[int, list[dict[str, Any]]] = {}
+        self._recent_candidates_by_chat = self._candidate_state.recent_by_chat
         self._clarification_pending_by_chat = self._clarification_state.pending_by_chat
 
     async def search_raw_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
@@ -247,72 +238,8 @@ class SearchMediaService:
                 if not self._set_clarification_pending(chat_id=chat_id, query=cleaned_query):
                     self._recent_candidates_by_chat.pop(chat_id, None)
                     return CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
-            if self._candidate_repo is not None:
-                try:
-                    self._candidate_repo.save_candidates(chat_id, selected_raw_results)
-                except CandidatePersistenceError as error:
-                    if str(error) == CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON:
-                        print(
-                            f"\033[31m[搜索候选写入结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
-                            "\033[33m[处理建议]\033[0m 检查 candidate_mapping 写入后的计数查询是否仍带有完整结果；"
-                            "当前会直接返回候选状态写入失败，避免把缺失真相误判成仍可继续按序号选择的候选缓存。",
-                            flush=True,
-                        )
-                    elif str(error) == CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON:
-                        print(
-                            f"\033[31m[搜索候选写入后记录不一致]\033[0m chat_id={chat_id} 错误={error}\n"
-                            "\033[33m[处理建议]\033[0m 检查 candidate_mapping 表是否被并发删除或部分回滚；"
-                            "如需继续按序号选择，请先确认 SQLite 写入后条目数和预期一致。",
-                            flush=True,
-                        )
-                    else:
-                        print(
-                            f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；当前会直接返回候选状态写入失败，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。",
-                            flush=True,
-                        )
-                    self._recent_candidates_by_chat.pop(chat_id, None)
-                    try:
-                        cleared_result = self._candidate_repo.clear_candidates(chat_id)
-                        if cleared_result is None:
-                            raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
-                    except Exception as rollback_error:
-                        if str(rollback_error) == CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON:
-                            print(
-                                f"\033[31m[搜索候选回滚清理结果缺失]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
-                                "\033[33m[处理建议]\033[0m 检查 candidate_mapping 回滚删除返回是否仍带有明确结果；"
-                                "当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                                flush=True,
-                            )
-                        else:
-                            print(
-                                f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                                flush=True,
-                            )
-                    return CANDIDATE_STATE_UNAVAILABLE_TEXT
-                except Exception as error:
-                    print(
-                        f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；当前会直接返回候选状态写入失败，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。",
-                        flush=True,
-                    )
-                    self._recent_candidates_by_chat.pop(chat_id, None)
-                    try:
-                        cleared_result = self._candidate_repo.clear_candidates(chat_id)
-                        if cleared_result is None:
-                            raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
-                    except Exception as rollback_error:
-                        if str(rollback_error) == CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON:
-                            print(
-                                f"\033[31m[搜索候选回滚清理结果缺失]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
-                                "\033[33m[处理建议]\033[0m 检查 candidate_mapping 回滚删除返回是否仍带有明确结果；"
-                                "当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                                flush=True,
-                            )
-                        else:
-                            print(
-                                f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                                flush=True,
-                            )
-                    return CANDIDATE_STATE_UNAVAILABLE_TEXT
+            if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=selected_raw_results):
+                return CANDIDATE_STATE_UNAVAILABLE_TEXT
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
         if channel in SUPPORTED_DELIVERY_CHANNELS and candidates:
@@ -329,89 +256,21 @@ class SearchMediaService:
         return self.get_cached_candidate_load_result(chat_id, index).candidate
 
     def _cache_bt_batch_preview_candidates(self, *, chat_id: int, candidates: list[dict[str, Any]]) -> str:
-        self._recent_candidates_by_chat[chat_id] = candidates
-        if self._candidate_repo is None:
+        if self._candidate_state.persist_bt_batch_preview_candidates(chat_id=chat_id, candidates=candidates):
             return ""
-        try:
-            self._candidate_repo.save_candidates(chat_id, candidates)
-        except Exception as error:
-            print(
-                f"\033[31m[BT 批量预览候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 写入是否正常；"
-                "当前会直接返回候选状态写入失败，避免把坏候选继续暴露给批量确认入口。",
-                flush=True,
-            )
-            self._recent_candidates_by_chat.pop(chat_id, None)
-            try:
-                cleared_result = self._candidate_repo.clear_candidates(chat_id)
-                if cleared_result is None:
-                    raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
-            except Exception as rollback_error:
-                print(
-                    f"\033[31m[BT 批量预览候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 删除是否正常；"
-                    "当前已按状态写入失败停路，但坏候选可能仍残留在持久化表里。",
-                    flush=True,
-                )
-            return CANDIDATE_STATE_UNAVAILABLE_TEXT
-        return ""
+        return CANDIDATE_STATE_UNAVAILABLE_TEXT
 
     def get_cached_candidate_load_result(self, chat_id: int, index: int) -> CandidateLoadResult:
-        if index < 1:
-            return CandidateLoadResult()
-        candidates = self._recent_candidates_by_chat.get(chat_id)
-        resolved_index = index - 1
-        if candidates and resolved_index < len(candidates):
-            return CandidateLoadResult(candidate=candidates[resolved_index])
-
-        return self._load_persisted_candidate(chat_id=chat_id, index=index)
+        return self._candidate_state.get_cached_candidate_load_result(chat_id, index)
 
     def has_cached_candidates(self, chat_id: int) -> bool | None:
-        if chat_id <= 0:
-            return False
-        candidates = self._recent_candidates_by_chat.get(chat_id)
-        if candidates:
-            return True
-        load_result = self._load_persisted_candidate(chat_id=chat_id, index=1)
-        if load_result.load_failed:
-            return None
-        return load_result.candidate is not None
+        return self._candidate_state.has_cached_candidates(chat_id)
 
     def clear_cached_candidates(self, chat_id: int) -> bool:
         if chat_id <= 0:
             return False
-
-        cleared = False
-        previous_candidates: Sequence[Mapping[str, Any]] | None = None
-        if chat_id in self._recent_candidates_by_chat:
-            previous_candidates = tuple(self._recent_candidates_by_chat[chat_id])
-            self._recent_candidates_by_chat.pop(chat_id, None)
-            cleared = True
-        cleared = self._clear_clarification_pending(chat_id=chat_id) or cleared
-
-        if self._candidate_repo is None:
-            return cleared
-        try:
-            cleared_result = self._candidate_repo.clear_candidates(chat_id)
-            if cleared_result is None:
-                raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_REASON)
-            return cleared_result or cleared
-        except Exception as error:
-            if str(error) == CANDIDATE_CLEAR_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[搜索候选清理结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 candidate_mapping 删除返回是否仍带有明确结果；"
-                    "当前进程内候选已清掉，但重启后旧候选可能仍残留。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[搜索候选清理失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表删除是否正常；当前进程内候选已清掉，但重启后旧候选可能仍残留。",
-                    flush=True,
-                )
-            if previous_candidates is not None:
-                self._recent_candidates_by_chat[chat_id] = list(previous_candidates)
-            return False
+        cleared = self._clear_clarification_pending(chat_id=chat_id)
+        return self._candidate_state.clear_cached_candidates(chat_id) or cleared
 
     def is_clarification_pending(self, chat_id: int) -> bool | None:
         return self._clarification_state.is_pending(chat_id)
@@ -429,22 +288,7 @@ class SearchMediaService:
         return self._clarification_state.load_persisted_query(chat_id=chat_id)
 
     def _load_persisted_candidate(self, *, chat_id: int, index: int) -> CandidateLoadResult:
-        if self._candidate_repo is None:
-            return CandidateLoadResult()
-        try:
-            return CandidateLoadResult(candidate=self._candidate_repo.get_candidate(chat_id, index))
-        except CandidatePayloadCorruptionError as error:
-            print(
-                f"\033[31m[搜索候选载荷损坏]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 表里的 candidate_json 是否仍是合法 JSON；当前相关入口会按候选读取失败或状态不可用处理，避免把持久化坏数据误判成“无候选”。",
-                flush=True,
-            )
-            return CandidateLoadResult(load_failed=True)
-        except Exception as error:
-            print(
-                f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前相关入口会按候选读取失败或状态不可用处理，避免把持久化异常误判成“无候选”。",
-                flush=True,
-            )
-            return CandidateLoadResult(load_failed=True)
+        return self._candidate_state.load_persisted_candidate(chat_id=chat_id, index=index)
 
 
 def _order_media_bt_results(

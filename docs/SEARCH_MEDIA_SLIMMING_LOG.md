@@ -1,4 +1,4 @@
-# Search media slimming log (v4)
+# Search media slimming log (v5)
 
 > 目的：承接当前“`search_media.py` 搜索编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -33,10 +33,12 @@ focused tests 入口：
 - 这一组收口只动回复协议和共享字段格式化；clarification、candidate 和 SQLite 真相边界未改。
 - `app/services/search_clarification_state.py` 现在承接 clarification pending / clear / persisted load 与 fail-closed 中文日志；`search_media.py` 已从 `725` 行降到 `616` 行。
 - 这一组继续只动澄清态读写边界；candidate 持久化和搜索文本协议未改。
+- `app/services/search_candidate_state.py` 现在承接 candidate save / load / rollback、批量预览候选缓存和对应 fail-closed 中文日志；`search_media.py` 已从 `616` 行降到 `460` 行。
+- 这一组继续只动候选状态真相边界；搜索排序、BT 预览协议和回复文本协议未改。
 
 剩余风险：
-- `search_media.py` 还把 candidate 持久化与回滚、`get_cached_candidate_load_result()`、`_load_persisted_candidate()` 混在同一文件；下一步只允许拆 candidate persistence helper，不顺手改搜索排序或 BT 预览协议。
-- 这一组继续守住“候选和澄清状态写入失败直接 fail-closed 返回中文提示”的边界，不回退现有 `CANDIDATE_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT` 协议。
+- `search_media.py` 当前剩余 `460` 行，已低于当前阶段的单山目标；下一步不再继续把搜索链当唯一主线，除非后续回归证明 BT 预览缓存或排序段还有新的结构风险。
+- 搜索链继续守住“候选和澄清状态写入失败直接 fail-closed 返回中文提示”的边界，不回退现有 `CANDIDATE_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT` 协议。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_search_media.py -k "clarification or candidate or quality_from_title"`
@@ -51,4 +53,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切回 2.2 风险组；本文件继续承接 clarification / candidate / reply 相关瘦身闭环，不回到 `manage_bt_subscription.py`。
+- 当前唯一主线已经切到 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`；本文件继续保留已完成的 clarification / candidate / reply 瘦身闭环，不回到 `manage_bt_subscription.py`。
