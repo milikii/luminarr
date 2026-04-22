@@ -15,13 +15,10 @@ from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
+from app.services.add_confirm_job_state import AddConfirmJobState
 from app.services.add_cancel_state import AddCancelState
+from app.services import add_pending_context
 from app.services.add_pending_context import (
-    CANDIDATE_SOURCE_MISSING_TEXT,
-    SELECT_LOOKUP_FAILED_TEXT,
-    SELECT_NOT_FOUND_TEXT,
-    SELECT_OUT_OF_RANGE_TEXT,
-    SELECT_USAGE_TEXT,
     AddPendingContextBuilder,
     PendingAddContext,
     pending_add_from_json,
@@ -34,6 +31,11 @@ from app.trace_logging import log_trace_event
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 
+CANDIDATE_SOURCE_MISSING_TEXT = add_pending_context.CANDIDATE_SOURCE_MISSING_TEXT
+SELECT_LOOKUP_FAILED_TEXT = add_pending_context.SELECT_LOOKUP_FAILED_TEXT
+SELECT_NOT_FOUND_TEXT = add_pending_context.SELECT_NOT_FOUND_TEXT
+SELECT_OUT_OF_RANGE_TEXT = add_pending_context.SELECT_OUT_OF_RANGE_TEXT
+SELECT_USAGE_TEXT = add_pending_context.SELECT_USAGE_TEXT
 ADD_FAILED_TEXT = "下载投递失败，请稍后重试。"
 ADD_PENDING_STATE_UNAVAILABLE_TEXT = "下载待确认状态写入失败，请稍后重试。"
 ADD_APPROVAL_PENDING_TEXT = (
@@ -64,14 +66,10 @@ DOWNLOADER_PENDING_APPROVAL_NONE_REASON = "downloader pending approval result mi
 DOWNLOADER_PENDING_APPROVAL_ROW_CORRUPTED_REASON = "approval row lease version corrupted after read"
 DOWNLOADER_APPROVE_RESULT_MISSING_REASON = "approval_record missing during approve"
 DOWNLOADER_APPROVE_RESULT_NONE_REASON = "downloader approval result missing"
-DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
 DOWNLOADER_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
 DOWNLOADER_EXECUTED_LEASE_RESULT_MISSING_REASON = "approval_record missing during executed version update"
-DOWNLOADER_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
-DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON = "downloader completed job result missing"
 CONFIRM_QUERY_USAGE_TEXT = "确认格式：confirm <任务ID或Hash>"
 BT_SOURCE_UNSUPPORTED_TEXT = "当前 BT 执行只支持直接 magnet:? 链接，请重新发送磁力链接后重试。"
-JOB_LEASE_OWNER = "downloader_confirm"
 PENDING_LEASE_LOOKUP_FAILED = -1
 DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS = frozenset(
     {
@@ -129,6 +127,7 @@ class AddToDownloaderService:
             add_failed_text=ADD_FAILED_TEXT,
             download_monitor_register_result_missing_reason=DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON,
         )
+        self._confirm_job_state = AddConfirmJobState(job_repo=job_repo)
         self._cancel_state = AddCancelState(
             job_repo=job_repo,
             add_cancel_state_unavailable_text=ADD_CANCEL_STATE_UNAVAILABLE_TEXT,
@@ -1044,36 +1043,7 @@ class AddToDownloaderService:
             self._latest_pending_task_ref_by_chat.pop(chat_id, None)
 
     def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool | None:
-        if self._job_repo is None:
-            return False
-        try:
-            claimed = self._job_repo.claim_lease(
-                job_id=job.job_id,
-                expected_version=job.version,
-                lease_owner=lease_owner,
-                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
-            )
-        except Exception as error:
-            if str(error) == DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[下载确认任务抢占结果缺失]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认任务是否仍存在，并确认抢占前后的 version/lease_owner 没有被其他路径改写；"
-                    "当前 confirm 会直接返回状态读取失败，避免把任务真相缺口误判成普通未持有执行权。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 更新是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常继续混成普通未持有执行权。",
-                    flush=True,
-                )
-            return None
-        if claimed is False:
-            print(
-                f"\033[31m[下载确认任务抢占失败]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误=jobs.claim_lease rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配，或是否已被其他路径抢先确认/取消；当前 confirm 会继续按 stale check 处理，避免把任务真相冲突静默混成普通未确认。",
-                flush=True,
-            )
-            return False
-        return True
+        return self._confirm_job_state.claim_pending_job(job=job, lease_owner=lease_owner)
 
     def _restore_pending_job(
         self,
@@ -1082,34 +1052,11 @@ class AddToDownloaderService:
         expected_version: int,
         lease_owner: str,
     ) -> None:
-        if self._job_repo is None:
-            return
-        try:
-            restored = self._job_repo.release_lease_to_pending(
-                job_id=job_id,
-                expected_version=expected_version,
-                lease_owner=lease_owner,
-                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
-            )
-        except Exception as error:
-            if str(error) == DOWNLOADER_RESTORE_PENDING_JOB_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[下载确认任务回退结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认任务是否仍存在，以及 lease 回退后是否还能回读到待确认状态；"
-                    "当前审批已尝试退回待确认，但任务真相还没有确认回退成功。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表 lease 回退是否正常；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
-                    flush=True,
-                )
-            return
-        if restored is False:
-            print(
-                f"\033[31m[下载确认任务回退失败]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误=jobs.release_lease_to_pending rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配；当前审批已尝试退回待确认，但持久化状态可能仍停在执行中。",
-                flush=True,
-            )
+        self._confirm_job_state.restore_pending_job(
+            job_id=job_id,
+            expected_version=expected_version,
+            lease_owner=lease_owner,
+        )
 
     def _mark_completed_job(
         self,
@@ -1119,46 +1066,15 @@ class AddToDownloaderService:
         lease_owner: str,
         completed_add: PendingAddContext,
     ) -> bool | None:
-        if self._job_repo is None:
-            return True
-        try:
-            marked = self._job_repo.mark_downloader_completed(
-                job_id=job_id,
-                expected_version=expected_version,
-                lease_owner=lease_owner,
-                task_id=completed_add.task_id,
-                task_hash=completed_add.task_hash,
-                payload_json=pending_add_to_json(completed_add),
-            )
-            if marked is None:
-                raise RuntimeError(DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
-        except Exception as error:
-            if str(error) == DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[下载确认任务完结结果缺失]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 jobs 表里该任务是否仍存在，以及完成态更新后是否还能回读到最新状态；"
-                    "当前下载结果已返回，但任务真相还没有确认完结成功。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载确认任务完结失败]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表完成态更新是否正常；当前下载结果已返回，但任务真相可能仍停留在待确认或执行中。",
-                    flush=True,
-                )
-            return None
-        if marked is False:
-            print(
-                f"\033[31m[下载确认任务完结失败]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误=jobs.mark_downloader_completed rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的任务行是否仍存在、version/lease_owner 是否匹配；当前下载结果已返回，但任务真相可能仍停留在待确认或执行中。",
-                flush=True,
-            )
-            return False
-        return True
+        return self._confirm_job_state.mark_completed_job(
+            job_id=job_id,
+            expected_version=expected_version,
+            lease_owner=lease_owner,
+            completed_add=completed_add,
+        )
 
     def _build_job_lease_owner(self, task_ref: str) -> str:
-        cleaned_ref = task_ref.strip()
-        if not cleaned_ref:
-            return JOB_LEASE_OWNER
-        return f"{JOB_LEASE_OWNER}:{cleaned_ref}"
+        return self._confirm_job_state.build_job_lease_owner(task_ref)
 
     def _resolve_pending_lease_version(
         self,
