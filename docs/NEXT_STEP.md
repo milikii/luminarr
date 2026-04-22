@@ -1,4 +1,4 @@
-# Next step (v308)
+# Next step (v309)
 
 ## Current goal
 
@@ -27,22 +27,23 @@
 - 当前阶段第 22 条主线已完成：**`app/services/add_confirm_preparation.py` 已承接 confirm 前置状态准备**，`add_to_downloader.py` 已从 `763` 行降到 `698` 行。
 - 当前阶段第 23 条主线已完成：**`app/services/add_confirm_execution_tail.py` 已承接 confirm execution tail**，`add_to_downloader.py` 已从 `698` 行降到 `674` 行。
 - 当前阶段第 24 条主线已完成：**`app/services/add_confirm_availability_state.py` 已承接 confirm availability 壳**，`add_to_downloader.py` 已从 `674` 行降到 `644` 行。
-- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 22 轮 · 评估 pending presence lookup 壳`**。
-- 为什么现在切山：confirm availability facade 已经离开主文件，剩下还直接挂在壳上的最小整块是 `has_pending_add()` 那段 pending job 查询、in-memory pending 兜底和 fail-closed 返回；继续顺着这段状态读取 facade 往下切，边界最稳。
+- 当前阶段第 25 条主线已完成：**`app/services/add_pending_presence_state.py` 已承接 `has_pending_add()` 的 pending presence lookup 壳**，`add_to_downloader.py` 已从 `644` 行降到 `627` 行。
+- 当前唯一主线切到 **`app/services/add_to_downloader.py` 数据结构重设计 · 第 23 轮 · 评估 pending write-through 壳`**。
+- 为什么现在切山：`has_pending_add()` facade 已经离开主文件，下一块还成片留在壳里的就是 `_persist_pending_add()` 那段 pending approval -> in-memory context -> jobs/event/trace/reply 顺序控制；这块切出来最有机会把文件直接压到 `≤ 600`。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `644` 行 / `import_to_library.py` `1392` 行 / `search_media.py` `460` 行。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `627` 行 / `import_to_library.py` `1392` 行 / `search_media.py` `460` 行。
 - 质量基线前置条件已满足：本轮 `tests/test_add_to_downloader.py` 为 `113 passed`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已通过。
 
 ## User value
 
-- `app/services/add_confirm_availability_state.py` 已经把 `confirm_add_by_task_ref()` 开头那段 confirm_context / in-memory pending / approval pending / expired rejection 壳抽走；主文件现在只保留 public confirm wrapper、preparation 和 execution tail 串联。
-- 下一步优先评估 `has_pending_add()` 那段 pending presence lookup 壳，目的是把“private_chat_confirm_runtime 问 add service 当前 ref 是否仍是下载待确认”这层 persisted job 查询、in-memory pending 兜底和 fail-closed 返回也从主文件拿走。
-- 若 helper 抽离会牵动 confirm / import 路由协议、jobs 真相或下载副作用边界，主线立即停住；不允许为了降行数改 shared runtime 回复协议。
+- `app/services/add_pending_presence_state.py` 已经把 `has_pending_add()` 的 persisted job 查询、in-memory pending 兜底和 fail-closed 返回抽走；`private_chat_confirm_runtime` 继续只通过 `AddToDownloaderService.has_pending_add()` 这个 public 接口判断 confirm 应该落到下载还是导入。
+- 下一步优先评估 `_persist_pending_add()` 那段 pending write-through 壳，目的是把“pending approval -> in-memory context -> pending job -> event/trace/reply”这层顺序控制从主文件拿走，顺手冲掉剩余的 `27` 行差距。
+- 若 helper 抽离会牵动 approval/jobs/event 顺序、待确认文本协议或下载副作用边界，主线立即停住；不允许为了降行数改待确认协议。
 
 ## Only do
 
-- 只评估 `add_to_downloader.py` 里的 pending presence lookup 壳，优先看 `has_pending_add()` 这段 persisted job 查询、in-memory pending 兜底和 fail-closed 返回。
-- `add_to_downloader.py` 只继续负责用户入口、confirm/cancel 编排和 helper 顺序控制；不回退已完成的 `add_confirm_availability_state.py`、`add_confirm_execution_tail.py`、`add_confirm_preparation.py`、`add_request_facade.py`、`add_pending_context.py`、`add_pending_persistence.py`、`add_trace_logger.py`、`add_execution_follow_up.py`、`add_cancel_state.py`、`add_confirm_job_state.py`、`add_confirm_approval_state.py` 和 `add_confirm_context_state.py` 边界。
+- 只评估 `add_to_downloader.py` 里的 pending write-through 壳，优先看 `_persist_pending_add()` 这段 approval / context / job / event / trace / reply 顺序控制。
+- `add_to_downloader.py` 只继续负责用户入口、confirm/cancel 编排和 helper 顺序控制；不回退已完成的 `add_pending_presence_state.py`、`add_confirm_availability_state.py`、`add_confirm_execution_tail.py`、`add_confirm_preparation.py`、`add_request_facade.py`、`add_pending_context.py`、`add_pending_persistence.py`、`add_trace_logger.py`、`add_execution_follow_up.py`、`add_cancel_state.py`、`add_confirm_job_state.py`、`add_confirm_approval_state.py` 和 `add_confirm_context_state.py` 边界。
 - focused 验证优先跑 `tests/test_add_to_downloader.py`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；搜索链详细台账继续留在 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`，下载链详细台账继续看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`。
 
@@ -50,22 +51,22 @@
 
 - 不回退 `search_request_context.py`、`search_reply_formatter.py`、`search_clarification_state.py`、`search_candidate_state.py` 的已收口边界；不改 search 文本协议。
 - 不改 downloader dispatch、download_monitor、job_event、approval / jobs / lease/version 真相协议；不回退 `add_execution_follow_up.py`、`add_cancel_state.py`、`add_confirm_job_state.py`、`add_confirm_approval_state.py` 和 `add_confirm_context_state.py`。
-- 不改 `private_chat_confirm_runtime.py` 的 confirm / import 路由协议，只允许把 `add_to_downloader.py` 里的状态读取壳继续外提。
+- 不改 `private_chat_confirm_runtime.py` 的 confirm / import 路由协议；不改待确认文本和 delivery item 协议，只允许把 `add_to_downloader.py` 里的 pending write-through 顺序控制继续外提。
 - 不在这一轮回到 `import_to_library.py`、`telegram_bot.py` 或 `private_chat_runtime.py`。
 - 不新增功能、不扩协议、不顺手重写搜索来源抽象。
 
 ## Done when
 
-当前 **`add_to_downloader.py` 数据结构重设计 · 第 22 轮 · 评估 pending presence lookup 壳`** 主线视为 **已收口**，需要同时满足：
+当前 **`add_to_downloader.py` 数据结构重设计 · 第 23 轮 · 评估 pending write-through 壳`** 主线视为 **已收口**，需要同时满足：
 
-1. helper 已承接 `has_pending_add()` 至少一整块 persisted lookup / in-memory fallback 边界，`add_to_downloader.py` 不再直接持有这组 fail-closed 返回的大块实现；
-2. `app/services/add_to_downloader.py` 行数从 `644` 继续下降；
+1. helper 已承接 `_persist_pending_add()` 至少一整块 approval / context / job / event / trace / reply 边界，`add_to_downloader.py` 不再直接持有这组 pending write-through 大块实现；
+2. `app/services/add_to_downloader.py` 行数从 `627` 继续下降，优先目标是压到 `≤ 600`；
 3. `tests/test_add_to_downloader.py` 继续绿灯；
 4. 若本轮有代码改动，`make quality` 和全量 `pytest` 不被破坏；
 5. `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md` 已同步新的当前真相。
 
 ## After this step
 
-1. 如果 pending presence lookup 壳抽离成功，下一条继续评估 `add_to_downloader.py` 是否还剩一块可独立外提的最小状态 facade，还是已经逼近收益递减。
-2. 如果 pending presence lookup 壳被证明会牵动 confirm / import 路由协议，下一条改走 `import_to_library.py` 的更小执行编排壳，不在下载链硬拆。
+1. 如果 pending write-through 壳抽离成功且 `add_to_downloader.py` 压到 `≤ 600`，下一条重新评估是继续在下载链收尾，还是切回 `import_to_library.py` 这座山。
+2. 如果 pending write-through 壳被证明会牵动 approval / jobs / event 顺序协议，下一条改走 `import_to_library.py` 的更小执行编排壳，不在下载链硬拆。
 3. 只有在 `add_to_downloader.py` 或 `import_to_library.py` 再拿下一座山后，当前阶段才可能逼近“三座大山各 ≤ 600” 的退出条件。

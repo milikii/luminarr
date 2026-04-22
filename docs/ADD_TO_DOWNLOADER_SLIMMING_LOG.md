@@ -1,4 +1,4 @@
-# Add to downloader slimming log (v11)
+# Add to downloader slimming log (v12)
 
 > 目的：承接当前“`add_to_downloader.py` 下载编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -60,10 +60,12 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `698` 行降到 `674` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 - `app/services/add_confirm_availability_state.py` 已承接 confirm availability 壳；`add_to_downloader.py` 只保留 public confirm wrapper、preparation 和 execution tail 串联，不再直接持有 `confirm_context` 重建、approval pending 校验、in-memory pending 兜底和 expired/fail-closed 拒绝路径，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
 - 这一步把 `add_to_downloader.py` 从 `674` 行降到 `644` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `19091 Transmission` confirm smoke（临时 SQLite + 真实 RPC）继续通过。
+- `app/services/add_pending_presence_state.py` 已承接 `has_pending_add()` 的 pending presence lookup 壳；`add_to_downloader.py` 只保留 public pending lookup wrapper，不再直接持有 persisted job 查询、in-memory pending 兜底和 fail-closed 返回，不回退 `private_chat_confirm_runtime -> AddToDownloaderService.has_pending_add()` 这条 confirm / import 路由协议。
+- 这一步把 `add_to_downloader.py` 从 `644` 行降到 `627` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `116 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `19091 Transmission` confirm smoke（临时 SQLite + 真实 RPC）继续通过，并显式复验 `has_pending_add()` 返回 `True`。
 
 剩余风险：
-- `add_to_downloader.py` 还把 `has_pending_add()` 这段 pending presence lookup 壳混在主文件里；下一步只允许优先评估 persisted job 查询、in-memory pending 兜底和 fail-closed 返回这一组 facade，不顺手改 confirm / import 路由协议、downloader dispatch 或 jobs 状态机。
-- 这一组继续守住“private_chat_confirm_runtime 只通过 `has_pending_add()` 判断当前 ref 是否仍是下载待确认；jobs 读取失败直接返回 service-not-ready” 的边界，不回退当前 confirm / import 路由协议。
+- `add_to_downloader.py` 还把 `_persist_pending_add()` 这段 pending write-through 壳混在主文件里；下一步只允许优先评估 approval / context / job / event / trace / reply 这一组顺序控制 facade，不顺手改待确认文本协议、downloader dispatch 或 confirm execution tail。
+- 这一组继续守住“待确认下载真相先落 approval，再落 in-memory/context+jobs，再补 event/trace/reply；中间任何一步失败都按现有 fail-closed 中文协议返回” 的边界，不回退当前待确认协议。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py`

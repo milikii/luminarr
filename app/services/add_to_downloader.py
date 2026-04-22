@@ -7,7 +7,7 @@ from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import ApprovalRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.db.job_repo import JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.add_confirm_availability_state import AddConfirmAvailabilityState
 from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,
@@ -25,6 +25,7 @@ from app.services.add_pending_context import (
     AddPendingRuntimeState,
     PendingAddContext,
 )
+from app.services.add_pending_presence_state import AddPendingPresenceState
 from app.services.add_pending_persistence import AddPendingPersistenceState, render_add_pending_reply
 from app.services.add_request_facade import AddPendingRequestFacade
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
@@ -98,6 +99,7 @@ class AddToDownloaderService:
             downloader_pending_job_none_reason=DOWNLOADER_PENDING_JOB_NONE_REASON,
             job_row_corrupted_reasons=DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS,
         )
+        self._pending_presence_state = AddPendingPresenceState(job_repo=job_repo)
         self._pending_request_facade = AddPendingRequestFacade(
             pending_context_builder=self._pending_context_builder,
             persist_pending_add=self._persist_pending_add,
@@ -312,31 +314,12 @@ class AddToDownloaderService:
         )
 
     def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:
-        cleaned_ref = task_ref.strip()
-        if chat_id <= 0 or not cleaned_ref:
-            return False
-        in_memory_pending = self._get_in_memory_pending(chat_id=chat_id, task_ref=cleaned_ref)
-        if self._job_repo is not None:
-            try:
-                job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=cleaned_ref)
-            except Exception as error:
-                print(
-                    f"\033[31m[下载待确认查询失败]\033[0m chat_id={chat_id} task_ref={cleaned_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；若当前进程里也没有待确认上下文，这次请求会直接返回服务未就绪，避免把持久化异常误判成“没有待确认下载”。",
-                    flush=True,
-                )
-                return True if in_memory_pending is not None else None
-            if job is not None and job.state == JOB_STATE_PENDING_APPROVAL:
-                return True
-            if in_memory_pending is not None:
-                self._log_pending_job_result_missing(
-                    chat_id=chat_id,
-                    task_ref=cleaned_ref,
-                    task_id=in_memory_pending.task_id,
-                    task_hash=in_memory_pending.task_hash,
-                    stage="lookup",
-                )
-                return None
-        return in_memory_pending is not None
+        return self._pending_presence_state.has_pending_add(
+            chat_id=chat_id,
+            task_ref=task_ref,
+            get_in_memory_pending=self._get_in_memory_pending,
+            log_pending_job_result_missing=self._log_pending_job_result_missing,
+        )
 
     def cancel_pending_add(self, chat_id: int) -> str | None:
         return self._cancel_state.cancel_pending_add(
