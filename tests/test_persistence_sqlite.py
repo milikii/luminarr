@@ -2262,7 +2262,7 @@ def test_copy_fallback_pending_survives_restart_and_second_confirm_copies(tmp_pa
     def _raise_exdev(src: str | Path, dst: str | Path) -> None:
         raise OSError(errno.EXDEV, "Invalid cross-device link")
 
-    monkeypatch.setattr(import_module.os, "link", _raise_exdev)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
     first_confirm = _run(
         before_restart_service.confirm_import_by_task_ref("87", chat_id=1001, user_id=2001)
     )
@@ -2279,7 +2279,7 @@ def test_copy_fallback_pending_survives_restart_and_second_confirm_copies(tmp_pa
     def _unexpected_hardlink(src: str | Path, dst: str | Path) -> None:
         raise AssertionError("copy confirm after restart should not call os.link")
 
-    monkeypatch.setattr(import_module.os, "link", _unexpected_hardlink)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _unexpected_hardlink)
     after_restart_service = ImportToLibraryService(
         get_import_source_func=AsyncMock(return_value=import_source),
         library_target_dir=str(target_dir),

@@ -758,7 +758,8 @@ def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
 
     assert verification_text == "verify-challenge"
     reply_xml = _decrypt_wecom_plaintext(_extract_encrypt_from_xml(reply_body))
-    assert "搜索结果：dune" in reply_xml
+    assert "搜索：dune ✓" in reply_xml
+    assert "- 开始下载：发送 select 1" in reply_xml
     assert "title-dune" in reply_xml
 
 

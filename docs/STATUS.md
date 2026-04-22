@@ -1,4 +1,4 @@
-# Current status (v387)
+# Current status (v388)
 
 ## Current mainline
 
@@ -7,9 +7,9 @@
 - 当前阶段第 2 条主线已完成：`app/services/import_post_processing.py` 已承接 `metadata / subtitle / refresh` 后置链，`import_to_library.py` 已从 `2242` 行降到 `2094` 行。
 - 当前阶段第 3 条主线已完成：`app/services/import_approval_state.py` 已承接 approval lease/version、stale-check、expiry 和目标路径回查，`import_to_library.py` 已从 `2094` 行降到 `1827` 行。
 - 当前阶段第 4 条主线已完成：`app/services/import_job_state.py` 已承接 `jobs` pending/claim/release/complete 状态迁移，`import_to_library.py` 已从 `1827` 行降到 `1727` 行。
-- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 5 轮 · 抽离 copy-fallback / file-transfer helper`**。
-- 当前这轮只允许先抽 copy-fallback 判定和文件导入执行，不动 approval helper、jobs helper 和 `cancel_pending_import()`。
-- 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1714 passed, 2 skipped`。
+- 当前阶段第 5 条主线已完成：`app/services/import_transfer_execution.py` 已承接 copy-fallback 判定 / payload 解析 / 文件系统导入执行，`import_to_library.py` 已从 `1727` 行降到 `1494` 行。
+- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 6 轮 · 重评 `cancel_pending_import()` 是否值得继续拆`**。
+- 默认分支已在本轮再次复验全量回归绿灯：`.venv/bin/python -m pytest -q` 为 `1716 passed, 0 skipped`。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；刚完成的上一条主线是 `private_chat_runtime.py` execution gate preparation 收口。
 
 ## Current health
@@ -19,21 +19,21 @@
 - 仓库入口层：绿灯；操作者入口、AI runbook、当前快照和当前主线已拆层。
 - 快速质量入口：绿灯；本次 `quality` 为 `24 passed`。
 - 当前主线 focused 验证入口：绿灯；`tests/test_import_to_library.py` 为 `142 passed`。
-- 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1714 passed, 2 skipped`。
+- 全量回归：绿灯；最近一次 `.venv/bin/python -m pytest -q` 为 `1716 passed, 0 skipped, 4 warnings`。
 
 ## Latest verification
 
 - `quality`：`python3 -m compileall app tests` 通过，`tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py` 为 `24 passed`。
-- import jobs helper focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`。
-- redesign 基线、post-processing helper、approval helper、jobs helper 都已落地：`docs/IMPORT_PIPELINE_REDESIGN.md`、`docs/NEXT_STEP.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md` 已同步当前真相。
-- 全量回归：`.venv/bin/python -m pytest -q` 为 `1714 passed, 2 skipped`。
-- 当前真实端点探针：`19091 Transmission` 返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`19092 BT Transmission` 与 `18098 qBittorrent` 当前返回 `000`。
+- import helper focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`；copy-fallback restart focused：`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "copy_fallback_pending_survives_restart_and_second_confirm_copies"` 为 `1 passed, 110 deselected`。
+- real import smoke：`/data/downloads/tr -> /data/library/movies` 真实硬链接 smoke 通过。
+- 全量回归：`.venv/bin/python -m pytest -q` 为 `1716 passed, 0 skipped, 4 warnings`；补修的 WeCom 真 HTTP 断言已对齐当前 shared runtime 回复协议。
+- 当前真实端点探针：`19091 Transmission` 与 `19092 BT Transmission` 都返回 `X-Transmission-Session-Id`，`18096 Emby` 返回 `ServerName`，`18098 qBittorrent` 当前连接失败。
 
 ## Current biggest risk
 
 - shared runtime 层微切分已进入边际递减区：`app/bot/telegram_bot.py` 当前 `256` 行（纯 wrapper 已清空），`app/bot/private_chat_runtime.py` 当前 `468` 行（bootstrap / route block / follow-up / preparation 都已收口），继续在这一层拆分收益有限——这也是 **质量硬化** 阶段 D-039 收工的直接依据。
-- 当前最大结构债转移到 services 层三座大山：`app/services/import_to_library.py` `1727` 行 / `app/services/add_to_downloader.py` `1669` 行 / `app/services/search_media.py` `1018` 行，合计 `4414` 行，占全仓 `25663` 行的 `17.2%`。
-- 风险消除路径：approval helper 和 jobs helper 都已经收出主文件，当前最该继续收口的是 copy-fallback / 文件导入执行；如果这一段再拆完收益仍递减，就该停止继续在 `import_to_library.py` 微切分。
+- 当前最大结构债回到 services 层三座大山：`app/services/add_to_downloader.py` `1669` 行 / `app/services/import_to_library.py` `1494` 行 / `app/services/search_media.py` `1018` 行。
+- 风险消除路径：`import_to_library.py` 的 context / approval / jobs / file-transfer 四段都已收口，当前只剩 `cancel_pending_import()` 还值得做一次收益重评；如果它没有清晰 helper，就停止继续在这座山上微切分并切去 `add_to_downloader.py`。
 
 ## Recommended Next Operator Command
 

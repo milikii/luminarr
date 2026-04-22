@@ -1,4 +1,4 @@
-# Import to library slimming log (v2)
+# Import to library slimming log (v3)
 
 > 目的：承接当前“`import_to_library.py` 导入编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -33,10 +33,12 @@ focused tests 入口：
 - 这一步把 `import_to_library.py` 从 `2242` 行降到 `2094` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
 - `app/services/import_job_state.py` 已承接 `jobs` pending/claim/release/complete 状态迁移；`import_to_library.py` 只保留 wrapper 和 confirm 编排，不回退 `jobs` 状态机的中文 fail-closed 日志。
 - 这一步把 `import_to_library.py` 从 `1827` 行降到 `1727` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
+- `app/services/import_transfer_execution.py` 已承接 copy-fallback 判定、payload 解析、硬链接 / 复制导入执行和对应中文 fail-closed 日志；`import_to_library.py` 只保留 confirm 编排、approval / jobs 顺序控制和后续 helper 调度，不回退 copy-fallback 协议或导入成功真相。
+- 这一步把 `import_to_library.py` 从 `1727` 行降到 `1494` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`，`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "copy_fallback_pending_survives_restart_and_second_confirm_copies"` 为 `1 passed, 110 deselected`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 为 `1716 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` 硬链接 smoke 也已通过。
 
 剩余风险：
-- `import_to_library.py` 仍把硬链接 / copy-fallback 和文件系统导入执行压在同一文件；下一条只允许继续拆 file-transfer helper，不能顺手改 approval helper、jobs helper 或文件导入真相。
-- 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`。
+- file-transfer 这段已经离开主文件，当前剩下的高风险厚块主要是 `cancel_pending_import()` 与超时取消分支；下一条只允许重评它是否还存在一个真正 cohesive 的 helper。
+- 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`；如果取消路径只剩诊断分流，就直接停止继续在 `import_to_library.py` 微切分。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`
@@ -45,10 +47,11 @@ focused tests 入口：
 
 - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt"`
 - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`
+- `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "cancel_pending_import or expired_pending_confirm"`
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
 
 ## 4. Maintenance rule
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 copy-fallback / file-transfer helper；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，等 file-transfer helper 真正落地后再回填对应收口。
+- 当前唯一主线已经切到 `cancel_pending_import()` 收益重评；本文件继续保留已完成瘦身闭环、风险分组和 focused tests 入口，不再回到已收口的 file-transfer helper。

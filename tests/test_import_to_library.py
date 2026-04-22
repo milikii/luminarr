@@ -3285,7 +3285,7 @@ def test_confirm_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monke
         raise OSError(errno.EXDEV, "Invalid cross-device link")
 
     _run(service.import_by_task_ref("87"))
-    monkeypatch.setattr(import_module.os, "link", _raise_exdev)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
     text = _run(service.confirm_import_by_task_ref("87"))
     assert text == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
 
@@ -3318,7 +3318,7 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     def _raise_exdev(src: str | Path, dst: str | Path) -> None:
         raise OSError(errno.EXDEV, "Invalid cross-device link")
 
-    monkeypatch.setattr(import_module.os, "link", _raise_exdev)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
     first_confirm = _run(service.confirm_import_by_task_ref("87"))
     assert first_confirm == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
 
@@ -3331,7 +3331,7 @@ def test_confirm_failure_restores_pending_without_advancing_lease(tmp_path: Path
     def _unexpected_hardlink(src: str | Path, dst: str | Path) -> None:
         raise AssertionError("copy confirm should not call os.link again")
 
-    monkeypatch.setattr(import_module.os, "link", _unexpected_hardlink)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _unexpected_hardlink)
     second_confirm = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in second_confirm
     assert "导入方式: 复制" in second_confirm
@@ -3370,7 +3370,7 @@ def test_confirm_import_logs_hardlink_failure(tmp_path: Path, monkeypatch, capsy
     def _raise_hardlink_failure(src: str | Path, dst: str | Path) -> None:
         raise OSError(errno.EPERM, "permission denied")
 
-    monkeypatch.setattr(import_module.os, "link", _raise_hardlink_failure)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_hardlink_failure)
 
     text = _run(service.confirm_import_by_task_ref("87"))
 
@@ -3410,7 +3410,7 @@ def test_execute_import_logs_copy_failure(tmp_path: Path, monkeypatch, capsys) -
     def _raise_copy_failure(src: str | Path, dst: str | Path) -> None:
         raise OSError(errno.ENOSPC, "no space left on device")
 
-    monkeypatch.setattr(import_module.shutil, "copy2", _raise_copy_failure)
+    monkeypatch.setattr(import_module.import_transfer_execution.shutil, "copy2", _raise_copy_failure)
 
     result = _run(
         service._execute_import(
@@ -3467,7 +3467,7 @@ def test_execute_import_logs_partial_target_cleanup_failure(tmp_path: Path, monk
             raise OSError(errno.EBUSY, "device or resource busy")
         return original_unlink(self, *args, **kwargs)
 
-    monkeypatch.setattr(import_module.shutil, "copy2", _raise_copy_failure_with_partial_target)
+    monkeypatch.setattr(import_module.import_transfer_execution.shutil, "copy2", _raise_copy_failure_with_partial_target)
     monkeypatch.setattr(type(target_path), "unlink", _raise_cleanup_failure)
 
     result = _run(
@@ -3512,7 +3512,7 @@ def test_confirm_import_logs_target_exists_during_execute(tmp_path: Path, monkey
     def _raise_target_exists(src: str | Path, dst: str | Path) -> None:
         raise FileExistsError(str(dst))
 
-    monkeypatch.setattr(import_module.os, "link", _raise_target_exists)
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_target_exists)
 
     text = _run(service.confirm_import_by_task_ref("87"))
 
