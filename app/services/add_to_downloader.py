@@ -6,13 +6,11 @@ from pathlib import Path
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
-    DEFAULT_PENDING_TIMEOUT_SECONDS,
     ApprovalRepo,
 )
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
-from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,
     AddConfirmApprovalState,
@@ -26,8 +24,8 @@ from app.services.add_pending_context import (
     AddPendingContextBuilder,
     AddPendingRuntimeState,
     PendingAddContext,
-    pending_add_to_json,
 )
+from app.services.add_pending_persistence import AddPendingPersistenceState, render_add_pending_reply
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.add_trace_logger import AddTraceLogger
 from app.services.search_media import SearchMediaService
@@ -93,6 +91,12 @@ class AddToDownloaderService:
         self._trace_logger = AddTraceLogger(trace_log_path)
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
+        self._pending_persistence_state = AddPendingPersistenceState(
+            job_repo=job_repo,
+            downloader_pending_job_result_missing_reason=DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON,
+            downloader_pending_job_none_reason=DOWNLOADER_PENDING_JOB_NONE_REASON,
+            job_row_corrupted_reasons=DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS,
+        )
         self._confirm_approval_state = AddConfirmApprovalState(
             approval_repo=approval_repo,
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -628,40 +632,11 @@ class AddToDownloaderService:
         user_id: int | None,
         pending_add: PendingAddContext,
     ) -> bool:
-        if self._job_repo is None:
-            return True
-        try:
-            pending_job = self._job_repo.upsert_downloader_job_pending(
-                chat_id=chat_id,
-                user_id=user_id,
-                task_ref=pending_add.task_ref,
-                task_id=pending_add.task_id,
-                task_hash=pending_add.task_hash,
-                payload_json=pending_add_to_json(pending_add),
-            )
-            if pending_job is None:
-                raise RuntimeError(DOWNLOADER_PENDING_JOB_NONE_REASON)
-        except Exception as error:
-            if str(error) in {
-                DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON,
-                DOWNLOADER_PENDING_JOB_NONE_REASON,
-            }:
-                print(
-                    f"\033[31m[下载待确认任务结果缺失]\033[0m chat_id={chat_id} user_id={user_id} task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 jobs 写入后回读是否仍能拿到刚创建的待确认任务；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认下载。",
-                    flush=True,
-                )
-            elif str(error) in DOWNLOADER_CONFIRM_CONTEXT_JOB_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[下载待确认任务记录损坏]\033[0m chat_id={chat_id} user_id={user_id} task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 jobs 新写入待确认任务里的 job_id / chat_id / user_id / version 等字段是否仍是完整真相；当前请求会直接返回待确认状态写入失败，避免把坏任务记录误报成可确认下载。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[下载待确认任务落盘失败]\033[0m chat_id={chat_id} user_id={user_id} task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把待确认任务真相缺口误报成可确认下载。",
-                    flush=True,
-                )
-            return False
-        return True
+        return self._pending_persistence_state.record_pending_job(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=pending_add,
+        )
 
     def _rebuild_confirm_context(
         self,
@@ -810,29 +785,3 @@ class AddToDownloaderService:
             chat_id=chat_id,
             user_id=user_id,
         )
-
-
-def render_add_pending_reply(*, pending_add: PendingAddContext, channel: str) -> str:
-    return render_delivery_item(build_add_pending_delivery_item(pending_add), channel=channel)
-
-
-def build_add_pending_delivery_item(pending_add: PendingAddContext) -> DeliveryItem:
-    expire_minutes = max(1, DEFAULT_PENDING_TIMEOUT_SECONDS // 60)
-    return DeliveryItem(
-        header=DeliveryHeader(kind="approval", title="待确认：下载"),
-        sections=(
-            DeliverySection(
-                label="任务信息",
-                lines=(
-                    f"片名：{pending_add.title}",
-                    f"选择序号：{pending_add.task_ref}",
-                ),
-            ),
-        ),
-        actions=(
-            DeliveryAction(label="确认下载", hint=f"发送 confirm {pending_add.task_ref}", kind="primary"),
-            DeliveryAction(label="取消下载", hint=f"发送 cancel {pending_add.task_ref}", kind="secondary"),
-        ),
-        footer=f"过期时间：{expire_minutes} 分钟后",
-        status="pending",
-    )
