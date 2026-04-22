@@ -1,4 +1,4 @@
-# Next step (v310)
+# Next step (v311)
 
 ## Current goal
 
@@ -29,45 +29,46 @@
 - 当前阶段第 24 条主线已完成：**`app/services/add_confirm_availability_state.py` 已承接 confirm availability 壳**，`add_to_downloader.py` 已从 `674` 行降到 `644` 行。
 - 当前阶段第 25 条主线已完成：**`app/services/add_pending_presence_state.py` 已承接 `has_pending_add()` 的 pending presence lookup 壳**，`add_to_downloader.py` 已从 `644` 行降到 `627` 行。
 - 当前阶段第 26 条主线已完成：**`app/services/add_pending_write_through_state.py` 已承接 `_persist_pending_add()` 的 pending write-through 壳**，`add_to_downloader.py` 已从 `627` 行降到 `608` 行。
-- 当前唯一主线切回 **`app/services/import_to_library.py` 数据结构重设计 · 第 7 轮 · 评估 prepare import 预检壳`**。
-- 为什么现在切山：`add_to_downloader.py` 只比 `≤ 600` 多 `8` 行，剩余主要是被测试直接覆盖的薄 wrapper / bridge；继续硬拆这座山的结构收益已经开始变小。相比之下，`import_to_library.py` 还在 `1392` 行，`_prepare_import()` 这整块“下载器查询 -> 完成态判断 -> 源/目标预检 -> 命名真相 -> target exists”更值得先拿。
+- 当前阶段第 27 条主线已完成：**`app/services/import_prepare_state.py` 已承接 `_prepare_import()` 下载器查询 / 完成态判断 / 源目标预检 / 命名真相 / target exists helper`**，`import_to_library.py` 已从 `1392` 行降到 `1087` 行。
+- 当前唯一主线切到 **`app/services/import_to_library.py` 数据结构重设计 · 第 8 轮 · 评估 confirm execution tail 壳`**。
+- 为什么现在切山：`_prepare_import()` 整块 fail-closed 预检已经离开主文件，`import_to_library.py` 一次性降了 `305` 行；当前剩余最大块明显集中在 `confirm_import_by_task_ref()` 里 `_execute_import()` 之后的 imported / pending_copy_approval / failed 三段收尾。相比继续抠零散 wrapper，这一刀更能继续降低 confirm 编排耦合。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `1392` 行 / `search_media.py` `460` 行。
-- 质量基线前置条件已满足：本轮 `tests/test_add_to_downloader.py` 为 `113 passed`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已通过。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `1087` 行 / `search_media.py` `460` 行。
+- 质量基线前置条件已满足：本轮 `tests/test_import_to_library.py` 为 `142 passed`、prepare focused 为 `48 passed, 94 deselected`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` import smoke 也已通过。
 
 ## User value
 
-- `app/services/add_pending_write_through_state.py` 已经把 `_persist_pending_add()` 那段 pending approval -> in-memory context -> pending job -> event/trace/reply 顺序控制抽走；`add_to_downloader.py` 现在只剩 `608` 行，离 `≤ 600` 只差 `8` 行，但这点差距主要落在薄 wrapper 上。
-- 下一步优先评估 `import_to_library.py` 里的 `_prepare_import()` 预检壳，目的是把“下载器查询失败、未完成、源缺失、目标目录创建失败、命名真相、target exists”这整块 fail-closed 预检从主文件拿走，不去硬拆下载链最后几条薄桥。
-- 若 helper 抽离会牵动 hardlink/copy-fallback 协议、metadata/subtitle/refresh 边界或导入成功真相，主线立即停住；不允许为了降行数改导入协议。
+- `app/services/import_prepare_state.py` 已经把 `_prepare_import()` 那段 fail-closed 预检拿走；`import_to_library.py` 当前 `1087` 行，剩余最大结构债已经从“导入前预检”切到“confirm 后执行收尾”。
+- 下一步优先评估 `confirm_import_by_task_ref()` 里 `_execute_import()` 之后的 execution tail，目标是把 imported / pending_copy_approval / failed 三段里的 approval restore、pending job restore、copy-fallback 标记和 finalize trace 收口成 helper，不改 confirm 对外协议。
+- 若 helper 抽离会牵动 hardlink/copy-fallback 审批真相、`job_event(import.succeeded)`、completed job 回写或 refresh 失败不回滚边界，主线立即停住；不允许为了降行数改导入协议。
 
 ## Only do
 
-- 只评估 `import_to_library.py` 里的 prepare import 预检壳，优先看 `_prepare_import()` 这段下载器查询、完成态判断、源/目标预检和 target exists 收口。
-- `import_to_library.py` 只继续负责用户入口、confirm 编排和 helper 顺序控制；不回退已完成的 `import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
-- focused 验证优先跑 `tests/test_import_to_library.py -k "prepare_import or import_by_task_ref or not_found or not_completed or source_missing or target_exists"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
+- 只评估 `import_to_library.py` 里的 confirm execution tail 壳，优先看 `_execute_import()` 之后 imported / pending_copy_approval / failed 三段收尾。
+- `import_to_library.py` 只继续负责用户入口、confirm 主顺序和 helper 编排；不回退已完成的 `import_prepare_state.py`、`import_post_processing.py`、`import_approval_state.py`、`import_job_state.py`、`import_transfer_execution.py`、`import_cancel_state.py` 和 `import_context_lookup.py` 边界。
+- focused 验证优先跑 `tests/test_import_to_library.py -k "confirm_import_by_task_ref or copy_fallback or hardlink_failure or target_exists_during_execute or refresh_exception"`；只有在代码真的变更时才补 `make quality` 和全量 `pytest`。
 - 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；下载链详细台账继续留在 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，导入链详细台账继续看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`。
 
 ## Do not do
 
 - 不回退 `search_request_context.py`、`search_reply_formatter.py`、`search_clarification_state.py`、`search_candidate_state.py` 的已收口边界；不改 search 文本协议。
 - 不回退 downloader dispatch、download_monitor、job_event、approval / jobs / lease/version 真相协议；下载链本轮不再继续为了 `8` 行差距去硬拆薄 wrapper。
-- 不改 hardlink/copy-fallback 协议，不改 metadata / subtitle / refresh 行为，不改导入成功后 `job_event(import.succeeded)` 及后置链边界。
+- 不改 hardlink/copy-fallback 协议，不改 metadata / subtitle / refresh 行为，不改导入成功后 `job_event(import.succeeded)`、approval executed-version 和 completed job 回写边界。
 - 不在这一轮回到 `telegram_bot.py`、`private_chat_runtime.py` 或 BT 页面 proof。
 - 不新增功能、不扩协议、不顺手重写搜索来源抽象。
 
 ## Done when
 
-当前 **`import_to_library.py` 数据结构重设计 · 第 7 轮 · 评估 prepare import 预检壳`** 主线视为 **已收口**，需要同时满足：
+当前 **`import_to_library.py` 数据结构重设计 · 第 8 轮 · 评估 confirm execution tail 壳`** 主线视为 **已收口**，需要同时满足：
 
-1. helper 已承接 `_prepare_import()` 至少一整块下载器查询 / 源目标预检 / target exists 边界，`import_to_library.py` 不再直接持有这组 fail-closed 预检大块实现；
-2. `app/services/import_to_library.py` 行数从 `1392` 继续下降；
-3. `tests/test_import_to_library.py -k "prepare_import or import_by_task_ref or not_found or not_completed or source_missing or target_exists"` 继续绿灯；
+1. helper 已承接 `_execute_import()` 之后至少一整块 imported / pending_copy_approval / failed 收尾分支，`import_to_library.py` 不再直接持有这组三岔执行结果收尾大块实现；
+2. `app/services/import_to_library.py` 行数从 `1087` 继续下降；
+3. `tests/test_import_to_library.py -k "confirm_import_by_task_ref or copy_fallback or hardlink_failure or target_exists_during_execute or refresh_exception"` 继续绿灯；
 4. 若本轮有代码改动，`make quality` 和全量 `pytest` 不被破坏；
 5. `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md` 已同步新的当前真相。
 
 ## After this step
 
-1. 如果 prepare import 预检壳抽离成功，下一条继续判断 `import_to_library.py` 剩余执行编排里哪一段最适合再拆。
-2. 如果 prepare import 预检壳被证明会牵动 hardlink/copy-fallback 或导入成功真相，下一条改走更保守的 facade，不在导入链硬拆执行协议。
+1. 如果 confirm execution tail 抽离成功，下一条继续判断 `confirm_import_by_task_ref()` 前半段 claim / stale / approval gate 哪一段最适合再拆。
+2. 如果 confirm execution tail 被证明会牵动 approval executed-version、completed job 或 copy-fallback 真相，下一条改走更保守的 facade，不在导入链硬拆执行协议。
 3. 只有在 `add_to_downloader.py` 或 `import_to_library.py` 再拿下一座山后，当前阶段才可能逼近“三座大山各 ≤ 600” 的退出条件。
