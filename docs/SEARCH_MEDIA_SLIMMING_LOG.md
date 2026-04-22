@@ -1,4 +1,4 @@
-# Search media slimming log (v2)
+# Search media slimming log (v3)
 
 > 目的：承接当前“`search_media.py` 搜索编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -28,8 +28,12 @@ focused tests 入口：
 
 ### 2.2 歧义澄清 / 候选持久化 / 回复格式化
 
+本轮收口：
+- `app/services/search_reply_formatter.py` 现在承接 `normalize_candidate()`、movie reply / delivery item、BT 只读与批量预览回复、标题质量猜测和共享格式化字段；`search_media.py` 已从 `1018` 行降到 `725` 行。
+- 这一组收口只动回复协议和共享字段格式化；clarification、candidate 和 SQLite 真相边界未改。
+
 剩余风险：
-- `search_media.py` 还把 `_set_clarification_pending()` / `_clear_clarification_pending()`、candidate 持久化与回滚、`format_movie_query_reply()` / `format_bt_read_only_reply()` 混在同一文件；这一步只允许按一组连贯 helper 拆开，不能顺手改 clarification、candidate 和 SQLite 真相边界。
+- `search_media.py` 还把 `_set_clarification_pending()` / `_clear_clarification_pending()` / `_load_persisted_clarification_query()` 和 candidate 持久化与回滚混在同一文件；下一步只允许先拆 clarification state helper，不顺手改 candidate 或 SQLite 真相边界。
 - 这一组继续守住“候选和澄清状态写入失败直接 fail-closed 返回中文提示”的边界，不回退现有 `CANDIDATE_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT` 协议。
 
 focused tests 入口：
