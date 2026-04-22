@@ -46,9 +46,11 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `937` 行降到 `927` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 为 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 继续通过。
 - `app/services/add_confirm_finalization_state.py` 已承接 confirm 成功后的 finalization warning 汇总、job completion 尾部回写、pending context 清理和 finalize trace；`add_to_downloader.py` 只保留入口壳、pending context/trace wrapper 和最外层 helper 顺序控制，不回退 warning 文本或 trace 协议。
 - 这一步把 `add_to_downloader.py` 从 `927` 行降到 `892` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 继续通过。
+- `app/services/add_pending_context.py` 已继续承接进程内 pending context 记录 / 查询 / 清理 / 缺失日志 helper；`add_to_downloader.py` 只保留 pending runtime state 的最外层调用、不再直接持有两张进程内字典和整段缺失日志分支，不回退下载确认 fail-closed 中文日志协议。
+- 这一步把 `add_to_downloader.py` 从 `892` 行降到 `866` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py` 继续 `113 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `add_to_downloader confirm` smoke 也已再次通过。
 
 剩余风险：
-- `add_to_downloader.py` 还把 `_record_pending_context()`、`_clear_pending_context()`、`_log_pending_job_result_missing()` 和剩余 trace 入口混在主文件里；下一步只允许评估 pending context / trace wrapper，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
+- `add_to_downloader.py` 还把 `_log_trace()` 和 pending reply/persistence 入口壳混在主文件里；下一步只允许评估 pure trace wrapper，不顺手改 downloader dispatch、jobs 状态机或下载回复协议。
 - 这一组继续守住“下载器已投递是真相；approval / jobs / lease 读取失败直接 fail-closed 返回中文提示”的边界，不回退 `ADD_CONFIRM_STATE_UNAVAILABLE_TEXT` / `ADD_CONFIRM_NOT_PENDING_TEXT` / `ADD_CONFIRM_EXPIRED_TEXT` 协议。
 
 focused tests 入口：

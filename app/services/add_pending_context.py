@@ -109,6 +109,66 @@ class AddPendingContextBuilder:
         )
 
 
+class AddPendingRuntimeState:
+    def __init__(self) -> None:
+        self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
+        self._latest_pending_task_ref_by_chat: dict[int, str] = {}
+
+    def record(self, *, chat_id: int, pending_add: PendingAddContext) -> None:
+        if chat_id <= 0:
+            return
+        key = (chat_id, pending_add.task_ref)
+        self._pending_add_contexts_by_chat_ref[key] = pending_add
+        self._latest_pending_task_ref_by_chat[chat_id] = pending_add.task_ref
+
+    def get(self, *, chat_id: int | None, task_ref: str) -> PendingAddContext | None:
+        if chat_id is None or chat_id <= 0:
+            return None
+        return self._pending_add_contexts_by_chat_ref.get((chat_id, task_ref))
+
+    def get_latest_task_ref(self, chat_id: int) -> str:
+        return self._latest_pending_task_ref_by_chat.get(chat_id, "")
+
+    def clear(self, *, chat_id: int | None, task_ref: str) -> None:
+        if chat_id is None or chat_id <= 0:
+            return
+        key = (chat_id, task_ref)
+        self._pending_add_contexts_by_chat_ref.pop(key, None)
+        if self._latest_pending_task_ref_by_chat.get(chat_id) == task_ref:
+            self._latest_pending_task_ref_by_chat.pop(chat_id, None)
+
+    def log_pending_job_result_missing(
+        self,
+        *,
+        chat_id: int,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        stage: str,
+    ) -> None:
+        if stage == "confirm":
+            suggestion = (
+                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前 confirm 会直接返回状态读取失败，"
+                "避免把进程内残留上下文误判成仍可确认下载。"
+            )
+        elif stage == "cancel":
+            suggestion = (
+                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前取消会直接返回状态读取失败，"
+                "避免把进程内残留上下文误判成仍可取消下载。"
+            )
+        else:
+            suggestion = (
+                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前入口会直接返回服务未就绪，"
+                "避免把进程内残留上下文误判成普通仍有待确认下载。"
+            )
+        print(
+            f"\033[31m[下载待确认任务结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} "
+            f"task_id={task_id} task_hash={task_hash} 错误=jobs pending row missing while in-memory pending exists\n"
+            f"\033[33m[处理建议]\033[0m {suggestion}",
+            flush=True,
+        )
+
+
 def build_pending_add_context(
     *,
     task_ref: str,

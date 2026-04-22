@@ -24,6 +24,7 @@ from app.services.add_cancel_state import AddCancelState
 from app.services import add_pending_context
 from app.services.add_pending_context import (
     AddPendingContextBuilder,
+    AddPendingRuntimeState,
     PendingAddContext,
     pending_add_to_json,
 )
@@ -91,6 +92,7 @@ class AddToDownloaderService:
         self._download_monitor_repo = download_monitor_repo
         self._trace_log_path = trace_log_path
         self._pending_context_builder = AddPendingContextBuilder(search_service)
+        self._pending_runtime_state = AddPendingRuntimeState()
         self._confirm_approval_state = AddConfirmApprovalState(
             approval_repo=approval_repo,
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -107,8 +109,6 @@ class AddToDownloaderService:
         )
         self._pending_add_identities = self._confirm_approval_state.pending_add_identities
         self._pending_add_lease_versions = self._confirm_approval_state.pending_add_lease_versions
-        self._pending_add_contexts_by_chat_ref: dict[tuple[int, str], PendingAddContext] = {}
-        self._latest_pending_task_ref_by_chat: dict[int, str] = {}
         self._execution_follow_up = AddExecutionFollowUpService(
             add_torrent_func=add_torrent_func,
             job_event_repo=job_event_repo,
@@ -509,7 +509,7 @@ class AddToDownloaderService:
         return self._cancel_state.cancel_pending_add(
             chat_id=chat_id,
             resolve_pending_lease_version=self._resolve_pending_lease_version,
-            get_latest_pending_task_ref=lambda current_chat_id: self._latest_pending_task_ref_by_chat.get(current_chat_id, ""),
+            get_latest_pending_task_ref=self._pending_runtime_state.get_latest_task_ref,
             get_in_memory_pending=self._get_in_memory_pending,
             log_pending_job_result_missing=self._log_pending_job_result_missing,
             cancel_pending_approval=self._cancel_pending_approval,
@@ -585,11 +585,7 @@ class AddToDownloaderService:
         )
 
     def _record_pending_context(self, *, chat_id: int, pending_add: PendingAddContext) -> None:
-        if chat_id <= 0:
-            return
-        key = (chat_id, pending_add.task_ref)
-        self._pending_add_contexts_by_chat_ref[key] = pending_add
-        self._latest_pending_task_ref_by_chat[chat_id] = pending_add.task_ref
+        self._pending_runtime_state.record(chat_id=chat_id, pending_add=pending_add)
 
     def _move_completed_approval_identity(
         self,
@@ -707,9 +703,7 @@ class AddToDownloaderService:
         )
 
     def _get_in_memory_pending(self, *, chat_id: int | None, task_ref: str) -> PendingAddContext | None:
-        if chat_id is None or chat_id <= 0:
-            return None
-        return self._pending_add_contexts_by_chat_ref.get((chat_id, task_ref))
+        return self._pending_runtime_state.get(chat_id=chat_id, task_ref=task_ref)
 
     def _log_pending_job_result_missing(
         self,
@@ -720,35 +714,16 @@ class AddToDownloaderService:
         task_hash: str,
         stage: str,
     ) -> None:
-        if stage == "confirm":
-            suggestion = (
-                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前 confirm 会直接返回状态读取失败，"
-                "避免把进程内残留上下文误判成仍可确认下载。"
-            )
-        elif stage == "cancel":
-            suggestion = (
-                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前取消会直接返回状态读取失败，"
-                "避免把进程内残留上下文误判成仍可取消下载。"
-            )
-        else:
-            suggestion = (
-                "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前入口会直接返回服务未就绪，"
-                "避免把进程内残留上下文误判成普通仍有待确认下载。"
-            )
-        print(
-            f"\033[31m[下载待确认任务结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} "
-            f"task_id={task_id} task_hash={task_hash} 错误=jobs pending row missing while in-memory pending exists\n"
-            f"\033[33m[处理建议]\033[0m {suggestion}",
-            flush=True,
+        self._pending_runtime_state.log_pending_job_result_missing(
+            chat_id=chat_id,
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            stage=stage,
         )
 
     def _clear_pending_context(self, *, chat_id: int | None, task_ref: str) -> None:
-        if chat_id is None or chat_id <= 0:
-            return
-        key = (chat_id, task_ref)
-        self._pending_add_contexts_by_chat_ref.pop(key, None)
-        if self._latest_pending_task_ref_by_chat.get(chat_id) == task_ref:
-            self._latest_pending_task_ref_by_chat.pop(chat_id, None)
+        self._pending_runtime_state.clear(chat_id=chat_id, task_ref=task_ref)
 
     def _claim_pending_job(self, *, job: JobRecord, lease_owner: str) -> bool | None:
         return self._confirm_job_state.claim_pending_job(job=job, lease_owner=lease_owner)
