@@ -1,4 +1,4 @@
-# Add to downloader slimming log (v1)
+# Add to downloader slimming log (v2)
 
 > 目的：承接当前“`add_to_downloader.py` 下载编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -27,9 +27,9 @@ focused tests 入口：
 
 ### 2.2 confirm 执行 / 下载监控登记 / 事件落盘
 
-剩余风险：
-- `add_to_downloader.py` 里 confirm 上下文重建、lease 抢占、下载器投递、下载监控登记和事件落盘仍在同一文件，但这一组已经不再阻塞当前主线切换。
-- 这一组后续只作为上一条已完成主线的剩余结构证据保留，继续守住“下载器已投递是真相；后续监控/事件写入失败只记显式中文日志 + `[处理建议]`，不回滚既有下载副作用”的边界。
+当前主线：
+- `add_to_downloader.py` 里 confirm 上下文重建、lease 抢占、下载器投递、下载监控登记和事件落盘仍在同一文件；当前唯一主线已经切回这一组，优先看是否能抽出 confirm 执行 / monitor / event helper。
+- 这一组继续守住“下载器已投递是真相；后续监控/事件写入失败只记显式中文日志 + `[处理建议]`，不回滚既有下载副作用”的边界。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"`
@@ -44,4 +44,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`；本文件只继续保留完成态路径和 focused tests 入口。
+- 当前唯一主线已经切回 2.2 风险组；本文件继续承接 downloader confirm / monitor / event 相关瘦身闭环，不回到 `search_media.py`。

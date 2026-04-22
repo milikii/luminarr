@@ -13,6 +13,7 @@ from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
+from app.services.import_cancel_state import ImportCancelState
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_job_state import ImportJobState
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
@@ -107,6 +108,17 @@ class ImportToLibraryService:
         self._job_state = ImportJobState(
             job_repo=job_repo,
             is_job_row_corrupted_error=_is_job_row_corrupted_error,
+        )
+        self._cancel_state = ImportCancelState(
+            job_repo=job_repo,
+            approval_repo=approval_repo,
+            import_cancel_state_unavailable_text=IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT,
+            import_cancelled_text=IMPORT_CANCELLED_TEXT,
+            pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
+            import_cancel_pending_job_result_missing_reason=IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
+            import_cancel_pending_job_row_missing_reason=IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
+            import_cancel_approval_result_missing_reason=IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON,
+            import_cancel_approval_none_reason=IMPORT_CANCEL_APPROVAL_NONE_REASON,
         )
         self._pending_import_identities = self._approval_state.pending_import_identities
         self._pending_import_lease_versions = self._approval_state.pending_import_lease_versions
@@ -604,125 +616,11 @@ class ImportToLibraryService:
         return execution.reply
 
     def cancel_pending_import(self, chat_id: int) -> str | None:
-        if chat_id <= 0:
-            return None
-        if self._job_repo is None:
-            return None
-
-        pending_lookup_failed = False
-        try:
-            pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
-        except Exception as error:
-            print(
-                f"\033[31m[导入取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前取消会直接返回状态读取失败，避免把查询异常误判成“没有待取消导入”。",
-                flush=True,
-            )
-            pending_job = None
-            pending_lookup_failed = True
-        if pending_job is None:
-            if pending_lookup_failed:
-                return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-            return None
-
-        expected_lease_version = self._resolve_pending_lease_version(
-            task_id=pending_job.task_id,
-            task_hash=pending_job.task_hash,
-            allow_in_memory_fallback_on_error=False,
-        )
-        if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
-            print(
-                f"\033[31m[导入取消状态读取失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease lookup failed\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前取消会直接返回状态读取失败，避免把审批查询异常误判成“没有待取消导入”。",
-                flush=True,
-            )
-            return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-        if expected_lease_version <= 0:
-            print(
-                f"\033[31m[导入取消状态读取失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease missing\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
-                flush=True,
-            )
-            return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-
-        approval_cancelled = True
-        if self._approval_repo is not None:
-            try:
-                approval_cancelled = self._approval_repo.cancel_import(
-                    task_id=pending_job.task_id,
-                    task_hash=pending_job.task_hash,
-                    task_ref=pending_job.task_ref,
-                    expected_lease_version=expected_lease_version,
-                )
-                if approval_cancelled is None:
-                    raise RuntimeError(IMPORT_CANCEL_APPROVAL_NONE_REASON)
-            except Exception as error:
-                if str(error) in {
-                    IMPORT_CANCEL_APPROVAL_RESULT_MISSING_REASON,
-                    IMPORT_CANCEL_APPROVAL_NONE_REASON,
-                }:
-                    print(
-                        f"\033[31m[导入取消审批结果缺失]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                        "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及取消更新后是否还能回读到该行；"
-                        "当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消导入”。",
-                        flush=True,
-                    )
-                else:
-                    print(
-                        f"\033[31m[导入取消审批更新失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认导入状态可能仍残留。",
-                        flush=True,
-                    )
-                return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-            if not approval_cancelled:
-                print(
-                    f"\033[31m[导入取消审批更新失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
-                    flush=True,
-                )
-
-        if not approval_cancelled:
-            return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-
-        try:
-            cancelled = self._job_repo.cancel_pending_job(
-                job_id=pending_job.job_id,
-                expected_version=pending_job.version,
-                workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
-            )
-            if cancelled is None:
-                raise RuntimeError(IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON)
-        except Exception as error:
-            if str(error) in {
-                IMPORT_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
-                IMPORT_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
-            }:
-                self._log_cancel_pending_job_result_missing(job=pending_job, reason=str(error))
-            else:
-                print(
-                    f"\033[31m[导入取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
-                    flush=True,
-                )
-            return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-        if not cancelled:
-            print(
-                f"\033[31m[导入取消任务更新失败]\033[0m task_ref={pending_job.task_ref} job_id={pending_job.job_id} task_id={pending_job.task_id} task_hash={pending_job.task_hash} version={pending_job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前审批可能已取消，但待确认任务真相可能已被其他状态迁移抢先改写。",
-                flush=True,
-            )
-            return IMPORT_CANCEL_STATE_UNAVAILABLE_TEXT
-        self._clear_pending_copy_fallback(
-            task_id=pending_job.task_id,
-            task_hash=pending_job.task_hash,
-        )
-
-        self._record_event(
-            task_ref=pending_job.task_ref,
-            task_id=pending_job.task_id,
-            task_hash=pending_job.task_hash,
-            event_type="import.cancelled",
-            message=IMPORT_CANCELLED_TEXT,
-        )
-        return IMPORT_CANCELLED_TEXT
-
-    def _log_cancel_pending_job_result_missing(self, *, job: JobRecord, reason: str) -> None:
-        print(
-            f"\033[31m[导入取消任务结果缺失]\033[0m task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认导入任务是否仍存在，以及取消更新后是否还能回读到最新状态；当前审批可能已取消，但任务真相还没有确认取消成功。",
-            flush=True,
+        return self._cancel_state.cancel_pending_import(
+            chat_id=chat_id,
+            resolve_pending_lease_version=self._resolve_pending_lease_version,
+            clear_pending_copy_fallback=self._clear_pending_copy_fallback,
+            record_event=self._record_event,
         )
 
     def _log_expired_cancel_pending_job_result_missing(self, *, job: JobRecord, task_ref: str, reason: str) -> None:
