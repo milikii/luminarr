@@ -1,4 +1,4 @@
-# Luminarr (v68)
+# Luminarr (v69)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
@@ -32,6 +32,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 - 当前短快照只看 `docs/STATUS.md`
 - 当前唯一施工主线只看 `docs/NEXT_STEP.md`
+- 当前默认继续施工已不是“收尾发布准备”，而是 **搜索相关性优化**
 - 快速仓库质量入口：`make quality`
 - 当前主线 focused 验证入口：`make verify-mainline`
 - 仓库级 CI 入口：GitHub Actions `Quality` workflow 在 `push` / `pull_request` / `workflow_dispatch` 上运行 `make quality` + `make verify-mainline`
@@ -45,7 +46,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```
 
-当前保守版发布准备已经收口完成；只有当文档真相、发布矩阵或质量入口再次漂移时，才需要回到 `docs/OPERATOR_RUNBOOK.md` 里的“收尾发布准备”模板。
+当前保守版发布准备已经收口完成；现在默认继续推进，会自动落到 `docs/NEXT_STEP.md` 里的**搜索相关性优化**主线。
+只有当文档真相、发布矩阵、真实 smoke 或质量入口再次漂移时，才需要回到 `docs/OPERATOR_RUNBOOK.md` 里的“收尾发布准备”模板。
 如果你只想让 AI 先做冷启动检查或只收口文档，也不要自己手改长提示词，直接去 `docs/OPERATOR_RUNBOOK.md` 复制对应模板。
 
 ## 6. 文档入口
