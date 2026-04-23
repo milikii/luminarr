@@ -64,12 +64,15 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `644` 行降到 `627` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `116 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `19091 Transmission` confirm smoke（临时 SQLite + 真实 RPC）继续通过，并显式复验 `has_pending_add()` 返回 `True`。
 - `app/services/add_pending_write_through_state.py` 已承接 `_persist_pending_add()` 的 pending write-through 壳；`add_to_downloader.py` 只保留 public pending persist wrapper，不再直接持有 pending approval -> in-memory context -> pending job -> event / trace / reply 顺序控制，不回退待确认文本或 fail-closed 中文协议。
 - 这一步把 `add_to_downloader.py` 从 `627` 行降到 `608` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 继续 `116 passed`，`make quality` 为 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1718 passed, 4 warnings`，真实 `19091 Transmission` confirm smoke（临时 SQLite + 真实 RPC）继续通过，并显式复验 `add_by_selection -> pending approval/job/event -> has_pending_add -> confirm`。
+- `app/services/add_execution_follow_up.py` 现在有独立 focused gate；`tests/test_add_execution_follow_up.py` 直接覆盖 `job_event` 追加失败、事件结果缺失、事件记录损坏、`download_monitor` 登记失败 / 结果缺失 / 记录损坏。`add_to_downloader.py` 删除这组测试专用 thin wrapper，改为直接把 `record_event` 传给 pending write-through、cancel、expired confirm 和 confirm execution tail。
+- 这一步把 `add_to_downloader.py` 从 `608` 行降到 `574` 行；`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `116 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1724 passed, 4 warnings`。
 
 剩余风险：
-- `add_to_downloader.py` 现在只比 `≤ 600` 多 `8` 行，剩余主要是被 tests 直接覆盖的 thin bridge / wrapper；继续在这座山上硬拆的结构收益开始下降。
-- 当前更值钱的下一刀已经切回 `import_to_library.py`：优先评估 `_prepare_import()` 那段下载器查询、完成态判断、源/目标预检和 target exists 预检壳；本文件先停在已完成 downloader 瘦身闭环，不再为 `8` 行差距继续微切分。
+- `add_to_downloader.py` 已到 `574` 行，download chain 瘦身目标已收口；后续只有在出现新的失败边界或新的 focused gate 缺口时才值得继续动它。
+- 当前更大的风险不再是 downloader 壳文件行数，而是后续如果没有 promoted 主线，容易回到为数字继续搬 wrapper 的递减施工。
 
 focused tests 入口：
+- `.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py`
 - `.venv/bin/python -m pytest -q tests/test_add_to_downloader.py`
 
 ## 3. Focused verification

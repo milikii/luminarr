@@ -2,7 +2,7 @@
 
 ## Current goal
 
-- **质量硬化** 阶段已按 `docs/DECISIONS.md` D-039 正式宣告收工；当前阶段继续做 **services 层数据结构降本**，Done 定义仍锁在"三座大山各 `≤ 600` 行 + focused tests 不跌 + CI 绿灯"。
+- **质量硬化** 阶段已按 `docs/DECISIONS.md` D-039 正式宣告收工；当前阶段的 **services 层数据结构降本** 已在本轮满足 Done 定义："三座大山各 `≤ 600` 行 + focused tests 不跌 + CI 绿灯"。
 - 当前阶段第 1 条主线已完成：**`app/services/import_to_library.py` 数据结构重设计 · 第 1 轮 · 路径与特殊分支清单** 已落到 `docs/IMPORT_PIPELINE_REDESIGN.md`。
 - 当前阶段第 2 条主线已完成：**`app/services/import_post_processing.py` 已承接 `metadata / subtitle / refresh` 后置链**，`import_to_library.py` 已从 `2242` 行降到 `2094` 行。
 - 当前阶段第 3 条主线已完成：**`app/services/import_approval_state.py` 已承接 approval lease/version、stale-check、expiry 和目标路径回查**，`import_to_library.py` 已从 `2094` 行降到 `1827` 行。
@@ -39,44 +39,45 @@
 - 当前阶段第 34 条主线已完成：**`app/services/import_metadata_title_year.py` 已承接 metadata title/year fallback glue`**，`import_to_library.py` 已从 `665` 行降到 `656` 行，`tests/test_import_to_library.py` 新增 2 条 metadata title/year 直接断言。
 - 当前阶段第 35 条主线已完成：**`ImportApprovalState.record_pending_approval_with_copy_fallback_reset()` 已承接 pending approval write-through glue`**，`import_to_library.py` 已从 `656` 行降到 `654` 行，`tests/test_import_to_library.py` 新增 1 条 copy-fallback 清理直接断言。
 - 当前阶段第 36 条主线已完成：**`app/services/import_pending_write_through_state.py` + `app/services/import_trace_logger.py` 已承接 `import_by_task_ref()` 的待确认写入 / trace wrapper**，`import_to_library.py` 已从 `654` 行降到 `585` 行，并新增 `tests/test_import_pending_write_through_state.py` focused gate。
-- 当前唯一主线切到 **`services 层数据结构降本 · add_to_downloader.py 最后 8 行 worth-it 复评估`**。
-- 为什么现在切山：`import_to_library.py` 已经到 `585` 行并满足 `≤ 600`，而且 `19091 Transmission` 真实 pending smoke 已复验 `approval_pending -> jobs -> job_event`；剩下唯一还高于门槛的是 `add_to_downloader.py` `608` 行。下一刀只允许证明 downloader 侧最后 `8` 行还有真实边界收益，否则就停在当前稳定状态。
+- 当前阶段第 37 条主线已完成：**`app/services/add_execution_follow_up.py` 已新增独立 focused gate，`add_to_downloader.py` 删除 `job_event / download_monitor` thin wrapper，tests 改为直接钉 helper**，`add_to_downloader.py` 已从 `608` 行降到 `574` 行。
+- 这一步证明 downloader 侧最后 `8` 行仍有真实结构收益：不是继续搬 wrapper，而是把 helper 失败日志测试从壳文件抽到真正负责事件落盘 / 监控登记的模块，顺手让三座大山全部过 `≤ 600`。
 - shared runtime / channel 解耦已累计完成 `57+` 条最小直连；`app/bot/private_chat_runtime.py` 当前 `468` 行、`app/bot/telegram_bot.py` 当前 `256` 行，更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态，不回退。
-- 当前三座大山现状：`app/services/add_to_downloader.py` `608` 行 / `import_to_library.py` `585` 行 / `search_media.py` `460` 行。
+- 当前三座大山现状：`app/services/add_to_downloader.py` `574` 行 / `import_to_library.py` `585` 行 / `search_media.py` `460` 行。
 - 质量基线前置条件已满足：本轮 import pending focused 为 `48 passed, 100 deselected`，`tests/test_import_to_library.py` 为 `145 passed`，`make quality` 为 `24 passed`，非沙箱 `.venv/bin/python -m pytest -q` 继续 `1724 passed, 4 warnings`。
+- 当前 services 阶段已收口：默认分支保持绿灯，`add_to_downloader.py` 不再需要为了行数继续硬拆；下一条 promoted 主线未选择前，仓库先停在稳定态。
 
 ## User value
 
-- `import_pending_write_through_state.py` 和 `import_trace_logger.py` 已把导入申请里的 `approval_pending -> pending job -> event -> trace -> reply` 顺序控制收成单点；`import_to_library.py` 现在 `585` 行，已跨过 `≤ 600` 门槛。
-- 下一步只复评估 `add_to_downloader.py` 最后 `8` 行：如果还能减少直接耦合、补 focused gate 或收口失败边界，就继续；否则直接宣布当前 services 阶段停在稳定态。
-- 当前不再为了行数回头硬拆 `import_to_library.py` 的剩余薄 wrapper。
+- `add_execution_follow_up.py` 现在自己承担 `job_event / download_monitor` fail-closed 中文日志 focused gate，后续回归会直接指到 helper，不再先穿过 `add_to_downloader.py` 壳文件。
+- `add_to_downloader.py` 现在 `574` 行，`import_to_library.py` `585` 行，`search_media.py` `460` 行；三座大山已经全部过线。
+- 当前不再为了行数回头硬拆 `add_to_downloader.py` 或 `import_to_library.py` 的剩余薄 wrapper。
 
 ## Only do
 
-- 只评估 `add_to_downloader.py` 最后 `8` 行是否还有真实收口价值。
-- 只有满足“能减少跨 helper 直接耦合、或新增明确 focused 测试入口、或把失败边界收成单点”的候选，才允许继续动代码。
-- 若代码真的变更，下载链按对应 focused tests 先跑，再补 `make quality` 和全量 `pytest`；导入链本轮只保留现有 focused gate，不再为追行数继续硬拆。
-- 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一主线；下载链详细台账继续留在 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，导入链详细台账继续看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`。
+- 本轮 services 阶段已经收口；下一条 promoted 主线未选定前，不自动继续拆新的 thin wrapper。
+- 若后续要继续动代码，候选必须满足“修真实红灯 / 收高风险失败边界 / 新增明确 focused gate”其中之一；不再把 `≤ 600` 当成单独施工理由。
+- 文档继续分层：`STATUS.md` 只写当前快照；`NEXT_STEP.md` 只写当前唯一状态；下载链详细台账继续留在 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`，导入链详细台账继续看 `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`。
 
 ## Do not do
 
 - 不回退 `search_request_context.py`、`search_reply_formatter.py`、`search_clarification_state.py`、`search_candidate_state.py` 的已收口边界；不改 search 文本协议。
-- 不回退 downloader dispatch、download_monitor、job_event、approval / jobs / lease/version 真相协议；下载链若没有真实边界收益，不得为了 `8` 行差距去硬拆薄 wrapper。
+- 不回退 downloader dispatch、download_monitor、job_event、approval / jobs / lease/version 真相协议；下载链现在已过 `≤ 600`，不得再为了数字继续硬拆薄 wrapper。
 - 不改 hardlink/copy-fallback 协议，不改 metadata / subtitle / refresh 行为，不改导入成功后 `job_event(import.succeeded)`、approval executed-version 和 completed job 回写边界。
 - 不回到 `import_to_library.py` 继续拆纯 trace / pending write-through 之后剩下的薄委托，除非能证明有新的 focused gate 或失败边界收益。
-- 不在这一轮回到 `telegram_bot.py`、`private_chat_runtime.py` 或 BT 页面 proof。
+- 不在当前稳定窗口里回到 `telegram_bot.py`、`private_chat_runtime.py` 或 BT 页面 proof。
 - 不新增功能、不扩协议、不顺手重写搜索来源抽象。
 
 ## Done when
 
-当前 **`services 层数据结构降本 · add_to_downloader.py 最后 8 行 worth-it 复评估`** 主线视为 **已收口**，需要同时满足：
+当前 **`services 层数据结构降本`** 阶段视为 **已收口**，需要同时满足：
 
-1. 已明确 downloader 侧最后 `8` 行仍有真实结构收益，或者已明确它们也已进入薄 wrapper 边界、不值得继续硬拆；
-2. 当前三座大山和全量回归真相已同步到 `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`；
-3. 若本轮有代码改动，对应 focused tests、`make quality` 和全量 `pytest` 不被破坏。
+1. 三座大山现状保持为 `add_to_downloader.py` `574` 行 / `import_to_library.py` `585` 行 / `search_media.py` `460` 行；
+2. `add_execution_follow_up.py` 的 focused gate 已独立存在，helper 行为不再通过 `add_to_downloader.py` 私有 wrapper 间接测试；
+3. 当前真相已同步到 `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`；
+4. focused tests、`make quality` 和全量 `pytest` 继续绿灯。
 
 ## After this step
 
-1. 如果复评估后确认 `add_to_downloader.py` 的最后 `8` 行还有真实结构收益，下一条只动那一块并保持 focused tests 先行。
-2. 如果复评估后确认 downloader 侧也只剩薄委托，就宣布当前 services 阶段先停在“默认分支稳定 + 三座大山已实质达标”的状态。
-3. 如果 downloader 侧暴露出新的单点失败边界，就围绕那一块开下一条最小主线，不回头重磨导入链已达标部分。
+1. 当前 services 阶段已停在“默认分支稳定 + 三座大山已实质达标”的状态；下一条 promoted 主线未选定前，不自动继续施工。
+2. 如果默认分支重新出现红灯，优先回到真实失败测试或高风险持久化链路，不回头重磨已达标壳文件。
+3. 如果后续出现新的 helper 失败边界，优先补独立 focused gate，而不是把测试继续钉回 orchestrator 壳文件。

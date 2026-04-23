@@ -310,7 +310,7 @@ class AddToDownloaderService:
             claimed_job_id=preparation.claimed_job_id,
             claimed_job_version=preparation.claimed_job_version,
             lease_owner=preparation.lease_owner,
-            record_event=self._record_event,
+            record_event=self._execution_follow_up.record_event,
             restore_pending_approval=self._restore_pending_approval,
             restore_pending_job=self._restore_pending_job,
             record_executed_lease_version=self._record_executed_lease_version,
@@ -336,7 +336,7 @@ class AddToDownloaderService:
             log_pending_job_result_missing=self._log_pending_job_result_missing,
             cancel_pending_approval=self._cancel_pending_approval,
             clear_pending_context=self._clear_pending_context,
-            record_event=self._record_event,
+            record_event=self._execution_follow_up.record_event,
         )
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
@@ -442,7 +442,7 @@ class AddToDownloaderService:
             record_pending_job=self._record_pending_job,
             clear_pending_context=self._clear_pending_context,
             cancel_pending_approval=self._cancel_pending_approval,
-            record_event=self._record_event,
+            record_event=self._execution_follow_up.record_event,
             log_trace=self._trace_logger.log,
         )
 
@@ -557,7 +557,7 @@ class AddToDownloaderService:
             is_pending_approval_expired=self._is_pending_approval_expired,
             cancel_pending_approval=self._cancel_pending_approval,
             clear_pending_context=self._clear_pending_context,
-            record_event=self._record_event,
+            record_event=self._execution_follow_up.record_event,
         )
 
     def _is_pending_approval_expired(
@@ -571,38 +571,4 @@ class AddToDownloaderService:
             task_id=task_id,
             task_hash=task_hash,
             expected_lease_version=expected_lease_version,
-        )
-
-    def _record_event(
-        self,
-        *,
-        task_ref: str,
-        event_type: str,
-        message: str,
-        task_id: str = "",
-        task_hash: str = "",
-    ) -> None:
-        self._execution_follow_up.record_event(
-            task_ref=task_ref,
-            task_id=task_id,
-            task_hash=task_hash,
-            event_type=event_type,
-            message=message,
-        )
-
-    def _register_download_monitor(
-        self,
-        *,
-        task_id: str,
-        task_hash: str,
-        title: str,
-        chat_id: int | None,
-        user_id: int | None,
-    ) -> None:
-        self._execution_follow_up.register_download_monitor(
-            task_id=task_id,
-            task_hash=task_hash,
-            title=title,
-            chat_id=chat_id,
-            user_id=user_id,
         )

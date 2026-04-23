@@ -10,8 +10,7 @@ import pytest
 from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, DEFAULT_PENDING_TIMEOUT_SECONDS, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
-from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.db.job_event_repo import JobEventPersistenceError
+from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
@@ -875,132 +874,6 @@ def test_move_completed_approval_identity_logs_persistence_failure(capsys) -> No
     output = capsys.readouterr().out
     assert "[下载审批身份迁移失败]" in output
     assert "db down" in output
-
-
-def test_record_event_logs_persistence_failure(capsys) -> None:
-    job_event_repo = type("JobEventRepo", (), {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
-    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_event_repo=job_event_repo)
-    service._record_event(
-        task_ref="1",
-        task_id="selection:1",
-        task_hash="abc123",
-        event_type="downloader.approval_pending",
-        message="Dune: Part Two",
-    )
-    output = capsys.readouterr().out
-    assert "[下载事件落盘失败]" in output
-    assert "event_type=downloader.approval_pending" in output
-
-
-def test_record_event_logs_missing_appended_event_result(capsys) -> None:
-    job_event_repo = type(
-        "JobEventRepo",
-        (),
-        {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append"))},
-    )()
-    service = AddToDownloaderService(
-        search_service=SearchMediaService(_fake_search_with_download_url),
-        add_torrent_func=AsyncMock(),
-        job_event_repo=job_event_repo,
-    )
-    service._record_event(
-        task_ref="1",
-        task_id="selection:1",
-        task_hash="abc123",
-        event_type="downloader.approval_pending",
-        message="Dune: Part Two",
-    )
-    output = capsys.readouterr().out
-    assert "[下载事件结果缺失]" in output
-    assert "downloader event missing after append" in output
-    assert "event_type=downloader.approval_pending" in output
-
-
-def test_record_event_logs_row_corrupted_appended_event(capsys) -> None:
-    job_event_repo = type(
-        "JobEventRepo",
-        (),
-        {
-            "append_event": lambda self, **kwargs: (_ for _ in ()).throw(
-                JobEventPersistenceError("job_event row identity corrupted after read")
-            )
-        },
-    )()
-    service = AddToDownloaderService(
-        search_service=SearchMediaService(_fake_search_with_download_url),
-        add_torrent_func=AsyncMock(),
-        job_event_repo=job_event_repo,
-    )
-    service._record_event(
-        task_ref="1",
-        task_id="selection:1",
-        task_hash="abc123",
-        event_type="downloader.approval_pending",
-        message="Dune: Part Two",
-    )
-    output = capsys.readouterr().out
-    assert "[下载事件记录损坏]" in output
-    assert "job_event row identity corrupted after read" in output
-    assert "event_type=downloader.approval_pending" in output
-
-
-def test_register_download_monitor_logs_persistence_failure(capsys) -> None:
-    download_monitor_repo = type("DownloadMonitorRepo", (), {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
-    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)
-    service._register_download_monitor(
-        task_id="42",
-        task_hash="abc123",
-        title="Dune: Part Two",
-        chat_id=1001,
-        user_id=2001,
-    )
-    output = capsys.readouterr().out
-    assert "[下载监控登记失败]" in output
-    assert "task_id=42" in output
-
-
-def test_register_download_monitor_logs_missing_registered_result(capsys) -> None:
-    download_monitor_repo = type(
-        "DownloadMonitorRepo",
-        (),
-        {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("download monitor state missing after register"))},
-    )()
-    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)
-    service._register_download_monitor(
-        task_id="42",
-        task_hash="abc123",
-        title="Dune: Part Two",
-        chat_id=1001,
-        user_id=2001,
-    )
-    output = capsys.readouterr().out
-    assert "[下载监控登记结果缺失]" in output
-    assert "download monitor state missing after register" in output
-    assert "task_id=42" in output
-
-
-def test_register_download_monitor_logs_row_corrupted_result(capsys) -> None:
-    download_monitor_repo = type(
-        "DownloadMonitorRepo",
-        (),
-        {
-            "register_download": lambda self, **kwargs: (_ for _ in ()).throw(
-                DownloadMonitorPersistenceError("download monitor row identity corrupted after read")
-            )
-        },
-    )()
-    service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), download_monitor_repo=download_monitor_repo)
-    service._register_download_monitor(
-        task_id="42",
-        task_hash="abc123",
-        title="Dune: Part Two",
-        chat_id=1001,
-        user_id=2001,
-    )
-    output = capsys.readouterr().out
-    assert "[下载监控登记记录损坏]" in output
-    assert "download monitor row identity corrupted after read" in output
-    assert "task_id=42" in output
 
 
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
