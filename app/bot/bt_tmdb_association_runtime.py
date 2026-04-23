@@ -14,7 +14,7 @@ from app.db.bt_pending_repo import (
     BtPendingRepo,
 )
 from app.services.add_to_downloader import BT_SOURCE_UNSUPPORTED_TEXT, AddToDownloaderService
-from app.services.search_media import parse_movie_query
+from app.services.search_request_context import parse_movie_query
 
 BT_TMDB_ASSOCIATION_PROMPT_TEXT_TEMPLATE = (
     "已记录本次 BT 分类：{label}（{kind}）。\n"

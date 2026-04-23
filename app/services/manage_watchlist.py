@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
-from app.services.search_media import parse_movie_query
+from app.services.search_request_context import parse_movie_query
 
 WATCHLIST_USAGE_TEXT = (
     "想看命令格式：\n"

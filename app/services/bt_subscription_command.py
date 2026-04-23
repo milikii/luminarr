@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
-from app.services.search_media import parse_movie_query
+from app.services.search_request_context import parse_movie_query
 
 BT_SUBSCRIPTION_USAGE_TEXT = (
     "BT 订阅命令格式：\n"
