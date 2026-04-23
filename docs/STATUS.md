@@ -1,9 +1,9 @@
-# Current status (v445)
+# Current status (v446)
 
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮已继续补齐标题噪音抑制：`Chapter 4 / Part 2 / 空格数字续作 + Extended / IMAX / Special Edition + 年份` 这类输入现在不会再把 sequel/chapter 数字吞掉。
+- 当前这一轮已继续补齐标题噪音抑制：`Chapter 4 / Part 2 / 空格数字续作 + Extended / IMAX / Special Edition / Final Cut / Director's Cut / Ultimate Edition + 年份` 这类输入现在不会再把 sequel/chapter 数字吞掉。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
 
@@ -17,6 +17,7 @@
 - `Fast Ten 2023` 这类“标题尾部英文数字词”现在也会稳定对齐 `Fast X`，不再因为 `Ten` 与 `X` 形式不同而错过高置信 TMDB 命中。
 - sequel-digit 搜索解析现已同时覆盖半角与全角括号年份：`沙丘 2 (2024)` 与 `沙丘 2（2024）` 当前都会保住续作数字，不再回退成缺失 `2` 的搜索标题。
 - `John Wick Chapter 4 Extended 2023`、`Dune Part 2 Extended 2024`、`Mission Impossible 7 IMAX 2023`、`Fast X Special Edition 2023` 这类“续作/章节 token + 版本噪音词 + 年份”输入现在会先剥掉尾部噪音词，再保住真正的 sequel/chapter token，不再把 `4 / 2 / 7 / X` 吞掉。
+- `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + 版本 cut/edition 词 + 年份”输入现在也会先剥掉尾部版本词，再把搜索标题对齐回真正片名；但 `The Final Cut 2004` 这类本体标题不会被误删空。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
@@ -32,8 +33,8 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
-- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `132 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `142 passed`
+- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `137 passed`
+- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `147 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
 - import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
 - 当前本机探针：

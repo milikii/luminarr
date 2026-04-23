@@ -37,7 +37,9 @@ _TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE = re.compile(
 )
 _SEQUEL_VALUE_PATTERN = r"(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部)"
 _SEQUEL_PHRASE_PATTERN = rf"(?:(?:part|chapter)\s+{_SEQUEL_VALUE_PATTERN}|{_SEQUEL_VALUE_PATTERN})"
-_TRAILING_QUERY_NOISE_PATTERN = r"(?:imax|extended(?:\s+edition)?|special\s+edition)"
+_TRAILING_QUERY_NOISE_PATTERN = (
+    r"(?:imax|extended(?:\s+edition)?|special\s+edition|ultimate\s+edition|final\s+cut|director'?s\s+cut|directors\s+cut)"
+)
 _TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE = re.compile(
     rf"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>{_SEQUEL_PHRASE_PATTERN})(?:\s+(?P<noise>{_TRAILING_QUERY_NOISE_PATTERN}(?:\s+{_TRAILING_QUERY_NOISE_PATTERN})*))?(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{{2}})(?:\s*[\])])?$",
     re.IGNORECASE,
@@ -156,7 +158,16 @@ def _strip_trailing_query_noise(value: str) -> str:
         next_value = normalize_spaces(_TRAILING_QUERY_NOISE_RE.sub("", stripped_value))
         if next_value == stripped_value:
             return stripped_value
+        if not next_value or _is_trivial_title_after_noise_strip(next_value):
+            return stripped_value
         stripped_value = next_value
+
+
+def _is_trivial_title_after_noise_strip(value: str) -> bool:
+    tokens = [token for token in normalize_spaces(value).split(" ") if token]
+    if not tokens:
+        return True
+    return len(tokens) == 1 and tokens[0].lower() in {"a", "an", "the"}
 
 
 async def build_search_request_context(

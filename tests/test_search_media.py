@@ -3127,6 +3127,35 @@ def test_search_and_format_strips_trailing_noise_after_chapter_digit_alias() -> 
     assert "John Wick: Chapter 4 2023 2160p BluRay" in text
 
 
+def test_search_and_format_strips_directors_cut_noise_before_tmdb_lookup() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Blade Runner 1982":
+            return [
+                {
+                    "title": "Blade Runner 1982 Final Cut 2160p BluRay",
+                    "year": 1982,
+                    "size": 14 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerBR",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Blade Runner"
+        assert year == "1982"
+        return TmdbMovie(title="Blade Runner", original_title="Blade Runner", year="1982")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Blade Runner Final Cut 1982"))
+
+    assert seen_queries == ["Blade Runner 1982"]
+    assert "片名: Blade Runner" in text
+    assert "Blade Runner 1982 Final Cut 2160p BluRay" in text
+
+
 def test_search_and_format_treats_trailing_word_number_alias_as_confident_tmdb_match() -> None:
     seen_queries: list[str] = []
 
@@ -3323,6 +3352,30 @@ def test_parse_movie_query_strips_trailing_noise_from_roman_numeral_title() -> N
     parsed = parse_movie_query("Fast X Special Edition 2023")
     assert parsed.title == "Fast X"
     assert parsed.year == "2023"
+
+
+def test_parse_movie_query_strips_final_cut_noise() -> None:
+    parsed = parse_movie_query("Blade Runner Final Cut 1982")
+    assert parsed.title == "Blade Runner"
+    assert parsed.year == "1982"
+
+
+def test_parse_movie_query_strips_directors_cut_noise() -> None:
+    parsed = parse_movie_query("Alien Director's Cut 1979")
+    assert parsed.title == "Alien"
+    assert parsed.year == "1979"
+
+
+def test_parse_movie_query_strips_ultimate_edition_noise() -> None:
+    parsed = parse_movie_query("Batman v Superman Ultimate Edition 2016")
+    assert parsed.title == "Batman v Superman"
+    assert parsed.year == "2016"
+
+
+def test_parse_movie_query_keeps_actual_final_cut_title() -> None:
+    parsed = parse_movie_query("The Final Cut 2004")
+    assert parsed.title == "The Final Cut"
+    assert parsed.year == "2004"
 
 
 def test_parse_movie_query_keeps_title_when_no_year() -> None:
