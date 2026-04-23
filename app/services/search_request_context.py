@@ -54,6 +54,11 @@ _SEQUEL_ALIAS_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bix\b", re.IGNORECASE), "9"),
     (re.compile(r"\bx\b", re.IGNORECASE), "10"),
 )
+_PART_DIGIT_PATTERN = re.compile(r"\bpart\s+(?P<value>(?:\d{1,2}|ii|iii|iv|v|vi|vii|viii|ix|x))\b", re.IGNORECASE)
+_CHAPTER_TOKEN_PATTERN = re.compile(
+    r"\bchapter\s+(?P<value>(?:\d{1,2}|ii|iii|iv|v|vi|vii|viii|ix|x))\b",
+    re.IGNORECASE,
+)
 _CHINESE_PART_PATTERN = re.compile(r"第\s*(?P<value>[一二三四五六七八九十两\d]+)\s*部", re.IGNORECASE)
 _CHINESE_NUMERAL_MAP = {
     "一": 1,
@@ -318,6 +323,8 @@ def _should_preserve_query_separator(base_title: str, sequel: str) -> bool:
 def _normalize_sequel_aliases(value: str) -> str:
     normalized = value
     normalized = _CHINESE_PART_PATTERN.sub(lambda match: str(_parse_chinese_part_number(match.group("value"))), normalized)
+    normalized = _PART_DIGIT_PATTERN.sub(lambda match: str(_parse_ordinal_token(match.group("value"))), normalized)
+    normalized = _CHAPTER_TOKEN_PATTERN.sub(lambda match: str(_parse_ordinal_token(match.group("value"))), normalized)
     for pattern, replacement in _SEQUEL_ALIAS_PATTERNS:
         normalized = pattern.sub(replacement, normalized)
     return normalized
@@ -339,3 +346,23 @@ def _parse_chinese_part_number(value: str) -> int:
         tens, _, ones = cleaned.partition("十")
         return _CHINESE_NUMERAL_MAP.get(tens, 0) * 10 + _CHINESE_NUMERAL_MAP.get(ones, 0)
     return _CHINESE_NUMERAL_MAP.get(cleaned, 0)
+
+
+def _parse_ordinal_token(value: str) -> int:
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return 0
+    if cleaned.isdigit():
+        return int(cleaned)
+    roman_map = {
+        "ii": 2,
+        "iii": 3,
+        "iv": 4,
+        "v": 5,
+        "vi": 6,
+        "vii": 7,
+        "viii": 8,
+        "ix": 9,
+        "x": 10,
+    }
+    return roman_map.get(cleaned, 0)

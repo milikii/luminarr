@@ -1,15 +1,16 @@
-# Next step (v333)
+# Next step (v334)
 
 ## Current goal
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**续作别名对齐 · 第 1 轮**。
-- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `122 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `129 passed`。
+- 当前刚完成的一条最小闭环是：**续作 / 章节别名对齐 · 第 2 轮**。
+- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `125 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `133 passed`。
 - 当前这一轮已经补齐：
   - `Part Two / II / 第二部` 这类续作别名现在会在 TMDB 置信匹配里更稳定对齐，不再轻易把 sequel 误当成基片或邻近片名
   - `Mission Impossible 7 2023` 这类“英文标题 + 空格数字续作”现在不会再把空格数字吞成 `Impossible7`
   - `沙丘第二部 2024`、`Dune II 2024`、`沙丘 2（2024）` 这几类 query 现在都能更稳定落到同一部 sequel
+  - `Dune Part 2 2024`、`John Wick IV 2023` 这类“数字 part / roman chapter”别名现在也能稳定对齐 `Part Two` / `Chapter 4`
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `468` 行，`app/bot/telegram_bot.py` 当前 `256` 行，不回退。
 - 当前剩余空间仍是“继续打磨命中偏好”，不是“主协议还没通”；movie-first 主链、发布矩阵和质量入口继续保持完成态。
 

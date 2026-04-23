@@ -3010,6 +3010,65 @@ def test_search_and_format_treats_roman_numeral_sequel_as_confident_tmdb_match()
     assert "Dune Part Two 2024 2160p BluRay" in text
 
 
+def test_search_and_format_treats_part_digit_alias_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Dune Part 2"
+        assert year == "2024"
+        return TmdbMovie(title="Dune Part Two", original_title="Dune: Part Two", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Dune Part 2 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: Dune: Part Two" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
+def test_search_and_format_treats_chapter_roman_alias_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "John Wick: Chapter 4 2023":
+            return [
+                {
+                    "title": "John Wick: Chapter 4 2023 2160p BluRay",
+                    "year": 2023,
+                    "size": 12 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerJW",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "John Wick IV"
+        assert year == "2023"
+        return TmdbMovie(title="John Wick: Chapter 4", original_title="John Wick: Chapter 4", year="2023")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("John Wick IV 2023"))
+
+    assert seen_queries == ["John Wick: Chapter 4 2023"]
+    assert "片名: John Wick: Chapter 4" in text
+    assert "John Wick: Chapter 4 2023 2160p BluRay" in text
+
+
 def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     seen_queries: list[str] = []
 
@@ -3147,6 +3206,12 @@ def test_parse_movie_query_keeps_spaced_digit_title_before_year() -> None:
     parsed = parse_movie_query("Mission Impossible 7 2023")
     assert parsed.title == "Mission Impossible 7"
     assert parsed.year == "2023"
+
+
+def test_parse_movie_query_keeps_part_digit_alias_before_year() -> None:
+    parsed = parse_movie_query("Dune Part 2 2024")
+    assert parsed.title == "Dune Part 2"
+    assert parsed.year == "2024"
 
 
 def test_parse_movie_query_keeps_title_when_no_year() -> None:

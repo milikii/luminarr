@@ -1,9 +1,9 @@
-# Current status (v440)
+# Current status (v441)
 
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮已补齐续作别名对齐：`Part Two / II / 第二部 / 空格数字续作` 现在会更稳定地落到同一部电影，不再轻易丢掉续作 token。
+- 当前这一轮已继续补齐续作/章节别名对齐：`Part Two / II / Part 2 / Chapter 4 / IV / 第二部 / 空格数字续作` 现在会更稳定地落到同一部电影，不再轻易丢掉 sequel token。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
 
@@ -12,6 +12,7 @@
 - 仓库级质量入口保持可用：`make quality`、`make verify-mainline`、`make verify-quality-gates` 当前都可复验。
 - movie-first 搜索相关性本轮继续收口：TMDB 低置信命中不再抢主导权；BT fallback 排序已覆盖单条候选、少量噪音候选、续作数字与括号年份这几类真实输入。
 - 续作别名对齐现在继续前推一格：`沙丘第二部 2024`、`Dune II 2024`、`Mission Impossible 7 2023` 这类输入不再把续作信息吞掉，TMDB 与搜索 query 会更稳定命中真正的 sequel。
+- `Dune Part 2 2024`、`John Wick IV 2023` 这类“数字 part / roman chapter”别名现在也会更稳定对齐 `Part Two` / `Chapter 4`，不再因为 token 形式不同就降级成低置信 TMDB 命中。
 - sequel-digit 搜索解析现已同时覆盖半角与全角括号年份：`沙丘 2 (2024)` 与 `沙丘 2（2024）` 当前都会保住续作数字，不再回退成缺失 `2` 的搜索标题。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
@@ -27,8 +28,8 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1748 passed, 2 skipped`
-- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `122 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `129 passed`
+- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `125 passed`
+- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `133 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
 - import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
 - 当前本机探针：
