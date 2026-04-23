@@ -3069,6 +3069,35 @@ def test_search_and_format_treats_chapter_roman_alias_as_confident_tmdb_match() 
     assert "John Wick: Chapter 4 2023 2160p BluRay" in text
 
 
+def test_search_and_format_treats_chapter_word_alias_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "John Wick: Chapter 4 2023":
+            return [
+                {
+                    "title": "John Wick: Chapter 4 2023 2160p BluRay",
+                    "year": 2023,
+                    "size": 12 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerJW",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "John Wick Chapter Four"
+        assert year == "2023"
+        return TmdbMovie(title="John Wick: Chapter 4", original_title="John Wick: Chapter 4", year="2023")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("John Wick Chapter Four 2023"))
+
+    assert seen_queries == ["John Wick: Chapter 4 2023"]
+    assert "片名: John Wick: Chapter 4" in text
+    assert "John Wick: Chapter 4 2023 2160p BluRay" in text
+
+
 def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     seen_queries: list[str] = []
 

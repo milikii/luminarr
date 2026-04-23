@@ -23,9 +23,12 @@ _SEQUEL_ALIAS_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bix\b", re.IGNORECASE), "9"),
     (re.compile(r"\bx\b", re.IGNORECASE), "10"),
 )
-_PART_DIGIT_PATTERN = re.compile(r"\bpart\s+(?P<value>(?:\d{1,2}|ii|iii|iv|v|vi|vii|viii|ix|x))\b", re.IGNORECASE)
+_PART_DIGIT_PATTERN = re.compile(
+    r"\bpart\s+(?P<value>(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x))\b",
+    re.IGNORECASE,
+)
 _CHAPTER_TOKEN_PATTERN = re.compile(
-    r"\bchapter\s+(?P<value>(?:\d{1,2}|ii|iii|iv|v|vi|vii|viii|ix|x))\b",
+    r"\bchapter\s+(?P<value>(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x))\b",
     re.IGNORECASE,
 )
 _CHINESE_PART_PATTERN = re.compile(r"第\s*(?P<value>[一二三四五六七八九十两\d]+)\s*部", re.IGNORECASE)
@@ -92,6 +95,20 @@ def _parse_ordinal_token(value: str) -> int:
         return 0
     if cleaned.isdigit():
         return int(cleaned)
+    word_map = {
+        "one": 1,
+        "two": 2,
+        "three": 3,
+        "four": 4,
+        "five": 5,
+        "six": 6,
+        "seven": 7,
+        "eight": 8,
+        "nine": 9,
+        "ten": 10,
+    }
+    if cleaned in word_map:
+        return word_map[cleaned]
     roman_map = {
         "ii": 2,
         "iii": 3,
