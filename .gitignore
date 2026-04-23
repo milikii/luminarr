@@ -13,4 +13,5 @@ build/
 *.sqlite3
 *.db
 logs/
+codex.log
 tmp_tests/
