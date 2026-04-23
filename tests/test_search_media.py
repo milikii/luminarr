@@ -2950,6 +2950,66 @@ def test_search_and_format_treats_fullwidth_bracketed_year_spaced_sequel_digit_a
     assert "Dune Part Two 2024 2160p BluRay" in text
 
 
+def test_search_and_format_treats_chinese_ordinal_part_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "沙丘第二部"
+        assert year == "2024"
+        return TmdbMovie(title="Dune Part Two", original_title="沙丘2", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘第二部 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: 沙丘2" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
+def test_search_and_format_treats_roman_numeral_sequel_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Dune II"
+        assert year == "2024"
+        return TmdbMovie(title="Dune Part Two", original_title="Dune Part Two", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Dune II 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: Dune Part Two" in text
+    assert "别名: -" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
 def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     seen_queries: list[str] = []
 
@@ -3075,6 +3135,18 @@ def test_parse_movie_query_keeps_spaced_sequel_digit_with_fullwidth_bracketed_ye
     parsed = parse_movie_query("沙丘 2（2024）")
     assert parsed.title == "沙丘2"
     assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_roman_numeral_sequel_before_year() -> None:
+    parsed = parse_movie_query("Dune II 2024")
+    assert parsed.title == "Dune II"
+    assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_spaced_digit_title_before_year() -> None:
+    parsed = parse_movie_query("Mission Impossible 7 2023")
+    assert parsed.title == "Mission Impossible 7"
+    assert parsed.year == "2023"
 
 
 def test_parse_movie_query_keeps_title_when_no_year() -> None:

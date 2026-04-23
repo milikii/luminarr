@@ -93,6 +93,39 @@ def test_search_movie_prefers_exact_title_match_over_partial_prefix() -> None:
     assert result.tmdb_id == "2"
 
 
+def test_search_movie_prefers_sequel_alias_match_over_base_title() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Dune II"
+        assert params["year"] == "2024"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "Dune",
+                        "original_title": "Dune",
+                        "release_date": "2024-01-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Dune Part Two",
+                        "original_title": "Dune: Part Two",
+                        "release_date": "2024-03-01",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Dune II", "2024"))
+
+    assert result is not None
+    assert result.title == "Dune Part Two"
+    assert result.tmdb_id == "2"
+
+
 def test_search_movie_without_valid_result_returns_none() -> None:
     client = TmdbClient(api_key="tmdb-key")
 
