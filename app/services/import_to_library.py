@@ -10,6 +10,7 @@ from app.db.approval_repo import (
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.services.import_pending_write_through_state import ImportPendingWriteThroughState
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
 from app.services.import_cancel_state import ImportCancelState
@@ -24,8 +25,8 @@ from app.services.import_metadata_title_year import ImportMetadataTitleYearResol
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState
 from app.services.import_raw_bt_guard import ImportRawBtGuard
+from app.services.import_trace_logger import ImportTraceLogger
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
-from app.trace_logging import log_trace_event
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 
@@ -94,10 +95,7 @@ class ImportToLibraryService:
     ) -> None:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
-        self._job_event_repo = job_event_repo
-        self._approval_repo = approval_repo
-        self._job_repo = job_repo
-        self._trace_log_path = trace_log_path
+        self._trace_logger = ImportTraceLogger(trace_log_path)
         self._context_lookup = ImportContextLookup(
             job_repo=job_repo,
             approval_repo=approval_repo,
@@ -133,6 +131,11 @@ class ImportToLibraryService:
         )
         self._pending_import_identities = self._approval_state.pending_import_identities
         self._pending_import_lease_versions = self._approval_state.pending_import_lease_versions
+        self._pending_write_through_state = ImportPendingWriteThroughState(
+            approval_repo=approval_repo,
+            import_pending_state_unavailable_text=IMPORT_PENDING_STATE_UNAVAILABLE_TEXT,
+            import_approval_pending_text_template=IMPORT_APPROVAL_PENDING_TEXT,
+        )
         self._post_processing_service = ImportPostProcessingService(
             refresh_media_server_func=refresh_media_server_func,
             scrape_metadata_func=scrape_metadata_func,
@@ -190,34 +193,6 @@ class ImportToLibraryService:
             is_import_event_row_corrupted_error=_is_import_event_row_corrupted_error,
         )
 
-    def _log_trace(
-        self,
-        *,
-        event: str,
-        result: str,
-        stage: str,
-        chat_id: int | None = None,
-        user_id: int | None = None,
-        task_ref: str = "",
-        task_id: str = "",
-        task_hash: str = "",
-        detail: str = "",
-    ) -> None:
-        log_trace_event(
-            scope="workflow",
-            workflow=WORKFLOW_IMPORT_TO_LIBRARY,
-            event=event,
-            result=result,
-            stage=stage,
-            log_path=self._trace_log_path,
-            chat_id=chat_id,
-            user_id=user_id,
-            task_ref=task_ref,
-            task_id=task_id,
-            task_hash=task_hash,
-            detail=detail,
-        )
-
     async def import_by_task_ref(
         self,
         task_ref: str,
@@ -239,59 +214,15 @@ class ImportToLibraryService:
         if prepared_import is None:
             return error_text
 
-        import_source = prepared_import.import_source
-        expected_lease_version = self._record_pending_approval(
+        return self._pending_write_through_state.persist_pending_import(
             task_ref=cleaned_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-        )
-        if expected_lease_version <= 0:
-            return IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
-        if not self._record_pending_job(
+            import_source=prepared_import.import_source,
             chat_id=chat_id,
             user_id=user_id,
-            task_ref=cleaned_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            payload_json="",
-        ):
-            if self._approval_repo is not None:
-                try:
-                    self._approval_repo.cancel_import(
-                        task_id=import_source.task_id,
-                        task_hash=import_source.task_hash,
-                        task_ref=cleaned_ref,
-                        expected_lease_version=expected_lease_version,
-                    )
-                except Exception as error:
-                    print(
-                        f"\033[31m[导入取消审批更新失败]\033[0m task_ref={cleaned_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前导入待确认创建会直接失败返回，但审批真相可能仍残留。",
-                        flush=True,
-                    )
-            return IMPORT_PENDING_STATE_UNAVAILABLE_TEXT
-        self._record_event(
-            task_ref=cleaned_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            event_type="import.approval_pending",
-            message=cleaned_ref,
-        )
-        self._log_trace(
-            event="approval_pending",
-            result="created",
-            stage="pending",
-            chat_id=chat_id,
-            user_id=user_id,
-            task_ref=cleaned_ref,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            detail=import_source.name,
-        )
-        return IMPORT_APPROVAL_PENDING_TEXT.format(
-            name=import_source.name,
-            task_id=import_source.task_id,
-            task_hash=import_source.task_hash,
-            task_ref=cleaned_ref,
+            record_pending_approval=self._record_pending_approval,
+            record_pending_job=self._record_pending_job,
+            record_event=self._record_event,
+            log_trace=self._trace_logger.log,
         )
 
     async def confirm_import_by_task_ref(
@@ -356,7 +287,7 @@ class ImportToLibraryService:
                 lease_owner=preparation.lease_owner,
                 confirm_context=preparation.confirm_context,
             ),
-            log_trace=self._log_trace,
+            log_trace=self._trace_logger.log,
             restore_pending_approval=self._restore_pending_approval,
             restore_pending_job=self._restore_pending_job,
             record_executed_lease_version=self._record_executed_lease_version,
