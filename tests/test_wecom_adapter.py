@@ -727,14 +727,7 @@ def test_handle_wecom_callback_http_request_routes_cleanup_protocol_in_chinese_a
 
 def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
     async def exercise() -> tuple[str, str]:
-        try:
-            runtime = start_wecom_webhook_server(
-                loop=asyncio.get_running_loop(),
-                config=WeComWebhookServerConfig(host="127.0.0.1", port=0, path="/wecom/webhook"),
-                bot_data=_build_bot_data(),
-            )
-        except PermissionError as error:
-            pytest.skip(f"当前环境禁止本地端口监听：{error}")
+        runtime = await _start_wecom_runtime_with_retry()
         try:
             echostr = _encrypt_wecom_plaintext("verify-challenge")
             verification_text = await asyncio.to_thread(
@@ -761,6 +754,22 @@ def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
     assert "搜索：dune ✓" in reply_xml
     assert "- 开始下载：发送 select 1" in reply_xml
     assert "title-dune" in reply_xml
+
+
+async def _start_wecom_runtime_with_retry(max_attempts: int = 3):
+    last_error: PermissionError | None = None
+    for attempt in range(max_attempts):
+        try:
+            return start_wecom_webhook_server(
+                loop=asyncio.get_running_loop(),
+                config=WeComWebhookServerConfig(host="127.0.0.1", port=0, path="/wecom/webhook"),
+                bot_data=_build_bot_data(),
+            )
+        except PermissionError as error:
+            last_error = error
+            if attempt + 1 < max_attempts:
+                await asyncio.sleep(0.1)
+    pytest.skip(f"当前环境禁止本地端口监听：{last_error}")
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:

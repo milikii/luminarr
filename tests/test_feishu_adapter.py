@@ -790,15 +790,7 @@ def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> No
     reply_text_func = AsyncMock()
 
     async def exercise() -> tuple[int, dict[str, object]]:
-        try:
-            runtime = start_feishu_webhook_server(
-                loop=asyncio.get_running_loop(),
-                config=FeishuWebhookServerConfig(host="127.0.0.1", port=0, path="/feishu/webhook"),
-                bot_data=_build_bot_data(),
-                reply_text_func=reply_text_func,
-            )
-        except PermissionError as error:
-            pytest.skip(f"当前环境禁止本地端口监听：{error}")
+        runtime = await _start_feishu_runtime_with_retry(reply_text_func=reply_text_func)
         try:
             payload = _build_feishu_private_text_payload("dune")
             body = json.dumps(payload, ensure_ascii=False)
@@ -817,6 +809,23 @@ def test_feishu_webhook_server_routes_real_http_post_into_shared_runtime() -> No
     assert status_code == 200
     assert payload == {"code": 0}
     reply_text_func.assert_awaited_once()
+
+
+async def _start_feishu_runtime_with_retry(*, reply_text_func: AsyncMock, max_attempts: int = 3):
+    last_error: PermissionError | None = None
+    for attempt in range(max_attempts):
+        try:
+            return start_feishu_webhook_server(
+                loop=asyncio.get_running_loop(),
+                config=FeishuWebhookServerConfig(host="127.0.0.1", port=0, path="/feishu/webhook"),
+                bot_data=_build_bot_data(),
+                reply_text_func=reply_text_func,
+            )
+        except PermissionError as error:
+            last_error = error
+            if attempt + 1 < max_attempts:
+                await asyncio.sleep(0.1)
+    pytest.skip(f"当前环境禁止本地端口监听：{last_error}")
 
 
 def _make_database(tmp_path: Path) -> SqliteDatabase:

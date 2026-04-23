@@ -74,8 +74,11 @@ def test_makefile_help_lists_quality_targets() -> None:
     makefile_text = Path("Makefile").read_text(encoding="utf-8")
 
     assert "quality" in makefile_text
+    assert "test-downloader-focused" in makefile_text
+    assert "test-import-focused" in makefile_text
+    assert "verify-quality-gates" in makefile_text
     assert "verify-mainline" in makefile_text
-    assert "targets: install test quality verify-mainline" in makefile_text
+    assert "targets: install test quality test-downloader-focused test-import-focused verify-quality-gates verify-mainline" in makefile_text
 
 
 def test_makefile_quality_target_keeps_fast_repo_guards_in_one_place() -> None:
@@ -84,6 +87,27 @@ def test_makefile_quality_target_keeps_fast_repo_guards_in_one_place() -> None:
 
     assert commands[0] == "$(MAKE) compile"
     assert commands[1] == "$(PYTHON) -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py"
+
+
+def test_makefile_quality_gate_targets_point_to_current_focused_regressions() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+
+    downloader_commands = _extract_makefile_target_commands(makefile_text, "test-downloader-focused")
+    assert downloader_commands == [
+        "$(PYTHON) -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py"
+    ]
+
+    import_commands = _extract_makefile_target_commands(makefile_text, "test-import-focused")
+    assert import_commands == [
+        "$(PYTHON) -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k \"import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending\""
+    ]
+
+    verify_commands = _extract_makefile_target_commands(makefile_text, "verify-quality-gates")
+    assert verify_commands == [
+        "$(MAKE) test",
+        "$(MAKE) test-downloader-focused",
+        "$(MAKE) test-import-focused",
+    ]
 
 
 def test_makefile_verify_mainline_target_points_to_current_focused_regressions() -> None:
