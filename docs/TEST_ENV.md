@@ -51,7 +51,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 - 当前 qB 测试栈为避免 WebUI `Host header` 端口不匹配，必须保持 `WEBUI_PORT=18098` 和 `18098:18098` 同步；不要回退成 `18098:8080`
 - qB 容器会在 `docker/test/qbittorrent/qBittorrent` 下生成 GeoDB / logs / RSS / lockfile / `qBittorrent-data.conf` 等运行态文件；这些文件不属于固定配置，不应提交到 Git
 - 当前 compose 文件在仓库里，Transmission / Emby 的实际容器配置和状态仍主要落在 `/home/alex/luminarr-test`
-- 截至 `2026-04-23` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`；`19092` 端口监听仍在，但 `curl -si http://127.0.0.1:19092/transmission/rpc` 本轮连续两次退出码 `7`
+- 截至 `2026-04-24` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`；`19092` 端口监听仍在，但 `curl -si http://127.0.0.1:19092/transmission/rpc` 本轮连续两次退出码 `7`
 
 ---
 
@@ -128,7 +128,7 @@ curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName" && echo
 |---|---|
 | WSL 访问地址 | `http://127.0.0.1:18098` |
 | Web API 基础路径 | `/api/v2` |
-| 登录方式 | 当前 `2026-04-23` 用户提供的本机 probe 已确认 `/api/v2/torrents/info` 返回 `200 OK`；本地协议验证可留空用户名密码 |
+| 登录方式 | 当前 `2026-04-24` 本机 probe 已确认 `/api/v2/torrents/info` 返回 `200 OK`；本地协议验证可留空用户名密码 |
 | 下载目录（宿主机） | `/data/downloads/qb` |
 | 下载目录（容器内） | `/data/downloads/qb` |
 | incomplete 目录（宿主机） | `/data/downloads/incomplete-qb` |
@@ -168,6 +168,8 @@ stat -c "%d %n" /data/downloads/tr /data/downloads/tr-bt /data/downloads/qb /dat
 ```
 
 这些路径的设备号相同，才表示 PT / BT Transmission 与 qBittorrent 到媒体库都满足硬链接前提。
+
+当前 `2026-04-24` 本机 probe 中，上述四条路径设备号都为 `2096`。
 
 ---
 
@@ -213,7 +215,7 @@ SQLITE_DB_PATH=/home/alex/projects/luminarr/data/luminarr.db
 - 当前代码读取的是 `TRANSMISSION_USERNAME` / `TRANSMISSION_PASSWORD`，不是 `TRANSMISSION_USER` / `TRANSMISSION_PASS`
 - 如果你准备直接用 `set -a && . ./.env && set +a` 导入环境，`DOWNLOADER_INSTANCES` 这种带 `;` 的值要整个包进引号；否则 shell 会把后半段当成新命令执行
 - 如果你要验证 PT / BT 双 Transmission 分流，当前代码要靠 `DOWNLOADER_INSTANCES + PT_DOWNLOADER + BT_DOWNLOADER` 明确绑定；只填 `TRANSMISSION_BASE_URL` 时，两条链都会落回默认 Transmission
-- 如果你要验证 qBittorrent 协议，当前测试栈的 `qb-smoke` 实例可以直接写进 `DOWNLOADER_INSTANCES`；截至 `2026-04-23` 用户提供的本机 probe，`18098/api/v2/torrents/info` 已返回 `200 OK`
+- 如果你要验证 qBittorrent 协议，当前测试栈的 `qb-smoke` 实例可以直接写进 `DOWNLOADER_INSTANCES`；截至 `2026-04-24` 本机 probe，`18098/api/v2/torrents/info` 已返回 `200 OK`
 - 当前代码读取的是 `LIBRARY_TARGET_DIR`，不是 `LIBRARY_MOVIES_PATH`
 - 当前测试栈 Transmission 关闭了 RPC 认证，所以用户名和密码可留空
 

@@ -1,4 +1,4 @@
-# Current status (v443)
+# Current status (v444)
 
 ## Current mainline
 
@@ -20,16 +20,17 @@
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
   - `status -> import -> confirm -> refresh` 已在真实 PT Transmission / Emby 上跑通。
-- 当前环境真相：
+- 当前环境真相（`2026-04-24` 本机 probe）：
   - `19091` PT Transmission RPC 与 `18096` Emby API 当前可达；`18098/api/v2/torrents/info` 当前返回 `200 OK`。
   - `19092` BT Transmission 当前 `ss -ltnp` 仍能看到监听，但本轮 `curl -si http://127.0.0.1:19092/transmission/rpc` 连续两次退出码 `7`；不要把它写成“当前已复验 RPC 可达”。
+  - `/data/downloads/tr`、`/data/downloads/tr-bt`、`/data/downloads/qb` 与 `/data/library/movies` 当前 `stat -c "%d %n"` 设备号都为 `2096`；硬链接前提仍满足。
 
 ## Latest verification
 
 - `make quality`：通过；docs/tests 阶段 `27 passed`
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
-- `make test`：`1748 passed, 2 skipped`
+- `make test`：`1761 passed, 2 skipped`
 - 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `127 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `137 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
@@ -39,13 +40,10 @@
   - `curl -s http://127.0.0.1:18096/System/Info/Public` 返回 `ServerName`
   - `curl -si http://127.0.0.1:18098/api/v2/torrents/info` 返回 `200 OK`
   - `curl -si http://127.0.0.1:19092/transmission/rpc` 连续两次退出码 `7`；但 `ss -ltnp | rg ":19091|:19092|:18096|:18098"` 仍显示 `19092` 在监听
-- 真实 smoke 重验：
-  - `tmp_tests/verify_release_live_smoke.py` 已验证 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> 临时 SQLite 真相落盘`
-  - `tmp_tests/verify_release_status_real_smoke.py` 已验证 `task_ref=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status -> 临时 SQLite download_monitor 落盘`
-  - `tmp_tests/verify_release_import_confirm_real_smoke.py` 已验证 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import -> confirm -> import.succeeded -> 独立 smoke 目录硬链接落盘`
-  - `tmp_tests/verify_release_import_refresh_real_smoke.py` 已验证 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import -> confirm -> refresh.succeeded -> 独立 smoke 目录硬链接落盘`
-- 已保存的首版实证：
-  - 前半段真实任务：`task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de`
+- 已保存的真实 smoke 证据：
+  - 当前仓库未保留 `tmp_tests/verify_release_*.py` 源脚本；不要把已清理的临时脚本路径继续写成现成验证入口。
+  - 前半段真实任务：`task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de`；已保存证据显示可再次进入 `status -> 临时 SQLite download_monitor 落盘`。
+  - 后半段真实任务：`task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e`；已保存证据显示可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
   - 后半段真实目标：`/data/library/movies/抓住它 Catch It (2015)/Catch.It.2015.1080p.WEB-DL.H264.AAC-PTerWEB.mp4`
   - metadata 现象：`Catch It 2015` 仍会命中 `TMDB 未命中 title=抓住它, year=2015`，但不回滚 `import.succeeded` 或 `refresh.succeeded`
 
