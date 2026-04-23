@@ -1,24 +1,22 @@
-# Next step (v336)
+# Next step (v337)
 
 ## Current goal
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**续作 / 章节别名对齐 · 第 4 轮**。
-- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `127 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `137 passed`。
+- 当前刚完成的一条最小闭环是：**标题噪音抑制 · 第 1 轮**。
+- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `132 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `142 passed`。
 - 当前这一轮已经补齐：
-  - `Part Two / II / 第二部` 这类续作别名现在会在 TMDB 置信匹配里更稳定对齐，不再轻易把 sequel 误当成基片或邻近片名
-  - `Mission Impossible 7 2023` 这类“英文标题 + 空格数字续作”现在不会再把空格数字吞成 `Impossible7`
-  - `沙丘第二部 2024`、`Dune II 2024`、`沙丘 2（2024）` 这几类 query 现在都能更稳定落到同一部 sequel
-  - `Dune Part 2 2024`、`John Wick IV 2023` 这类“数字 part / roman chapter”别名现在也能稳定对齐 `Part Two` / `Chapter 4`
-  - `John Wick Chapter Four 2023` 这类“章节词 + 英文数字词”现在也能稳定对齐 `Chapter 4`
-  - `Fast Ten 2023` 这类“标题尾部英文数字词”现在也能稳定对齐 `Fast X`
+  - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
+  - `Dune Part 2 Extended 2024` 这类“part 数字 + 版本噪音词 + 年份”输入现在不会再把 `2` 吞掉，query 解析会继续保住 sequel token
+  - `Mission Impossible 7 IMAX 2023` 这类“空格数字续作 + IMAX + 年份”输入现在不会再把尾部数字吞回基片标题
+  - `Fast X Special Edition 2023` 这类“尾部 sequel token + 版本噪音词 + 年份”输入现在会先剥掉 `Special Edition`，再稳定保住 `Fast X`
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `468` 行，`app/bot/telegram_bot.py` 当前 `256` 行，不回退。
 - 当前剩余空间仍是“继续打磨命中偏好”，不是“主协议还没通”；movie-first 主链、发布矩阵和质量入口继续保持完成态。
 
 ## User value
 
-- 用户现在输入续作别名时，更不容易被错误 query 拖到基片、邻近片或丢掉 sequel token。
+- 用户现在输入带 `Extended / IMAX / Special Edition` 这类版本噪音词的片名时，更不容易因为尾部脏词把真正的 sequel/chapter token 吞掉。
 - 当前这条主线的价值也更直接：不改协议、不扩能力，只提高“搜索第一屏更像用户真正要的片”这件事。
 - 后续若继续，仍然优先做这类 query 命中质量与排序偏好，不回头重开发布准备或结构瘦身。
 

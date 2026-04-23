@@ -35,6 +35,17 @@ _TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE = re.compile(
     r"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>(?:\d{1,2}|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部))(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{2})(?:\s*[\])])?$",
     re.IGNORECASE,
 )
+_SEQUEL_VALUE_PATTERN = r"(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部)"
+_SEQUEL_PHRASE_PATTERN = rf"(?:(?:part|chapter)\s+{_SEQUEL_VALUE_PATTERN}|{_SEQUEL_VALUE_PATTERN})"
+_TRAILING_QUERY_NOISE_PATTERN = r"(?:imax|extended(?:\s+edition)?|special\s+edition)"
+_TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE = re.compile(
+    rf"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>{_SEQUEL_PHRASE_PATTERN})(?:\s+(?P<noise>{_TRAILING_QUERY_NOISE_PATTERN}(?:\s+{_TRAILING_QUERY_NOISE_PATTERN})*))?(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{{2}})(?:\s*[\])])?$",
+    re.IGNORECASE,
+)
+_TRAILING_QUERY_NOISE_RE = re.compile(
+    rf"(?:\s+(?:{_TRAILING_QUERY_NOISE_PATTERN}))+$",
+    re.IGNORECASE,
+)
 def normalize_spaces(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value)
     return re.sub(r"\s+", " ", normalized.strip())
@@ -53,6 +64,7 @@ def parse_movie_query(query: str) -> ParsedMovieQuery:
         parsed_title=title,
         parsed_year=year,
     )
+    title = _strip_trailing_query_noise(title)
     return ParsedMovieQuery(title=title, year=year)
 
 
@@ -88,6 +100,13 @@ def _restore_trailing_sequel_token_title(
         parsed_title=parsed_title,
         parsed_year=parsed_year,
     )
+    restored_noise_title = _restore_trailing_sequel_token_with_noise_title(
+        cleaned_query=cleaned_query,
+        parsed_title=restored_digit_title,
+        parsed_year=parsed_year,
+    )
+    if restored_noise_title != restored_digit_title:
+        return restored_noise_title
     match = _TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE.match(cleaned_query)
     if match is None:
         return restored_digit_title
@@ -107,6 +126,37 @@ def _restore_trailing_sequel_token_title(
     if separator and parsed_compact == candidate_compact:
         return candidate_title
     return restored_digit_title
+
+
+def _restore_trailing_sequel_token_with_noise_title(
+    *,
+    cleaned_query: str,
+    parsed_title: str,
+    parsed_year: str,
+) -> str:
+    match = _TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE.match(cleaned_query)
+    if match is None:
+        return parsed_title
+    if (match.group("year") or "").strip() != parsed_year:
+        return parsed_title
+    base_title = normalize_spaces(match.group("title") or "")
+    sequel = normalize_spaces(match.group("sequel") or "")
+    if not base_title or not sequel:
+        return parsed_title
+    separator = _resolve_query_separator(match, base_title=base_title, sequel=sequel)
+    return f"{base_title}{separator}{sequel}".strip()
+
+
+def _strip_trailing_query_noise(value: str) -> str:
+    cleaned_value = normalize_spaces(value)
+    if not cleaned_value:
+        return cleaned_value
+    stripped_value = cleaned_value
+    while True:
+        next_value = normalize_spaces(_TRAILING_QUERY_NOISE_RE.sub("", stripped_value))
+        if next_value == stripped_value:
+            return stripped_value
+        stripped_value = next_value
 
 
 async def build_search_request_context(

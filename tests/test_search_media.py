@@ -3098,6 +3098,35 @@ def test_search_and_format_treats_chapter_word_alias_as_confident_tmdb_match() -
     assert "John Wick: Chapter 4 2023 2160p BluRay" in text
 
 
+def test_search_and_format_strips_trailing_noise_after_chapter_digit_alias() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "John Wick: Chapter 4 2023":
+            return [
+                {
+                    "title": "John Wick: Chapter 4 2023 2160p BluRay",
+                    "year": 2023,
+                    "size": 12 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerJW",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "John Wick Chapter 4"
+        assert year == "2023"
+        return TmdbMovie(title="John Wick: Chapter 4", original_title="John Wick: Chapter 4", year="2023")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("John Wick Chapter 4 Extended 2023"))
+
+    assert seen_queries == ["John Wick: Chapter 4 2023"]
+    assert "片名: John Wick: Chapter 4" in text
+    assert "John Wick: Chapter 4 2023 2160p BluRay" in text
+
+
 def test_search_and_format_treats_trailing_word_number_alias_as_confident_tmdb_match() -> None:
     seen_queries: list[str] = []
 
@@ -3270,6 +3299,30 @@ def test_parse_movie_query_keeps_part_digit_alias_before_year() -> None:
     parsed = parse_movie_query("Dune Part 2 2024")
     assert parsed.title == "Dune Part 2"
     assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_chapter_digit_before_trailing_noise_and_year() -> None:
+    parsed = parse_movie_query("John Wick Chapter 4 Extended 2023")
+    assert parsed.title == "John Wick Chapter 4"
+    assert parsed.year == "2023"
+
+
+def test_parse_movie_query_keeps_part_digit_before_trailing_noise_and_year() -> None:
+    parsed = parse_movie_query("Dune Part 2 Extended 2024")
+    assert parsed.title == "Dune Part 2"
+    assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_spaced_digit_title_before_trailing_noise_and_year() -> None:
+    parsed = parse_movie_query("Mission Impossible 7 IMAX 2023")
+    assert parsed.title == "Mission Impossible 7"
+    assert parsed.year == "2023"
+
+
+def test_parse_movie_query_strips_trailing_noise_from_roman_numeral_title() -> None:
+    parsed = parse_movie_query("Fast X Special Edition 2023")
+    assert parsed.title == "Fast X"
+    assert parsed.year == "2023"
 
 
 def test_parse_movie_query_keeps_title_when_no_year() -> None:
