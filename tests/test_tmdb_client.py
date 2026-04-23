@@ -192,6 +192,39 @@ def test_search_movie_prefers_chapter_word_alias_match_over_base_title() -> None
     assert result.tmdb_id == "2"
 
 
+def test_search_movie_prefers_trailing_word_number_alias_match_over_base_title() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Fast Ten"
+        assert params["year"] == "2023"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "Fast Five",
+                        "original_title": "Fast Five",
+                        "release_date": "2023-01-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Fast X",
+                        "original_title": "Fast X",
+                        "release_date": "2023-05-19",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Fast Ten", "2023"))
+
+    assert result is not None
+    assert result.title == "Fast X"
+    assert result.tmdb_id == "2"
+
+
 def test_search_movie_without_valid_result_returns_none() -> None:
     client = TmdbClient(api_key="tmdb-key")
 

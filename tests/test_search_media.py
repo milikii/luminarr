@@ -3098,6 +3098,35 @@ def test_search_and_format_treats_chapter_word_alias_as_confident_tmdb_match() -
     assert "John Wick: Chapter 4 2023 2160p BluRay" in text
 
 
+def test_search_and_format_treats_trailing_word_number_alias_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Fast X 2023":
+            return [
+                {
+                    "title": "Fast X 2023 2160p BluRay",
+                    "year": 2023,
+                    "size": 15 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerFX",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Fast Ten"
+        assert year == "2023"
+        return TmdbMovie(title="Fast X", original_title="Fast X", year="2023")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Fast Ten 2023"))
+
+    assert seen_queries == ["Fast X 2023"]
+    assert "片名: Fast X" in text
+    assert "Fast X 2023 2160p BluRay" in text
+
+
 def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     seen_queries: list[str] = []
 

@@ -31,6 +31,7 @@ _CHAPTER_TOKEN_PATTERN = re.compile(
     r"\bchapter\s+(?P<value>(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x))\b",
     re.IGNORECASE,
 )
+_TRAILING_ORDINAL_WORD_PATTERN = re.compile(r"\b(?P<value>(?:one|two|three|four|five|six|seven|eight|nine|ten))\b$", re.IGNORECASE)
 _CHINESE_PART_PATTERN = re.compile(r"第\s*(?P<value>[一二三四五六七八九十两\d]+)\s*部", re.IGNORECASE)
 _CHINESE_NUMERAL_MAP = {
     "一": 1,
@@ -68,6 +69,7 @@ def _normalize_sequel_aliases(value: str) -> str:
     normalized = _CHAPTER_TOKEN_PATTERN.sub(lambda match: str(_parse_ordinal_token(match.group("value"))), normalized)
     for pattern, replacement in _SEQUEL_ALIAS_PATTERNS:
         normalized = pattern.sub(replacement, normalized)
+    normalized = _TRAILING_ORDINAL_WORD_PATTERN.sub(lambda match: str(_parse_ordinal_token(match.group("value"))), normalized)
     return normalized
 
 
