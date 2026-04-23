@@ -115,15 +115,15 @@ Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
 
 ## 8. Current priority
 
-刚完成的 promoted 阶段是 **质量硬化 / services 层数据结构降本**：三座大山已经全部压到 `≤ 600` 行，`make quality` / `make verify-mainline` / `make verify-quality-gates` 与全量 `pytest` 现已复验绿灯。当前仓库已不再停留在“继续瘦身大文件”阶段，而是进入新的 **收尾发布准备** 阶段。
+**质量硬化** 与 **保守版收尾发布准备** 已完成：三座大山保持 `≤ 600` 行，`make quality` / `make verify-mainline` / `make verify-quality-gates` 与全量 `pytest` 当前都已复验绿灯。默认分支若继续推进，当前唯一主线就是 **搜索相关性优化**，不再把发布准备当作默认施工方向。
 
-当前更小也更有用户价值的下一步，是先完成 **发布真相对齐 / 发布矩阵冻结 · 第 1 轮**：
+当前更小也更有用户价值的下一步，是继续在现有 movie-first 搜索链里做最小闭环的确定性相关性优化，例如：
 
-- 把 `docs/STATUS.md`、`docs/NEXT_STEP.md`、operator prompt 与当前真实复验结论对齐；
-- 明确区分“代码已实现能力”和“首版发布承诺矩阵”；
-- 把当前机器上 `19091/18096` 可达、`19092/18098` 当前不可达这类环境真相写清，而不是继续沿用旧的业务黄灯描述。
+- query 解析与标题归一
+- TMDB 候选选择与置信判断
+- 既有 BT 排序器在 movie-first 搜索里的排序偏好
 
-当前主线入口继续看 `docs/NEXT_STEP.md` 与 `docs/STATUS.md`；当前阶段蓝图继续看 `docs/RELEASE_PREP_PLAN.md`；当前阶段长提示词入口继续看 `docs/RELEASE_PREP_PROMPTS.md`。已完成闭环入口继续看 `docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md` 与 `docs/PERSISTENCE_CLOSURE_LOG.md`。
+当前主线入口继续看 `docs/NEXT_STEP.md` 与 `docs/STATUS.md`。只有当文档真相、发布矩阵、真实 smoke 或质量入口再次漂移时，才临时回到 **收尾发布准备**，并按 `docs/OPERATOR_RUNBOOK.md` 与 `docs/RELEASE_PREP_PROMPTS.md` 的对应模板执行。已完成闭环入口继续看 `docs/RELEASE_PREP_PLAN.md`、`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md` 与 `docs/PERSISTENCE_CLOSURE_LOG.md`。
 
 **诊断分流递减自检**：若本轮候选闭环的代码变更 < 20 行、只是对同一个 repo 方法再拆一条 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，则视为收益递减；本轮完成并提交后**直接停止**，把"当前主线可宣告完成"汇报给用户，不要自动进入下一轮再拆一条分流。
 
