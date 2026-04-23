@@ -1,0 +1,7 @@
+GeoDB/
+logs/
+rss/
+categories.json
+lockfile
+qBittorrent-data.conf
+watched_folders.json

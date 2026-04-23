@@ -13,7 +13,7 @@ from app.services.status_delivery import (
     render_status_reply,
 )
 from app.services.status_follow_up import (
-    STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT,
+    STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT as _STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT,
     StatusFollowUpRecorder,
 )
 
@@ -22,6 +22,7 @@ GetStatusFunc = Callable[..., Awaitable[TransmissionTaskStatus | None]]
 STATUS_QUERY_USAGE_TEXT = "状态查询格式：status <任务ID或Hash>"
 STATUS_NOT_FOUND_TEXT = "未找到对应下载任务，请检查任务 ID/Hash。"
 STATUS_QUERY_FAILED_TEXT = "查询下载状态失败，请稍后重试。"
+STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT = _STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT
 class GetDownloadStatusService:
     def __init__(
         self,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -26,8 +27,14 @@ class SearchRequestContext:
     raw_results: Sequence[Mapping[str, Any]]
 
 
+_TRAILING_SEQUEL_DIGIT_WITH_YEAR_RE = re.compile(
+    r"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>\d{1,2})(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{2})(?:\s*[\])])?$"
+)
+
+
 def normalize_spaces(value: str) -> str:
-    return re.sub(r"\s+", " ", value.strip())
+    normalized = unicodedata.normalize("NFKC", value)
+    return re.sub(r"\s+", " ", normalized.strip())
 
 
 def parse_movie_query(query: str) -> ParsedMovieQuery:
@@ -38,7 +45,29 @@ def parse_movie_query(query: str) -> ParsedMovieQuery:
     parsed_name = parse_media_name(cleaned_query)
     title = normalize_spaces(parsed_name.title or cleaned_query)
     year = str(parsed_name.year) if parsed_name.year is not None else ""
+    title = _restore_sequel_digit_title(cleaned_query=cleaned_query, parsed_title=title, parsed_year=year)
     return ParsedMovieQuery(title=title, year=year)
+
+
+def _restore_sequel_digit_title(
+    *,
+    cleaned_query: str,
+    parsed_title: str,
+    parsed_year: str,
+) -> str:
+    if not parsed_title or not parsed_year:
+        return parsed_title
+    match = _TRAILING_SEQUEL_DIGIT_WITH_YEAR_RE.match(cleaned_query)
+    if match is None:
+        return parsed_title
+    if (match.group("year") or "").strip() != parsed_year:
+        return parsed_title
+    base_title = normalize_spaces(match.group("title") or "")
+    if base_title != parsed_title:
+        return parsed_title
+    separator = " " if (match.group("separator") or "").strip() else ""
+    sequel = (match.group("sequel") or "").strip()
+    return f"{parsed_title}{separator}{sequel}".strip()
 
 
 async def build_search_request_context(
@@ -59,7 +88,12 @@ async def build_search_request_context(
                 flush=True,
             )
 
-    ordered_queries = _resolve_ordered_queries(parsed_query=parsed_query, tmdb_movie=tmdb_movie)
+    tmdb_confident = _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=tmdb_movie)
+    ordered_queries = _resolve_ordered_queries(
+        parsed_query=parsed_query,
+        tmdb_movie=tmdb_movie,
+        prefer_tmdb=tmdb_confident,
+    )
     resolved_query, raw_results = await _search_candidates_with_logging(
         search_func=search_func,
         ordered_queries=ordered_queries,
@@ -67,7 +101,7 @@ async def build_search_request_context(
     )
     return SearchRequestContext(
         parsed_query=parsed_query,
-        tmdb_movie=tmdb_movie,
+        tmdb_movie=tmdb_movie if tmdb_confident else None,
         resolved_query=resolved_query,
         raw_results=raw_results,
     )
@@ -77,18 +111,39 @@ def _resolve_ordered_queries(
     *,
     parsed_query: ParsedMovieQuery,
     tmdb_movie: TmdbMovie | None,
+    prefer_tmdb: bool,
 ) -> tuple[str, ...]:
     fallback_query = _build_query(parsed_query.title, parsed_query.year)
+    fallback_title_only_query = _build_query(parsed_query.title, "")
     if tmdb_movie is None:
-        return (fallback_query,)
+        return tuple(_unique_queries([fallback_query, fallback_title_only_query]))
 
     resolved_year = tmdb_movie.year or parsed_query.year
+    english_query = _build_query(tmdb_movie.title, resolved_year)
+    original_query = _build_query(tmdb_movie.original_title, resolved_year)
+    english_title_only_query = _build_query(tmdb_movie.title, "")
+    original_title_only_query = _build_query(tmdb_movie.original_title, "")
     return tuple(
         _unique_queries(
-            [
-                _build_query(tmdb_movie.title, resolved_year),
-                _build_query(tmdb_movie.original_title, resolved_year),
-            ]
+            (
+                [
+                    english_query,
+                    original_query,
+                    fallback_query,
+                    english_title_only_query,
+                    original_title_only_query,
+                    fallback_title_only_query,
+                ]
+                if prefer_tmdb
+                else [
+                    fallback_query,
+                    english_query,
+                    original_query,
+                    fallback_title_only_query,
+                    english_title_only_query,
+                    original_title_only_query,
+                ]
+            )
         )
     ) or (fallback_query,)
 
@@ -139,3 +194,34 @@ def _unique_queries(candidates: Sequence[str]) -> list[str]:
             continue
         ordered_queries.append(cleaned_query)
     return ordered_queries
+
+
+def _is_tmdb_confident_match(
+    *,
+    parsed_query: ParsedMovieQuery,
+    tmdb_movie: TmdbMovie | None,
+) -> bool:
+    if tmdb_movie is None:
+        return False
+    normalized_query = _normalize_match_key(parsed_query.title)
+    if not normalized_query:
+        return False
+    compact_query = _compact_match_key(normalized_query)
+    normalized_title = _normalize_match_key(tmdb_movie.title)
+    normalized_original_title = _normalize_match_key(tmdb_movie.original_title)
+    normalized_candidates = {normalized_title, normalized_original_title}
+    compact_candidates = {_compact_match_key(candidate) for candidate in normalized_candidates if candidate}
+    return normalized_query in normalized_candidates or compact_query in compact_candidates
+
+
+def _normalize_match_key(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"[._:：\-]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
+
+
+def _compact_match_key(value: str) -> str:
+    return value.replace(" ", "")

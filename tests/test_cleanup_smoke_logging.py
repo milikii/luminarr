@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import app.bot.cleanup_smoke_logging as cleanup_smoke_logging
 from app.bot.cleanup_smoke_logging import (
     CleanupPrivateChatSmokeLogEntry,
     build_cleanup_private_chat_smoke_log_line,

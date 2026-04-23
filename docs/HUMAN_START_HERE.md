@@ -1,4 +1,4 @@
-# docs/HUMAN_START_HERE.md (v1)
+# docs/HUMAN_START_HERE.md (v3)
 
 > 目的：给**不会写代码**的人一个稳定入口，知道“先看哪里、下一句怎么发、结果去哪里看、失败先去哪里查”。
 
@@ -6,7 +6,8 @@
 
 - 它是一个自托管影视自动化项目，不是聊天机器人平台
 - 你发一句自然语言，它去做搜索、审批、下载、入库、刷新和状态查询
-- 当前正式入口是 Telegram / personal WeChat / Feishu / WeCom 四个私聊渠道
+- 代码里现在有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口
+- 但当前保守首版发布承诺只先冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
 - 当前最稳的是 movie-first 场景；更细的工程边界看 `docs/DECISIONS.md`
 
 ## 2. 你最常用的文档
@@ -27,6 +28,8 @@
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```
+
+如果你是要回头重开“发布口径 / 质量入口 / 真实 smoke”收口，再去 `docs/OPERATOR_RUNBOOK.md` 里复制“收尾发布准备”模板。
 
 ### 想知道项目现在稳不稳
 

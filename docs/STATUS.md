@@ -1,40 +1,58 @@
-# Current status (v414)
+# Current status (v439)
 
 ## Current mainline
 
-- **质量硬化** 阶段已按 `docs/DECISIONS.md` D-039 收工；当前阶段的 **services 层数据结构降本** 保持 Done 状态："三座大山各 `≤ 600` 行 + focused tests 不跌 + CI 绿灯"。
-- 最新闭环：`Makefile` 已新增 `test-downloader-focused`、`test-import-focused`、`verify-quality-gates`；当前批次已确认 Feishu / WeCom 本地 webhook smoke 的 `Operation not permitted` 属于当前环境边界，不再继续在这轮里用代码硬磨。
-- 当前主线：**`verify-quality-gates` 环境边界已确认，先停在“固定质量入口已落地 + 本地 webhook smoke 受当前环境限制”状态`**。
-- 三座大山现状：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
-- 默认分支全量回归：`.venv/bin/python -m pytest -q -rs` 单独复验为 `1725 passed, 4 warnings`。
+- **质量硬化** 已收工；当前主线仍是 **收尾发布准备**。
+- 保守版发布准备当前已可宣告完成；默认分支剩余项只剩搜索相关性优化或外部环境后置项。
+- 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
+- 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
 
 ## Current health
 
-- 仓库级 CI：`make quality` / `make verify-mainline` 绿灯；`make verify-quality-gates` 在当前环境下固定受本地 webhook 监听限制影响。
-- 固定质量入口：`Makefile` 已新增 `test-downloader-focused`、`test-import-focused`、`verify-quality-gates`，后续不必再手敲长 pytest 命令。
-- downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `116 passed`。
-- 导入链 focused：`48 passed, 100 deselected`；`tests/test_import_to_library.py` 为 `145 passed`。
-- 真实 import smoke：`19091 Transmission` 已复验 `approval_pending -> pending_approval job -> import.approval_pending`。
-- 当前没有新的业务红灯；剩余黄灯是当前环境对本地端口监听的限制，不是业务协议回归。
+- 仓库级质量入口保持可用：`make quality`、`make verify-mainline`、`make verify-quality-gates` 当前都可复验。
+- movie-first 搜索相关性本轮继续收口：TMDB 低置信命中不再抢主导权；BT fallback 排序已覆盖单条候选、少量噪音候选、续作数字与括号年份这几类真实输入。
+- sequel-digit 搜索解析现已同时覆盖半角与全角括号年份：`沙丘 2 (2024)` 与 `沙丘 2（2024）` 当前都会保住续作数字，不再回退成缺失 `2` 的搜索标题。
+- 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
+- 当前 live smoke 真相仍分两段：
+  - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
+  - `status -> import -> confirm -> refresh` 已在真实 PT Transmission / Emby 上跑通。
+- 当前环境真相：
+  - `19091` PT Transmission RPC 与 `18096` Emby API 当前可达；`18098/api/v2/torrents/info` 当前返回 `200 OK`。
+  - `19092` BT Transmission 当前 `ss -ltnp` 仍能看到监听，但本轮 `curl -si http://127.0.0.1:19092/transmission/rpc` 连续两次退出码 `7`；不要把它写成“当前已复验 RPC 可达”。
 
 ## Latest verification
 
-- `make quality`：`25 passed`。
-- `make verify-quality-gates`：当前环境下会卡在 Feishu / WeCom 本地 webhook smoke；当前可见真相仍是 `1723 passed, 2 skipped`，跳过前的固定错误为 `Operation not permitted`；其余 bulk full / downloader focused / import focused 仍可通过。
-- downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `116 passed`。
-- import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`。
-- import 全量：`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `145 passed`。
-- 真实 smoke：`19091 Transmission` + 临时 SQLite 复验导入申请待确认落盘链路。
-- 全量回归：`.venv/bin/python -m pytest -q -rs` 为 `1725 passed, 4 warnings`。
+- `make quality`：通过；docs/tests 阶段 `27 passed`
+- `make verify-mainline`：通过
+- `make verify-quality-gates`：通过
+- `make test`：`1748 passed, 2 skipped`
+- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `118 passed`
+- downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
+- import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
+- 当前本机探针：
+  - `curl -si http://127.0.0.1:19091/transmission/rpc` 返回 `409 + X-Transmission-Session-Id`
+  - `curl -s http://127.0.0.1:18096/System/Info/Public` 返回 `ServerName`
+  - `curl -si http://127.0.0.1:18098/api/v2/torrents/info` 返回 `200 OK`
+  - `curl -si http://127.0.0.1:19092/transmission/rpc` 连续两次退出码 `7`；但 `ss -ltnp | rg ":19091|:19092|:18096|:18098"` 仍显示 `19092` 在监听
+- 真实 smoke 重验：
+  - `tmp_tests/verify_release_live_smoke.py` 已验证 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> 临时 SQLite 真相落盘`
+  - `tmp_tests/verify_release_status_real_smoke.py` 已验证 `task_ref=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status -> 临时 SQLite download_monitor 落盘`
+  - `tmp_tests/verify_release_import_confirm_real_smoke.py` 已验证 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import -> confirm -> import.succeeded -> 独立 smoke 目录硬链接落盘`
+  - `tmp_tests/verify_release_import_refresh_real_smoke.py` 已验证 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import -> confirm -> refresh.succeeded -> 独立 smoke 目录硬链接落盘`
+- 已保存的首版实证：
+  - 前半段真实任务：`task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de`
+  - 后半段真实目标：`/data/library/movies/抓住它 Catch It (2015)/Catch.It.2015.1080p.WEB-DL.H264.AAC-PTerWEB.mp4`
+  - metadata 现象：`Catch It 2015` 仍会命中 `TMDB 未命中 title=抓住它, year=2015`，但不回滚 `import.succeeded` 或 `refresh.succeeded`
 
 ## Current biggest risk
 
-- `services` 三座大山已经全部过线；当前最大风险不再是文件行数，而是后续若没有新的 promoted 主线，容易回到 thin wrapper 搬家式施工。
-- `app/services/import_to_library.py` 与 `app/services/add_to_downloader.py` 都不应再为了数字回头硬拆；只有出现新的 focused gate、失败边界或高风险链路真相，才值得继续动。
-- 当前最大新增风险是 [tests/test_feishu_adapter.py](/home/alex/projects/luminarr/tests/test_feishu_adapter.py) / [tests/test_wecom_adapter.py](/home/alex/projects/luminarr/tests/test_wecom_adapter.py) 的本地 webhook 监听 smoke 在当前环境里会命中 `[Errno 1] Operation not permitted`；下一次继续应优先换到允许本地监听的环境后再复验，而不是继续在仓库内硬改。
+- 当前最大治理风险仍是文档漂移：不要再把“代码里已实现”写成“首版承诺”。
+- 当前机器环境真相要继续按当轮探针写，不要把 `19092` 的旧“可达”或更早的旧“不可达”结论直接抄回入口文档。
+- 当前最大发布前不确定性已收缩到搜索相关性偏好，而不是协议或环境主链失败。
+- 运行时编排层仍较依赖 `bot_data` 字符串 key 和跨模块常量约定；这比三座大山行数更值得警惕。
 
 ## Recommended Next Operator Command
 
 ```text
-按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的"默认 3 轮施工"执行。
+保守版发布准备已可宣告完成；如需继续，优先做搜索相关性优化，不必再把 19092 / 18098 当当前 blocker。
 ```

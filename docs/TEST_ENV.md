@@ -48,7 +48,10 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 - 四个容器都运行在 WSL 本机 Docker 中，通过宿主机端口映射给应用访问
 - 两个 Transmission 都按 LinuxServer 官方约定分别挂载 `/downloads/complete`、`/downloads/incomplete` 和 `/watch`；qBittorrent 与 Emby 分别按宿主机同路径挂载 `/data/downloads/qb`、`/data/downloads/incomplete-qb` 与 `/data/library:/data/library`
 - BT Transmission 会把 PT Transmission 已有的 `trguing-zh` 自定义 WebUI 只读挂进自己的 `/config/webui/trguing-zh`，所以两台 TR 的 WebUI 保持同一套界面资源，但运行状态仍各自独立
-- 当前 compose 文件在仓库里，实际容器配置和状态仍落在 `/home/alex/luminarr-test`
+- 当前 qB 测试栈为避免 WebUI `Host header` 端口不匹配，必须保持 `WEBUI_PORT=18098` 和 `18098:18098` 同步；不要回退成 `18098:8080`
+- qB 容器会在 `docker/test/qbittorrent/qBittorrent` 下生成 GeoDB / logs / RSS / lockfile / `qBittorrent-data.conf` 等运行态文件；这些文件不属于固定配置，不应提交到 Git
+- 当前 compose 文件在仓库里，Transmission / Emby 的实际容器配置和状态仍主要落在 `/home/alex/luminarr-test`
+- 截至 `2026-04-23` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`；`19092` 端口监听仍在，但 `curl -si http://127.0.0.1:19092/transmission/rpc` 本轮连续两次退出码 `7`
 
 ---
 
@@ -96,6 +99,9 @@ curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Sessi
 curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Session-Id" && echo "BT TR up" || echo "BT TR down"
 ```
 
+说明：
+- 当前 `19092` 不能直接沿用旧的“可达”或更早的“不可达”结论；每轮都要按当轮探针重写
+
 ---
 
 ## Emby（媒体服务器测试实例）
@@ -122,17 +128,24 @@ curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName" && echo
 |---|---|
 | WSL 访问地址 | `http://127.0.0.1:18098` |
 | Web API 基础路径 | `/api/v2` |
-| 登录方式 | 当前测试栈用本机来源白名单放开 WebUI，本地协议验证可留空用户名密码 |
+| 登录方式 | 当前 `2026-04-23` 用户提供的本机 probe 已确认 `/api/v2/torrents/info` 返回 `200 OK`；本地协议验证可留空用户名密码 |
 | 下载目录（宿主机） | `/data/downloads/qb` |
 | 下载目录（容器内） | `/data/downloads/qb` |
 | incomplete 目录（宿主机） | `/data/downloads/incomplete-qb` |
 | incomplete 目录（容器内） | `/data/downloads/incomplete-qb` |
 | 配置目录（宿主机） | `/home/alex/projects/luminarr/docker/test/qbittorrent` |
+| WebUI 端口约束 | `WEBUI_PORT=18098` 且 `ports: 18098:18098` |
 
 健康检查：
 
 ```bash
-curl -fsS http://127.0.0.1:18098/ >/dev/null && echo "qB up" || echo "qB down"
+curl -si http://127.0.0.1:18098/api/v2/torrents/info | grep -q "200 OK" && echo "qB up" || echo "qB down"
+```
+
+协议探针：
+
+```bash
+curl -si http://127.0.0.1:18098/api/v2/torrents/info
 ```
 
 ---
@@ -177,12 +190,12 @@ TRANSMISSION_USERNAME=
 TRANSMISSION_PASSWORD=
 
 # 可选：如果你要让 PT / BT 在本地测试栈里明确分流到两台 Transmission
-DOWNLOADER_INSTANCES=tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt
+DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt"
 PT_DOWNLOADER=tr-pt
 BT_DOWNLOADER=tr-bt
 
 # 可选：如果你要顺手验证 qBittorrent 协议
-DOWNLOADER_INSTANCES=tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt;qb-smoke|qbittorrent|http://127.0.0.1:18098|/data/downloads/qb
+DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt;qb-smoke|qbittorrent|http://127.0.0.1:18098|/data/downloads/qb"
 
 # Emby
 EMBY_BASE_URL=http://127.0.0.1:18096
@@ -198,8 +211,9 @@ SQLITE_DB_PATH=/home/alex/projects/luminarr/data/luminarr.db
 说明：
 - 当前代码读取的是 `TRANSMISSION_BASE_URL`，不是 `TRANSMISSION_HOST`
 - 当前代码读取的是 `TRANSMISSION_USERNAME` / `TRANSMISSION_PASSWORD`，不是 `TRANSMISSION_USER` / `TRANSMISSION_PASS`
+- 如果你准备直接用 `set -a && . ./.env && set +a` 导入环境，`DOWNLOADER_INSTANCES` 这种带 `;` 的值要整个包进引号；否则 shell 会把后半段当成新命令执行
 - 如果你要验证 PT / BT 双 Transmission 分流，当前代码要靠 `DOWNLOADER_INSTANCES + PT_DOWNLOADER + BT_DOWNLOADER` 明确绑定；只填 `TRANSMISSION_BASE_URL` 时，两条链都会落回默认 Transmission
-- 如果你要验证 qBittorrent 协议，当前测试栈的 `qb-smoke` 实例可以直接写进 `DOWNLOADER_INSTANCES`；因为测试栈靠来源白名单放开 WebUI，所以用户名和密码可留空
+- 如果你要验证 qBittorrent 协议，当前测试栈的 `qb-smoke` 实例可以直接写进 `DOWNLOADER_INSTANCES`；截至 `2026-04-23` 用户提供的本机 probe，`18098/api/v2/torrents/info` 已返回 `200 OK`
 - 当前代码读取的是 `LIBRARY_TARGET_DIR`，不是 `LIBRARY_MOVIES_PATH`
 - 当前测试栈 Transmission 关闭了 RPC 认证，所以用户名和密码可留空
 
@@ -209,6 +223,6 @@ SQLITE_DB_PATH=/home/alex/projects/luminarr/data/luminarr.db
 
 1. 执行涉及 `import_to_library` / `refresh_media_server` / `add_to_downloader` 的端到端验证前，必须先做健康检查。
 2. 如果健康检查失败，不要继续执行，先让用户启动测试栈。
-3. 后续联调默认把 `PT Transmission(http://127.0.0.1:19091)`、`BT Transmission(http://127.0.0.1:19092)`、`qBittorrent(http://127.0.0.1:18098)` 和 `Emby(http://127.0.0.1:18096)` 视为常驻依赖；正常情况下无需再次询问用户“它们在哪里”。
+3. 后续联调默认把 `PT Transmission(http://127.0.0.1:19091)`、`BT Transmission(http://127.0.0.1:19092)`、`qBittorrent(http://127.0.0.1:18098)` 和 `Emby(http://127.0.0.1:18096)` 视为固定地址；但每轮可达性仍要以当轮探针为准，不要直接沿用旧结论。
 4. 不要把测试栈真实凭据硬编码进仓库代码，始终从本地 config / `.env` 读取。
 5. 测试完成后，Transmission 中的测试任务和 Emby 中的测试媒体条目可以手动清理，不要求仓库代码自动清理。

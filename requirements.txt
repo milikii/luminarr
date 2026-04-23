@@ -3,5 +3,6 @@ httpx==0.28.1
 socksio==1.0.0
 Pillow==11.2.1
 pytest==8.4.0
+pyflakes==3.4.0
 cryptography==46.0.6
 wechat-clawbot==0.3.0

@@ -2510,6 +2510,158 @@ def test_search_and_format_orders_media_bt_candidates_with_shared_scorer(
     assert cached_first["downloadUrl"] == "https://example.com/dune-720p.torrent"
 
 
+def test_search_and_format_derives_english_fallback_query_for_movie_title_ranking() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "沙丘 2021"
+        return [
+            {
+                "title": "Dune: Part One 2021 2160p BluRay",
+                "year": 2021,
+                "size": 90 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune-part-one.torrent",
+                "indexerName": "IndexerA",
+            },
+            {
+                "title": "Dune 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 10 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune.torrent",
+                "indexerName": "IndexerB",
+            },
+        ]
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Devil in Dune", original_title="沙丘虫暴", year="2021")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2021", chat_id=1001))
+
+    assert "1. Dune 2021 1080p WEB-DL (2021)" in text
+    assert "2. Dune: Part One 2021 2160p BluRay (2021)" in text
+
+
+def test_search_and_format_derives_fallback_query_with_noisy_outlier_result() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "沙丘 2021"
+        return [
+            {
+                "title": "Random Movie 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 2 * 1024 * 1024 * 1024,
+                "seeders": 50,
+                "downloadUrl": "https://example.com/random.torrent",
+                "indexerName": "IndexerZ",
+            },
+            {
+                "title": "Dune 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 10 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune.torrent",
+                "indexerName": "IndexerB",
+            },
+            {
+                "title": "Dune: Part One 2021 2160p BluRay",
+                "year": 2021,
+                "size": 90 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune-part-one.torrent",
+                "indexerName": "IndexerA",
+            },
+        ]
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Devil in Dune", original_title="沙丘虫暴", year="2021")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2021", chat_id=1001))
+
+    assert "1. Dune 2021 1080p WEB-DL (2021)" in text
+    assert "2. Dune: Part One 2021 2160p BluRay (2021)" in text
+    assert "3. Random Movie 2021 1080p WEB-DL (2021)" in text
+
+
+def test_search_and_format_derives_fallback_query_from_single_related_result() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "沙丘 2021"
+        return [
+            {
+                "title": "Dune 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 10 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune.torrent",
+                "indexerName": "IndexerB",
+            }
+        ]
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Devil in Dune", original_title="沙丘虫暴", year="2021")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2021", chat_id=1001))
+
+    assert "1. Dune 2021 1080p WEB-DL (2021)" in text
+
+
+def test_search_and_format_derives_fallback_query_from_two_related_results_among_noise() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "沙丘 2021"
+        return [
+            {
+                "title": "Random Movie 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 2 * 1024 * 1024 * 1024,
+                "seeders": 50,
+                "downloadUrl": "https://example.com/random-a.torrent",
+                "indexerName": "IndexerZ",
+            },
+            {
+                "title": "Another Random Film 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 2 * 1024 * 1024 * 1024,
+                "seeders": 40,
+                "downloadUrl": "https://example.com/random-b.torrent",
+                "indexerName": "IndexerY",
+            },
+            {
+                "title": "Dune 2021 1080p WEB-DL",
+                "year": 2021,
+                "size": 10 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune.torrent",
+                "indexerName": "IndexerB",
+            },
+            {
+                "title": "Dune: Part One 2021 2160p BluRay",
+                "year": 2021,
+                "size": 90 * 1024 * 1024 * 1024,
+                "seeders": 5,
+                "downloadUrl": "https://example.com/dune-part-one.torrent",
+                "indexerName": "IndexerA",
+            },
+            {
+                "title": "Noise Title 2021 720p WEBRip",
+                "year": 2021,
+                "size": 1 * 1024 * 1024 * 1024,
+                "seeders": 80,
+                "downloadUrl": "https://example.com/random-c.torrent",
+                "indexerName": "IndexerX",
+            },
+        ]
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Devil in Dune", original_title="沙丘虫暴", year="2021")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2021", chat_id=1001))
+
+    assert "1. Dune 2021 1080p WEB-DL (2021)" in text
+    assert "2. Dune: Part One 2021 2160p BluRay (2021)" in text
+
+
 async def _fake_search_tmdb_hit(query: str) -> list[dict[str, object]]:
     assert query == "Interstellar 2014"
     return [
@@ -2525,7 +2677,7 @@ async def _fake_search_tmdb_hit(query: str) -> list[dict[str, object]]:
 async def _fake_lookup_tmdb_movie(title: str, year: str) -> TmdbMovie | None:
     assert title == "星际穿越"
     assert year == "2014"
-    return TmdbMovie(title="Interstellar", original_title="Interstellar", year="2014")
+    return TmdbMovie(title="Interstellar", original_title="星际穿越", year="2014")
 
 
 def test_search_and_format_uses_tmdb_first_when_available() -> None:
@@ -2535,9 +2687,9 @@ def test_search_and_format_uses_tmdb_first_when_available() -> None:
     )
     text = _run(service.search_and_format("星际穿越 (2014)"))
     assert "电影海报卡片" in text
-    assert "片名: Interstellar" in text
+    assert "片名: 星际穿越" in text
     assert "年份: 2014" in text
-    assert "别名: -" in text
+    assert "别名: Interstellar" in text
     assert "搜索结果：星际穿越 (2014)" in text
     assert "Interstellar 2014 1080p BluRay" in text
 
@@ -2600,6 +2752,204 @@ def test_search_and_format_fallbacks_to_tmdb_original_when_english_miss() -> Non
     assert "星际穿越 2014 1080p BluRay" in text
 
 
+def test_search_and_format_fallbacks_to_user_query_after_tmdb_titles_miss() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "星际穿越":
+            return [
+                {
+                    "title": "星际穿越 1080p BluRay",
+                    "year": 2014,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerC",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="星际穿越", year="2014")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("星际穿越 (2014)"))
+
+    assert seen_queries == [
+        "Interstellar 2014",
+        "星际穿越 2014",
+        "Interstellar",
+        "星际穿越",
+    ]
+    assert "星际穿越 1080p BluRay" in text
+
+
+def test_search_and_format_prefers_user_query_first_when_tmdb_match_is_not_exact() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "沙丘 2021":
+            return [
+                {
+                    "title": "Dune 2021 1080p BluRay",
+                    "year": 2021,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerD",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Devil in Dune", original_title="沙丘虫暴", year="2021")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2021"))
+
+    assert seen_queries == ["沙丘 2021"]
+    assert "片名: 沙丘" in text
+    assert "别名: -" in text
+    assert "Dune 2021 1080p BluRay" in text
+
+
+def test_search_and_format_fallbacks_to_tmdb_after_user_query_miss_when_tmdb_match_not_exact() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Devil in Dune 2021":
+            return [
+                {
+                    "title": "Devil in Dune 2021 1080p WEB-DL",
+                    "year": 2021,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerE",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Devil in Dune", original_title="沙丘虫暴", year="2021")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2021"))
+
+    assert seen_queries == ["沙丘 2021", "Devil in Dune 2021"]
+    assert "片名: 沙丘" in text
+    assert "Devil in Dune 2021 1080p WEB-DL" in text
+
+
+def test_search_and_format_treats_space_insensitive_original_title_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Dune Part Two", original_title="沙丘2", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘2 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: 沙丘2" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
+def test_search_and_format_treats_spaced_sequel_digit_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Dune Part Two", original_title="沙丘2", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: 沙丘2" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
+def test_search_and_format_treats_bracketed_year_spaced_sequel_digit_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Dune Part Two", original_title="沙丘2", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2 (2024)"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: 沙丘2" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
+def test_search_and_format_treats_fullwidth_bracketed_year_spaced_sequel_digit_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Dune Part Two", original_title="沙丘2", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("沙丘 2（2024）"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: 沙丘2" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two 2024 2160p BluRay" in text
+
+
 def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     seen_queries: list[str] = []
 
@@ -2613,15 +2963,20 @@ def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
     text = _run(service.search_and_format("星际穿越 (2014)"))
 
-    assert seen_queries == ["Interstellar 2014"]
+    assert seen_queries == [
+        "星际穿越 2014",
+        "Interstellar 2014",
+        "星际穿越",
+        "Interstellar",
+    ]
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="星际穿越 (2014)")
 
 
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_empty() -> None:
-    seen_query: dict[str, str] = {}
+    seen_queries: list[str] = []
 
     async def fake_search(query: str) -> list[dict[str, object]]:
-        seen_query["value"] = query
+        seen_queries.append(query)
         return []
 
     async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
@@ -2631,15 +2986,15 @@ def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_empty() -> No
 
     service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
     text = _run(service.search_and_format("Dune (2021)"))
-    assert seen_query["value"] == "Dune 2021"
+    assert seen_queries == ["Dune 2021", "Dune"]
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune (2021)")
 
 
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> None:
-    seen_query: dict[str, str] = {}
+    seen_queries: list[str] = []
 
     async def fake_search(query: str) -> list[dict[str, object]]:
-        seen_query["value"] = query
+        seen_queries.append(query)
         return []
 
     async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
@@ -2647,13 +3002,15 @@ def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> N
 
     service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
     text = _run(service.search_and_format("Dune 2021"))
-    assert seen_query["value"] == "Dune 2021"
+    assert seen_queries == ["Dune 2021", "Dune"]
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune 2021")
 
 
 def test_search_and_format_logs_tmdb_failure(capsys) -> None:
+    seen_queries: list[str] = []
+
     async def fake_search(query: str) -> list[dict[str, object]]:
-        assert query == "Dune 2021"
+        seen_queries.append(query)
         return []
 
     async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
@@ -2664,6 +3021,7 @@ def test_search_and_format_logs_tmdb_failure(capsys) -> None:
     text = _run(service.search_and_format("Dune 2021"))
 
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune 2021")
+    assert seen_queries == ["Dune 2021", "Dune"]
     output = capsys.readouterr().out
     assert "[TMDB 查询失败]" in output
     assert "query=Dune 2021" in output
@@ -2693,6 +3051,30 @@ def test_parse_movie_query_suffix_year() -> None:
     parsed = parse_movie_query("Dune 2021")
     assert parsed.title == "Dune"
     assert parsed.year == "2021"
+
+
+def test_parse_movie_query_keeps_sequel_digit_before_year() -> None:
+    parsed = parse_movie_query("沙丘2 2024")
+    assert parsed.title == "沙丘2"
+    assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_spaced_sequel_digit_before_year() -> None:
+    parsed = parse_movie_query("沙丘 2 2024")
+    assert parsed.title == "沙丘2"
+    assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_spaced_sequel_digit_with_bracketed_year() -> None:
+    parsed = parse_movie_query("沙丘 2 (2024)")
+    assert parsed.title == "沙丘2"
+    assert parsed.year == "2024"
+
+
+def test_parse_movie_query_keeps_spaced_sequel_digit_with_fullwidth_bracketed_year() -> None:
+    parsed = parse_movie_query("沙丘 2（2024）")
+    assert parsed.title == "沙丘2"
+    assert parsed.year == "2024"
 
 
 def test_parse_movie_query_keeps_title_when_no_year() -> None:

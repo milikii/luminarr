@@ -104,6 +104,8 @@ def test_filter_candidates_exposes_expected_score_breakdown() -> None:
     first = scored[0]
     assert first.drop_reason is None
     assert first.score_breakdown == {
+        "title_relevance": 1.0,
+        "source_site": 0.2,
         "resolution": 0.8,
         "source_type": 0.7,
         "seeders": 1.0,
@@ -111,7 +113,20 @@ def test_filter_candidates_exposes_expected_score_breakdown() -> None:
         "codec": 0.9,
         "release_group": 1.0,
     }
-    assert first.score == 9.05
+    assert first.score == 16.025
+
+
+def test_filter_candidates_prefers_exact_movie_title_over_neighbor_title() -> None:
+    scored = filter_candidates(
+        (
+            _make_candidate(title="Dune: Part One 2021 2160p BluRay", resolution="2160p", source_type="BluRay", size_bytes=90 * 1024**3),
+            _make_candidate(title="Dune 2021 1080p WEB-DL", resolution="1080p", source_type="WEB-DL", size_bytes=10 * 1024**3),
+        ),
+        _movie_context(query="Dune 2021"),
+    )
+
+    assert scored[0].candidate.title == "Dune 2021 1080p WEB-DL"
+    assert scored[0].score_breakdown["title_relevance"] > scored[1].score_breakdown["title_relevance"]
 
 
 def test_filter_candidates_prefers_movie_size_range() -> None:
@@ -126,6 +141,69 @@ def test_filter_candidates_prefers_movie_size_range() -> None:
     assert scored[0].candidate.size_bytes == 8 * 1024**3
     assert scored[0].score_breakdown["size_fit"] == 1.0
     assert scored[1].score_breakdown["size_fit"] == 0.2
+
+
+def test_filter_candidates_prefers_better_source_type_over_more_seeders() -> None:
+    scored = filter_candidates(
+        (
+            _make_candidate(
+                title="Dune 2021 1080p BluRay",
+                source_type="BluRay",
+                resolution="1080p",
+                seeders=8,
+            ),
+            _make_candidate(
+                title="Dune 2021 1080p WEBRip",
+                source_type="WEBRip",
+                resolution="1080p",
+                seeders=70,
+            ),
+        ),
+        _movie_context(),
+    )
+
+    assert scored[0].candidate.title == "Dune 2021 1080p BluRay"
+    assert scored[0].score_breakdown["source_type"] > scored[1].score_breakdown["source_type"]
+    assert scored[0].score > scored[1].score
+
+
+def test_filter_candidates_applies_source_site_preference() -> None:
+    scored = filter_candidates(
+        (
+            _make_candidate(title="Dune 2021 1080p WEB-DL", source_type="WEB-DL", source_site="PTP"),
+            _make_candidate(title="Dune 2021 1080p WEB-DL", source_type="WEB-DL", source_site="OtherSite"),
+        ),
+        _movie_context(),
+    )
+
+    assert scored[0].candidate.source_site == "PTP"
+    assert scored[0].score_breakdown["source_site"] == 1.0
+    assert scored[1].score_breakdown["source_site"] == 0.2
+
+
+def test_filter_candidates_uses_seeders_as_tiebreak_inside_same_quality_bucket() -> None:
+    scored = filter_candidates(
+        (
+            _make_candidate(
+                title="Dune 2021 1080p WEB-DL x265 low-seeders",
+                source_type="WEB-DL",
+                resolution="1080p",
+                codec="x265",
+                seeders=6,
+            ),
+            _make_candidate(
+                title="Dune 2021 1080p WEB-DL x265 high-seeders",
+                source_type="WEB-DL",
+                resolution="1080p",
+                codec="x265",
+                seeders=80,
+            ),
+        ),
+        _movie_context(),
+    )
+
+    assert scored[0].candidate.title == "Dune 2021 1080p WEB-DL x265 high-seeders"
+    assert scored[0].score_breakdown["seeders"] > scored[1].score_breakdown["seeders"]
 
 
 def test_filter_candidates_prefers_episode_size_range_for_anime() -> None:
@@ -218,6 +296,7 @@ def test_load_bt_scoring_rules_warns_and_keeps_defaults_for_invalid_field(tmp_pa
     rules = load_bt_scoring_rules(path)
 
     assert rules.weights["seeders"] == DEFAULT_BT_SCORING_RULES.weights["seeders"]
+    assert rules.source_site_preferred == DEFAULT_BT_SCORING_RULES.source_site_preferred
     assert rules.release_group_preferred == ("CHD",)
     captured = capsys.readouterr()
     assert "[BT 评分规则文件回退]" in captured.out
@@ -229,11 +308,14 @@ def test_pick_best_can_use_loaded_custom_rules(tmp_path: Path) -> None:
     path.write_text(
         "weights:\n"
         "  resolution: 1.0\n"
+        "  source_site: 1.25\n"
         "  source_type: 1.0\n"
         "  seeders: 8.0\n"
         "  size_fit: 1.0\n"
         "  codec: 1.0\n"
         "  release_group: 0.0\n"
+        "source_site_preferred:\n"
+        "  - PTP\n"
         "release_group_preferred:\n"
         "  - CHD\n",
         encoding="utf-8",
@@ -257,6 +339,7 @@ def _make_candidate(
     *,
     title: str = "Dune 2021 1080p",
     magnet_or_torrent_url: str = "https://example.com/dune.torrent",
+    source_site: str = "nyaa",
     size_bytes: int | None = 8 * 1024**3,
     seeders: int | None = 20,
     leechers: int | None = None,
@@ -269,7 +352,7 @@ def _make_candidate(
     media_kind: str = "movie",
 ) -> BTCandidate:
     return BTCandidate(
-        source_site="nyaa",
+        source_site=source_site,
         title=title,
         magnet_or_torrent_url=magnet_or_torrent_url,
         size_bytes=size_bytes,

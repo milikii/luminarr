@@ -27,7 +27,6 @@ from app.bot.private_chat_bt_processing_runtime import (
 )
 from app.bot.execution_runtime import (
     resolve_execution_gate,
-    run_sync_with_policy,
 )
 from app.bot.private_chat_bt_direct_runtime import (
     handle_bt_direct_intent_query as handle_shared_bt_direct_intent_query,

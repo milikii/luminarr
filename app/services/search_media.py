@@ -307,18 +307,128 @@ def _order_media_bt_results(
     if not candidate_pairs:
         return raw_results
 
-    ordered_results: list[Mapping[str, Any]] = []
-    for scored_candidate in filter_candidates(
+    scored_candidates = filter_candidates(
         [candidate for candidate, _ in candidate_pairs],
         BTScoringContext(query=query, media_kind="movie"),
         rules=load_bt_scoring_rules(),
-    ):
+    )
+    if all(scored_candidate.drop_reason == "title_mismatch" for scored_candidate in scored_candidates):
+        fallback_queries = _derive_media_title_fallback_queries(raw_results, query=query)
+        best_fallback_metrics: tuple[int, float, float] | None = None
+        best_rescored_candidates: Sequence[Any] | None = None
+        for fallback_query in fallback_queries:
+            rescored_candidates = filter_candidates(
+                [candidate for candidate, _ in candidate_pairs],
+                BTScoringContext(query=fallback_query, media_kind="movie"),
+                rules=load_bt_scoring_rules(),
+            )
+            fallback_metrics = _score_fallback_candidates(rescored_candidates)
+            if fallback_metrics[0] <= 0:
+                continue
+            if best_fallback_metrics is None or fallback_metrics > best_fallback_metrics:
+                best_fallback_metrics = fallback_metrics
+                best_rescored_candidates = rescored_candidates
+        if best_rescored_candidates is not None:
+            scored_candidates = list(best_rescored_candidates)
+
+    ordered_results: list[Mapping[str, Any]] = []
+    for scored_candidate in scored_candidates:
         for candidate, item in candidate_pairs:
             if candidate is scored_candidate.candidate:
                 ordered_results.append(item)
                 break
     ordered_results.extend(remainder)
     return tuple(ordered_results)
+
+
+def _derive_media_title_fallback_queries(
+    raw_results: Sequence[Mapping[str, Any]],
+    *,
+    query: str,
+) -> tuple[str, ...]:
+    parsed_query = parse_movie_query(query)
+    titles = [safe_text(item.get("title"), default="") for item in raw_results[:5]]
+    normalized_titles = [_normalize_title_tokens_for_fallback(title) for title in titles if title]
+    if not normalized_titles:
+        return ()
+    token_counts = _count_fallback_tokens(normalized_titles)
+    minimum_shared_count = 1 if len(normalized_titles) == 1 else 2
+    fallback_queries: list[str] = []
+    for title_tokens in normalized_titles:
+        common_tokens = [token for token in title_tokens if token_counts.get(token, 0) >= minimum_shared_count]
+        if not common_tokens:
+            continue
+        query_text = " ".join(common_tokens).strip()
+        if not query_text:
+            continue
+        fallback_queries.append(f"{query_text} {parsed_query.year}".strip() if parsed_query.year else query_text)
+    return tuple(dict.fromkeys(fallback_queries))
+
+
+def _normalize_title_tokens_for_fallback(title: str) -> list[str]:
+    normalized = title.strip().lower()
+    normalized = re.sub(r"[._:：\-/]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    tokens = [token for token in normalized.split() if token]
+    stopwords = {
+        "2160p",
+        "1080p",
+        "720p",
+        "480p",
+        "web",
+        "dl",
+        "webdl",
+        "webrip",
+        "bluray",
+        "blu",
+        "ray",
+        "bdrip",
+        "hdr",
+        "dv",
+        "hevc",
+        "x264",
+        "x265",
+        "h264",
+        "h265",
+        "ddp",
+        "aac",
+        "dts",
+        "atmos",
+        "truehd",
+        "uhd",
+        "10bit",
+        "8bit",
+        "remux",
+        "ma",
+        "2audios",
+        "csweb",
+        "frds",
+        "hdsweb",
+        "diy",
+        "hhweb",
+        "eur",
+        "max",
+    }
+    return [token for token in tokens if token not in stopwords and not re.fullmatch(r"(?:19|20)\d{2}", token)]
+
+
+def _count_fallback_tokens(normalized_titles: Sequence[Sequence[str]]) -> dict[str, int]:
+    token_counts: dict[str, int] = {}
+    for tokens in normalized_titles:
+        for token in dict.fromkeys(tokens):
+            token_counts[token] = token_counts.get(token, 0) + 1
+    return token_counts
+
+
+def _score_fallback_candidates(scored_candidates: Sequence[Any]) -> tuple[int, float, float]:
+    accepted_candidates = [candidate for candidate in scored_candidates if candidate.drop_reason is None]
+    if not accepted_candidates:
+        return 0, 0.0, 0.0
+    return (
+        len(accepted_candidates),
+        max(candidate.score for candidate in accepted_candidates),
+        sum(candidate.score for candidate in accepted_candidates),
+    )
 
 
 def _build_media_bt_candidate(item: Mapping[str, Any]) -> BTCandidate | None:

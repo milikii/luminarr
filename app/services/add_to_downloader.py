@@ -7,7 +7,7 @@ from app.clients.transmission import TransmissionTask
 from app.db.approval_repo import ApprovalRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.db.job_repo import JobRecord, JobRepo
 from app.services.add_confirm_availability_state import AddConfirmAvailabilityState
 from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,

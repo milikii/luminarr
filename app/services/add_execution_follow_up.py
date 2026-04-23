@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -190,11 +191,17 @@ class AddExecutionFollowUpService:
                 )
 
     async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
-        if pending_add.downloader_name.strip() or pending_add.download_dir.strip():
+        accepted_parameters = inspect.signature(self._add_torrent_func).parameters
+        if pending_add.downloader_name.strip() and "downloader_name" in accepted_parameters:
             return await self._add_torrent_func(
                 pending_add.source,
-                pending_add.downloader_name,
-                pending_add.download_dir,
+                downloader_name=pending_add.downloader_name,
+                download_dir=pending_add.download_dir,
+            )
+        if pending_add.download_dir.strip() and "download_dir" in accepted_parameters:
+            return await self._add_torrent_func(
+                pending_add.source,
+                download_dir=pending_add.download_dir,
             )
         return await self._add_torrent_func(pending_add.source)
 

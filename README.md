@@ -1,8 +1,8 @@
-# Luminarr (v66)
+# Luminarr (v68)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness。
 
-它当前服务 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口，负责把“搜索 -> 下载 -> 入库 -> 刷新 -> 状态查询 -> 追更”这条链路稳定跑通；它**不是**通用 AI 助手、通用 Agent 平台或通用多渠道平台。
+代码里当前已实现 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口，以及 Transmission / qBittorrent、Emby / Jellyfin / Plex 等路径；但当前**保守首版发布承诺矩阵**只先冻结为 `Telegram 私聊 + PT Transmission + Emby + movie-first 主链`。它**不是**通用 AI 助手、通用 Agent 平台或通用多渠道平台。
 
 ## 1. 先看这里
 
@@ -15,7 +15,8 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 ## 2. 它现在能做什么
 
-- 四个私聊入口共用一套 shared runtime、approval、`jobs` 和 SQLite 真相
+- 当前首版承诺矩阵：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
+- 已实现能力继续保留：四个私聊入口共用一套 shared runtime、approval、`jobs` 和 SQLite 真相
 - 媒体主链已覆盖：搜索、下载审批、确认投递、状态查询、导入审批、硬链接导入、metadata、字幕翻译、媒体库刷新
 - BT 支线已覆盖：PT / BT 分流、processing-path inquiry、TMDB 关联、`raw_bt` 目录选择、BT 搜索与最小订阅基线
 - 下载器支持 Transmission + qBittorrent；刷新支持 Emby / Jellyfin / Plex（按配置选择 provider）
@@ -44,6 +45,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```
 
+当前保守版发布准备已经收口完成；只有当文档真相、发布矩阵或质量入口再次漂移时，才需要回到 `docs/OPERATOR_RUNBOOK.md` 里的“收尾发布准备”模板。
 如果你只想让 AI 先做冷启动检查或只收口文档，也不要自己手改长提示词，直接去 `docs/OPERATOR_RUNBOOK.md` 复制对应模板。
 
 ## 6. 文档入口

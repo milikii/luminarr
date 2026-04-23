@@ -31,10 +31,10 @@ class TmdbClient:
         self._proxy_url = proxy_url.strip()
 
     async def search_movie(self, title: str, year: str = "") -> TmdbMovie | None:
-        results = await self.search_movie_candidates(title, year=year, limit=1)
+        results = await self.search_movie_candidates(title, year=year, limit=5)
         if not results:
             return None
-        return results[0]
+        return _pick_best_tmdb_match(results, title=title, year=year)
 
     async def search_movie_candidates(
         self,
@@ -53,10 +53,10 @@ class TmdbClient:
         )
 
     async def search_tv(self, title: str, year: str = "") -> TmdbMovie | None:
-        results = await self.search_tv_candidates(title, year=year, limit=1)
+        results = await self.search_tv_candidates(title, year=year, limit=5)
         if not results:
             return None
-        return results[0]
+        return _pick_best_tmdb_match(results, title=title, year=year)
 
     async def search_tv_candidates(
         self,
@@ -193,3 +193,54 @@ def _extract_year(value: str) -> str:
     if matched is None:
         return ""
     return matched.group(0)
+
+
+def _pick_best_tmdb_match(
+    candidates: list[TmdbMovie],
+    *,
+    title: str,
+    year: str,
+) -> TmdbMovie:
+    cleaned_title = _normalize_match_key(title)
+    cleaned_year = year.strip()
+    best_candidate = candidates[0]
+    best_score = _score_tmdb_match(best_candidate, title=cleaned_title, year=cleaned_year)
+    for candidate in candidates[1:]:
+        score = _score_tmdb_match(candidate, title=cleaned_title, year=cleaned_year)
+        if score > best_score:
+            best_candidate = candidate
+            best_score = score
+    return best_candidate
+
+
+def _score_tmdb_match(candidate: TmdbMovie, *, title: str, year: str) -> tuple[int, int, int]:
+    normalized_title = _normalize_match_key(candidate.title)
+    normalized_original_title = _normalize_match_key(candidate.original_title)
+    title_score = max(
+        _score_title_variant(title, normalized_title),
+        _score_title_variant(title, normalized_original_title),
+    )
+    year_score = 1 if year and candidate.year == year else 0
+    exact_year_penalty = 0 if year_score or not year else -1
+    return title_score, year_score, exact_year_penalty
+
+
+def _score_title_variant(query: str, candidate_title: str) -> int:
+    if not query or not candidate_title:
+        return 0
+    if candidate_title == query:
+        return 4
+    if candidate_title.startswith(query):
+        return 3
+    if query in candidate_title:
+        return 2
+    return 1 if candidate_title.replace(" ", "") == query.replace(" ", "") else 0
+
+
+def _normalize_match_key(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return ""
+    cleaned = re.sub(r"[._:：\-]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()

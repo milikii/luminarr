@@ -25,6 +25,46 @@ _MULTI_ITEM_PATTERNS = (
 )
 _DEFAULT_MOVIE_SIZE_RANGE = (5 * 1024**3, 15 * 1024**3)
 _DEFAULT_EPISODE_SIZE_RANGE = (1 * 1024**3, 5 * 1024**3)
+_TITLE_RELEVANCE_STOPWORDS = frozenset(
+    {
+        "2160p",
+        "1080p",
+        "720p",
+        "480p",
+        "web",
+        "dl",
+        "webdl",
+        "webrip",
+        "bluray",
+        "blu",
+        "ray",
+        "bdrip",
+        "hdr",
+        "dv",
+        "hevc",
+        "x264",
+        "x265",
+        "h264",
+        "h265",
+        "ddp",
+        "aac",
+        "dts",
+        "atmos",
+        "truehd",
+        "uhd",
+        "10bit",
+        "8bit",
+        "remux",
+        "ma",
+        "2audios",
+        "csweb",
+        "frds",
+        "hdsweb",
+        "diy",
+        "hhweb",
+        "eur",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,16 +106,19 @@ class BTScoringRules:
     resolution_scores: dict[str | None, float]
     source_type_scores: dict[str | None, float]
     codec_scores: dict[str | None, float]
-    release_group_preferred: tuple[str, ...]
+    source_site_preferred: tuple[str, ...] = ()
+    release_group_preferred: tuple[str, ...] = ()
 
 
 DEFAULT_BT_SCORING_RULES = BTScoringRules(
     weights={
-        "resolution": 3.0,
-        "source_type": 2.5,
-        "seeders": 2.0,
+        "title_relevance": 8.0,
+        "source_site": 1.25,
+        "source_type": 3.0,
+        "resolution": 2.5,
+        "seeders": 1.0,
         "size_fit": 1.5,
-        "codec": 1.0,
+        "codec": 0.75,
         "release_group": 0.5,
     },
     resolution_scores={
@@ -98,6 +141,7 @@ DEFAULT_BT_SCORING_RULES = BTScoringRules(
         "x264": 0.8,
         None: 0.4,
     },
+    source_site_preferred=("PTP", "BTN", "PTerClub", "HDBits", "MTV"),
     release_group_preferred=("VCB-Studio", "SweetSub", "CHD", "WiKi", "FRDS"),
 )
 DEFAULT_BT_SCORING_RULES_PATH = Path(__file__).with_name("bt_scoring_rules.yml")
@@ -219,6 +263,7 @@ def _build_rules_from_data(raw_data: dict[str, object]) -> tuple[BTScoringRules,
     resolution_scores = dict(DEFAULT_BT_SCORING_RULES.resolution_scores)
     source_type_scores = dict(DEFAULT_BT_SCORING_RULES.source_type_scores)
     codec_scores = dict(DEFAULT_BT_SCORING_RULES.codec_scores)
+    source_site_preferred = list(DEFAULT_BT_SCORING_RULES.source_site_preferred)
     release_group_preferred = list(DEFAULT_BT_SCORING_RULES.release_group_preferred)
 
     weights, weight_warnings = _merge_score_mapping(
@@ -250,6 +295,17 @@ def _build_rules_from_data(raw_data: dict[str, object]) -> tuple[BTScoringRules,
     )
     warnings.extend(codec_warnings)
 
+    source_site_raw = raw_data.get("source_site_preferred")
+    if source_site_raw is None:
+        warnings.append("source_site_preferred 缺失，继续使用内置默认值")
+    elif not isinstance(source_site_raw, list):
+        warnings.append("source_site_preferred 不是列表，继续使用内置默认值")
+    else:
+        source_site_preferred = [str(item).strip() for item in source_site_raw if str(item).strip()]
+        if not source_site_preferred:
+            warnings.append("source_site_preferred 为空，继续使用内置默认值")
+            source_site_preferred = list(DEFAULT_BT_SCORING_RULES.source_site_preferred)
+
     release_group_raw = raw_data.get("release_group_preferred")
     if release_group_raw is None:
         warnings.append("release_group_preferred 缺失，继续使用内置默认值")
@@ -267,6 +323,7 @@ def _build_rules_from_data(raw_data: dict[str, object]) -> tuple[BTScoringRules,
             resolution_scores=resolution_scores,
             source_type_scores=source_type_scores,
             codec_scores=codec_scores,
+            source_site_preferred=tuple(source_site_preferred),
             release_group_preferred=tuple(release_group_preferred),
         ),
         warnings,
@@ -366,6 +423,8 @@ def _build_score_breakdown(
     rules: BTScoringRules,
 ) -> dict[str, float]:
     return {
+        "title_relevance": _score_title_relevance(candidate.title, context.query),
+        "source_site": _score_source_site(candidate.source_site, rules.source_site_preferred),
         "resolution": _score_lookup(candidate.resolution, rules.resolution_scores),
         "source_type": _score_lookup(candidate.source_type, rules.source_type_scores),
         "seeders": _score_seeders(candidate.seeders),
@@ -424,6 +483,18 @@ def _score_release_group(release_group: str | None, preferred_groups: tuple[str,
     return 0.2
 
 
+def _score_source_site(source_site: str | None, preferred_sites: tuple[str, ...]) -> float:
+    if not source_site:
+        return 0.0
+    normalized_source_site = source_site.strip().lower()
+    if not normalized_source_site:
+        return 0.0
+    normalized_preferred_sites = [site.strip().lower() for site in preferred_sites if site.strip()]
+    if normalized_source_site in normalized_preferred_sites:
+        return 1.0
+    return 0.2
+
+
 def _looks_like_valid_download_source(source: str) -> bool:
     cleaned_source = source.strip()
     if not cleaned_source:
@@ -450,6 +521,42 @@ def _title_matches_query(title: str, query: str) -> bool:
     matched_count = sum(1 for token in query_tokens if token in normalized_title)
     required_count = max(1, math.ceil(len(query_tokens) * 0.8))
     return matched_count >= required_count
+
+
+def _score_title_relevance(title: str, query: str) -> float:
+    normalized_query_title = _normalize_title_for_relevance(query)
+    normalized_candidate_title = _normalize_title_for_relevance(title)
+    if not normalized_query_title or not normalized_candidate_title:
+        return 0.0
+    if normalized_candidate_title == normalized_query_title:
+        return 1.0
+    if normalized_candidate_title.startswith(normalized_query_title):
+        return 0.2
+    if normalized_query_title in normalized_candidate_title:
+        return 0.1
+
+    query_tokens = [token for token in normalized_query_title.split() if token]
+    if not query_tokens:
+        return 0.0
+    matched_count = sum(1 for token in query_tokens if token in normalized_candidate_title)
+    if matched_count <= 0:
+        return 0.0
+    return matched_count / len(query_tokens) * 0.5
+
+
+def _normalize_title_for_relevance(value: str) -> str:
+    cleaned_value = re.sub(r"-[A-Za-z0-9][A-Za-z0-9-]*$", "", value.strip())
+    normalized = _normalize_text(cleaned_value)
+    if not normalized:
+        return ""
+    filtered_tokens: list[str] = []
+    for token in normalized.split():
+        if re.fullmatch(r"(?:19|20)\d{2}", token):
+            continue
+        if token in _TITLE_RELEVANCE_STOPWORDS:
+            continue
+        filtered_tokens.append(token)
+    return " ".join(filtered_tokens).strip()
 
 
 def _normalize_text(text: str) -> str:

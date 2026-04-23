@@ -115,6 +115,65 @@ def test_confirm_add_by_task_ref_dispatches_download() -> None:
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
 
 
+def test_confirm_add_by_task_ref_dispatches_with_keyword_downloader_context() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    captured_call: dict[str, str] = {}
+
+    async def add_torrent(source: str, *, downloader_name: str = "", download_dir: str = "") -> TransmissionTask:
+        captured_call["source"] = source
+        captured_call["downloader_name"] = downloader_name
+        captured_call["download_dir"] = download_dir
+        return TransmissionTask(task_id="42", task_hash="abc123")
+
+    service = AddToDownloaderService(search_service=search_service, add_torrent_func=add_torrent)
+
+    pending_reply = _run(
+        service.add_by_selection(
+            1001,
+            "1",
+            downloader_name="tr-pt",
+            download_dir="/data/downloads/tr",
+        )
+    )
+    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert pending_reply == ADD_APPROVAL_PENDING_TEXT.format(title="Dune: Part Two", task_ref="1")
+    assert "任务 ID: 42" in confirm_reply
+    assert "任务 Hash: abc123" in confirm_reply
+    assert captured_call == {
+        "source": "https://example.com/dune.torrent",
+        "downloader_name": "tr-pt",
+        "download_dir": "/data/downloads/tr",
+    }
+
+
+def test_confirm_add_by_task_ref_skips_downloader_name_for_direct_client_signature() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    async def add_torrent(source: str, download_dir: str = "") -> TransmissionTask:
+        assert source == "https://example.com/dune.torrent"
+        assert download_dir == "/data/downloads/tr"
+        return TransmissionTask(task_id="42", task_hash="abc123")
+
+    service = AddToDownloaderService(search_service=search_service, add_torrent_func=add_torrent)
+
+    _run(
+        service.add_by_selection(
+            1001,
+            "1",
+            downloader_name="tr-pt",
+            download_dir="/data/downloads/tr",
+        )
+    )
+    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001))
+
+    assert "任务 ID: 42" in confirm_reply
+    assert "任务 Hash: abc123" in confirm_reply
+
+
 def test_add_workflow_writes_trace_log_when_configured(tmp_path: Path) -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     _run(search_service.search_and_format("dune", chat_id=1001))
@@ -550,7 +609,7 @@ def test_record_pending_approval_logs_row_corruption(capsys) -> None:
     assert "approval_record.lease_version" in output
 
 
-def test_record_pending_job_logs_persistence_failure(capsys) -> None:
+def test_record_pending_job_logs_persistence_failure_with_full_pending_context(capsys) -> None:
     job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),

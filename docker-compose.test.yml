@@ -61,18 +61,18 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Asia/Shanghai}
-      - WEBUI_PORT=8080
+      - WEBUI_PORT=18098
       - TORRENTING_PORT=6881
     volumes:
       - /home/alex/projects/luminarr/docker/test/qbittorrent:/config
       - /data/downloads/qb:/data/downloads/qb
       - /data/downloads/incomplete-qb:/data/downloads/incomplete-qb
     ports:
-      - "18098:8080"
+      - "18098:18098"
       - "15143:6881"
       - "15143:6881/udp"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/ >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:18098/ >/dev/null"]
       interval: 20s
       timeout: 10s
       retries: 5

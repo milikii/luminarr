@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import errno
 import json
-import os
 from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock

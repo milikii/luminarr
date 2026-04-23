@@ -1,4 +1,4 @@
-# docs/GETTING_STARTED.md (v5)
+# docs/GETTING_STARTED.md (v10)
 
 > 目的：让一个不会写代码、但能用命令行的人，也能把仓库在本机跑起来并完成第一次验证。
 
@@ -78,14 +78,18 @@ sudo docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -
 启动后先做健康检查：
 
 ```bash
-curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -fsS http://127.0.0.1:18098/ >/dev/null && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
+curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -s http://127.0.0.1:18096/System/Info/Public | grep -q "ServerName"
 ```
 
 说明：
 
 - compose 文件在仓库里：`/home/alex/projects/luminarr/docker-compose.test.yml`
 - Transmission / Emby 的配置目录仍然落在 `/home/alex/luminarr-test/config/...`
-- qBittorrent 的固定测试配置落在仓库内 `docker/test/qbittorrent`
+- 上面这条默认健康检查只覆盖当前保守首版发布矩阵里的 `19091 PT Transmission + 18096 Emby`
+- 如果你还要额外确认 BT / qB 测试栈，再单独跑：`curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Session-Id" && curl -si http://127.0.0.1:18098/api/v2/torrents/info >/dev/null`
+- 截至 `2026-04-23` 本轮复验：`19091` RPC 返回 `409 + X-Transmission-Session-Id`，`18096` 返回 `ServerName`，`18098/api/v2/torrents/info` 返回 `200 OK`
+- 同日当前 shell 下，`curl -si http://127.0.0.1:19092/transmission/rpc` 连续两次退出码 `7`；但 `ss -ltnp | rg ":19091|:19092|:18096|:18098"` 仍能看到 `19092` 在监听，所以 BT Transmission 要按当轮探针单独判断，不要直接沿用旧的“可达 / 不可达”结论
+- qBittorrent 的固定测试配置落在仓库内 `docker/test/qbittorrent`；当前必须保持 `WEBUI_PORT=18098` 与 `18098:18098` 同步，不要回退成 `18098:8080`
 - 如果这里只想跑纯单元测试，不做真实导入和刷新，可以先跳过这一步
 
 ## 5. 运行应用
@@ -235,7 +239,8 @@ make help
 最常用的是：
 
 - `make test`：跑全量 pytest
-- `make quality`：跑当前仓库级快速质量入口（compile + Makefile/docs gate）
+- `make quality`：跑当前仓库级快速质量入口（compile + pyflakes + Makefile/docs gate）
+- `make lint`：跑最小静态检查（当前为 `pyflakes app tests`）
 - `make verify-mainline`：跑当前主线 focused 验证入口
 - `make test-cleanup-smoke`：跑四渠道 cleanup smoke gate
 - `make test-cleanup-service-not-ready`：跑 cleanup service-not-ready 专项 smoke
@@ -261,7 +266,8 @@ make help
 - 没有 `make` 时，`make test-cleanup-docs-gate` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make test-cleanup-window` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py && .venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup && .venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make sync-cleanup-doc-snapshots` 的等价一行命令是：`.venv/bin/python -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness telegram_bot_api local_smoke_evidence runtime_process`
-- 没有 `make` 时，`make quality` 的等价一行命令是：`python3 -m compileall app tests && .venv/bin/python -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`
+- 没有 `make` 时，`make quality` 的等价一行命令是：`python3 -m compileall app tests && .venv/bin/python -m pyflakes app tests && .venv/bin/python -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`
+- 没有 `make` 时，`make lint` 的等价一行命令是：`.venv/bin/python -m pyflakes app tests`
 - 没有 `make` 时，`make verify-mainline` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event" && .venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list or download_completion_polling or post_download_auto_import_scheduler"`
 - `make compile`：跑 `compileall`
 - `make run`：读取 `.env` 后启动应用

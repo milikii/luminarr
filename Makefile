@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test quality test-downloader-focused test-import-focused verify-quality-gates verify-mainline test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
+.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test quality test-downloader-focused test-import-focused verify-quality-gates verify-mainline test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -16,7 +16,11 @@ test:
 
 quality:
 	$(MAKE) compile
+	$(MAKE) lint
 	$(PYTHON) -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py
+
+lint:
+	$(PYTHON) -m pyflakes app tests
 
 test-downloader-focused:
 	$(PYTHON) -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py

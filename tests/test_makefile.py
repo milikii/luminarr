@@ -70,15 +70,41 @@ def test_makefile_run_sources_absolute_env_file_before_start(tmp_path: Path) -> 
     assert result.stderr == ""
 
 
+def test_makefile_run_accepts_shell_safe_semicolon_env_values(tmp_path: Path) -> None:
+    recipe = _build_run_recipe(
+        python_command='python3 -c "import os; print(os.environ.get(\'DOWNLOADER_INSTANCES\', \'\'))"'
+    )
+    env_file = tmp_path / "luminarr.env"
+    env_file.write_text(
+        'DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt"\n',
+        encoding="utf-8",
+    )
+    env = os.environ | {"ENV_FILE": str(env_file.resolve())}
+
+    result = subprocess.run(
+        ["bash", "-lc", recipe],
+        capture_output=True,
+        text=True,
+        cwd=Path.cwd(),
+        env=env,
+        check=False,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout.strip() == "tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt"
+    assert result.stderr == ""
+
+
 def test_makefile_help_lists_quality_targets() -> None:
     makefile_text = Path("Makefile").read_text(encoding="utf-8")
 
     assert "quality" in makefile_text
+    assert "lint" in makefile_text
     assert "test-downloader-focused" in makefile_text
     assert "test-import-focused" in makefile_text
     assert "verify-quality-gates" in makefile_text
     assert "verify-mainline" in makefile_text
-    assert "targets: install test quality test-downloader-focused test-import-focused verify-quality-gates verify-mainline" in makefile_text
+    assert "targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline" in makefile_text
 
 
 def test_makefile_quality_target_keeps_fast_repo_guards_in_one_place() -> None:
@@ -86,7 +112,15 @@ def test_makefile_quality_target_keeps_fast_repo_guards_in_one_place() -> None:
     commands = _extract_makefile_target_commands(makefile_text, "quality")
 
     assert commands[0] == "$(MAKE) compile"
-    assert commands[1] == "$(PYTHON) -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py"
+    assert commands[1] == "$(MAKE) lint"
+    assert commands[2] == "$(PYTHON) -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py"
+
+
+def test_makefile_lint_target_points_to_repo_static_guard() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+    commands = _extract_makefile_target_commands(makefile_text, "lint")
+
+    assert commands == ["$(PYTHON) -m pyflakes app tests"]
 
 
 def test_makefile_quality_gate_targets_point_to_current_focused_regressions() -> None:
