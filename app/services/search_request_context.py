@@ -4,19 +4,12 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.search_title_normalization import compact_match_key, finalize_parsed_query_title, normalize_match_key, normalize_spaces, strip_trailing_query_noise
+from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
 from app.clients.tmdb import TmdbMovie
-from app.services.media_name_parser import parse_media_name
+from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
-
-
-@dataclass(frozen=True, slots=True)
-class ParsedMovieQuery:
-    title: str
-    year: str
-
 
 @dataclass(frozen=True, slots=True)
 class SearchRequestContext:
@@ -24,21 +17,6 @@ class SearchRequestContext:
     tmdb_movie: TmdbMovie | None
     resolved_query: str
     raw_results: Sequence[Mapping[str, Any]]
-
-def parse_movie_query(query: str) -> ParsedMovieQuery:
-    cleaned_query = normalize_spaces(query)
-    if not cleaned_query:
-        return ParsedMovieQuery(title="", year="")
-
-    parsed_name = parse_media_name(cleaned_query)
-    year = str(parsed_name.year) if parsed_name.year is not None else ""
-    title = finalize_parsed_query_title(
-        cleaned_query=cleaned_query,
-        parsed_title=parsed_name.title or cleaned_query,
-        parsed_year=year,
-    )
-    title = strip_trailing_query_noise(title)
-    return ParsedMovieQuery(title=title, year=year)
 
 async def build_search_request_context(
     *,

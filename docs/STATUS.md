@@ -1,9 +1,9 @@
-# Current status (v451)
+# Current status (v452)
 
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮已把搜索链对共享标题归一的直接依赖继续收口：`search_media.py` 与 `search_reply_formatter.py` 不再经 `search_request_context.py` 间接拿 `normalize_spaces`。
+- 当前这一轮已把 query 解析职责从请求编排层里拆出来：`ParsedMovieQuery` 与 `parse_movie_query()` 不再继续挂在 `search_request_context.py` 下面。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
 
@@ -23,6 +23,7 @@
 - `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会继续复用共享噪音归一层，不再把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里，或把基片标题拖偏。
 - 当前续作/章节 token 恢复逻辑也已并回 `search_title_normalization.py`；后续若还要补 query 标题恢复规则，不需要再同时改 `search_request_context.py` 和共享归一层两份实现。
 - 当前 `search_media.py` 与 `search_reply_formatter.py` 现在直接依赖 `search_title_normalization.py` 的 `normalize_spaces`，不再通过 `search_request_context.py` 间接耦合共享标题工具。
+- 当前 `ParsedMovieQuery` 与 `parse_movie_query()` 已抽到独立的 `search_query_parser.py`；`search_request_context.py` 现在只保留“TMDB 查询 + ordered queries + 搜索请求编排”职责，不再混放纯 query 解析实现。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。

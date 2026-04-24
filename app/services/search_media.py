@@ -18,7 +18,6 @@ from app.services.search_candidate_state import CandidateLoadResult, CandidateSt
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services.bt_sources import resolve_bt_source
 from app.services import search_reply_formatter
-from app.services import search_request_context
 from app.services.search_reply_formatter import (
     format_bt_batch_preview_reply,
     format_bt_batch_preview_selection_label,
@@ -32,10 +31,10 @@ from app.services.search_reply_formatter import (
 )
 from app.services.search_request_context import (
     LookupMovieFunc,
-    ParsedMovieQuery,
     SearchFunc,
     build_search_request_context,
 )
+from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
@@ -73,7 +72,6 @@ CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失�
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
-parse_movie_query = search_request_context.parse_movie_query
 
 
 class UnsupportedBatchPreviewPageUrl(ValueError):
