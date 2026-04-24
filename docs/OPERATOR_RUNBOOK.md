@@ -18,12 +18,14 @@
 
 ```text
 按 AGENTS.md + docs/STATUS.md + docs/NEXT_STEP.md 执行。
+如果 docs/NEXT_STEP.md 当前主线已完成，先做冷启动一致性检查；若无漂移，再从 docs/SCRAPING_SYSTEM_PLAN.md 的后续 backlog 或新的 operator 指定主线里选一个更小闭环。
+如果 docs/NEXT_STEP.md 当前主线已完成，不要因为旧 Done when 已满足就立刻停止；应以当前选中的更小闭环作为本轮退出条件。
 本机真实测试环境已就绪；凡是任务需要真实 downloader / import / refresh 验证，直接执行，不要留给我。
 默认连续执行 3 轮；每轮只做一个最小闭环，自己验证、必要时更新文档、review diff、commit 并 push。
 如果遇到 blocker、违反文档边界、无法确认 commit / push 状态，或已达到 docs/NEXT_STEP.md 的 Done when 任一条，就停止并简短汇报。
 ```
 
-截至 `2026-04-23`，当前默认分支已经把“保守版收尾发布准备”收口完成；现在默认继续施工，优先就用这一条，让 AI 按 `docs/NEXT_STEP.md` 自动落到“搜索相关性优化”或“首版承诺范围内最小修复”。
+截至 `2026-04-25`，当前默认分支已经把“刮削系统基础收口”也收口完成；现在默认继续施工，优先就用这一条，让 AI 先核对文档是否漂移；若无漂移，再从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 里选更小闭环。
 
 ## 2. 连续 10 轮施工（封顶版）
 
@@ -31,6 +33,8 @@
 
 ```text
 按 AGENTS.md + docs/STATUS.md + docs/NEXT_STEP.md 执行。
+如果 docs/NEXT_STEP.md 当前主线已完成，先做冷启动一致性检查；若无漂移，再从 docs/SCRAPING_SYSTEM_PLAN.md 的后续 backlog 或新的 operator 指定主线里选一个更小闭环。
+如果 docs/NEXT_STEP.md 当前主线已完成，不要因为旧 Done when 已满足就立刻停止；应以当前选中的更小闭环作为本轮退出条件。
 本机真实测试环境已就绪；凡是任务需要真实 downloader / import / refresh 验证，直接执行，不要留给我。
 默认连续执行 10 轮；每轮只做一个最小闭环，自己验证、必要时更新文档、review diff、commit 并 push。
 如果遇到 blocker、违反文档边界、无法确认 commit / push 状态、出现收益递减，或已达到 docs/NEXT_STEP.md 的 Done when 任一条，就停止并简短汇报。

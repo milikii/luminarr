@@ -21,7 +21,7 @@
 
 ## Only do
 
-- 当前这条主线已可宣告完成；若继续推进，优先从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 或新的 operator 指定主线里选更小闭环。
+- 当前这条主线已可宣告完成；不要因为这里已完成就空转停止。默认继续施工时，先做冷启动一致性检查；若无漂移，再从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 或新的 operator 指定主线里选更小闭环。
 
 ## Do not do
 

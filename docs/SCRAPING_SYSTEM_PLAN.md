@@ -107,7 +107,7 @@ Luminarr 当前仍是：
 
 目标：产出真正的本地刮削产物。
 
-当前状态：进行中；`.nfo`、`poster`、`backdrop` 已开始落地，下一步补写入策略
+当前状态：已完成；`.luminarr.metadata.json`、`.nfo`、`poster`、`backdrop` 已落地，写入策略与真实 smoke 见 Phase 4
 
 最小实现：
 
@@ -132,7 +132,8 @@ Luminarr 当前仍是：
 这些不是当前刮削主线的即时 blocker，但已经明确挂进后续任务，避免再次靠口头记忆：
 
 - `app/services/subtitle_translator.py`
-  - 目标：按“外挂字幕识别 / 内嵌字幕探测 / 提取执行 / 翻译执行 / 中文跳过策略”拆分
+  - 当前状态：已前推一格；support helper 已拆到 `app/services/subtitle_translation_support.py`
+  - 目标：继续按“外挂字幕识别 / 内嵌字幕探测 / 提取执行 / 翻译执行 / 中文跳过策略”收口剩余编排
 - `app/services/manage_bt_subscription.py`
   - 目标：按“命令解析 / 持久化 / 扫描候选 / 最后一次 seen 状态更新 / scheduler tick”拆分
 - `app/services/cleanup_downloaded_source.py`

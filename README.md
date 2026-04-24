@@ -15,7 +15,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 2. 当前稳定范围
 
 - 当前首版承诺矩阵：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
-- 当前保守版发布准备已经收口完成；默认分支继续推进时，主线已切到 `docs/NEXT_STEP.md` 里的**刮削系统基础收口**
+- 当前保守版发布准备与**刮削系统基础收口**都已完成；默认分支继续推进时，先按 `docs/NEXT_STEP.md` 核对当前主线是否已收工，再从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 里选更小闭环
 - 当前仓库质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`
 - 已实现但当前不纳入首版发布保证的路径，继续保留在代码和测试里，不因为发布口径收紧而回退
 
@@ -29,7 +29,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 4. 当前状态
 
 - 当前短快照和环境真相：看 `docs/STATUS.md`
-- 当前唯一施工主线：看 `docs/NEXT_STEP.md`
+- 当前主线状态与下一步边界：看 `docs/NEXT_STEP.md`
 - 已定死的长期边界：看 `docs/DECISIONS.md`
 - 文档总入口和分流规则：看 `docs/INDEX.md`
 
@@ -39,7 +39,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 如果你只想记住一条推进顺序，就记这个：
 
-1. 先看 `docs/STATUS.md`，确认当前是不是绿灯、主线是不是还在刮削系统基础收口
+1. 先看 `docs/STATUS.md`，确认当前是不是绿灯、当前主线是否已经完成，是否需要先做冷启动一致性检查
 2. 最快时，直接复制 `docs/STATUS.md` 末尾的 `Recommended Next Operator Command`
 3. 如果那一句不适合你当前场景，再去 `docs/OPERATOR_RUNBOOK.md` 按场景复制一条模板
 4. 不确定有没有文档漂移时，先用“只做冷启动一致性检查”，不要直接让 AI 动代码
@@ -58,5 +58,5 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/GETTING_STARTED.md`：安装、启动、最小 smoke
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/STATUS.md`：当前短快照
-- `docs/NEXT_STEP.md`：当前唯一主线
+- `docs/NEXT_STEP.md`：当前主线状态与下一步边界
 - `docs/DECISIONS.md`：长期边界
