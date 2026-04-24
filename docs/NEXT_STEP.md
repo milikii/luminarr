@@ -19,6 +19,7 @@
   - `Dune Part 2 2024` 命中 `Dune Part Two / Dune: Part Two` 这类共享归一后等价的 TMDB 双标题时，搜索请求现在会按共享归一去重，不再把 `Dune Part Two`、`Dune: Part Two`、`Dune Part 2` 各搜一轮
   - `周处除三害 2024` 这类 movie-first 查询如果只命中 `S01 / S01E01 / Season / Episode` 形态的假阳性结果，现在会直接按“未找到候选”处理，不再把明显剧集资源展示成电影候选
   - `沙丘 2021` 这类查询里夹着 `Random Movie 2021` 这种明显无关 outlier 时，当前展示结果也不会再把这类被判掉的噪音候选混进前台列表
+  - `Dune: Part Two 2024 Extras ...` 这类明显的附加内容 / 花絮结果，现在也不会再作为 movie-first 候选展示，不再把 `Extras / featurette / making of / bonus` 顶到正片前面
   - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
   - 更早完成的 `query 解析职责拆分` 继续保持完成态：当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
   - 当前 TMDB 客户端标题打分与 `search_request_context.py` 的高置信判断也已收口到共享标题关系 helper；后续若继续补 exact / compact / subtitle extension 关系，不再同时改两套判断实现
@@ -42,6 +43,7 @@
 - 当前这一轮也继续降低了维护成本：TMDB 选片打分和搜索请求高置信判断现在共享同一套标题关系 helper，不再有“一边修了、另一边忘了”的漂移风险。
 - 当前这一轮也顺手降低了无效查询次数：共享归一后等价的 TMDB 标题现在只会保留一条搜索请求，不再把 Prowlarr/BT 来源重复打一遍。
 - 当前这一轮也把真实搜索结果质量再收紧了一点：movie-first 结果展示会直接丢掉被判成剧集形态或明显无关的噪音候选，不再为了“有结果”把假阳性顶到前台。
+- 当前这一轮也继续收紧了非正片噪音：`Extras / featurette / making of / bonus` 这类附加内容不会再混进电影结果前排。
 - 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
 - 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。
 - 当前这一轮也继续降低了结构维护成本：若后面还要补 sequel/chapter 恢复规则，默认先改共享标题归一层，不再让 `search_request_context.py` 再长出第二套恢复实现。

@@ -28,6 +28,15 @@ def test_filter_candidates_drops_series_episode_release_for_movie_query() -> Non
     assert scored[0].drop_reason == "title_mismatch"
 
 
+def test_filter_candidates_drops_movie_extra_release_for_movie_query() -> None:
+    scored = filter_candidates(
+        (_make_candidate(title="Dune: Part Two 2024 Extras 1080p BluRay Remux AVC DD2.0-OPTIMUM"),),
+        _movie_context(query="Dune Part 2 2024"),
+    )
+
+    assert scored[0].drop_reason == "title_mismatch"
+
+
 def test_filter_candidates_allows_chinese_title_with_year_token_match() -> None:
     scored = filter_candidates((_make_candidate(title="葬送的芙莉莲 2023 1080p"),), _anime_context(query="葬送的芙莉莲 2023"))
 

@@ -3470,6 +3470,33 @@ def test_search_and_format_drops_series_episode_candidate_for_movie_query() -> N
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="周处除三害 2024")
 
 
+def test_search_and_format_drops_movie_extra_candidate_for_movie_query() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune Part 2 2024"
+        return [
+            {
+                "title": "Dune: Part Two 2024 Extras 1080p BluRay Remux AVC DD2.0-OPTIMUM",
+                "year": 2024,
+                "size": 10 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-extras.torrent",
+                "indexerName": "IndexerExtras",
+            },
+            {
+                "title": "Dune: Part Two 2024 2160p UHD BluRay x265 10bit DoVi 2Audio TrueHD Atmos 7.1 mUHD-FRDS",
+                "year": 2024,
+                "size": 80 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-main.torrent",
+                "indexerName": "IndexerMain",
+            },
+        ]
+
+    service = SearchMediaService(fake_search)
+    text = _run(service.search_and_format("Dune Part 2 2024"))
+
+    assert "Dune: Part Two 2024 2160p UHD BluRay x265 10bit DoVi 2Audio TrueHD Atmos 7.1 mUHD-FRDS" in text
+    assert "Dune: Part Two 2024 Extras 1080p BluRay Remux AVC DD2.0-OPTIMUM" not in text
+
+
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> None:
     seen_queries: list[str] = []
 

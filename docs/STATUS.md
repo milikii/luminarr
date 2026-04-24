@@ -3,7 +3,7 @@
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮刚完成：movie-first 结果展示现在会直接丢掉明显的剧集形态假阳性和被判掉的无关 outlier；`周处除三害 2024` 这类只命中 `S01` 结果的查询会回到“未找到候选”，`沙丘 2021` 这类查询也不会再把 `Random Movie 2021` 这类噪音混进结果列表。
+- 当前这一轮刚完成：movie-first 结果展示现在会直接丢掉剧集形态假阳性和无关 outlier；`周处除三害 2024` 这类只命中 `S01` 结果的查询会回到“未找到候选”，`沙丘 2021` 也不会再把 `Random Movie 2021` 混进结果列表。
 - 更早完成的 `query 解析职责拆分` 继续保持完成态：`ParsedMovieQuery` 与 `parse_movie_query()` 不再继续挂在 `search_request_context.py` 下面。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `568` 行。
@@ -23,10 +23,9 @@
 - `Remastered / Theatrical / Uncut / Unrated / Anniversary Edition / Collectors Edition` 这几类尾部版本词现在也都复用同一套共享噪音归一层，不再把噪音留在搜索标题里或把基片标题拖偏。
 - `Batman v Superman 2016` 这类“主标题 + 官方多词副标题”现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中并优先直搜官方长片名；但 `John Wick 2023 -> John Wick: Chapter 4` 这类 `Part / Chapter / 2049` 式续作后缀不会被误判成同片高置信。
 - `Alien 2024` 这类“主标题 + 单词官方副标题”现在也会把 `Alien: Romulus` 视为高置信 TMDB 命中并优先直搜官方长片名；但没有副标题分隔符的单词后缀仍不会被当作同片高置信。
-- 搜索链当前结构也继续收口：共享标题噪音规则已改成“声明式词表 + 统一正则拼装”；`search_request_context.py`、`search_media.py`、`search_reply_formatter.py` 都直接复用 `search_title_normalization.py` / `search_query_parser.py`，不再各自挂一份 query 解析或标题工具。
-- 当前标题关系判断也已继续收口：TMDB 客户端标题打分和搜索请求高置信判断现在共享同一套 helper，不再分别手写 exact / compact / subtitle extension 关系。
-- 搜索请求去重现在也已继续收口：`Dune Part Two` / `Dune: Part Two` / `Dune Part 2` 这类共享归一后等价的 TMDB 双标题只会保留一条搜索请求，不再重复打到搜索源。
+- 搜索链结构继续收口：共享标题噪音规则已改成“声明式词表 + 统一正则拼装”；`search_request_context.py`、`search_media.py`、`search_reply_formatter.py` 直接复用共享标题归一 / parser，TMDB 客户端标题打分、高置信判断和等价查询去重也已共用同一套 helper。
 - movie-first 结果展示现在也已继续收口：被判成 `S01 / S01E01 / Season / Episode` 的剧集形态假阳性，以及明显无关的 outlier，不会再继续混进前台候选列表。
+- `Dune: Part Two 2024 Extras ...` 这类附加内容 / 花絮结果，现在也不会再作为 movie-first 候选展示，不再把 `Extras / featurette / making of / bonus` 顶到正片前面。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。

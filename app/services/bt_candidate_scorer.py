@@ -29,6 +29,14 @@ _SERIES_EPISODE_PATTERNS = (
     re.compile(r"\bseason\s*\d{1,2}\b", re.IGNORECASE),
     re.compile(r"\bepisode\s*\d{1,3}\b", re.IGNORECASE),
 )
+_MOVIE_EXTRA_PATTERNS = (
+    re.compile(r"\bextras?\b", re.IGNORECASE),
+    re.compile(r"\bfeaturettes?\b", re.IGNORECASE),
+    re.compile(r"\bbehind\s+the\s+scenes\b", re.IGNORECASE),
+    re.compile(r"\bmaking\s+of\b", re.IGNORECASE),
+    re.compile(r"\bdeleted\s+scenes?\b", re.IGNORECASE),
+    re.compile(r"\bbonus\b", re.IGNORECASE),
+)
 _DEFAULT_MOVIE_SIZE_RANGE = (5 * 1024**3, 15 * 1024**3)
 _DEFAULT_EPISODE_SIZE_RANGE = (1 * 1024**3, 5 * 1024**3)
 _TITLE_RELEVANCE_STOPWORDS = frozenset(
@@ -414,6 +422,8 @@ def _resolve_drop_reason(
         return "title_mismatch"
     if context.media_kind == "movie" and _looks_like_series_episode_release(candidate.title):
         return "title_mismatch"
+    if context.media_kind == "movie" and _looks_like_movie_extra_release(candidate.title):
+        return "title_mismatch"
     info_hash = _extract_info_hash(candidate.magnet_or_torrent_url)
     if info_hash and info_hash in seen_info_hashes:
         return "duplicate_info_hash"
@@ -595,3 +605,10 @@ def _looks_like_series_episode_release(title: str) -> bool:
     if not cleaned_title:
         return False
     return any(pattern.search(cleaned_title) is not None for pattern in _SERIES_EPISODE_PATTERNS)
+
+
+def _looks_like_movie_extra_release(title: str) -> bool:
+    cleaned_title = title.strip()
+    if not cleaned_title:
+        return False
+    return any(pattern.search(cleaned_title) is not None for pattern in _MOVIE_EXTRA_PATTERNS)
