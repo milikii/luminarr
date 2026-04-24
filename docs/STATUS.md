@@ -22,6 +22,7 @@
 - `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类复合版本词写法现在也会回到真实片名，不再把 `2` 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 留在搜索标题里。
 - `Remastered / Theatrical / Uncut / Unrated / Anniversary Edition / Collectors Edition` 这几类尾部版本词现在也都复用同一套共享噪音归一层，不再把噪音留在搜索标题里或把基片标题拖偏。
 - `Batman v Superman 2016` 这类“主标题 + 官方多词副标题”现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中并优先直搜官方长片名；但 `John Wick 2023 -> John Wick: Chapter 4` 这类 `Part / Chapter / 2049` 式续作后缀不会被误判成同片高置信。
+- `Alien 2024` 这类“主标题 + 单词官方副标题”现在也会把 `Alien: Romulus` 视为高置信 TMDB 命中并优先直搜官方长片名；但没有副标题分隔符的单词后缀仍不会被当作同片高置信。
 - 搜索链当前结构也继续收口：共享标题噪音规则已改成“声明式词表 + 统一正则拼装”；`search_request_context.py`、`search_media.py`、`search_reply_formatter.py` 都直接复用 `search_title_normalization.py` / `search_query_parser.py`，不再各自挂一份 query 解析或标题工具。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
@@ -38,8 +39,8 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
-- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `156 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `173 passed`
+- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `157 passed`
+- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `174 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
 - import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
 - 当前本机探针：

@@ -117,9 +117,13 @@ def is_subtitle_extension_match(query: str, candidate_title: str) -> bool:
     if not suffix:
         return False
     suffix_tokens = suffix.split()
-    if len(suffix_tokens) < 2:
+    if len(suffix_tokens) < 2 and not _has_subtitle_separator(candidate_title):
         return False
     return _SEQUEL_SUFFIX_RE.match(suffix) is None
+
+
+def _has_subtitle_separator(value: str) -> bool:
+    return bool(re.search(r"[:：\-]", value))
 
 
 def finalize_parsed_query_title(

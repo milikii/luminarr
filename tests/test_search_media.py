@@ -2899,6 +2899,35 @@ def test_search_and_format_treats_multiword_tmdb_subtitle_extension_as_confident
     assert "Batman v Superman: Dawn of Justice 2016 2160p BluRay" in text
 
 
+def test_search_and_format_treats_single_word_tmdb_subtitle_extension_as_confident_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Alien: Romulus 2024":
+            return [
+                {
+                    "title": "Alien: Romulus 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerAR",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Alien"
+        assert year == "2024"
+        return TmdbMovie(title="Alien: Romulus", original_title="Alien: Romulus", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Alien 2024"))
+
+    assert seen_queries == ["Alien: Romulus 2024"]
+    assert "片名: Alien: Romulus" in text
+    assert "Alien: Romulus 2024 2160p BluRay" in text
+
+
 def test_search_and_format_does_not_treat_sequel_suffix_as_confident_tmdb_match() -> None:
     seen_queries: list[str] = []
 
