@@ -4,6 +4,7 @@ import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 from xml.sax.saxutils import escape
 
 from app.clients.fanart import FanartMovieImages
@@ -12,6 +13,7 @@ from app.clients.tmdb import TmdbMovie
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
 LookupMovieByTmdbIdFunc = Callable[[str], Awaitable[TmdbMovie | None]]
 GetMovieImagesFunc = Callable[[str], Awaitable[FanartMovieImages | None]]
+DownloadImageFunc = Callable[[str], Awaitable[bytes]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,10 +41,12 @@ class MetadataScraperService:
         lookup_movie_func: LookupMovieFunc,
         get_movie_images_func: GetMovieImagesFunc,
         lookup_movie_by_tmdb_id_func: LookupMovieByTmdbIdFunc | None = None,
+        download_image_func: DownloadImageFunc | None = None,
     ) -> None:
         self._lookup_movie_func = lookup_movie_func
         self._get_movie_images_func = get_movie_images_func
         self._lookup_movie_by_tmdb_id_func = lookup_movie_by_tmdb_id_func
+        self._download_image_func = download_image_func
 
     async def scrape_for_import(self, scrape_input: MetadataScrapeInput) -> MetadataScrapeResult:
         title = scrape_input.title.strip()
@@ -123,8 +127,17 @@ class MetadataScraperService:
                 fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
             )
             return MetadataScrapeResult(success=False, message=message)
+        image_artifacts, error_result = await self._write_image_artifacts(
+            target_path=target_path,
+            fanart_images=fanart_images,
+        )
+        if error_result is not None:
+            return error_result
 
-        message = f"metadata 刮削成功：{metadata_path}；NFO：{nfo_path}"
+        image_suffix = ""
+        if image_artifacts:
+            image_suffix = "；图片：" + "、".join(str(path) for path in image_artifacts)
+        message = f"metadata 刮削成功：{metadata_path}；NFO：{nfo_path}{image_suffix}"
         return MetadataScrapeResult(
             success=True,
             message=message,
@@ -175,6 +188,49 @@ class MetadataScraperService:
             )
             return None, MetadataScrapeResult(success=False, message=message)
         return tmdb_movie, None
+
+    async def _write_image_artifacts(
+        self,
+        *,
+        target_path: Path,
+        fanart_images: FanartMovieImages | None,
+    ) -> tuple[list[Path], MetadataScrapeResult | None]:
+        if fanart_images is None or self._download_image_func is None:
+            return [], None
+
+        artifact_specs = _build_image_artifact_specs(target_path=target_path, fanart_images=fanart_images)
+        created_paths: list[Path] = []
+        for label, image_url, artifact_path in artifact_specs:
+            try:
+                payload = await self._download_image_func(image_url)
+            except Exception as exc:
+                _cleanup_written_artifacts(created_paths)
+                message = f"下载 {label} 图片失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查图片 URL、代理和网络连通性；当前 metadata / NFO 已写入，但图片产物需要修复后重试。",
+                )
+                return [], MetadataScrapeResult(success=False, message=message)
+            if not payload:
+                _cleanup_written_artifacts(created_paths)
+                message = f"下载 {label} 图片失败：响应为空"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查图片 URL 是否仍可访问；当前 metadata / NFO 已写入，但图片产物需要修复后重试。",
+                )
+                return [], MetadataScrapeResult(success=False, message=message)
+            try:
+                artifact_path.write_bytes(payload)
+            except Exception as exc:
+                _cleanup_written_artifacts(created_paths)
+                message = f"写入 {label} 图片失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
+                )
+                return [], MetadataScrapeResult(success=False, message=message)
+            created_paths.append(artifact_path)
+        return created_paths, None
 
 
 def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
@@ -240,6 +296,43 @@ def _render_movie_nfo(*, tmdb_movie: TmdbMovie, fanart_images: FanartMovieImages
 
 def _normalize_for_match(value: str) -> str:
     return "".join(ch for ch in value.casefold() if ch.isalnum())
+
+
+def _build_image_artifact_specs(
+    *,
+    target_path: Path,
+    fanart_images: FanartMovieImages,
+) -> list[tuple[str, str, Path]]:
+    specs: list[tuple[str, str, Path]] = []
+    if fanart_images.poster_url:
+        specs.append(("poster", fanart_images.poster_url, _resolve_image_artifact_path(target_path, "poster", fanart_images.poster_url)))
+    if fanart_images.backdrop_url:
+        specs.append(("backdrop", fanart_images.backdrop_url, _resolve_image_artifact_path(target_path, "backdrop", fanart_images.backdrop_url)))
+    return specs
+
+
+def _resolve_image_artifact_path(target_path: Path, label: str, image_url: str) -> Path:
+    suffix = _resolve_image_suffix(image_url)
+    if target_path.is_file():
+        return target_path.with_name(f"{target_path.stem}-{label}{suffix}")
+    return target_path / f"{label}{suffix}"
+
+
+def _resolve_image_suffix(image_url: str) -> str:
+    path = urlparse(image_url).path
+    suffix = Path(path).suffix.lower()
+    if suffix in {".jpg", ".jpeg", ".png", ".webp"}:
+        return suffix
+    return ".jpg"
+
+
+def _cleanup_written_artifacts(created_paths: list[Path]) -> None:
+    for artifact_path in reversed(created_paths):
+        try:
+            if artifact_path.exists():
+                artifact_path.unlink()
+        except OSError:
+            continue
 
 
 def _print_colored_error(*, problem: str, fix: str) -> None:

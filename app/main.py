@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import httpx
 from telegram.error import NetworkError
 
 from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
@@ -72,6 +73,16 @@ _COMPAT_REEXPORTS = (
 
 async def _skip_fanart_images(_: str):
     return None
+
+
+async def _download_remote_image(url: str, *, proxy_url: str) -> bytes:
+    cleaned_url = url.strip()
+    if not cleaned_url:
+        return b""
+    async with httpx.AsyncClient(timeout=20.0, proxy=proxy_url or None) as client:
+        response = await client.get(cleaned_url)
+    response.raise_for_status()
+    return response.content
 
 
 def _build_downloader_instances_by_name(
@@ -245,6 +256,7 @@ def main() -> None:
             lookup_movie_func=tmdb_client.search_movie,
             get_movie_images_func=get_movie_images_func,
             lookup_movie_by_tmdb_id_func=tmdb_client.get_movie_by_id,
+            download_image_func=lambda url: _download_remote_image(url, proxy_url=settings.outbound_proxy_url),
         )
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(
