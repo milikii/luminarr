@@ -36,7 +36,7 @@
 
 ## Latest verification
 
-- `make quality`：通过；docs/tests 阶段 `27 passed`
+- `make quality`：通过；docs/tests 阶段 `28 passed`
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
