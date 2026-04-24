@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from app.search_title_normalization import normalize_match_key
+from app.search_title_normalization import normalize_match_key, score_title_match
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,21 +219,9 @@ def _score_tmdb_match(candidate: TmdbMovie, *, title: str, year: str) -> tuple[i
     normalized_title = normalize_match_key(candidate.title)
     normalized_original_title = normalize_match_key(candidate.original_title)
     title_score = max(
-        _score_title_variant(title, normalized_title),
-        _score_title_variant(title, normalized_original_title),
+        score_title_match(title, normalized_title),
+        score_title_match(title, normalized_original_title),
     )
     year_score = 1 if year and candidate.year == year else 0
     exact_year_penalty = 0 if year_score or not year else -1
     return title_score, year_score, exact_year_penalty
-
-
-def _score_title_variant(query: str, candidate_title: str) -> int:
-    if not query or not candidate_title:
-        return 0
-    if candidate_title == query:
-        return 4
-    if candidate_title.startswith(query):
-        return 3
-    if query in candidate_title:
-        return 2
-    return 1 if candidate_title.replace(" ", "") == query.replace(" ", "") else 0

@@ -105,6 +105,33 @@ def compact_match_key(value: str) -> str:
     return value.replace(" ", "")
 
 
+def is_confident_title_match(query: str, candidate_title: str) -> bool:
+    normalized_query = normalize_match_key(query)
+    normalized_candidate = normalize_match_key(candidate_title)
+    if not normalized_query or not normalized_candidate:
+        return False
+    if normalized_candidate == normalized_query:
+        return True
+    return compact_match_key(normalized_candidate) == compact_match_key(normalized_query) or is_subtitle_extension_match(
+        query,
+        candidate_title,
+    )
+
+
+def score_title_match(query: str, candidate_title: str) -> int:
+    normalized_query = normalize_match_key(query)
+    normalized_candidate = normalize_match_key(candidate_title)
+    if not normalized_query or not normalized_candidate:
+        return 0
+    if normalized_candidate == normalized_query:
+        return 4
+    if is_subtitle_extension_match(query, candidate_title) or normalized_candidate.startswith(normalized_query):
+        return 3
+    if normalized_query in normalized_candidate:
+        return 2
+    return 1 if compact_match_key(normalized_candidate) == compact_match_key(normalized_query) else 0
+
+
 def is_subtitle_extension_match(query: str, candidate_title: str) -> bool:
     normalized_query = normalize_match_key(query)
     normalized_candidate = normalize_match_key(candidate_title)
