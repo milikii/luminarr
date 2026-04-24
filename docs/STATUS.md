@@ -1,4 +1,4 @@
-# Current status (v458)
+# Current status (v459)
 
 ## Current mainline
 
@@ -8,7 +8,7 @@
 - 当前这一轮再补一格：`.metadata.json` 之外的最小本地刮削产物 `.nfo` 已开始落地；文件型目标会写同名 `.nfo`，目录型目标会优先写到主视频旁边。
 - 当前这一轮又前推一格：本地 `poster` / `backdrop` 图片产物也已开始落地；文件型目标会写 `<basename>-poster.*` / `<basename>-backdrop.*`，目录型目标会写 `poster.*` / `backdrop.*`。
 - 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
-- 当前下一步切到真实 smoke：`import -> scrape -> subtitle -> refresh`。
+- 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -18,7 +18,7 @@
 - 搜索链当前保持完成态：续作/章节别名归一、尾部版本噪音剥离、TMDB 高置信长标题命中，以及 `AMZN / DSNP / 4K / 2160p` 这类 BT 标题噪音与等价分辨率去重都已收口。
 - 字幕链当前保持完成态：外挂字幕随导入落库、已有中文字幕跳过翻译、无外挂字幕时可探测/提取英文文本字幕再翻译。
 - 当前刮削系统的输入真相已经收口：metadata 刮削现在优先消费已确认媒体身份，且有 `tmdb_id` 时会直连详情。
-- 当前最大缺口已经从“重新猜片”切到“真实消费结果仍未确认”：目前 `.metadata.json` + `.nfo` + `poster` / `backdrop` 和写入策略都已落地，但还缺一次真实 `import -> scrape -> subtitle -> refresh` 联调确认。
+- 当前刮削系统基础收口已完成：`.metadata.json` + `.nfo` + `poster` / `backdrop` 与写入策略都已落地，且真实 `import -> scrape -> subtitle -> refresh` 联调已拿到 Emby 消费证据。
 - 当前 live smoke 真相仍分两段：`search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 跑通；`status -> import -> confirm -> refresh` 已在真实 PT Transmission / Emby 跑通。
 
 ## Latest verification
@@ -32,12 +32,13 @@
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`
 - 字幕 / 导入 focused：`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py tests/test_import_to_library.py` 为 `161 passed`
 - 当前真实 smoke 证据仍有效：前半段 `task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status`；后半段 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
+- 当前刮削真实 smoke 新证据：`/tmp/luminarr-real-smoke-1777048577.json` 记录了 `metadata_path`、`nfo_path`、`poster_path`、`backdrop_path` 与 Emby 返回的 `Name=Interstellar`、`Tmdb=157336`。
 
 ## Current biggest risk
 
-- 当前最大刮削风险已经从“导入后重新猜片”切到“真实消费结果还没确认”：本地产物虽然已经开始落地，但 Emby 侧对这些本地真相的实际消费效果还没有当前轮 smoke 证据。
+- 当前最大刮削风险已经从“导入后重新猜片”切到“后续扩展边界”：如果继续往更多图片类型或更复杂命名规则扩，会重新拉高回归风险。
 - 当前机器环境真相要继续按当轮探针写；涉及内嵌字幕探测时，默认要求 `ffmpeg` 在 PATH 中可执行。
-- 当前最大发布前不确定性已收缩到“真实联调结果”；下一步应优先做 `import -> scrape -> subtitle -> refresh` smoke，而不是再开新的 provider 支线。
+- 当前最大发布前不确定性已收缩到“下一条主线要不要继续扩刮削产物”，而不是当前主链是否成立。
 
 ## Recommended Next Operator Command
 
