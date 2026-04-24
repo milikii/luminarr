@@ -10,6 +10,7 @@ from app.clients.web_source import (
     looks_like_web_source_page_request,
     resolve_supported_web_source_page_request,
 )
+from app.search_title_normalization import normalize_spaces
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
@@ -34,7 +35,6 @@ from app.services.search_request_context import (
     ParsedMovieQuery,
     SearchFunc,
     build_search_request_context,
-    normalize_spaces,
 )
 from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
 

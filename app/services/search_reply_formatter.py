@@ -7,7 +7,8 @@ from typing import Any
 
 from app.clients.tmdb import TmdbMovie
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
-from app.services.search_request_context import ParsedMovieQuery, normalize_spaces
+from app.search_title_normalization import normalize_spaces
+from app.services.search_request_context import ParsedMovieQuery
 
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
