@@ -1,4 +1,4 @@
-# Current status (v447)
+# Current status (v448)
 
 ## Current mainline
 
@@ -19,6 +19,7 @@
 - `John Wick Chapter 4 Extended 2023`、`Dune Part 2 Extended 2024`、`Mission Impossible 7 IMAX 2023`、`Fast X Special Edition 2023` 这类“续作/章节 token + 版本噪音词 + 年份”输入现在会先剥掉尾部噪音词，再保住真正的 sequel/chapter token，不再把 `4 / 2 / 7 / X` 吞掉。
 - `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + 版本 cut/edition 词 + 年份”输入现在也会先剥掉尾部版本词，再把搜索标题对齐回真正片名；但 `The Final Cut 2004` 这类本体标题不会被误删空。
 - 当前 `search_request_context.py` 与 `search_title_normalization.py` 已共享同一套标题噪音剥离规则；TMDB 直接候选比对现在也会把 `Final Cut / Extended` 这类尾部版本词当作噪音处理，不再只靠 query 解析这一层兜底。
+- `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会继续复用共享噪音归一层，不再把 `Remastered / Theatrical / Uncut` 留在搜索标题里，或把 `Part 2 / Chapter 4` 吞掉。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
@@ -34,8 +35,8 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
-- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `137 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `149 passed`
+- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `141 passed`
+- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `154 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
 - import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
 - 当前本机探针：

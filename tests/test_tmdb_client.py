@@ -291,6 +291,39 @@ def test_search_movie_prefers_chapter_alias_when_query_has_extended_noise() -> N
     assert result.tmdb_id == "2"
 
 
+def test_search_movie_prefers_base_title_when_query_has_remastered_noise() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Alien Remastered"
+        assert params["year"] == "1979"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "Aliens",
+                        "original_title": "Aliens",
+                        "release_date": "1979-07-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Alien",
+                        "original_title": "Alien",
+                        "release_date": "1979-05-25",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Alien Remastered", "1979"))
+
+    assert result is not None
+    assert result.title == "Alien"
+    assert result.tmdb_id == "2"
+
+
 def test_search_movie_without_valid_result_returns_none() -> None:
     client = TmdbClient(api_key="tmdb-key")
 

@@ -4,7 +4,7 @@ import re
 import unicodedata
 
 SEARCH_TITLE_NOISE_PATTERN = (
-    r"(?:imax|extended(?:\s+edition)?|special\s+edition|ultimate\s+edition|final\s+cut|director'?s\s+cut|directors\s+cut)"
+    r"(?:imax|extended(?:\s+edition)?|special\s+edition|ultimate\s+edition|final\s+cut|director'?s\s+cut|directors\s+cut|remaster(?:ed)?|theatrical(?:\s+cut)?|uncut)"
 )
 _SEQUEL_ALIAS_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bpart\s+one\b", re.IGNORECASE), "1"),
