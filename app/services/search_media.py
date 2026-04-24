@@ -10,7 +10,7 @@ from app.clients.web_source import (
     looks_like_web_source_page_request,
     resolve_supported_web_source_page_request,
 )
-from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
+from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key, normalize_spaces
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
@@ -375,44 +375,7 @@ def _normalize_media_bt_title_for_dedupe(title: str) -> str:
     if not normalized_title:
         return ""
     filtered_tokens: list[str] = []
-    stopwords = {
-        "2160p",
-        "1080p",
-        "720p",
-        "480p",
-        "web",
-        "dl",
-        "webdl",
-        "webrip",
-        "bluray",
-        "blu",
-        "ray",
-        "bdrip",
-        "hdr",
-        "dv",
-        "hevc",
-        "x264",
-        "x265",
-        "h264",
-        "h265",
-        "ddp",
-        "aac",
-        "dts",
-        "atmos",
-        "truehd",
-        "uhd",
-        "10bit",
-        "8bit",
-        "remux",
-        "ma",
-        "2audio",
-        "2audios",
-        "gbr",
-        "usa",
-        "jpn",
-        "fra",
-        "eur",
-    }
+    stopwords = BT_RESULT_TITLE_NOISE_TOKENS | {"2audio", "gbr", "usa", "jpn", "fra"}
     for token in normalized_title.split():
         if re.fullmatch(r"(?:19|20)\d{2}", token):
             continue
@@ -423,10 +386,13 @@ def _normalize_media_bt_title_for_dedupe(title: str) -> str:
 
 
 def _extract_resolution_token(title: str) -> str:
-    match = re.search(r"\b(2160p|1080p|720p|480p)\b", title, flags=re.IGNORECASE)
+    match = re.search(r"\b(2160p|4k|1080p|720p|480p)\b", title, flags=re.IGNORECASE)
     if match is None:
         return ""
-    return str(match.group(1) or "").lower()
+    token = str(match.group(1) or "").lower()
+    if token == "4k":
+        return "2160p"
+    return token
 
 
 def _derive_media_title_fallback_queries(
@@ -457,46 +423,7 @@ def _normalize_title_tokens_for_fallback(title: str) -> list[str]:
     normalized = re.sub(r"\b\d\.\d\b", " ", title.strip(), flags=re.IGNORECASE)
     normalized = normalize_match_key(normalized)
     tokens = [token for token in normalized.split() if token]
-    stopwords = {
-        "2160p",
-        "1080p",
-        "720p",
-        "480p",
-        "web",
-        "dl",
-        "webdl",
-        "webrip",
-        "bluray",
-        "blu",
-        "ray",
-        "bdrip",
-        "hdr",
-        "dv",
-        "hevc",
-        "x264",
-        "x265",
-        "h264",
-        "h265",
-        "ddp",
-        "aac",
-        "dts",
-        "atmos",
-        "truehd",
-        "uhd",
-        "10bit",
-        "8bit",
-        "remux",
-        "ma",
-        "2audios",
-        "csweb",
-        "frds",
-        "hd",
-        "hdsweb",
-        "diy",
-        "hhweb",
-        "eur",
-        "max",
-    }
+    stopwords = BT_RESULT_TITLE_NOISE_TOKENS | {"max"}
     return [token for token in tokens if token not in stopwords and not re.fullmatch(r"(?:19|20)\d{2}", token)]
 
 

@@ -61,6 +61,26 @@ def test_filter_candidates_prefers_sequel_alias_candidate_over_neighbor_title() 
     assert scored[1].drop_reason == "title_mismatch"
 
 
+def test_filter_candidates_treats_streaming_provider_tag_as_title_noise() -> None:
+    scored = filter_candidates(
+        (_make_candidate(title="Dune 2021 1080p AMZN WEB-DL x265-GRP"),),
+        _movie_context(query="Dune 2021"),
+    )
+
+    assert scored[0].drop_reason is None
+    assert scored[0].score_breakdown["title_relevance"] == 1.0
+
+
+def test_filter_candidates_treats_4k_token_as_resolution_noise() -> None:
+    scored = filter_candidates(
+        (_make_candidate(title="Dune 2021 4K UHD BluRay x265-GRP"),),
+        _movie_context(query="Dune 2021"),
+    )
+
+    assert scored[0].drop_reason is None
+    assert scored[0].score_breakdown["title_relevance"] == 1.0
+
+
 def test_filter_candidates_allows_chinese_title_with_year_token_match() -> None:
     scored = filter_candidates((_make_candidate(title="葬送的芙莉莲 2023 1080p"),), _anime_context(query="葬送的芙莉莲 2023"))
 

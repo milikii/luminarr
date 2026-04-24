@@ -17,6 +17,58 @@ _SEARCH_TITLE_NOISE_VARIANTS: tuple[str, ...] = (
     r"(?:the\s+)?anniversary\s+edition",
     r"(?:the\s+)?collector(?:'?s)?\s+edition",
 )
+BT_RESULT_PROVIDER_TAGS = frozenset(
+    {
+        "amzn",
+        "dsnp",
+        "nf",
+        "atvp",
+        "hmax",
+        "itunes",
+    }
+)
+BT_RESULT_TITLE_NOISE_TOKENS = frozenset(
+    {
+        "2160p",
+        "4k",
+        "1080p",
+        "720p",
+        "480p",
+        "web",
+        "dl",
+        "webdl",
+        "webrip",
+        "bluray",
+        "blu",
+        "ray",
+        "bdrip",
+        "hdr",
+        "dv",
+        "hevc",
+        "x264",
+        "x265",
+        "h264",
+        "h265",
+        "ddp",
+        "aac",
+        "dts",
+        "hd",
+        "atmos",
+        "truehd",
+        "uhd",
+        "10bit",
+        "8bit",
+        "remux",
+        "ma",
+        "2audios",
+        "csweb",
+        "frds",
+        "hdsweb",
+        "diy",
+        "hhweb",
+        "eur",
+    }
+) | BT_RESULT_PROVIDER_TAGS
 
 
 def _union_pattern(variants: tuple[str, ...]) -> str:

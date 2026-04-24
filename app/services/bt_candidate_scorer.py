@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.search_title_normalization import compact_match_key, normalize_match_key
+from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key
 
 _INFO_HASH_PATTERN = re.compile(r"xt=urn:btih:([0-9a-z]{32,40})", re.IGNORECASE)
 _NORMALIZED_TEXT_PATTERN = re.compile(r"[^0-9a-z\u4e00-\u9fff]+", re.IGNORECASE)
@@ -42,47 +42,7 @@ _MOVIE_EXTRA_PATTERNS = (
 )
 _DEFAULT_MOVIE_SIZE_RANGE = (5 * 1024**3, 15 * 1024**3)
 _DEFAULT_EPISODE_SIZE_RANGE = (1 * 1024**3, 5 * 1024**3)
-_TITLE_RELEVANCE_STOPWORDS = frozenset(
-    {
-        "2160p",
-        "1080p",
-        "720p",
-        "480p",
-        "web",
-        "dl",
-        "webdl",
-        "webrip",
-        "bluray",
-        "blu",
-        "ray",
-        "bdrip",
-        "hdr",
-        "dv",
-        "hevc",
-        "x264",
-        "x265",
-        "h264",
-        "h265",
-        "ddp",
-        "aac",
-        "dts",
-        "hd",
-        "atmos",
-        "truehd",
-        "uhd",
-        "10bit",
-        "8bit",
-        "remux",
-        "ma",
-        "2audios",
-        "csweb",
-        "frds",
-        "hdsweb",
-        "diy",
-        "hhweb",
-        "eur",
-    }
-)
+_TITLE_RELEVANCE_STOPWORDS = BT_RESULT_TITLE_NOISE_TOKENS
 
 
 @dataclass(frozen=True, slots=True)

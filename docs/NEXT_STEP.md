@@ -1,12 +1,14 @@
-# Next step (v344)
+# Next step (v345)
 
 ## Current goal
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**TMDB 英文标题查询顺序固定优先**。
-- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `158 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `175 passed`。
+- 当前刚完成的一条最小闭环是：**BT 标题噪音归一继续收口到共享标题归一层**。
+- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`。
 - 当前这一轮已经补齐：
+  - `Dune 2021 4K UHD BluRay ...`、`Dune 2021 2160p UHD BluRay ...` 这类只差 `4K / 2160p` 分辨率写法的同片结果，现在 movie-first 去重会把两者视作同一档分辨率；不会再把同一部片的 UHD 结果因为写法不同连着展示两条
+  - `Dune 2021 1080p AMZN WEB-DL ...`、`Dune 2021 1080p DSNP WEB-DL ...` 这类只差流媒体来源标签的同片结果，现在 movie-first 排序与去重会把 `AMZN / DSNP / NF / ATVP / HMAX / iTunes` 视作标题噪音；不会再把同一部片的 1080p WEB-DL 因来源标签不同连着展示两条
   - `Dune Part 2 2024` 这类没拿到 TMDB 改写、但 BT 结果标题写成 `Dune: Part Two ...` 的查询，现在 movie-first 排序器也会把 sequel alias 视作同片，不再直接把真结果判成 `title_mismatch` 或落成“未找到候选”
   - `流浪地球2 2023` 这类只能靠结果反推 fallback query 的查询，现在 fallback token 也会先走共享标题归一；`II` / `2` 不再被拆成两套公共词，`5.1` 这类音轨噪音也不会再混进 fallback query
   - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
@@ -56,6 +58,9 @@
 - 当前这一轮也继续降低了模块耦合：搜索链里凡是纯标题归一工具，默认直接从共享标题归一层取，不再挂靠到 request context 模块。
 - 当前这一轮也把模块边界再切清了一步：后续若继续补 query 解析规则，优先改 parser 模块和共享标题归一层，不再把 parser 逻辑混回 request context。
 - 当前这一轮也把 BT 排序器和 fallback query 的标题理解再对齐了一步：续作别名与公共 fallback token 现在也会复用共享标题归一，不再各自靠原始字符串硬猜。
+- 当前这一轮也继续收紧了同片版本噪音：常见流媒体来源标签现在也会按标题噪音处理，不再把 `AMZN / DSNP / NF` 这类来源差异误当成片名差异。
+- 当前这一轮也把 `4K / 2160p` 这类等价分辨率写法对齐了一步：同片 UHD 结果不再因为资源站写法不同被拆成两条前台候选。
+- 当前这一轮也顺手做了一步结构降本：BT 标题噪音 stopwords 现在回收到共享标题归一层，后续若继续补 scene/source/tag 噪音词，不需要再在 `search_media.py` 和 `bt_candidate_scorer.py` 两边各抄一份。
 - 当前这条主线的价值也更直接：不改协议、不扩能力，只提高“搜索第一屏更像用户真正要的片”这件事。
 - 后续若继续，仍然优先做这类 query 命中质量与排序偏好，不回头重开发布准备或结构瘦身。
 

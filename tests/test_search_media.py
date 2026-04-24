@@ -3524,6 +3524,68 @@ def test_search_and_format_keeps_sequel_alias_candidate_without_tmdb_lookup() ->
     assert "2. Dune: Part One 2024 2160p BluRay" not in text
 
 
+def test_search_and_format_deduplicates_streaming_provider_tag_variants() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune 2021"
+        return [
+            {
+                "title": "Dune 2021 2160p BluRay x265-GRP3",
+                "year": 2021,
+                "size": 20 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-2160.torrent",
+                "indexerName": "Indexer2160",
+            },
+            {
+                "title": "Dune 2021 1080p AMZN WEB-DL x265-GRP",
+                "year": 2021,
+                "size": 8 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-amzn.torrent",
+                "indexerName": "IndexerAmzn",
+            },
+            {
+                "title": "Dune 2021 1080p DSNP WEB-DL x265-GRP2",
+                "year": 2021,
+                "size": 8 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-dsnp.torrent",
+                "indexerName": "IndexerDsnp",
+            },
+        ]
+
+    service = SearchMediaService(fake_search)
+    text = _run(service.search_and_format("Dune 2021"))
+
+    assert "1. Dune 2021 2160p BluRay x265-GRP3" in text
+    assert "2. Dune 2021 1080p AMZN WEB-DL x265-GRP" in text
+    assert "Dune 2021 1080p DSNP WEB-DL x265-GRP2" not in text
+
+
+def test_search_and_format_deduplicates_4k_and_2160p_variants() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune 2021"
+        return [
+            {
+                "title": "Dune 2021 4K UHD BluRay x265-GRP1",
+                "year": 2021,
+                "size": 20 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-4k.torrent",
+                "indexerName": "Indexer4K",
+            },
+            {
+                "title": "Dune 2021 2160p UHD BluRay x265-GRP2",
+                "year": 2021,
+                "size": 20 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-2160p.torrent",
+                "indexerName": "Indexer2160p",
+            },
+        ]
+
+    service = SearchMediaService(fake_search)
+    text = _run(service.search_and_format("Dune 2021"))
+
+    assert "1. Dune 2021 4K UHD BluRay x265-GRP1" in text
+    assert "Dune 2021 2160p UHD BluRay x265-GRP2" not in text
+
+
 def test_search_and_format_deduplicates_same_title_after_movie_ordering() -> None:
     async def fake_search(query: str) -> list[dict[str, object]]:
         assert query == "流浪地球2 2023"
