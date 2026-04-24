@@ -19,6 +19,7 @@
 - `John Wick Chapter 4 Extended 2023`、`Dune Part 2 Extended 2024`、`Mission Impossible 7 IMAX 2023`、`Fast X Special Edition 2023` 这类“续作/章节 token + 版本噪音词 + 年份”输入现在会先剥掉尾部噪音词，再保住真正的 sequel/chapter token，不再把 `4 / 2 / 7 / X` 吞掉。
 - `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + 版本 cut/edition 词 + 年份”输入现在也会先剥掉尾部版本词，再把搜索标题对齐回真正片名；但 `The Final Cut 2004` 这类本体标题不会被误删空。
 - `Blade Runner The Final Cut 1982`、`Alien The Director's Cut 1979` 这类“前置冠词 + 版本短语”尾巴现在也会整段剥掉，不再把搜索标题错误残留成 `Blade Runner The` / `Alien The`；`The Final Cut 2004` 这类本体标题仍保持不误删。
+- `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类复合版本词写法现在也会回到真实片名，不再把 `2` 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 留在搜索标题里。
 - 当前 `search_request_context.py` 与 `search_title_normalization.py` 已共享同一套标题噪音剥离规则；TMDB 直接候选比对现在也会把 `Final Cut / Extended` 这类尾部版本词当作噪音处理，不再只靠 query 解析这一层兜底。
 - `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会继续复用共享噪音归一层，不再把 `Remastered / Theatrical / Uncut` 留在搜索标题里，或把 `Part 2 / Chapter 4` 吞掉。
 - `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会继续复用共享噪音归一层，不再把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里，或把基片标题拖偏。

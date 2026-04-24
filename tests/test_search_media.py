@@ -3214,6 +3214,36 @@ def test_search_and_format_strips_remastered_noise_after_chapter_digit_alias() -
     assert "John Wick: Chapter 4 Remastered 2023 2160p BluRay" in text
 
 
+def test_search_and_format_strips_imax_enhanced_noise_after_part_digit_alias() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune Part Two 2024":
+            return [
+                {
+                    "title": "Dune Part Two IMAX Enhanced 2024 2160p BluRay",
+                    "year": 2024,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerPT",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Dune Part 2"
+        assert year == "2024"
+        return TmdbMovie(title="Dune Part Two", original_title="Dune: Part Two", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Dune Part 2 IMAX Enhanced 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024"]
+    assert "片名: Dune: Part Two" in text
+    assert "别名: Dune Part Two" in text
+    assert "Dune Part Two IMAX Enhanced 2024 2160p BluRay" in text
+
+
 def test_search_and_format_strips_anniversary_edition_noise_from_query_title() -> None:
     seen_queries: list[str] = []
 
@@ -3483,10 +3513,34 @@ def test_parse_movie_query_strips_remastered_noise() -> None:
     assert parsed.year == "1979"
 
 
+def test_parse_movie_query_strips_extended_cut_noise() -> None:
+    parsed = parse_movie_query("Avatar Extended Cut 2009")
+    assert parsed.title == "Avatar"
+    assert parsed.year == "2009"
+
+
+def test_parse_movie_query_strips_special_extended_edition_noise() -> None:
+    parsed = parse_movie_query("Batman v Superman Special Extended Edition 2016")
+    assert parsed.title == "Batman v Superman"
+    assert parsed.year == "2016"
+
+
+def test_parse_movie_query_strips_imax_enhanced_noise_after_part_digit() -> None:
+    parsed = parse_movie_query("Dune Part 2 IMAX Enhanced 2024")
+    assert parsed.title == "Dune Part 2"
+    assert parsed.year == "2024"
+
+
 def test_parse_movie_query_strips_theatrical_cut_noise_after_part_digit() -> None:
     parsed = parse_movie_query("Dune Part 2 Theatrical 2024")
     assert parsed.title == "Dune Part 2"
     assert parsed.year == "2024"
+
+
+def test_parse_movie_query_strips_theatrical_version_noise() -> None:
+    parsed = parse_movie_query("Blade Runner Theatrical Version 1982")
+    assert parsed.title == "Blade Runner"
+    assert parsed.year == "1982"
 
 
 def test_parse_movie_query_strips_uncut_noise() -> None:
@@ -3511,6 +3565,12 @@ def test_parse_movie_query_strips_collectors_edition_noise() -> None:
     parsed = parse_movie_query("Avatar Collectors Edition 2009")
     assert parsed.title == "Avatar"
     assert parsed.year == "2009"
+
+
+def test_parse_movie_query_strips_collector_edition_noise() -> None:
+    parsed = parse_movie_query("Aliens Collector Edition 1986")
+    assert parsed.title == "Aliens"
+    assert parsed.year == "1986"
 
 
 def test_parse_movie_query_keeps_title_when_no_year() -> None:

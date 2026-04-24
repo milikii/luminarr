@@ -324,6 +324,39 @@ def test_search_movie_prefers_chapter_alias_when_query_has_extended_noise() -> N
     assert result.tmdb_id == "2"
 
 
+def test_search_movie_prefers_part_alias_when_query_has_imax_enhanced_noise() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Dune Part 2 IMAX Enhanced"
+        assert params["year"] == "2024"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "Dune",
+                        "original_title": "Dune",
+                        "release_date": "2024-01-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Dune Part Two",
+                        "original_title": "Dune: Part Two",
+                        "release_date": "2024-03-01",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Dune Part 2 IMAX Enhanced", "2024"))
+
+    assert result is not None
+    assert result.title == "Dune Part Two"
+    assert result.tmdb_id == "2"
+
+
 def test_search_movie_prefers_base_title_when_query_has_remastered_noise() -> None:
     client = TmdbClient(api_key="tmdb-key")
 
@@ -354,6 +387,39 @@ def test_search_movie_prefers_base_title_when_query_has_remastered_noise() -> No
 
     assert result is not None
     assert result.title == "Alien"
+    assert result.tmdb_id == "2"
+
+
+def test_search_movie_prefers_base_title_when_query_has_extended_cut_noise() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Avatar Extended Cut"
+        assert params["year"] == "2009"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "The Last Avatar",
+                        "original_title": "The Last Avatar",
+                        "release_date": "2009-08-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Avatar",
+                        "original_title": "Avatar",
+                        "release_date": "2009-12-18",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Avatar Extended Cut", "2009"))
+
+    assert result is not None
+    assert result.title == "Avatar"
     assert result.tmdb_id == "2"
 
 
