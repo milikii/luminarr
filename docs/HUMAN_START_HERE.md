@@ -19,11 +19,17 @@
 
 如果你只记得一条原则：**不要先读历史台账，先看 `STATUS` 和 `RUNBOOK`。**
 
+如果你只想最快继续推进，优先直接复制 `docs/STATUS.md` 最后那段 `Recommended Next Operator Command`。
+
 ## 3. 你最常做的三件事
 
 ### 想继续让 AI 施工
 
 先不要自己写一大段自由提示词，先判断你属于哪一种：
+
+0. 只是想最快继续当前主线：
+
+直接复制 `docs/STATUS.md` 最后那段 `Recommended Next Operator Command`。
 
 1. 只是继续当前主线：
 

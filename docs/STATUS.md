@@ -63,6 +63,8 @@
 
 ## Recommended Next Operator Command
 
+默认继续施工时，直接复制下面这句给 AI：
+
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```

@@ -21,8 +21,9 @@
 如果你只想继续推进当前仓库，默认顺序是：
 
 1. 先看 `docs/STATUS.md`
-2. 再去 `docs/OPERATOR_RUNBOOK.md` 选一条模板复制
-3. 不确定有没有漂移时，先跑“冷启动一致性检查”
+2. 最快时，直接复制 `docs/STATUS.md` 末尾的 `Recommended Next Operator Command`
+3. 如果那一句不适合当前场景，再去 `docs/OPERATOR_RUNBOOK.md` 选一条模板复制
+4. 不确定有没有漂移时，先跑“冷启动一致性检查”
 
 ## 2. 如果你是 AI / 施工代理
 
