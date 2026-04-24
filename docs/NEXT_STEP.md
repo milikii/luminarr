@@ -11,7 +11,8 @@
 
 - 导入后的 metadata 刮削现在不再优先赌“文件名猜得对不对”，而是优先吃搜索确认时已经拿到的媒体身份真相。
 - 只要 `media_identity` 里已经有 `tmdb_id`，metadata 刮削现在会直接按该 ID 取详情，不再重新拿 `title/year` 搜一次。
-- 当前这条主线已经补到真实产物层：`.metadata.json`、`.nfo`、`poster`、`backdrop` 已落地，且 Emby 已能消费到 `Name=Interstellar`、`Tmdb=157336` 的结果。
+- 当前真实链路也已确认最终展示优先中文：最新 smoke 样本在 Emby 中返回的是 `Name=星际穿越`，不是英文标题。
+- 当前这条主线已经补到真实产物层：`.metadata.json`、`.nfo`、`poster`、`backdrop` 已落地，且 Emby 已能消费到 `Name=星际穿越`、`Tmdb=157336` 的结果。
 - 当前默认策略已明确：
   - `.metadata.json`：`overwrite`
   - `.nfo`：`missing-only`
