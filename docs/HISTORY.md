@@ -420,8 +420,9 @@
   已经有分流、分类、TMDB 关联、raw_bt 目录、qB、`btsub`、后台 tick。
   但 BT 选源、外部站点、helper 还没继续补。
 
-- **渠道成熟度：低**
-  当前仍然只有 Telegram。
+- **渠道成熟度：中低**
+  代码里已经有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口；
+  但当前保守首版发布承诺矩阵仍只冻结为 Telegram 私聊。
 
 - **运维自动化成熟度：低到中**
   还没补 downloader/library 关联清理，也还没补通知统计主线。
@@ -436,7 +437,8 @@
 
 当前正式口径可以压缩成下面这几句话：
 
-- 当前唯一主入口是 Telegram 私聊。
+- 代码里当前已有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口。
+- 但当前保守首版发布承诺矩阵仍只冻结为 Telegram 私聊。
 - 当前最近一步是 BT subscription deterministic candidate-selection baseline。
 - 原始磁力后续会增加“影视入库链 / 纯 BT 下载链”问询。
 - pure BT 后续按单片资源优选，不复用影视入库链的复杂规则。

@@ -24,7 +24,7 @@
   - 当前 query 标题里的续作/章节 token 恢复逻辑也已收回共享标题归一层；`search_request_context.py` 不再单独维护那段正则和 match-key 比对细节
   - 当前 `search_media.py` 与 `search_reply_formatter.py` 也已直接依赖共享标题归一层；后续如果还要复用 `normalize_spaces`，不需要再通过 `search_request_context.py` 间接转手
   - 当前 `ParsedMovieQuery` 与 `parse_movie_query()` 已抽到独立 parser 模块；`search_request_context.py` 只保留请求编排职责，不再同时承担纯 query 解析
-- 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `468` 行，`app/bot/telegram_bot.py` 当前 `256` 行，不回退。
+- 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `467` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退。
 - 当前剩余空间仍是“继续打磨命中偏好”，不是“主协议还没通”；movie-first 主链、发布矩阵和质量入口继续保持完成态。
 
 ## User value

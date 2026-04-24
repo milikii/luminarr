@@ -116,6 +116,20 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     assert "cold-start consistency audit" not in status_text
     assert "git log --oneline -20" not in status_text
     assert "git grep -n 'except Exception" not in status_text
+    assert "`app/services/search_media.py` `568` 行" in status_text
+
+
+def test_current_doc_truth_keeps_runtime_lines_and_channel_scope_aligned() -> None:
+    next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
+    decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
+    history_text = Path("docs/HISTORY.md").read_text(encoding="utf-8")
+
+    assert "`app/bot/private_chat_runtime.py` 当前 `467` 行" in next_step_text
+    assert "`app/bot/telegram_bot.py` 当前 `276` 行" in next_step_text
+    assert "`app/bot/telegram_bot.py` 当前维持在 `276` 行" in decisions_text
+    assert "`app/bot/private_chat_runtime.py` 当前维持在 `467` 行" in decisions_text
+    assert "代码里已经有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口" in history_text
+    assert "当前仍然只有 Telegram。" not in history_text
 
 
 def test_codex_prompt_prevents_returning_to_same_proof_family() -> None:
