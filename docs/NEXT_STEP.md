@@ -1,11 +1,11 @@
-# Next step (v340)
+# Next step (v341)
 
 ## Current goal
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**共享标题噪音归一 · 第 2 轮**。
-- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `141 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `154 passed`。
+- 当前刚完成的一条最小闭环是：**共享标题噪音归一 · 第 3 轮**。
+- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `145 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `159 passed`。
 - 当前这一轮已经补齐：
   - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
   - `Dune Part 2 Extended 2024` 这类“part 数字 + 版本噪音词 + 年份”输入现在不会再把 `2` 吞掉，query 解析会继续保住 sequel token
@@ -15,6 +15,7 @@
   - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
   - 当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
   - `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Remastered / Theatrical / Uncut` 留在搜索标题里
+  - `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `468` 行，`app/bot/telegram_bot.py` 当前 `256` 行，不回退。
 - 当前剩余空间仍是“继续打磨命中偏好”，不是“主协议还没通”；movie-first 主链、发布矩阵和质量入口继续保持完成态。
 
@@ -23,6 +24,7 @@
 - 用户现在输入带 `Extended / IMAX / Special Edition / Final Cut / Director's Cut / Ultimate Edition` 这类版本噪音词的片名时，更不容易因为尾部脏词把真正的 sequel/chapter token 吞掉，或者把片名误留在版本 cut/edition 词上。
 - 当前这一轮也顺手降低了后续维护成本：再加新一类尾部标题噪音词时，不需要同时改 query 解析和 TMDB 标题比对两套逻辑。
 - 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
+- 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。
 - 当前这条主线的价值也更直接：不改协议、不扩能力，只提高“搜索第一屏更像用户真正要的片”这件事。
 - 后续若继续，仍然优先做这类 query 命中质量与排序偏好，不回头重开发布准备或结构瘦身。
 
