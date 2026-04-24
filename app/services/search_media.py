@@ -10,7 +10,7 @@ from app.clients.web_source import (
     looks_like_web_source_page_request,
     resolve_supported_web_source_page_request,
 )
-from app.search_title_normalization import normalize_spaces
+from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
@@ -347,14 +347,86 @@ def _dedupe_media_bt_results_by_title(results: Sequence[Mapping[str, Any]]) -> l
     deduped_results: list[Mapping[str, Any]] = []
     seen_titles: set[str] = set()
     for item in results:
-        title = normalize_spaces(safe_text(item.get("title"), default=""))
-        if title:
-            title_key = title.lower()
+        title_key = _media_bt_result_dedupe_key(item)
+        if title_key:
             if title_key in seen_titles:
                 continue
             seen_titles.add(title_key)
         deduped_results.append(item)
     return deduped_results
+
+
+def _media_bt_result_dedupe_key(item: Mapping[str, Any]) -> str:
+    title = normalize_spaces(safe_text(item.get("title"), default=""))
+    if not title:
+        return ""
+    normalized_title = _normalize_media_bt_title_for_dedupe(title)
+    if not normalized_title:
+        return title.lower()
+    resolution = _extract_resolution_token(title)
+    if not resolution:
+        return normalized_title
+    return f"{normalized_title}|{resolution}"
+
+
+def _normalize_media_bt_title_for_dedupe(title: str) -> str:
+    cleaned_title = re.sub(r"-[A-Za-z0-9][A-Za-z0-9-]*$", "", title.strip())
+    normalized_title = normalize_match_key(cleaned_title)
+    if not normalized_title:
+        return ""
+    filtered_tokens: list[str] = []
+    stopwords = {
+        "2160p",
+        "1080p",
+        "720p",
+        "480p",
+        "web",
+        "dl",
+        "webdl",
+        "webrip",
+        "bluray",
+        "blu",
+        "ray",
+        "bdrip",
+        "hdr",
+        "dv",
+        "hevc",
+        "x264",
+        "x265",
+        "h264",
+        "h265",
+        "ddp",
+        "aac",
+        "dts",
+        "atmos",
+        "truehd",
+        "uhd",
+        "10bit",
+        "8bit",
+        "remux",
+        "ma",
+        "2audio",
+        "2audios",
+        "gbr",
+        "usa",
+        "jpn",
+        "fra",
+        "eur",
+    }
+    for token in normalized_title.split():
+        if re.fullmatch(r"(?:19|20)\d{2}", token):
+            continue
+        if token in stopwords:
+            continue
+        filtered_tokens.append(token)
+    return compact_match_key(" ".join(filtered_tokens))
+
+
+def _extract_resolution_token(title: str) -> str:
+    match = re.search(r"\b(2160p|1080p|720p|480p)\b", title, flags=re.IGNORECASE)
+    if match is None:
+        return ""
+    return str(match.group(1) or "").lower()
 
 
 def _derive_media_title_fallback_queries(

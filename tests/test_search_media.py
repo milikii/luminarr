@@ -3528,7 +3528,42 @@ def test_search_and_format_deduplicates_same_title_after_movie_ordering() -> Non
     text = _run(service.search_and_format("流浪地球2 2023"))
 
     assert text.count("The Wandering Earth 2 2023 2160p UHD BluRay Remux HEVC DV DTS-HD MA 5.1-ADE") == 1
-    assert "The Wandering Earth II 2023 GBR UHD BluRay 2160p x265 10bit HDR 2Audio DTS-HD MA 5.1-beAst" in text
+    assert "The Wandering Earth II 2023 GBR UHD BluRay 2160p x265 10bit HDR 2Audio DTS-HD MA 5.1-beAst" not in text
+
+
+def test_search_and_format_deduplicates_near_duplicate_title_after_movie_ordering() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "流浪地球2 2023"
+        return [
+            {
+                "title": "The Wandering Earth 2 2023 2160p UHD BluRay Remux HEVC DV DTS-HD MA 5.1-ADE",
+                "year": 2023,
+                "size": 80 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/a.torrent",
+                "indexerName": "IndexerA",
+            },
+            {
+                "title": "The Wandering Earth II 2023 2160p UHD BluRay Remux HEVC DV DTS-HD MA 5.1-BEAST",
+                "year": 2023,
+                "size": 79 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/b.torrent",
+                "indexerName": "IndexerB",
+            },
+            {
+                "title": "The Wandering Earth II 2023 1080p BluRay DTS x264-WiKi",
+                "year": 2023,
+                "size": 20 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/c.torrent",
+                "indexerName": "IndexerC",
+            },
+        ]
+
+    service = SearchMediaService(fake_search)
+    text = _run(service.search_and_format("流浪地球2 2023"))
+
+    assert text.count("The Wandering Earth 2 2023 2160p UHD BluRay Remux HEVC DV DTS-HD MA 5.1-ADE") == 1
+    assert "The Wandering Earth II 2023 2160p UHD BluRay Remux HEVC DV DTS-HD MA 5.1-BEAST" not in text
+    assert "The Wandering Earth II 2023 1080p BluRay DTS x264-WiKi" in text
 
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> None:
     seen_queries: list[str] = []
