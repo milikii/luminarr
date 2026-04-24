@@ -340,7 +340,21 @@ def _order_media_bt_results(
     if not ordered_results:
         return ()
     ordered_results.extend(remainder)
-    return tuple(ordered_results)
+    return tuple(_dedupe_media_bt_results_by_title(ordered_results))
+
+
+def _dedupe_media_bt_results_by_title(results: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    deduped_results: list[Mapping[str, Any]] = []
+    seen_titles: set[str] = set()
+    for item in results:
+        title = normalize_spaces(safe_text(item.get("title"), default=""))
+        if title:
+            title_key = title.lower()
+            if title_key in seen_titles:
+                continue
+            seen_titles.add(title_key)
+        deduped_results.append(item)
+    return deduped_results
 
 
 def _derive_media_title_fallback_queries(

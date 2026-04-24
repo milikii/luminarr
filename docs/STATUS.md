@@ -26,6 +26,7 @@
 - 搜索链结构继续收口：共享标题噪音规则已改成“声明式词表 + 统一正则拼装”；`search_request_context.py`、`search_media.py`、`search_reply_formatter.py` 直接复用共享标题归一 / parser，TMDB 客户端标题打分、高置信判断和等价查询去重也已共用同一套 helper。
 - movie-first 结果展示现在也已继续收口：被判成 `S01 / S01E01 / Season / Episode` 的剧集形态假阳性，以及明显无关的 outlier，不会再继续混进前台候选列表。
 - `Dune: Part Two 2024 Extras ...` 这类附加内容 / 花絮结果，现在也不会再作为 movie-first 候选展示，不再把 `Extras / featurette / making of / bonus` 顶到正片前面。
+- `流浪地球2 2023` 这类真实查询里前排完全重复的同标题结果，现在也会在 movie-first 展示前先去重，不再让第一屏被同一条标题刷两次。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
