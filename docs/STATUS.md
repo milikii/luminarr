@@ -3,7 +3,8 @@
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮已把 query 解析职责从请求编排层里拆出来：`ParsedMovieQuery` 与 `parse_movie_query()` 不再继续挂在 `search_request_context.py` 下面。
+- 当前这一轮刚完成：`Batman v Superman 2016` 这类“主标题 + 官方多词副标题”现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中并优先直搜官方长片名；但 `John Wick 2023 -> John Wick: Chapter 4` 这类续作后缀不会被误判成同片高置信。
+- 更早完成的 `query 解析职责拆分` 继续保持完成态：`ParsedMovieQuery` 与 `parse_movie_query()` 不再继续挂在 `search_request_context.py` 下面。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
 
