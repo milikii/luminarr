@@ -3,6 +3,9 @@ from __future__ import annotations
 import re
 import unicodedata
 
+SEARCH_TITLE_NOISE_PATTERN = (
+    r"(?:imax|extended(?:\s+edition)?|special\s+edition|ultimate\s+edition|final\s+cut|director'?s\s+cut|directors\s+cut)"
+)
 _SEQUEL_ALIAS_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bpart\s+one\b", re.IGNORECASE), "1"),
     (re.compile(r"\bpart\s+two\b", re.IGNORECASE), "2"),
@@ -46,6 +49,7 @@ _CHINESE_NUMERAL_MAP = {
     "九": 9,
     "十": 10,
 }
+_TRAILING_QUERY_NOISE_RE = re.compile(rf"(?:\s+(?:{SEARCH_TITLE_NOISE_PATTERN}))+$", re.IGNORECASE)
 
 
 def normalize_match_key(value: str) -> str:
@@ -53,6 +57,7 @@ def normalize_match_key(value: str) -> str:
     if not cleaned:
         return ""
     cleaned = re.sub(r"[._:：\-]+", " ", cleaned)
+    cleaned = strip_trailing_query_noise(cleaned)
     cleaned = _normalize_sequel_aliases(cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip()
@@ -60,6 +65,20 @@ def normalize_match_key(value: str) -> str:
 
 def compact_match_key(value: str) -> str:
     return value.replace(" ", "")
+
+
+def strip_trailing_query_noise(value: str) -> str:
+    cleaned_value = _normalize_spaces(value)
+    if not cleaned_value:
+        return cleaned_value
+    stripped_value = cleaned_value
+    while True:
+        next_value = _normalize_spaces(_TRAILING_QUERY_NOISE_RE.sub("", stripped_value))
+        if next_value == stripped_value:
+            return stripped_value
+        if not next_value or _is_trivial_title_after_noise_strip(next_value):
+            return stripped_value
+        stripped_value = next_value
 
 
 def _normalize_sequel_aliases(value: str) -> str:
@@ -71,6 +90,17 @@ def _normalize_sequel_aliases(value: str) -> str:
         normalized = pattern.sub(replacement, normalized)
     normalized = _TRAILING_ORDINAL_WORD_PATTERN.sub(lambda match: str(_parse_ordinal_token(match.group("value"))), normalized)
     return normalized
+
+
+def _normalize_spaces(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def _is_trivial_title_after_noise_strip(value: str) -> bool:
+    tokens = [token for token in _normalize_spaces(value).split(" ") if token]
+    if not tokens:
+        return True
+    return len(tokens) == 1 and tokens[0].lower() in {"a", "an", "the"}
 
 
 def _parse_chinese_part_number(value: str) -> int:

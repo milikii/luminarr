@@ -225,6 +225,72 @@ def test_search_movie_prefers_trailing_word_number_alias_match_over_base_title()
     assert result.tmdb_id == "2"
 
 
+def test_search_movie_prefers_base_title_when_query_has_final_cut_noise() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Blade Runner Final Cut"
+        assert params["year"] == "1982"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "Blade Runner 2049",
+                        "original_title": "Blade Runner 2049",
+                        "release_date": "1982-10-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Blade Runner",
+                        "original_title": "Blade Runner",
+                        "release_date": "1982-06-25",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Blade Runner Final Cut", "1982"))
+
+    assert result is not None
+    assert result.title == "Blade Runner"
+    assert result.tmdb_id == "2"
+
+
+def test_search_movie_prefers_chapter_alias_when_query_has_extended_noise() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "John Wick Chapter 4 Extended"
+        assert params["year"] == "2023"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "John Wick",
+                        "original_title": "John Wick",
+                        "release_date": "2023-01-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "John Wick: Chapter 4",
+                        "original_title": "John Wick: Chapter 4",
+                        "release_date": "2023-03-24",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("John Wick Chapter 4 Extended", "2023"))
+
+    assert result is not None
+    assert result.title == "John Wick: Chapter 4"
+    assert result.tmdb_id == "2"
+
+
 def test_search_movie_without_valid_result_returns_none() -> None:
     client = TmdbClient(api_key="tmdb-key")
 
