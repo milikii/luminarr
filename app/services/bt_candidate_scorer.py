@@ -3,9 +3,11 @@ from __future__ import annotations
 import math
 import os
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+
+from app.search_title_normalization import compact_match_key, normalize_match_key
 
 _INFO_HASH_PATTERN = re.compile(r"xt=urn:btih:([0-9a-z]{32,40})", re.IGNORECASE)
 _NORMALIZED_TEXT_PATTERN = re.compile(r"[^0-9a-z\u4e00-\u9fff]+", re.IGNORECASE)
@@ -64,6 +66,7 @@ _TITLE_RELEVANCE_STOPWORDS = frozenset(
         "ddp",
         "aac",
         "dts",
+        "hd",
         "atmos",
         "truehd",
         "uhd",
@@ -569,19 +572,22 @@ def _looks_like_valid_download_source(source: str) -> bool:
 
 
 def _title_matches_query(title: str, query: str) -> bool:
-    normalized_query = _normalize_text(query)
+    normalized_query = _normalize_title_for_relevance(query)
     if not normalized_query:
         return True
-    normalized_title = _normalize_text(title)
+    normalized_title = _normalize_title_for_relevance(title)
     if not normalized_title:
         return False
     if normalized_query in normalized_title:
+        return True
+    if compact_match_key(normalized_title) == compact_match_key(normalized_query):
         return True
 
     query_tokens = [token for token in normalized_query.split() if token]
     if not query_tokens:
         return True
-    matched_count = sum(1 for token in query_tokens if token in normalized_title)
+    title_tokens = set(normalized_title.split())
+    matched_count = sum(1 for token in query_tokens if token in title_tokens)
     required_count = max(1, math.ceil(len(query_tokens) * 0.8))
     return matched_count >= required_count
 
@@ -592,6 +598,14 @@ def _score_title_relevance(title: str, query: str) -> float:
     if not normalized_query_title or not normalized_candidate_title:
         return 0.0
     if normalized_candidate_title == normalized_query_title:
+        surface_query_title = _normalize_surface_title_for_relevance(query)
+        surface_candidate_title = _normalize_surface_title_for_relevance(title)
+        if compact_match_key(surface_candidate_title) == compact_match_key(surface_query_title):
+            return 1.0
+        return 0.9
+    surface_query_title = _normalize_surface_title_for_relevance(query)
+    surface_candidate_title = _normalize_surface_title_for_relevance(title)
+    if surface_candidate_title == surface_query_title:
         return 1.0
     if normalized_candidate_title.startswith(normalized_query_title):
         return 0.2
@@ -608,8 +622,17 @@ def _score_title_relevance(title: str, query: str) -> float:
 
 
 def _normalize_title_for_relevance(value: str) -> str:
+    return _normalize_title_tokens_for_relevance(value, normalizer=normalize_match_key)
+
+
+def _normalize_surface_title_for_relevance(value: str) -> str:
+    return _normalize_title_tokens_for_relevance(value, normalizer=_normalize_text)
+
+
+def _normalize_title_tokens_for_relevance(value: str, *, normalizer: Callable[[str], str]) -> str:
     cleaned_value = re.sub(r"-[A-Za-z0-9][A-Za-z0-9-]*$", "", value.strip())
-    normalized = _normalize_text(cleaned_value)
+    cleaned_value = re.sub(r"\b\d\.\d\b", " ", cleaned_value, flags=re.IGNORECASE)
+    normalized = normalizer(cleaned_value)
     if not normalized:
         return ""
     filtered_tokens: list[str] = []

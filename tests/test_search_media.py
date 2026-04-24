@@ -3497,6 +3497,33 @@ def test_search_and_format_drops_movie_extra_candidate_for_movie_query() -> None
     assert "Dune: Part Two 2024 Extras 1080p BluRay Remux AVC DD2.0-OPTIMUM" not in text
 
 
+def test_search_and_format_keeps_sequel_alias_candidate_without_tmdb_lookup() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune Part 2 2024"
+        return [
+            {
+                "title": "Dune: Part One 2024 2160p BluRay",
+                "year": 2024,
+                "size": 50 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-part-one.torrent",
+                "indexerName": "IndexerPartOne",
+            },
+            {
+                "title": "Dune: Part Two 2024 1080p WEB-DL",
+                "year": 2024,
+                "size": 8 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/dune-part-two.torrent",
+                "indexerName": "IndexerPartTwo",
+            },
+        ]
+
+    service = SearchMediaService(fake_search)
+    text = _run(service.search_and_format("Dune Part 2 2024"))
+
+    assert "1. Dune: Part Two 2024 1080p WEB-DL" in text
+    assert "2. Dune: Part One 2024 2160p BluRay" not in text
+
+
 def test_search_and_format_deduplicates_same_title_after_movie_ordering() -> None:
     async def fake_search(query: str) -> list[dict[str, object]]:
         assert query == "流浪地球2 2023"

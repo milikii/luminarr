@@ -37,6 +37,30 @@ def test_filter_candidates_drops_movie_extra_release_for_movie_query() -> None:
     assert scored[0].drop_reason == "title_mismatch"
 
 
+def test_filter_candidates_keeps_sequel_alias_match_for_movie_query() -> None:
+    scored = filter_candidates(
+        (_make_candidate(title="Dune: Part Two 2024 1080p WEB-DL"),),
+        _movie_context(query="Dune Part 2 2024"),
+    )
+
+    assert scored[0].drop_reason is None
+    assert scored[0].score_breakdown["title_relevance"] == 0.9
+
+
+def test_filter_candidates_prefers_sequel_alias_candidate_over_neighbor_title() -> None:
+    scored = filter_candidates(
+        (
+            _make_candidate(title="Dune: Part One 2024 2160p BluRay", resolution="2160p", source_type="BluRay"),
+            _make_candidate(title="Dune: Part Two 2024 1080p WEB-DL", resolution="1080p", source_type="WEB-DL"),
+        ),
+        _movie_context(query="Dune Part 2 2024"),
+    )
+
+    assert scored[0].candidate.title == "Dune: Part Two 2024 1080p WEB-DL"
+    assert scored[0].score_breakdown["title_relevance"] == 0.9
+    assert scored[1].drop_reason == "title_mismatch"
+
+
 def test_filter_candidates_allows_chinese_title_with_year_token_match() -> None:
     scored = filter_candidates((_make_candidate(title="葬送的芙莉莲 2023 1080p"),), _anime_context(query="葬送的芙莉莲 2023"))
 

@@ -454,9 +454,8 @@ def _derive_media_title_fallback_queries(
 
 
 def _normalize_title_tokens_for_fallback(title: str) -> list[str]:
-    normalized = title.strip().lower()
-    normalized = re.sub(r"[._:：\-/]+", " ", normalized)
-    normalized = re.sub(r"\s+", " ", normalized)
+    normalized = re.sub(r"\b\d\.\d\b", " ", title.strip(), flags=re.IGNORECASE)
+    normalized = normalize_match_key(normalized)
     tokens = [token for token in normalized.split() if token]
     stopwords = {
         "2160p",
@@ -491,6 +490,7 @@ def _normalize_title_tokens_for_fallback(title: str) -> list[str]:
         "2audios",
         "csweb",
         "frds",
+        "hd",
         "hdsweb",
         "diy",
         "hhweb",

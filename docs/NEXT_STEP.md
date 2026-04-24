@@ -7,6 +7,8 @@
 - 当前刚完成的一条最小闭环是：**TMDB 英文标题查询顺序固定优先**。
 - 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `158 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `175 passed`。
 - 当前这一轮已经补齐：
+  - `Dune Part 2 2024` 这类没拿到 TMDB 改写、但 BT 结果标题写成 `Dune: Part Two ...` 的查询，现在 movie-first 排序器也会把 sequel alias 视作同片，不再直接把真结果判成 `title_mismatch` 或落成“未找到候选”
+  - `流浪地球2 2023` 这类只能靠结果反推 fallback query 的查询，现在 fallback token 也会先走共享标题归一；`II` / `2` 不再被拆成两套公共词，`5.1` 这类音轨噪音也不会再混进 fallback query
   - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
   - `Dune Part 2 Extended 2024` 这类“part 数字 + 版本噪音词 + 年份”输入现在不会再把 `2` 吞掉，query 解析会继续保住 sequel token
   - `Mission Impossible 7 IMAX 2023` 这类“空格数字续作 + IMAX + 年份”输入现在不会再把尾部数字吞回基片标题
@@ -53,6 +55,7 @@
 - 当前这一轮也继续降低了结构维护成本：若后面还要补 sequel/chapter 恢复规则，默认先改共享标题归一层，不再让 `search_request_context.py` 再长出第二套恢复实现。
 - 当前这一轮也继续降低了模块耦合：搜索链里凡是纯标题归一工具，默认直接从共享标题归一层取，不再挂靠到 request context 模块。
 - 当前这一轮也把模块边界再切清了一步：后续若继续补 query 解析规则，优先改 parser 模块和共享标题归一层，不再把 parser 逻辑混回 request context。
+- 当前这一轮也把 BT 排序器和 fallback query 的标题理解再对齐了一步：续作别名与公共 fallback token 现在也会复用共享标题归一，不再各自靠原始字符串硬猜。
 - 当前这条主线的价值也更直接：不改协议、不扩能力，只提高“搜索第一屏更像用户真正要的片”这件事。
 - 后续若继续，仍然优先做这类 query 命中质量与排序偏好，不回头重开发布准备或结构瘦身。
 
