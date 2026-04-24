@@ -50,6 +50,7 @@ from app.services.import_to_library import (
     parse_import_query,
 )
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
+from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 from app.trace_logging import parse_trace_log_line
 
@@ -3945,6 +3946,51 @@ def test_resolve_metadata_title_year_prefers_downloader_naming_truth(tmp_path: P
 
     assert title == "Mission: Impossible - Fallout"
     assert year == "2018"
+
+
+def test_resolve_metadata_title_year_prefers_confirmed_media_identity(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="1",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="downloader.succeeded",
+        message="Wrong Guess 2018 1080p",
+    )
+    event_repo.append_event(
+        task_ref="1",
+        task_id="87",
+        task_hash="hash-87",
+        event_type=MEDIA_IDENTITY_EVENT_TYPE,
+        message=media_identity_to_json(
+            {
+                "media_type": "movie",
+                "tmdb_id": "157336",
+                "title": "Interstellar",
+                "original_title": "星际穿越",
+                "year": "2014",
+                "source": "search_confirmed",
+            }
+        ),
+    )
+    target_path = tmp_path / "raw.mkv"
+    target_path.write_bytes(b"demo")
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=None),
+        library_target_dir="/data/library/movies",
+        job_event_repo=event_repo,
+    )
+
+    title, year = service._resolve_metadata_title_year(
+        task_id="87",
+        task_hash="hash-87",
+        target_path=target_path,
+    )
+
+    assert title == "Interstellar"
+    assert year == "2014"
 
 
 def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:

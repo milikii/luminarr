@@ -2694,6 +2694,26 @@ def test_search_and_format_uses_tmdb_first_when_available() -> None:
     assert "Interstellar 2014 1080p BluRay" in text
 
 
+def test_search_and_format_caches_confirmed_media_identity_for_candidates() -> None:
+    service = SearchMediaService(
+        _fake_search_tmdb_hit,
+        lookup_movie_func=_fake_lookup_tmdb_movie,
+    )
+
+    _run(service.search_and_format("星际穿越 (2014)", chat_id=1001))
+    candidate = service.get_cached_candidate(1001, 1)
+
+    assert candidate is not None
+    assert candidate["media_identity"] == {
+        "media_type": "movie",
+        "tmdb_id": "",
+        "title": "Interstellar",
+        "original_title": "星际穿越",
+        "year": "2014",
+        "source": "search_confirmed",
+    }
+
+
 def test_search_and_format_tmdb_english_hit_stops_before_original() -> None:
     seen_queries: list[str] = []
 

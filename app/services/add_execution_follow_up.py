@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from app.clients.transmission import TransmissionTask
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json
 from app.services.add_pending_context import PendingAddContext
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
@@ -89,6 +90,12 @@ class AddExecutionFollowUpService:
             event_type="downloader.succeeded",
             message=result.title,
         )
+        self.record_media_identity_event(
+            task_ref=task_ref,
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            pending_add=pending_add,
+        )
         self._log_trace(
             event="confirm_dispatch",
             result="succeeded",
@@ -149,6 +156,27 @@ class AddExecutionFollowUpService:
                     f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
                     flush=True,
                 )
+
+    def record_media_identity_event(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        pending_add: PendingAddContext,
+    ) -> None:
+        if pending_add.media_identity is None:
+            return
+        payload_json = media_identity_to_json(pending_add.media_identity)
+        if not payload_json:
+            return
+        self.record_event(
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            event_type=MEDIA_IDENTITY_EVENT_TYPE,
+            message=payload_json,
+        )
 
     def register_download_monitor(
         self,

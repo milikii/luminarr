@@ -18,6 +18,7 @@ from app.services.search_candidate_state import CandidateLoadResult, CandidateSt
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services.bt_sources import resolve_bt_source
 from app.services import search_reply_formatter
+from app.services.media_identity import build_media_identity_from_tmdb_movie, normalize_media_identity_payload
 from app.services.search_reply_formatter import (
     format_bt_batch_preview_reply,
     format_bt_batch_preview_selection_label,
@@ -206,6 +207,7 @@ class SearchMediaService:
         parsed_query = request_context.parsed_query
         tmdb_movie = request_context.tmdb_movie
         raw_results = request_context.raw_results
+        media_identity = build_media_identity_from_tmdb_movie(tmdb_movie)
 
         ambiguous_text = _format_ambiguous_clarification(
             query=cleaned_query,
@@ -222,6 +224,10 @@ class SearchMediaService:
             query=request_context.resolved_query or cleaned_query,
         )
         selected_raw_results = [_to_candidate_dict(item) for item in ordered_raw_results[: self._limit]]
+        if media_identity is not None:
+            selected_raw_results = [
+                _attach_media_identity_to_candidate(item, media_identity=media_identity) for item in selected_raw_results
+            ]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
             if selected_raw_results:
@@ -522,6 +528,19 @@ def _safe_optional_int(value: Any) -> int | None:
 
 def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in item.items()}
+
+
+def _attach_media_identity_to_candidate(
+    item: Mapping[str, Any],
+    *,
+    media_identity: Mapping[str, Any],
+) -> dict[str, Any]:
+    candidate = _to_candidate_dict(item)
+    normalized_media_identity = normalize_media_identity_payload(media_identity)
+    if normalized_media_identity is None:
+        return candidate
+    candidate["media_identity"] = normalized_media_identity
+    return candidate
 
 
 def _format_ambiguous_clarification(

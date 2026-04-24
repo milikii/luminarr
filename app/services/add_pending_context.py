@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.media_identity import normalize_media_identity_payload
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
 
@@ -23,6 +24,7 @@ class PendingAddContext:
     task_hash: str
     title: str
     source: str
+    media_identity: dict[str, str] | None = None
     downloader_name: str = ""
     downloader_type: str = "transmission"
     download_dir: str = ""
@@ -70,11 +72,13 @@ class AddPendingContextBuilder:
             return PendingAddBuildResult(pending_add=None, error_text=CANDIDATE_SOURCE_MISSING_TEXT)
 
         title = str(candidate.get("title", "")).strip() or "(no title)"
+        media_identity = normalize_media_identity_payload(candidate.get("media_identity"))
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(
                 task_ref=str(index),
                 title=title,
                 source=source,
+                media_identity=media_identity,
                 downloader_name=downloader_name,
                 downloader_type=downloader_type,
                 download_dir=download_dir,
@@ -174,6 +178,7 @@ def build_pending_add_context(
     task_ref: str,
     title: str,
     source: str,
+    media_identity: Mapping[str, Any] | None = None,
     downloader_name: str = "",
     downloader_type: str = "transmission",
     download_dir: str = "",
@@ -186,6 +191,7 @@ def build_pending_add_context(
         task_hash=f"candidate:{digest}",
         title=title,
         source=source,
+        media_identity=normalize_media_identity_payload(media_identity),
         downloader_name=downloader_name.strip(),
         downloader_type=downloader_type.strip() or "transmission",
         download_dir=download_dir.strip(),
@@ -205,6 +211,7 @@ def to_completed_pending_add_context(
         task_hash=actual_task_hash.strip(),
         title=pending_add.title,
         source=pending_add.source,
+        media_identity=pending_add.media_identity,
         downloader_name=pending_add.downloader_name,
         downloader_type=pending_add.downloader_type,
         download_dir=pending_add.download_dir,
@@ -225,6 +232,7 @@ def pending_add_to_json(pending_add: PendingAddContext) -> str:
             "task_hash": pending_add.task_hash,
             "title": pending_add.title,
             "source": pending_add.source,
+            "media_identity": pending_add.media_identity or {},
             "downloader_name": pending_add.downloader_name,
             "downloader_type": pending_add.downloader_type,
             "download_dir": pending_add.download_dir,
@@ -251,6 +259,7 @@ def pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None, 
     task_hash = str(payload.get("task_hash", "")).strip()
     title = str(payload.get("title", "")).strip()
     source = str(payload.get("source", "")).strip()
+    media_identity = normalize_media_identity_payload(payload.get("media_identity"))
     downloader_name = str(payload.get("downloader_name", "")).strip()
     downloader_type = str(payload.get("downloader_type", "")).strip() or "transmission"
     download_dir = str(payload.get("download_dir", "")).strip()
@@ -275,6 +284,7 @@ def pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None, 
             task_hash=task_hash,
             title=title,
             source=source,
+            media_identity=media_identity,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,

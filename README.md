@@ -15,7 +15,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 2. 当前稳定范围
 
 - 当前首版承诺矩阵：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
-- 当前保守版发布准备已经收口完成；默认分支继续推进时，主线已切到 `docs/NEXT_STEP.md` 里的**搜索相关性优化**
+- 当前保守版发布准备已经收口完成；默认分支继续推进时，主线已切到 `docs/NEXT_STEP.md` 里的**刮削系统基础收口**
 - 当前仓库质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`
 - 已实现但当前不纳入首版发布保证的路径，继续保留在代码和测试里，不因为发布口径收紧而回退
 
@@ -39,7 +39,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 如果你只想记住一条推进顺序，就记这个：
 
-1. 先看 `docs/STATUS.md`，确认当前是不是绿灯、主线是不是还在搜索相关性优化
+1. 先看 `docs/STATUS.md`，确认当前是不是绿灯、主线是不是还在刮削系统基础收口
 2. 最快时，直接复制 `docs/STATUS.md` 末尾的 `Recommended Next Operator Command`
 3. 如果那一句不适合你当前场景，再去 `docs/OPERATOR_RUNBOOK.md` 按场景复制一条模板
 4. 不确定有没有文档漂移时，先用“只做冷启动一致性检查”，不要直接让 AI 动代码

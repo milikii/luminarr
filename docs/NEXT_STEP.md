@@ -1,95 +1,47 @@
-# Next step (v345)
+# Next step (v346)
 
 ## Current goal
 
-- **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
-- 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**BT 标题噪音归一继续收口到共享标题归一层**。
-- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`。
-- 当前这一轮已经补齐：
-  - `Dune 2021 4K UHD BluRay ...`、`Dune 2021 2160p UHD BluRay ...` 这类只差 `4K / 2160p` 分辨率写法的同片结果，现在 movie-first 去重会把两者视作同一档分辨率；不会再把同一部片的 UHD 结果因为写法不同连着展示两条
-  - `Dune 2021 1080p AMZN WEB-DL ...`、`Dune 2021 1080p DSNP WEB-DL ...` 这类只差流媒体来源标签的同片结果，现在 movie-first 排序与去重会把 `AMZN / DSNP / NF / ATVP / HMAX / iTunes` 视作标题噪音；不会再把同一部片的 1080p WEB-DL 因来源标签不同连着展示两条
-  - `Dune Part 2 2024` 这类没拿到 TMDB 改写、但 BT 结果标题写成 `Dune: Part Two ...` 的查询，现在 movie-first 排序器也会把 sequel alias 视作同片，不再直接把真结果判成 `title_mismatch` 或落成“未找到候选”
-  - `流浪地球2 2023` 这类只能靠结果反推 fallback query 的查询，现在 fallback token 也会先走共享标题归一；`II` / `2` 不再被拆成两套公共词，`5.1` 这类音轨噪音也不会再混进 fallback query
-  - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
-  - `Dune Part 2 Extended 2024` 这类“part 数字 + 版本噪音词 + 年份”输入现在不会再把 `2` 吞掉，query 解析会继续保住 sequel token
-  - `Mission Impossible 7 IMAX 2023` 这类“空格数字续作 + IMAX + 年份”输入现在不会再把尾部数字吞回基片标题
-  - `Fast X Special Edition 2023` 这类“尾部 sequel token + 版本噪音词 + 年份”输入现在会先剥掉 `Special Edition`，再稳定保住 `Fast X`
-  - `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + cut/edition 词 + 年份”输入现在会把尾部版本词剥掉，再把 TMDB 与搜索 query 对齐回真正片名
-  - `Blade Runner The Final Cut 1982`、`Alien The Director's Cut 1979` 这类带前置冠词的尾部版本短语现在也会整段剥掉，不再把标题错误残留成 `Blade Runner The` / `Alien The`
-  - `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类常见复合版本词写法现在也会回到真实片名，不再把 sequel token 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 残留进搜索标题
-  - `Batman v Superman 2016` 这类“主标题 + 官方多词副标题”的输入现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中，优先直接用官方长片名去搜；但 `John Wick 2023 -> John Wick: Chapter 4` 这类续作后缀不会被误判成同片高置信
-  - `Alien 2024` 这类“主标题 + 单词官方副标题”输入现在也会把 `Alien: Romulus` 视为高置信 TMDB 命中，不再先搜一轮短标题再回退；但没有副标题分隔符的单词后缀仍不会被当作同片高置信
-  - 只要 TMDB 返回了电影候选，搜索请求顺序现在固定为：`TMDB 英文标题 + 年份 -> TMDB original_title + 年份 -> 用户标题 + 年份`；不再因为低置信命中就把中文标题排回前面
-  - `Dune Part 2 2024` 命中 `Dune Part Two / Dune: Part Two` 这类共享归一后等价的 TMDB 双标题时，搜索请求现在会按共享归一去重，不再把 `Dune Part Two`、`Dune: Part Two`、`Dune Part 2` 各搜一轮
-  - `周处除三害 2024` 这类 movie-first 查询如果只命中 `S01 / S01E01 / Season / Episode` 形态的假阳性结果，现在会直接按“未找到候选”处理，不再把明显剧集资源展示成电影候选
-  - `沙丘 2021` 这类查询里夹着 `Random Movie 2021` 这种明显无关 outlier 时，当前展示结果也不会再把这类被判掉的噪音候选混进前台列表
-  - `Dune: Part Two 2024 Extras ...` 这类明显的附加内容 / 花絮结果，现在也不会再作为 movie-first 候选展示，不再把 `Extras / featurette / making of / bonus` 顶到正片前面
-  - `流浪地球2 2023` 这类真实查询里前排完全重复的同标题结果，以及 `The Wandering Earth 2 / The Wandering Earth II` 这类只差数字写法的近似重复结果，现在也会在 movie-first 展示前先去重，不再让第一屏被同片 2160p 变体连续刷屏
-  - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
-  - 更早完成的 `query 解析职责拆分` 继续保持完成态：当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
-  - 当前 TMDB 客户端标题打分与 `search_request_context.py` 的高置信判断也已收口到共享标题关系 helper；后续若继续补 exact / compact / subtitle extension 关系，不再同时改两套判断实现
-  - 当前共享标题噪音词表也已改成声明式词表 + 统一正则拼装；后续若继续补版本词，默认只改共享词表，不再直接手改整段大正则
-  - `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Remastered / Theatrical / Uncut` 留在搜索标题里
-  - `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里
-  - 当前 query 标题里的续作/章节 token 恢复逻辑也已收回共享标题归一层；`search_request_context.py` 不再单独维护那段正则和 match-key 比对细节
-  - 当前 `search_media.py` 与 `search_reply_formatter.py` 也已直接依赖共享标题归一层；后续如果还要复用 `normalize_spaces`，不需要再通过 `search_request_context.py` 间接转手
-  - 当前 `ParsedMovieQuery` 与 `parse_movie_query()` 已抽到独立 parser 模块；`search_request_context.py` 只保留请求编排职责，不再同时承担纯 query 解析
+- **质量硬化**、**搜索相关性优化** 与 **字幕闭环补齐** 当前都已完成；默认分支若继续推进，当前唯一主线切到 **刮削系统基础收口**。
+- 这条主线当前不改发布矩阵、不扩协议，只先收口一个基础事实：导入后刮削必须优先消费已确认媒体身份，而不是默认靠文件名重新猜片。
+- 当前第一条最小闭环是：**把 `media_identity` 沿着 `search -> select -> confirm download -> job_event -> import metadata` 落成真相链**。
+- 当前详细判断与分阶段设计见：`docs/SCRAPING_SYSTEM_PLAN.md`。
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `467` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退。
-- 当前剩余空间仍是“继续打磨命中偏好”，不是“主协议还没通”；movie-first 主链、发布矩阵和质量入口继续保持完成态。
 
 ## User value
 
-- 用户现在输入带 `Extended / IMAX / Special Edition / Final Cut / Director's Cut / Ultimate Edition` 这类版本噪音词的片名时，更不容易因为尾部脏词把真正的 sequel/chapter token 吞掉，或者把片名误留在版本 cut/edition 词上。
-- 当前这套规则也已覆盖 `The Final Cut / The Director's Cut` 这类资源站常见写法；尾部前置冠词会和版本短语一起剥掉，不再把错误的 `The` 残留进搜索标题。
-- 当前也已补到几类常见复合变体：`IMAX Enhanced`、`Extended Cut`、`Special Extended Edition`、`Theatrical Version`、`Collector Edition`；后续补版本词时，优先先判断是否只是同一类尾部噪音变体。
-- 当前这一轮也顺手降低了后续维护成本：再加新一类尾部标题噪音词时，不需要同时改 query 解析和 TMDB 标题比对两套逻辑。
-- 当前这一轮也补了一点结构降本：共享标题噪音规则不再靠一整段越滚越长的手写正则硬撑，后续新增变体时更容易做小改动和小回归。
-- 当前这一轮也把 TMDB 置信判断补细了一点：官方长片名副标题可以直接走高置信命中，但会显式排除 `Part / Chapter / 2049` 这类更像续作的后缀，避免把基片误判成 sequel。
-- 当前这一轮也把查询顺序正式固定了：对中文内容和国际内容都优先走 TMDB 英文标题，再走 original_title，最后才回到中文/原始用户标题。
-- 当前这一轮也继续降低了维护成本：TMDB 选片打分和搜索请求高置信判断现在共享同一套标题关系 helper，不再有“一边修了、另一边忘了”的漂移风险。
-- 当前这一轮也顺手降低了无效查询次数：共享归一后等价的 TMDB 标题现在只会保留一条搜索请求，不再把 Prowlarr/BT 来源重复打一遍。
-- 当前这一轮也把真实搜索结果质量再收紧了一点：movie-first 结果展示会直接丢掉被判成剧集形态或明显无关的噪音候选，不再为了“有结果”把假阳性顶到前台。
-- 当前这一轮也继续收紧了非正片噪音：`Extras / featurette / making of / bonus` 这类附加内容不会再混进电影结果前排。
-- 当前这一轮也顺手提高了第一屏可读性：完全重复的同标题结果，以及只差数字写法的近似重复结果，会先折叠成一条，不再挤占前排编号。
-- 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
-- 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。
-- 当前这一轮也继续降低了结构维护成本：若后面还要补 sequel/chapter 恢复规则，默认先改共享标题归一层，不再让 `search_request_context.py` 再长出第二套恢复实现。
-- 当前这一轮也继续降低了模块耦合：搜索链里凡是纯标题归一工具，默认直接从共享标题归一层取，不再挂靠到 request context 模块。
-- 当前这一轮也把模块边界再切清了一步：后续若继续补 query 解析规则，优先改 parser 模块和共享标题归一层，不再把 parser 逻辑混回 request context。
-- 当前这一轮也把 BT 排序器和 fallback query 的标题理解再对齐了一步：续作别名与公共 fallback token 现在也会复用共享标题归一，不再各自靠原始字符串硬猜。
-- 当前这一轮也继续收紧了同片版本噪音：常见流媒体来源标签现在也会按标题噪音处理，不再把 `AMZN / DSNP / NF` 这类来源差异误当成片名差异。
-- 当前这一轮也把 `4K / 2160p` 这类等价分辨率写法对齐了一步：同片 UHD 结果不再因为资源站写法不同被拆成两条前台候选。
-- 当前这一轮也顺手做了一步结构降本：BT 标题噪音 stopwords 现在回收到共享标题归一层，后续若继续补 scene/source/tag 噪音词，不需要再在 `search_media.py` 和 `bt_candidate_scorer.py` 两边各抄一份。
-- 当前这条主线的价值也更直接：不改协议、不扩能力，只提高“搜索第一屏更像用户真正要的片”这件事。
-- 后续若继续，仍然优先做这类 query 命中质量与排序偏好，不回头重开发布准备或结构瘦身。
+- 这一步完成后，导入后的 metadata 刮削不再优先赌“文件名猜得对不对”，而是优先吃搜索确认时已经拿到的媒体身份真相。
+- 这能直接降低后续 `.metadata.json`、`.nfo`、本地海报背景图围绕错误媒体对象展开的风险。
+- 当前这条主线仍然只服务 movie-first，不把项目带进“大媒体管理平台”。
 
 ## Only do
 
-- 只在现有搜索链里做确定性相关性优化：
-  - query 解析
-  - TMDB 候选选择与置信判断
-  - 既有 BT 排序器在 movie-first 搜索里的排序偏好
+- 只做刮削系统 Phase 1：
+  - 搜索候选挂上 `media_identity`
+  - 待确认下载 payload 保留 `media_identity`
+  - 下载成功后写独立 `media.identity.confirmed` 事件
+  - metadata 入参优先消费这份真相
+- 继续保持 movie-first，不扩 TV / anime 本地刮削。
 - 若默认分支重新出现红灯，只做首版承诺范围内最小修复。
 
 ## Do not do
 
 - 不改发布矩阵，不重开真实 smoke 范围，不顺手把环境探针再写成产品承诺。
-- 不新增用户可感知功能，不扩协议，不改 approval / jobs / lease / downloader / import 副作用边界。
-- 不把搜索相关性问题混写成“Transmission / Emby 环境失败”或“搜索协议没通”；当前主问题是 query 命中质量与排序偏好。
-- 不回到 `add_to_downloader.py`、`import_to_library.py`、`search_media.py` 为了数字再拆 thin wrapper。
-- 不顺手把 BT / watchlist / 群聊 / UI 再开新支线。
+- 不先做全量 NFO / 图片体系，不先做 TV / season / episode 刮削，不先做全库扫描。
+- 不改 SQLite schema，不改 approval / jobs / lease / downloader / import 副作用边界。
+- 不把这条主线扩成多源元数据平台，不顺手引入 Douban / Bangumi / TVDB 或插件化 provider。
 
 ## Done when
 
-当前 **搜索相关性优化** 主线继续推进时，每一条最小闭环都应满足：
+当前 **刮削系统基础收口** 主线继续推进时，第一条最小闭环应满足：
 
-1. 改动只落在现有搜索链，不扩协议或副作用边界。
-2. 搜索相关 focused tests 当前可通过，且 `make quality` 不回退。
-3. `docs/STATUS.md` 与本文件能把“本轮到底修了哪类 query 命中问题”写成当前真相。
-4. 当前默认分支质量入口不回退。
+1. 已确认的 `media_identity` 能从搜索候选带进下载确认，并在下载成功后以独立 `job_event` 落盘。
+2. metadata 入参解析当前优先吃 `media_identity`，没有这份真相时才回退命名真相或文件名解析。
+3. add/import/search focused tests 当前可通过，且 `make quality` 不回退。
+4. `docs/STATUS.md`、本文件和 `docs/SCRAPING_SYSTEM_PLAN.md` 能把“当前第一步做了什么”写成当前真相。
 
 ## After this step
 
-1. 继续按最小闭环推进搜索相关性优化，例如别名归一、标题噪音抑制、同片不同版本偏好。
-2. 如果默认分支出现红灯，再临时切回首版承诺范围内的最小修复。
+1. 让 `metadata_scraper` 直接优先吃 `tmdb_id`，停止二次 `search_movie(title, year)`。
+2. 在 `.metadata.json` 之外补最小本地刮削产物：`.nfo`、`poster`、`backdrop`。
+3. 再补 `missing-only / overwrite / skip` 写入策略与一次真实 `import -> scrape -> subtitle -> refresh` smoke。

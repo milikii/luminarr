@@ -6,6 +6,7 @@ from pathlib import Path
 from app.services.import_prepare_state import extract_title_year_for_scrape, extract_title_year_from_text
 
 ResolveNormalizedNamingTruthFunc = Callable[..., str]
+ResolveConfirmedMediaIdentityFunc = Callable[..., dict[str, str] | None]
 
 
 class ImportMetadataTitleYearResolver:
@@ -13,11 +14,22 @@ class ImportMetadataTitleYearResolver:
         self,
         *,
         resolve_normalized_naming_truth_func: ResolveNormalizedNamingTruthFunc,
+        resolve_confirmed_media_identity_func: ResolveConfirmedMediaIdentityFunc,
     ) -> None:
         self._resolve_normalized_naming_truth = resolve_normalized_naming_truth_func
+        self._resolve_confirmed_media_identity = resolve_confirmed_media_identity_func
 
     def resolve(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
         fallback_title, fallback_year = extract_title_year_for_scrape(target_path)
+        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
+        if confirmed_media_identity is not None:
+            title = (
+                confirmed_media_identity.get("title", "").strip()
+                or confirmed_media_identity.get("original_title", "").strip()
+                or fallback_title
+            )
+            year = confirmed_media_identity.get("year", "").strip() or fallback_year
+            return title, year
         naming_truth = self._resolve_normalized_naming_truth(
             task_id=task_id,
             task_hash=task_hash,

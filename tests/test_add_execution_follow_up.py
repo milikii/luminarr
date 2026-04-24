@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from unittest.mock import AsyncMock
 
+from app.clients.transmission import TransmissionTask
+from app.db.job_event_repo import JobEventRepo, JobEventPersistenceError
+from app.db.sqlite import SqliteDatabase
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError
-from app.db.job_event_repo import JobEventPersistenceError
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
+from app.services.add_pending_context import PendingAddContext
+from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE
 
 
 def test_record_event_logs_persistence_failure(capsys) -> None:
@@ -183,3 +189,47 @@ def test_register_download_monitor_logs_row_corrupted_result(capsys) -> None:
     assert "[下载监控登记记录损坏]" in output
     assert "download monitor row identity corrupted after read" in output
     assert "task_id=42" in output
+
+
+def test_dispatch_records_confirmed_media_identity_event(tmp_path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    service = AddExecutionFollowUpService(
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        job_event_repo=event_repo,
+        download_monitor_repo=None,
+        log_trace_func=lambda **kwargs: None,
+        add_failed_text="下载投递失败，请稍后重试。",
+        download_monitor_register_result_missing_reason="download monitor state missing after register",
+    )
+
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:abc123",
+        title="Interstellar",
+        source="https://example.com/interstellar.torrent",
+        media_identity={
+            "media_type": "movie",
+            "tmdb_id": "157336",
+            "title": "Interstellar",
+            "original_title": "Interstellar",
+            "year": "2014",
+            "source": "search_confirmed",
+        },
+    )
+
+    outcome = asyncio.run(
+        service.dispatch(
+            task_ref="1",
+            pending_add=pending_add,
+            chat_id=1001,
+            user_id=2001,
+        )
+    )
+
+    assert outcome.result is not None
+    events = event_repo.list_events_for_task_identity(task_id="42", task_hash="hash-42")
+    assert [event.event_type for event in events] == ["downloader.succeeded", MEDIA_IDENTITY_EVENT_TYPE]
+    assert json.loads(events[1].message) == pending_add.media_identity
