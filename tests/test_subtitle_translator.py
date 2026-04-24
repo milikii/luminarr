@@ -49,6 +49,52 @@ def test_translate_for_import_creates_zh_subtitle_for_file_target(tmp_path: Path
     assert "专业译文：hello movie" in payload
 
 
+def test_translate_for_import_translates_large_srt_in_chunks(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "\n\n".join(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index + 1:02d},000\nline {index}"
+            for index in range(1, 63)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    seen_chunk_sizes: list[int] = []
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        seen_chunk_sizes.append(len(source_lines))
+        translations = [f"专业译文：{line}" for line in source_lines]
+        return json.dumps({"translations": translations}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Interstellar (2014).zh.srt"
+    assert result.success is True
+    assert result.skipped is False
+    assert seen_chunk_sizes == [60, 2]
+    payload = translated_file.read_text(encoding="utf-8")
+    assert "专业译文：line 1" in payload
+    assert "专业译文：line 62" in payload
+
+
 def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)

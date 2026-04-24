@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +72,9 @@ _CHINESE_SUBTITLE_TOKENS = frozenset(
 _CHINESE_SUBTITLE_SUBSTRINGS = ("中英", "中文", "中文字幕", "双语", "简中", "繁中", "简体中文", "繁体中文")
 _ENGLISH_SUBTITLE_TOKENS = frozenset({"en", "eng", "english", "英文", "英字"})
 _ENGLISH_SUBTITLE_SUBSTRINGS = ("english", "英文", "英字")
+
+_ChunkItem = TypeVar("_ChunkItem")
+_TranslatedChunkItem = TypeVar("_TranslatedChunkItem")
 
 
 def _find_all_subtitle_paths(target_path: Path) -> list[Path]:
@@ -211,11 +216,55 @@ def _parse_srt_blocks(content: str) -> list[_SrtBlock]:
     return blocks
 
 
-def _chunk_blocks(blocks: list[_SrtBlock], *, size: int) -> list[list[_SrtBlock]]:
-    result: list[list[_SrtBlock]] = []
+def _chunk_blocks(blocks: list[_ChunkItem], *, size: int) -> list[list[_ChunkItem]]:
+    result: list[list[_ChunkItem]] = []
     for i in range(0, len(blocks), size):
         result.append(blocks[i : i + size])
     return result
+
+
+def _translate_blocks_in_chunks(
+    *,
+    blocks: list[_ChunkItem],
+    size: int,
+    get_source_text: Callable[[_ChunkItem], str],
+    translate_chunk: Callable[[list[str]], tuple[list[str] | None, str | None]],
+    build_output_block: Callable[[_ChunkItem, str], _TranslatedChunkItem],
+) -> tuple[list[_TranslatedChunkItem] | None, str | None]:
+    translated_blocks: list[_TranslatedChunkItem] = []
+    for chunk in _chunk_blocks(blocks, size=size):
+        translated_lines, error_message = translate_chunk([get_source_text(block) for block in chunk])
+        if translated_lines is None:
+            return None, error_message
+        for block, translated_text in zip(chunk, translated_lines):
+            translated_blocks.append(build_output_block(block, translated_text.strip()))
+    return translated_blocks, None
+
+
+def _translate_chunk_lines(
+    *,
+    source_lines: list[str],
+    translate_lines: Callable[[list[str]], list[str]],
+    subtitle_path: Path,
+) -> tuple[list[str] | None, str | None]:
+    try:
+        translated_lines = translate_lines(source_lines)
+    except Exception as exc:
+        message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
+        _print_colored_error(
+            problem=message,
+            fix="检查 API Key、模型名、网络和余额；必要时稍后重试。",
+        )
+        return None, message
+
+    if len(translated_lines) != len(source_lines):
+        message = f"模型返回行数不一致：源={len(source_lines)}，译文={len(translated_lines)}，文件={subtitle_path}"
+        _print_colored_error(
+            problem=message,
+            fix="检查模型输出格式约束，确保返回严格 JSON translations 数组。",
+        )
+        return None, message
+    return translated_lines, None
 
 
 def _render_srt(blocks: list[_SrtBlock]) -> str:

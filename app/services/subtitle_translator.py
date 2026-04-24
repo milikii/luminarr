@@ -13,7 +13,6 @@ from app.services.subtitle_translation_support import (
     _SubtitleFile,
     _SrtBlock,
     _build_subtitle_file,
-    _chunk_blocks,
     _extract_translations_from_response,
     _find_all_subtitle_paths,
     _find_video_files,
@@ -27,6 +26,8 @@ from app.services.subtitle_translation_support import (
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _translate_blocks_in_chunks,
+    _translate_chunk_lines,
 )
 
 
@@ -424,23 +425,26 @@ class SubtitleTranslatorService:
             )
             return None, message
 
-        translated_blocks: list[_SrtBlock] = []
-        for chunk in _chunk_blocks(blocks, size=60):
-            translated_lines, error_message = self._translate_chunk_lines(
-                source_lines=[block.text for block in chunk],
-                movie_title=movie_title,
+        translated_blocks, error_message = _translate_blocks_in_chunks(
+            blocks=blocks,
+            size=60,
+            get_source_text=lambda block: block.text,
+            translate_chunk=lambda source_lines: _translate_chunk_lines(
+                source_lines=source_lines,
                 subtitle_path=subtitle_path,
-            )
-            if translated_lines is None:
-                return None, error_message
-            for block, translated_text in zip(chunk, translated_lines):
-                translated_blocks.append(
-                    _SrtBlock(
-                        index=block.index,
-                        timecode=block.timecode,
-                        text=translated_text.strip(),
-                    )
-                )
+                translate_lines=lambda lines: self._translate_lines_professional(
+                    source_lines=lines,
+                    movie_title=movie_title,
+                ),
+            ),
+            build_output_block=lambda block, translated_text: _SrtBlock(
+                index=block.index,
+                timecode=block.timecode,
+                text=translated_text,
+            ),
+        )
+        if translated_blocks is None:
+            return None, error_message
         return _render_srt(translated_blocks), None
 
     def _translate_ass_text(
@@ -459,48 +463,25 @@ class SubtitleTranslatorService:
             )
             return None, message
 
-        for chunk in _chunk_blocks(dialogue_lines, size=60):
-            translated_lines, error_message = self._translate_chunk_lines(
-                source_lines=[line.text for line in chunk],
-                movie_title=movie_title,
-                subtitle_path=subtitle_path,
-            )
-            if translated_lines is None:
-                return None, error_message
-            for dialogue_line, translated_text in zip(chunk, translated_lines):
-                lines[dialogue_line.line_index] = dialogue_line.prefix + translated_text.strip()
-        return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
-
-    def _translate_chunk_lines(
-        self,
-        *,
-        source_lines: list[str],
-        movie_title: str,
-        subtitle_path: Path,
-    ) -> tuple[list[str] | None, str | None]:
-        try:
-            translated_lines = self._translate_lines_professional(
+        translated_lines, error_message = _translate_blocks_in_chunks(
+            blocks=dialogue_lines,
+            size=60,
+            get_source_text=lambda line: line.text,
+            translate_chunk=lambda source_lines: _translate_chunk_lines(
                 source_lines=source_lines,
-                movie_title=movie_title,
-            )
-        except Exception as exc:
-            message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
-            _print_colored_error(
-                problem=message,
-                fix="检查 API Key、模型名、网络和余额；必要时稍后重试。",
-            )
-            return None, message
-
-        if len(translated_lines) != len(source_lines):
-            message = (
-                f"模型返回行数不一致：源={len(source_lines)}，译文={len(translated_lines)}，文件={subtitle_path}"
-            )
-            _print_colored_error(
-                problem=message,
-                fix="检查模型输出格式约束，确保返回严格 JSON translations 数组。",
-            )
-            return None, message
-        return translated_lines, None
+                subtitle_path=subtitle_path,
+                translate_lines=lambda lines: self._translate_lines_professional(
+                    source_lines=lines,
+                    movie_title=movie_title,
+                ),
+            ),
+            build_output_block=lambda _, translated_text: translated_text,
+        )
+        if translated_lines is None:
+            return None, error_message
+        for dialogue_line, translated_text in zip(dialogue_lines, translated_lines):
+            lines[dialogue_line.line_index] = dialogue_line.prefix + translated_text
+        return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
 
     def _translate_lines_professional(self, *, source_lines: list[str], movie_title: str) -> list[str]:
         system_prompt = (
