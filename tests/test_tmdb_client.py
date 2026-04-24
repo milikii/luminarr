@@ -23,6 +23,40 @@ def test_search_movie_returns_none_on_empty_title() -> None:
     assert result is None
 
 
+def test_get_movie_by_id_returns_none_on_empty_tmdb_id() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+    result = _run(client.get_movie_by_id("   "))
+    assert result is None
+
+
+def test_get_movie_by_id_returns_valid_result() -> None:
+    client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
+    captured: dict[str, Any] = {}
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        captured["path"] = path
+        captured["params"] = params
+        return _FakeResponse(
+            {
+                "id": 157336,
+                "title": "Interstellar",
+                "original_title": "Interstellar",
+                "release_date": "2014-11-05",
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.get_movie_by_id("157336"))
+
+    assert captured["path"] == "/3/movie/157336"
+    assert captured["params"] == {"api_key": "tmdb-key"}
+    assert result is not None
+    assert result.title == "Interstellar"
+    assert result.original_title == "Interstellar"
+    assert result.year == "2014"
+    assert result.tmdb_id == "157336"
+
+
 def test_search_movie_returns_first_valid_result() -> None:
     client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
     captured: dict[str, Any] = {}

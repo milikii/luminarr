@@ -143,6 +143,7 @@ class ImportToLibraryService:
             scrape_metadata_func=scrape_metadata_func,
             translate_subtitle_func=translate_subtitle_func,
             resolve_metadata_title_year_func=self._resolve_metadata_title_year,
+            resolve_metadata_tmdb_id_func=self._resolve_metadata_tmdb_id,
             record_event_func=self._record_event,
         )
         self._prepare_state = ImportPrepareState(
@@ -358,6 +359,12 @@ class ImportToLibraryService:
             task_hash=task_hash,
             target_path=target_path,
         )
+
+    def _resolve_metadata_tmdb_id(self, task_id: str, task_hash: str) -> str:
+        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
+        if confirmed_media_identity is None:
+            return ""
+        return confirmed_media_identity.get("tmdb_id", "").strip()
 
     def _resolve_confirmed_media_identity(self, *, task_id: str, task_hash: str) -> dict[str, str] | None:
         if self._job_event_repo is None:

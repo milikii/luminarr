@@ -45,6 +45,48 @@ def test_scrape_for_import_writes_metadata_sidecar(tmp_path: Path) -> None:
     assert payload["fanart"]["poster_url"] == "https://img.example/poster.jpg"
 
 
+def test_scrape_for_import_prefers_tmdb_id_lookup_when_available(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+    seen_search_calls: list[tuple[str, str]] = []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        seen_search_calls.append((title, year))
+        return None
+
+    async def fake_tmdb_lookup_by_id(tmdb_id: str) -> TmdbMovie | None:
+        assert tmdb_id == "157336"
+        return TmdbMovie(title="Interstellar", original_title="Interstellar", year="2014", tmdb_id="157336")
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_by_tmdb_id_func=fake_tmdb_lookup_by_id,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Wrong Guess",
+                year="2018",
+                target_path=str(target_file),
+                tmdb_id="157336",
+            )
+        )
+    )
+
+    assert result.success is True
+    assert seen_search_calls == []
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["id"] == "157336"
+    assert payload["tmdb"]["title"] == "Interstellar"
+
+
 def test_scrape_for_import_returns_failed_when_tmdb_not_found(tmp_path: Path) -> None:
     target_file = tmp_path / "Unknown (2026).mkv"
     target_file.write_bytes(b"demo")
@@ -70,6 +112,46 @@ def test_scrape_for_import_returns_failed_when_tmdb_not_found(tmp_path: Path) ->
     )
     assert result.success is False
     assert "TMDB 未命中" in result.message
+    assert not target_file.with_suffix(".metadata.json").exists()
+
+
+def test_scrape_for_import_fails_when_tmdb_id_not_found_without_title_fallback(tmp_path: Path) -> None:
+    target_file = tmp_path / "Unknown (2026).mkv"
+    target_file.write_bytes(b"demo")
+    seen_search_calls: list[tuple[str, str]] = []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        seen_search_calls.append((title, year))
+        return TmdbMovie(title="Fallback", original_title="Fallback", year="2026", tmdb_id="999")
+
+    async def fake_tmdb_lookup_by_id(_: str) -> TmdbMovie | None:
+        return None
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_by_tmdb_id_func=fake_tmdb_lookup_by_id,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Unknown",
+                year="2026",
+                target_path=str(target_file),
+                tmdb_id="157336",
+            )
+        )
+    )
+
+    assert result.success is False
+    assert "tmdb_id=157336" in result.message
+    assert seen_search_calls == []
     assert not target_file.with_suffix(".metadata.json").exists()
 
 

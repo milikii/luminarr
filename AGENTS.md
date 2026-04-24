@@ -1,201 +1,194 @@
-# Luminarr AGENTS.md (v36)
+AGENTS.md
+本文件定义当前项目的执行规则。 若与全局 AGENTS.md 冲突，以本文件为准。
 
-This file is the repository contract for AI coding agents.
+项目目标
+本项目采用“文档驱动 + 小步闭环 + 连续施工”的推进方式。 Codex 的职责不是自由发挥，而是：
 
-## 1. Communication rules
+读取项目文档
+依据当前主线推进
+每轮只完成一个最小闭环
+自行验证
+同步更新文档
+保持默认分支长期可用
+项目所有者不负责编码细节判断，因此所有关键改动必须可验证、可追溯、可回滚。
 
-- Use plain Chinese when explaining architecture or changes.
-- No black-box jargon. Explain who sends what data to whom.
-- Before modifying a file, explain its role in 1-2 plain Chinese sentences.
-- Never fail silently. On operational failure, print explicit colored Chinese logs with a clear fix hint.
-- Default user-facing progress reports should be brief and non-technical.
-- Per iteration, report only: current task, verification result, changed files, docs updated or not, commit hash / blocker.
-- Give detailed logs or deep technical explanation only when failure happens or the user explicitly asks.
+权威文档顺序
+执行任何任务前，优先读取以下文档；若存在冲突，按顺序判定：
 
-## 2. Read Order
+AGENTS.md
+docs/INDEX.md
+docs/STATUS.md
+docs/NEXT_STEP.md
+docs/DECISIONS.md
+docs/ARCHITECTURE.md
+代码与测试真相
+规则：
 
-### Cold start
+文档服务连续施工，不服务展示。
+文档只维护执行真相、当前状态、主线、边界和质量结论。
+不为“人类入口体验”额外重写文档。
+若代码真相与文档冲突，先确认是否属于文档滞后；必要时修正文档。
+默认执行模式
+默认连续执行若干轮，每轮只做一个最小闭环。
+一个闭环应尽量自包含完成：
+实施
+验证
+必要时更新文档
+review diff
+commit
+若仓库流程允许且远端状态明确，可 push。
+不做大杂烩式提交。
+不无故暂停，不频繁请求确认。
+当前阶段原则
+除非 docs/NEXT_STEP.md 或用户明确改口，否则始终遵守：
 
-在**同一会话的第 1 轮**、第一次真正动代码前，按这个顺序读：
+默认分支持续可用
+回归结果不回退
+当前主线持续收口
+diff 尽量小，避免无关重构
+文档与代码真相保持一致
+如果当前阶段被定义为“质量硬化阶段”，则额外遵守：
 
-1. `docs/INDEX.md`
-2. `docs/ARCHITECTURE.md`
-3. `docs/NEXT_STEP.md`
-4. `docs/DECISIONS.md`
-5. `docs/STATUS.md`
-6. `docs/TEST_ENV.md`（only when the task depends on real downloader/import/refresh verification）
+暂停新增用户可感知功能
+暂停扩协议、扩真相边界、扩系统能力
+优先降低回归风险、耦合、超大文件与历史债
+优先把质量 gate、focused tests、真实 smoke 补稳
+不用顺手加功能来掩盖结构问题
+闭环选择规则
+每轮只选择一个最小闭环，优先级按以下顺序判断：
 
-### Same-session follow-up rounds
+当前失败测试或回归红灯
+当前主线缺口
+最近引入的回归风险
+当前阶段明确标注的结构债
+可显著降低长期维护成本的最小改动
+若一轮结束后没有立刻看到下一步，不允许直接停止；应重新扫描：
 
-同一会话里的**后续轮次**不要机械重读全文。默认只读：
+docs/NEXT_STEP.md
+docs/STATUS.md
+相关代码
+当前失败测试
+最近若干提交
+然后从“更小、更保守、可验证”的方向继续选一个闭环。
 
-1. `AGENTS.md`
-2. `docs/NEXT_STEP.md` 当前主线相关段落
-3. `docs/STATUS.md` 当前快照
-4. 与本轮任务直接相关的代码、测试、最近提交
+验证要求
+能跑测试就先跑相关测试。
+有全量回归入口时，按阶段适度运行。
+涉及 downloader / import / refresh / restart / approval / persistence 等高风险链路时，优先做真实验证。
+若本机真实测试环境已就绪，不要把验证留给用户。
+若当前环境无法完成某项验证，必须明确说明缺口与影响。
+文档同步要求
+发生以下变化时，必要文档必须同步更新：
 
-只有在确实需要时才按需读取：
+当前状态变化
+主线推进结果变化
+质量结论变化
+决策变化
+架构边界变化
+验证入口变化
+文档写“当前真相”，不要写大段历史流水账，不要把历史台账整段抄回 STATUS.md。
 
-- `docs/DECISIONS.md` 相关边界段落
-- `docs/PERSISTENCE_CLOSURE_LOG.md` 当前主线详细闭环
-- `docs/CLEANUP_VERIFICATION_WINDOW.md` cleanup 已完成窗口证据
-- `docs/TEST_ENV.md` 真实 downloader / import / refresh 联调规则
+质量优先原则
+优先修真实失败与高风险耦合。
+优先降低长期维护成本。
+不为“看起来更优雅”做高风险重写。
+大文件瘦身应以边界收口、职责分离、降低协调复杂度为目标，而不是机械拆文件。
+先确认再改的事项
+遇到以下情况必须先汇报并等待用户决定：
 
-## 3. Environment
+改对外协议
+改数据库/SQLite 真相边界
+改公共 API 或客户端行为契约
+改部署模型
+改鉴权/权限模型
+改大范围目录结构
+引入重量级依赖
+删除或废弃已有主流程能力
+若修改只是修复当前失败测试、降低当前主线耦合、或完成已写明的边界收口，可在范围可控时直接实施。
 
-- Host OS: Windows
-- Dev shell: WSL Ubuntu
-- Interaction mode: Codex CLI in pure terminal
-- Repo path: inside WSL filesystem
+日志与可追溯性要求
+本项目默认追求“足够可追溯”，但不盲目上复杂平台。
 
-## 4. Local integration test stack
+若新增或重构以下链路，应补足最小可维护日志体系：
 
-Use the WSL Docker test stack for real downloader/import/refresh verification when the task depends on:
-- hardlink execution
-- Transmission RPC dispatch
-- Emby refresh API behavior
+后台任务
+下载/导入/刷新链路
+外部服务调用
+审批链路
+重试/恢复/重启链路
+跨模块编排链路
+最小要求按项目规模择需采用：
 
-Services:
-- Transmission: `http://127.0.0.1:19091`
-- BT Transmission: `http://127.0.0.1:19092`
-- Emby: `http://127.0.0.1:18096`
+关键操作有结构化日志
+错误日志带最小必要上下文
+异步任务有 job/task 标识
+同一业务闭环可追踪前后关键状态
+README 或 docs 中能找到最基本排障入口
+不要未经需要就引入完整 observability 堆栈。
 
-Read `docs/TEST_ENV.md` before touching these paths.
+模块化要求
+本项目默认追求“边界清晰的模块化”，不是“为了拆而拆”。
 
-## 5. CLI rules
+新增逻辑不得继续堆进历史热点大文件，除非该文件本就是当前唯一合理边界。
+业务编排、外部集成、状态协调、持久化、协议适配应尽量放在各自职责范围内。
+若存在 shared runtime / channel / service / repo 等边界，应优先消除跨层直连。
+瘦身大文件时，优先抽离稳定职责，而不是切碎调用链。
+重构必须保持行为可验证，不得凭感觉大搬家。
+前后端分离约束（仅当项目包含前端时生效）
+若本项目包含前端与后端：
 
-- No heredoc or multiline commands in user-facing instructions.
-- Use single-line commands.
-- Put temporary validation scripts only in `tmp_tests/`.
-- If a task needs manual verification, provide a one-line command.
-- Wrap executable commands in standard ` ```bash ` blocks.
+前端只通过明确接口调用后端，不直接依赖后端内部实现。
+后端不为前端临时页面结构泄露内部模型。
+API、鉴权、错误格式、配置注入方式应在文档中明确。
+不把“前后端分离”当成默认重构目标；只有当项目文档已定义该边界时，才按该边界推进。
+若当前仓库本质是后端 / 机器人 / 服务型项目，则不要为了形式去人为引入前后端分离结构。
 
-## 6. Document priority
+停止条件
+只有在以下情况允许停止当前连续施工：
 
-When docs disagree, follow:
-1. `docs/DECISIONS.md`
-2. `docs/NEXT_STEP.md`
-3. `docs/STATUS.md`
-4. `README.md`
-5. `AGENTS.md`
+出现明确 blocker
+达到 docs/NEXT_STEP.md 当前主线的可测量退出条件
+继续修改会违反本文件或文档边界
+无法确认 commit / push 状态
+已完成一个可验证闭环，且当前阶段没有比“停止并汇报”更保守的下一步
+汇报条件
+默认不要中途频繁汇报。 只有在以下情况才汇报：
 
-`docs/HISTORY.md` is background only. Do not use it as the source of current execution truth.
+失败
+blocker
+必须由用户决定
+达到当前阶段退出条件
+继续推进风险明显上升
+默认汇报格式
+全部轮次结束后，默认只做一次简短总结，输出：
 
-## 7. Project scope
+当前主线完成度 / 当前阶段完成度
+默认分支当前质量状态
+本次完成的主要闭环
+本次验证结果摘要
+更新的文档
+最后停下来的原因
+commit hash 列表（若有）
+如果是中途异常汇报，输出：
 
-Current mainline profile:
-- Telegram + personal WeChat + Feishu + WeCom（当前为最小私聊文本基线）
-- TMDB
-- Prowlarr（current main source） + minimal BT WebSource（BT-only）
-- Transmission + qBittorrent
-- Emby / Jellyfin / Plex（按配置选择 refresh provider）
-- SQLite
-- Docker Compose
-- single instance / single process / single host
-- movie-first workflow
+当前任务
+当前状态
+失败或 blocker
+已尝试的验证
+建议的下一步
+Git 纪律
+每个闭环尽量形成独立 commit。
+commit 信息应直接描述闭环内容。
+未验证通过的改动，不要伪装成完成态。
+高风险改动前，优先保留可回滚检查点。
+若仓库要求 push，先确认本地状态、分支状态与远端状态一致。
+成功标准
+本项目中的一次成功推进，应满足：
 
-Core responsibilities:
-- `search_media`
-- `add_to_downloader`
-- `get_download_status`
-- `import_to_library`
-- `refresh_media_server`
-- `manage_watchlist`
-- `manage_bt_subscription`
-
-Do not expand into:
-- generic AI assistant behavior
-- generic agent platform features
-- generic plugin / skill / MCP platformization
-- Jellyfin / Plex full media-management parity or auto-detection in the current step
-- auto-download watchlist in the current mainline
-
-Roadmap items that stay out of scope until `docs/NEXT_STEP.md` promotes them:
-- downloader/library asset cleanup automation
-
-## 8. Current priority
-
-**质量硬化** 与 **保守版收尾发布准备** 已完成：三座大山保持 `≤ 600` 行，`make quality` / `make verify-mainline` / `make verify-quality-gates` 与全量 `pytest` 当前都已复验绿灯。默认分支若继续推进，当前唯一主线就是 **搜索相关性优化**，不再把发布准备当作默认施工方向。
-
-当前更小也更有用户价值的下一步，是继续在现有 movie-first 搜索链里做最小闭环的确定性相关性优化，例如：
-
-- query 解析与标题归一
-- TMDB 候选选择与置信判断
-- 既有 BT 排序器在 movie-first 搜索里的排序偏好
-
-当前主线入口继续看 `docs/NEXT_STEP.md` 与 `docs/STATUS.md`。只有当文档真相、发布矩阵、真实 smoke 或质量入口再次漂移时，才临时回到 **收尾发布准备**，并按 `docs/OPERATOR_RUNBOOK.md` 与 `docs/RELEASE_PREP_PROMPTS.md` 的对应模板执行。已完成闭环入口继续看 `docs/RELEASE_PREP_PLAN.md`、`docs/QUICK_START_PLAN.md`、`docs/DEPLOY_CHECKLIST.md`、`docs/APP_MAIN_SLIMMING_LOG.md`、`docs/PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`、`docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md`、`docs/TELEGRAM_BOT_SLIMMING_LOG.md` 与 `docs/PERSISTENCE_CLOSURE_LOG.md`。
-
-**诊断分流递减自检**：若本轮候选闭环的代码变更 < 20 行、只是对同一个 repo 方法再拆一条 `if/elif/log` 诊断分支，且上一轮也是同类微闭环，则视为收益递减；本轮完成并提交后**直接停止**，把"当前主线可宣告完成"汇报给用户，不要自动进入下一轮再拆一条分流。
-
-## 9. Runtime rules
-
-### Model usage
-- Parser-first, LLM-fallback.
-- Never use the model for idempotency checks.
-- Never use the model for lease ownership.
-- Never use the model for execution-result truth.
-- Never use the model for approval re-validation.
-- Background recovery and scheduler ticks must not depend on LLM calls.
-
-### Concurrency
-- Read-only tools may be marked concurrency-safe.
-- Stateful tools must remain serialized through workflow ownership.
-- Same-job side effects must never run concurrently.
-- If no lease is held, the side-effect path must exit.
-
-### Approval wake
-- `confirm` must rebuild execution context from persisted truth.
-- Do not reuse old free-form conversation transcript as execution memory.
-
-### BT boundary
-- direct `magnet:?` requests currently ask which downstream path to use (`media-import` vs `pure-bt`), but they still stay inside the BT envelope.
-- pure BT path currently has a minimum single-item ranking baseline, and may later add LLM-assisted preference after deterministic pre-filtering.
-- BT 当前已可接 deterministic external website sources, but PT main path must stay unchanged.
-- BT may later add a BT-only read-only helper.
-- That helper may not write workflow truth, mutate approvals/jobs, dispatch downloads, or trigger import side effects.
-- Scheduler ticks and automatic recovery must not depend on that helper.
-
-## 10. Engineering conventions
-
-- Python 3.12 style.
-- Prefer small explicit functions.
-- Prefer deterministic text protocols over fancy UI.
-- Keep diffs narrow.
-- Do not refactor unrelated modules.
-- Update docs whenever behavior or rules change.
-- **瘦身 commit 必须顺手清掉对应被拆文件的 pyflakes 未用 import**；不单独开 commit、不单独开主线。具体纪律见 `docs/SLIMMING_RULES.md`。
-
-## 11. Task protocol
-
-- Identify the smallest reasonable closed loop from `docs/NEXT_STEP.md` and current codebase state.
-- Work on one small task at a time; do not bundle unrelated cleanup or refactors.
-- Prefer reusing existing tests and scripts; only create `tmp_tests/` files when necessary.
-- Run verification yourself; do not stop at “here is the command”.
-- After implementation, review the diff for scope creep, debug leftovers, and temporary files.
-- If behavior, rules, or entrypoints changed, update the relevant docs in the same turn.
-- **同能力族 proof 连续上限**：如果同一能力族已经连续完成 2 条 promoted proof-only 主线，且都没有新增副作用验证、用户可感知协议能力或显著结构降本，则下一条主线必须切到以下三类之一：真实 side-effect smoke、结构降本主线、新的用户可感知协议能力；不得继续在同一能力族里再挑更小页面形式。
-- **诊断分流递减停机规则**：本轮代码变更 `< 20 行` 且只是为同一个 repo 方法追加 `if/elif/log` 诊断分支时，视为收益递减。本轮完成并提交后**直接停止**并请用户确认是否宣告当前主线完成、切换到 `After this step` 第 1 项；不要自动连续第 2/3 轮再拆一条分流。
-- 同一会话默认最多连续推进 10 轮；到第 10 轮结束后，下一次继续施工时应新开会话，不要把第 11 轮继续叠在旧线程里。
-- 长会话重开时，优先用“最新 commit hash + 1 段当前快照 + 1 段当前主线详细闭环”做交接，不要把整段历史对话当执行上下文。
-
-## 12. High-risk paths
-
-Do not casually modify these without updating docs and calling out the risk:
-- persistence schema / migrations
-- approval protocol
-- lease/version protocol
-- recovery scripts
-- docker-compose deployment files
-- restore / backup scripts
-- secrets or token wiring
-
-## 13. Definition of done
-
-A task is done only when:
-1. code or docs are complete
-2. if verification is needed, a `tmp_tests/` script is created
-3. manual verification succeeds
-4. relevant docs are updated
-5. temporary validation scripts are deleted
-6. no obvious regression remains
-7. document priority is still internally consistent
+只推进当前主线或当前质量目标
+每轮只有一个最小闭环
+结果可验证
+默认分支不被破坏
+文档和代码保持一致
+结构债减少或至少没有扩大
+为下一轮连续施工留下清晰起点

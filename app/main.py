@@ -244,6 +244,7 @@ def main() -> None:
         metadata_scraper_service = MetadataScraperService(
             lookup_movie_func=tmdb_client.search_movie,
             get_movie_images_func=get_movie_images_func,
+            lookup_movie_by_tmdb_id_func=tmdb_client.get_movie_by_id,
         )
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(

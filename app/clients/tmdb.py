@@ -54,6 +54,19 @@ class TmdbClient:
             limit=limit,
         )
 
+    async def get_movie_by_id(self, tmdb_id: str) -> TmdbMovie | None:
+        cleaned_tmdb_id = tmdb_id.strip()
+        if not cleaned_tmdb_id:
+            return None
+        response = await self._get(
+            f"/3/movie/{cleaned_tmdb_id}",
+            params={"api_key": self._api_key},
+        )
+        data = response.json()
+        if not isinstance(data, Mapping):
+            return None
+        return _to_tmdb_movie(data)
+
     async def search_tv(self, title: str, year: str = "") -> TmdbMovie | None:
         results = await self.search_tv_candidates(title, year=year, limit=5)
         if not results:

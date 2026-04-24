@@ -81,6 +81,8 @@ Luminarr 当前仍是：
 
 目标：先把 `media_identity` 沿着当前主链落稳。
 
+当前状态：已完成
+
 最小实现：
 
 - 搜索候选写入时附带 `media_identity`
@@ -92,6 +94,8 @@ Luminarr 当前仍是：
 
 目标：让 `metadata_scraper` 直接优先吃 `tmdb_id`。
 
+当前状态：已完成
+
 最小实现：
 
 - `MetadataScrapeInput` 增加可选 `tmdb_id`
@@ -100,6 +104,8 @@ Luminarr 当前仍是：
 ### Phase 3
 
 目标：产出真正的本地刮削产物。
+
+当前状态：当前主线下一步
 
 最小实现：
 
@@ -116,6 +122,23 @@ Luminarr 当前仍是：
 - `.metadata.json`：`overwrite`
 - `.nfo` / 图片：先 `missing-only`
 - 补一次真实 `import -> scrape -> subtitle -> refresh` smoke
+
+## Later structural backlog
+
+这些不是当前刮削主线的即时 blocker，但已经明确挂进后续任务，避免再次靠口头记忆：
+
+- `app/services/subtitle_translator.py`
+  - 目标：按“外挂字幕识别 / 内嵌字幕探测 / 提取执行 / 翻译执行 / 中文跳过策略”拆分
+- `app/services/manage_bt_subscription.py`
+  - 目标：按“命令解析 / 持久化 / 扫描候选 / 最后一次 seen 状态更新 / scheduler tick”拆分
+- `app/services/cleanup_downloaded_source.py`
+  - 目标：按“任务解析 / import 关联 / inspect / 执行删除 / follow-up”拆分
+- `app/db/approval_repo.py`
+  - 目标：按 action 族或 query/update helper 收口，避免继续在同一文件里累加协议分支
+- `app/db/job_repo.py`
+  - 目标：按 workflow/job lifecycle 的 query/update helper 收口，降低跨能力族耦合
+
+这些文件的拆解默认排在当前刮削主线之后；只有当其中某个文件直接阻塞当前 `media_identity -> scrape` 主线时，才允许提前插队。
 
 ## Not Now
 

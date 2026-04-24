@@ -4113,6 +4113,63 @@ def test_confirm_import_metadata_scrape_prefers_downloader_title_truth(tmp_path:
     assert seen_inputs[0].year == "2018"
 
 
+def test_confirm_import_metadata_scrape_passes_confirmed_tmdb_id(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "raw.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="1",
+        task_id="87",
+        task_hash="hash-87",
+        event_type=MEDIA_IDENTITY_EVENT_TYPE,
+        message=media_identity_to_json(
+            {
+                "media_type": "movie",
+                "tmdb_id": "157336",
+                "title": "Interstellar",
+                "original_title": "星际穿越",
+                "year": "2014",
+                "source": "search_confirmed",
+            }
+        ),
+    )
+
+    seen_inputs: list[MetadataScrapeInput] = []
+
+    async def fake_scrape(scrape_input: MetadataScrapeInput) -> MetadataScrapeResult:
+        seen_inputs.append(scrape_input)
+        return MetadataScrapeResult(success=True, message="metadata 刮削成功：/tmp/demo.metadata.json")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        scrape_metadata_func=fake_scrape,
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+    assert "导入成功" in text
+    assert len(seen_inputs) == 1
+    assert seen_inputs[0].tmdb_id == "157336"
+    assert seen_inputs[0].title == "Interstellar"
+    assert seen_inputs[0].year == "2014"
+
+
 def test_confirm_import_metadata_scrape_exception_does_not_break_import(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

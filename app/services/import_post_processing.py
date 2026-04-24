@@ -11,6 +11,7 @@ RefreshMediaServerFunc = Callable[[], Awaitable[str]]
 MetadataScrapeFunc = Callable[[MetadataScrapeInput], Awaitable[MetadataScrapeResult]]
 SubtitleTranslateFunc = Callable[[SubtitleTranslateInput], SubtitleTranslateResult]
 ResolveMetadataTitleYearFunc = Callable[[str, str, Path], tuple[str, str]]
+ResolveMetadataTmdbIdFunc = Callable[[str, str], str]
 RecordImportEventFunc = Callable[..., None]
 
 IMPORT_REFRESH_FAILED_TEXT = "媒体库刷新失败：未知错误"
@@ -38,12 +39,14 @@ class ImportPostProcessingService:
         scrape_metadata_func: MetadataScrapeFunc | None,
         translate_subtitle_func: SubtitleTranslateFunc | None,
         resolve_metadata_title_year_func: ResolveMetadataTitleYearFunc,
+        resolve_metadata_tmdb_id_func: ResolveMetadataTmdbIdFunc,
         record_event_func: RecordImportEventFunc,
     ) -> None:
         self._refresh_media_server_func = refresh_media_server_func
         self._scrape_metadata_func = scrape_metadata_func
         self._translate_subtitle_func = translate_subtitle_func
         self._resolve_metadata_title_year = resolve_metadata_title_year_func
+        self._resolve_metadata_tmdb_id = resolve_metadata_tmdb_id_func
         self._record_event = record_event_func
 
     async def run(self, request: ImportPostProcessRequest) -> ImportPostProcessResult:
@@ -65,6 +68,10 @@ class ImportPostProcessingService:
             task_hash=request.task_hash,
             target_path=request.target_path,
         )
+        tmdb_id = self._resolve_metadata_tmdb_id(
+            request.task_id,
+            request.task_hash,
+        )
         scrape_input = MetadataScrapeInput(
             task_ref=request.task_ref,
             task_id=request.task_id,
@@ -72,6 +79,7 @@ class ImportPostProcessingService:
             title=title,
             year=year,
             target_path=str(request.target_path),
+            tmdb_id=tmdb_id,
         )
         try:
             result = await self._scrape_metadata_func(scrape_input)
