@@ -12,6 +12,8 @@
 
 当前代码会在启动时读取它；文件缺失或字段损坏时，会打印中文 warning，并回退到内置默认值。
 
+如果你不想改仓库里的 YAML，也可以在本地 `.env` 里用 `BT_SOURCE_SITE_PREFERRED` 覆盖站点顺序；环境变量优先级高于这个文件。
+
 ## 2. 默认风格
 
 当前默认风格是：
@@ -75,6 +77,17 @@ source_site_preferred:
 - 更适合做 tie-break 和偏好排序，不适合拿来压过标题匹配
 
 如果你自己的索引器里某些站更可信，就把它们往前放。
+
+如果你只想在自己本机改，不想改仓库文件，可以直接在 `.env` 里写：
+
+```env
+BT_SOURCE_SITE_PREFERRED=PTP,BTN,BHD,PTerClub
+```
+
+说明：
+- 多个站点用 `,` 分隔
+- 可写真实站点名，也可写常见缩写
+- 当前已兼容的常见写法包括：`PTP / PassThePopcorn`、`BTN / BroadcasTheNet`、`BHD / BeyondHD`
 
 ### `source_type_scores`
 

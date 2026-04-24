@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
+import os
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -159,9 +160,25 @@ DEFAULT_BT_SCORING_RULES = BTScoringRules(
     release_group_preferred=("VCB-Studio", "SweetSub", "CHD", "WiKi", "FRDS"),
 )
 DEFAULT_BT_SCORING_RULES_PATH = Path(__file__).with_name("bt_scoring_rules.yml")
+_SOURCE_SITE_PREFERRED_ENV_KEY = "BT_SOURCE_SITE_PREFERRED"
+_SOURCE_SITE_ALIASES = {
+    "ptp": "ptp",
+    "passthepopcorn": "ptp",
+    "btn": "btn",
+    "broadcasthe.net": "btn",
+    "broadcasthetnet": "btn",
+    "broadcasthetnetwork": "btn",
+    "bhd": "bhd",
+    "beyondhd": "bhd",
+    "pter": "pterclub",
+    "pterclub": "pterclub",
+    "hdb": "hdbits",
+    "hdbits": "hdbits",
+    "mtv": "mtv",
+}
 
 
-def load_bt_scoring_rules(path: Path | None = None) -> BTScoringRules:
+def load_bt_scoring_rules(path: Path | None = None, *, environ: Mapping[str, str] | None = None) -> BTScoringRules:
     resolved_path = path or DEFAULT_BT_SCORING_RULES_PATH
     try:
         raw_text = resolved_path.read_text(encoding="utf-8")
@@ -178,7 +195,7 @@ def load_bt_scoring_rules(path: Path | None = None) -> BTScoringRules:
 
     if warnings:
         _log_bt_scoring_rules_warning(path=resolved_path, reason="；".join(warnings))
-    return rules
+    return _apply_source_site_env_override(rules, environ=os.environ if environ is None else environ)
 
 
 def filter_candidates(
@@ -504,13 +521,41 @@ def _score_release_group(release_group: str | None, preferred_groups: tuple[str,
 def _score_source_site(source_site: str | None, preferred_sites: tuple[str, ...]) -> float:
     if not source_site:
         return 0.0
-    normalized_source_site = source_site.strip().lower()
+    normalized_source_site = _normalize_source_site_key(source_site)
     if not normalized_source_site:
         return 0.0
-    normalized_preferred_sites = [site.strip().lower() for site in preferred_sites if site.strip()]
+    normalized_preferred_sites = [_normalize_source_site_key(site) for site in preferred_sites if site.strip()]
     if normalized_source_site in normalized_preferred_sites:
         return 1.0
     return 0.2
+
+
+def _apply_source_site_env_override(
+    rules: BTScoringRules,
+    *,
+    environ: Mapping[str, str],
+) -> BTScoringRules:
+    raw_value = str(environ.get(_SOURCE_SITE_PREFERRED_ENV_KEY, "")).strip()
+    if not raw_value:
+        return rules
+    preferred_sites = tuple(site.strip() for site in raw_value.replace(";", ",").split(",") if site.strip())
+    if not preferred_sites:
+        return rules
+    return BTScoringRules(
+        weights=dict(rules.weights),
+        resolution_scores=dict(rules.resolution_scores),
+        source_type_scores=dict(rules.source_type_scores),
+        codec_scores=dict(rules.codec_scores),
+        source_site_preferred=preferred_sites,
+        release_group_preferred=tuple(rules.release_group_preferred),
+    )
+
+
+def _normalize_source_site_key(value: str) -> str:
+    collapsed = re.sub(r"[^a-z0-9.]+", "", value.strip().lower())
+    if not collapsed:
+        return ""
+    return _SOURCE_SITE_ALIASES.get(collapsed, collapsed)
 
 
 def _looks_like_valid_download_source(source: str) -> bool:

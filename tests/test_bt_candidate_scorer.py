@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, pick_best
+from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, BTScoringRules, filter_candidates, pick_best
 from app.services.bt_candidate_scorer import DEFAULT_BT_SCORING_RULES, load_bt_scoring_rules
 
 
@@ -199,6 +199,28 @@ def test_filter_candidates_applies_source_site_preference() -> None:
     assert scored[1].score_breakdown["source_site"] == 0.2
 
 
+def test_filter_candidates_applies_source_site_preference_for_alias_name() -> None:
+    scored = filter_candidates(
+        (
+            _make_candidate(title="Dune 2021 1080p WEB-DL", source_type="WEB-DL", source_site="BeyondHD"),
+            _make_candidate(title="Dune 2021 1080p WEB-DL", source_type="WEB-DL", source_site="OtherSite"),
+        ),
+        _movie_context(),
+        rules=BTScoringRules(
+            weights=dict(DEFAULT_BT_SCORING_RULES.weights),
+            resolution_scores=dict(DEFAULT_BT_SCORING_RULES.resolution_scores),
+            source_type_scores=dict(DEFAULT_BT_SCORING_RULES.source_type_scores),
+            codec_scores=dict(DEFAULT_BT_SCORING_RULES.codec_scores),
+            source_site_preferred=("BHD",),
+            release_group_preferred=DEFAULT_BT_SCORING_RULES.release_group_preferred,
+        ),
+    )
+
+    assert scored[0].candidate.source_site == "BeyondHD"
+    assert scored[0].score_breakdown["source_site"] == 1.0
+    assert scored[1].score_breakdown["source_site"] == 0.2
+
+
 def test_filter_candidates_uses_seeders_as_tiebreak_inside_same_quality_bucket() -> None:
     scored = filter_candidates(
         (
@@ -319,6 +341,20 @@ def test_load_bt_scoring_rules_warns_and_keeps_defaults_for_invalid_field(tmp_pa
     captured = capsys.readouterr()
     assert "[BT 评分规则文件回退]" in captured.out
     assert "weights.seeders 不是数字" in captured.out
+
+
+def test_load_bt_scoring_rules_allows_env_override_for_source_site_priority(tmp_path: Path) -> None:
+    path = tmp_path / "rules.yml"
+    path.write_text(
+        "source_site_preferred:\n"
+        "  - PTerClub\n"
+        "  - PassThePopcorn\n",
+        encoding="utf-8",
+    )
+
+    rules = load_bt_scoring_rules(path, environ={"BT_SOURCE_SITE_PREFERRED": "PTP,BTN,BHD,PTerClub"})
+
+    assert rules.source_site_preferred == ("PTP", "BTN", "BHD", "PTerClub")
 
 
 def test_pick_best_can_use_loaded_custom_rules(tmp_path: Path) -> None:
