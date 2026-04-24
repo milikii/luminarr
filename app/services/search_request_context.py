@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.search_title_normalization import is_confident_title_match, normalize_spaces
+from app.search_title_normalization import compact_match_key, is_confident_title_match, normalize_match_key, normalize_spaces
 from app.clients.tmdb import TmdbMovie
 from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
@@ -134,14 +134,24 @@ async def _search_candidates_with_logging(
 
 def _unique_queries(candidates: Sequence[str]) -> list[str]:
     ordered_queries: list[str] = []
+    seen_query_keys: set[str] = set()
     for query in candidates:
         cleaned_query = query.strip()
         if not cleaned_query:
             continue
-        if cleaned_query in ordered_queries:
+        query_key = _query_dedupe_key(cleaned_query)
+        if query_key in seen_query_keys:
             continue
         ordered_queries.append(cleaned_query)
+        seen_query_keys.add(query_key)
     return ordered_queries
+
+
+def _query_dedupe_key(query: str) -> str:
+    normalized_query = normalize_match_key(query)
+    if not normalized_query:
+        return query.strip()
+    return compact_match_key(normalized_query)
 
 
 def _is_tmdb_confident_match(

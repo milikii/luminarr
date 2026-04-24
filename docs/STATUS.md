@@ -3,7 +3,7 @@
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮刚完成：TMDB 客户端标题打分与 `search_request_context.py` 的高置信判断已收口到共享标题关系 helper；`Batman v Superman: Dawn of Justice`、`Alien: Romulus` 这类副标题命中规则不再在两个模块里各维护一份。
+- 当前这一轮刚完成：搜索请求去重现在也会复用共享标题归一；`Dune Part Two` / `Dune: Part Two` / `Dune Part 2` 这类共享归一后等价的 TMDB 双标题不再各搜一轮。
 - 更早完成的 `query 解析职责拆分` 继续保持完成态：`ParsedMovieQuery` 与 `parse_movie_query()` 不再继续挂在 `search_request_context.py` 下面。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `568` 行。
@@ -25,6 +25,7 @@
 - `Alien 2024` 这类“主标题 + 单词官方副标题”现在也会把 `Alien: Romulus` 视为高置信 TMDB 命中并优先直搜官方长片名；但没有副标题分隔符的单词后缀仍不会被当作同片高置信。
 - 搜索链当前结构也继续收口：共享标题噪音规则已改成“声明式词表 + 统一正则拼装”；`search_request_context.py`、`search_media.py`、`search_reply_formatter.py` 都直接复用 `search_title_normalization.py` / `search_query_parser.py`，不再各自挂一份 query 解析或标题工具。
 - 当前标题关系判断也已继续收口：TMDB 客户端标题打分和搜索请求高置信判断现在共享同一套 helper，不再分别手写 exact / compact / subtitle extension 关系。
+- 搜索请求去重现在也已继续收口：`Dune Part Two` / `Dune: Part Two` / `Dune Part 2` 这类共享归一后等价的 TMDB 双标题只会保留一条搜索请求，不再重复打到搜索源。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
@@ -40,8 +41,8 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
-- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `157 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `174 passed`
+- 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `158 passed`
+- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `175 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
 - import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
 - 当前本机探针：

@@ -3416,6 +3416,23 @@ def test_search_and_format_deduplicates_same_tmdb_titles() -> None:
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="星际穿越 (2014)")
 
 
+def test_search_and_format_deduplicates_normalization_equivalent_tmdb_titles() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Dune Part Two", original_title="Dune: Part Two", year="2024")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Dune Part 2 2024"))
+
+    assert seen_queries == ["Dune Part Two 2024", "Dune Part Two"]
+    assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune Part 2 2024")
+
+
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_empty() -> None:
     seen_queries: list[str] = []
 
