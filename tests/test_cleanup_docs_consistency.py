@@ -33,6 +33,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/STATUS.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/DECISIONS.md" in readme_text
+    assert "再去 `docs/OPERATOR_RUNBOOK.md` 按场景复制一条模板" in readme_text
     assert "docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md" not in readme_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" not in readme_text
 
@@ -40,7 +41,10 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/OPERATOR_RUNBOOK.md" in human_start_text
     assert "docs/GETTING_STARTED.md" in human_start_text
     assert "AGENTS.md" in human_start_text
+    assert "不确定文档、最近提交、当前状态有没有漂移" in human_start_text
+    assert "这一轮只改文档与 docs gate" in human_start_text
 
+    assert "## 0. 怎么选模板" in runbook_text
     assert "默认 3 轮施工" in runbook_text
     assert "只做冷启动一致性检查" in runbook_text
     assert "只做文档收口，不改业务代码" in runbook_text
@@ -53,6 +57,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/HUMAN_START_HERE.md" in index_text
     assert "docs/OPERATOR_RUNBOOK.md" in index_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in index_text
+    assert "先看 `docs/STATUS.md`" in index_text
 
     assert "docs/HUMAN_START_HERE.md" in getting_started_text
     assert "docs/STATUS.md" in getting_started_text
@@ -100,6 +105,7 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     assert re.search(r"\b\d+ passed, \d+ skipped\b", status_text)
     assert "make quality" in status_text
     assert "make verify-mainline" in status_text
+    assert "按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。" in status_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" not in status_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" not in status_text
     assert "cold-start consistency audit" not in status_text

@@ -23,7 +23,32 @@
 
 ### 想继续让 AI 施工
 
-直接复制：
+先不要自己写一大段自由提示词，先判断你属于哪一种：
+
+1. 只是继续当前主线：
+
+```text
+按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
+```
+
+2. 不确定文档、最近提交、当前状态有没有漂移：
+
+```text
+按 AGENTS.md 执行。
+先做冷启动一致性检查：读取 docs/INDEX.md、docs/ARCHITECTURE.md、docs/NEXT_STEP.md、docs/DECISIONS.md、docs/STATUS.md，运行 git log --oneline -20，并核对 STATUS 与 NEXT_STEP 是否一致。
+如果发现漂移，这一轮只补文档，不改业务代码；否则再从当前主线里选一个最小闭环继续做。
+```
+
+3. 这轮只想收文档入口，不要碰代码：
+
+```text
+按 AGENTS.md 执行。
+这一轮只改文档与 docs gate，不改业务代码、不改协议、不改 SQLite 真相边界。
+目标是让非技术操作者更容易继续推进：必要时更新 README、docs/INDEX.md、docs/STATUS.md、docs/NEXT_STEP.md、docs/HUMAN_START_HERE.md、docs/OPERATOR_RUNBOOK.md 和相关测试。
+改完后自行运行针对性验证、review diff、commit 并 push。
+```
+
+如果你已经确认只是继续当前主线，再直接复制：
 
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
@@ -56,6 +81,7 @@
 - 当前主线为什么没继续：`docs/STATUS.md` + `docs/NEXT_STEP.md`
 - 真实 downloader / import / refresh 环境：`docs/TEST_ENV.md`
 - AI 为什么不该那样改：`AGENTS.md`
+- 不知道该给 AI 发哪一句：先回 `docs/OPERATOR_RUNBOOK.md`
 
 ## 6. 给 fork 维护者的最短入口
 

@@ -18,6 +18,12 @@
 - `docs/GETTING_STARTED.md`：怎么启动、怎么做最小 smoke
 - `docs/STATUS.md`：现在稳不稳、最近验证到哪
 
+如果你只想继续推进当前仓库，默认顺序是：
+
+1. 先看 `docs/STATUS.md`
+2. 再去 `docs/OPERATOR_RUNBOOK.md` 选一条模板复制
+3. 不确定有没有漂移时，先跑“冷启动一致性检查”
+
 ## 2. 如果你是 AI / 施工代理
 
 先按这个顺序读：

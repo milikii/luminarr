@@ -64,5 +64,5 @@
 ## Recommended Next Operator Command
 
 ```text
-保守版发布准备已可宣告完成；如需继续，优先做搜索相关性优化，不必再把 19092 / 18098 当当前 blocker。
+按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```

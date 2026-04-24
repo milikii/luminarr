@@ -37,6 +37,12 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 默认还是直接从 `docs/OPERATOR_RUNBOOK.md` 复制模板，不要自己重新发明长提示词。
 
+如果你只想记住一条推进顺序，就记这个：
+
+1. 先看 `docs/STATUS.md`，确认当前是不是绿灯、主线是不是还在搜索相关性优化
+2. 再去 `docs/OPERATOR_RUNBOOK.md` 按场景复制一条模板
+3. 不确定有没有文档漂移时，先用“只做冷启动一致性检查”，不要直接让 AI 动代码
+
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```
