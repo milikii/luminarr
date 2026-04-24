@@ -12,6 +12,7 @@
   - `Mission Impossible 7 IMAX 2023` 这类“空格数字续作 + IMAX + 年份”输入现在不会再把尾部数字吞回基片标题
   - `Fast X Special Edition 2023` 这类“尾部 sequel token + 版本噪音词 + 年份”输入现在会先剥掉 `Special Edition`，再稳定保住 `Fast X`
   - `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + cut/edition 词 + 年份”输入现在会把尾部版本词剥掉，再把 TMDB 与搜索 query 对齐回真正片名
+  - `Blade Runner The Final Cut 1982`、`Alien The Director's Cut 1979` 这类带前置冠词的尾部版本短语现在也会整段剥掉，不再把标题错误残留成 `Blade Runner The` / `Alien The`
   - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
   - 当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
   - `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Remastered / Theatrical / Uncut` 留在搜索标题里
@@ -25,6 +26,7 @@
 ## User value
 
 - 用户现在输入带 `Extended / IMAX / Special Edition / Final Cut / Director's Cut / Ultimate Edition` 这类版本噪音词的片名时，更不容易因为尾部脏词把真正的 sequel/chapter token 吞掉，或者把片名误留在版本 cut/edition 词上。
+- 当前这套规则也已覆盖 `The Final Cut / The Director's Cut` 这类资源站常见写法；尾部前置冠词会和版本短语一起剥掉，不再把错误的 `The` 残留进搜索标题。
 - 当前这一轮也顺手降低了后续维护成本：再加新一类尾部标题噪音词时，不需要同时改 query 解析和 TMDB 标题比对两套逻辑。
 - 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
 - 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。

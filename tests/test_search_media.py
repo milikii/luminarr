@@ -3156,6 +3156,35 @@ def test_search_and_format_strips_directors_cut_noise_before_tmdb_lookup() -> No
     assert "Blade Runner 1982 Final Cut 2160p BluRay" in text
 
 
+def test_search_and_format_strips_the_final_cut_noise_before_tmdb_lookup() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Blade Runner 1982":
+            return [
+                {
+                    "title": "Blade Runner The Final Cut 1982 2160p BluRay",
+                    "year": 1982,
+                    "size": 14 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerBR",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Blade Runner"
+        assert year == "1982"
+        return TmdbMovie(title="Blade Runner", original_title="Blade Runner", year="1982")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Blade Runner The Final Cut 1982"))
+
+    assert seen_queries == ["Blade Runner 1982"]
+    assert "片名: Blade Runner" in text
+    assert "Blade Runner The Final Cut 1982 2160p BluRay" in text
+
+
 def test_search_and_format_strips_remastered_noise_after_chapter_digit_alias() -> None:
     seen_queries: list[str] = []
 
@@ -3420,6 +3449,18 @@ def test_parse_movie_query_strips_final_cut_noise() -> None:
 
 def test_parse_movie_query_strips_directors_cut_noise() -> None:
     parsed = parse_movie_query("Alien Director's Cut 1979")
+    assert parsed.title == "Alien"
+    assert parsed.year == "1979"
+
+
+def test_parse_movie_query_strips_the_final_cut_noise() -> None:
+    parsed = parse_movie_query("Blade Runner The Final Cut 1982")
+    assert parsed.title == "Blade Runner"
+    assert parsed.year == "1982"
+
+
+def test_parse_movie_query_strips_the_directors_cut_noise() -> None:
+    parsed = parse_movie_query("Alien The Director's Cut 1979")
     assert parsed.title == "Alien"
     assert parsed.year == "1979"
 

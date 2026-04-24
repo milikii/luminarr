@@ -4,7 +4,7 @@ import re
 import unicodedata
 
 SEARCH_TITLE_NOISE_PATTERN = (
-    r"(?:imax|extended(?:\s+edition)?|special\s+edition|ultimate\s+edition|final\s+cut|director'?s\s+cut|directors\s+cut|remaster(?:ed)?|theatrical(?:\s+cut)?|uncut|unrated|anniversary\s+edition|collector'?s\s+edition|collectors\s+edition)"
+    r"(?:imax|(?:the\s+)?extended(?:\s+edition)?|(?:the\s+)?special\s+edition|(?:the\s+)?ultimate\s+edition|(?:the\s+)?final\s+cut|(?:the\s+)?director'?s\s+cut|(?:the\s+)?directors\s+cut|remaster(?:ed)?|theatrical(?:\s+cut)?|uncut|unrated|(?:the\s+)?anniversary\s+edition|(?:the\s+)?collector'?s\s+edition|(?:the\s+)?collectors\s+edition)"
 )
 _TRAILING_SEQUEL_DIGIT_WITH_YEAR_RE = re.compile(
     r"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>\d{1,2})(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{2})(?:\s*[\])])?$"

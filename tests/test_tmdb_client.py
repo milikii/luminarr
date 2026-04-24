@@ -258,6 +258,39 @@ def test_search_movie_prefers_base_title_when_query_has_final_cut_noise() -> Non
     assert result.tmdb_id == "2"
 
 
+def test_search_movie_prefers_base_title_when_query_has_the_final_cut_noise() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "Blade Runner The Final Cut"
+        assert params["year"] == "1982"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 1,
+                        "title": "Blade Runner 2049",
+                        "original_title": "Blade Runner 2049",
+                        "release_date": "1982-10-01",
+                    },
+                    {
+                        "id": 2,
+                        "title": "Blade Runner",
+                        "original_title": "Blade Runner",
+                        "release_date": "1982-06-25",
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_movie("Blade Runner The Final Cut", "1982"))
+
+    assert result is not None
+    assert result.title == "Blade Runner"
+    assert result.tmdb_id == "2"
+
+
 def test_search_movie_prefers_chapter_alias_when_query_has_extended_noise() -> None:
     client = TmdbClient(api_key="tmdb-key")
 
