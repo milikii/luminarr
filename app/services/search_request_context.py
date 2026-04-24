@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import re
-import unicodedata
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.search_title_normalization import SEARCH_TITLE_NOISE_PATTERN, compact_match_key, normalize_match_key, strip_trailing_query_noise
+from app.search_title_normalization import compact_match_key, finalize_parsed_query_title, normalize_match_key, normalize_spaces, strip_trailing_query_noise
 from app.clients.tmdb import TmdbMovie
 from app.services.media_name_parser import parse_media_name
 
@@ -27,121 +25,20 @@ class SearchRequestContext:
     resolved_query: str
     raw_results: Sequence[Mapping[str, Any]]
 
-
-_TRAILING_SEQUEL_DIGIT_WITH_YEAR_RE = re.compile(
-    r"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>\d{1,2})(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{2})(?:\s*[\])])?$"
-)
-_TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE = re.compile(
-    r"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>(?:\d{1,2}|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部))(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{2})(?:\s*[\])])?$",
-    re.IGNORECASE,
-)
-_SEQUEL_VALUE_PATTERN = r"(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部)"
-_SEQUEL_PHRASE_PATTERN = rf"(?:(?:part|chapter)\s+{_SEQUEL_VALUE_PATTERN}|{_SEQUEL_VALUE_PATTERN})"
-_TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE = re.compile(
-    rf"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>{_SEQUEL_PHRASE_PATTERN})(?:\s+(?P<noise>{SEARCH_TITLE_NOISE_PATTERN}(?:\s+{SEARCH_TITLE_NOISE_PATTERN})*))?(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{{2}})(?:\s*[\])])?$",
-    re.IGNORECASE,
-)
-
-
-def normalize_spaces(value: str) -> str:
-    normalized = unicodedata.normalize("NFKC", value)
-    return re.sub(r"\s+", " ", normalized.strip())
-
-
 def parse_movie_query(query: str) -> ParsedMovieQuery:
     cleaned_query = normalize_spaces(query)
     if not cleaned_query:
         return ParsedMovieQuery(title="", year="")
 
     parsed_name = parse_media_name(cleaned_query)
-    title = normalize_spaces(parsed_name.title or cleaned_query)
     year = str(parsed_name.year) if parsed_name.year is not None else ""
-    title = _restore_trailing_sequel_token_title(
+    title = finalize_parsed_query_title(
         cleaned_query=cleaned_query,
-        parsed_title=title,
+        parsed_title=parsed_name.title or cleaned_query,
         parsed_year=year,
     )
     title = strip_trailing_query_noise(title)
     return ParsedMovieQuery(title=title, year=year)
-
-
-def _restore_sequel_digit_title(
-    *,
-    cleaned_query: str,
-    parsed_title: str,
-    parsed_year: str,
-) -> str:
-    if not parsed_title or not parsed_year:
-        return parsed_title
-    match = _TRAILING_SEQUEL_DIGIT_WITH_YEAR_RE.match(cleaned_query)
-    if match is None:
-        return parsed_title
-    if (match.group("year") or "").strip() != parsed_year:
-        return parsed_title
-    base_title = normalize_spaces(match.group("title") or "")
-    if base_title != parsed_title:
-        return parsed_title
-    separator = _resolve_query_separator(match, base_title=base_title, sequel=(match.group("sequel") or "").strip())
-    sequel = (match.group("sequel") or "").strip()
-    return f"{parsed_title}{separator}{sequel}".strip()
-
-
-def _restore_trailing_sequel_token_title(
-    *,
-    cleaned_query: str,
-    parsed_title: str,
-    parsed_year: str,
-) -> str:
-    restored_digit_title = _restore_sequel_digit_title(
-        cleaned_query=cleaned_query,
-        parsed_title=parsed_title,
-        parsed_year=parsed_year,
-    )
-    restored_noise_title = _restore_trailing_sequel_token_with_noise_title(
-        cleaned_query=cleaned_query,
-        parsed_title=restored_digit_title,
-        parsed_year=parsed_year,
-    )
-    if restored_noise_title != restored_digit_title:
-        return restored_noise_title
-    match = _TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE.match(cleaned_query)
-    if match is None:
-        return restored_digit_title
-    if (match.group("year") or "").strip() != parsed_year:
-        return restored_digit_title
-    base_title = normalize_spaces(match.group("title") or "")
-    sequel = normalize_spaces(match.group("sequel") or "")
-    separator = _resolve_query_separator(match, base_title=base_title, sequel=sequel)
-    candidate_title = f"{base_title}{separator}{sequel}".strip()
-    if candidate_title == restored_digit_title:
-        return restored_digit_title
-    parsed_compact = compact_match_key(normalize_match_key(restored_digit_title))
-    base_compact = compact_match_key(normalize_match_key(base_title))
-    candidate_compact = compact_match_key(normalize_match_key(candidate_title))
-    if parsed_compact == base_compact:
-        return candidate_title
-    if separator and parsed_compact == candidate_compact:
-        return candidate_title
-    return restored_digit_title
-
-
-def _restore_trailing_sequel_token_with_noise_title(
-    *,
-    cleaned_query: str,
-    parsed_title: str,
-    parsed_year: str,
-) -> str:
-    match = _TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE.match(cleaned_query)
-    if match is None:
-        return parsed_title
-    if (match.group("year") or "").strip() != parsed_year:
-        return parsed_title
-    base_title = normalize_spaces(match.group("title") or "")
-    sequel = normalize_spaces(match.group("sequel") or "")
-    if not base_title or not sequel:
-        return parsed_title
-    separator = _resolve_query_separator(match, base_title=base_title, sequel=sequel)
-    return f"{base_title}{separator}{sequel}".strip()
 
 async def build_search_request_context(
     *,
@@ -285,16 +182,3 @@ def _is_tmdb_confident_match(
     normalized_candidates = {normalized_title, normalized_original_title}
     compact_candidates = {compact_match_key(candidate) for candidate in normalized_candidates if candidate}
     return normalized_query in normalized_candidates or compact_query in compact_candidates
-
-
-def _resolve_query_separator(match: re.Match[str], *, base_title: str, sequel: str) -> str:
-    raw_separator = match.group("separator") or ""
-    raw_title = match.group("title") or ""
-    if (raw_separator or raw_title.endswith(" ")) and _should_preserve_query_separator(base_title, sequel):
-        return " "
-    return ""
-
-
-def _should_preserve_query_separator(base_title: str, sequel: str) -> bool:
-    _ = sequel
-    return bool(re.search(r"[a-z0-9]", base_title, re.IGNORECASE))

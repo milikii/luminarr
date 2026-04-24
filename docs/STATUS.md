@@ -1,9 +1,9 @@
-# Current status (v449)
+# Current status (v450)
 
 ## Current mainline
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已收工；当前主线已正式切到 **搜索相关性优化**。
-- 当前这一轮已把标题噪音归一逻辑收成共享层：query 解析与 TMDB 标题比对现在复用同一套尾部噪音词剥离规则，不再各自维护一份。
+- 当前这一轮已把 query 标题恢复逻辑继续收进共享层：`search_request_context.py` 不再单独维护那段续作/章节 token 恢复正则与比对逻辑。
 - 首版发布矩阵已冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/add_to_downloader.py` `574` 行 / `app/services/import_to_library.py` `585` 行 / `app/services/search_media.py` `460` 行。
 
@@ -21,6 +21,7 @@
 - 当前 `search_request_context.py` 与 `search_title_normalization.py` 已共享同一套标题噪音剥离规则；TMDB 直接候选比对现在也会把 `Final Cut / Extended` 这类尾部版本词当作噪音处理，不再只靠 query 解析这一层兜底。
 - `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会继续复用共享噪音归一层，不再把 `Remastered / Theatrical / Uncut` 留在搜索标题里，或把 `Part 2 / Chapter 4` 吞掉。
 - `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会继续复用共享噪音归一层，不再把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里，或把基片标题拖偏。
+- 当前续作/章节 token 恢复逻辑也已并回 `search_title_normalization.py`；后续若还要补 query 标题恢复规则，不需要再同时改 `search_request_context.py` 和共享归一层两份实现。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
