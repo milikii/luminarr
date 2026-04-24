@@ -15,6 +15,10 @@ LookupMovieByTmdbIdFunc = Callable[[str], Awaitable[TmdbMovie | None]]
 GetMovieImagesFunc = Callable[[str], Awaitable[FanartMovieImages | None]]
 DownloadImageFunc = Callable[[str], Awaitable[bytes]]
 
+WRITE_STRATEGY_OVERWRITE = "overwrite"
+WRITE_STRATEGY_MISSING_ONLY = "missing_only"
+WRITE_STRATEGY_SKIP = "skip"
+
 
 @dataclass(frozen=True, slots=True)
 class MetadataScrapeInput:
@@ -103,30 +107,22 @@ class MetadataScraperService:
                 "backdrop_url": fanart_images.backdrop_url if fanart_images is not None else "",
             },
         }
-        try:
-            metadata_path.write_text(
-                json.dumps(payload, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-        except Exception as exc:
-            message = f"写入 metadata 文件失败：{exc}"
-            _print_colored_error(
-                problem=message,
-                fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
-            )
-            return MetadataScrapeResult(success=False, message=message)
-        try:
-            nfo_path.write_text(
-                _render_movie_nfo(tmdb_movie=tmdb_movie, fanart_images=fanart_images),
-                encoding="utf-8",
-            )
-        except Exception as exc:
-            message = f"写入 NFO 文件失败：{exc}"
-            _print_colored_error(
-                problem=message,
-                fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
-            )
-            return MetadataScrapeResult(success=False, message=message)
+        error_result = _write_text_artifact(
+            artifact_path=metadata_path,
+            content=json.dumps(payload, ensure_ascii=False, indent=2),
+            label="metadata",
+            write_strategy=WRITE_STRATEGY_OVERWRITE,
+        )
+        if error_result is not None:
+            return error_result
+        error_result = _write_text_artifact(
+            artifact_path=nfo_path,
+            content=_render_movie_nfo(tmdb_movie=tmdb_movie, fanart_images=fanart_images),
+            label="NFO",
+            write_strategy=WRITE_STRATEGY_MISSING_ONLY,
+        )
+        if error_result is not None:
+            return error_result
         image_artifacts, error_result = await self._write_image_artifacts(
             target_path=target_path,
             fanart_images=fanart_images,
@@ -201,6 +197,11 @@ class MetadataScraperService:
         artifact_specs = _build_image_artifact_specs(target_path=target_path, fanart_images=fanart_images)
         created_paths: list[Path] = []
         for label, image_url, artifact_path in artifact_specs:
+            if _resolve_write_strategy_for_path(
+                artifact_path=artifact_path,
+                default_strategy=WRITE_STRATEGY_MISSING_ONLY,
+            ) == WRITE_STRATEGY_SKIP:
+                continue
             try:
                 payload = await self._download_image_func(image_url)
             except Exception as exc:
@@ -338,3 +339,36 @@ def _cleanup_written_artifacts(created_paths: list[Path]) -> None:
 def _print_colored_error(*, problem: str, fix: str) -> None:
     print(f"\033[31m[元数据刮削失败]\033[0m {problem}", flush=True)
     print(f"\033[33m[处理建议]\033[0m {fix}", flush=True)
+
+
+def _write_text_artifact(
+    *,
+    artifact_path: Path,
+    content: str,
+    label: str,
+    write_strategy: str,
+) -> MetadataScrapeResult | None:
+    resolved_strategy = _resolve_write_strategy_for_path(
+        artifact_path=artifact_path,
+        default_strategy=write_strategy,
+    )
+    if resolved_strategy == WRITE_STRATEGY_SKIP:
+        return None
+    try:
+        artifact_path.write_text(content, encoding="utf-8")
+    except Exception as exc:
+        message = f"写入 {label} 文件失败：{exc}"
+        _print_colored_error(
+            problem=message,
+            fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
+        )
+        return MetadataScrapeResult(success=False, message=message)
+    return None
+
+
+def _resolve_write_strategy_for_path(*, artifact_path: Path, default_strategy: str) -> str:
+    if default_strategy == WRITE_STRATEGY_OVERWRITE:
+        return WRITE_STRATEGY_OVERWRITE
+    if default_strategy == WRITE_STRATEGY_MISSING_ONLY and artifact_path.exists():
+        return WRITE_STRATEGY_SKIP
+    return default_strategy

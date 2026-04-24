@@ -103,6 +103,37 @@ def test_scrape_for_import_prefers_tmdb_id_lookup_when_available(tmp_path: Path)
     assert payload["tmdb"]["title"] == "Interstellar"
 
 
+def test_scrape_for_import_overwrites_metadata_sidecar(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+    metadata_path = target_file.with_suffix(".metadata.json")
+    metadata_path.write_text('{"tmdb": {"id": "old"}}', encoding="utf-8")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="Interstellar", year="2014", tmdb_id="157336")
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    service = MetadataScraperService(fake_tmdb_lookup, fake_fanart)
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert payload["tmdb"]["id"] == "157336"
+
+
 def test_scrape_for_import_returns_failed_when_tmdb_not_found(tmp_path: Path) -> None:
     target_file = tmp_path / "Unknown (2026).mkv"
     target_file.write_bytes(b"demo")
@@ -248,6 +279,77 @@ def test_scrape_for_import_writes_nfo_next_to_primary_video_in_directory_target(
     assert "<title>Interstellar</title>" in nfo_path.read_text(encoding="utf-8")
     assert poster_path.read_bytes() == b"image:https://img.example/poster.png"
     assert backdrop_path.read_bytes() == b"image:https://img.example/bg.webp"
+
+
+def test_scrape_for_import_keeps_existing_nfo_when_missing_only(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+    nfo_path = target_file.with_suffix(".nfo")
+    nfo_path.write_text("<movie>manual</movie>\n", encoding="utf-8")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="Interstellar", year="2014", tmdb_id="157336")
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    service = MetadataScraperService(fake_tmdb_lookup, fake_fanart)
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    assert nfo_path.read_text(encoding="utf-8") == "<movie>manual</movie>\n"
+
+
+def test_scrape_for_import_keeps_existing_images_when_missing_only(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+    poster_path = target_file.with_name("Interstellar (2014)-poster.jpg")
+    poster_path.write_bytes(b"manual-poster")
+
+    seen_urls: list[str] = []
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="Interstellar", original_title="Interstellar", year="2014", tmdb_id="157336")
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return FanartMovieImages(
+            poster_url="https://img.example/poster.jpg",
+            backdrop_url="https://img.example/bg.jpg",
+        )
+
+    async def fake_download_image(url: str) -> bytes:
+        seen_urls.append(url)
+        return f"image:{url}".encode("utf-8")
+
+    service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    assert seen_urls == ["https://img.example/bg.jpg"]
+    assert poster_path.read_bytes() == b"manual-poster"
+    assert target_file.with_name("Interstellar (2014)-backdrop.jpg").exists()
 
 
 def test_scrape_for_import_cleans_up_partial_image_artifacts_on_download_failure(tmp_path: Path) -> None:

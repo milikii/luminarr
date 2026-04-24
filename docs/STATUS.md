@@ -1,4 +1,4 @@
-# Current status (v457)
+# Current status (v458)
 
 ## Current mainline
 
@@ -7,7 +7,8 @@
 - 当前这一轮又前推一格：只要 `media_identity` 里已有 `tmdb_id`，`metadata_scraper.py` 现在会直接按该 ID 取详情，不再默认走 `search_movie(title, year)` 二次猜片。
 - 当前这一轮再补一格：`.metadata.json` 之外的最小本地刮削产物 `.nfo` 已开始落地；文件型目标会写同名 `.nfo`，目录型目标会优先写到主视频旁边。
 - 当前这一轮又前推一格：本地 `poster` / `backdrop` 图片产物也已开始落地；文件型目标会写 `<basename>-poster.*` / `<basename>-backdrop.*`，目录型目标会写 `poster.*` / `backdrop.*`。
-- 当前下一步切到写入策略层：`missing-only / overwrite / skip`。
+- 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
+- 当前下一步切到真实 smoke：`import -> scrape -> subtitle -> refresh`。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -17,7 +18,7 @@
 - 搜索链当前保持完成态：续作/章节别名归一、尾部版本噪音剥离、TMDB 高置信长标题命中，以及 `AMZN / DSNP / 4K / 2160p` 这类 BT 标题噪音与等价分辨率去重都已收口。
 - 字幕链当前保持完成态：外挂字幕随导入落库、已有中文字幕跳过翻译、无外挂字幕时可探测/提取英文文本字幕再翻译。
 - 当前刮削系统的输入真相已经收口：metadata 刮削现在优先消费已确认媒体身份，且有 `tmdb_id` 时会直连详情。
-- 当前最大缺口已经从“重新猜片”切到“写入策略仍未明确”：目前已有 `.metadata.json` + `.nfo` + `poster` / `backdrop`，但还没有清晰的 `missing-only / overwrite / skip` 规则。
+- 当前最大缺口已经从“重新猜片”切到“真实消费结果仍未确认”：目前 `.metadata.json` + `.nfo` + `poster` / `backdrop` 和写入策略都已落地，但还缺一次真实 `import -> scrape -> subtitle -> refresh` 联调确认。
 - 当前 live smoke 真相仍分两段：`search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 跑通；`status -> import -> confirm -> refresh` 已在真实 PT Transmission / Emby 跑通。
 
 ## Latest verification
@@ -26,7 +27,7 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
-- metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `198 passed, 4 warnings`
+- metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`
 - 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`
 - 字幕 / 导入 focused：`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py tests/test_import_to_library.py` 为 `161 passed`
@@ -34,9 +35,9 @@
 
 ## Current biggest risk
 
-- 当前最大刮削风险已经从“导入后重新猜片”切到“写入策略还没明确”：如果继续停在默认覆盖语义，后续手工修正的本地产物可能会被下一次确认导入覆盖。
+- 当前最大刮削风险已经从“导入后重新猜片”切到“真实消费结果还没确认”：本地产物虽然已经开始落地，但 Emby 侧对这些本地真相的实际消费效果还没有当前轮 smoke 证据。
 - 当前机器环境真相要继续按当轮探针写；涉及内嵌字幕探测时，默认要求 `ffmpeg` 在 PATH 中可执行。
-- 当前最大发布前不确定性已收缩到“写入策略命名与覆盖边界”；下一步应优先做 `missing-only / overwrite / skip`，而不是再开新的 provider 支线。
+- 当前最大发布前不确定性已收缩到“真实联调结果”；下一步应优先做 `import -> scrape -> subtitle -> refresh` smoke，而不是再开新的 provider 支线。
 
 ## Recommended Next Operator Command
 

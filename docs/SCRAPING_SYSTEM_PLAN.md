@@ -117,10 +117,12 @@ Luminarr 当前仍是：
 
 目标：明确写入策略与真实验证。
 
+当前状态：写入策略已完成；下一步补真实 smoke
+
 最小实现：
 
-- `.metadata.json`：`overwrite`
-- `.nfo` / 图片：先 `missing-only`
+- `.metadata.json`：`overwrite`（已完成）
+- `.nfo` / 图片：先 `missing-only`（已完成）
 - 补一次真实 `import -> scrape -> subtitle -> refresh` smoke
 
 ## Later structural backlog
