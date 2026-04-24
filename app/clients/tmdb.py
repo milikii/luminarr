@@ -60,7 +60,10 @@ class TmdbClient:
             return None
         response = await self._get(
             f"/3/movie/{cleaned_tmdb_id}",
-            params={"api_key": self._api_key},
+            params={
+                "api_key": self._api_key,
+                "language": "zh-CN",
+            },
         )
         data = response.json()
         if not isinstance(data, Mapping):

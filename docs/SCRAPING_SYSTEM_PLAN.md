@@ -100,6 +100,8 @@ Luminarr 当前仍是：
 
 - `MetadataScrapeInput` 增加可选 `tmdb_id`
 - 有已确认 `tmdb_id` 时，不再走 `search_movie(title, year)`，改成直接取对应详情
+- detail 查询当前固定使用 `zh-CN`
+- 若拿不到中文标题，当前刮削会 fail-closed，不再把英文标题悄悄落进最终产物
 
 ### Phase 3
 

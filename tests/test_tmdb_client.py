@@ -39,7 +39,7 @@ def test_get_movie_by_id_returns_valid_result() -> None:
         return _FakeResponse(
             {
                 "id": 157336,
-                "title": "Interstellar",
+                "title": "星际穿越",
                 "original_title": "Interstellar",
                 "release_date": "2014-11-05",
             }
@@ -49,9 +49,9 @@ def test_get_movie_by_id_returns_valid_result() -> None:
     result = _run(client.get_movie_by_id("157336"))
 
     assert captured["path"] == "/3/movie/157336"
-    assert captured["params"] == {"api_key": "tmdb-key"}
+    assert captured["params"] == {"api_key": "tmdb-key", "language": "zh-CN"}
     assert result is not None
-    assert result.title == "Interstellar"
+    assert result.title == "星际穿越"
     assert result.original_title == "Interstellar"
     assert result.year == "2014"
     assert result.tmdb_id == "157336"

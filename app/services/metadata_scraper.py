@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape
+import re
 
 from app.clients.fanart import FanartMovieImages
 from app.clients.tmdb import TmdbMovie
@@ -165,7 +166,10 @@ class MetadataScraperService:
                     fix="检查这次导入链里保存的 `media_identity.tmdb_id` 是否正确；当前不会回退到 title/year 二次猜片。",
                 )
                 return None, MetadataScrapeResult(success=False, message=message)
-            return tmdb_movie, None
+            return _resolve_chinese_scrape_movie(
+                tmdb_movie=tmdb_movie,
+                failure_message=f"TMDB 未返回中文标题：tmdb_id={tmdb_id}",
+            )
 
         try:
             tmdb_movie = await self._lookup_movie_func(title, year)
@@ -183,7 +187,31 @@ class MetadataScraperService:
                 fix="确认电影名和年份是否正确，或先用 `search` 指令确认资源标题。",
             )
             return None, MetadataScrapeResult(success=False, message=message)
-        return tmdb_movie, None
+        if tmdb_movie.tmdb_id and self._lookup_movie_by_tmdb_id_func is not None:
+            try:
+                localized_movie = await self._lookup_movie_by_tmdb_id_func(tmdb_movie.tmdb_id)
+            except Exception as exc:
+                message = f"TMDB 详情查询失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查 `TMDB_API_KEY`、网络连通性，以及 `TMDB_BASE_URL` 是否可访问；当前不会回退成英文标题刮削。",
+                )
+                return None, MetadataScrapeResult(success=False, message=message)
+            if localized_movie is None:
+                message = f"TMDB 未命中：tmdb_id={tmdb_movie.tmdb_id}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查搜索确认后落下来的 `tmdb_id` 是否仍有效；当前不会回退成 title/year 英文刮削。",
+                )
+                return None, MetadataScrapeResult(success=False, message=message)
+            return _resolve_chinese_scrape_movie(
+                tmdb_movie=localized_movie,
+                failure_message=f"TMDB 未返回中文标题：tmdb_id={tmdb_movie.tmdb_id}",
+            )
+        return _resolve_chinese_scrape_movie(
+            tmdb_movie=tmdb_movie,
+            failure_message=f"TMDB 未返回中文标题：title={title}, year={year or '-'}",
+        )
 
     async def _write_image_artifacts(
         self,
@@ -339,6 +367,42 @@ def _cleanup_written_artifacts(created_paths: list[Path]) -> None:
 def _print_colored_error(*, problem: str, fix: str) -> None:
     print(f"\033[31m[元数据刮削失败]\033[0m {problem}", flush=True)
     print(f"\033[33m[处理建议]\033[0m {fix}", flush=True)
+
+
+def _resolve_chinese_scrape_movie(
+    *,
+    tmdb_movie: TmdbMovie,
+    failure_message: str,
+) -> tuple[TmdbMovie | None, MetadataScrapeResult | None]:
+    chinese_title = _resolve_preferred_chinese_title(tmdb_movie)
+    if not chinese_title:
+        _print_colored_error(
+            problem=failure_message,
+            fix="检查 TMDB 对应条目是否存在 `zh-CN` 本地化标题；当前为避免最终刮削落英文标题，会直接 fail-closed。",
+        )
+        return None, MetadataScrapeResult(success=False, message=failure_message)
+    return (
+        TmdbMovie(
+            title=chinese_title,
+            original_title=tmdb_movie.original_title or tmdb_movie.title,
+            year=tmdb_movie.year,
+            tmdb_id=tmdb_movie.tmdb_id,
+            media_type=tmdb_movie.media_type,
+        ),
+        None,
+    )
+
+
+def _resolve_preferred_chinese_title(tmdb_movie: TmdbMovie) -> str:
+    if _contains_chinese(tmdb_movie.title):
+        return tmdb_movie.title.strip()
+    if _contains_chinese(tmdb_movie.original_title):
+        return tmdb_movie.original_title.strip()
+    return ""
+
+
+def _contains_chinese(value: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", value))
 
 
 def _write_text_artifact(
