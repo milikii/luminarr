@@ -3,9 +3,28 @@ from __future__ import annotations
 import re
 import unicodedata
 
-SEARCH_TITLE_NOISE_PATTERN = (
-    r"(?:imax(?:\s+enhanced)?|(?:the\s+)?extended(?:\s+(?:edition|cut))?|(?:the\s+)?special(?:\s+extended)?\s+edition|(?:the\s+)?ultimate\s+edition|(?:the\s+)?final\s+cut|(?:the\s+)?director(?:'?s)?\s+cut|remaster(?:ed)?|theatrical(?:\s+(?:cut|version))?|uncut|unrated|(?:the\s+)?anniversary\s+edition|(?:the\s+)?collector(?:'?s)?\s+edition)"
+_SEARCH_TITLE_NOISE_VARIANTS: tuple[str, ...] = (
+    r"imax(?:\s+enhanced)?",
+    r"(?:the\s+)?extended(?:\s+(?:edition|cut))?",
+    r"(?:the\s+)?special(?:\s+extended)?\s+edition",
+    r"(?:the\s+)?ultimate\s+edition",
+    r"(?:the\s+)?final\s+cut",
+    r"(?:the\s+)?director(?:'?s)?\s+cut",
+    r"remaster(?:ed)?",
+    r"theatrical(?:\s+(?:cut|version))?",
+    r"uncut",
+    r"unrated",
+    r"(?:the\s+)?anniversary\s+edition",
+    r"(?:the\s+)?collector(?:'?s)?\s+edition",
 )
+
+
+def _union_pattern(variants: tuple[str, ...]) -> str:
+    return rf"(?:{'|'.join(variants)})"
+
+
+SEARCH_TITLE_NOISE_PATTERN = _union_pattern(_SEARCH_TITLE_NOISE_VARIANTS)
+_SEARCH_TITLE_NOISE_SEQUENCE_PATTERN = rf"{SEARCH_TITLE_NOISE_PATTERN}(?:\s+{SEARCH_TITLE_NOISE_PATTERN})*"
 _TRAILING_SEQUEL_DIGIT_WITH_YEAR_RE = re.compile(
     r"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>\d{1,2})(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{2})(?:\s*[\])])?$"
 )
@@ -16,7 +35,7 @@ _TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE = re.compile(
 _SEQUEL_VALUE_PATTERN = r"(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部)"
 _SEQUEL_PHRASE_PATTERN = rf"(?:(?:part|chapter)\s+{_SEQUEL_VALUE_PATTERN}|{_SEQUEL_VALUE_PATTERN})"
 _TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE = re.compile(
-    rf"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>{_SEQUEL_PHRASE_PATTERN})(?:\s+(?P<noise>{SEARCH_TITLE_NOISE_PATTERN}(?:\s+{SEARCH_TITLE_NOISE_PATTERN})*))?(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{{2}})(?:\s*[\])])?$",
+    rf"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>{_SEQUEL_PHRASE_PATTERN})(?:\s+(?P<noise>{_SEARCH_TITLE_NOISE_SEQUENCE_PATTERN}))?(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{{2}})(?:\s*[\])])?$",
     re.IGNORECASE,
 )
 _SEQUEL_ALIAS_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -62,7 +81,7 @@ _CHINESE_NUMERAL_MAP = {
     "九": 9,
     "十": 10,
 }
-_TRAILING_QUERY_NOISE_RE = re.compile(rf"(?:\s+(?:{SEARCH_TITLE_NOISE_PATTERN}))+$", re.IGNORECASE)
+_TRAILING_QUERY_NOISE_RE = re.compile(rf"(?:\s+{SEARCH_TITLE_NOISE_PATTERN})+$", re.IGNORECASE)
 
 
 def normalize_spaces(value: str) -> str:

@@ -16,6 +16,7 @@
   - `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类常见复合版本词写法现在也会回到真实片名，不再把 sequel token 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 残留进搜索标题
   - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
   - 当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
+  - 当前共享标题噪音词表也已改成声明式词表 + 统一正则拼装；后续若继续补版本词，默认只改共享词表，不再直接手改整段大正则
   - `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Remastered / Theatrical / Uncut` 留在搜索标题里
   - `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会复用同一套共享尾部噪音词规则，不再继续把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里
   - 当前 query 标题里的续作/章节 token 恢复逻辑也已收回共享标题归一层；`search_request_context.py` 不再单独维护那段正则和 match-key 比对细节
@@ -30,6 +31,7 @@
 - 当前这套规则也已覆盖 `The Final Cut / The Director's Cut` 这类资源站常见写法；尾部前置冠词会和版本短语一起剥掉，不再把错误的 `The` 残留进搜索标题。
 - 当前也已补到几类常见复合变体：`IMAX Enhanced`、`Extended Cut`、`Special Extended Edition`、`Theatrical Version`、`Collector Edition`；后续补版本词时，优先先判断是否只是同一类尾部噪音变体。
 - 当前这一轮也顺手降低了后续维护成本：再加新一类尾部标题噪音词时，不需要同时改 query 解析和 TMDB 标题比对两套逻辑。
+- 当前这一轮也补了一点结构降本：共享标题噪音规则不再靠一整段越滚越长的手写正则硬撑，后续新增变体时更容易做小改动和小回归。
 - 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
 - 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。
 - 当前这一轮也继续降低了结构维护成本：若后面还要补 sequel/chapter 恢复规则，默认先改共享标题归一层，不再让 `search_request_context.py` 再长出第二套恢复实现。

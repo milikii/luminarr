@@ -10,7 +10,6 @@
 ## Current health
 
 - 仓库级质量入口保持可用：`make quality`、`make verify-mainline`、`make verify-quality-gates` 当前都可复验。
-- movie-first 搜索相关性本轮继续收口：TMDB 低置信命中不再抢主导权；BT fallback 排序已覆盖单条候选、少量噪音候选、续作数字与括号年份这几类真实输入。
 - 续作别名对齐现在继续前推一格：`沙丘第二部 2024`、`Dune II 2024`、`Mission Impossible 7 2023` 这类输入不再把续作信息吞掉，TMDB 与搜索 query 会更稳定命中真正的 sequel。
 - `Dune Part 2 2024`、`John Wick IV 2023` 这类“数字 part / roman chapter”别名现在也会更稳定对齐 `Part Two` / `Chapter 4`，不再因为 token 形式不同就降级成低置信 TMDB 命中。
 - `John Wick Chapter Four 2023` 这类“章节词 + 英文数字词”现在也会稳定对齐 `Chapter 4`，不再因为 `Four` 没被归一而走低置信回退。
@@ -20,12 +19,8 @@
 - `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + 版本 cut/edition 词 + 年份”输入现在也会先剥掉尾部版本词，再把搜索标题对齐回真正片名；但 `The Final Cut 2004` 这类本体标题不会被误删空。
 - `Blade Runner The Final Cut 1982`、`Alien The Director's Cut 1979` 这类“前置冠词 + 版本短语”尾巴现在也会整段剥掉，不再把搜索标题错误残留成 `Blade Runner The` / `Alien The`；`The Final Cut 2004` 这类本体标题仍保持不误删。
 - `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类复合版本词写法现在也会回到真实片名，不再把 `2` 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 留在搜索标题里。
-- 当前 `search_request_context.py` 与 `search_title_normalization.py` 已共享同一套标题噪音剥离规则；TMDB 直接候选比对现在也会把 `Final Cut / Extended` 这类尾部版本词当作噪音处理，不再只靠 query 解析这一层兜底。
-- `Alien Remastered 1979`、`Dune Part 2 Theatrical 2024`、`Batman v Superman Uncut 2016`、`John Wick Chapter 4 Remastered 2023` 这类输入现在也会继续复用共享噪音归一层，不再把 `Remastered / Theatrical / Uncut` 留在搜索标题里，或把 `Part 2 / Chapter 4` 吞掉。
-- `Dune Part 2 Unrated 2024`、`Blade Runner Anniversary Edition 1982`、`Avatar Collectors Edition 2009` 这类输入现在也会继续复用共享噪音归一层，不再把 `Unrated / Anniversary Edition / Collectors Edition` 留在搜索标题里，或把基片标题拖偏。
-- 当前续作/章节 token 恢复逻辑也已并回 `search_title_normalization.py`；后续若还要补 query 标题恢复规则，不需要再同时改 `search_request_context.py` 和共享归一层两份实现。
-- 当前 `search_media.py` 与 `search_reply_formatter.py` 现在直接依赖 `search_title_normalization.py` 的 `normalize_spaces`，不再通过 `search_request_context.py` 间接耦合共享标题工具。
-- 当前 `ParsedMovieQuery` 与 `parse_movie_query()` 已抽到独立的 `search_query_parser.py`；`search_request_context.py` 现在只保留“TMDB 查询 + ordered queries + 搜索请求编排”职责，不再混放纯 query 解析实现。
+- `Remastered / Theatrical / Uncut / Unrated / Anniversary Edition / Collectors Edition` 这几类尾部版本词现在也都复用同一套共享噪音归一层，不再把噪音留在搜索标题里或把基片标题拖偏。
+- 搜索链当前结构也继续收口：共享标题噪音规则已改成“声明式词表 + 统一正则拼装”；`search_request_context.py`、`search_media.py`、`search_reply_formatter.py` 都直接复用 `search_title_normalization.py` / `search_query_parser.py`，不再各自挂一份 query 解析或标题工具。
 - 当前 `.env` / `.env.example` / `docs/TEST_ENV.md` 里的 `DOWNLOADER_INSTANCES` 示例已改成 shell-safe 写法；直接用 `set -a && . ./.env && set +a` 时不会再因为分号值把后半段当成命令执行。
 - 当前 live smoke 真相仍分两段：
   - `search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 上跑通。
@@ -42,7 +37,7 @@
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
 - 搜索相关回归：`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `145 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `159 passed`
+- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `171 passed`
 - downloader focused：`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `119 passed`
 - import focused：`.venv/bin/python -m pytest -q tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 为 `48 passed, 100 deselected`
 - 当前本机探针：
