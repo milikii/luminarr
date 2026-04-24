@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -91,11 +92,22 @@ def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: 
     assert "[Script Info]" in payload
 
 
-def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path) -> None:
+def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path, monkeypatch) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps({"streams": []}, ensure_ascii=False),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
 
     service = SubtitleTranslatorService()
     result = service.translate_for_import(
@@ -110,6 +122,32 @@ def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path) -> Non
     assert result.success is False
     assert result.skipped is True
     assert "已跳过" in result.message
+
+
+def test_translate_for_import_skips_when_chinese_external_subtitle_exists(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).chs.srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\n你好，宇航员\n",
+        encoding="utf-8",
+    )
+
+    service = SubtitleTranslatorService()
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert "中文字幕外挂字幕" in result.message
 
 
 def test_translate_for_import_fails_when_ass_file_is_invalid(tmp_path: Path) -> None:
@@ -167,6 +205,147 @@ def test_translate_for_import_fails_when_missing_api_key(tmp_path: Path) -> None
     assert result.success is False
     assert result.skipped is False
     assert "缺少 SUBTITLE_TRANSLATION_API_KEY" in result.message
+
+
+def test_translate_for_import_extracts_embedded_english_subtitle_when_no_external_subtitle(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert capture_output is True
+        assert text is True
+        assert timeout == 60.0
+        if args[0] == "ffprobe":
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "index": 2,
+                                "codec_name": "subrip",
+                                "tags": {"language": "eng", "title": "English"},
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                stderr="",
+            )
+        if args[0] == "ffmpeg":
+            Path(args[-1]).write_text(
+                "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    extracted_file = library_dir / "Interstellar (2014).srt"
+    translated_file = library_dir / "Interstellar (2014).zh.srt"
+    assert result.success is True
+    assert result.skipped is False
+    assert extracted_file.exists()
+    assert translated_file.exists()
+    assert "专业译文：hello movie" in translated_file.read_text(encoding="utf-8")
+
+
+def test_translate_for_import_skips_when_embedded_chinese_subtitle_exists(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "index": 2,
+                            "codec_name": "subrip",
+                            "tags": {"language": "chi", "title": "简体中文"},
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert "中文字幕轨" in result.message
+
+
+def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_path: Path, monkeypatch) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        if args[0] == "ffprobe":
+            raise FileNotFoundError("ffprobe")
+        assert args[0] == "ffmpeg"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=1,
+            stdout="",
+            stderr="Stream #0:2(eng): Subtitle: subrip (default)\n",
+        )
+
+    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    streams, error = service._probe_embedded_subtitles(target_file)
+
+    assert error is None
+    assert len(streams) == 1
+    assert streams[0].stream_index == 2
+    assert streams[0].language == "eng"
+    assert streams[0].codec_name == "subrip"
 
 
 def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> None:

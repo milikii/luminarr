@@ -130,6 +130,42 @@ def test_confirm_import_by_task_ref_executes_after_pending(tmp_path: Path) -> No
     assert source_file.stat().st_ino == target_file.stat().st_ino
 
 
+def test_confirm_import_by_task_ref_hardlinks_matching_external_subtitles(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    source_en_subtitle = download_dir / "Dune.2021.en.srt"
+    source_en_subtitle.write_text("1\n00:00:01,000 --> 00:00:03,000\nhello dune\n", encoding="utf-8")
+    source_zh_subtitle = download_dir / "Dune.2021.zh.ass"
+    source_zh_subtitle.write_text("[Script Info]\nTitle: demo\n", encoding="utf-8")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(AsyncMock(return_value=import_source), str(target_dir))
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert "导入成功" in text
+    target_file = target_dir / "Dune (2021).mkv"
+    target_en_subtitle = target_dir / "Dune (2021).en.srt"
+    target_zh_subtitle = target_dir / "Dune (2021).zh.ass"
+    assert target_file.exists()
+    assert target_en_subtitle.exists()
+    assert target_zh_subtitle.exists()
+    assert source_file.stat().st_ino == target_file.stat().st_ino
+    assert source_en_subtitle.stat().st_ino == target_en_subtitle.stat().st_ino
+    assert source_zh_subtitle.stat().st_ino == target_zh_subtitle.stat().st_ino
+
+
 def test_import_workflow_writes_trace_log_when_configured(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
@@ -3392,6 +3428,56 @@ def test_confirm_import_logs_hardlink_failure(tmp_path: Path, monkeypatch, capsy
     assert "task_id=87" in output
     assert "permission denied" in output
     assert "[处理建议]" in output
+
+
+def test_confirm_import_copy_fallback_copies_matching_external_subtitles(tmp_path: Path, monkeypatch) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+    source_subtitle = download_dir / "Dune.2021.en.srt"
+    source_subtitle.write_text("1\n00:00:01,000 --> 00:00:03,000\nhello dune\n", encoding="utf-8")
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+
+    def _raise_exdev(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
+    first_confirm = _run(service.confirm_import_by_task_ref("87"))
+    assert first_confirm == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
+
+    def _unexpected_hardlink(src: str | Path, dst: str | Path) -> None:
+        raise AssertionError("copy confirm should not call os.link again")
+
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _unexpected_hardlink)
+    second_confirm = _run(service.confirm_import_by_task_ref("87"))
+
+    assert "导入成功" in second_confirm
+    assert "导入方式: 复制" in second_confirm
+    target_file = tmp_path / "library" / "Dune (2021).mkv"
+    target_subtitle = tmp_path / "library" / "Dune (2021).en.srt"
+    assert target_file.exists()
+    assert target_subtitle.exists()
+    assert source_file.stat().st_ino != target_file.stat().st_ino
+    assert source_subtitle.stat().st_ino != target_subtitle.stat().st_ino
 
 
 def test_execute_import_logs_copy_failure(tmp_path: Path, monkeypatch, capsys) -> None:

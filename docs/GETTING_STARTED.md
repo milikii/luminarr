@@ -15,6 +15,8 @@
 - `make`（可选；没有也能直接跑下面的一行命令）
 - `docker` / `docker compose`（可选；想走容器启动时需要）
 - 一份可用的 `.env`
+- 如果要在**没有外挂字幕**时自动检查/提取视频内嵌字幕：
+  `ffmpeg` 需要在当前 shell 的 `PATH` 里可执行；`ffprobe` 若存在会优先用于探测
 - 当前最少要能访问：
   - Telegram Bot
   - Prowlarr
@@ -162,6 +164,7 @@ docker compose logs -f luminarr
 - **Fanart.tv API Key**：不填会关闭 fanart 抓取，不阻塞启动。
 - **Telegram Bot Token**：当前是启动硬必填。Telegram 私聊入口无论你用不用都必须先有 token。
 - **可选：OpenAI / 字幕翻译 Key**：仅影响 `.srt` 字幕自动翻译。
+- **可选：`ffmpeg`（`ffprobe` 可选）**：只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要；当前代码默认直接从 `PATH` 调用，若缺少 `ffprobe` 会自动回退到 `ffmpeg -i` 做探测。
 - **可选：Feishu / WeCom webhook 三元组**：只有你真的要用这两个渠道才填；当前都是"要么都空、要么都填"。
 
 如果这台机器不能直连公网（Telegram / TMDB / Fanart / BT 外站），再加一条 `OUTBOUND_PROXY_URL=http://192.168.2.110:7890` 走宿主机或旁路由代理；Transmission / Emby / Prowlarr 这类本地地址仍然直连，不吃代理。

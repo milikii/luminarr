@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +48,51 @@ class _AssDialogueLine:
     text: str
 
 
+@dataclass(frozen=True, slots=True)
+class _EmbeddedSubtitleStream:
+    stream_index: int
+    codec_name: str
+    language: str
+    title: str
+
+
+_VIDEO_FILE_SUFFIXES = frozenset({".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"})
+_SUBTITLE_FILE_SUFFIXES = (".srt", ".ass")
+_EMBEDDED_SUBTITLE_OUTPUT_SUFFIX = {
+    "ass": ".ass",
+    "mov_text": ".srt",
+    "ssa": ".ass",
+    "subrip": ".srt",
+    "srt": ".srt",
+    "webvtt": ".srt",
+}
+_CHINESE_SUBTITLE_TOKENS = frozenset(
+    {
+        "chi",
+        "chinese",
+        "chs",
+        "cht",
+        "cn",
+        "sc",
+        "tc",
+        "zh",
+        "zho",
+        "中英",
+        "中文",
+        "中文字幕",
+        "双语",
+        "中字",
+        "简中",
+        "简体中文",
+        "繁中",
+        "繁体中文",
+    }
+)
+_CHINESE_SUBTITLE_SUBSTRINGS = ("中英", "中文", "中文字幕", "双语", "简中", "繁中", "简体中文", "繁体中文")
+_ENGLISH_SUBTITLE_TOKENS = frozenset({"en", "eng", "english", "英文", "英字"})
+_ENGLISH_SUBTITLE_SUBSTRINGS = ("english", "英文", "英字")
+
+
 class SubtitleTranslatorService:
     def __init__(
         self,
@@ -71,10 +117,9 @@ class SubtitleTranslatorService:
             message = f"字幕翻译已跳过：导入目标不存在：{target_path}"
             return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
 
-        subtitle_files = _find_source_subtitle_files(target_path)
-        if not subtitle_files:
-            message = "字幕翻译已跳过：未找到可翻译的 .srt / .ass 字幕文件。"
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+        subtitle_files, resolved_result = self._resolve_subtitle_files_for_translation(target_path)
+        if resolved_result is not None:
+            return resolved_result
 
         if not self._api_key:
             message = "字幕翻译失败：缺少 SUBTITLE_TRANSLATION_API_KEY，无法进行专业级翻译。"
@@ -111,6 +156,248 @@ class SubtitleTranslatorService:
             translated_count=translated_count,
             skipped=False,
         )
+
+    def _resolve_subtitle_files_for_translation(
+        self,
+        target_path: Path,
+    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
+        external_subtitle_paths = _find_all_subtitle_paths(target_path)
+        if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
+            message = "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+
+        external_subtitle_files = [
+            subtitle_file
+            for path in external_subtitle_paths
+            if (subtitle_file := _build_subtitle_file(path)) is not None
+        ]
+        if external_subtitle_files:
+            return external_subtitle_files, None
+        return self._resolve_embedded_subtitle_files(target_path)
+
+    def _resolve_embedded_subtitle_files(
+        self,
+        target_path: Path,
+    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
+        video_files = _find_video_files(target_path)
+        if not video_files:
+            message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+
+        probed_streams: list[tuple[Path, list[_EmbeddedSubtitleStream]]] = []
+        for video_path in video_files:
+            streams, error_result = self._probe_embedded_subtitles(video_path)
+            if error_result is not None:
+                return [], error_result
+            probed_streams.append((video_path, streams))
+
+        if any(any(_is_chinese_embedded_subtitle(stream) for stream in streams) for _, streams in probed_streams):
+            message = "字幕翻译已跳过：视频内已检测到中文字幕轨。"
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+
+        subtitle_files: list[_SubtitleFile] = []
+        for video_path, streams in probed_streams:
+            english_stream = next(
+                (
+                    stream
+                    for stream in streams
+                    if _is_english_embedded_subtitle(stream)
+                    and stream.codec_name.casefold() in _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX
+                ),
+                None,
+            )
+            if english_stream is None:
+                continue
+            subtitle_file, error_result = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
+            if error_result is not None:
+                return [], error_result
+            if subtitle_file is not None:
+                subtitle_files.append(subtitle_file)
+
+        if subtitle_files:
+            return subtitle_files, None
+
+        message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
+        return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+
+    def _probe_embedded_subtitles(
+        self,
+        video_path: Path,
+    ) -> tuple[list[_EmbeddedSubtitleStream], SubtitleTranslateResult | None]:
+        command = [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "s",
+            "-show_entries",
+            "stream=index,codec_name:stream_tags=language,title",
+            "-of",
+            "json",
+            str(video_path),
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self._timeout_seconds,
+            )
+        except FileNotFoundError:
+            return self._probe_embedded_subtitles_with_ffmpeg(video_path)
+        except subprocess.TimeoutExpired:
+            message = f"字幕翻译失败：检查内嵌字幕超时：{video_path}"
+            _print_colored_error(
+                problem=message,
+                fix="检查视频文件是否可读、体积是否异常，以及 `ffprobe` 是否可正常执行。",
+            )
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        if completed.returncode != 0:
+            problem = completed.stderr.strip() or completed.stdout.strip() or f"exit={completed.returncode}"
+            message = f"字幕翻译失败：检查内嵌字幕失败：{video_path}，原因：{problem}"
+            _print_colored_error(
+                problem=message,
+                fix="确认视频文件未损坏，并检查 `ffprobe` 是否能读取该视频的字幕流信息。",
+            )
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        try:
+            payload = json.loads(completed.stdout or "{}")
+        except json.JSONDecodeError as exc:
+            message = f"字幕翻译失败：ffprobe 输出不是有效 JSON：{video_path}，原因：{exc}"
+            _print_colored_error(
+                problem=message,
+                fix="检查 `ffprobe` 输出是否被外部 wrapper 改写，确保它返回标准 JSON。",
+            )
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        streams = payload.get("streams", [])
+        if not isinstance(streams, list):
+            return [], None
+        result: list[_EmbeddedSubtitleStream] = []
+        for item in streams:
+            if not isinstance(item, dict):
+                continue
+            tags = item.get("tags", {})
+            if not isinstance(tags, dict):
+                tags = {}
+            try:
+                stream_index = int(item.get("index", -1))
+            except (TypeError, ValueError):
+                stream_index = -1
+            if stream_index < 0:
+                continue
+            result.append(
+                _EmbeddedSubtitleStream(
+                    stream_index=stream_index,
+                    codec_name=str(item.get("codec_name", "")).strip(),
+                    language=str(tags.get("language", "")).strip(),
+                    title=str(tags.get("title", "")).strip(),
+                )
+            )
+        return result, None
+
+    def _probe_embedded_subtitles_with_ffmpeg(
+        self,
+        video_path: Path,
+    ) -> tuple[list[_EmbeddedSubtitleStream], SubtitleTranslateResult | None]:
+        command = [
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            str(video_path),
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self._timeout_seconds,
+            )
+        except FileNotFoundError:
+            message = f"字幕翻译失败：系统缺少 ffprobe/ffmpeg，无法检查内嵌字幕：{video_path}"
+            _print_colored_error(
+                problem=message,
+                fix="安装 `ffmpeg`（如能一并安装 `ffprobe` 更好）并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
+            )
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        except subprocess.TimeoutExpired:
+            message = f"字幕翻译失败：检查内嵌字幕超时：{video_path}"
+            _print_colored_error(
+                problem=message,
+                fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常执行。",
+            )
+            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        parsed_streams = _parse_ffmpeg_subtitle_streams(completed.stderr or completed.stdout or "")
+        return parsed_streams, None
+
+    def _extract_embedded_subtitle_file(
+        self,
+        *,
+        video_path: Path,
+        stream: _EmbeddedSubtitleStream,
+    ) -> tuple[_SubtitleFile | None, SubtitleTranslateResult | None]:
+        output_suffix = _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX.get(stream.codec_name.casefold())
+        if not output_suffix:
+            return None, None
+        output_path = video_path.with_suffix(output_suffix)
+        command = [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-i",
+            str(video_path),
+            "-map",
+            f"0:{stream.stream_index}",
+            "-c:s",
+            "ass" if output_suffix == ".ass" else "srt",
+            str(output_path),
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self._timeout_seconds,
+            )
+        except FileNotFoundError:
+            message = f"字幕翻译失败：系统缺少 ffmpeg，无法提取英文内嵌字幕：{video_path}"
+            _print_colored_error(
+                problem=message,
+                fix="安装 `ffmpeg` 并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
+            )
+            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        except subprocess.TimeoutExpired:
+            message = f"字幕翻译失败：提取英文内嵌字幕超时：{video_path}"
+            _print_colored_error(
+                problem=message,
+                fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常抽取字幕流。",
+            )
+            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        if completed.returncode != 0:
+            if output_path.exists():
+                output_path.unlink(missing_ok=True)
+            problem = completed.stderr.strip() or completed.stdout.strip() or f"exit={completed.returncode}"
+            message = f"字幕翻译失败：提取英文内嵌字幕失败：{video_path}，原因：{problem}"
+            _print_colored_error(
+                problem=message,
+                fix="确认视频里确实有可提取的英文文本字幕流；若是图片字幕（PGS/VobSub），当前不会自动 OCR 翻译。",
+            )
+            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+
+        subtitle_file = _build_subtitle_file(output_path)
+        if subtitle_file is None:
+            message = f"字幕翻译失败：提取后的字幕文件不可用：{output_path}"
+            _print_colored_error(
+                problem=message,
+                fix="检查提取结果是否仍是 `.srt/.ass`，并确认未被已有中文字幕命名规则过滤。",
+            )
+            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        return subtitle_file, None
 
     def _translate_single_file(
         self,
@@ -323,14 +610,18 @@ class SubtitleTranslatorService:
         return text
 
 
-def _find_source_subtitle_files(target_path: Path) -> list[_SubtitleFile]:
+def _find_all_subtitle_paths(target_path: Path) -> list[Path]:
     if target_path.is_file():
-        return [candidate for suffix in (".srt", ".ass") if (candidate := _build_subtitle_file(target_path.with_suffix(suffix)))]
+        return _find_adjacent_subtitle_paths(target_path)
 
     if not target_path.is_dir():
         return []
 
-    candidates = sorted(candidate for pattern in ("*.srt", "*.ass") for candidate in target_path.rglob(pattern))
+    return sorted(candidate for pattern in _SUBTITLE_FILE_SUFFIXES for candidate in target_path.rglob(f"*{pattern}"))
+
+
+def _find_source_subtitle_files(target_path: Path) -> list[_SubtitleFile]:
+    candidates = _find_all_subtitle_paths(target_path)
     files: list[_SubtitleFile] = []
     for candidate in candidates:
         subtitle_file = _build_subtitle_file(candidate)
@@ -339,19 +630,113 @@ def _find_source_subtitle_files(target_path: Path) -> list[_SubtitleFile]:
     return files
 
 
+def _find_adjacent_subtitle_paths(target_path: Path) -> list[Path]:
+    if not target_path.exists() or not target_path.is_file():
+        return []
+    subtitle_paths: list[Path] = []
+    for candidate in sorted(target_path.parent.iterdir()):
+        if candidate == target_path or not candidate.is_file():
+            continue
+        if _extract_adjacent_subtitle_suffix(target_path=target_path, subtitle_path=candidate) is None:
+            continue
+        subtitle_paths.append(candidate)
+    return subtitle_paths
+
+
+def _extract_adjacent_subtitle_suffix(*, target_path: Path, subtitle_path: Path) -> str | None:
+    target_stem = target_path.stem
+    candidate_name = subtitle_path.name
+    lowered_name = candidate_name.lower()
+    for suffix in _SUBTITLE_FILE_SUFFIXES:
+        if not lowered_name.endswith(suffix):
+            continue
+        subtitle_stem = candidate_name[: -len(suffix)]
+        if subtitle_stem == target_stem:
+            return candidate_name[len(target_stem) :]
+        if subtitle_stem.startswith(f"{target_stem}."):
+            return candidate_name[len(target_stem) :]
+    return None
+
+
 def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
     if not path.exists() or not path.is_file():
         return None
+    if _is_chinese_subtitle_path(path):
+        return None
     suffix = path.suffix.lower()
     if suffix == ".srt":
-        if path.name.endswith(".zh.srt"):
-            return None
         return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.srt"), kind="srt")
     if suffix == ".ass":
-        if path.name.endswith(".zh.ass"):
-            return None
         return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.ass"), kind="ass")
     return None
+
+
+def _find_video_files(target_path: Path) -> list[Path]:
+    if target_path.is_file():
+        return [target_path] if target_path.suffix.lower() in _VIDEO_FILE_SUFFIXES else []
+    if not target_path.is_dir():
+        return []
+    return sorted(candidate for candidate in target_path.rglob("*") if candidate.is_file() and candidate.suffix.lower() in _VIDEO_FILE_SUFFIXES)
+
+
+def _is_chinese_subtitle_path(path: Path) -> bool:
+    return _looks_like_chinese_subtitle_label(path.name)
+
+
+def _is_chinese_embedded_subtitle(stream: _EmbeddedSubtitleStream) -> bool:
+    return _looks_like_chinese_subtitle_label(f"{stream.language} {stream.title}")
+
+
+def _is_english_embedded_subtitle(stream: _EmbeddedSubtitleStream) -> bool:
+    return _looks_like_english_subtitle_label(f"{stream.language} {stream.title}")
+
+
+def _looks_like_chinese_subtitle_label(value: str) -> bool:
+    normalized = _normalize_subtitle_label(value)
+    if not normalized:
+        return False
+    if any(marker in normalized for marker in _CHINESE_SUBTITLE_SUBSTRINGS):
+        return True
+    return bool(set(normalized.split()) & _CHINESE_SUBTITLE_TOKENS)
+
+
+def _looks_like_english_subtitle_label(value: str) -> bool:
+    normalized = _normalize_subtitle_label(value)
+    if not normalized or _looks_like_chinese_subtitle_label(value):
+        return False
+    if any(marker in normalized for marker in _ENGLISH_SUBTITLE_SUBSTRINGS):
+        return True
+    return bool(set(normalized.split()) & _ENGLISH_SUBTITLE_TOKENS)
+
+
+def _normalize_subtitle_label(value: str) -> str:
+    cleaned = re.sub(r"[^0-9a-z\u4e00-\u9fff]+", " ", value.casefold())
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _parse_ffmpeg_subtitle_streams(output_text: str) -> list[_EmbeddedSubtitleStream]:
+    streams: list[_EmbeddedSubtitleStream] = []
+    pattern = re.compile(
+        r"Stream #\d+:(?P<index>\d+)(?:\((?P<language>[^)]+)\))?: Subtitle: (?P<codec>[A-Za-z0-9_]+)",
+        re.IGNORECASE,
+    )
+    for line in output_text.splitlines():
+        match = pattern.search(line)
+        if match is None:
+            continue
+        try:
+            stream_index = int(match.group("index"))
+        except (TypeError, ValueError):
+            continue
+        streams.append(
+            _EmbeddedSubtitleStream(
+                stream_index=stream_index,
+                codec_name=str(match.group("codec") or "").strip(),
+                language=str(match.group("language") or "").strip(),
+                title="",
+            )
+        )
+    return streams
 
 
 def _parse_srt_blocks(content: str) -> list[_SrtBlock]:

@@ -14,6 +14,7 @@ from app.services.import_post_processing import ImportPostProcessRequest, Import
 
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"
+_EXTERNAL_SUBTITLE_SUFFIXES = (".srt", ".ass")
 
 RecordImportEventFunc = Callable[..., None]
 
@@ -218,7 +219,9 @@ def _hardlink_import(
     import_source_type_unsupported_text: str,
 ) -> None:
     if source_path.is_file():
-        os.link(source_path, target_path)
+        transfer_pairs = _build_file_transfer_pairs(source_path=source_path, target_path=target_path)
+        _ensure_transfer_targets_do_not_exist(transfer_pairs)
+        _hardlink_file_pairs(transfer_pairs)
         return
     if source_path.is_dir():
         _hardlink_directory(source_path, target_path)
@@ -233,13 +236,9 @@ def _copy_import(
     import_source_type_unsupported_text: str,
 ) -> None:
     if source_path.is_file():
-        if target_path.exists():
-            raise FileExistsError(str(target_path))
-        try:
-            shutil.copy2(source_path, target_path)
-        except Exception:
-            _cleanup_partial_target(target_path)
-            raise
+        transfer_pairs = _build_file_transfer_pairs(source_path=source_path, target_path=target_path)
+        _ensure_transfer_targets_do_not_exist(transfer_pairs)
+        _copy_file_pairs(transfer_pairs)
         return
     if source_path.is_dir():
         try:
@@ -264,6 +263,84 @@ def _hardlink_directory(source_dir: Path, target_dir: Path) -> None:
             if dst_file.exists():
                 raise FileExistsError(str(dst_file))
             os.link(src_file, dst_file)
+
+
+def _build_file_transfer_pairs(*, source_path: Path, target_path: Path) -> list[tuple[Path, Path]]:
+    transfer_pairs: list[tuple[Path, Path]] = [(source_path, target_path)]
+    target_stem = target_path.stem
+    for sidecar_path in _find_external_subtitle_sidecars(source_path):
+        suffix = _extract_sidecar_suffix(source_path=source_path, sidecar_path=sidecar_path)
+        if suffix is None:
+            continue
+        transfer_pairs.append((sidecar_path, target_path.with_name(f"{target_stem}{suffix}")))
+    return transfer_pairs
+
+
+def _find_external_subtitle_sidecars(source_path: Path) -> list[Path]:
+    if not source_path.exists() or not source_path.is_file():
+        return []
+    sidecars: list[Path] = []
+    for candidate in sorted(source_path.parent.iterdir()):
+        if candidate == source_path or not candidate.is_file():
+            continue
+        if _extract_sidecar_suffix(source_path=source_path, sidecar_path=candidate) is None:
+            continue
+        sidecars.append(candidate)
+    return sidecars
+
+
+def _extract_sidecar_suffix(*, source_path: Path, sidecar_path: Path) -> str | None:
+    source_stem = source_path.stem
+    candidate_name = sidecar_path.name
+    lowered_name = candidate_name.lower()
+    for suffix in _EXTERNAL_SUBTITLE_SUFFIXES:
+        if not lowered_name.endswith(suffix):
+            continue
+        subtitle_stem = candidate_name[: -len(suffix)]
+        if subtitle_stem == source_stem:
+            return candidate_name[len(source_stem) :]
+        if subtitle_stem.startswith(f"{source_stem}."):
+            return candidate_name[len(source_stem) :]
+    return None
+
+
+def _ensure_transfer_targets_do_not_exist(transfer_pairs: list[tuple[Path, Path]]) -> None:
+    for _, target_path in transfer_pairs:
+        if target_path.exists():
+            raise FileExistsError(str(target_path))
+
+
+def _hardlink_file_pairs(transfer_pairs: list[tuple[Path, Path]]) -> None:
+    created_targets: list[Path] = []
+    try:
+        for source_path, target_path in transfer_pairs:
+            os.link(source_path, target_path)
+            created_targets.append(target_path)
+    except Exception:
+        _cleanup_partial_targets(created_targets)
+        raise
+
+
+def _copy_file_pairs(transfer_pairs: list[tuple[Path, Path]]) -> None:
+    created_targets: list[Path] = []
+    current_target: Path | None = None
+    try:
+        for source_path, target_path in transfer_pairs:
+            current_target = target_path
+            shutil.copy2(source_path, target_path)
+            created_targets.append(target_path)
+            current_target = None
+    except Exception:
+        cleanup_targets = list(created_targets)
+        if current_target is not None:
+            cleanup_targets.append(current_target)
+        _cleanup_partial_targets(cleanup_targets)
+        raise
+
+
+def _cleanup_partial_targets(target_paths: list[Path]) -> None:
+    for target_path in reversed(target_paths):
+        _cleanup_partial_target(target_path)
 
 
 def _cleanup_partial_target(target_path: Path) -> None:
