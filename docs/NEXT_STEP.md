@@ -4,7 +4,7 @@
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**搜索请求去重补齐共享归一等价折叠**。
+- 当前刚完成的一条最小闭环是：**movie-first 结果过滤补齐剧集形态假阳性**。
 - 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `158 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `175 passed`。
 - 当前这一轮已经补齐：
   - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
@@ -17,6 +17,8 @@
   - `Batman v Superman 2016` 这类“主标题 + 官方多词副标题”的输入现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中，优先直接用官方长片名去搜；但 `John Wick 2023 -> John Wick: Chapter 4` 这类续作后缀不会被误判成同片高置信
   - `Alien 2024` 这类“主标题 + 单词官方副标题”输入现在也会把 `Alien: Romulus` 视为高置信 TMDB 命中，不再先搜一轮短标题再回退；但没有副标题分隔符的单词后缀仍不会被当作同片高置信
   - `Dune Part 2 2024` 命中 `Dune Part Two / Dune: Part Two` 这类共享归一后等价的 TMDB 双标题时，搜索请求现在会按共享归一去重，不再把 `Dune Part Two`、`Dune: Part Two`、`Dune Part 2` 各搜一轮
+  - `周处除三害 2024` 这类 movie-first 查询如果只命中 `S01 / S01E01 / Season / Episode` 形态的假阳性结果，现在会直接按“未找到候选”处理，不再把明显剧集资源展示成电影候选
+  - `沙丘 2021` 这类查询里夹着 `Random Movie 2021` 这种明显无关 outlier 时，当前展示结果也不会再把这类被判掉的噪音候选混进前台列表
   - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
   - 更早完成的 `query 解析职责拆分` 继续保持完成态：当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
   - 当前 TMDB 客户端标题打分与 `search_request_context.py` 的高置信判断也已收口到共享标题关系 helper；后续若继续补 exact / compact / subtitle extension 关系，不再同时改两套判断实现
@@ -39,6 +41,7 @@
 - 当前这一轮也把 TMDB 置信判断补细了一点：官方长片名副标题可以直接走高置信命中，但会显式排除 `Part / Chapter / 2049` 这类更像续作的后缀，避免把基片误判成 sequel。
 - 当前这一轮也继续降低了维护成本：TMDB 选片打分和搜索请求高置信判断现在共享同一套标题关系 helper，不再有“一边修了、另一边忘了”的漂移风险。
 - 当前这一轮也顺手降低了无效查询次数：共享归一后等价的 TMDB 标题现在只会保留一条搜索请求，不再把 Prowlarr/BT 来源重复打一遍。
+- 当前这一轮也把真实搜索结果质量再收紧了一点：movie-first 结果展示会直接丢掉被判成剧集形态或明显无关的噪音候选，不再为了“有结果”把假阳性顶到前台。
 - 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
 - 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。
 - 当前这一轮也继续降低了结构维护成本：若后面还要补 sequel/chapter 恢复规则，默认先改共享标题归一层，不再让 `search_request_context.py` 再长出第二套恢复实现。

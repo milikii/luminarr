@@ -19,6 +19,15 @@ def test_filter_candidates_drops_query_mismatch() -> None:
     assert scored[0].drop_reason == "title_mismatch"
 
 
+def test_filter_candidates_drops_series_episode_release_for_movie_query() -> None:
+    scored = filter_candidates(
+        (_make_candidate(title="Zhou Chu Chu San Hai Zhi Su Ming 2024 S01 1080p WEB-DL"),),
+        _movie_context(query="周处除三害 2024"),
+    )
+
+    assert scored[0].drop_reason == "title_mismatch"
+
+
 def test_filter_candidates_allows_chinese_title_with_year_token_match() -> None:
     scored = filter_candidates((_make_candidate(title="葬送的芙莉莲 2023 1080p"),), _anime_context(query="葬送的芙莉莲 2023"))
 

@@ -2580,7 +2580,7 @@ def test_search_and_format_derives_fallback_query_with_noisy_outlier_result() ->
 
     assert "1. Dune 2021 1080p WEB-DL (2021)" in text
     assert "2. Dune: Part One 2021 2160p BluRay (2021)" in text
-    assert "3. Random Movie 2021 1080p WEB-DL (2021)" in text
+    assert "Random Movie 2021 1080p WEB-DL (2021)" not in text
 
 
 def test_search_and_format_derives_fallback_query_from_single_related_result() -> None:
@@ -3449,6 +3449,25 @@ def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_empty() -> No
     text = _run(service.search_and_format("Dune (2021)"))
     assert seen_queries == ["Dune 2021", "Dune"]
     assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Dune (2021)")
+
+
+def test_search_and_format_drops_series_episode_candidate_for_movie_query() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "周处除三害 2024"
+        return [
+            {
+                "title": "Zhou Chu Chu San Hai Zhi Su Ming 2024 S01 1080p WEB-DL H.264 AAC-GodDramas",
+                "year": 2024,
+                "size": 2 * 1024 * 1024 * 1024,
+                "downloadUrl": "https://example.com/zhou.torrent",
+                "indexerName": "IndexerDrama",
+            }
+        ]
+
+    service = SearchMediaService(fake_search)
+    text = _run(service.search_and_format("周处除三害 2024"))
+
+    assert text == NO_RESULT_TEXT_TEMPLATE.format(query="周处除三害 2024")
 
 
 def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> None:

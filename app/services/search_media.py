@@ -331,10 +331,14 @@ def _order_media_bt_results(
 
     ordered_results: list[Mapping[str, Any]] = []
     for scored_candidate in scored_candidates:
+        if scored_candidate.drop_reason is not None:
+            continue
         for candidate, item in candidate_pairs:
             if candidate is scored_candidate.candidate:
                 ordered_results.append(item)
                 break
+    if not ordered_results:
+        return ()
     ordered_results.extend(remainder)
     return tuple(ordered_results)
 
