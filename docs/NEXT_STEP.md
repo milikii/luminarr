@@ -1,26 +1,26 @@
-# Next step (v347)
+# Next step (v348)
 
 ## Current goal
 
 - **质量硬化**、**搜索相关性优化** 与 **字幕闭环补齐** 当前都已完成；默认分支若继续推进，当前唯一主线切到 **刮削系统基础收口**。
 - 这条主线当前不改发布矩阵、不扩协议，只先收口一个基础事实：导入后刮削必须优先消费已确认媒体身份，而不是默认靠文件名重新猜片。
-- 当前刚完成的最小闭环是：**`metadata_scraper` 现在会优先吃已确认的 `tmdb_id`，不再默认走 `search_movie(title, year)` 二次猜片**。
+- 当前刚完成的最小闭环是：**最小本地刮削产物 `.nfo` 已开始落地**。
 - 当前详细判断与分阶段设计见：`docs/SCRAPING_SYSTEM_PLAN.md`。
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `467` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退。
 
 ## User value
 
-- 这一步完成后，导入后的 metadata 刮削不再优先赌“文件名猜得对不对”，而是优先吃搜索确认时已经拿到的媒体身份真相。
-- 这一步又继续前推了一格：只要 `media_identity` 里已经有 `tmdb_id`，metadata 刮削现在会直接按该 ID 取详情，不再重新拿 `title/year` 搜一次。
-- 这能直接降低后续 `.metadata.json`、`.nfo`、本地海报背景图围绕错误媒体对象展开的风险。
+- 导入后的 metadata 刮削现在不再优先赌“文件名猜得对不对”，而是优先吃搜索确认时已经拿到的媒体身份真相。
+- 只要 `media_identity` 里已经有 `tmdb_id`，metadata 刮削现在会直接按该 ID 取详情，不再重新拿 `title/year` 搜一次。
+- 当前又把本地刮削产物前推了一步：`.metadata.json` 之外已经开始生成 `.nfo`，媒体服务器可消费的本地真相不再只有内部 sidecar。
 - 当前这条主线仍然只服务 movie-first，不把项目带进“大媒体管理平台”。
 
 ## Only do
 
 - 继续做刮削系统 Phase 3：
-  - 在 `.luminarr.metadata.json` 之外补最小本地刮削产物
-  - 先从 `.nfo`、`poster`、`backdrop` 这种最小 movie-first 产物开始
+  - 在 `.nfo` 已落地的基础上补 `poster` / `backdrop`
   - 保持内部真相和对外刮削产物分层
+  - 不把这一步扩成全量图片下载系统
 - 继续保持 movie-first，不扩 TV / anime 本地刮削。
 - 若默认分支重新出现红灯，只做首版承诺范围内最小修复。
 
@@ -35,13 +35,13 @@
 
 当前 **刮削系统基础收口** 主线继续推进时，下一条最小闭环应满足：
 
-1. `.metadata.json` 之外至少有一种本地刮削产物开始落地，且命名规则清晰。
-2. 产物写入不破坏现有 import / subtitle / refresh 真相链。
+1. `poster` / `backdrop` 至少有一种开始落地，且命名规则清晰。
+2. `.metadata.json` / `.nfo` / 图片写入不破坏现有 import / subtitle / refresh 真相链。
 3. add/import/metadata focused tests 当前可通过，且 `make quality` 不回退。
 4. `docs/STATUS.md`、本文件和 `docs/SCRAPING_SYSTEM_PLAN.md` 能把“当前下一步做到哪一层产物”写成当前真相。
 
 ## After this step
 
-1. 在 `.metadata.json` 之外补最小本地刮削产物：`.nfo`、`poster`、`backdrop`。
+1. 在 `.nfo` 之外补 `poster`、`backdrop`。
 2. 再补 `missing-only / overwrite / skip` 写入策略。
 3. 最后补一次真实 `import -> scrape -> subtitle -> refresh` smoke。

@@ -4,6 +4,7 @@ import json
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from app.clients.fanart import FanartMovieImages
 from app.clients.tmdb import TmdbMovie
@@ -29,6 +30,7 @@ class MetadataScrapeResult:
     success: bool
     message: str
     metadata_path: str = ""
+    nfo_path: str = ""
 
 
 class MetadataScraperService:
@@ -80,6 +82,7 @@ class MetadataScraperService:
             return MetadataScrapeResult(success=False, message=message)
 
         metadata_path = _resolve_metadata_sidecar_path(target_path)
+        nfo_path = _resolve_nfo_sidecar_path(target_path)
         payload = {
             "task_ref": scrape_input.task_ref,
             "task_id": scrape_input.task_id,
@@ -108,9 +111,26 @@ class MetadataScraperService:
                 fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
             )
             return MetadataScrapeResult(success=False, message=message)
+        try:
+            nfo_path.write_text(
+                _render_movie_nfo(tmdb_movie=tmdb_movie, fanart_images=fanart_images),
+                encoding="utf-8",
+            )
+        except Exception as exc:
+            message = f"写入 NFO 文件失败：{exc}"
+            _print_colored_error(
+                problem=message,
+                fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
+            )
+            return MetadataScrapeResult(success=False, message=message)
 
-        message = f"metadata 刮削成功：{metadata_path}"
-        return MetadataScrapeResult(success=True, message=message, metadata_path=str(metadata_path))
+        message = f"metadata 刮削成功：{metadata_path}；NFO：{nfo_path}"
+        return MetadataScrapeResult(
+            success=True,
+            message=message,
+            metadata_path=str(metadata_path),
+            nfo_path=str(nfo_path),
+        )
 
     async def _resolve_tmdb_movie(
         self,
@@ -161,6 +181,65 @@ def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
     if target_path.is_dir():
         return target_path / ".luminarr.metadata.json"
     return target_path.with_suffix(".metadata.json")
+
+
+def _resolve_nfo_sidecar_path(target_path: Path) -> Path:
+    if target_path.is_file():
+        return target_path.with_suffix(".nfo")
+    primary_video_path = _find_primary_video_file(target_path)
+    if primary_video_path is not None:
+        return primary_video_path.with_suffix(".nfo")
+    return target_path / "movie.nfo"
+
+
+def _find_primary_video_file(target_path: Path) -> Path | None:
+    if not target_path.exists() or not target_path.is_dir():
+        return None
+    video_suffixes = {".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"}
+    candidates = sorted(
+        candidate
+        for candidate in target_path.rglob("*")
+        if candidate.is_file() and candidate.suffix.lower() in video_suffixes
+    )
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    normalized_dir_name = _normalize_for_match(target_path.name)
+    for candidate in candidates:
+        if _normalize_for_match(candidate.stem) == normalized_dir_name:
+            return candidate
+    return None
+
+
+def _render_movie_nfo(*, tmdb_movie: TmdbMovie, fanart_images: FanartMovieImages | None) -> str:
+    lines = [
+        "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>",
+        "<movie>",
+        f"  <title>{escape(tmdb_movie.title)}</title>",
+        f"  <originaltitle>{escape(tmdb_movie.original_title or tmdb_movie.title)}</originaltitle>",
+    ]
+    if tmdb_movie.year:
+        lines.append(f"  <year>{escape(tmdb_movie.year)}</year>")
+    if tmdb_movie.tmdb_id:
+        lines.append(f"  <tmdbid>{escape(tmdb_movie.tmdb_id)}</tmdbid>")
+        lines.append(f"  <uniqueid type=\"tmdb\" default=\"true\">{escape(tmdb_movie.tmdb_id)}</uniqueid>")
+    if fanart_images is not None and fanart_images.poster_url:
+        lines.append(f"  <thumb aspect=\"poster\">{escape(fanart_images.poster_url)}</thumb>")
+    if fanart_images is not None and fanart_images.backdrop_url:
+        lines.extend(
+            [
+                "  <fanart>",
+                f"    <thumb>{escape(fanart_images.backdrop_url)}</thumb>",
+                "  </fanart>",
+            ]
+        )
+    lines.append("</movie>")
+    return "\n".join(lines) + "\n"
+
+
+def _normalize_for_match(value: str) -> str:
+    return "".join(ch for ch in value.casefold() if ch.isalnum())
 
 
 def _print_colored_error(*, problem: str, fix: str) -> None:

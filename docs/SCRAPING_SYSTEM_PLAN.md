@@ -105,12 +105,12 @@ Luminarr 当前仍是：
 
 目标：产出真正的本地刮削产物。
 
-当前状态：当前主线下一步
+当前状态：进行中；`.nfo` 已开始落地，下一步补 `poster` / `backdrop`
 
 最小实现：
 
 - 保留 `.luminarr.metadata.json`
-- 新增 `.nfo`
+- 新增 `.nfo`（已完成）
 - 新增 `poster` / `backdrop`
 
 ### Phase 4
