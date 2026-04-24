@@ -4,7 +4,7 @@
 
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
-- 当前刚完成的一条最小闭环是：**movie-first 结果过滤补齐剧集形态假阳性**。
+- 当前刚完成的一条最小闭环是：**TMDB 英文标题查询顺序固定优先**。
 - 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `158 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `175 passed`。
 - 当前这一轮已经补齐：
   - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
@@ -16,6 +16,7 @@
   - `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类常见复合版本词写法现在也会回到真实片名，不再把 sequel token 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 残留进搜索标题
   - `Batman v Superman 2016` 这类“主标题 + 官方多词副标题”的输入现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中，优先直接用官方长片名去搜；但 `John Wick 2023 -> John Wick: Chapter 4` 这类续作后缀不会被误判成同片高置信
   - `Alien 2024` 这类“主标题 + 单词官方副标题”输入现在也会把 `Alien: Romulus` 视为高置信 TMDB 命中，不再先搜一轮短标题再回退；但没有副标题分隔符的单词后缀仍不会被当作同片高置信
+  - 只要 TMDB 返回了电影候选，搜索请求顺序现在固定为：`TMDB 英文标题 + 年份 -> TMDB original_title + 年份 -> 用户标题 + 年份`；不再因为低置信命中就把中文标题排回前面
   - `Dune Part 2 2024` 命中 `Dune Part Two / Dune: Part Two` 这类共享归一后等价的 TMDB 双标题时，搜索请求现在会按共享归一去重，不再把 `Dune Part Two`、`Dune: Part Two`、`Dune Part 2` 各搜一轮
   - `周处除三害 2024` 这类 movie-first 查询如果只命中 `S01 / S01E01 / Season / Episode` 形态的假阳性结果，现在会直接按“未找到候选”处理，不再把明显剧集资源展示成电影候选
   - `沙丘 2021` 这类查询里夹着 `Random Movie 2021` 这种明显无关 outlier 时，当前展示结果也不会再把这类被判掉的噪音候选混进前台列表
@@ -41,6 +42,7 @@
 - 当前这一轮也顺手降低了后续维护成本：再加新一类尾部标题噪音词时，不需要同时改 query 解析和 TMDB 标题比对两套逻辑。
 - 当前这一轮也补了一点结构降本：共享标题噪音规则不再靠一整段越滚越长的手写正则硬撑，后续新增变体时更容易做小改动和小回归。
 - 当前这一轮也把 TMDB 置信判断补细了一点：官方长片名副标题可以直接走高置信命中，但会显式排除 `Part / Chapter / 2049` 这类更像续作的后缀，避免把基片误判成 sequel。
+- 当前这一轮也把查询顺序正式固定了：对中文内容和国际内容都优先走 TMDB 英文标题，再走 original_title，最后才回到中文/原始用户标题。
 - 当前这一轮也继续降低了维护成本：TMDB 选片打分和搜索请求高置信判断现在共享同一套标题关系 helper，不再有“一边修了、另一边忘了”的漂移风险。
 - 当前这一轮也顺手降低了无效查询次数：共享归一后等价的 TMDB 标题现在只会保留一条搜索请求，不再把 Prowlarr/BT 来源重复打一遍。
 - 当前这一轮也把真实搜索结果质量再收紧了一点：movie-first 结果展示会直接丢掉被判成剧集形态或明显无关的噪音候选，不再为了“有结果”把假阳性顶到前台。

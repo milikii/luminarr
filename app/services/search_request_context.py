@@ -40,7 +40,6 @@ async def build_search_request_context(
     ordered_queries = _resolve_ordered_queries(
         parsed_query=parsed_query,
         tmdb_movie=tmdb_movie,
-        prefer_tmdb=tmdb_confident,
     )
     resolved_query, raw_results = await _search_candidates_with_logging(
         search_func=search_func,
@@ -59,7 +58,6 @@ def _resolve_ordered_queries(
     *,
     parsed_query: ParsedMovieQuery,
     tmdb_movie: TmdbMovie | None,
-    prefer_tmdb: bool,
 ) -> tuple[str, ...]:
     fallback_query = _build_query(parsed_query.title, parsed_query.year)
     fallback_title_only_query = _build_query(parsed_query.title, "")
@@ -73,25 +71,14 @@ def _resolve_ordered_queries(
     original_title_only_query = _build_query(tmdb_movie.original_title, "")
     return tuple(
         _unique_queries(
-            (
-                [
-                    english_query,
-                    original_query,
-                    fallback_query,
-                    english_title_only_query,
-                    original_title_only_query,
-                    fallback_title_only_query,
-                ]
-                if prefer_tmdb
-                else [
-                    fallback_query,
-                    english_query,
-                    original_query,
-                    fallback_title_only_query,
-                    english_title_only_query,
-                    original_title_only_query,
-                ]
-            )
+            [
+                english_query,
+                original_query,
+                fallback_query,
+                english_title_only_query,
+                original_title_only_query,
+                fallback_title_only_query,
+            ]
         )
     ) or (fallback_query,)
 
