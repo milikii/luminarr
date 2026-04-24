@@ -2866,6 +2866,69 @@ def test_search_and_format_treats_space_insensitive_original_title_as_confident_
     assert "Dune Part Two 2024 2160p BluRay" in text
 
 
+def test_search_and_format_treats_multiword_tmdb_subtitle_extension_as_confident_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Batman v Superman: Dawn of Justice 2016":
+            return [
+                {
+                    "title": "Batman v Superman: Dawn of Justice 2016 2160p BluRay",
+                    "year": 2016,
+                    "size": 10 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerDC",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "Batman v Superman"
+        assert year == "2016"
+        return TmdbMovie(
+            title="Batman v Superman: Dawn of Justice",
+            original_title="Batman v Superman: Dawn of Justice",
+            year="2016",
+        )
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("Batman v Superman 2016"))
+
+    assert seen_queries == ["Batman v Superman: Dawn of Justice 2016"]
+    assert "片名: Batman v Superman: Dawn of Justice" in text
+    assert "Batman v Superman: Dawn of Justice 2016 2160p BluRay" in text
+
+
+def test_search_and_format_does_not_treat_sequel_suffix_as_confident_tmdb_match() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "John Wick 2023":
+            return [
+                {
+                    "title": "John Wick 2023 1080p BluRay",
+                    "year": 2023,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerJW",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_lookup(title: str, year: str) -> TmdbMovie | None:
+        assert title == "John Wick"
+        assert year == "2023"
+        return TmdbMovie(title="John Wick: Chapter 4", original_title="John Wick: Chapter 4", year="2023")
+
+    service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
+    text = _run(service.search_and_format("John Wick 2023"))
+
+    assert seen_queries == ["John Wick 2023"]
+    assert "片名: John Wick" in text
+    assert "别名: -" in text
+    assert "John Wick 2023 1080p BluRay" in text
+
+
 def test_search_and_format_treats_spaced_sequel_digit_as_confident_tmdb_match() -> None:
     seen_queries: list[str] = []
 

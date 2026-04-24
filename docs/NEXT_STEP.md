@@ -5,7 +5,7 @@
 - **质量硬化** 与 **保守版收尾发布准备** 都已完成；当前默认分支若继续推进，唯一主线就是 **搜索相关性优化**。
 - 这条主线不再碰发布矩阵、真实 smoke 范围或副作用边界，只在现有 movie-first 搜索链里继续收敛“用户输入什么，前几条候选能不能更像他要的那一部”。
 - 当前刚完成的一条最小闭环是：**query 解析职责拆分 · 第 1 轮**。
-- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `145 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `159 passed`。
+- 当前批次已通过本机复验确认：`make quality` 绿灯；`.venv/bin/python -m pytest -q tests/test_search_media.py` 为 `156 passed`；`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `173 passed`。
 - 当前这一轮已经补齐：
   - `John Wick Chapter 4 Extended 2023` 这类“章节数字 + 版本噪音词 + 年份”输入现在不会再把 `4` 吞掉，TMDB 与搜索 query 会继续稳定落到 `Chapter 4`
   - `Dune Part 2 Extended 2024` 这类“part 数字 + 版本噪音词 + 年份”输入现在不会再把 `2` 吞掉，query 解析会继续保住 sequel token
@@ -14,6 +14,7 @@
   - `Blade Runner Final Cut 1982`、`Alien Director's Cut 1979`、`Batman v Superman Ultimate Edition 2016` 这类“电影标题 + cut/edition 词 + 年份”输入现在会把尾部版本词剥掉，再把 TMDB 与搜索 query 对齐回真正片名
   - `Blade Runner The Final Cut 1982`、`Alien The Director's Cut 1979` 这类带前置冠词的尾部版本短语现在也会整段剥掉，不再把标题错误残留成 `Blade Runner The` / `Alien The`
   - `Dune Part 2 IMAX Enhanced 2024`、`Avatar Extended Cut 2009`、`Batman v Superman Special Extended Edition 2016`、`Blade Runner Theatrical Version 1982`、`Aliens Collector Edition 1986` 这类常见复合版本词写法现在也会回到真实片名，不再把 sequel token 吞成 `Part Enhanced`，或把 `Extended Cut / Theatrical Version / Collector Edition` 残留进搜索标题
+  - `Batman v Superman 2016` 这类“主标题 + 官方多词副标题”的输入现在会把 `Batman v Superman: Dawn of Justice` 视为高置信 TMDB 命中，优先直接用官方长片名去搜；但 `John Wick 2023 -> John Wick: Chapter 4` 这类续作后缀不会被误判成同片高置信
   - `The Final Cut 2004` 这类本体标题现在不会被错误地整段剥成空标题或只剩冠词
   - 当前标题噪音剥离规则已经抽到共享归一层；query 解析和 TMDB 候选比对复用同一套 `Extended / Final Cut / Director's Cut / Ultimate Edition` 规则，不再继续在两个模块里各写一份
   - 当前共享标题噪音词表也已改成声明式词表 + 统一正则拼装；后续若继续补版本词，默认只改共享词表，不再直接手改整段大正则
@@ -32,6 +33,7 @@
 - 当前也已补到几类常见复合变体：`IMAX Enhanced`、`Extended Cut`、`Special Extended Edition`、`Theatrical Version`、`Collector Edition`；后续补版本词时，优先先判断是否只是同一类尾部噪音变体。
 - 当前这一轮也顺手降低了后续维护成本：再加新一类尾部标题噪音词时，不需要同时改 query 解析和 TMDB 标题比对两套逻辑。
 - 当前这一轮也补了一点结构降本：共享标题噪音规则不再靠一整段越滚越长的手写正则硬撑，后续新增变体时更容易做小改动和小回归。
+- 当前这一轮也把 TMDB 置信判断补细了一点：官方长片名副标题可以直接走高置信命中，但会显式排除 `Part / Chapter / 2049` 这类更像续作的后缀，避免把基片误判成 sequel。
 - 共享层现在已经继续覆盖 `Remastered / Theatrical / Uncut`；后续若还要补新一类版本词，默认优先走共享归一层，不再回到局部正则散改。
 - 共享层现在也已经覆盖 `Unrated / Anniversary Edition / Collectors Edition`；后续若继续补版本词，优先判断是否仍属于尾部标题噪音，再统一并入共享层。
 - 当前这一轮也继续降低了结构维护成本：若后面还要补 sequel/chapter 恢复规则，默认先改共享标题归一层，不再让 `search_request_context.py` 再长出第二套恢复实现。

@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
+from app.search_title_normalization import compact_match_key, is_subtitle_extension_match, normalize_match_key, normalize_spaces
 from app.clients.tmdb import TmdbMovie
 from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
@@ -159,4 +159,9 @@ def _is_tmdb_confident_match(
     normalized_original_title = normalize_match_key(tmdb_movie.original_title)
     normalized_candidates = {normalized_title, normalized_original_title}
     compact_candidates = {compact_match_key(candidate) for candidate in normalized_candidates if candidate}
-    return normalized_query in normalized_candidates or compact_query in compact_candidates
+    if normalized_query in normalized_candidates or compact_query in compact_candidates:
+        return True
+    return is_subtitle_extension_match(parsed_query.title, tmdb_movie.title) or is_subtitle_extension_match(
+        parsed_query.title,
+        tmdb_movie.original_title,
+    )

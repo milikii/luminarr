@@ -34,6 +34,7 @@ _TRAILING_SEQUEL_TOKEN_WITH_YEAR_RE = re.compile(
 )
 _SEQUEL_VALUE_PATTERN = r"(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|ii|iii|iv|v|vi|vii|viii|ix|x|第\s*[一二三四五六七八九十两\d]+\s*部)"
 _SEQUEL_PHRASE_PATTERN = rf"(?:(?:part|chapter)\s+{_SEQUEL_VALUE_PATTERN}|{_SEQUEL_VALUE_PATTERN})"
+_SEQUEL_SUFFIX_RE = re.compile(rf"^(?:{_SEQUEL_PHRASE_PATTERN}|\d{{4}})$", re.IGNORECASE)
 _TRAILING_SEQUEL_TOKEN_WITH_NOISE_AND_YEAR_RE = re.compile(
     rf"^(?P<title>.+?)(?P<separator>\s*)(?P<sequel>{_SEQUEL_PHRASE_PATTERN})(?:\s+(?P<noise>{_SEARCH_TITLE_NOISE_SEQUENCE_PATTERN}))?(?:\s+|\s*[\[(]\s*)(?P<year>(?:19|20)\d{{2}})(?:\s*[\])])?$",
     re.IGNORECASE,
@@ -102,6 +103,23 @@ def normalize_match_key(value: str) -> str:
 
 def compact_match_key(value: str) -> str:
     return value.replace(" ", "")
+
+
+def is_subtitle_extension_match(query: str, candidate_title: str) -> bool:
+    normalized_query = normalize_match_key(query)
+    normalized_candidate = normalize_match_key(candidate_title)
+    if not normalized_query or not normalized_candidate:
+        return False
+    prefix = f"{normalized_query} "
+    if not normalized_candidate.startswith(prefix):
+        return False
+    suffix = normalized_candidate[len(prefix) :].strip()
+    if not suffix:
+        return False
+    suffix_tokens = suffix.split()
+    if len(suffix_tokens) < 2:
+        return False
+    return _SEQUEL_SUFFIX_RE.match(suffix) is None
 
 
 def finalize_parsed_query_title(
