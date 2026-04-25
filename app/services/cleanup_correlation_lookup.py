@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_event_support import fetch_cleanup_correlation_event
+from app.services.cleanup_correlation_result_support import build_cleanup_correlation_result
 
 CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
@@ -72,24 +73,28 @@ class CleanupCorrelationLookup:
         if event is None:
             return resolved_identity, None
 
-        source_path = event.source_path.strip()
-        target_path = event.target_path.strip()
-        if not source_path or not target_path:
-            _print_cleanup_correlation_path_missing_log(
+        correlation = build_cleanup_correlation_result(
+            event=event,
+            fallback_task_ref=resolved_identity.task_ref,
+            fallback_task_id=resolved_identity.task_id,
+            fallback_task_hash=resolved_identity.task_hash,
+            on_path_missing=lambda source_path_missing, target_path_missing: _print_cleanup_correlation_path_missing_log(
                 task_ref=task_ref,
                 resolved_identity=resolved_identity,
                 event=event,
-                source_path_missing=not source_path,
-                target_path_missing=not target_path,
-            )
+                source_path_missing=source_path_missing,
+                target_path_missing=target_path_missing,
+            ),
+        )
+        if correlation is None:
             return resolved_identity, None
 
         return resolved_identity, ImportCorrelation(
-            task_ref=event.task_ref.strip() or resolved_identity.task_ref,
-            task_id=event.task_id.strip() or resolved_identity.task_id,
-            task_hash=event.task_hash.strip() or resolved_identity.task_hash,
-            source_path=source_path,
-            target_path=target_path,
+            task_ref=correlation.task_ref,
+            task_id=correlation.task_id,
+            task_hash=correlation.task_hash,
+            source_path=correlation.source_path,
+            target_path=correlation.target_path,
         )
 
     def resolve_task_identity(
