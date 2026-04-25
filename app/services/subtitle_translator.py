@@ -313,26 +313,13 @@ class SubtitleTranslatorService:
                 fix=read_failure.fix,
             )
 
-        rendered_output, error_message, translate_failure = _resolve_translated_subtitle_content(
+        rendered_output, error_result = self._resolve_single_file_rendered_output(
             subtitle_file=subtitle_file,
             source_text=source_text,
             movie_title=movie_title,
-            translate_srt=self._translate_srt_text,
-            translate_ass=self._translate_ass_text,
         )
-        if translate_failure is not None:
-            return self._build_failed_result(
-                problem=translate_failure.problem,
-                fix=translate_failure.fix,
-            )
-
-        if rendered_output is None:
-            return SubtitleTranslateResult(
-                success=False,
-                message=error_message or "字幕翻译失败。",
-                translated_count=0,
-                skipped=False,
-            )
+        if error_result is not None:
+            return error_result
 
         write_failure = _write_translated_subtitle_file(
             output_path=subtitle_file.translated_path,
@@ -344,6 +331,34 @@ class SubtitleTranslatorService:
                 fix=write_failure.fix,
             )
         return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
+
+    def _resolve_single_file_rendered_output(
+        self,
+        *,
+        subtitle_file: _SubtitleFile,
+        source_text: str,
+        movie_title: str,
+    ) -> tuple[str | None, SubtitleTranslateResult | None]:
+        rendered_output, error_message, translate_failure = _resolve_translated_subtitle_content(
+            subtitle_file=subtitle_file,
+            source_text=source_text,
+            movie_title=movie_title,
+            translate_srt=self._translate_srt_text,
+            translate_ass=self._translate_ass_text,
+        )
+        if translate_failure is not None:
+            return None, self._build_failed_result(
+                problem=translate_failure.problem,
+                fix=translate_failure.fix,
+            )
+        if rendered_output is None:
+            return None, SubtitleTranslateResult(
+                success=False,
+                message=error_message or "字幕翻译失败。",
+                translated_count=0,
+                skipped=False,
+            )
+        return rendered_output, None
 
     def _build_failed_result(self, *, problem: str, fix: str) -> SubtitleTranslateResult:
         _print_colored_error(problem=problem, fix=fix)

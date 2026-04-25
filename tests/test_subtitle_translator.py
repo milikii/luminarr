@@ -520,6 +520,25 @@ def test_translate_for_import_fails_when_ass_file_is_invalid(tmp_path: Path) -> 
     assert "不是有效 ASS" in result.message
 
 
+def test_translate_single_file_fails_when_subtitle_kind_is_unsupported(tmp_path: Path) -> None:
+    subtitle_file = tmp_path / "Interstellar (2014).vtt"
+    subtitle_file.write_text("WEBVTT\n\n00:00.000 --> 00:01.000\nhello\n", encoding="utf-8")
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service._translate_single_file(
+        subtitle_file=subtitle_support._SubtitleFile(
+            source_path=subtitle_file,
+            translated_path=tmp_path / "Interstellar (2014).zh.vtt",
+            kind="vtt",
+        ),
+        movie_title="Interstellar",
+    )
+
+    assert result.success is False
+    assert result.skipped is False
+    assert "暂不支持的字幕格式" in result.message
+
+
 def test_translate_for_import_fails_when_missing_api_key(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
