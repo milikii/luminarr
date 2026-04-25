@@ -139,7 +139,8 @@ Luminarr 当前仍是：
   - 目标：继续按“命令解析 / scheduler tick 总编排 / 剩余结果封装”拆分
 - `app/services/cleanup_downloaded_source.py`
   - 当前状态：已再前推几格；命令解析、`job_event` 追加护栏、inspection 计算、inspect 文本渲染、follow-up / blocked outcome 编排、删除执行、PT seed guard 评估、blocked / event / delete failure 日志，以及 cleanup 主流程编排都已下沉到 `cleanup_query_support.py` / `cleanup_event_support.py` / `cleanup_inspection_support.py` / `cleanup_inspect_render_support.py` / `cleanup_follow_up_support.py` / `cleanup_blocked_support.py` / `cleanup_execution_support.py` / `cleanup_seed_guard_support.py` / `cleanup_logging_support.py` / `cleanup_flow_support.py`；当前 `cleanup_downloaded_source.py` 为 `340` 行。
-  - 目标：继续按“correlation lookup 边界 / 剩余 service 粘合层”拆分
+  - 当前补充：`cleanup_correlation_lookup.py` 的关联事件读取护栏、路径缺失判定 / 结果构造，以及任务身份解析也已下沉到 `cleanup_correlation_event_support.py` / `cleanup_correlation_result_support.py` / `cleanup_task_identity_support.py`；当前 `cleanup_correlation_lookup.py` 为 `232` 行。
+  - 目标：继续按“剩余 service 粘合层 / correlation lookup 剩余日志边界”拆分
 - `app/db/approval_repo.py`
   - 目标：按 action 族或 query/update helper 收口，避免继续在同一文件里累加协议分支
 - `app/db/job_repo.py`
