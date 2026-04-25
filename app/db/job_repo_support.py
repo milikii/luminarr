@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 
@@ -103,6 +104,129 @@ def normalize_job_pending_upsert_identity(
         task_id=task_key.task_id,
         task_hash=task_key.task_hash,
     )
+
+
+def fetch_job_row_by_chat_task_ref(
+    *,
+    connection: object,
+    chat_id: int,
+    task_ref: str,
+    state: str | None = None,
+    workflow_type: str = "",
+) -> Mapping[str, object] | None:
+    state_clause = "AND state = ?" if state else ""
+    parameters: list[object] = []
+    if workflow_type:
+        parameters.append(workflow_type)
+    parameters.append(chat_id)
+    if state:
+        parameters.append(state)
+    parameters.extend([task_ref, task_ref, task_ref])
+    return connection.execute(
+        f"""
+        SELECT
+            job_id,
+            chat_id,
+            user_id,
+            workflow_type,
+            state,
+            task_ref,
+            task_id,
+            task_hash,
+            payload_json,
+            version,
+            lease_owner,
+            lease_until,
+            created_at,
+            updated_at
+        FROM jobs
+        WHERE {('workflow_type = ? AND ' if workflow_type else '')}chat_id = ?
+          {state_clause}
+          AND (task_ref = ? OR task_id = ? OR task_hash = ?)
+        ORDER BY updated_at DESC
+        LIMIT 1
+        """,
+        tuple(parameters),
+    ).fetchone()
+
+
+def fetch_latest_pending_job_row(
+    *,
+    connection: object,
+    chat_id: int,
+    workflow_type: str = "",
+    pending_state: str,
+) -> Mapping[str, object] | None:
+    workflow_clause = "workflow_type = ? AND " if workflow_type else ""
+    parameters: list[object] = []
+    if workflow_type:
+        parameters.append(workflow_type)
+    parameters.extend([chat_id, pending_state])
+    return connection.execute(
+        f"""
+        SELECT
+            job_id,
+            chat_id,
+            user_id,
+            workflow_type,
+            state,
+            task_ref,
+            task_id,
+            task_hash,
+            payload_json,
+            version,
+            lease_owner,
+            lease_until,
+            created_at,
+            updated_at
+        FROM jobs
+        WHERE {workflow_clause}chat_id = ? AND state = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+        """,
+        tuple(parameters),
+    ).fetchone()
+
+
+def fetch_job_row_by_identity(
+    *,
+    connection: object,
+    job_id: str,
+    workflow_type: str,
+) -> Mapping[str, object] | None:
+    return connection.execute(
+        """
+        SELECT
+            job_id,
+            chat_id,
+            user_id,
+            workflow_type,
+            state,
+            task_ref,
+            task_id,
+            task_hash,
+            payload_json,
+            version,
+            lease_owner,
+            lease_until,
+            created_at,
+            updated_at
+        FROM jobs
+        WHERE job_id = ? AND workflow_type = ?
+        LIMIT 1
+        """,
+        (job_id, workflow_type),
+    ).fetchone()
+
+
+def resolve_job_record_from_row(
+    *,
+    row: Mapping[str, object] | None,
+    to_job_record: callable,
+) -> object | None:
+    if row is None:
+        return None
+    return to_job_record(row)
 
 
 def normalize_job_lease_identity(

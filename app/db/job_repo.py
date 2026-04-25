@@ -5,11 +5,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.db.job_repo_support import (
+    fetch_job_row_by_chat_task_ref,
+    fetch_job_row_by_identity,
+    fetch_latest_pending_job_row,
     normalize_job_chat_identity,
     normalize_job_lease_identity,
     normalize_job_pending_upsert_identity,
     normalize_job_task_ref,
     normalize_job_workflow,
+    resolve_job_record_from_row,
 )
 from app.db.sqlite import SqliteDatabase
 
@@ -104,71 +108,30 @@ class JobRepo:
     def get_pending_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
         chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
         task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
-        return self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE chat_id = ?
-              AND state = ?
-              AND (task_ref = ? OR task_id = ? OR task_hash = ?)
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (
-                chat.chat_id,
-                JOB_STATE_PENDING_APPROVAL,
-                task.task_ref,
-                task.task_ref,
-                task.task_ref,
-            ),
+        with self._database.connect() as connection:
+            row = fetch_job_row_by_chat_task_ref(
+                connection=connection,
+                chat_id=chat.chat_id,
+                task_ref=task.task_ref,
+                state=JOB_STATE_PENDING_APPROVAL,
+            )
+        return resolve_job_record_from_row(
+            row=row,
+            to_job_record=_to_job_record,
         )
 
     def get_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
         chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
         task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
-        return self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE chat_id = ?
-              AND (task_ref = ? OR task_id = ? OR task_hash = ?)
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (
-                chat.chat_id,
-                task.task_ref,
-                task.task_ref,
-                task.task_ref,
-            ),
+        with self._database.connect() as connection:
+            row = fetch_job_row_by_chat_task_ref(
+                connection=connection,
+                chat_id=chat.chat_id,
+                task_ref=task.task_ref,
+            )
+        return resolve_job_record_from_row(
+            row=row,
+            to_job_record=_to_job_record,
         )
 
     def get_latest_pending_import_job(self, *, chat_id: int) -> JobRecord | None:
@@ -189,29 +152,15 @@ class JobRepo:
             context="pending query",
             error_cls=JobPersistenceError,
         )
-        return self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE chat_id = ? AND state = ?
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (chat.chat_id, JOB_STATE_PENDING_APPROVAL),
+        with self._database.connect() as connection:
+            row = fetch_latest_pending_job_row(
+                connection=connection,
+                chat_id=chat.chat_id,
+                pending_state=JOB_STATE_PENDING_APPROVAL,
+            )
+        return resolve_job_record_from_row(
+            row=row,
+            to_job_record=_to_job_record,
         )
 
     def claim_lease(
@@ -501,37 +450,16 @@ class JobRepo:
             context="query",
             error_cls=JobPersistenceError,
         )
-        return self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE workflow_type = ?
-              AND chat_id = ?
-              AND (task_ref = ? OR task_id = ? OR task_hash = ?)
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (
-                workflow.workflow_type,
-                chat.chat_id,
-                task.task_ref,
-                task.task_ref,
-                task.task_ref,
-            ),
+        with self._database.connect() as connection:
+            row = fetch_job_row_by_chat_task_ref(
+                connection=connection,
+                chat_id=chat.chat_id,
+                task_ref=task.task_ref,
+                workflow_type=workflow.workflow_type,
+            )
+        return resolve_job_record_from_row(
+            row=row,
+            to_job_record=_to_job_record,
         )
 
     def _get_latest_pending_job_for_workflow(
@@ -550,29 +478,16 @@ class JobRepo:
             context="pending query",
             error_cls=JobPersistenceError,
         )
-        return self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE workflow_type = ? AND chat_id = ? AND state = ?
-            ORDER BY updated_at DESC
-            LIMIT 1
-            """,
-            (workflow.workflow_type, chat.chat_id, JOB_STATE_PENDING_APPROVAL),
+        with self._database.connect() as connection:
+            row = fetch_latest_pending_job_row(
+                connection=connection,
+                chat_id=chat.chat_id,
+                workflow_type=workflow.workflow_type,
+                pending_state=JOB_STATE_PENDING_APPROVAL,
+            )
+        return resolve_job_record_from_row(
+            row=row,
+            to_job_record=_to_job_record,
         )
 
     def _set_job_state(
@@ -637,28 +552,15 @@ class JobRepo:
         )
         if not cleaned_job_id:
             raise JobPersistenceError("job identity missing for internal query")
-        return self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE job_id = ? AND workflow_type = ?
-            LIMIT 1
-            """,
-            (cleaned_job_id, workflow.workflow_type),
+        with self._database.connect() as connection:
+            row = fetch_job_row_by_identity(
+                connection=connection,
+                job_id=cleaned_job_id,
+                workflow_type=workflow.workflow_type,
+            )
+        return resolve_job_record_from_row(
+            row=row,
+            to_job_record=_to_job_record,
         )
 
     def _select_one(self, query: str, params: tuple[object, ...]) -> JobRecord | None:
