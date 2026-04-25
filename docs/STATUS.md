@@ -17,6 +17,7 @@
 - 当前又从 cleanup/approval/job 三条结构 backlog 再收掉几小格：cleanup 与 correlation 的主流程、路径校验、删除资产和日志边界，approval 的身份/查询/状态/写入/读路径，以及 job 的身份、查询、写路径与 pending upsert 都已下沉到各自 helper；当前 `cleanup_downloaded_source.py` `334` 行、`cleanup_correlation_lookup.py` `215` 行、`approval_repo.py` `779` 行、`job_repo.py` `533` 行。
 - 当前又从 job backlog 再收掉一小格：`mark_downloader_completed()` 的身份规范化也已下沉到 `job_repo_support.py`，`job_repo.py` 当前为 `535` 行。
 - 当前又从 job backlog 再收掉一小格：`cancel_pending_job()` 的身份规范化也已下沉到 `job_repo_support.py`，`job_repo.py` 当前为 `536` 行。
+- 当前又从 approval backlog 再收掉一小格：`_approve/_restore_pending/_cancel` 三条状态迁移薄壳已合并到共享 helper，`approval_repo.py` 当前为 `762` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -43,6 +44,7 @@
 - 2026-04-25 cleanup/approval/job 结构收口 follow-up：对应 helper 的 `pyflakes` 均通过；focused 结果分别保持为 cleanup `49 passed`、approval `147 passed, 112 deselected`、job `152 passed, 138 deselected`
 - 2026-04-25 job completed identity follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "mark_downloader_completed or missing_identity_for_lease_and_cancel or cancel_pending_downloader_updates_persisted_truth"` 为 `2 passed, 109 deselected`
 - 2026-04-25 job cancel identity follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "cancel_pending_job or missing_identity_for_lease_and_cancel or cancel_pending_downloader_updates_persisted_truth or cancel_pending_import_updates_persisted_truth or cancel_target_missing_after_update"` 为 `4 passed, 107 deselected`
+- 2026-04-25 approval transition helper follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approve_import_requires_current_lease_version or approval_repo_approve_raises_when_row_missing or approval_repo_cancel_raises_when_row_missing or approval_repo_restore_pending_raises_when_row_missing or cancel_pending_import_updates_persisted_truth"` 为 `5 passed, 106 deselected`
 - metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`
 - 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`

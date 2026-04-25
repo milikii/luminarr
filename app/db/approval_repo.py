@@ -414,36 +414,16 @@ class ApprovalRepo:
         task_ref: str,
         expected_lease_version: int,
     ) -> bool:
-        identity = normalize_transition_identity(
+        return self._transition_approval_status(
+            action_type=action_type,
             task_id=task_id,
             task_hash=task_hash,
+            task_ref=task_ref,
             expected_lease_version=expected_lease_version,
-            context="state transition",
-            error_cls=ApprovalPersistenceError,
+            next_status=APPROVAL_STATUS_APPROVED,
+            require_pending_status=True,
+            missing_error="approval_record missing during approve",
         )
-
-        with self._database.connect() as connection:
-            rowcount = update_approval_status(
-                connection=connection,
-                action_type=action_type,
-                task_id=identity.task_id,
-                task_hash=identity.task_hash,
-                task_ref=task_ref,
-                next_status=APPROVAL_STATUS_APPROVED,
-                expected_lease_version=identity.expected_lease_version,
-                require_pending_status=True,
-            )
-            connection.commit()
-        if rowcount == 1:
-            return True
-        approval_record = self._get_exact_approval_record(
-            action_type=action_type,
-            task_id=identity.task_id,
-            task_hash=identity.task_hash,
-        )
-        if approval_record is None:
-            raise ApprovalPersistenceError("approval_record missing during approve")
-        return False
 
     def _restore_pending(
         self,
@@ -454,36 +434,16 @@ class ApprovalRepo:
         task_ref: str,
         expected_lease_version: int,
     ) -> bool:
-        identity = normalize_transition_identity(
+        return self._transition_approval_status(
+            action_type=action_type,
             task_id=task_id,
             task_hash=task_hash,
+            task_ref=task_ref,
             expected_lease_version=expected_lease_version,
-            context="state transition",
-            error_cls=ApprovalPersistenceError,
+            next_status=APPROVAL_STATUS_PENDING,
+            require_pending_status=False,
+            missing_error="approval_record missing during restore",
         )
-
-        with self._database.connect() as connection:
-            rowcount = update_approval_status(
-                connection=connection,
-                action_type=action_type,
-                task_id=identity.task_id,
-                task_hash=identity.task_hash,
-                task_ref=task_ref,
-                next_status=APPROVAL_STATUS_PENDING,
-                expected_lease_version=identity.expected_lease_version,
-                require_pending_status=False,
-            )
-            connection.commit()
-        if rowcount == 1:
-            return True
-        approval_record = self._get_exact_approval_record(
-            action_type=action_type,
-            task_id=identity.task_id,
-            task_hash=identity.task_hash,
-        )
-        if approval_record is None:
-            raise ApprovalPersistenceError("approval_record missing during restore")
-        return False
 
     def _cancel(
         self,
@@ -493,6 +453,29 @@ class ApprovalRepo:
         task_hash: str,
         task_ref: str,
         expected_lease_version: int,
+    ) -> bool:
+        return self._transition_approval_status(
+            action_type=action_type,
+            task_id=task_id,
+            task_hash=task_hash,
+            task_ref=task_ref,
+            expected_lease_version=expected_lease_version,
+            next_status=APPROVAL_STATUS_CANCELLED,
+            require_pending_status=True,
+            missing_error="approval_record missing during cancel",
+        )
+
+    def _transition_approval_status(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+        task_ref: str,
+        expected_lease_version: int,
+        next_status: str,
+        require_pending_status: bool,
+        missing_error: str,
     ) -> bool:
         identity = normalize_transition_identity(
             task_id=task_id,
@@ -509,9 +492,9 @@ class ApprovalRepo:
                 task_id=identity.task_id,
                 task_hash=identity.task_hash,
                 task_ref=task_ref,
-                next_status=APPROVAL_STATUS_CANCELLED,
+                next_status=next_status,
                 expected_lease_version=identity.expected_lease_version,
-                require_pending_status=True,
+                require_pending_status=require_pending_status,
             )
             connection.commit()
         if rowcount == 1:
@@ -522,7 +505,7 @@ class ApprovalRepo:
             task_hash=identity.task_hash,
         )
         if approval_record is None:
-            raise ApprovalPersistenceError("approval_record missing during cancel")
+            raise ApprovalPersistenceError(missing_error)
         return False
 
     def _mark_executed(
