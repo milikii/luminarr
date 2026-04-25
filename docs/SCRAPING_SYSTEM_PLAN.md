@@ -145,7 +145,8 @@ Luminarr 当前仍是：
   - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前 `approval_repo.py` 为 `779` 行。
   - 目标：继续按“action 族入口 / 剩余 SQL 写入边界”收口
 - `app/db/job_repo.py`
-  - 目标：按 workflow/job lifecycle 的 query/update helper 收口，降低跨能力族耦合
+  - 当前状态：已再前推几格；身份校验、查询 helper，以及 lease/state/completed/cancel 写路径都已下沉到 `job_repo_support.py`；当前 `job_repo.py` 为 `565` 行。
+  - 目标：继续按“workflow 入口 / 剩余 SQL 边界”收口
 
 这些文件的拆解默认排在当前刮削主线之后；只有当其中某个文件直接阻塞当前 `media_identity -> scrape` 主线时，才允许提前插队。
 
