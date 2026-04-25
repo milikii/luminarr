@@ -13,19 +13,16 @@ from app.services.subtitle_translation_support import (
     _build_subtitle_skip_result,
     _build_subtitle_translation_summary,
     _extract_translations_from_response,
-    _find_video_files,
+    _probe_embedded_subtitle_streams_for_video,
     _print_colored_error,
     _read_metadata_title,
     _request_subtitle_chat_completion,
     _translate_ass_subtitle_content,
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
-    _resolve_directory_skip_reason,
     _resolve_embedded_subtitle_extract_result,
     _resolve_embedded_subtitle_output_path,
     _resolve_target_subtitle_files,
-    _resolve_ffprobe_subtitle_streams,
-    _resolve_ffmpeg_subtitle_streams,
     _read_subtitle_source_text,
     _resolve_translated_subtitle_content,
     _run_subprocess_command,
@@ -133,66 +130,10 @@ class SubtitleTranslatorService:
         self,
         video_path: Path,
     ) -> tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]:
-        command = [
-            "ffprobe",
-            "-v",
-            "error",
-            "-select_streams",
-            "s",
-            "-show_entries",
-            "stream=index,codec_name:stream_tags=language,title",
-            "-of",
-            "json",
-            str(video_path),
-        ]
-        completed, failure = _run_subprocess_command(
-            command=command,
-            timeout_seconds=self._timeout_seconds,
-            missing_problem=f"字幕翻译失败：系统缺少 ffprobe，无法检查内嵌字幕：{video_path}",
-            missing_fix="安装 `ffprobe`（通常随 `ffmpeg` 一起提供）并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
-            timeout_problem=f"字幕翻译失败：检查内嵌字幕超时：{video_path}",
-            timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffprobe` 是否可正常执行。",
-        )
-        if failure is not None:
-            if failure.reason == "missing":
-                return self._probe_embedded_subtitles_with_ffmpeg_streams(video_path)
-            return [], failure
-
-        streams, parse_failure = _resolve_ffprobe_subtitle_streams(
+        return _probe_embedded_subtitle_streams_for_video(
             video_path=video_path,
-            returncode=completed.returncode,
-            stdout=completed.stdout or "",
-            stderr=completed.stderr or "",
-        )
-        if parse_failure is not None:
-            return [], parse_failure
-        return streams or [], None
-
-    def _probe_embedded_subtitles_with_ffmpeg_streams(
-        self,
-        video_path: Path,
-    ) -> tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]:
-        command = [
-            "ffmpeg",
-            "-hide_banner",
-            "-i",
-            str(video_path),
-        ]
-        completed, failure = _run_subprocess_command(
-            command=command,
             timeout_seconds=self._timeout_seconds,
-            missing_problem=f"字幕翻译失败：系统缺少 ffprobe/ffmpeg，无法检查内嵌字幕：{video_path}",
-            missing_fix="安装 `ffmpeg`（如能一并安装 `ffprobe` 更好）并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
-            timeout_problem=f"字幕翻译失败：检查内嵌字幕超时：{video_path}",
-            timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常执行。",
         )
-        if failure is not None:
-            return [], failure
-
-        parsed_streams = _resolve_ffmpeg_subtitle_streams(
-            output_text=completed.stderr or completed.stdout or "",
-        )
-        return parsed_streams, None
 
     def _probe_embedded_subtitles(
         self,
