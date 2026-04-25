@@ -11,6 +11,7 @@ from app.db.approval_repo_support import (
     normalize_approval_identity,
     normalize_move_identity,
     normalize_transition_identity,
+    update_approval_status,
 )
 from app.db.sqlite import SqliteDatabase
 
@@ -418,33 +419,18 @@ class ApprovalRepo:
         )
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE approval_record
-                SET
-                    status = ?,
-                    last_task_ref = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE action_type = ?
-                  AND task_id = ?
-                  AND task_hash = ?
-                  AND status = ?
-                  AND lease_version = ?
-                  AND executed_version < ?
-                """,
-                (
-                    APPROVAL_STATUS_APPROVED,
-                    task_ref.strip(),
-                    action_type,
-                    identity.task_id,
-                    identity.task_hash,
-                    APPROVAL_STATUS_PENDING,
-                    identity.expected_lease_version,
-                    identity.expected_lease_version,
-                ),
+            rowcount = update_approval_status(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                task_ref=task_ref,
+                next_status=APPROVAL_STATUS_APPROVED,
+                expected_lease_version=identity.expected_lease_version,
+                require_pending_status=True,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return True
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
@@ -473,31 +459,18 @@ class ApprovalRepo:
         )
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE approval_record
-                SET
-                    status = ?,
-                    last_task_ref = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE action_type = ?
-                  AND task_id = ?
-                  AND task_hash = ?
-                  AND lease_version = ?
-                  AND executed_version < ?
-                """,
-                (
-                    APPROVAL_STATUS_PENDING,
-                    task_ref.strip(),
-                    action_type,
-                    identity.task_id,
-                    identity.task_hash,
-                    identity.expected_lease_version,
-                    identity.expected_lease_version,
-                ),
+            rowcount = update_approval_status(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                task_ref=task_ref,
+                next_status=APPROVAL_STATUS_PENDING,
+                expected_lease_version=identity.expected_lease_version,
+                require_pending_status=False,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return True
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
@@ -526,33 +499,18 @@ class ApprovalRepo:
         )
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE approval_record
-                SET
-                    status = ?,
-                    last_task_ref = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE action_type = ?
-                  AND task_id = ?
-                  AND task_hash = ?
-                  AND status = ?
-                  AND lease_version = ?
-                  AND executed_version < ?
-                """,
-                (
-                    APPROVAL_STATUS_CANCELLED,
-                    task_ref.strip(),
-                    action_type,
-                    identity.task_id,
-                    identity.task_hash,
-                    APPROVAL_STATUS_PENDING,
-                    identity.expected_lease_version,
-                    identity.expected_lease_version,
-                ),
+            rowcount = update_approval_status(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                task_ref=task_ref,
+                next_status=APPROVAL_STATUS_CANCELLED,
+                expected_lease_version=identity.expected_lease_version,
+                require_pending_status=True,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return True
         approval_record = self._get_exact_approval_record(
             action_type=action_type,

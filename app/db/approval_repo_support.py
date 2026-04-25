@@ -134,6 +134,47 @@ def fetch_approval_lease_version_row(
     ).fetchone()
 
 
+def update_approval_status(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+    task_ref: str,
+    next_status: str,
+    expected_lease_version: int,
+    require_pending_status: bool,
+) -> int:
+    where_status_clause = "AND status = ?" if require_pending_status else ""
+    parameters: list[object] = [
+        next_status,
+        task_ref.strip(),
+        action_type,
+        task_id,
+        task_hash,
+    ]
+    if require_pending_status:
+        parameters.append("pending")
+    parameters.extend([expected_lease_version, expected_lease_version])
+    cursor = connection.execute(
+        f"""
+        UPDATE approval_record
+        SET
+            status = ?,
+            last_task_ref = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE action_type = ?
+          AND task_id = ?
+          AND task_hash = ?
+          {where_status_clause}
+          AND lease_version = ?
+          AND executed_version < ?
+        """,
+        tuple(parameters),
+    )
+    return cursor.rowcount
+
+
 def normalize_move_identity(
     *,
     current_task_id: str,
