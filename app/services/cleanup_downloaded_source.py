@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-from datetime import UTC, datetime
 from pathlib import Path
 
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -19,6 +18,7 @@ from app.services.cleanup_query_support import (
     parse_cleanup_inspect_query_text,
     parse_cleanup_query_text,
 )
+from app.services.cleanup_seed_guard_support import evaluate_cleanup_pt_seed_window
 
 CLEANUP_QUERY_USAGE_TEXT = (
     "cleanup 用法：\n"
@@ -294,56 +294,28 @@ class CleanupDownloadedSourceService:
         task_id: str,
         task_hash: str,
     ) -> str | None:
-        cleaned_task_ref = task_ref.strip().lower()
-        if self._pt_min_seed_hours <= 0 or cleaned_task_ref.startswith("bt-"):
-            return None
-        if self._download_monitor_repo is None:
-            _print_cleanup_pt_seed_guard_state_unavailable_log(
+        return evaluate_cleanup_pt_seed_window(
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            pt_min_seed_hours=self._pt_min_seed_hours,
+            download_monitor_repo=self._download_monitor_repo,
+            sqlite_utc_format=_SQLITE_UTC_FORMAT,
+            state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
+            blocked_template=CLEANUP_PT_SEED_WINDOW_BLOCKED_TEMPLATE,
+            on_state_unavailable=lambda reason: _print_cleanup_pt_seed_guard_state_unavailable_log(
                 task_ref=task_ref,
                 task_id=task_id,
                 task_hash=task_hash,
-                reason="download_monitor_repo missing",
-            )
-            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
-
-        try:
-            record = self._download_monitor_repo.get_record(task_id=task_id, task_hash=task_hash)
-        except Exception as error:
-            _print_cleanup_pt_seed_guard_lookup_failed_log(
+                reason=reason,
+            ),
+            on_lookup_failed=lambda error: _print_cleanup_pt_seed_guard_lookup_failed_log(
                 task_ref=task_ref,
                 task_id=task_id,
                 task_hash=task_hash,
                 error=error,
-            )
-            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
-
-        if record is None or not record.completion_observed_at.strip():
-            _print_cleanup_pt_seed_guard_state_unavailable_log(
-                task_ref=task_ref,
-                task_id=task_id,
-                task_hash=task_hash,
-                reason="completion_observed_at missing",
-            )
-            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
-
-        try:
-            completion_observed_at = datetime.strptime(record.completion_observed_at, _SQLITE_UTC_FORMAT).replace(tzinfo=UTC)
-        except ValueError:
-            _print_cleanup_pt_seed_guard_state_unavailable_log(
-                task_ref=task_ref,
-                task_id=task_id,
-                task_hash=task_hash,
-                reason=f"invalid completion_observed_at: {record.completion_observed_at}",
-            )
-            return CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT
-
-        elapsed_hours = max(0.0, (datetime.now(UTC) - completion_observed_at).total_seconds() / 3600.0)
-        if elapsed_hours < float(self._pt_min_seed_hours):
-            return CLEANUP_PT_SEED_WINDOW_BLOCKED_TEMPLATE.format(
-                elapsed_hours=elapsed_hours,
-                required_hours=self._pt_min_seed_hours,
-            )
-        return None
+            ),
+        )
 
 
 def _is_cleanup_event_row_corrupted_error(error: Exception) -> bool:
