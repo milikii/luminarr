@@ -5,9 +5,11 @@ from app.db.job_event_repo import JobEventRepo
 from app.services.cleanup_downloaded_source import (
     CLEANUP_EVENT_RESULT_MISSING_REASON,
     _is_cleanup_event_row_corrupted_error,
-    _print_cleanup_event_append_failed_log,
-    _print_cleanup_event_append_result_missing_log,
-    _print_cleanup_event_append_row_corrupted_log,
+)
+from app.services.cleanup_logging_support import (
+    print_cleanup_event_append_failed_log,
+    print_cleanup_event_append_result_missing_log,
+    print_cleanup_event_append_row_corrupted_log,
 )
 
 
@@ -34,7 +36,7 @@ def append_cleanup_event(
         )
     except Exception as error:
         if str(error) == CLEANUP_EVENT_RESULT_MISSING_REASON:
-            _print_cleanup_event_append_result_missing_log(
+            print_cleanup_event_append_result_missing_log(
                 task_ref=task_ref,
                 event_type=event_type,
                 task_id=task_id,
@@ -45,7 +47,7 @@ def append_cleanup_event(
             )
             return
         if _is_cleanup_event_row_corrupted_error(error):
-            _print_cleanup_event_append_row_corrupted_log(
+            print_cleanup_event_append_row_corrupted_log(
                 task_ref=task_ref,
                 event_type=event_type,
                 task_id=task_id,
@@ -55,7 +57,7 @@ def append_cleanup_event(
                 reason=str(error),
             )
             return
-        _print_cleanup_event_append_failed_log(
+        print_cleanup_event_append_failed_log(
             task_ref=task_ref,
             event_type=event_type,
             task_id=task_id,
