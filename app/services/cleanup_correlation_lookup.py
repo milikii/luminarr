@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_event_support import fetch_cleanup_correlation_event
+from app.services.cleanup_correlation_flow_support import run_cleanup_correlation_lookup
 from app.services.cleanup_correlation_logging_support import (
     print_cleanup_correlation_lookup_failed_log,
     print_cleanup_correlation_path_missing_log,
@@ -53,56 +54,60 @@ class CleanupCorrelationLookup:
         task_ref: str,
         chat_id: int | None,
     ) -> tuple[ResolvedCleanupTaskIdentity, ImportCorrelation | None]:
-        resolved_identity = self.resolve_task_identity(task_ref=task_ref, chat_id=chat_id)
-        event = fetch_cleanup_correlation_event(
-            fetch_event=lambda: self._job_event_repo.find_latest_import_correlation(
-                task_ref=resolved_identity.lookup_task_ref,
-                task_id=resolved_identity.lookup_task_id,
-                task_hash=resolved_identity.lookup_task_hash,
+        return run_cleanup_correlation_lookup(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            resolve_task_identity=lambda resolved_task_ref, resolved_chat_id: self.resolve_task_identity(
+                task_ref=resolved_task_ref,
+                chat_id=resolved_chat_id,
             ),
-            on_result_missing=lambda reason: _print_cleanup_correlation_result_missing_log(
-                task_ref=task_ref,
-                resolved_identity=resolved_identity,
-                reason=reason,
+            fetch_event=lambda resolved_identity: fetch_cleanup_correlation_event(
+                fetch_event=lambda: self._job_event_repo.find_latest_import_correlation(
+                    task_ref=resolved_identity.lookup_task_ref,
+                    task_id=resolved_identity.lookup_task_id,
+                    task_hash=resolved_identity.lookup_task_hash,
+                ),
+                on_result_missing=lambda reason: _print_cleanup_correlation_result_missing_log(
+                    task_ref=task_ref,
+                    resolved_identity=resolved_identity,
+                    reason=reason,
+                ),
+                on_row_corrupted=lambda reason: _print_cleanup_correlation_row_corrupted_log(
+                    task_ref=task_ref,
+                    resolved_identity=resolved_identity,
+                    reason=reason,
+                ),
+                on_failed=lambda reason: _print_cleanup_correlation_lookup_failed_log(
+                    task_ref=task_ref,
+                    resolved_identity=resolved_identity,
+                    reason=reason,
+                ),
+                result_missing_reason=CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON,
+                is_row_corrupted_reason=lambda reason: _is_cleanup_correlation_row_corrupted_reason(reason),
             ),
-            on_row_corrupted=lambda reason: _print_cleanup_correlation_row_corrupted_log(
-                task_ref=task_ref,
-                resolved_identity=resolved_identity,
-                reason=reason,
+            build_correlation_result=lambda resolved_identity, event: (
+                (lambda correlation: None if correlation is None else ImportCorrelation(
+                    task_ref=correlation.task_ref,
+                    task_id=correlation.task_id,
+                    task_hash=correlation.task_hash,
+                    source_path=correlation.source_path,
+                    target_path=correlation.target_path,
+                ))(
+                    build_cleanup_correlation_result(
+                        event=event,
+                        fallback_task_ref=resolved_identity.task_ref,
+                        fallback_task_id=resolved_identity.task_id,
+                        fallback_task_hash=resolved_identity.task_hash,
+                        on_path_missing=lambda source_path_missing, target_path_missing: _print_cleanup_correlation_path_missing_log(
+                            task_ref=task_ref,
+                            resolved_identity=resolved_identity,
+                            event=event,
+                            source_path_missing=source_path_missing,
+                            target_path_missing=target_path_missing,
+                        ),
+                    )
+                )
             ),
-            on_failed=lambda reason: _print_cleanup_correlation_lookup_failed_log(
-                task_ref=task_ref,
-                resolved_identity=resolved_identity,
-                reason=reason,
-            ),
-            result_missing_reason=CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON,
-            is_row_corrupted_reason=lambda reason: _is_cleanup_correlation_row_corrupted_reason(reason),
-        )
-        if event is None:
-            return resolved_identity, None
-
-        correlation = build_cleanup_correlation_result(
-            event=event,
-            fallback_task_ref=resolved_identity.task_ref,
-            fallback_task_id=resolved_identity.task_id,
-            fallback_task_hash=resolved_identity.task_hash,
-            on_path_missing=lambda source_path_missing, target_path_missing: _print_cleanup_correlation_path_missing_log(
-                task_ref=task_ref,
-                resolved_identity=resolved_identity,
-                event=event,
-                source_path_missing=source_path_missing,
-                target_path_missing=target_path_missing,
-            ),
-        )
-        if correlation is None:
-            return resolved_identity, None
-
-        return resolved_identity, ImportCorrelation(
-            task_ref=correlation.task_ref,
-            task_id=correlation.task_id,
-            task_hash=correlation.task_hash,
-            source_path=correlation.source_path,
-            target_path=correlation.target_path,
         )
 
     def resolve_task_identity(
