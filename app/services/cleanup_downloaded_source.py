@@ -6,9 +6,10 @@ from pathlib import Path
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
+from app.services.cleanup_flow_support import run_cleanup_flow
 from app.services.cleanup_blocked_support import resolve_cleanup_blocked_outcome
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
-from app.services.cleanup_execution_support import execute_cleanup_delete
+from app.services.cleanup_execution_support import CleanupDeleteExecutionResult, execute_cleanup_delete
 from app.services.cleanup_follow_up_support import (
     preferred_cleanup_ref,
 )
@@ -130,76 +131,62 @@ class CleanupDownloadedSourceService:
         *,
         chat_id: int | None = None,
     ) -> str:
-        cleaned_ref = task_ref.strip()
-        if not cleaned_ref:
-            return CLEANUP_QUERY_USAGE_TEXT
-
-        inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
-        task_ref_for_event = inspection.task_ref or cleaned_ref
-        follow_up_ref = preferred_cleanup_ref(inspection)
-        blocked_outcome = resolve_cleanup_blocked_outcome(
-            inspection=inspection,
-            follow_up_ref=follow_up_ref,
-            correlation_missing_text=CLEANUP_CORRELATION_MISSING_TEXT,
-            correlation_missing_fix_hint=CLEANUP_CORRELATION_MISSING_FIX_HINT,
-            target_missing_fix_hint=CLEANUP_TARGET_MISSING_FIX_HINT,
-            source_missing_fix_hint=CLEANUP_SOURCE_MISSING_FIX_HINT,
-            pt_seed_window_state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
-            pt_seed_window_blocked_fix_hint=CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT,
-            pt_seed_window_state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
-            source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
-            source_type_unsupported_fix_hint=CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT,
-            guard_rejected_fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
-            follow_up_template=CLEANUP_FOLLOW_UP_TEMPLATE,
-        )
-        if blocked_outcome is not None:
-            self._record_event(
+        return run_cleanup_flow(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            query_usage_text=CLEANUP_QUERY_USAGE_TEXT,
+            inspect_cleanup=lambda resolved_task_ref, resolved_chat_id: self._inspect_cleanup(
+                task_ref=resolved_task_ref,
+                chat_id=resolved_chat_id,
+            ),
+            preferred_cleanup_ref=preferred_cleanup_ref,
+            resolve_blocked_outcome=lambda inspection, follow_up_ref: resolve_cleanup_blocked_outcome(
+                inspection=inspection,
+                follow_up_ref=follow_up_ref,
+                correlation_missing_text=CLEANUP_CORRELATION_MISSING_TEXT,
+                correlation_missing_fix_hint=CLEANUP_CORRELATION_MISSING_FIX_HINT,
+                target_missing_fix_hint=CLEANUP_TARGET_MISSING_FIX_HINT,
+                source_missing_fix_hint=CLEANUP_SOURCE_MISSING_FIX_HINT,
+                pt_seed_window_state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
+                pt_seed_window_blocked_fix_hint=CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT,
+                pt_seed_window_state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
+                source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+                source_type_unsupported_fix_hint=CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT,
+                guard_rejected_fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
+                follow_up_template=CLEANUP_FOLLOW_UP_TEMPLATE,
+            ),
+            record_event=lambda task_ref_for_event, inspection, event_type, message, source_path, target_path: self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
-                event_type=blocked_outcome.event_type,
-                message=blocked_outcome.message,
-                source_path=blocked_outcome.source_path,
-                target_path=blocked_outcome.target_path,
-            )
-            print_cleanup_blocked_log(
-                event_type=blocked_outcome.event_type,
+                event_type=event_type,
+                message=message,
+                source_path=source_path,
+                target_path=target_path,
+            ),
+            log_blocked=lambda task_ref_for_event, inspection, event_type, fix_hint, source_path, target_path: print_cleanup_blocked_log(
+                event_type=event_type,
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
-                source_path=blocked_outcome.source_path,
-                target_path=blocked_outcome.target_path,
+                source_path=source_path,
+                target_path=target_path,
                 reason=inspection.conclusion,
-                fix_hint=blocked_outcome.fix_hint,
-            )
-            return blocked_outcome.message
-
-        source_path = Path(inspection.source_path).expanduser()
-        target_path = Path(inspection.target_path).expanduser()
-
-        delete_result = execute_cleanup_delete(
-            delete_source_asset=_delete_source_asset,
-            source_path=source_path,
-            target_path=target_path,
-            task_id=inspection.task_id,
-            task_hash=inspection.task_hash,
-            follow_up_ref=follow_up_ref,
-            cleanup_failed_text=CLEANUP_FAILED_TEXT,
-            cleanup_succeeded_text=CLEANUP_SUCCEEDED_TEXT,
-            follow_up_template=CLEANUP_FOLLOW_UP_TEMPLATE,
-            success_follow_up_template=CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE,
-        )
-        if not delete_result.success:
-            self._record_event(
-                task_ref=task_ref_for_event,
+                fix_hint=fix_hint,
+            ),
+            execute_delete=lambda source_path, target_path, inspection, follow_up_ref: execute_cleanup_delete(
+                delete_source_asset=_delete_source_asset,
+                source_path=source_path,
+                target_path=target_path,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
-                event_type=delete_result.event_type,
-                message=delete_result.message,
-                source_path=str(source_path),
-                target_path=str(target_path),
-            )
-            print_cleanup_delete_failed_log(
+                follow_up_ref=follow_up_ref,
+                cleanup_failed_text=CLEANUP_FAILED_TEXT,
+                cleanup_succeeded_text=CLEANUP_SUCCEEDED_TEXT,
+                follow_up_template=CLEANUP_FOLLOW_UP_TEMPLATE,
+                success_follow_up_template=CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE,
+            ),
+            log_delete_failed=lambda task_ref_for_event, inspection, source_path, target_path, delete_result: print_cleanup_delete_failed_log(
                 task_ref=task_ref_for_event,
                 event_type=delete_result.event_type,
                 task_id=inspection.task_id,
@@ -207,19 +194,8 @@ class CleanupDownloadedSourceService:
                 source_path=str(source_path),
                 target_path=str(target_path),
                 failure_reason=delete_result.failure_reason,
-            )
-            return delete_result.message
-
-        self._record_event(
-            task_ref=task_ref_for_event,
-            task_id=inspection.task_id,
-            task_hash=inspection.task_hash,
-            event_type=delete_result.event_type,
-            message=delete_result.message,
-            source_path=str(source_path),
-            target_path=str(target_path),
-        )
-        return delete_result.message
+            ),
+        ).message
 
     def inspect_by_task_ref(
         self,
