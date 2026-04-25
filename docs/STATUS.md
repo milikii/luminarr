@@ -1,4 +1,4 @@
-# Current status (v464)
+# Current status (v465)
 
 ## Current mainline
 
@@ -12,6 +12,7 @@
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
 - 当前又从刮削后续 backlog 再收掉几小格：字幕翻译的目标字幕解析、`ffprobe/ffmpeg` 探测执行、内嵌字幕提取执行、单文件翻译读写边界与专业翻译请求编排都已下沉到 `subtitle_translation_support.py`；连同更早收掉的 `ffmpeg` fallback 结果解析 / 错误映射与“`ffprobe` 缺失且 `ffmpeg` 也缺失时返回明确失败结果”的 focused 护栏，当前 `subtitle_translator.py` 已降到 `283` 行。
 - 当前又从刮削后续 backlog 再收掉一小格：单视频目标的外挂/内嵌字幕解析编排也已下沉到 `subtitle_translation_support.py`，`subtitle_translator.py` 当前为 `273` 行。
+- 当前又从刮削后续 backlog 再收掉一小格：`translate_for_import()` 的前置校验也已下沉到 `subtitle_translation_support.py`，现在统一处理目标存在性、目标字幕解析、API key 缺失与 metadata title 读取；`subtitle_translator.py` 当前为 `267` 行。
 - 当前又从后续结构 backlog 再收掉一组 BT 订阅小闭环：`add/list/remove/clear` 的 repo guard、扫描前的 `chat_ids/items` 读取护栏、`last_seen` 回写护栏，以及单条订阅的搜索 / pending 创建编排都已下沉到 support helper；当前 `manage_bt_subscription.py` 已降到 `900` 行。
 - 当前又从 cleanup/approval/job 三条结构 backlog 再收掉几小格：cleanup 与 correlation 的主流程、路径校验、删除资产和日志边界，approval 的身份/查询/状态/写入/读路径，以及 job 的身份、查询、写路径与 pending upsert 都已下沉到各自 helper；当前 `cleanup_downloaded_source.py` `334` 行、`cleanup_correlation_lookup.py` `215` 行、`approval_repo.py` `779` 行、`job_repo.py` `533` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
@@ -35,6 +36,7 @@
 - 2026-04-25 连续施工冷启动复验：`make quality` 与 `make verify-mainline` 均通过，默认分支与当前文档真相未见漂移
 - 2026-04-25 冷启动一致性检查：`make quality`、`make verify-mainline` 与 `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 均已复验通过；其中跨渠道搜索 smoke 的测试夹具已同步到当前搜索评分真相。
 - 2026-04-25 subtitle 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `37 passed`
+- 2026-04-25 subtitle 前置校验收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py tests/test_subtitle_translator.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `38 passed`
 - 2026-04-25 btsub 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/manage_bt_subscription.py app/services/bt_subscription_repo_support.py app/services/bt_subscription_dispatch_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py` 为 `38 passed`
 - 2026-04-25 cleanup/approval/job 结构收口 follow-up：对应 helper 的 `pyflakes` 均通过；focused 结果分别保持为 cleanup `49 passed`、approval `147 passed, 112 deselected`、job `152 passed, 138 deselected`
 - metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`

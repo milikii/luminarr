@@ -168,6 +168,25 @@ def test_translate_for_import_skips_when_translated_subtitle_already_exists(tmp_
     assert result.message == "字幕翻译已跳过：目标中文字幕文件已存在。"
 
 
+def test_translate_for_import_skips_when_target_path_is_missing(tmp_path: Path) -> None:
+    missing_target = tmp_path / "missing" / "Interstellar (2014).mkv"
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-missing-target",
+            task_id="missing-target",
+            task_hash="hash-missing-target",
+            target_path=str(missing_target),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.translated_count == 0
+    assert result.message == f"字幕翻译已跳过：导入目标不存在：{missing_target}"
+
+
 def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)

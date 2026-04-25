@@ -47,6 +47,19 @@ class _SubtitleCommandFailure:
     fix: str
 
 
+@dataclass(frozen=True, slots=True)
+class _SubtitleImportPreparationFailure:
+    message: str
+    skipped: bool
+    fix: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class _SubtitleImportTranslationPlan:
+    subtitle_files: list[_SubtitleFile]
+    movie_title: str
+
+
 _VIDEO_FILE_SUFFIXES = frozenset({".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"})
 _SUBTITLE_FILE_SUFFIXES = (".srt", ".ass")
 _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX = {
@@ -491,6 +504,47 @@ def _resolve_target_subtitle_files(
     if subtitle_files:
         return subtitle_files, None, None
     return None, None, _resolve_directory_skip_reason(skip_reasons)
+
+
+def _prepare_subtitle_translation_for_import(
+    *,
+    target_path: Path,
+    metadata_path: Path,
+    api_key: str,
+    resolve_video_subtitle_files: Callable[[Path], tuple[list[_SubtitleFile], _SubtitleCommandFailure | None, str]],
+    read_metadata_title: Callable[[Path], str],
+) -> tuple[_SubtitleImportTranslationPlan | None, _SubtitleImportPreparationFailure | None]:
+    if not target_path.exists():
+        return None, _SubtitleImportPreparationFailure(
+            message=f"字幕翻译已跳过：导入目标不存在：{target_path}",
+            skipped=True,
+        )
+
+    subtitle_files, resolve_failure, skip_reason = _resolve_target_subtitle_files(
+        target_path=target_path,
+        resolve_video_subtitle_files=resolve_video_subtitle_files,
+    )
+    if resolve_failure is not None:
+        return None, _SubtitleImportPreparationFailure(
+            message=resolve_failure.problem,
+            skipped=False,
+            fix=resolve_failure.fix,
+        )
+    if subtitle_files is None:
+        message, skipped = _build_subtitle_skip_result(skip_reason=skip_reason or "none")
+        return None, _SubtitleImportPreparationFailure(message=message, skipped=skipped)
+
+    if not api_key:
+        return None, _SubtitleImportPreparationFailure(
+            message="字幕翻译失败：缺少 SUBTITLE_TRANSLATION_API_KEY，无法进行专业级翻译。",
+            skipped=False,
+            fix="在环境变量里配置 `SUBTITLE_TRANSLATION_API_KEY`，并确认网络可访问翻译接口。",
+        )
+
+    return _SubtitleImportTranslationPlan(
+        subtitle_files=subtitle_files,
+        movie_title=read_metadata_title(metadata_path),
+    ), None
 
 
 def _resolve_video_subtitle_files_for_import(

@@ -8,9 +8,10 @@ from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
     _SubtitleFile,
     _SubtitleCommandFailure,
-    _build_subtitle_skip_result,
+    _SubtitleImportPreparationFailure,
     _build_subtitle_translation_summary,
     _extract_embedded_subtitle_file_for_video,
+    _prepare_subtitle_translation_for_import,
     _probe_embedded_subtitle_streams_for_video,
     _print_colored_error,
     _read_metadata_title,
@@ -18,7 +19,6 @@ from app.services.subtitle_translation_support import (
     _resolve_video_subtitle_files_for_import,
     _translate_single_subtitle_file,
     _translate_ass_subtitle_content,
-    _resolve_target_subtitle_files,
     _translate_subtitle_lines_professionally,
     _translate_srt_subtitle_content,
 )
@@ -60,40 +60,24 @@ class SubtitleTranslatorService:
         self._request_chat_completion_func = request_chat_completion_func
 
     def translate_for_import(self, translate_input: SubtitleTranslateInput) -> SubtitleTranslateResult:
-        target_path = Path(translate_input.target_path).expanduser()
-        if not target_path.exists():
-            message = f"字幕翻译已跳过：导入目标不存在：{target_path}"
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
-
-        subtitle_files, resolve_failure, skip_reason = _resolve_target_subtitle_files(
-            target_path=target_path,
+        plan, preparation_failure = _prepare_subtitle_translation_for_import(
+            target_path=Path(translate_input.target_path).expanduser(),
+            metadata_path=Path(translate_input.metadata_path),
+            api_key=self._api_key,
             resolve_video_subtitle_files=self._resolve_video_subtitle_files,
+            read_metadata_title=_read_metadata_title,
         )
-        if resolve_failure is not None:
-            return self._build_failed_result(
-                problem=resolve_failure.problem,
-                fix=resolve_failure.fix,
-            )
-        if subtitle_files is None:
-            return self._build_skip_result(skip_reason=skip_reason or "none")
+        if preparation_failure is not None:
+            return self._build_preparation_result(failure=preparation_failure)
 
-        if not self._api_key:
-            message = "字幕翻译失败：缺少 SUBTITLE_TRANSLATION_API_KEY，无法进行专业级翻译。"
-            _print_colored_error(
-                problem=message,
-                fix="在环境变量里配置 `SUBTITLE_TRANSLATION_API_KEY`，并确认网络可访问翻译接口。",
-            )
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-
-        movie_title = _read_metadata_title(Path(translate_input.metadata_path))
         translated_count, error_result = self._translate_pending_subtitle_files(
-            subtitle_files=subtitle_files,
-            movie_title=movie_title,
+            subtitle_files=plan.subtitle_files,
+            movie_title=plan.movie_title,
         )
         if error_result is not None:
             return error_result
         return self._build_translation_summary_result(
-            movie_title=movie_title,
+            movie_title=plan.movie_title,
             translated_count=translated_count,
         )
 
@@ -175,6 +159,20 @@ class SubtitleTranslatorService:
             skipped=False,
         )
 
+    def _build_preparation_result(
+        self,
+        *,
+        failure: _SubtitleImportPreparationFailure,
+    ) -> SubtitleTranslateResult:
+        if failure.fix:
+            _print_colored_error(problem=failure.message, fix=failure.fix)
+        return SubtitleTranslateResult(
+            success=False,
+            message=failure.message,
+            translated_count=0,
+            skipped=failure.skipped,
+        )
+
     def _translate_pending_subtitle_files(
         self,
         *,
@@ -193,10 +191,6 @@ class SubtitleTranslatorService:
                 return 0, result
             translated_count += 1
         return translated_count, None
-
-    def _build_skip_result(self, *, skip_reason: str) -> SubtitleTranslateResult:
-        message, skipped = _build_subtitle_skip_result(skip_reason=skip_reason)
-        return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=skipped)
 
     def _build_translation_summary_result(
         self,
