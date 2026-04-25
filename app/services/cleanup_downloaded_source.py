@@ -14,7 +14,11 @@ from app.services.cleanup_follow_up_support import (
 )
 from app.services.cleanup_inspect_render_support import render_cleanup_inspect_message
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
-from app.services.cleanup_logging_support import print_cleanup_blocked_log
+from app.services.cleanup_logging_support import (
+    print_cleanup_blocked_log,
+    print_cleanup_pt_seed_guard_lookup_failed_log,
+    print_cleanup_pt_seed_guard_state_unavailable_log,
+)
 from app.services.cleanup_query_support import (
     parse_cleanup_inspect_query_text,
     parse_cleanup_query_text,
@@ -304,17 +308,19 @@ class CleanupDownloadedSourceService:
             sqlite_utc_format=_SQLITE_UTC_FORMAT,
             state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
             blocked_template=CLEANUP_PT_SEED_WINDOW_BLOCKED_TEMPLATE,
-            on_state_unavailable=lambda reason: _print_cleanup_pt_seed_guard_state_unavailable_log(
+            on_state_unavailable=lambda reason: print_cleanup_pt_seed_guard_state_unavailable_log(
                 task_ref=task_ref,
                 task_id=task_id,
                 task_hash=task_hash,
                 reason=reason,
+                state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
             ),
-            on_lookup_failed=lambda error: _print_cleanup_pt_seed_guard_lookup_failed_log(
+            on_lookup_failed=lambda error: print_cleanup_pt_seed_guard_lookup_failed_log(
                 task_ref=task_ref,
                 task_id=task_id,
                 task_hash=task_hash,
                 error=error,
+                state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
             ),
         )
 
@@ -358,38 +364,3 @@ def _delete_source_asset(source_path: Path) -> None:
         return
     raise OSError(CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT)
 
-
-def _print_cleanup_pt_seed_guard_lookup_failed_log(
-    *,
-    task_ref: str,
-    task_id: str,
-    task_hash: str,
-    error: Exception,
-) -> None:
-    print(
-        f"\033[31m[cleanup PT 保护查询失败]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
-        f"task_hash={task_hash or '-'} 错误={error}",
-        flush=True,
-    )
-    print(
-        f"\033[33m[处理建议]\033[0m {CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT}",
-        flush=True,
-    )
-
-
-def _print_cleanup_pt_seed_guard_state_unavailable_log(
-    *,
-    task_ref: str,
-    task_id: str,
-    task_hash: str,
-    reason: str,
-) -> None:
-    print(
-        f"\033[31m[cleanup PT 保护真相缺失]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
-        f"task_hash={task_hash or '-'} 原因={reason}",
-        flush=True,
-    )
-    print(
-        f"\033[33m[处理建议]\033[0m {CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT}",
-        flush=True,
-    )

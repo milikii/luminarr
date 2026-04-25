@@ -123,3 +123,41 @@ def print_cleanup_event_append_row_corrupted_log(
         "当前 cleanup 文本结果已返回，但不会把这条坏事件当成已稳定落盘。",
         flush=True,
     )
+
+
+def print_cleanup_pt_seed_guard_lookup_failed_log(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    error: Exception,
+    state_unavailable_fix_hint: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup PT 保护查询失败]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
+        f"task_hash={task_hash or '-'} 错误={error}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
+        flush=True,
+    )
+
+
+def print_cleanup_pt_seed_guard_state_unavailable_log(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    reason: str,
+    state_unavailable_fix_hint: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup PT 保护真相缺失]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
+        f"task_hash={task_hash or '-'} 原因={reason}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
+        flush=True,
+    )
