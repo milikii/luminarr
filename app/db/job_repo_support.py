@@ -408,3 +408,63 @@ def update_job_cancel_pending(
         ),
     )
     return cursor.rowcount
+
+
+def upsert_pending_job_row(
+    *,
+    connection: object,
+    job_id: str,
+    chat_id: int,
+    user_id: int,
+    workflow_type: str,
+    pending_state: str,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    payload_json: str,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO jobs (
+            job_id,
+            chat_id,
+            user_id,
+            workflow_type,
+            state,
+            task_ref,
+            task_id,
+            task_hash,
+            payload_json,
+            version,
+            lease_owner,
+            lease_until,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(job_id)
+        DO UPDATE SET
+            chat_id = excluded.chat_id,
+            user_id = excluded.user_id,
+            workflow_type = excluded.workflow_type,
+            state = excluded.state,
+            task_ref = excluded.task_ref,
+            task_id = excluded.task_id,
+            task_hash = excluded.task_hash,
+            payload_json = excluded.payload_json,
+            version = jobs.version + 1,
+            lease_owner = '',
+            lease_until = '',
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            job_id,
+            chat_id,
+            user_id,
+            workflow_type,
+            pending_state,
+            task_ref,
+            task_id,
+            task_hash,
+            payload_json.strip(),
+        ),
+    )

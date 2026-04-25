@@ -14,6 +14,7 @@ from app.db.job_repo_support import (
     normalize_job_task_ref,
     normalize_job_workflow,
     resolve_job_record_from_row,
+    upsert_pending_job_row,
     update_downloader_job_completed,
     update_job_cancel_pending,
     update_job_lease_claim,
@@ -322,50 +323,17 @@ class JobRepo:
 
         job_id = _build_job_id(identity.workflow_type, identity.task_hash)
         with self._database.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO jobs (
-                    job_id,
-                    chat_id,
-                    user_id,
-                    workflow_type,
-                    state,
-                    task_ref,
-                    task_id,
-                    task_hash,
-                    payload_json,
-                    version,
-                    lease_owner,
-                    lease_until,
-                    created_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT(job_id)
-                DO UPDATE SET
-                    chat_id = excluded.chat_id,
-                    user_id = excluded.user_id,
-                    workflow_type = excluded.workflow_type,
-                    state = excluded.state,
-                    task_ref = excluded.task_ref,
-                    task_id = excluded.task_id,
-                    task_hash = excluded.task_hash,
-                    payload_json = excluded.payload_json,
-                    version = jobs.version + 1,
-                    lease_owner = '',
-                    lease_until = '',
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (
-                    job_id,
-                    identity.chat_id,
-                    identity.user_id,
-                    identity.workflow_type,
-                    JOB_STATE_PENDING_APPROVAL,
-                    identity.task_ref,
-                    identity.task_id,
-                    identity.task_hash,
-                    payload_json.strip(),
-                ),
+            upsert_pending_job_row(
+                connection=connection,
+                job_id=job_id,
+                chat_id=identity.chat_id,
+                user_id=identity.user_id,
+                workflow_type=identity.workflow_type,
+                pending_state=JOB_STATE_PENDING_APPROVAL,
+                task_ref=identity.task_ref,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                payload_json=payload_json,
             )
             connection.commit()
         job = self._select_one(
