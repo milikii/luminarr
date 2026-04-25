@@ -210,8 +210,46 @@ def _resolve_embedded_subtitle_extract_result(
             reason="extract_failed",
             problem=f"字幕翻译失败：提取英文内嵌字幕失败：{video_path}，原因：{problem}",
             fix="确认视频里确实有可提取的英文文本字幕流；若是图片字幕（PGS/VobSub），当前不会自动 OCR 翻译。",
-        )
+    )
     return _resolve_extracted_subtitle_file(output_path)
+
+
+def _extract_embedded_subtitle_file_for_video(
+    *,
+    video_path: Path,
+    stream: _EmbeddedSubtitleStream,
+    timeout_seconds: float,
+) -> tuple[_SubtitleFile | None, _SubtitleCommandFailure | None]:
+    output_path = _resolve_embedded_subtitle_output_path(
+        video_path=video_path,
+        codec_name=stream.codec_name,
+    )
+    if output_path is None:
+        return None, None
+
+    command = _build_embedded_subtitle_extract_command(
+        video_path=video_path,
+        stream_index=stream.stream_index,
+        output_path=output_path,
+    )
+    completed, failure = _run_subprocess_command(
+        command=command,
+        timeout_seconds=timeout_seconds,
+        missing_problem=f"字幕翻译失败：系统缺少 ffmpeg，无法提取英文内嵌字幕：{video_path}",
+        missing_fix="安装 `ffmpeg` 并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
+        timeout_problem=f"字幕翻译失败：提取英文内嵌字幕超时：{video_path}",
+        timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常抽取字幕流。",
+    )
+    if failure is not None:
+        return None, failure
+
+    return _resolve_embedded_subtitle_extract_result(
+        video_path=video_path,
+        output_path=output_path,
+        returncode=completed.returncode,
+        stdout=completed.stdout or "",
+        stderr=completed.stderr or "",
+    )
 
 
 def _read_subtitle_source_text(source_path: Path) -> tuple[str | None, _SubtitleCommandFailure | None]:
