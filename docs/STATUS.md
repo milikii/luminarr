@@ -10,7 +10,7 @@
 - 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
 - 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
-- 当前又从刮削后续 backlog 收掉一小格：`_request_chat_completion` 的响应解析 / 错误映射也已下沉到 support helper，并补上了 `HTTP` 错误、非 JSON、缺少 `content`、空内容这四条 focused 护栏。当前 `subtitle_translator.py` 为 `524` 行，`_request_chat_completion` 已回落到 `26` 行。
+- 当前又从刮削后续 backlog 收掉一小格：`_request_chat_completion` 的响应解析 / 错误映射已下沉到 support helper，并补上了 `HTTP` 错误、非 JSON、缺少 `content`、空内容这四条 focused 护栏；当前 `subtitle_translator.py` 为 `524` 行，`_request_chat_completion` 已回落到 `26` 行，`translate_for_import` 结果汇总与 skip/success 文案分发继续保持收口态。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
