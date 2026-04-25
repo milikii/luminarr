@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,6 +16,10 @@ from app.services.cleanup_follow_up_support import (
     resolve_cleanup_blocked_event_details,
 )
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
+from app.services.cleanup_query_support import (
+    parse_cleanup_inspect_query_text,
+    parse_cleanup_query_text,
+)
 
 CLEANUP_QUERY_USAGE_TEXT = (
     "cleanup 用法：\n"
@@ -438,19 +441,11 @@ def _is_cleanup_event_row_corrupted_error(error: Exception) -> bool:
 
 
 def parse_cleanup_query(text: str) -> str | None:
-    cleaned_text = text.strip()
-    matched = re.match(r"^(?:(?i:cleanup)|清理)(?:\s+(.*))?$", cleaned_text)
-    if not matched:
-        return None
-    return (matched.group(1) or "").strip()
+    return parse_cleanup_query_text(text)
 
 
 def parse_cleanup_inspect_query(text: str) -> str | None:
-    cleaned_text = text.strip()
-    matched = re.match(r"^(?:(?i:cleanup)\s+(?i:inspect)|清理检查)(?:\s+(.*))?$", cleaned_text)
-    if not matched:
-        return None
-    return (matched.group(1) or "").strip()
+    return parse_cleanup_inspect_query_text(text)
 
 
 def _validate_cleanup_paths(*, source_path: Path, target_path: Path) -> str | None:
