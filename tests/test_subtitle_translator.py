@@ -284,6 +284,56 @@ def test_translate_for_import_directory_reports_chinese_external_skip_when_all_e
     assert result.message == "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
 
 
+def test_translate_for_import_directory_reports_chinese_embedded_skip_when_all_episodes_have_chinese_embedded_subtitles(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    season_dir = library_dir / "Show.S01"
+    season_dir.mkdir(parents=True)
+
+    episode1 = season_dir / "Show.S01E01.mkv"
+    episode2 = season_dir / "Show.S01E02.mkv"
+    episode1.write_bytes(b"video-1")
+    episode2.write_bytes(b"video-2")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "index": 2,
+                            "codec_name": "subrip",
+                            "tags": {"language": "chi", "title": "简体中文"},
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-dir-embedded-skip",
+            task_id="dir-embedded-skip",
+            task_hash="hash-dir-embedded-skip",
+            target_path=str(season_dir),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.message == "字幕翻译已跳过：视频内已检测到中文字幕轨。"
+
+
 def test_translate_for_import_skips_when_directory_has_no_video_files(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     season_dir = library_dir / "Show.S01"

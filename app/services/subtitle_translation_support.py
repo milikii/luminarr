@@ -237,6 +237,14 @@ def _build_subtitle_skip_result(*, skip_reason: str) -> tuple[str, bool]:
     return "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。", True
 
 
+def _resolve_directory_skip_reason(skip_reasons: list[str]) -> str:
+    if skip_reasons and all(reason == "chinese_external" for reason in skip_reasons):
+        return "chinese_external"
+    if skip_reasons and all(reason == "chinese_embedded" for reason in skip_reasons):
+        return "chinese_embedded"
+    return "none"
+
+
 def _build_subtitle_translation_summary(
     *,
     movie_title: str,

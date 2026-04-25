@@ -30,6 +30,7 @@ from app.services.subtitle_translation_support import (
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _resolve_directory_skip_reason,
     _resolve_embedded_subtitle_output_path,
     _resolve_extracted_subtitle_file,
     _read_subtitle_source_text,
@@ -144,12 +145,7 @@ class SubtitleTranslatorService:
 
         if subtitle_files:
             return subtitle_files, None
-
-        if skip_reasons and all(reason == "chinese_external" for reason in skip_reasons):
-            return [], self._build_skip_result(skip_reason="chinese_external")
-        if skip_reasons and all(reason == "chinese_embedded" for reason in skip_reasons):
-            return [], self._build_skip_result(skip_reason="chinese_embedded")
-        return [], self._build_skip_result(skip_reason="none")
+        return [], self._build_skip_result(skip_reason=_resolve_directory_skip_reason(skip_reasons))
 
     def _resolve_video_subtitle_files(
         self,
