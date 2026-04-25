@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,13 @@ class _EmbeddedSubtitleStream:
     codec_name: str
     language: str
     title: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SubtitleCommandFailure:
+    reason: str
+    problem: str
+    fix: str
 
 
 _VIDEO_FILE_SUFFIXES = frozenset({".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"})
@@ -295,6 +303,29 @@ def _translate_chunk_lines(
         )
         return None, message
     return translated_lines, None
+
+
+def _run_subprocess_command(
+    *,
+    command: list[str],
+    timeout_seconds: float,
+    missing_problem: str,
+    missing_fix: str,
+    timeout_problem: str,
+    timeout_fix: str,
+) -> tuple[subprocess.CompletedProcess[str] | None, _SubtitleCommandFailure | None]:
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+        )
+    except FileNotFoundError:
+        return None, _SubtitleCommandFailure(reason="missing", problem=missing_problem, fix=missing_fix)
+    except subprocess.TimeoutExpired:
+        return None, _SubtitleCommandFailure(reason="timeout", problem=timeout_problem, fix=timeout_fix)
+    return completed, None
 
 
 def _render_srt(blocks: list[_SrtBlock]) -> str:

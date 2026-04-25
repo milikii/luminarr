@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
+import app.services.subtitle_translation_support as subtitle_support
 import app.services.subtitle_translator as subtitle_module
 import httpx
 
@@ -153,7 +154,7 @@ def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path, monkey
             stderr="",
         )
 
-    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
 
     service = SubtitleTranslatorService()
     result = service.translate_for_import(
@@ -297,7 +298,7 @@ def test_translate_for_import_extracts_embedded_english_subtitle_when_no_externa
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
         raise AssertionError(f"unexpected command: {args}")
 
-    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
 
     service = SubtitleTranslatorService(
         api_key="demo-key",
@@ -350,7 +351,7 @@ def test_translate_for_import_skips_when_embedded_chinese_subtitle_exists(
             stderr="",
         )
 
-    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
 
     service = SubtitleTranslatorService(api_key="demo-key")
     result = service.translate_for_import(
@@ -382,7 +383,7 @@ def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_
             stderr="Stream #0:2(eng): Subtitle: subrip (default)\n",
         )
 
-    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
 
     service = SubtitleTranslatorService(api_key="demo-key")
     streams, error = service._probe_embedded_subtitles(target_file)
@@ -425,7 +426,7 @@ def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path:
             stderr="",
         )
 
-    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
 
     service = SubtitleTranslatorService(api_key="demo-key")
     streams, error = service._probe_embedded_subtitles(target_file)

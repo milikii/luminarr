@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +26,7 @@ from app.services.subtitle_translation_support import (
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _run_subprocess_command,
     _translate_blocks_in_chunks,
     _translate_chunk_lines,
 )
@@ -192,22 +192,19 @@ class SubtitleTranslatorService:
             "json",
             str(video_path),
         ]
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=self._timeout_seconds,
-            )
-        except FileNotFoundError:
-            return self._probe_embedded_subtitles_with_ffmpeg(video_path)
-        except subprocess.TimeoutExpired:
-            message = f"字幕翻译失败：检查内嵌字幕超时：{video_path}"
-            _print_colored_error(
-                problem=message,
-                fix="检查视频文件是否可读、体积是否异常，以及 `ffprobe` 是否可正常执行。",
-            )
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        completed, failure = _run_subprocess_command(
+            command=command,
+            timeout_seconds=self._timeout_seconds,
+            missing_problem=f"字幕翻译失败：系统缺少 ffprobe，无法检查内嵌字幕：{video_path}",
+            missing_fix="安装 `ffprobe`（通常随 `ffmpeg` 一起提供）并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
+            timeout_problem=f"字幕翻译失败：检查内嵌字幕超时：{video_path}",
+            timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffprobe` 是否可正常执行。",
+        )
+        if failure is not None:
+            if failure.reason == "missing":
+                return self._probe_embedded_subtitles_with_ffmpeg(video_path)
+            _print_colored_error(problem=failure.problem, fix=failure.fix)
+            return [], SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
 
         if completed.returncode != 0:
             problem = completed.stderr.strip() or completed.stdout.strip() or f"exit={completed.returncode}"
@@ -239,27 +236,17 @@ class SubtitleTranslatorService:
             "-i",
             str(video_path),
         ]
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=self._timeout_seconds,
-            )
-        except FileNotFoundError:
-            message = f"字幕翻译失败：系统缺少 ffprobe/ffmpeg，无法检查内嵌字幕：{video_path}"
-            _print_colored_error(
-                problem=message,
-                fix="安装 `ffmpeg`（如能一并安装 `ffprobe` 更好）并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
-            )
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-        except subprocess.TimeoutExpired:
-            message = f"字幕翻译失败：检查内嵌字幕超时：{video_path}"
-            _print_colored_error(
-                problem=message,
-                fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常执行。",
-            )
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        completed, failure = _run_subprocess_command(
+            command=command,
+            timeout_seconds=self._timeout_seconds,
+            missing_problem=f"字幕翻译失败：系统缺少 ffprobe/ffmpeg，无法检查内嵌字幕：{video_path}",
+            missing_fix="安装 `ffmpeg`（如能一并安装 `ffprobe` 更好）并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
+            timeout_problem=f"字幕翻译失败：检查内嵌字幕超时：{video_path}",
+            timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常执行。",
+        )
+        if failure is not None:
+            _print_colored_error(problem=failure.problem, fix=failure.fix)
+            return [], SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
 
         parsed_streams = _parse_ffmpeg_subtitle_streams(completed.stderr or completed.stdout or "")
         return parsed_streams, None
@@ -287,27 +274,17 @@ class SubtitleTranslatorService:
             "ass" if output_suffix == ".ass" else "srt",
             str(output_path),
         ]
-        try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=self._timeout_seconds,
-            )
-        except FileNotFoundError:
-            message = f"字幕翻译失败：系统缺少 ffmpeg，无法提取英文内嵌字幕：{video_path}"
-            _print_colored_error(
-                problem=message,
-                fix="安装 `ffmpeg` 并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
-            )
-            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-        except subprocess.TimeoutExpired:
-            message = f"字幕翻译失败：提取英文内嵌字幕超时：{video_path}"
-            _print_colored_error(
-                problem=message,
-                fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常抽取字幕流。",
-            )
-            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+        completed, failure = _run_subprocess_command(
+            command=command,
+            timeout_seconds=self._timeout_seconds,
+            missing_problem=f"字幕翻译失败：系统缺少 ffmpeg，无法提取英文内嵌字幕：{video_path}",
+            missing_fix="安装 `ffmpeg` 并确保命令在 PATH；如果只依赖外挂字幕，先确认同名 `.srt/.ass` 已随导入进入库目录。",
+            timeout_problem=f"字幕翻译失败：提取英文内嵌字幕超时：{video_path}",
+            timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常抽取字幕流。",
+        )
+        if failure is not None:
+            _print_colored_error(problem=failure.problem, fix=failure.fix)
+            return None, SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
 
         if completed.returncode != 0:
             if output_path.exists():
