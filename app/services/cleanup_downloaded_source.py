@@ -22,6 +22,7 @@ from app.services.cleanup_logging_support import (
     print_cleanup_pt_seed_guard_lookup_failed_log,
     print_cleanup_pt_seed_guard_state_unavailable_log,
 )
+from app.services.cleanup_path_guard_support import validate_cleanup_paths
 from app.services.cleanup_query_support import (
     parse_cleanup_inspect_query_text,
     parse_cleanup_query_text,
@@ -318,21 +319,12 @@ def parse_cleanup_inspect_query(text: str) -> str | None:
 
 
 def _validate_cleanup_paths(*, source_path: Path, target_path: Path) -> str | None:
-    if not source_path.is_file() and not source_path.is_dir():
-        return CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT
-
-    source_resolved = source_path.resolve(strict=True)
-    target_resolved = target_path.resolve(strict=True)
-    if (
-        source_resolved == target_resolved
-        or source_resolved in target_resolved.parents
-        or target_resolved in source_resolved.parents
-    ):
-        return CLEANUP_GUARD_REJECTED_TEXT.format(
-            source_path=str(source_path),
-            target_path=str(target_path),
-        )
-    return None
+    return validate_cleanup_paths(
+        source_path=source_path,
+        target_path=target_path,
+        source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+        guard_rejected_text=CLEANUP_GUARD_REJECTED_TEXT,
+    )
 
 
 def _delete_source_asset(source_path: Path) -> None:
