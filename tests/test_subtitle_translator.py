@@ -799,3 +799,37 @@ def test_subtitle_translator_passes_proxy_to_httpx(monkeypatch) -> None:
 
     assert result == "{\"translations\": [\"ok\"]}"
     client_ctor.assert_called_once_with(timeout=60.0, proxy="http://192.168.2.110:7890")
+
+
+def test_translate_lines_professional_builds_expected_request_payload() -> None:
+    seen_system_prompt: list[str] = []
+    seen_user_payload: list[dict[str, object]] = []
+
+    def fake_request(system_prompt: str, user_payload: dict[str, object]) -> str:
+        seen_system_prompt.append(system_prompt)
+        seen_user_payload.append(user_payload)
+        return json.dumps({"translations": ["专业译文：hello"]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service._translate_lines_professional(
+        source_lines=["hello"],
+        movie_title="Interstellar",
+    )
+
+    assert result == ["专业译文：hello"]
+    assert seen_system_prompt and "专业影视字幕译者" in seen_system_prompt[0]
+    assert seen_user_payload == [
+        {
+            "movie_title": "Interstellar",
+            "source_lines": ["hello"],
+            "rules": {
+                "target_language": "zh-CN",
+                "style": "专业影视字幕",
+                "return_json_only": True,
+                "json_schema": {"translations": ["与 source_lines 等长的中文字符串数组"]},
+            },
+        }
+    ]

@@ -206,6 +206,29 @@ def _write_translated_subtitle_file(
     return None
 
 
+def _build_professional_subtitle_translation_request(
+    *,
+    movie_title: str,
+    source_lines: list[str],
+) -> tuple[str, dict[str, object]]:
+    system_prompt = (
+        "你是专业影视字幕译者。任务：把英文字幕逐行翻译为简体中文。"
+        "必须保留每行语气、语境、人物关系，不要删减信息，不要总结。"
+        "脏话、双关、俚语要自然等价翻译。"
+    )
+    user_payload: dict[str, object] = {
+        "movie_title": movie_title,
+        "source_lines": source_lines,
+        "rules": {
+            "target_language": "zh-CN",
+            "style": "专业影视字幕",
+            "return_json_only": True,
+            "json_schema": {"translations": ["与 source_lines 等长的中文字符串数组"]},
+        },
+    }
+    return system_prompt, user_payload
+
+
 def _resolve_translated_subtitle_content(
     *,
     subtitle_file: _SubtitleFile,

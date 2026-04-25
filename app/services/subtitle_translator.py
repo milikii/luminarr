@@ -11,6 +11,7 @@ from app.services.subtitle_translation_support import (
     _SubtitleFile,
     _SrtBlock,
     _build_embedded_subtitle_extract_command,
+    _build_professional_subtitle_translation_request,
     _build_subtitle_file,
     _extract_translations_from_response,
     _find_adjacent_subtitle_paths,
@@ -456,21 +457,10 @@ class SubtitleTranslatorService:
         return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
 
     def _translate_lines_professional(self, *, source_lines: list[str], movie_title: str) -> list[str]:
-        system_prompt = (
-            "你是专业影视字幕译者。任务：把英文字幕逐行翻译为简体中文。"
-            "必须保留每行语气、语境、人物关系，不要删减信息，不要总结。"
-            "脏话、双关、俚语要自然等价翻译。"
+        system_prompt, user_payload = _build_professional_subtitle_translation_request(
+            movie_title=movie_title,
+            source_lines=source_lines,
         )
-        user_payload = {
-            "movie_title": movie_title,
-            "source_lines": source_lines,
-            "rules": {
-                "target_language": "zh-CN",
-                "style": "专业影视字幕",
-                "return_json_only": True,
-                "json_schema": {"translations": ["与 source_lines 等长的中文字符串数组"]},
-            },
-        }
 
         response_text = self._request_chat_completion(
             system_prompt=system_prompt,
