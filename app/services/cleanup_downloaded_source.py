@@ -11,10 +11,10 @@ from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
 from app.services.cleanup_execution_support import execute_cleanup_delete
 from app.services.cleanup_follow_up_support import (
     append_cleanup_follow_up,
-    format_cleanup_inspect_follow_up,
     preferred_cleanup_ref,
     resolve_cleanup_blocked_event_details,
 )
+from app.services.cleanup_inspect_render_support import render_cleanup_inspect_message
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
 from app.services.cleanup_query_support import (
     parse_cleanup_inspect_query_text,
@@ -293,37 +293,12 @@ class CleanupDownloadedSourceService:
             return CLEANUP_INSPECT_QUERY_USAGE_TEXT
 
         inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
-        lines = [
-            CLEANUP_INSPECT_RESULT_TEMPLATE.format(
-                query_ref=inspection.query_ref,
-                task_id=inspection.task_id or "-",
-                task_hash=inspection.task_hash or "-",
-                correlation_status="已找到" if inspection.correlation_found else "未找到",
-                source_path=inspection.source_path or "-",
-                source_status=_format_path_status(inspection.source_exists),
-                target_path=inspection.target_path or "-",
-                target_status=_format_path_status(inspection.target_exists),
-                guardrail_status="允许 cleanup" if inspection.cleanup_allowed else "拒绝 cleanup",
-                conclusion=inspection.conclusion,
-            )
-        ]
-        if inspection.cleanup_allowed:
-            lines.append(
-                format_cleanup_inspect_follow_up(
-                    inspection,
-                    inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
-                    inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
-                )
-            )
-        elif inspection.correlation_found:
-            lines.append(
-                format_cleanup_inspect_follow_up(
-                    inspection,
-                    inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
-                    inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
-                )
-            )
-        return "\n".join(lines)
+        return render_cleanup_inspect_message(
+            inspection=inspection,
+            inspect_result_template=CLEANUP_INSPECT_RESULT_TEMPLATE,
+            inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
+            inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
+        )
 
     def _inspect_cleanup(
         self,
@@ -474,14 +449,6 @@ def _delete_source_asset(source_path: Path) -> None:
         source_path.unlink()
         return
     raise OSError(CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT)
-
-
-def _format_path_status(exists: bool | None) -> str:
-    if exists is None:
-        return "未找到关联"
-    if exists:
-        return "存在"
-    return "不存在"
 
 
 def _print_cleanup_blocked_log(
