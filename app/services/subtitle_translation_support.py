@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
 
+import httpx
+
 
 @dataclass(frozen=True, slots=True)
 class _SrtBlock:
@@ -299,6 +301,39 @@ def _extract_chat_completion_response_text(body: dict[str, object]) -> str:
     if not text:
         raise RuntimeError("模型返回空内容。")
     return text
+
+
+def _request_subtitle_chat_completion(
+    *,
+    api_key: str,
+    base_url: str,
+    model: str,
+    timeout_seconds: float,
+    proxy_url: str,
+    system_prompt: str,
+    user_payload: dict[str, object],
+) -> str:
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    with httpx.Client(timeout=timeout_seconds, proxy=proxy_url or None) as client:
+        response = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+    if response.status_code >= 400:
+        raise RuntimeError(f"HTTP {response.status_code}: {response.text[:300]}")
+    try:
+        body = response.json()
+    except Exception as exc:
+        raise RuntimeError(f"响应不是 JSON：{exc}") from exc
+    return _extract_chat_completion_response_text(body)
 
 
 def _resolve_translated_subtitle_content(

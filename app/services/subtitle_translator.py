@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-import httpx
 from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
     _SubtitleFile,
@@ -23,6 +21,7 @@ from app.services.subtitle_translation_support import (
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _request_subtitle_chat_completion,
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
     _resolve_directory_skip_reason,
@@ -479,25 +478,12 @@ class SubtitleTranslatorService:
     def _request_chat_completion(self, *, system_prompt: str, user_payload: dict[str, object]) -> str:
         if self._request_chat_completion_func is not None:
             return self._request_chat_completion_func(system_prompt, user_payload)
-        payload = {
-            "model": self._model,
-            "temperature": 0.2,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
-            ],
-        }
-        url = f"{self._base_url}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {self._api_key}",
-            "Content-Type": "application/json",
-        }
-        with httpx.Client(timeout=self._timeout_seconds, proxy=self._proxy_url or None) as client:
-            response = client.post(url, headers=headers, json=payload)
-        if response.status_code >= 400:
-            raise RuntimeError(f"HTTP {response.status_code}: {response.text[:300]}")
-        try:
-            body = response.json()
-        except Exception as exc:
-            raise RuntimeError(f"响应不是 JSON：{exc}") from exc
-        return _extract_chat_completion_response_text(body)
+        return _request_subtitle_chat_completion(
+            api_key=self._api_key,
+            base_url=self._base_url,
+            model=self._model,
+            timeout_seconds=self._timeout_seconds,
+            proxy_url=self._proxy_url,
+            system_prompt=system_prompt,
+            user_payload=user_payload,
+        )
