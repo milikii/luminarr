@@ -279,6 +279,38 @@ def _write_translated_subtitle_file(
     return None
 
 
+def _translate_single_subtitle_file(
+    *,
+    subtitle_file: _SubtitleFile,
+    movie_title: str,
+    translate_srt: Callable[[str, str, Path], tuple[str | None, str | None]],
+    translate_ass: Callable[[str, str, Path], tuple[str | None, str | None]],
+) -> tuple[bool, str | None, _SubtitleCommandFailure | None]:
+    source_text, read_failure = _read_subtitle_source_text(subtitle_file.source_path)
+    if read_failure is not None:
+        return False, None, read_failure
+
+    rendered_output, error_message, translate_failure = _resolve_translated_subtitle_content(
+        subtitle_file=subtitle_file,
+        source_text=source_text,
+        movie_title=movie_title,
+        translate_srt=translate_srt,
+        translate_ass=translate_ass,
+    )
+    if translate_failure is not None:
+        return False, None, translate_failure
+    if rendered_output is None:
+        return False, error_message or "字幕翻译失败。", None
+
+    write_failure = _write_translated_subtitle_file(
+        output_path=subtitle_file.translated_path,
+        rendered_output=rendered_output,
+    )
+    if write_failure is not None:
+        return False, None, write_failure
+    return True, None, None
+
+
 def _build_professional_subtitle_translation_request(
     *,
     movie_title: str,

@@ -17,14 +17,12 @@ from app.services.subtitle_translation_support import (
     _print_colored_error,
     _read_metadata_title,
     _request_subtitle_chat_completion,
+    _translate_single_subtitle_file,
     _translate_ass_subtitle_content,
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
     _resolve_target_subtitle_files,
-    _read_subtitle_source_text,
-    _resolve_translated_subtitle_content,
     _translate_srt_subtitle_content,
-    _write_translated_subtitle_file,
 )
 
 
@@ -159,59 +157,25 @@ class SubtitleTranslatorService:
         subtitle_file: _SubtitleFile,
         movie_title: str,
     ) -> SubtitleTranslateResult:
-        source_text, read_failure = _read_subtitle_source_text(subtitle_file.source_path)
-        if read_failure is not None:
-            return self._build_failed_result(
-                problem=read_failure.problem,
-                fix=read_failure.fix,
-            )
-
-        rendered_output, error_result = self._resolve_single_file_rendered_output(
+        success, error_message, failure = _translate_single_subtitle_file(
             subtitle_file=subtitle_file,
-            source_text=source_text,
-            movie_title=movie_title,
-        )
-        if error_result is not None:
-            return error_result
-
-        write_failure = _write_translated_subtitle_file(
-            output_path=subtitle_file.translated_path,
-            rendered_output=rendered_output,
-        )
-        if write_failure is not None:
-            return self._build_failed_result(
-                problem=write_failure.problem,
-                fix=write_failure.fix,
-            )
-        return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
-
-    def _resolve_single_file_rendered_output(
-        self,
-        *,
-        subtitle_file: _SubtitleFile,
-        source_text: str,
-        movie_title: str,
-    ) -> tuple[str | None, SubtitleTranslateResult | None]:
-        rendered_output, error_message, translate_failure = _resolve_translated_subtitle_content(
-            subtitle_file=subtitle_file,
-            source_text=source_text,
             movie_title=movie_title,
             translate_srt=self._translate_srt_text,
             translate_ass=self._translate_ass_text,
         )
-        if translate_failure is not None:
-            return None, self._build_failed_result(
-                problem=translate_failure.problem,
-                fix=translate_failure.fix,
+        if failure is not None:
+            return self._build_failed_result(
+                problem=failure.problem,
+                fix=failure.fix,
             )
-        if rendered_output is None:
-            return None, SubtitleTranslateResult(
+        if not success:
+            return SubtitleTranslateResult(
                 success=False,
                 message=error_message or "字幕翻译失败。",
                 translated_count=0,
                 skipped=False,
             )
-        return rendered_output, None
+        return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
 
     def _build_failed_result(self, *, problem: str, fix: str) -> SubtitleTranslateResult:
         _print_colored_error(problem=problem, fix=fix)
