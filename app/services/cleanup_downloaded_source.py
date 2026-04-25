@@ -14,6 +14,7 @@ from app.services.cleanup_follow_up_support import (
     preferred_cleanup_ref,
 )
 from app.services.cleanup_inspect_render_support import render_cleanup_inspect_message
+from app.services.cleanup_inspect_flow_support import run_cleanup_inspect_flow
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
 from app.services.cleanup_logging_support import (
     print_cleanup_blocked_log,
@@ -203,16 +204,20 @@ class CleanupDownloadedSourceService:
         *,
         chat_id: int | None = None,
     ) -> str:
-        cleaned_ref = task_ref.strip()
-        if not cleaned_ref:
-            return CLEANUP_INSPECT_QUERY_USAGE_TEXT
-
-        inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
-        return render_cleanup_inspect_message(
-            inspection=inspection,
-            inspect_result_template=CLEANUP_INSPECT_RESULT_TEMPLATE,
-            inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
-            inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
+        return run_cleanup_inspect_flow(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            usage_text=CLEANUP_INSPECT_QUERY_USAGE_TEXT,
+            inspect_cleanup=lambda resolved_task_ref, resolved_chat_id: self._inspect_cleanup(
+                task_ref=resolved_task_ref,
+                chat_id=resolved_chat_id,
+            ),
+            render_message=lambda inspection: render_cleanup_inspect_message(
+                inspection=inspection,
+                inspect_result_template=CLEANUP_INSPECT_RESULT_TEMPLATE,
+                inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
+                inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
+            ),
         )
 
     def _inspect_cleanup(
