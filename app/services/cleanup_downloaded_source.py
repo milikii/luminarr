@@ -7,12 +7,11 @@ from pathlib import Path
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
+from app.services.cleanup_blocked_support import resolve_cleanup_blocked_outcome
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
 from app.services.cleanup_execution_support import execute_cleanup_delete
 from app.services.cleanup_follow_up_support import (
-    append_cleanup_follow_up,
     preferred_cleanup_ref,
-    resolve_cleanup_blocked_event_details,
 )
 from app.services.cleanup_inspect_render_support import render_cleanup_inspect_message
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
@@ -132,109 +131,45 @@ class CleanupDownloadedSourceService:
         inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
         task_ref_for_event = inspection.task_ref or cleaned_ref
         follow_up_ref = preferred_cleanup_ref(inspection)
-        if not inspection.correlation_found:
-            message = append_cleanup_follow_up(
-                CLEANUP_CORRELATION_MISSING_TEXT,
-                follow_up_ref,
-                CLEANUP_FOLLOW_UP_TEMPLATE,
-            )
-            _print_cleanup_blocked_log(
-                event_type="cleanup.correlation_missing",
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                reason=CLEANUP_CORRELATION_MISSING_TEXT,
-                fix_hint=CLEANUP_CORRELATION_MISSING_FIX_HINT,
-            )
+        blocked_outcome = resolve_cleanup_blocked_outcome(
+            inspection=inspection,
+            follow_up_ref=follow_up_ref,
+            correlation_missing_text=CLEANUP_CORRELATION_MISSING_TEXT,
+            correlation_missing_fix_hint=CLEANUP_CORRELATION_MISSING_FIX_HINT,
+            target_missing_fix_hint=CLEANUP_TARGET_MISSING_FIX_HINT,
+            source_missing_fix_hint=CLEANUP_SOURCE_MISSING_FIX_HINT,
+            pt_seed_window_state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
+            pt_seed_window_blocked_fix_hint=CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT,
+            pt_seed_window_state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
+            source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+            source_type_unsupported_fix_hint=CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT,
+            guard_rejected_fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
+            follow_up_template=CLEANUP_FOLLOW_UP_TEMPLATE,
+        )
+        if blocked_outcome is not None:
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
-                event_type="cleanup.correlation_missing",
-                message=message,
+                event_type=blocked_outcome.event_type,
+                message=blocked_outcome.message,
+                source_path=blocked_outcome.source_path,
+                target_path=blocked_outcome.target_path,
             )
-            return message
+            _print_cleanup_blocked_log(
+                event_type=blocked_outcome.event_type,
+                task_ref=task_ref_for_event,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
+                source_path=blocked_outcome.source_path,
+                target_path=blocked_outcome.target_path,
+                reason=inspection.conclusion,
+                fix_hint=blocked_outcome.fix_hint,
+            )
+            return blocked_outcome.message
 
         source_path = Path(inspection.source_path).expanduser()
         target_path = Path(inspection.target_path).expanduser()
-
-        if inspection.target_exists is False:
-            message = append_cleanup_follow_up(inspection.conclusion, follow_up_ref, CLEANUP_FOLLOW_UP_TEMPLATE)
-            _print_cleanup_blocked_log(
-                event_type="cleanup.target_missing",
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                source_path=str(source_path),
-                target_path=str(target_path),
-                reason=inspection.conclusion,
-                fix_hint=CLEANUP_TARGET_MISSING_FIX_HINT,
-            )
-            self._record_event(
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                event_type="cleanup.target_missing",
-                message=message,
-                source_path=str(source_path),
-                target_path=str(target_path),
-            )
-            return message
-
-        if inspection.source_exists is False:
-            message = append_cleanup_follow_up(inspection.conclusion, follow_up_ref, CLEANUP_FOLLOW_UP_TEMPLATE)
-            _print_cleanup_blocked_log(
-                event_type="cleanup.source_missing",
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                source_path=str(source_path),
-                target_path=str(target_path),
-                reason=inspection.conclusion,
-                fix_hint=CLEANUP_SOURCE_MISSING_FIX_HINT,
-            )
-            self._record_event(
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                event_type="cleanup.source_missing",
-                message=message,
-                source_path=str(source_path),
-                target_path=str(target_path),
-            )
-            return message
-
-        if not inspection.cleanup_allowed:
-            blocked_event_type, blocked_fix_hint = resolve_cleanup_blocked_event_details(
-                inspection=inspection,
-                pt_seed_window_state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
-                pt_seed_window_blocked_fix_hint=CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT,
-                pt_seed_window_state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
-                source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
-                source_type_unsupported_fix_hint=CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT,
-                guard_rejected_fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
-            )
-            message = append_cleanup_follow_up(inspection.conclusion, follow_up_ref, CLEANUP_FOLLOW_UP_TEMPLATE)
-            _print_cleanup_blocked_log(
-                event_type=blocked_event_type,
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                source_path=str(source_path),
-                target_path=str(target_path),
-                reason=inspection.conclusion,
-                fix_hint=blocked_fix_hint,
-            )
-            self._record_event(
-                task_ref=task_ref_for_event,
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                event_type=blocked_event_type,
-                message=message,
-                source_path=str(source_path),
-                target_path=str(target_path),
-            )
-            return message
 
         delete_result = execute_cleanup_delete(
             delete_source_asset=_delete_source_asset,
