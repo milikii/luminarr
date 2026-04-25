@@ -9,6 +9,7 @@
   - `subtitle_translator.py`：`translate_for_import()` 的前置校验已下沉到 `subtitle_translation_support.py`，统一处理目标存在性、目标字幕解析、API key 缺失与 metadata title 读取；当前 `267` 行。
   - `job_repo.py`：`mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化已下沉到 `job_repo_support.py`；当前 `536` 行。
   - `approval_repo.py`：`_approve/_restore_pending/_cancel` 的共享状态迁移薄壳已合并到 helper，且 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界已下沉到 `approval_repo_support.py`；当前 `715` 行。
+- 当前又从 approval backlog 再收掉一小格：`_mark_executed()` 的身份规范化也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `714` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -26,6 +27,7 @@
 - 2026-04-25 subtitle 前置校验收口：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py tests/test_subtitle_translator.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `38 passed`。
 - 2026-04-25 job identity 收口：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；两组 focused 结果分别为 `2 passed, 109 deselected` 与 `4 passed, 107 deselected`。
 - 2026-04-25 approval helper / SQL 收口：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；三组 focused 结果分别为 `5 passed, 106 deselected`、`3 passed, 108 deselected`、`3 passed, 108 deselected`。
+- 2026-04-25 approval executed identity follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approval_repo_rejects_missing_identity_for_write_paths or approval_repo_raises_when_mark_executed_row_missing"` 为 `2 passed, 109 deselected`。
 - 当前真实 smoke 证据仍有效：前半段 `task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status`；后半段 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
 
 ## Current biggest risk

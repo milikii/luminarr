@@ -142,7 +142,7 @@ Luminarr 当前仍是：
   - 当前补充：`inspect_by_task_ref()` 主流程、`cleanup_correlation_lookup.py` 的关联事件读取护栏、主流程、路径缺失判定 / 结果构造、任务身份解析，以及 cleanup 路径校验 / 删除资产也已继续下沉到 `cleanup_inspect_flow_support.py` / `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` / `cleanup_task_identity_support.py` / `cleanup_correlation_logging_support.py` / `cleanup_path_guard_support.py` / `cleanup_asset_support.py`；当前 `cleanup_downloaded_source.py` 为 `334` 行，`cleanup_correlation_lookup.py` 为 `215` 行。
   - 目标：继续按“剩余 service 粘合层 / correlation lookup 最后封装层”拆分
 - `app/db/approval_repo.py`
-  - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前又把 `_approve/_restore_pending/_cancel` 的共享状态迁移薄壳合并到 repo 内 helper，并把 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界继续下沉到 support helper，`approval_repo.py` 为 `715` 行。
+  - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前又把 `_approve/_restore_pending/_cancel` 的共享状态迁移薄壳合并到 repo 内 helper，并把 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界与 `_mark_executed()` 的身份规范化继续下沉到 support helper，`approval_repo.py` 为 `714` 行。
   - 目标：继续按“action 族入口 / 剩余 SQL 写入边界”收口
 - `app/db/job_repo.py`
   - 当前状态：已再前推几格；身份校验、查询 helper，以及 lease/state/completed/cancel 写路径和 pending upsert SQL 都已下沉到 `job_repo_support.py`；当前又把 `mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化继续下沉到 support helper，`job_repo.py` 为 `536` 行。

@@ -9,6 +9,7 @@ from app.db.approval_repo_support import (
     fetch_exact_approval_row,
     fetch_latest_approval_row_for_task_id,
     move_approval_identity_row,
+    normalize_executed_identity,
     normalize_approval_identity,
     normalize_move_identity,
     request_approval_row,
@@ -469,14 +470,12 @@ class ApprovalRepo:
         task_hash: str,
         executed_lease_version: int,
     ) -> None:
-        identity = normalize_approval_identity(
+        identity = normalize_executed_identity(
             task_id=task_id,
             task_hash=task_hash,
-            context="executed version update",
+            executed_lease_version=executed_lease_version,
             error_cls=ApprovalPersistenceError,
         )
-        if executed_lease_version <= 0:
-            raise ApprovalPersistenceError("approval executed lease version missing")
 
         with self._database.connect() as connection:
             rowcount = update_approval_executed_version(
@@ -484,7 +483,7 @@ class ApprovalRepo:
                 action_type=action_type,
                 task_id=identity.task_id,
                 task_hash=identity.task_hash,
-                executed_lease_version=executed_lease_version,
+                executed_lease_version=identity.executed_lease_version,
             )
             connection.commit()
         if rowcount != 1:

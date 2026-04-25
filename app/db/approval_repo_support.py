@@ -23,6 +23,11 @@ class ApprovalMoveIdentity:
     new_task_hash: str
 
 
+@dataclass(frozen=True, slots=True)
+class ApprovalExecutedIdentity(ApprovalIdentity):
+    executed_lease_version: int
+
+
 def normalize_approval_identity(
     *,
     task_id: str,
@@ -57,6 +62,28 @@ def normalize_transition_identity(
         task_id=identity.task_id,
         task_hash=identity.task_hash,
         expected_lease_version=expected_lease_version,
+    )
+
+
+def normalize_executed_identity(
+    *,
+    task_id: str,
+    task_hash: str,
+    executed_lease_version: int,
+    error_cls: type[Exception],
+) -> ApprovalExecutedIdentity:
+    identity = normalize_approval_identity(
+        task_id=task_id,
+        task_hash=task_hash,
+        context="executed version update",
+        error_cls=error_cls,
+    )
+    if executed_lease_version <= 0:
+        raise error_cls("approval executed lease version missing")
+    return ApprovalExecutedIdentity(
+        task_id=identity.task_id,
+        task_hash=identity.task_hash,
+        executed_lease_version=executed_lease_version,
     )
 
 
