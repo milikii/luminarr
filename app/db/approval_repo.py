@@ -639,6 +639,23 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> int | None:
+        row = self._query_approval_lease_version_row(
+            action_type=action_type,
+            task_id=task_id,
+            task_hash=task_hash,
+        )
+        return resolve_requested_lease_version_from_row(
+            row=row,
+            error_cls=ApprovalPersistenceError,
+        )
+
+    def _query_approval_lease_version_row(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+    ) -> Mapping[str, object] | None:
         identity = normalize_approval_identity(
             task_id=task_id,
             task_hash=task_hash,
@@ -646,16 +663,12 @@ class ApprovalRepo:
             error_cls=ApprovalPersistenceError,
         )
         with self._database.connect() as connection:
-            row = fetch_approval_lease_version_row(
+            return fetch_approval_lease_version_row(
                 connection=connection,
                 action_type=action_type,
                 task_id=identity.task_id,
                 task_hash=identity.task_hash,
             )
-        return resolve_requested_lease_version_from_row(
-            row=row,
-            error_cls=ApprovalPersistenceError,
-        )
 
     def _require_exact_approval_record(
         self,
