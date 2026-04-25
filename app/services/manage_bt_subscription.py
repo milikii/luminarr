@@ -6,14 +6,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
-from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
+from app.services.add_to_downloader import AddToDownloaderService
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
 from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_ADD_USAGE_TEXT,
     BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
     BT_SUBSCRIPTION_USAGE_TEXT,
     BtSubscriptionCommand,
-    bt_subscription_media_kind_label,
     format_bt_subscription_add_result,
     format_bt_subscription_clear_result,
     format_bt_subscription_list,
@@ -21,6 +20,7 @@ from app.services.bt_subscription_command import (
     parse_bt_subscription_add_request,
     parse_bt_subscription_query as _parse_bt_subscription_query,
 )
+from app.services.bt_subscription_dispatch_support import dispatch_bt_subscription_item
 from app.services.bt_subscription_repo_support import (
     add_subscription_item,
     clear_subscription_items,
@@ -329,66 +329,64 @@ class ManageBtSubscriptionService:
         user_id: int | None,
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> tuple[str | None, bool]:
-        query = _build_subscription_query(item)
-        try:
-            results = await self._search_func(query)
-        except Exception as error:
-            _log_bt_subscription_scan_error(item=item, query=query, error=error)
-            return None, False
+        result = await dispatch_bt_subscription_item(
+            item=item,
+            search_func=self._search_func,
+            resolve_candidate=lambda results, resolved_item: self._resolve_item_dispatch_candidate(
+                results=results,
+                item=resolved_item,
+            ),
+            create_pending=lambda source, title: self._add_to_downloader_service.add_candidate_source(
+                chat_id=chat_id,
+                user_id=user_id,
+                source=source,
+                title=title,
+                downloader_name=dispatch_context.downloader_name,
+                downloader_type=dispatch_context.downloader_type,
+                download_dir=dispatch_context.download_dir,
+                auto_import_enabled=True,
+            ),
+            update_last_seen_status=lambda source, title: self._update_last_seen(
+                item=item,
+                chat_id=chat_id,
+                source=source,
+                title=title,
+            ).status,
+            log_scan_error=lambda query, error: _log_bt_subscription_scan_error(
+                item=item,
+                query=query,
+                error=error,
+            ),
+            log_pending_creation_failed=lambda source, title, reason: _log_bt_subscription_pending_creation_failed(
+                item=item,
+                chat_id=chat_id,
+                source=source,
+                title=title,
+                reason=reason,
+            ),
+            last_seen_update_warning_text=BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT,
+            last_seen_item_missing_warning_text=BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT,
+        )
+        return result.reply, result.pending_creation_failed
 
+    def _resolve_item_dispatch_candidate(
+        self,
+        *,
+        results: Sequence[Mapping[str, Any]],
+        item: BtSubscriptionItem,
+    ) -> tuple[str, str] | None:
         selected_result = _pick_subscription_candidate(
             results,
             item=item,
             last_seen_source=item.last_seen_source,
         )
         if selected_result is None:
-            return None, False
-
+            return None
         selected_source = _resolve_candidate_source(selected_result)
         if not selected_source:
-            return None, False
-
+            return None
         candidate_title = _resolve_candidate_title(selected_result, item=item)
-        pending_text = await self._add_to_downloader_service.add_candidate_source(
-            chat_id=chat_id,
-            user_id=user_id,
-            source=selected_source,
-            title=candidate_title,
-            downloader_name=dispatch_context.downloader_name,
-            downloader_type=dispatch_context.downloader_type,
-            download_dir=dispatch_context.download_dir,
-            auto_import_enabled=True,
-        )
-        if pending_text == ADD_PENDING_STATE_UNAVAILABLE_TEXT:
-            _log_bt_subscription_pending_creation_failed(
-                item=item,
-                chat_id=chat_id,
-                source=selected_source,
-                title=candidate_title,
-                reason=pending_text,
-            )
-            return None, True
-        if "下载待确认：" not in pending_text:
-            return None, False
-
-        year_text = item.year if item.year else "-"
-        reply = (
-            f"BT 订阅命中新资源：{item.title} ({year_text})\n"
-            f"类型: {bt_subscription_media_kind_label(item.media_kind)}\n"
-            f"命中资源: {candidate_title}\n\n"
-            f"{pending_text}"
-        )
-        last_seen_update = self._update_last_seen(
-            item=item,
-            chat_id=chat_id,
-            source=selected_source,
-            title=candidate_title,
-        )
-        if last_seen_update.updated:
-            return reply, False
-        if last_seen_update.item_missing:
-            return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT}", False
-        return f"{reply}\n\n{BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT}", False
+        return selected_source, candidate_title
 
     async def _scan_chat_once(
         self,
@@ -492,14 +490,6 @@ class ManageBtSubscriptionService:
             reason=result.reason,
         )
         return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-
-
-def _build_subscription_query(item: BtSubscriptionItem) -> str:
-    title = item.title.strip()
-    year = item.year.strip()
-    if title and year:
-        return f"{title} {year}"
-    return title
 
 
 def _pick_subscription_candidate(
