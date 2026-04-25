@@ -719,6 +719,58 @@ def test_translate_for_import_skips_when_embedded_chinese_subtitle_exists(
     assert "中文字幕轨" in result.message
 
 
+def test_translate_for_import_prefers_chinese_embedded_skip_over_extractable_english_stream(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "index": 2,
+                            "codec_name": "subrip",
+                            "tags": {"language": "chi", "title": "简体中文"},
+                        },
+                        {
+                            "index": 3,
+                            "codec_name": "subrip",
+                            "tags": {"language": "eng", "title": "English"},
+                        },
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-embedded-priority",
+            task_id="embedded-priority",
+            task_hash="hash-embedded-priority",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert "中文字幕轨" in result.message
+    assert not (library_dir / "Interstellar (2014).srt").exists()
+
+
 def test_translate_for_import_skips_when_only_non_text_embedded_english_subtitle_exists(
     tmp_path: Path,
     monkeypatch,

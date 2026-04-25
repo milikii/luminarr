@@ -345,6 +345,17 @@ def _pick_extractable_english_embedded_subtitle(
     )
 
 
+def _resolve_embedded_subtitle_stream_selection(
+    streams: list[_EmbeddedSubtitleStream],
+) -> tuple[_EmbeddedSubtitleStream | None, str]:
+    if any(_is_chinese_embedded_subtitle(stream) for stream in streams):
+        return None, "chinese_embedded"
+    english_stream = _pick_extractable_english_embedded_subtitle(streams)
+    if english_stream is None:
+        return None, "none"
+    return english_stream, "embedded"
+
+
 def _looks_like_chinese_subtitle_label(value: str) -> bool:
     normalized = _normalize_subtitle_label(value)
     if not normalized:

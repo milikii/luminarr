@@ -17,16 +17,15 @@ from app.services.subtitle_translation_support import (
     _extract_chat_completion_response_text,
     _extract_translations_from_response,
     _find_video_files,
-    _is_chinese_embedded_subtitle,
     _parse_ass_dialogue_lines,
     _parse_ffmpeg_subtitle_streams,
     _parse_ffprobe_subtitle_streams,
-    _pick_extractable_english_embedded_subtitle,
     _parse_srt_blocks,
     _print_colored_error,
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
     _resolve_directory_skip_reason,
     _resolve_embedded_subtitle_output_path,
@@ -156,19 +155,16 @@ class SubtitleTranslatorService:
         streams, error_result = self._probe_embedded_subtitles(video_path)
         if error_result is not None:
             return [], error_result, "error"
-        if any(_is_chinese_embedded_subtitle(stream) for stream in streams):
-            return [], None, "chinese_embedded"
-
-        english_stream = _pick_extractable_english_embedded_subtitle(streams)
+        english_stream, skip_reason = _resolve_embedded_subtitle_stream_selection(streams)
         if english_stream is None:
-            return [], None, "none"
+            return [], None, skip_reason
 
         subtitle_file, error_result = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
         if error_result is not None:
             return [], error_result, "error"
         if subtitle_file is None:
             return [], None, "none"
-        return [subtitle_file], None, "embedded"
+        return [subtitle_file], None, skip_reason
 
     def _probe_embedded_subtitles(
         self,
