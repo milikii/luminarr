@@ -893,10 +893,9 @@ def test_job_repo_persists_version_and_lease_for_restart(tmp_path: Path) -> None
 
 def test_job_repo_raises_when_pending_upsert_row_missing(tmp_path: Path) -> None:
     class MissingRowJobRepo(JobRepo):
-        def _select_one(self, query: str, params: tuple[object, ...]):
-            if "FROM jobs" in query and "WHERE job_id = ?" in query:
-                return None
-            return super()._select_one(query, params)
+        def _get_job_by_identity(self, *, job_id: str, workflow_type: str):
+            _ = (job_id, workflow_type)
+            return None
 
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()

@@ -353,31 +353,11 @@ class JobRepo:
                 payload_json=payload_json,
             )
             connection.commit()
-        job = self._select_one(
-            """
-            SELECT
-                job_id,
-                chat_id,
-                user_id,
-                workflow_type,
-                state,
-                task_ref,
-                task_id,
-                task_hash,
-                payload_json,
-                version,
-                lease_owner,
-                lease_until,
-                created_at,
-                updated_at
-            FROM jobs
-            WHERE job_id = ?
-            LIMIT 1
-            """,
-            (job_id,),
+        job = self._require_job_by_identity(
+            job_id=job_id,
+            workflow_type=identity.workflow_type,
+            missing_error="job missing after pending upsert",
         )
-        if job is None:
-            raise JobPersistenceError("job missing after pending upsert")
         return job
 
     def _get_job_for_chat_ref(
@@ -510,13 +490,6 @@ class JobRepo:
         if job is None:
             raise JobPersistenceError(missing_error)
         return job
-
-    def _select_one(self, query: str, params: tuple[object, ...]) -> JobRecord | None:
-        with self._database.connect() as connection:
-            row = connection.execute(query, params).fetchone()
-        if row is None:
-            return None
-        return _to_job_record(row)
 
 
 def _build_job_id(workflow_type: str, task_hash: str) -> str:
