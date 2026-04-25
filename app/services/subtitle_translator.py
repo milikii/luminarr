@@ -280,28 +280,23 @@ class SubtitleTranslatorService:
             timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常抽取字幕流。",
         )
         if failure is not None:
-            _print_colored_error(problem=failure.problem, fix=failure.fix)
-            return None, SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
+            return None, self._build_failed_result(problem=failure.problem, fix=failure.fix)
 
         if completed.returncode != 0:
             if output_path.exists():
                 output_path.unlink(missing_ok=True)
             problem = completed.stderr.strip() or completed.stdout.strip() or f"exit={completed.returncode}"
             message = f"字幕翻译失败：提取英文内嵌字幕失败：{video_path}，原因：{problem}"
-            _print_colored_error(
+            return None, self._build_failed_result(
                 problem=message,
                 fix="确认视频里确实有可提取的英文文本字幕流；若是图片字幕（PGS/VobSub），当前不会自动 OCR 翻译。",
             )
-            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
 
         subtitle_file, output_failure = _resolve_extracted_subtitle_file(output_path)
         if output_failure is not None:
-            _print_colored_error(problem=output_failure.problem, fix=output_failure.fix)
-            return None, SubtitleTranslateResult(
-                success=False,
-                message=output_failure.problem,
-                translated_count=0,
-                skipped=False,
+            return None, self._build_failed_result(
+                problem=output_failure.problem,
+                fix=output_failure.fix,
             )
         return subtitle_file, None
 
@@ -313,12 +308,9 @@ class SubtitleTranslatorService:
     ) -> SubtitleTranslateResult:
         source_text, read_failure = _read_subtitle_source_text(subtitle_file.source_path)
         if read_failure is not None:
-            _print_colored_error(problem=read_failure.problem, fix=read_failure.fix)
-            return SubtitleTranslateResult(
-                success=False,
-                message=read_failure.problem,
-                translated_count=0,
-                skipped=False,
+            return self._build_failed_result(
+                problem=read_failure.problem,
+                fix=read_failure.fix,
             )
 
         rendered_output, error_message, translate_failure = _resolve_translated_subtitle_content(
@@ -329,15 +321,9 @@ class SubtitleTranslatorService:
             translate_ass=self._translate_ass_text,
         )
         if translate_failure is not None:
-            _print_colored_error(
+            return self._build_failed_result(
                 problem=translate_failure.problem,
                 fix=translate_failure.fix,
-            )
-            return SubtitleTranslateResult(
-                success=False,
-                message=translate_failure.problem,
-                translated_count=0,
-                skipped=False,
             )
 
         if rendered_output is None:
@@ -353,14 +339,20 @@ class SubtitleTranslatorService:
             rendered_output=rendered_output,
         )
         if write_failure is not None:
-            _print_colored_error(problem=write_failure.problem, fix=write_failure.fix)
-            return SubtitleTranslateResult(
-                success=False,
-                message=write_failure.problem,
-                translated_count=0,
-                skipped=False,
+            return self._build_failed_result(
+                problem=write_failure.problem,
+                fix=write_failure.fix,
             )
         return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
+
+    def _build_failed_result(self, *, problem: str, fix: str) -> SubtitleTranslateResult:
+        _print_colored_error(problem=problem, fix=fix)
+        return SubtitleTranslateResult(
+            success=False,
+            message=problem,
+            translated_count=0,
+            skipped=False,
+        )
 
     def _translate_pending_subtitle_files(
         self,
