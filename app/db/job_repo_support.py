@@ -363,7 +363,7 @@ def normalize_job_chat_task_query_identity(
 def normalize_job_pending_query_identity(
     *,
     chat_id: int,
-    workflow_type: str,
+    workflow_type: str = "",
     context: str,
     error_cls: type[Exception],
 ) -> JobPendingQueryIdentity:
@@ -372,14 +372,17 @@ def normalize_job_pending_query_identity(
         context=context,
         error_cls=error_cls,
     )
-    workflow = normalize_job_workflow(
-        workflow_type=workflow_type,
-        context=context,
-        error_cls=error_cls,
-    )
     return JobPendingQueryIdentity(
         chat_id=chat.chat_id,
-        workflow_type=workflow.workflow_type,
+        workflow_type=(
+            normalize_job_workflow(
+                workflow_type=workflow_type,
+                context=context,
+                error_cls=error_cls,
+            ).workflow_type
+            if workflow_type
+            else ""
+        ),
     )
 
 

@@ -9,7 +9,6 @@ from app.db.job_repo_support import (
     fetch_job_row_by_identity,
     fetch_latest_pending_job_row,
     normalize_downloader_completed_job_identity,
-    normalize_job_chat_identity,
     normalize_job_chat_task_query_identity,
     normalize_job_lease_identity,
     normalize_job_pending_cancel_identity,
@@ -163,7 +162,7 @@ class JobRepo:
         )
 
     def get_latest_pending_job(self, *, chat_id: int) -> JobRecord | None:
-        chat = normalize_job_chat_identity(
+        identity = normalize_job_pending_query_identity(
             chat_id=chat_id,
             context="pending query",
             error_cls=JobPersistenceError,
@@ -171,7 +170,7 @@ class JobRepo:
         with self._database.connect() as connection:
             row = fetch_latest_pending_job_row(
                 connection=connection,
-                chat_id=chat.chat_id,
+                chat_id=identity.chat_id,
                 pending_state=JOB_STATE_PENDING_APPROVAL,
             )
         return resolve_job_record_from_row(
