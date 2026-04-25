@@ -229,6 +229,17 @@ def _build_professional_subtitle_translation_request(
     return system_prompt, user_payload
 
 
+def _extract_chat_completion_response_text(body: dict[str, object]) -> str:
+    try:
+        content = body["choices"][0]["message"]["content"]
+    except Exception as exc:
+        raise RuntimeError(f"响应缺少 content 字段：{exc}") from exc
+    text = str(content).strip()
+    if not text:
+        raise RuntimeError("模型返回空内容。")
+    return text
+
+
 def _resolve_translated_subtitle_content(
     *,
     subtitle_file: _SubtitleFile,

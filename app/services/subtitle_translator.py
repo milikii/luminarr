@@ -13,6 +13,7 @@ from app.services.subtitle_translation_support import (
     _build_embedded_subtitle_extract_command,
     _build_professional_subtitle_translation_request,
     _build_subtitle_file,
+    _extract_chat_completion_response_text,
     _extract_translations_from_response,
     _find_adjacent_subtitle_paths,
     _find_video_files,
@@ -520,11 +521,4 @@ class SubtitleTranslatorService:
             body = response.json()
         except Exception as exc:
             raise RuntimeError(f"响应不是 JSON：{exc}") from exc
-        try:
-            content = body["choices"][0]["message"]["content"]
-        except Exception as exc:
-            raise RuntimeError(f"响应缺少 content 字段：{exc}") from exc
-        text = str(content).strip()
-        if not text:
-            raise RuntimeError("模型返回空内容。")
-        return text
+        return _extract_chat_completion_response_text(body)

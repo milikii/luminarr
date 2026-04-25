@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import app.services.subtitle_translation_support as subtitle_support
 import app.services.subtitle_translator as subtitle_module
 import httpx
+import pytest
 
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslatorService
 
@@ -870,6 +871,78 @@ def test_subtitle_translator_passes_proxy_to_httpx(monkeypatch) -> None:
 
     assert result == "{\"translations\": [\"ok\"]}"
     client_ctor.assert_called_once_with(timeout=60.0, proxy="http://192.168.2.110:7890")
+
+
+def test_request_chat_completion_raises_on_http_error(monkeypatch) -> None:
+    client_ctor = Mock()
+    post = Mock(
+        return_value=httpx.Response(
+            401,
+            text="unauthorized",
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"),
+        )
+    )
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+
+    with pytest.raises(RuntimeError, match="HTTP 401"):
+        service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
+
+
+def test_request_chat_completion_raises_when_response_is_not_json(monkeypatch) -> None:
+    client_ctor = Mock()
+    response = Mock(status_code=200)
+    response.json.side_effect = ValueError("bad json")
+    post = Mock(return_value=response)
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+
+    with pytest.raises(RuntimeError, match="响应不是 JSON"):
+        service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
+
+
+def test_request_chat_completion_raises_when_content_is_missing(monkeypatch) -> None:
+    client_ctor = Mock()
+    post = Mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{}]},
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"),
+        )
+    )
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+
+    with pytest.raises(RuntimeError, match="响应缺少 content 字段"):
+        service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
+
+
+def test_request_chat_completion_raises_when_content_is_empty(monkeypatch) -> None:
+    client_ctor = Mock()
+    post = Mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "   "}}]},
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"),
+        )
+    )
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+
+    with pytest.raises(RuntimeError, match="模型返回空内容"):
+        service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
 
 
 def test_translate_lines_professional_builds_expected_request_payload() -> None:
