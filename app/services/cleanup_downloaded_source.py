@@ -3,13 +3,13 @@ from __future__ import annotations
 import re
 import shutil
 from datetime import UTC, datetime
-from dataclasses import dataclass
 from pathlib import Path
 
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
+from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
 
 CLEANUP_QUERY_USAGE_TEXT = (
     "cleanup 用法：\n"
@@ -91,21 +91,6 @@ CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT = (
 )
 CLEANUP_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 _SQLITE_UTC_FORMAT = "%Y-%m-%d %H:%M:%S"
-
-
-@dataclass(frozen=True, slots=True)
-class CleanupInspection:
-    query_ref: str
-    task_ref: str
-    task_id: str
-    task_hash: str
-    source_path: str
-    target_path: str
-    correlation_found: bool
-    source_exists: bool | None
-    target_exists: bool | None
-    cleanup_allowed: bool
-    conclusion: str
 
 
 class CleanupDownloadedSourceService:
@@ -322,62 +307,22 @@ class CleanupDownloadedSourceService:
             task_ref=task_ref,
             chat_id=chat_id,
         )
-        if correlation is None:
-            return CleanupInspection(
-                query_ref=task_ref,
-                task_ref=resolved_identity.task_ref,
-                task_id=resolved_identity.task_id,
-                task_hash=resolved_identity.task_hash,
-                source_path="",
-                target_path="",
-                correlation_found=False,
-                source_exists=None,
-                target_exists=None,
-                cleanup_allowed=False,
-                conclusion=CLEANUP_CORRELATION_MISSING_TEXT,
-            )
-
-        source_path = Path(correlation.source_path).expanduser()
-        target_path = Path(correlation.target_path).expanduser()
-        target_exists = target_path.exists()
-        source_exists = source_path.exists()
-
-        if not target_exists:
-            conclusion = CLEANUP_TARGET_MISSING_TEXT.format(target_path=str(target_path))
-            cleanup_allowed = False
-        elif not source_exists:
-            conclusion = CLEANUP_SOURCE_MISSING_TEXT.format(source_path=str(source_path))
-            cleanup_allowed = False
-        else:
-            guard_rejection = _validate_cleanup_paths(source_path=source_path, target_path=target_path)
-            if guard_rejection is not None:
-                conclusion = guard_rejection
-                cleanup_allowed = False
-            else:
-                pt_seed_guard_conclusion = self._evaluate_pt_seed_window(
-                    task_ref=correlation.task_ref.strip() or resolved_identity.task_ref or task_ref,
-                    task_id=correlation.task_id.strip() or resolved_identity.task_id,
-                    task_hash=correlation.task_hash.strip() or resolved_identity.task_hash,
-                )
-                if pt_seed_guard_conclusion is not None:
-                    conclusion = pt_seed_guard_conclusion
-                    cleanup_allowed = False
-                else:
-                    conclusion = "已通过 cleanup 预检，可执行清理下载源资产。"
-                    cleanup_allowed = True
-
-        return CleanupInspection(
-            query_ref=task_ref,
-            task_ref=correlation.task_ref.strip() or resolved_identity.task_ref,
-            task_id=correlation.task_id.strip() or resolved_identity.task_id,
-            task_hash=correlation.task_hash.strip() or resolved_identity.task_hash,
-            source_path=str(source_path),
-            target_path=str(target_path),
-            correlation_found=True,
-            source_exists=source_exists,
-            target_exists=target_exists,
-            cleanup_allowed=cleanup_allowed,
-            conclusion=conclusion,
+        return build_cleanup_inspection(
+            task_ref=task_ref,
+            resolved_identity=resolved_identity,
+            correlation=correlation,
+            correlation_missing_text=CLEANUP_CORRELATION_MISSING_TEXT,
+            target_missing_text=CLEANUP_TARGET_MISSING_TEXT,
+            source_missing_text=CLEANUP_SOURCE_MISSING_TEXT,
+            validate_cleanup_paths=lambda source_path, target_path: _validate_cleanup_paths(
+                source_path=source_path,
+                target_path=target_path,
+            ),
+            evaluate_pt_seed_window=lambda resolved_task_ref, task_id, task_hash: self._evaluate_pt_seed_window(
+                task_ref=resolved_task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+            ),
         )
 
     def _record_event(
