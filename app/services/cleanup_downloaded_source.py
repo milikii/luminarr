@@ -391,48 +391,18 @@ class CleanupDownloadedSourceService:
         source_path: str = "",
         target_path: str = "",
     ) -> None:
-        try:
-            self._job_event_repo.append_event(
-                task_ref=task_ref,
-                task_id=task_id,
-                task_hash=task_hash,
-                event_type=event_type,
-                message=message,
-                source_path=source_path,
-                target_path=target_path,
-            )
-        except Exception as error:
-            if str(error) == CLEANUP_EVENT_RESULT_MISSING_REASON:
-                _print_cleanup_event_append_result_missing_log(
-                    task_ref=task_ref,
-                    event_type=event_type,
-                    task_id=task_id,
-                    task_hash=task_hash,
-                    source_path=source_path,
-                    target_path=target_path,
-                    reason="cleanup event missing after append",
-                )
-            elif _is_cleanup_event_row_corrupted_error(error):
-                _print_cleanup_event_append_row_corrupted_log(
-                    task_ref=task_ref,
-                    event_type=event_type,
-                    task_id=task_id,
-                    task_hash=task_hash,
-                    source_path=source_path,
-                    target_path=target_path,
-                    reason=str(error),
-                )
-            else:
-                _print_cleanup_event_append_failed_log(
-                    task_ref=task_ref,
-                    event_type=event_type,
-                    task_id=task_id,
-                    task_hash=task_hash,
-                    source_path=source_path,
-                    target_path=target_path,
-                    error=error,
-                )
-            return
+        from app.services.cleanup_event_support import append_cleanup_event
+
+        append_cleanup_event(
+            job_event_repo=self._job_event_repo,
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            event_type=event_type,
+            message=message,
+            source_path=source_path,
+            target_path=target_path,
+        )
 
     def _evaluate_pt_seed_window(
         self,
