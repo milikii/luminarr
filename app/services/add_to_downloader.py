@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from app.clients.transmission import TransmissionTask
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.approval_repo import ApprovalRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
@@ -83,6 +84,7 @@ class AddToDownloaderService:
         job_repo: JobRepo | None = None,
         job_event_repo: JobEventRepo | None = None,
         download_monitor_repo: DownloadMonitorRepo | None = None,
+        adult_content_registry_repo: AdultContentRegistryRepo | None = None,
         trace_log_path: Path | None = None,
     ) -> None:
         self._search_service = search_service
@@ -91,6 +93,7 @@ class AddToDownloaderService:
         self._job_repo = job_repo
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
+        self._adult_content_registry_repo = adult_content_registry_repo
         self._trace_logger = AddTraceLogger(trace_log_path)
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
@@ -140,6 +143,7 @@ class AddToDownloaderService:
             add_torrent_func=add_torrent_func,
             job_event_repo=job_event_repo,
             download_monitor_repo=download_monitor_repo,
+            adult_content_registry_repo=adult_content_registry_repo,
             log_trace_func=self._trace_logger.log,
             add_failed_text=ADD_FAILED_TEXT,
             download_monitor_register_result_missing_reason=DOWNLOAD_MONITOR_REGISTER_RESULT_MISSING_REASON,
@@ -432,7 +436,7 @@ class AddToDownloaderService:
         pending_add: PendingAddContext,
         channel: str | None = None,
     ) -> str:
-        return self._pending_write_through_state.persist_pending_add(
+        reply = self._pending_write_through_state.persist_pending_add(
             chat_id=chat_id,
             user_id=user_id,
             pending_add=pending_add,
@@ -445,6 +449,9 @@ class AddToDownloaderService:
             record_event=self._execution_follow_up.record_event,
             log_trace=self._trace_logger.log,
         )
+        if reply != ADD_PENDING_STATE_UNAVAILABLE_TEXT:
+            self._record_adult_pending(pending_add=pending_add)
+        return reply
 
     def _record_pending_job(
         self,
@@ -458,6 +465,31 @@ class AddToDownloaderService:
             user_id=user_id,
             pending_add=pending_add,
         )
+
+    def _record_adult_pending(self, *, pending_add: PendingAddContext) -> None:
+        if self._adult_content_registry_repo is None:
+            return
+        if not pending_add.adult_content_id:
+            return
+        try:
+            self._adult_content_registry_repo.upsert_pending(
+                normalized_content_id=pending_add.adult_content_id,
+                content_id_kind=pending_add.adult_content_kind or pending_add.adult_archive_category or "adult",
+                archive_category=pending_add.adult_archive_category or "other_adult",
+                display_title=pending_add.adult_display_id or pending_add.title,
+                latest_source_site=pending_add.source_site,
+                task_ref=pending_add.task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                downloader_name=pending_add.downloader_name,
+            )
+        except Exception as error:
+            print(
+                f"\033[31m[成人资源待确认登记失败]\033[0m content_id={pending_add.adult_content_id} "
+                f"task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表写入是否正常；当前下载待确认已创建，但历史提醒可能不会及时更新。",
+                flush=True,
+            )
 
     def _rebuild_confirm_context(
         self,

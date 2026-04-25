@@ -31,6 +31,7 @@ from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
 from app.clients.web_source import SUPPORTED_WEB_SOURCE_RULES, WebSourceClient
 from app.config import DownloaderInstanceConfig, load_settings
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.bt_subscription_repo import BtSubscriptionRepo
@@ -45,12 +46,14 @@ from app.db.watchlist_repo import WatchlistRepo
 from app.downloader_route_lookup import (
     DownloaderRouteLookupError,
     _get_torrent_import_source_with_routing,
+    _remove_torrent_with_routing,
     _get_torrent_status_with_routing,
     _resolve_downloader_client_for_lookup,
     _resolve_downloader_client_for_dispatch,
     _resolve_downloader_name_for_task,
 )
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.adult_archive_service import AdultArchiveService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
@@ -135,9 +138,7 @@ def _build_bt_source_providers(
     bt_web_sources: tuple[str, ...],
     outbound_proxy_url: str = "",
 ) -> tuple[BtSourceProvider, ...]:
-    providers: list[BtSourceProvider] = [
-        BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search),
-    ]
+    providers: list[BtSourceProvider] = []
     for source_name in bt_web_sources:
         rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
         if rule is None:
@@ -148,6 +149,7 @@ def _build_bt_source_providers(
             continue
         client = WebSourceClient(rule=rule, proxy_url=outbound_proxy_url)
         providers.append(BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page))
+    providers.append(BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search))
     return tuple(providers)
 
 
@@ -217,6 +219,7 @@ def main() -> None:
     job_event_repo = JobEventRepo(database)
     job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
+    adult_content_registry_repo = AdultContentRegistryRepo(database)
     bt_pending_repo = BtPendingRepo(database)
     bt_subscription_repo = BtSubscriptionRepo(database)
     download_monitor_repo = DownloadMonitorRepo(database)
@@ -266,6 +269,7 @@ def main() -> None:
         candidate_repo=candidate_repo,
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
+        adult_content_registry_repo=adult_content_registry_repo,
     )
     transmission_client = TransmissionClient(
         base_url=settings.transmission_base_url,
@@ -322,6 +326,21 @@ def main() -> None:
             qbittorrent_clients_by_name=qbittorrent_clients_by_name,
         )
 
+    async def remove_torrent_with_routing(
+        task_ref: str,
+        chat_id: int | None = None,
+        delete_local_data: bool = True,
+    ) -> None:
+        await _remove_torrent_with_routing(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            job_repo=job_repo,
+            downloader_instances_by_name=downloader_instances_by_name,
+            transmission_clients_by_name=transmission_clients_by_name,
+            qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+            delete_local_data=delete_local_data,
+        )
+
     add_to_downloader_service = AddToDownloaderService(
         search_service=search_service,
         add_torrent_func=add_torrent_with_routing,
@@ -329,6 +348,7 @@ def main() -> None:
         job_repo=job_repo,
         job_event_repo=job_event_repo,
         download_monitor_repo=download_monitor_repo,
+        adult_content_registry_repo=adult_content_registry_repo,
         trace_log_path=trace_log_path,
     )
     refresh_media_server_func = _build_refresh_media_server_func(settings)
@@ -356,6 +376,15 @@ def main() -> None:
             task_ref,
             chat_id=chat_id,
             user_id=user_id,
+        ),
+        adult_content_registry_repo=adult_content_registry_repo,
+        adult_archive_service=AdultArchiveService(
+            get_import_source_func=get_torrent_import_source_with_routing,
+            remove_torrent_func=remove_torrent_with_routing,
+            registry_repo=adult_content_registry_repo,
+            job_event_repo=job_event_repo,
+            archive_destinations=settings.adult_archive_destinations,
+            retention_hours=settings.adult_bt_retention_hours,
         ),
     )
     get_download_status_service = GetDownloadStatusService(

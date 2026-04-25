@@ -57,8 +57,10 @@ cp .env.example .env
 
 - 当前启动硬必填仍是 `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL`
 - 如果你还要跑 import / refresh 联调，再补 `LIBRARY_TARGET_DIR`、`EMBY_BASE_URL`、`EMBY_API_KEY`
+- 如果你要跑当前成人 BT 专线，再补 `ADULT_ARCHIVE_DESTINATIONS`；统一保留窗口可选 `ADULT_BT_RETENTION_HOURS`，默认 `96`
 - 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
 - `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；如果你填了多实例但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
+- direct magnet 入口当前仍会先问“观影 PT 链 / BT 成人链”；不会因为你配置了成人 BT 站点就自动走成人链
 - Feishu / WeCom 三元组都必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
 
 补 WeCom 真实私聊 smoke 前，可以先在 `app.main` 已运行的前提下，用 `curl -si http://127.0.0.1:18889/wecom/callback` 确认本地 callback 已经监听；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 里的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于入口已就绪，不等于真实私聊 smoke 已完成；如果直接拿到 `connection refused`，先回头确认应用是否真的已启动。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改，不要死抄这里的样例。

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.adult_content import extract_adult_content_match
 from app.services.media_identity import normalize_media_identity_payload
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
@@ -25,6 +26,12 @@ class PendingAddContext:
     title: str
     source: str
     media_identity: dict[str, str] | None = None
+    adult_content_id: str = ""
+    adult_content_kind: str = ""
+    adult_archive_category: str = ""
+    adult_display_id: str = ""
+    adult_history_text: str = ""
+    source_site: str = ""
     downloader_name: str = ""
     downloader_type: str = "transmission"
     download_dir: str = ""
@@ -73,12 +80,26 @@ class AddPendingContextBuilder:
 
         title = str(candidate.get("title", "")).strip() or "(no title)"
         media_identity = normalize_media_identity_payload(candidate.get("media_identity"))
+        adult_content_match = extract_adult_content_match(
+            title,
+            source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
+        )
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(
                 task_ref=str(index),
                 title=title,
                 source=source,
                 media_identity=media_identity,
+                adult_content_id=str(candidate.get("adult_content_id", "")).strip()
+                or (adult_content_match.normalized_content_id if adult_content_match is not None else ""),
+                adult_content_kind=str(candidate.get("adult_content_kind", "")).strip()
+                or (adult_content_match.source_kind if adult_content_match is not None else ""),
+                adult_archive_category=str(candidate.get("adult_archive_category", "")).strip()
+                or (adult_content_match.archive_category if adult_content_match is not None else ""),
+                adult_display_id=str(candidate.get("adult_display_id", "")).strip()
+                or (adult_content_match.display_id if adult_content_match is not None else ""),
+                adult_history_text=str(candidate.get("adult_history_text", "")).strip(),
+                source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
                 downloader_name=downloader_name,
                 downloader_type=downloader_type,
                 download_dir=download_dir,
@@ -99,12 +120,18 @@ class AddPendingContextBuilder:
         cleaned_source = source.strip()
         if not cleaned_source:
             return PendingAddBuildResult(pending_add=None, error_text=CANDIDATE_SOURCE_MISSING_TEXT)
+        cleaned_title = title.strip() or "(no title)"
+        adult_content_match = extract_adult_content_match(cleaned_title) or extract_adult_content_match(cleaned_source)
 
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(
                 task_ref=build_bt_task_ref(cleaned_source),
-                title=title.strip() or "(no title)",
+                title=cleaned_title,
                 source=cleaned_source,
+                adult_content_id=adult_content_match.normalized_content_id if adult_content_match is not None else "",
+                adult_content_kind=adult_content_match.source_kind if adult_content_match is not None else "",
+                adult_archive_category=adult_content_match.archive_category if adult_content_match is not None else "",
+                adult_display_id=adult_content_match.display_id if adult_content_match is not None else "",
                 downloader_name=downloader_name,
                 downloader_type=downloader_type,
                 download_dir=download_dir,
@@ -179,6 +206,12 @@ def build_pending_add_context(
     title: str,
     source: str,
     media_identity: Mapping[str, Any] | None = None,
+    adult_content_id: str = "",
+    adult_content_kind: str = "",
+    adult_archive_category: str = "",
+    adult_display_id: str = "",
+    adult_history_text: str = "",
+    source_site: str = "",
     downloader_name: str = "",
     downloader_type: str = "transmission",
     download_dir: str = "",
@@ -192,6 +225,12 @@ def build_pending_add_context(
         title=title,
         source=source,
         media_identity=normalize_media_identity_payload(media_identity),
+        adult_content_id=adult_content_id.strip().lower(),
+        adult_content_kind=adult_content_kind.strip().lower(),
+        adult_archive_category=adult_archive_category.strip().lower(),
+        adult_display_id=adult_display_id.strip(),
+        adult_history_text=adult_history_text.strip(),
+        source_site=source_site.strip(),
         downloader_name=downloader_name.strip(),
         downloader_type=downloader_type.strip() or "transmission",
         download_dir=download_dir.strip(),
@@ -212,6 +251,12 @@ def to_completed_pending_add_context(
         title=pending_add.title,
         source=pending_add.source,
         media_identity=pending_add.media_identity,
+        adult_content_id=pending_add.adult_content_id,
+        adult_content_kind=pending_add.adult_content_kind,
+        adult_archive_category=pending_add.adult_archive_category,
+        adult_display_id=pending_add.adult_display_id,
+        adult_history_text=pending_add.adult_history_text,
+        source_site=pending_add.source_site,
         downloader_name=pending_add.downloader_name,
         downloader_type=pending_add.downloader_type,
         download_dir=pending_add.download_dir,
@@ -233,6 +278,12 @@ def pending_add_to_json(pending_add: PendingAddContext) -> str:
             "title": pending_add.title,
             "source": pending_add.source,
             "media_identity": pending_add.media_identity or {},
+            "adult_content_id": pending_add.adult_content_id,
+            "adult_content_kind": pending_add.adult_content_kind,
+            "adult_archive_category": pending_add.adult_archive_category,
+            "adult_display_id": pending_add.adult_display_id,
+            "adult_history_text": pending_add.adult_history_text,
+            "source_site": pending_add.source_site,
             "downloader_name": pending_add.downloader_name,
             "downloader_type": pending_add.downloader_type,
             "download_dir": pending_add.download_dir,
@@ -260,6 +311,12 @@ def pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None, 
     title = str(payload.get("title", "")).strip()
     source = str(payload.get("source", "")).strip()
     media_identity = normalize_media_identity_payload(payload.get("media_identity"))
+    adult_content_id = str(payload.get("adult_content_id", "")).strip().lower()
+    adult_content_kind = str(payload.get("adult_content_kind", "")).strip().lower()
+    adult_archive_category = str(payload.get("adult_archive_category", "")).strip().lower()
+    adult_display_id = str(payload.get("adult_display_id", "")).strip()
+    adult_history_text = str(payload.get("adult_history_text", "")).strip()
+    source_site = str(payload.get("source_site", "")).strip()
     downloader_name = str(payload.get("downloader_name", "")).strip()
     downloader_type = str(payload.get("downloader_type", "")).strip() or "transmission"
     download_dir = str(payload.get("download_dir", "")).strip()
@@ -285,6 +342,12 @@ def pending_add_from_json(payload_json: str) -> tuple[PendingAddContext | None, 
             title=title,
             source=source,
             media_identity=media_identity,
+            adult_content_id=adult_content_id,
+            adult_content_kind=adult_content_kind,
+            adult_archive_category=adult_archive_category,
+            adult_display_id=adult_display_id,
+            adult_history_text=adult_history_text,
+            source_site=source_site,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,

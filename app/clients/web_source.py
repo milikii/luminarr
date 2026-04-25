@@ -31,6 +31,8 @@ class WebSourceRule:
     name: str
     base_url: str
     search_path_template: str
+    parser_kind: str = "nyaa"
+    allow_page_preview: bool = True
 
 
 class UnsupportedWebSourcePageError(ValueError):
@@ -42,9 +44,39 @@ NYAA_RULE = WebSourceRule(
     base_url="https://nyaa.si",
     search_path_template="/?f=0&c=0_0&q={query}",
 )
+TOKYOTOSHO_RULE = WebSourceRule(
+    name="tokyotosho",
+    base_url="https://www.tokyotosho.info",
+    search_path_template="/search.php?terms={query}",
+    parser_kind="tokyotosho",
+    allow_page_preview=False,
+)
+SUKEBEI_RULE = WebSourceRule(
+    name="sukebei",
+    base_url="https://sukebei.nyaa.si",
+    search_path_template="/?f=0&c=0_0&q={query}&u=offkab",
+)
+JAVBUS_RULE = WebSourceRule(
+    name="javbus",
+    base_url="https://www.javbus.com",
+    search_path_template="/search/{query}",
+    parser_kind="javbus",
+    allow_page_preview=False,
+)
+JAVLIBRARY_RULE = WebSourceRule(
+    name="javlibrary",
+    base_url="https://www.javlibrary.com",
+    search_path_template="/tw/vl_searchbyid.php?keyword={query}",
+    parser_kind="javlibrary",
+    allow_page_preview=False,
+)
 
 SUPPORTED_WEB_SOURCE_RULES: dict[str, WebSourceRule] = {
     NYAA_RULE.name: NYAA_RULE,
+    TOKYOTOSHO_RULE.name: TOKYOTOSHO_RULE,
+    SUKEBEI_RULE.name: SUKEBEI_RULE,
+    JAVBUS_RULE.name: JAVBUS_RULE,
+    JAVLIBRARY_RULE.name: JAVLIBRARY_RULE,
 }
 
 
@@ -74,6 +106,8 @@ class WebSourceClient:
             _log_web_source_error(source_name=self._rule.name, query=cleaned_query, error=error)
             return []
 
+        if self._rule.parser_kind == "javbus":
+            return await self._search_javbus_entries(response.text)
         return parse_web_source_html(response.text, rule=self._rule)
 
     async def search_page(self, page_url: str) -> list[Mapping[str, Any]]:
@@ -90,6 +124,28 @@ class WebSourceClient:
             return []
 
         return parse_web_source_html(response.text, rule=self._rule)
+
+    async def _search_javbus_entries(self, html: str) -> list[Mapping[str, Any]]:
+        entries = _extract_javbus_search_entries(html, base_url=self._rule.base_url)
+        results: list[Mapping[str, Any]] = []
+        for title, detail_url in entries[:5]:
+            try:
+                detail_response = await self._get(detail_url)
+            except Exception as error:
+                _log_web_source_error(source_name=self._rule.name, query=detail_url, error=error)
+                continue
+            source = _extract_source(detail_response.text, base_url=self._rule.base_url)
+            if not source:
+                continue
+            results.append(
+                {
+                    "title": title,
+                    "source": source,
+                    "indexerName": self._rule.name,
+                    "sourceProvider": self._rule.name,
+                }
+            )
+        return results
 
     def _build_search_url(self, query: str) -> str:
         encoded_query = quote_plus(query)
@@ -155,6 +211,10 @@ def resolve_supported_web_source_page_request(text: str) -> str | None:
 
 
 def parse_web_source_html(html: str, *, rule: WebSourceRule) -> list[dict[str, Any]]:
+    if rule.parser_kind == "tokyotosho":
+        return _parse_tokyotosho_html(html, rule=rule)
+    if rule.parser_kind in {"javbus", "javlibrary"}:
+        return []
     candidates: list[dict[str, Any]] = []
     for row_html in _ROW_PATTERN.findall(html):
         title = _extract_title(row_html)
@@ -179,6 +239,8 @@ def _replace_page_number(url: str, *, page_number: str) -> str:
 
 
 def _is_supported_page_url_for_rule(url: str, *, rule: WebSourceRule) -> bool:
+    if not rule.allow_page_preview:
+        return False
     parsed = urlparse(url.strip())
     rule_host = urlparse(rule.base_url).netloc.lower()
     if parsed.netloc.lower() != rule_host:
@@ -300,6 +362,53 @@ def _parse_size_bytes(text: str) -> int:
 def _clean_html_text(value: str) -> str:
     without_tags = _TAG_PATTERN.sub(" ", value)
     return re.sub(r"\s+", " ", unescape(without_tags)).strip()
+
+
+def _parse_tokyotosho_html(html: str, *, rule: WebSourceRule) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for row_html in _ROW_PATTERN.findall(html):
+        source = _extract_source(row_html, base_url=rule.base_url)
+        if not source:
+            continue
+        title = _extract_tokyotosho_title(row_html)
+        if not title:
+            continue
+        candidate = {
+            "title": title,
+            "source": source,
+            "indexerName": rule.name,
+        }
+        candidate.update(_extract_metadata(row_html))
+        candidates.append(candidate)
+    return candidates
+
+
+def _extract_tokyotosho_title(row_html: str) -> str:
+    matched = re.search(
+        r"""<a[^>]+href=["'][^"']*details\.php\?id=\d+[^"']*["'][^>]*>(?P<title>.*?)</a>""",
+        row_html,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if matched is None:
+        return ""
+    return _clean_html_text(str(matched.group("title") or ""))
+
+
+def _extract_javbus_search_entries(html: str, *, base_url: str) -> list[tuple[str, str]]:
+    entries: list[tuple[str, str]] = []
+    pattern = re.compile(
+        r"""<a[^>]+class=["'][^"']*movie-box[^"']*["'][^>]+href=["'](?P<href>[^"']+)["'][^>]*>.*?(?:title=["'](?P<title>[^"']+)["']|<date>(?P<serial>[^<]+)</date>).*?</a>""",
+        re.IGNORECASE | re.DOTALL,
+    )
+    for matched in pattern.finditer(html):
+        detail_url = urljoin(base_url, str(matched.group("href") or "").strip())
+        title = _clean_html_text(str(matched.group("title") or "").strip())
+        if not title:
+            title = _clean_html_text(str(matched.group("serial") or "").strip())
+        if not title or not detail_url:
+            continue
+        entries.append((title, detail_url))
+    return entries
 
 
 def _log_web_source_error(*, source_name: str, query: str, error: Exception) -> None:

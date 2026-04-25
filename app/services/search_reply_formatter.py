@@ -85,6 +85,12 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         size = format_size(item.get("size"))
         lines.append(f"{index}. {title}")
         lines.append(f"   站点: {indexer} | 来源入口: {provider} | 做种: {seeders} | 大小: {size}")
+        adult_summary = format_adult_candidate_summary(item)
+        if adult_summary:
+            lines.append(f"   {adult_summary}")
+        history_text = safe_text(item.get("adult_history_text"), default="")
+        if history_text:
+            lines.append(f"   {history_text}")
         lines.append(f"   链接参考: {format_bt_source_reference(item)}")
     lines.append(BT_READ_ONLY_NOTICE_TEXT)
     return "\n".join(lines)
@@ -108,6 +114,12 @@ def format_bt_batch_preview_reply(
         size = format_size(item.get("size"))
         lines.append(f"{index}. {title}")
         lines.append(f"   站点: {indexer} | 来源入口: {provider} | 做种: {seeders} | 大小: {size}")
+        adult_summary = format_adult_candidate_summary(item)
+        if adult_summary:
+            lines.append(f"   {adult_summary}")
+        history_text = safe_text(item.get("adult_history_text"), default="")
+        if history_text:
+            lines.append(f"   {history_text}")
         lines.append(f"   链接参考: {format_bt_source_reference(item)}")
     lines.append(BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection=selection_label))
     return "\n".join(lines)
@@ -117,6 +129,18 @@ def format_bt_batch_preview_selection_label(selected_indexes: Sequence[int]) -> 
     if not selected_indexes:
         return "-"
     return ",".join(str(index) for index in selected_indexes)
+
+
+def format_adult_candidate_summary(item: Mapping[str, Any]) -> str:
+    content_id = safe_text(item.get("adult_display_id"), default="")
+    category = safe_text(item.get("adult_archive_category"), default="")
+    if not content_id and not category:
+        return ""
+    if content_id and category:
+        return f"番号: {content_id} | 分类: {category}"
+    if content_id:
+        return f"番号: {content_id}"
+    return f"分类: {category}"
 
 
 def safe_text(value: Any, default: str) -> str:

@@ -197,3 +197,26 @@ def test_get_torrent_import_source_maps_qb_fields(monkeypatch: pytest.MonkeyPatc
     assert source.download_dir == "/data/downloads/qb"
     assert source.is_finished is True
     assert source.percent_done == 1.0
+
+
+def test_remove_torrent_calls_delete_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str, dict[str, object]]] = []
+
+    def dispatcher(method: str, url: str, payload: dict[str, object]) -> httpx.Response:
+        calls.append((method, url, payload))
+        if url.endswith("/auth/login"):
+            return _text_response(method, url, "Ok.")
+        if method == "POST" and url.endswith("/torrents/delete"):
+            return _text_response(method, url, "")
+        raise AssertionError(f"unexpected request: {method} {url} {payload}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(dispatcher, **kwargs))
+
+    client = QbittorrentClient(base_url="http://qb:8080", username="user", password="pass")
+    asyncio.run(client.remove_torrent("hash-99", delete_local_data=True))
+
+    assert calls[1] == (
+        "POST",
+        "http://qb:8080/api/v2/torrents/delete",
+        {"hashes": "hash-99", "deleteFiles": "true"},
+    )

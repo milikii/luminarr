@@ -4,7 +4,10 @@ import asyncio
 import httpx
 
 from app.clients.web_source import (
+    JAVBUS_RULE,
     NYAA_RULE,
+    TOKYOTOSHO_RULE,
+    SUKEBEI_RULE,
     UnsupportedWebSourcePageError,
     WebSourceClient,
     is_supported_web_source_page_url,
@@ -121,6 +124,30 @@ def test_parse_web_source_html_extracts_size_and_seeders_for_nyaa() -> None:
     assert first["size"] == int(1.5 * 1024 * 1024 * 1024)
 
 
+def test_parse_web_source_html_extracts_tokyotosho_candidate() -> None:
+    html = """
+    <table>
+      <tbody>
+        <tr>
+          <td><a href="/details.php?id=777">SSIS-123 Sample Title</a></td>
+          <td><a href="magnet:?xt=urn:btih:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&dn=ssis-123">magnet</a></td>
+          <td>2.1 GiB</td>
+          <td>52</td>
+        </tr>
+      </tbody>
+    </table>
+    """
+
+    results = parse_web_source_html(html, rule=TOKYOTOSHO_RULE)
+
+    assert len(results) == 1
+    first = results[0]
+    assert first["title"] == "SSIS-123 Sample Title"
+    assert first["source"].startswith("magnet:?xt=urn:btih:AAAAAAAA")
+    assert first["indexerName"] == "tokyotosho"
+    assert first["seeders"] == 52
+
+
 def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
     client_kwargs: list[dict[str, object]] = []
 
@@ -145,6 +172,54 @@ def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
     assert result == []
     assert client_kwargs
     assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
+
+
+def test_web_source_client_search_supports_javbus_detail_follow_up(monkeypatch) -> None:
+    requests: list[str] = []
+
+    class FakeAsyncClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str) -> httpx.Response:
+            requests.append(url)
+            if url == "https://www.javbus.com/search/SSIS-123":
+                return httpx.Response(
+                    200,
+                    text=(
+                        '<a class="movie-box" href="/SSIS-123">'
+                        '<img title="SSIS-123 Sample Title" />'
+                        "<date>SSIS-123</date>"
+                        "</a>"
+                    ),
+                    request=httpx.Request("GET", url),
+                )
+            if url == "https://www.javbus.com/SSIS-123":
+                return httpx.Response(
+                    200,
+                    text='<a href="magnet:?xt=urn:btih:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB&dn=ssis-123">magnet</a>',
+                    request=httpx.Request("GET", url),
+                )
+            raise AssertionError(f"unexpected url: {url}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = WebSourceClient(rule=JAVBUS_RULE)
+    results = asyncio.run(client.search("SSIS-123"))
+
+    assert requests == [
+        "https://www.javbus.com/search/SSIS-123",
+        "https://www.javbus.com/SSIS-123",
+    ]
+    assert len(results) == 1
+    assert results[0]["title"] == "SSIS-123 Sample Title"
+    assert results[0]["source"].startswith("magnet:?xt=urn:btih:BBBBBBBB")
 
 
 def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages() -> None:
@@ -175,6 +250,11 @@ def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pag
     assert not is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&q=frieren&s=seeders")
     assert not is_supported_web_source_page_url("https://nyaa.si/?f=0&c=1_2&u=subsplease&s=seeders")
     assert not is_supported_web_source_page_url("https://example.com/?q=frieren")
+
+
+def test_is_supported_web_source_page_url_rejects_non_preview_sites() -> None:
+    assert not is_supported_web_source_page_url("https://www.tokyotosho.info/search.php?terms=SSIS-123", rule=TOKYOTOSHO_RULE)
+    assert is_supported_web_source_page_url("https://sukebei.nyaa.si/?u=offkab", rule=SUKEBEI_RULE)
 
 
 def test_resolve_supported_web_source_page_request_appends_page_number() -> None:

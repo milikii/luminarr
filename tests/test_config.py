@@ -54,6 +54,8 @@ def test_load_settings_reads_token() -> None:
     assert settings.wecom_webhook_host == "0.0.0.0"
     assert settings.wecom_webhook_port == 18097
     assert settings.wecom_webhook_path == "/wecom/webhook"
+    assert settings.adult_archive_destinations == ()
+    assert settings.adult_bt_retention_hours == 96
 
 
 def test_load_settings_reads_outbound_proxy_url() -> None:
@@ -316,6 +318,28 @@ def test_load_settings_reads_raw_bt_destinations() -> None:
     assert settings.raw_bt_destination_options[0].label == "下载目录"
     assert settings.raw_bt_destination_options[0].target_dir == "/data/raw/downloads"
     assert settings.raw_bt_destination_options[1].key == "archive"
+
+
+def test_load_settings_reads_adult_archive_destinations() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "ADULT_ARCHIVE_DESTINATIONS": (
+                "fc2|FC2|/data/adult/fc2;"
+                "censored|有码|/data/adult/censored"
+            ),
+            "ADULT_BT_RETENTION_HOURS": "120",
+        }
+    )
+
+    assert len(settings.adult_archive_destinations) == 2
+    assert settings.adult_archive_destinations[0].category == "fc2"
+    assert settings.adult_archive_destinations[0].label == "FC2"
+    assert settings.adult_archive_destinations[0].target_dir == "/data/adult/fc2"
+    assert settings.adult_bt_retention_hours == 120
 
 
 def test_load_settings_reads_downloader_instances_and_role_binding() -> None:

@@ -108,6 +108,21 @@ class QbittorrentClient:
             percent_done=progress,
         )
 
+    async def remove_torrent(self, task_ref: str, *, delete_local_data: bool = True) -> None:
+        cleaned_ref = task_ref.strip().lower()
+        if not cleaned_ref:
+            raise QbittorrentError("missing task ref for remove")
+        async with httpx.AsyncClient(timeout=self._timeout_seconds, follow_redirects=True) as client:
+            await self._login(client)
+            response = await client.post(
+                f"{self._api_base}/torrents/delete",
+                data={
+                    "hashes": cleaned_ref,
+                    "deleteFiles": "true" if delete_local_data else "false",
+                },
+            )
+        response.raise_for_status()
+
     async def _login(self, client: httpx.AsyncClient) -> None:
         if not self._username:
             return

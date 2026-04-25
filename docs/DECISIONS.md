@@ -678,6 +678,56 @@
     2. 默认分支全量回归稳绿：`.venv/bin/python -m pytest -q` = `1714 passed, 2 skipped`。
     3. shared runtime / channel 解耦累计完成 `57+` 条最小直连闭环。
     4. `app/bot/telegram_bot.py` 当前维持在 `276` 行，纯 wrapper 继续保持完成态。
+
+## D-040 BT 支线当前专注成人资源，动漫 BT 不再继续投资
+- **状态**：已决定
+- **日期**：2026-04-26
+- **结论**：
+  - BT 支线当前主叙事改为 **成人资源专线**。
+  - 动漫 BT 不再继续扩展；动漫资源继续走 PT 主链。
+  - 当前 generic `raw_bt` / 旧 BT 入口仍保留兼容代码，但不再作为文档主线扩能力。
+- **原因**：
+  当前真实使用价值集中在成人资源站点搜索、归档、保留期清理与历史提醒；继续把 BT 当通用能力会同时拉高范围和维护成本。
+
+## D-041 成人 BT 来源优先级固定为“成人站点优先，Prowlarr 成人 PT 补充”
+- **状态**：已决定
+- **日期**：2026-04-26
+- **结论**：
+  - 成人 BT 当前主来源优先顺序为：
+    - `tokyotosho`
+    - `sukebei(offkab)`
+    - `javbus`
+  - `Prowlarr` 成人 PT 作为补充来源，不再占 BT 结果默认优先级。
+  - `javlibrary` 当前定位为后续的只读识别 / 补全 helper，不直接放宽成自动 dispatch 来源。
+- **原因**：
+  用户当前最需要的是成人资源站点覆盖率；Prowlarr 成人 PT 仍有价值，但不应再反过来主导 BT 选源。
+
+## D-042 direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询
+- **状态**：已决定
+- **日期**：2026-04-26
+- **结论**：
+  - 用户直接发送 `magnet:?` 或“下载这个 BT / 磁力”时，系统仍必须先问：
+    - 观影 PT 链
+    - BT 成人链
+  - 不允许因为 BT 主线当前专注成人资源，就把 direct magnet 自动改成成人 BT 直投。
+  - 只有用户明确选了链路，后续才进入对应的下载、归档或入库处理。
+- **原因**：
+  用户顺手复制过来的磁力既可能是 PT 观影片源，也可能是成人资源站点资源；在入口就擅自代判会直接破坏当前使用边界。
+
+## D-043 成人 BT 下载完成后走“归档保留 + 延迟清理”，不走媒体入库链
+- **状态**：已决定
+- **日期**：2026-04-26
+- **结论**：
+  - 成人 BT 下载完成后不进入 TMDB / metadata / subtitle / refresh。
+  - 成人 BT 当前真相使用 `adult_content_registry`，状态最小集合固定为：
+    - `pending`
+    - `downloading`
+    - `archived_present`
+    - `archived_deleted`
+  - 下载完成后的 sidecar 当前应先做归档；统一保留窗口到期后，再清理下载器任务与源资源。
+  - 历史提醒以内容 ID 为主键，不以标题近似匹配代替。
+- **原因**：
+  成人 BT 的关键价值在于内容 ID 历史、分类归档和后续清理，而不是继续硬套媒体入库后半段。
     5. `app/bot/private_chat_runtime.py` 当前维持在 `467` 行，runtime bootstrap / route block / follow-up / preparation 段继续保持收口态。
     6. `tests/test_cleanup_docs_consistency.py` 锁住 `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/INDEX.md` / `docs/PERSISTENCE_CLOSURE_LOG.md` 的关键字符串与分层规则。
   - **切到下一阶段 services 层数据结构降本**。该阶段可测量 Done 定义：

@@ -54,6 +54,7 @@ SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
 
 - TMDB / Fanart：提供元数据。
 - Prowlarr / WebSource：提供搜索候选。
+- `adult_content_registry`：记录成人内容 ID、当前下载状态、归档路径和保留期清理状态。
 - Transmission / qBittorrent：提供下载动作和状态。
 - Emby / Jellyfin / Plex：提供媒体库刷新动作。
 
@@ -67,6 +68,10 @@ SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
 
 `下载状态 -> post_download_auto_import -> import_to_library -> job_event(import.succeeded) -> metadata_scraper -> subtitle_translator -> refresh_media_server(Emby/Jellyfin/Plex)`
 
+### 成人 BT 下载完成到归档
+
+`下载状态 -> download_monitor(completed) -> post_download_auto_import -> adult_archive_service -> adult_content_registry(archived_present / archived_deleted)`
+
 ### cleanup
 
 `cleanup 文本 -> cleanup_downloaded_source -> job_event 查 import 关联 -> 只读预检或删除源文件 -> job_event 写 cleanup 结果 -> 文本回用户`
@@ -74,6 +79,10 @@ SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
 ### watchlist / btsub
 
 `用户文本 -> runtime -> manage_watchlist / manage_bt_subscription -> SQLite 持久化 -> 后台 tick 或手动命令再进入既有 downloader approval 边界`
+
+### direct magnet
+
+`用户直接发送 magnet:? -> shared runtime 先问链路(观影 PT / BT 成人) -> 明确链路后再进入对应后续处理`
 
 ## 6. 四个渠道为什么没有分叉成四套业务代码
 

@@ -17,6 +17,13 @@ class RawBtDestinationOption:
 
 
 @dataclass(frozen=True, slots=True)
+class AdultArchiveDestination:
+    category: str
+    label: str
+    target_dir: str
+
+
+@dataclass(frozen=True, slots=True)
 class DownloaderInstanceConfig:
     name: str
     downloader_type: str
@@ -60,6 +67,8 @@ class Settings:
     pt_min_seed_hours: int
     sqlite_db_path: str
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...]
+    adult_archive_destinations: tuple[AdultArchiveDestination, ...]
+    adult_bt_retention_hours: int
     bt_web_sources: tuple[str, ...]
     downloader_instances: tuple[DownloaderInstanceConfig, ...]
     downloader_role_binding: DownloaderRoleBinding | None
@@ -194,6 +203,51 @@ def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDesti
         )
 
     return tuple(options)
+
+
+def _read_adult_archive_destinations(env: Mapping[str, str]) -> tuple[AdultArchiveDestination, ...]:
+    raw_value = _read_optional(env, "ADULT_ARCHIVE_DESTINATIONS")
+    if not raw_value:
+        return ()
+
+    destinations: list[AdultArchiveDestination] = []
+    seen_categories: set[str] = set()
+    for raw_item in raw_value.split(";"):
+        cleaned_item = raw_item.strip()
+        if not cleaned_item:
+            continue
+
+        parts = [part.strip() for part in cleaned_item.split("|")]
+        if len(parts) == 2:
+            category, target_dir = parts
+            label = category
+        elif len(parts) == 3:
+            category, label, target_dir = parts
+        else:
+            raise ConfigError(
+                "ADULT_ARCHIVE_DESTINATIONS format must be `category|target_dir` or `category|label|target_dir`, separated by `;`"
+            )
+
+        normalized_category = category.lower().strip()
+        if not normalized_category:
+            raise ConfigError("ADULT_ARCHIVE_DESTINATIONS category cannot be empty")
+        if normalized_category in seen_categories:
+            raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS contains duplicate category: {normalized_category}")
+        if not label:
+            raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS label cannot be empty: {normalized_category}")
+        if not target_dir:
+            raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS target_dir cannot be empty: {normalized_category}")
+
+        seen_categories.add(normalized_category)
+        destinations.append(
+            AdultArchiveDestination(
+                category=normalized_category,
+                label=label,
+                target_dir=target_dir,
+            )
+        )
+
+    return tuple(destinations)
 
 
 def _read_bt_web_sources(env: Mapping[str, str]) -> tuple[str, ...]:
@@ -366,6 +420,8 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         pt_min_seed_hours=_read_optional_non_negative_int(env, "PT_MIN_SEED_HOURS", 0),
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
         raw_bt_destination_options=_read_raw_bt_destination_options(env),
+        adult_archive_destinations=_read_adult_archive_destinations(env),
+        adult_bt_retention_hours=_read_optional_non_negative_int(env, "ADULT_BT_RETENTION_HOURS", 96),
         bt_web_sources=_read_bt_web_sources(env),
         downloader_instances=downloader_instances,
         downloader_role_binding=_read_downloader_role_binding(env, downloader_instances),

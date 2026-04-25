@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.clients.transmission import TransmissionTask
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json
@@ -37,10 +38,12 @@ class AddExecutionFollowUpService:
         log_trace_func: LogTraceFunc,
         add_failed_text: str,
         download_monitor_register_result_missing_reason: str,
+        adult_content_registry_repo: AdultContentRegistryRepo | None = None,
     ) -> None:
         self._add_torrent_func = add_torrent_func
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
+        self._adult_content_registry_repo = adult_content_registry_repo
         self._log_trace = log_trace_func
         self._add_failed_text = add_failed_text
         self._download_monitor_register_result_missing_reason = download_monitor_register_result_missing_reason
@@ -96,6 +99,12 @@ class AddExecutionFollowUpService:
             task_hash=result.task_hash,
             pending_add=pending_add,
         )
+        self.record_adult_content_downloading(
+            task_ref=task_ref,
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            pending_add=pending_add,
+        )
         self._log_trace(
             event="confirm_dispatch",
             result="succeeded",
@@ -107,7 +116,7 @@ class AddExecutionFollowUpService:
             task_hash=result.task_hash,
             detail=result.title,
         )
-        if pending_add.auto_import_enabled:
+        if pending_add.auto_import_enabled or bool(pending_add.adult_content_id):
             self.register_download_monitor(
                 task_id=result.task_id,
                 task_hash=result.task_hash,
@@ -217,6 +226,38 @@ class AddExecutionFollowUpService:
                     f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
                     flush=True,
                 )
+
+    def record_adult_content_downloading(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        pending_add: PendingAddContext,
+    ) -> None:
+        if self._adult_content_registry_repo is None:
+            return
+        if not pending_add.adult_content_id:
+            return
+        try:
+            self._adult_content_registry_repo.mark_downloading(
+                normalized_content_id=pending_add.adult_content_id,
+                content_id_kind=pending_add.adult_content_kind or pending_add.adult_archive_category or "adult",
+                archive_category=pending_add.adult_archive_category or "other_adult",
+                display_title=pending_add.adult_display_id or pending_add.title,
+                latest_source_site=pending_add.source_site,
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                downloader_name=pending_add.downloader_name,
+            )
+        except Exception as error:
+            print(
+                f"\033[31m[成人资源下载状态登记失败]\033[0m content_id={pending_add.adult_content_id} task_ref={task_ref} "
+                f"task_id={task_id} task_hash={task_hash} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表写入是否正常；当前下载已投递，但成人历史状态可能不会及时更新。",
+                flush=True,
+            )
 
     async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
         accepted_parameters = inspect.signature(self._add_torrent_func).parameters

@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.clients.web_source import (
     looks_like_http_url,
     looks_like_web_source_page_request,
@@ -13,6 +14,8 @@ from app.clients.web_source import (
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key, normalize_spaces
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
+from app.services.adult_bt_selector import build_adult_history_text, order_adult_bt_candidates
+from app.services.adult_content import extract_adult_content_match
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
 from app.services.search_candidate_state import CandidateLoadResult, CandidateStateStore
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
@@ -95,6 +98,7 @@ class SearchMediaService:
         candidate_repo: CandidateMappingRepo | None = None,
         clarification_repo: ClarificationRepo | None = None,
         lookup_movie_func: LookupMovieFunc | None = None,
+        adult_content_registry_repo: AdultContentRegistryRepo | None = None,
     ) -> None:
         self._search_func = search_func
         self._raw_search_func = raw_search_func or search_func
@@ -103,6 +107,7 @@ class SearchMediaService:
         self._candidate_state = CandidateStateStore(repo=candidate_repo)
         self._clarification_state = ClarificationStateStore(repo=clarification_repo)
         self._lookup_movie_func = lookup_movie_func
+        self._adult_content_registry_repo = adult_content_registry_repo
         self._recent_candidates_by_chat = self._candidate_state.recent_by_chat
         self._clarification_pending_by_chat = self._clarification_state.pending_by_chat
 
@@ -111,13 +116,14 @@ class SearchMediaService:
         if not cleaned_query:
             return ()
         try:
-            return await self._raw_search_func(cleaned_query)
+            raw_results = await self._raw_search_func(cleaned_query)
         except Exception as error:
             print(
                 f"\033[31m[BT 只读搜索失败]\033[0m query={cleaned_query} 错误={error}\n\033[33m[处理建议]\033[0m 检查 BT 搜索源、代理和网络连通性；当前只读探索没有拿到结果，且这不是正常的“无候选”状态。",
                 flush=True,
             )
             raise
+        return tuple(self._prepare_adult_bt_candidates(raw_results, query=cleaned_query))
 
     async def search_bt_read_only_and_format(self, query: str) -> str:
         cleaned_query = normalize_spaces(query)
@@ -177,7 +183,7 @@ class SearchMediaService:
         if self._raw_page_search_func is None:
             raise UnsupportedBatchPreviewPageUrl(cleaned_page_url)
         try:
-            return await self._raw_page_search_func(cleaned_page_url)
+            raw_results = await self._raw_page_search_func(cleaned_page_url)
         except UnsupportedBatchPreviewPageUrl:
             raise
         except Exception as error:
@@ -187,6 +193,7 @@ class SearchMediaService:
                 flush=True,
             )
             raise
+        return tuple(self._prepare_adult_bt_candidates(raw_results, query=cleaned_page_url))
 
     async def search_and_format(
         self,
@@ -263,6 +270,61 @@ class SearchMediaService:
         if self._candidate_state.persist_bt_batch_preview_candidates(chat_id=chat_id, candidates=candidates):
             return ""
         return CANDIDATE_STATE_UNAVAILABLE_TEXT
+
+    def _prepare_adult_bt_candidates(
+        self,
+        raw_results: Sequence[Mapping[str, Any]],
+        *,
+        query: str,
+    ) -> list[dict[str, Any]]:
+        prepared_results = [self._annotate_adult_candidate(item) for item in raw_results]
+        ordered_results = order_adult_bt_candidates(prepared_results, query=query)
+        return [self._annotate_adult_history(item) for item in ordered_results]
+
+    def _annotate_adult_candidate(self, item: Mapping[str, Any]) -> dict[str, Any]:
+        candidate = _to_candidate_dict(item)
+        if candidate.get("adult_content_id"):
+            if not candidate.get("adult_display_id"):
+                candidate["adult_display_id"] = candidate.get("adult_content_id", "")
+            return candidate
+        content_match = extract_adult_content_match(
+            str(candidate.get("title", "")).strip(),
+            source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
+        )
+        if content_match is None:
+            return candidate
+        candidate["adult_content_id"] = content_match.normalized_content_id
+        candidate["adult_archive_category"] = content_match.archive_category
+        candidate["adult_content_kind"] = content_match.source_kind
+        candidate["adult_display_id"] = content_match.display_id
+        return candidate
+
+    def _annotate_adult_history(self, item: Mapping[str, Any]) -> dict[str, Any]:
+        candidate = _to_candidate_dict(item)
+        if self._adult_content_registry_repo is None:
+            return candidate
+        content_id = str(candidate.get("adult_content_id", "")).strip().lower()
+        if not content_id:
+            return candidate
+        try:
+            record = self._adult_content_registry_repo.get_by_content_id(normalized_content_id=content_id)
+        except Exception as error:
+            print(
+                f"\033[31m[成人资源历史查询失败]\033[0m content_id={content_id} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表读取是否正常；当前只跳过历史提示，不影响候选展示。",
+                flush=True,
+            )
+            return candidate
+        if record is None:
+            return candidate
+        history_text = build_adult_history_text(
+            status=record.current_status,
+            archive_path=record.archive_path,
+        )
+        if history_text:
+            candidate["adult_history_text"] = history_text
+            candidate["adult_history_status"] = record.current_status
+        return candidate
 
     def get_cached_candidate_load_result(self, chat_id: int, index: int) -> CandidateLoadResult:
         return self._candidate_state.get_cached_candidate_load_result(chat_id, index)

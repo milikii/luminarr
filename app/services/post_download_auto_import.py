@@ -4,8 +4,14 @@ import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+from app.db.adult_content_registry_repo import (
+    ADULT_CONTENT_STATUS_ARCHIVED_DELETED,
+    ADULT_CONTENT_STATUS_ARCHIVED_PRESENT,
+    AdultContentRegistryRepo,
+)
 from app.db.download_monitor_repo import DownloadMonitorRecord, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.services.adult_archive_service import AdultArchiveService, AdultArchiveStateUnavailableError
 from app.services.auto_import_batch import (
     AutoImportCompletedListUnavailableError,
     load_completed_auto_import_candidates,
@@ -49,10 +55,14 @@ class PostDownloadAutoImportService:
         download_monitor_repo: DownloadMonitorRepo,
         job_event_repo: JobEventRepo,
         auto_import_func: AutoImportFunc,
+        adult_content_registry_repo: AdultContentRegistryRepo | None = None,
+        adult_archive_service: AdultArchiveService | None = None,
     ) -> None:
         self._download_monitor_repo = download_monitor_repo
         self._job_event_repo = job_event_repo
         self._auto_import_func = auto_import_func
+        self._adult_content_registry_repo = adult_content_registry_repo
+        self._adult_archive_service = adult_archive_service
 
     async def run_once(self, *, limit: int = 20) -> AutoImportRunResult:
         try:
@@ -87,6 +97,9 @@ class PostDownloadAutoImportService:
             raise AutoImportStateUnavailableError(
                 f"auto import chat identity invalid for {candidate.task_id}/{candidate.task_hash}"
             )
+        adult_registry_record = self._get_adult_registry_record(candidate)
+        if adult_registry_record is not None:
+            return await self._run_adult_archive_follow_up(candidate=candidate, registry_record=adult_registry_record)
         has_terminal_activity = self._has_terminal_activity(candidate)
         if has_terminal_activity:
             return None
@@ -100,6 +113,54 @@ class PostDownloadAutoImportService:
             )
         user_id = candidate.user_id if candidate.user_id > 0 else None
         return await self._auto_import_func(candidate.task_hash, candidate.chat_id, user_id)
+
+    def _get_adult_registry_record(self, candidate: DownloadMonitorRecord):
+        if self._adult_content_registry_repo is None:
+            return None
+        try:
+            return self._adult_content_registry_repo.get_by_task_identity(
+                task_id=candidate.task_id,
+                task_hash=candidate.task_hash,
+            )
+        except Exception as error:
+            print(
+                f"\033[31m[成人资源历史查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表读取是否正常；当前会按状态不可用停路，避免把历史真相缺口误判成普通非成人下载。",
+                flush=True,
+            )
+            raise AutoImportStateUnavailableError(
+                f"adult registry lookup failed for {candidate.task_id}/{candidate.task_hash}"
+            ) from error
+
+    async def _run_adult_archive_follow_up(self, *, candidate: DownloadMonitorRecord, registry_record) -> str | None:
+        if registry_record.current_status == ADULT_CONTENT_STATUS_ARCHIVED_DELETED:
+            return None
+        if self._adult_archive_service is None:
+            raise AutoImportStateUnavailableError(
+                f"adult archive service missing for {candidate.task_id}/{candidate.task_hash}"
+            )
+        try:
+            return await self._adult_archive_service.run_for_record(
+                candidate=candidate,
+                registry_record=registry_record,
+            )
+        except AdultArchiveStateUnavailableError as error:
+            print(
+                f"\033[31m[成人资源归档状态不可用]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查 adult_content_registry、下载器导入源查询和归档目录配置；当前这条成人资源不会继续推进归档/清理。",
+                flush=True,
+            )
+            raise AutoImportStateUnavailableError(
+                f"adult archive state unavailable for {candidate.task_id}/{candidate.task_hash}"
+            ) from error
+        except Exception as error:
+            action = "保留期清理" if registry_record.current_status == ADULT_CONTENT_STATUS_ARCHIVED_PRESENT else "归档"
+            print(
+                f"\033[31m[成人资源{action}失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
+                "\033[33m[处理建议]\033[0m 检查下载器删除协议、源路径权限、归档目标目录和 adult_content_registry 状态后重试。",
+                flush=True,
+            )
+            return f"注意：成人资源{action}失败，本轮未更新后续状态，请稍后重试。"
 
     def _has_terminal_activity(self, candidate: DownloadMonitorRecord) -> bool:
         try:

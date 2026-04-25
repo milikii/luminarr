@@ -232,3 +232,31 @@ async def _get_torrent_status_with_routing(
     if client is None:
         raise DownloaderRouteLookupError(f"downloader client unavailable for status task: {task_ref}")
     return await client.get_torrent_status(task_ref)
+
+
+async def _remove_torrent_with_routing(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+    delete_local_data: bool,
+) -> None:
+    downloader_name = _resolve_downloader_name_for_task(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+    )
+    if downloader_name is None:
+        raise DownloaderRouteLookupError(f"downloader route unavailable for remove task: {task_ref}")
+    client = _resolve_downloader_client_for_lookup(
+        downloader_name=downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
+    if client is None:
+        raise DownloaderRouteLookupError(f"downloader client unavailable for remove task: {task_ref}")
+    await client.remove_torrent(task_ref, delete_local_data=delete_local_data)

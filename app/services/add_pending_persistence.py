@@ -69,15 +69,22 @@ def render_add_pending_reply(*, pending_add: PendingAddContext, channel: str) ->
 
 def build_add_pending_delivery_item(pending_add: PendingAddContext) -> DeliveryItem:
     expire_minutes = max(1, DEFAULT_PENDING_TIMEOUT_SECONDS // 60)
+    task_lines = [
+        f"片名：{pending_add.title}",
+        f"选择序号：{pending_add.task_ref}",
+    ]
+    if pending_add.adult_display_id:
+        task_lines.append(f"番号：{pending_add.adult_display_id}")
+    if pending_add.adult_archive_category:
+        task_lines.append(f"分类：{pending_add.adult_archive_category}")
+    if pending_add.adult_history_text:
+        task_lines.append(pending_add.adult_history_text)
     return DeliveryItem(
         header=DeliveryHeader(kind="approval", title="待确认：下载"),
         sections=(
             DeliverySection(
                 label="任务信息",
-                lines=(
-                    f"片名：{pending_add.title}",
-                    f"选择序号：{pending_add.task_ref}",
-                ),
+                lines=tuple(task_lines),
             ),
         ),
         actions=(

@@ -233,3 +233,54 @@ def test_dispatch_records_confirmed_media_identity_event(tmp_path) -> None:
     events = event_repo.list_events_for_task_identity(task_id="42", task_hash="hash-42")
     assert [event.event_type for event in events] == ["downloader.succeeded", MEDIA_IDENTITY_EVENT_TYPE]
     assert json.loads(events[1].message) == pending_add.media_identity
+
+
+def test_dispatch_registers_download_monitor_for_adult_candidate_even_without_auto_import() -> None:
+    calls: list[tuple[str, str, str, int | None, int | None]] = []
+
+    service = AddExecutionFollowUpService(
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        job_event_repo=None,
+        download_monitor_repo=type(
+            "DownloadMonitorRepo",
+            (),
+            {
+                "register_download": lambda self, **kwargs: calls.append(
+                    (
+                        kwargs["task_id"],
+                        kwargs["task_hash"],
+                        kwargs["name"],
+                        kwargs["chat_id"],
+                        kwargs["user_id"],
+                    )
+                )
+            },
+        )(),
+        log_trace_func=lambda **kwargs: None,
+        add_failed_text="下载投递失败，请稍后重试。",
+        download_monitor_register_result_missing_reason="download monitor state missing after register",
+    )
+
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:abc123",
+        title="SSIS-123",
+        source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        adult_content_id="censored:ssis-123",
+        adult_archive_category="censored",
+        adult_display_id="SSIS-123",
+        auto_import_enabled=False,
+    )
+
+    outcome = asyncio.run(
+        service.dispatch(
+            task_ref="1",
+            pending_add=pending_add,
+            chat_id=1001,
+            user_id=2001,
+        )
+    )
+
+    assert outcome.result is not None
+    assert calls == [("42", "hash-42", "SSIS-123", 1001, 2001)]

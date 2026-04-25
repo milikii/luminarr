@@ -140,6 +140,27 @@ SCHEMA_STATEMENTS = (
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_download_monitor_complete ON download_monitor(is_complete, updated_at)",
+    """
+    CREATE TABLE IF NOT EXISTS adult_content_registry (
+        normalized_content_id TEXT PRIMARY KEY,
+        content_id_kind TEXT NOT NULL,
+        archive_category TEXT NOT NULL,
+        display_title TEXT NOT NULL DEFAULT '',
+        latest_source_site TEXT NOT NULL DEFAULT '',
+        current_status TEXT NOT NULL DEFAULT '',
+        current_task_ref TEXT NOT NULL DEFAULT '',
+        current_task_id TEXT NOT NULL DEFAULT '',
+        current_task_hash TEXT NOT NULL DEFAULT '',
+        current_downloader_name TEXT NOT NULL DEFAULT '',
+        archive_path TEXT NOT NULL DEFAULT '',
+        archive_present INTEGER NOT NULL DEFAULT 0,
+        last_status_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_adult_content_registry_task_identity ON adult_content_registry(current_task_id, current_task_hash)",
+    "CREATE INDEX IF NOT EXISTS idx_adult_content_registry_status ON adult_content_registry(current_status, updated_at)",
 )
 
 

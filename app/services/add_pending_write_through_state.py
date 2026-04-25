@@ -78,4 +78,14 @@ class AddPendingWriteThroughState:
         )
         if channel in self._supported_delivery_channels:
             return render_add_pending_reply(pending_add=pending_add, channel=channel)
-        return self._add_approval_pending_text_template.format(title=pending_add.title, task_ref=pending_add.task_ref)
+        reply = self._add_approval_pending_text_template.format(title=pending_add.title, task_ref=pending_add.task_ref)
+        extra_lines: list[str] = []
+        if pending_add.adult_display_id:
+            extra_lines.append(f"番号: {pending_add.adult_display_id}")
+        if pending_add.adult_archive_category:
+            extra_lines.append(f"分类: {pending_add.adult_archive_category}")
+        if pending_add.adult_history_text:
+            extra_lines.append(pending_add.adult_history_text)
+        if not extra_lines:
+            return reply
+        return f"{reply}\n" + "\n".join(extra_lines)

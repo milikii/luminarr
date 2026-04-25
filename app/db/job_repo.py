@@ -263,6 +263,12 @@ class JobRepo:
         task_hash: str,
         payload_json: str,
     ) -> bool:
+        if not job_id.strip() or not lease_owner.strip():
+            raise JobPersistenceError("downloader completed job identity missing")
+        if expected_version <= 0:
+            raise JobPersistenceError("downloader completed job expected version missing")
+        if not task_id.strip() or not task_hash.strip():
+            raise JobPersistenceError("downloader completed job identity missing")
         identity = normalize_downloader_completed_job_identity(
             job_id=job_id,
             expected_version=expected_version,

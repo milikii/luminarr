@@ -190,6 +190,25 @@ class TransmissionClient:
             percent_done=percent_done,
         )
 
+    async def remove_torrent(self, task_ref: str, *, delete_local_data: bool = True) -> None:
+        cleaned_ref = task_ref.strip()
+        if not cleaned_ref:
+            raise TransmissionError("missing task ref for remove")
+
+        lookup_id: str | int
+        if cleaned_ref.isdigit():
+            lookup_id = int(cleaned_ref)
+        else:
+            lookup_id = cleaned_ref
+
+        await self._rpc(
+            "torrent-remove",
+            {
+                "ids": [lookup_id],
+                "delete-local-data": bool(delete_local_data),
+            },
+        )
+
     async def _rpc(self, method: str, arguments: dict[str, Any]) -> dict[str, Any]:
         payload = {"method": method, "arguments": arguments}
         for _ in range(2):

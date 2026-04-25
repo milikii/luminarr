@@ -1,42 +1,50 @@
-# Next step (v351)
+# Next step (v352)
 
 ## Current goal
 
-- **质量硬化**、**搜索相关性优化**、**字幕闭环补齐** 与 **刮削系统基础收口** 当前都已完成。
-- 当前这一条主线已经补齐到真实 smoke：`import -> scrape -> subtitle -> refresh` 已在真实 PT Transmission / Emby 环境复验通过。
-- 当前详细判断与分阶段设计见：`docs/SCRAPING_SYSTEM_PLAN.md`。
+- 当前主线已切到 **成人 BT 专线基础收口**。
+- 已落地范围：
+  - 成人 BT 站点优先、Prowlarr 成人 PT 补充
+  - 成人内容 ID 识别与历史账本
+  - BT 只读预览 / 批量预览里的历史提醒
+  - 下载完成后的成人归档与统一保留期清理框架
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `467` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退。
+- 当前 direct magnet 入口 **继续保留** “观影 PT 链 / BT 成人链” 问询；不能自动假定所有磁力都走成人 BT。
 
 ## User value
 
-- 导入后的 metadata 刮削现在不再优先赌“文件名猜得对不对”，而是优先吃搜索确认时已经拿到的媒体身份真相。
-- 只要 `media_identity` 里已经有 `tmdb_id`，metadata 刮削现在会直接按该 ID 取详情，不再重新拿 `title/year` 搜一次。
-- 当前真实链路也已确认最终展示优先中文：最新 smoke 样本在 Emby 中返回的是 `Name=星际穿越`，不是英文标题。
-- 当前这条主线已经补到真实产物层：`.metadata.json`、`.nfo`、`poster`、`backdrop` 已落地，且 Emby 已能消费到 `Name=星际穿越`、`Tmdb=157336` 的结果。
-- 当前默认策略已明确：
-  - `.metadata.json`：`overwrite`
-  - `.nfo`：`missing-only`
-  - `poster` / `backdrop`：`missing-only`
-  - 没有来源或当前不该写时：`skip`
+- 成人资源站点现在不再只能依赖 Prowlarr 补全，`tokyotosho` / `sukebei(offkab)` / `javbus` 已进入 BT 来源模板。
+- BT 预览和待确认现在会尽量识别内容 ID，并提示：
+  - 已有待确认
+  - 已在下载
+  - 已归档保留
+  - 已归档后清理
+- 成人 BT 下载完成后，当前 sidecar 已能按内容分类归档，并在统一保留窗口后清理下载器任务与源资源。
 
 ## Only do
 
-- 当前这条主线已可宣告完成；不要因为这里已完成就空转停止。默认继续施工时，先做冷启动一致性检查；若无漂移，再从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 或新的 operator 指定主线里选更小闭环。
+- 继续收口当前主线时，只做成人 BT 专线的小闭环：
+  - 成人站点规则补稳
+  - 成人归档 / 保留期清理 focused tests 补齐
+  - 历史账本与 direct magnet 问询边界补稳
+- direct magnet 继续先问链路，不放宽成自动成人 BT。
 
 ## Do not do
 
-- 不把这条已完成主线再扩成全量 NFO / 图片体系，不顺手开 TV / season / episode、本地全库扫描、多源 provider。
+- 不把 direct magnet 默认改成成人 BT 自动直投。
+- 不把动漫 BT 再拉回主线；动漫继续走 PT 链。
+- 不把这一步扩成浏览器自动化、登录态站点、CAPTCHA 或通用爬站平台。
 
 ## Done when
 
-当前这条 **刮削系统基础收口** 主线已经满足：
+当前这条 **成人 BT 专线基础收口** 主线满足：
 
-1. `media_identity` 已沿着 `search -> select -> confirm download -> job_event -> import metadata` 落稳。
-2. `metadata_scraper` 已优先吃 `tmdb_id`。
-3. `.metadata.json`、`.nfo`、`poster`、`backdrop` 已开始落地，且写入策略已明确。
-4. 真实 `import -> scrape -> subtitle -> refresh` smoke 已通过，Emby 侧已确认消费结果。
+1. 成人 BT 网站优先、Prowlarr 成人 PT 补充的来源顺序已落地。
+2. 成人内容 ID 与历史账本已进入 BT 预览、待确认和确认执行。
+3. 成人下载完成后可进入归档，并在统一保留窗口后清理下载器任务与源资源。
+4. direct magnet 入口仍保留“观影 PT 链 / BT 成人链”问询，不回退。
 
 ## After this step
 
-1. 如果继续沿刮削方向推进，优先评估是否还要补更多图片类型或更严格的本地产物命名规则。
-2. 如果继续按结构降本推进，优先回到 `docs/SCRAPING_SYSTEM_PLAN.md` 里的大文件 backlog。
+1. 如果继续沿成人 BT 方向推进，优先补 `javlibrary` helper 的只读识别补全。
+2. 如果继续按质量方向推进，优先跑更大的 focused / quality gate，确认成人归档 sidecar 不回归现有导入主链。

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
@@ -172,6 +173,47 @@ def test_search_bt_read_only_and_format_no_result() -> None:
     text = _run(service.search_bt_read_only_and_format("unknown"))
 
     assert text == BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
+
+
+def test_search_bt_read_only_and_format_includes_adult_history_hint(tmp_path: Path) -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "SSIS-123 sample release",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    database = SqliteDatabase(str(tmp_path / "adult.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.upsert_pending(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="tokyotosho",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:hash",
+        downloader_name="bt",
+    )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_content_registry_repo=registry_repo,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "番号: SSIS-123 | 分类: censored" in text
+    assert "历史: 该番号已有待确认下载记录。" in text
 
 
 def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:
