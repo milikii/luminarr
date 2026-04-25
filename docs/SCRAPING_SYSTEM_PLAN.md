@@ -132,7 +132,7 @@ Luminarr 当前仍是：
 这些不是当前刮削主线的即时 blocker，但已经明确挂进后续任务，避免再次靠口头记忆：
 
 - `app/services/subtitle_translator.py`
-  - 当前状态：已再前推几格；support helper 已承接目标字幕解析、chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排、“可提取英文内嵌字幕结果筛选”、“提取后字幕文件可用性整理”、“单文件翻译读写边界”、翻译请求载荷构造、专业翻译请求执行 / 响应解析 / 错误映射、SRT / ASS 渲染编排、`translate_for_import` 的 skip/success 结果构造、`_translate_single_file` / `_extract_embedded_subtitle_file` 的失败结果构造，以及“外挂字幕识别 + 中文字幕外挂 skip 优先级”“内嵌字幕流优先级判定”“ffprobe 结果解析 / 错误映射”“提取结果解析 / 半成品清理”“ffmpeg fallback 结果解析 / 错误映射”；当前又把 `translate_for_import()` 的前置校验继续下沉到 support helper，统一处理目标存在性、目标字幕解析、API key 缺失与 metadata title 读取，`subtitle_translator.py` 为 `267` 行。
+  - 当前状态：已再前推几格；support helper 已承接目标字幕解析、chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排、“可提取英文内嵌字幕结果筛选”、“提取后字幕文件可用性整理”、“单文件翻译读写边界”、翻译请求载荷构造、专业翻译请求执行 / 响应解析 / 错误映射、SRT / ASS 渲染编排、`translate_for_import` 的 skip/success 结果构造、`_translate_single_file` / `_extract_embedded_subtitle_file` 的失败结果构造，以及“外挂字幕识别 + 中文字幕外挂 skip 优先级”“内嵌字幕流优先级判定”“ffprobe 结果解析 / 错误映射”“提取结果解析 / 半成品清理”“ffmpeg fallback 结果解析 / 错误映射”；当前又把 `translate_for_import()` 的前置校验与统一 result builder 收口到 helper / 壳层，`subtitle_translator.py` 为 `274` 行。
   - 目标：继续按“剩余结果封装 / 中文跳过策略”收口剩余编排
 - `app/services/manage_bt_subscription.py`
   - 当前状态：已再前推几格；CRUD 持久化 guard、扫描前的 `chat_ids/items` 读取护栏、`last_seen` 回写护栏，以及单条订阅的搜索 / pending 创建编排都已下沉到 `bt_subscription_repo_support.py` / `bt_subscription_dispatch_support.py`；当前 `manage_bt_subscription.py` 为 `900` 行。
@@ -142,10 +142,10 @@ Luminarr 当前仍是：
   - 当前补充：`inspect_by_task_ref()` 主流程、`cleanup_correlation_lookup.py` 的关联事件读取护栏、主流程、路径缺失判定 / 结果构造、任务身份解析，以及 cleanup 路径校验 / 删除资产也已继续下沉到 `cleanup_inspect_flow_support.py` / `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` / `cleanup_task_identity_support.py` / `cleanup_correlation_logging_support.py` / `cleanup_path_guard_support.py` / `cleanup_asset_support.py`；当前 `cleanup_downloaded_source.py` 为 `334` 行，`cleanup_correlation_lookup.py` 为 `215` 行。
   - 目标：继续按“剩余 service 粘合层 / correlation lookup 最后封装层”拆分
 - `app/db/approval_repo.py`
-  - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前又把 `_approve/_restore_pending/_cancel` 的共享状态迁移薄壳合并到 repo 内 helper，并把 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界、`_mark_executed()` 的身份规范化，以及多处 exact-record 缺失判定继续收口，`approval_repo.py` 为 `726` 行。
+  - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前又把 `_approve/_restore_pending/_cancel` 的共享状态迁移薄壳合并到 repo 内 helper，并把 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界、`_mark_executed()` 的身份规范化，以及 exact query / lease version query helper 继续收口，`approval_repo.py` 为 `749` 行。
   - 目标：继续按“action 族入口 / 剩余 SQL 写入边界”收口
 - `app/db/job_repo.py`
-  - 当前状态：已再前推几格；身份校验、查询 helper，以及 lease/state/completed/cancel 写路径和 pending upsert SQL 都已下沉到 `job_repo_support.py`；当前又把 `mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化，以及 chat + task_ref / workflow pending / latest pending 查询身份继续下沉到 support helper。
+  - 当前状态：已再前推几格；身份校验、查询 helper，以及 lease/state/completed/cancel 写路径和 pending upsert SQL 都已下沉到 `job_repo_support.py`；当前又把 `mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化、chat + task_ref / workflow pending / latest pending 查询身份、以及 require-by-identity / pending upsert 回读边界继续下沉到 support helper，`job_repo.py` 为 `541` 行。
   - 目标：继续按“workflow 入口 / 剩余 SQL 边界”收口
 
 这些文件的拆解默认排在当前刮削主线之后；只有当其中某个文件直接阻塞当前 `media_identity -> scrape` 主线时，才允许提前插队。

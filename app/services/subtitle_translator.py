@@ -142,22 +142,15 @@ class SubtitleTranslatorService:
                 fix=failure.fix,
             )
         if not success:
-            return SubtitleTranslateResult(
+            return self._build_result(
                 success=False,
                 message=error_message or "字幕翻译失败。",
-                translated_count=0,
-                skipped=False,
             )
-        return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
+        return self._build_result(success=True, message="ok", translated_count=1)
 
     def _build_failed_result(self, *, problem: str, fix: str) -> SubtitleTranslateResult:
         _print_colored_error(problem=problem, fix=fix)
-        return SubtitleTranslateResult(
-            success=False,
-            message=problem,
-            translated_count=0,
-            skipped=False,
-        )
+        return self._build_result(success=False, message=problem)
 
     def _build_preparation_result(
         self,
@@ -166,10 +159,9 @@ class SubtitleTranslatorService:
     ) -> SubtitleTranslateResult:
         if failure.fix:
             _print_colored_error(problem=failure.message, fix=failure.fix)
-        return SubtitleTranslateResult(
+        return self._build_result(
             success=False,
             message=failure.message,
-            translated_count=0,
             skipped=failure.skipped,
         )
 
@@ -202,8 +194,23 @@ class SubtitleTranslatorService:
             movie_title=movie_title,
             translated_count=translated_count,
         )
-        return SubtitleTranslateResult(
+        return self._build_result(
             success=not skipped,
+            message=message,
+            translated_count=translated_count,
+            skipped=skipped,
+        )
+
+    def _build_result(
+        self,
+        *,
+        success: bool,
+        message: str,
+        translated_count: int = 0,
+        skipped: bool = False,
+    ) -> SubtitleTranslateResult:
+        return SubtitleTranslateResult(
+            success=success,
             message=message,
             translated_count=translated_count,
             skipped=skipped,

@@ -1,4 +1,4 @@
-# Current status (v466)
+# Current status (v467)
 
 ## Current mainline
 
@@ -9,11 +9,12 @@
   - `subtitle_translator.py`：`translate_for_import()` 的前置校验已下沉到 `subtitle_translation_support.py`，统一处理目标存在性、目标字幕解析、API key 缺失与 metadata title 读取；当前 `267` 行。
   - `job_repo.py`：`mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化已下沉到 `job_repo_support.py`；当前 `536` 行。
   - `approval_repo.py`：`_approve/_restore_pending/_cancel` 的共享状态迁移薄壳已合并到 helper，且 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界已下沉到 `approval_repo_support.py`；当前 `715` 行。
-- 当前又从 approval backlog 再收掉一小格：`_mark_executed()` 的身份规范化也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `714` 行。
-- 当前又从 approval backlog 再收掉一小格：多处重复的 exact-record 缺失判定已收口到 `_require_exact_approval_record()`，`approval_repo.py` 当前为 `726` 行。
-- 当前又从 job backlog 再收掉一小格：chat + task_ref 查询身份已收口到 `job_repo_support.py`，`get_pending_job_for_chat_ref()` / `get_job_for_chat_ref()` / `_get_job_for_chat_ref()` 现在共用同一组 query identity helper。
-- 当前又从 job backlog 再收掉一小格：workflow pending query 身份也已收口到 `job_repo_support.py`，`_get_latest_pending_job_for_workflow()` 现在共用同一组 pending query helper。
-- 当前又从 job backlog 再收掉一小格：`get_latest_pending_job()` 也已切到同一组 pending query helper，不再单独保留 chat identity 薄壳。
+- approval backlog：`_mark_executed()` 的身份规范化也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `714` 行。
+- approval backlog：多处重复的 exact-record 缺失判定已收口到 `_require_exact_approval_record()`，`approval_repo.py` 当前为 `726` 行。
+- job backlog：chat + task_ref 查询身份已收口到 `job_repo_support.py`，`get_pending_job_for_chat_ref()` / `get_job_for_chat_ref()` / `_get_job_for_chat_ref()` 现在共用同一组 query identity helper。
+- job backlog：workflow pending query 身份也已收口到 `job_repo_support.py`，`_get_latest_pending_job_for_workflow()` 现在共用同一组 pending query helper。
+- job backlog：`get_latest_pending_job()` 也已切到同一组 pending query helper，不再单独保留 chat identity 薄壳。
+- 当前又从 approval / job / subtitle backlog 再收掉 5 个小闭环：`approval_repo.py` 新增 exact query / lease version query helper，`job_repo.py` 新增 require-by-identity helper 并收掉 pending upsert 裸 SQL，`subtitle_translator.py` 的结果封装已统一走共享 builder；当前 `approval_repo.py` `749` 行、`job_repo.py` `541` 行、`subtitle_translator.py` `274` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -36,6 +37,7 @@
 - 2026-04-25 job chat-task query helper follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "job_repo_rejects_missing_identity_for_query or get_job_for_chat_ref or get_pending_job_for_chat_ref"` 为 `1 passed, 110 deselected`。
 - 2026-04-25 job pending query helper follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "job_repo_rejects_missing_identity_for_query or get_latest_pending_job or _get_latest_pending_job_for_workflow"` 为 `1 passed, 110 deselected`。
 - 2026-04-25 job latest pending helper follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "job_repo_rejects_missing_identity_for_query or get_latest_pending_job or _get_latest_pending_job_for_workflow"` 为 `1 passed, 110 deselected`。
+- 2026-04-25 approval / job / subtitle follow-up：approval query focused 为 `2 passed, 109 deselected` 与 `3 passed, 108 deselected`；job require/pending upsert focused 为 `3 passed, 108 deselected` 与 `2 passed, 109 deselected`；字幕 focused 为 `38 passed`；`make quality` 与 `make verify-mainline` 均已通过。
 - 当前真实 smoke 证据仍有效：前半段 `task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status`；后半段 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
 
 ## Current biggest risk
