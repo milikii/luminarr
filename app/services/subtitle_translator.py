@@ -7,20 +7,16 @@ from pathlib import Path
 from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
     _SubtitleFile,
-    _SrtBlock,
     _build_embedded_subtitle_extract_command,
     _build_professional_subtitle_translation_request,
     _build_subtitle_skip_result,
     _build_subtitle_translation_summary,
-    _extract_chat_completion_response_text,
     _extract_translations_from_response,
     _find_video_files,
     _parse_ass_dialogue_lines,
-    _parse_srt_blocks,
     _print_colored_error,
     _read_metadata_title,
     _render_ass_lines,
-    _render_srt,
     _request_subtitle_chat_completion,
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
@@ -34,6 +30,7 @@ from app.services.subtitle_translation_support import (
     _run_subprocess_command,
     _translate_blocks_in_chunks,
     _translate_chunk_lines,
+    _translate_srt_subtitle_content,
     _write_translated_subtitle_file,
 )
 
@@ -391,36 +388,15 @@ class SubtitleTranslatorService:
         movie_title: str,
         subtitle_path: Path,
     ) -> tuple[str | None, str | None]:
-        blocks = _parse_srt_blocks(source_text)
-        if not blocks:
-            message = f"字幕翻译失败：{subtitle_path} 不是有效 SRT 或内容为空。"
-            _print_colored_error(
-                problem=message,
-                fix="确认字幕是标准 SubRip(.srt) 格式，包含序号、时间轴和文本。",
-            )
-            return None, message
-
-        translated_blocks, error_message = _translate_blocks_in_chunks(
-            blocks=blocks,
-            size=60,
-            get_source_text=lambda block: block.text,
-            translate_chunk=lambda source_lines: _translate_chunk_lines(
+        return _translate_srt_subtitle_content(
+            source_text=source_text,
+            movie_title=movie_title,
+            subtitle_path=subtitle_path,
+            translate_lines=lambda source_lines, resolved_movie_title: self._translate_lines_professional(
                 source_lines=source_lines,
-                subtitle_path=subtitle_path,
-                translate_lines=lambda lines: self._translate_lines_professional(
-                    source_lines=lines,
-                    movie_title=movie_title,
-                ),
-            ),
-            build_output_block=lambda block, translated_text: _SrtBlock(
-                index=block.index,
-                timecode=block.timecode,
-                text=translated_text,
+                movie_title=resolved_movie_title,
             ),
         )
-        if translated_blocks is None:
-            return None, error_message
-        return _render_srt(translated_blocks), None
 
     def _translate_ass_text(
         self,

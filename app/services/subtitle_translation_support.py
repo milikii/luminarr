@@ -590,6 +590,42 @@ def _translate_chunk_lines(
     return translated_lines, None
 
 
+def _translate_srt_subtitle_content(
+    *,
+    source_text: str,
+    movie_title: str,
+    subtitle_path: Path,
+    translate_lines: Callable[[list[str], str], list[str]],
+) -> tuple[str | None, str | None]:
+    blocks = _parse_srt_blocks(source_text)
+    if not blocks:
+        message = f"字幕翻译失败：{subtitle_path} 不是有效 SRT 或内容为空。"
+        _print_colored_error(
+            problem=message,
+            fix="确认字幕是标准 SubRip(.srt) 格式，包含序号、时间轴和文本。",
+        )
+        return None, message
+
+    translated_blocks, error_message = _translate_blocks_in_chunks(
+        blocks=blocks,
+        size=60,
+        get_source_text=lambda block: block.text,
+        translate_chunk=lambda source_lines: _translate_chunk_lines(
+            source_lines=source_lines,
+            subtitle_path=subtitle_path,
+            translate_lines=lambda lines: translate_lines(lines, movie_title),
+        ),
+        build_output_block=lambda block, translated_text: _SrtBlock(
+            index=block.index,
+            timecode=block.timecode,
+            text=translated_text,
+        ),
+    )
+    if translated_blocks is None:
+        return None, error_message
+    return _render_srt(translated_blocks), None
+
+
 def _run_subprocess_command(
     *,
     command: list[str],
