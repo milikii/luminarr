@@ -43,6 +43,12 @@ class JobLeaseIdentity:
     expected_version: int
 
 
+@dataclass(frozen=True, slots=True)
+class DownloaderCompletedJobIdentity(JobLeaseIdentity):
+    task_id: str
+    task_hash: str
+
+
 def normalize_job_chat_identity(*, chat_id: int, context: str, error_cls: type[Exception]) -> JobChatIdentity:
     if chat_id <= 0:
         raise error_cls(f"job chat identity missing for {context}")
@@ -254,6 +260,40 @@ def normalize_job_lease_identity(
         workflow_type=workflow.workflow_type,
         lease_owner=cleaned_owner,
         expected_version=expected_version,
+    )
+
+
+def normalize_downloader_completed_job_identity(
+    *,
+    job_id: str,
+    expected_version: int,
+    lease_owner: str,
+    task_id: str,
+    task_hash: str,
+    workflow_type: str,
+    error_cls: type[Exception],
+) -> DownloaderCompletedJobIdentity:
+    lease = normalize_job_lease_identity(
+        job_id=job_id,
+        expected_version=expected_version,
+        lease_owner=lease_owner,
+        workflow_type=workflow_type,
+        context="downloader completed",
+        error_cls=error_cls,
+    )
+    task_key = normalize_job_task_key(
+        task_id=task_id,
+        task_hash=task_hash,
+        context="downloader completed",
+        error_cls=error_cls,
+    )
+    return DownloaderCompletedJobIdentity(
+        job_id=lease.job_id,
+        workflow_type=lease.workflow_type,
+        lease_owner=lease.lease_owner,
+        expected_version=lease.expected_version,
+        task_id=task_key.task_id,
+        task_hash=task_key.task_hash,
     )
 
 

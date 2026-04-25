@@ -8,6 +8,7 @@ from app.db.job_repo_support import (
     fetch_job_row_by_chat_task_ref,
     fetch_job_row_by_identity,
     fetch_latest_pending_job_row,
+    normalize_downloader_completed_job_identity,
     normalize_job_chat_identity,
     normalize_job_lease_identity,
     normalize_job_pending_upsert_identity,
@@ -250,26 +251,27 @@ class JobRepo:
         task_hash: str,
         payload_json: str,
     ) -> bool:
-        cleaned_job_id = job_id.strip()
-        cleaned_owner = lease_owner.strip()
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_job_id or not cleaned_owner or not cleaned_task_id or not cleaned_task_hash:
-            raise JobPersistenceError("downloader completed job identity missing")
-        if expected_version <= 0:
-            raise JobPersistenceError("downloader completed job expected version missing")
+        identity = normalize_downloader_completed_job_identity(
+            job_id=job_id,
+            expected_version=expected_version,
+            lease_owner=lease_owner,
+            task_id=task_id,
+            task_hash=task_hash,
+            workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+            error_cls=JobPersistenceError,
+        )
 
         with self._database.connect() as connection:
             rowcount = update_downloader_job_completed(
                 connection=connection,
-                job_id=cleaned_job_id,
-                expected_version=expected_version,
-                lease_owner=cleaned_owner,
-                task_id=cleaned_task_id,
-                task_hash=cleaned_task_hash,
+                job_id=identity.job_id,
+                expected_version=identity.expected_version,
+                lease_owner=identity.lease_owner,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
                 payload_json=payload_json,
                 completed_state=JOB_STATE_COMPLETED,
-                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
+                workflow_type=identity.workflow_type,
             )
             connection.commit()
         return rowcount == 1
