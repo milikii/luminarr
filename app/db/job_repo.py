@@ -212,8 +212,11 @@ class JobRepo:
             connection.commit()
         if rowcount == 1:
             return True
-        if self._get_job_by_identity(job_id=identity.job_id, workflow_type=identity.workflow_type) is None:
-            raise JobPersistenceError("job missing during lease claim")
+        self._require_job_by_identity(
+            job_id=identity.job_id,
+            workflow_type=identity.workflow_type,
+            missing_error="job missing during lease claim",
+        )
         return False
 
     def release_lease_to_pending(
@@ -307,8 +310,11 @@ class JobRepo:
             connection.commit()
         if rowcount == 1:
             return True
-        if self._get_job_by_identity(job_id=identity.job_id, workflow_type=identity.workflow_type) is None:
-            raise JobPersistenceError("job missing during cancel")
+        self._require_job_by_identity(
+            job_id=identity.job_id,
+            workflow_type=identity.workflow_type,
+            missing_error="job missing during cancel",
+        )
         return False
 
     def _upsert_job_pending(
@@ -463,8 +469,11 @@ class JobRepo:
             connection.commit()
         if rowcount == 1:
             return True
-        if self._get_job_by_identity(job_id=lease.job_id, workflow_type=lease.workflow_type) is None:
-            raise JobPersistenceError("job missing during state transition")
+        self._require_job_by_identity(
+            job_id=lease.job_id,
+            workflow_type=lease.workflow_type,
+            missing_error="job missing during state transition",
+        )
         return False
 
     def _get_job_by_identity(self, *, job_id: str, workflow_type: str) -> JobRecord | None:
@@ -486,6 +495,21 @@ class JobRepo:
             row=row,
             to_job_record=_to_job_record,
         )
+
+    def _require_job_by_identity(
+        self,
+        *,
+        job_id: str,
+        workflow_type: str,
+        missing_error: str,
+    ) -> JobRecord:
+        job = self._get_job_by_identity(
+            job_id=job_id,
+            workflow_type=workflow_type,
+        )
+        if job is None:
+            raise JobPersistenceError(missing_error)
+        return job
 
     def _select_one(self, query: str, params: tuple[object, ...]) -> JobRecord | None:
         with self._database.connect() as connection:
