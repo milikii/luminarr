@@ -31,6 +31,7 @@
 - `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
+- 2026-04-25 连续施工冷启动复验：`make quality` 与 `make verify-mainline` 均通过，默认分支与当前文档真相未见漂移
 - 2026-04-25 冷启动一致性检查：`make quality`、`make verify-mainline` 与 `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 均已复验通过；其中跨渠道搜索 smoke 的测试夹具已同步到当前搜索评分真相。
 - 2026-04-25 subtitle 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `37 passed`
 - 2026-04-25 btsub 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/manage_bt_subscription.py app/services/bt_subscription_repo_support.py app/services/bt_subscription_dispatch_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py` 为 `38 passed`
