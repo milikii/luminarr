@@ -10,10 +10,10 @@ from app.db.job_repo_support import (
     fetch_latest_pending_job_row,
     normalize_downloader_completed_job_identity,
     normalize_job_chat_identity,
+    normalize_job_chat_task_query_identity,
     normalize_job_lease_identity,
     normalize_job_pending_cancel_identity,
     normalize_job_pending_upsert_identity,
-    normalize_job_task_ref,
     normalize_job_workflow,
     resolve_job_record_from_row,
     upsert_pending_job_row,
@@ -113,13 +113,17 @@ class JobRepo:
         )
 
     def get_pending_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
-        chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
-        task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
+        identity = normalize_job_chat_task_query_identity(
+            chat_id=chat_id,
+            task_ref=task_ref,
+            context="query",
+            error_cls=JobPersistenceError,
+        )
         with self._database.connect() as connection:
             row = fetch_job_row_by_chat_task_ref(
                 connection=connection,
-                chat_id=chat.chat_id,
-                task_ref=task.task_ref,
+                chat_id=identity.chat_id,
+                task_ref=identity.task_ref,
                 state=JOB_STATE_PENDING_APPROVAL,
             )
         return resolve_job_record_from_row(
@@ -128,13 +132,17 @@ class JobRepo:
         )
 
     def get_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
-        chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
-        task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
+        identity = normalize_job_chat_task_query_identity(
+            chat_id=chat_id,
+            task_ref=task_ref,
+            context="query",
+            error_cls=JobPersistenceError,
+        )
         with self._database.connect() as connection:
             row = fetch_job_row_by_chat_task_ref(
                 connection=connection,
-                chat_id=chat.chat_id,
-                task_ref=task.task_ref,
+                chat_id=identity.chat_id,
+                task_ref=identity.task_ref,
             )
         return resolve_job_record_from_row(
             row=row,
@@ -373,8 +381,12 @@ class JobRepo:
         chat_id: int,
         task_ref: str,
     ) -> JobRecord | None:
-        chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
-        task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
+        identity = normalize_job_chat_task_query_identity(
+            chat_id=chat_id,
+            task_ref=task_ref,
+            context="query",
+            error_cls=JobPersistenceError,
+        )
         workflow = normalize_job_workflow(
             workflow_type=workflow_type,
             context="query",
@@ -383,8 +395,8 @@ class JobRepo:
         with self._database.connect() as connection:
             row = fetch_job_row_by_chat_task_ref(
                 connection=connection,
-                chat_id=chat.chat_id,
-                task_ref=task.task_ref,
+                chat_id=identity.chat_id,
+                task_ref=identity.task_ref,
                 workflow_type=workflow.workflow_type,
             )
         return resolve_job_record_from_row(

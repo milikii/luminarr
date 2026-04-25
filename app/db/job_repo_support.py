@@ -56,6 +56,12 @@ class JobPendingCancelIdentity:
     expected_version: int
 
 
+@dataclass(frozen=True, slots=True)
+class JobChatTaskQueryIdentity:
+    chat_id: int
+    task_ref: str
+
+
 def normalize_job_chat_identity(*, chat_id: int, context: str, error_cls: type[Exception]) -> JobChatIdentity:
     if chat_id <= 0:
         raise error_cls(f"job chat identity missing for {context}")
@@ -326,6 +332,26 @@ def normalize_job_pending_cancel_identity(
         workflow_type=workflow.workflow_type,
         expected_version=expected_version,
     )
+
+
+def normalize_job_chat_task_query_identity(
+    *,
+    chat_id: int,
+    task_ref: str,
+    context: str,
+    error_cls: type[Exception],
+) -> JobChatTaskQueryIdentity:
+    chat = normalize_job_chat_identity(
+        chat_id=chat_id,
+        context=context,
+        error_cls=error_cls,
+    )
+    task = normalize_job_task_ref(
+        task_ref=task_ref,
+        context=context,
+        error_cls=error_cls,
+    )
+    return JobChatTaskQueryIdentity(chat_id=chat.chat_id, task_ref=task.task_ref)
 
 
 def update_job_lease_claim(
