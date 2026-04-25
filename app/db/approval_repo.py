@@ -543,19 +543,13 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> ApprovalRecord | None:
-        identity = normalize_approval_identity(
+        row, identity = self._query_exact_approval_row(
+            action_type=action_type,
             task_id=task_id,
             task_hash=task_hash,
             context="query",
-            error_cls=ApprovalPersistenceError,
         )
         with self._database.connect() as connection:
-            row = fetch_exact_approval_row(
-                connection=connection,
-                action_type=action_type,
-                task_id=identity.task_id,
-                task_hash=identity.task_hash,
-            )
             if row is None:
                 fallback_row = fetch_latest_approval_row_for_task_id(
                     connection=connection,
@@ -576,10 +570,29 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> ApprovalRecord | None:
-        identity = normalize_approval_identity(
+        row, _ = self._query_exact_approval_row(
+            action_type=action_type,
             task_id=task_id,
             task_hash=task_hash,
             context="exact query",
+        )
+        return resolve_approval_record_from_row(
+            row=row,
+            to_approval_record=_to_approval_record,
+        )
+
+    def _query_exact_approval_row(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+        context: str,
+    ) -> tuple[Mapping[str, object] | None, object]:
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context=context,
             error_cls=ApprovalPersistenceError,
         )
         with self._database.connect() as connection:
@@ -589,10 +602,7 @@ class ApprovalRepo:
                 task_id=identity.task_id,
                 task_hash=identity.task_hash,
             )
-        return resolve_approval_record_from_row(
-            row=row,
-            to_approval_record=_to_approval_record,
-        )
+        return row, identity
 
     def _is_pending_expired(
         self,
