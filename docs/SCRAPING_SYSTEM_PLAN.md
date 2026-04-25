@@ -142,7 +142,8 @@ Luminarr 当前仍是：
   - 当前补充：`inspect_by_task_ref()` 主流程、`cleanup_correlation_lookup.py` 的关联事件读取护栏、主流程、路径缺失判定 / 结果构造、任务身份解析，以及 cleanup 路径校验 / 删除资产也已继续下沉到 `cleanup_inspect_flow_support.py` / `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` / `cleanup_task_identity_support.py` / `cleanup_correlation_logging_support.py` / `cleanup_path_guard_support.py` / `cleanup_asset_support.py`；当前 `cleanup_downloaded_source.py` 为 `334` 行，`cleanup_correlation_lookup.py` 为 `215` 行。
   - 目标：继续按“剩余 service 粘合层 / correlation lookup 最后封装层”拆分
 - `app/db/approval_repo.py`
-  - 目标：按 action 族或 query/update helper 收口，避免继续在同一文件里累加协议分支
+  - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前 `approval_repo.py` 为 `779` 行。
+  - 目标：继续按“action 族入口 / 剩余 SQL 写入边界”收口
 - `app/db/job_repo.py`
   - 目标：按 workflow/job lifecycle 的 query/update helper 收口，降低跨能力族耦合
 
