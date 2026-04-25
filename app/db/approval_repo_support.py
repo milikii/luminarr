@@ -184,6 +184,49 @@ def upsert_approval_row(
     )
 
 
+def request_approval_row(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+    pending_status: str,
+    expires_at: str,
+    task_ref: str,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO approval_record (
+            action_type,
+            task_id,
+            task_hash,
+            status,
+            lease_version,
+            executed_version,
+            expires_at,
+            last_task_ref,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, 1, 0, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(action_type, task_id, task_hash)
+        DO UPDATE SET
+            status = excluded.status,
+            lease_version = approval_record.lease_version + 1,
+            expires_at = excluded.expires_at,
+            last_task_ref = excluded.last_task_ref,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            action_type,
+            task_id,
+            task_hash,
+            pending_status,
+            expires_at,
+            task_ref.strip(),
+        ),
+    )
+
+
 def update_approval_status(
     *,
     connection: object,

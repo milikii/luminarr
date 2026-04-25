@@ -11,6 +11,7 @@ from app.db.approval_repo_support import (
     move_approval_identity_row,
     normalize_approval_identity,
     normalize_move_identity,
+    request_approval_row,
     normalize_transition_identity,
     resolve_approval_record_from_row,
     resolve_requested_lease_version_from_row,
@@ -338,36 +339,14 @@ class ApprovalRepo:
         expires_at = _format_utc(_utcnow() + timedelta(seconds=max(0, timeout_seconds)))
 
         with self._database.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO approval_record (
-                    action_type,
-                    task_id,
-                    task_hash,
-                    status,
-                    lease_version,
-                    executed_version,
-                    expires_at,
-                    last_task_ref,
-                    created_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, 1, 0, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT(action_type, task_id, task_hash)
-                DO UPDATE SET
-                    status = excluded.status,
-                    lease_version = approval_record.lease_version + 1,
-                    expires_at = excluded.expires_at,
-                    last_task_ref = excluded.last_task_ref,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (
-                    action_type,
-                    identity.task_id,
-                    identity.task_hash,
-                    APPROVAL_STATUS_PENDING,
-                    expires_at,
-                    task_ref.strip(),
-                ),
+            request_approval_row(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                pending_status=APPROVAL_STATUS_PENDING,
+                expires_at=expires_at,
+                task_ref=task_ref,
             )
             connection.commit()
         lease_version = self._get_requested_lease_version(
