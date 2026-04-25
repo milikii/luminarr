@@ -29,6 +29,11 @@ from app.services.bt_subscription_repo_support import (
     remove_subscription_item,
     update_subscription_last_seen,
 )
+from app.services.bt_subscription_scan_support import (
+    BtSubscriptionRunResult,
+    format_bt_subscription_run_result,
+    scan_bt_subscription_items,
+)
 from app.services.bt_sources import resolve_bt_source
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -56,14 +61,6 @@ BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT = (
 BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON = "bt_subscription_item missing after insert"
 BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON = "bt subscription last_seen update result missing"
 parse_bt_subscription_query = _parse_bt_subscription_query
-
-
-@dataclass(frozen=True, slots=True)
-class BtSubscriptionRunResult:
-    scanned: int
-    matched: int
-    replies: tuple[str, ...]
-    pending_creation_failed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,7 +129,12 @@ class ManageBtSubscriptionService:
             return BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT
         if result.scanned <= 0:
             return BT_SUBSCRIPTION_RUN_EMPTY_TEXT
-        return _format_bt_subscription_run_result(result)
+        return format_bt_subscription_run_result(
+            result=result,
+            run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
+            run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
+            pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
+        )
 
     async def run_scheduler_tick(
         self,
@@ -168,7 +170,17 @@ class ManageBtSubscriptionService:
                 continue
             if result.matched <= 0:
                 continue
-            notifications.append((chat_id, _format_bt_subscription_run_result(result)))
+            notifications.append(
+                (
+                    chat_id,
+                    format_bt_subscription_run_result(
+                        result=result,
+                        run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
+                        run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
+                        pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
+                    ),
+                )
+            )
         if scan_failed and not notifications:
             return None
         return tuple(notifications)
@@ -395,44 +407,28 @@ class ManageBtSubscriptionService:
         user_id: int | None,
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> BtSubscriptionRunResult | None:
-        items_result = list_subscription_items(
-            repo=self._bt_subscription_repo,
-            chat_id=chat_id,
-            result_missing_reason="bt subscription scan items result missing",
-            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
-        )
-        if not items_result.ok:
-            if items_result.status == "result_missing":
-                _log_bt_subscription_scan_items_result_missing(chat_id=chat_id, reason=items_result.reason)
-            elif items_result.status == "row_corrupted":
-                _log_bt_subscription_scan_items_row_corrupted(chat_id=chat_id, reason=items_result.reason)
-            else:
-                _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=items_result.reason)
-            return None
-        items = items_result.value or ()
-        if not items:
-            return BtSubscriptionRunResult(scanned=0, matched=0, replies=())
-
-        replies: list[str] = []
-        matched = 0
-        pending_creation_failed = False
-        for item in items:
-            reply, item_pending_creation_failed = await self._run_for_item(
+        return await scan_bt_subscription_items(
+            list_items=lambda: list_subscription_items(
+                repo=self._bt_subscription_repo,
+                chat_id=chat_id,
+                result_missing_reason="bt subscription scan items result missing",
+                is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+            ),
+            run_for_item=lambda item: self._run_for_item(
                 item=item,
                 chat_id=chat_id,
                 user_id=user_id,
                 dispatch_context=dispatch_context,
-            )
-            pending_creation_failed = pending_creation_failed or item_pending_creation_failed
-            if reply is None:
-                continue
-            matched += 1
-            replies.append(reply)
-        return BtSubscriptionRunResult(
-            scanned=len(items),
-            matched=matched,
-            replies=tuple(replies),
-            pending_creation_failed=pending_creation_failed,
+            ),
+            log_items_failed=lambda reason: _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=reason),
+            log_items_result_missing=lambda reason: _log_bt_subscription_scan_items_result_missing(
+                chat_id=chat_id,
+                reason=reason,
+            ),
+            log_items_row_corrupted=lambda reason: _log_bt_subscription_scan_items_row_corrupted(
+                chat_id=chat_id,
+                reason=reason,
+            ),
         )
 
     def _update_last_seen(
@@ -873,21 +869,6 @@ def _log_bt_subscription_pending_creation_failed(
         f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。"
     )
-
-
-def _format_bt_subscription_run_result(result: BtSubscriptionRunResult) -> str:
-    header = (
-        BT_SUBSCRIPTION_RUN_DONE_TEMPLATE.format(scanned=result.scanned, matched=result.matched)
-        if result.matched > 0
-        else BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE.format(scanned=result.scanned)
-    )
-    if not result.replies:
-        return header
-    body = "\n\n".join(result.replies)
-    if result.pending_creation_failed:
-        body = f"{body}\n\n{BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT}"
-    return f"{header}\n\n{body}"
-
 
 def _is_bt_subscription_item_row_corrupted_reason(reason: str) -> bool:
     return reason in {
