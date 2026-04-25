@@ -12,6 +12,8 @@ from app.services.subtitle_translation_support import (
     _SrtBlock,
     _build_embedded_subtitle_extract_command,
     _build_professional_subtitle_translation_request,
+    _build_subtitle_skip_result,
+    _build_subtitle_translation_summary,
     _build_subtitle_file,
     _extract_chat_completion_response_text,
     _extract_translations_from_response,
@@ -384,13 +386,8 @@ class SubtitleTranslatorService:
         return translated_count, None
 
     def _build_skip_result(self, *, skip_reason: str) -> SubtitleTranslateResult:
-        if skip_reason == "chinese_external":
-            message = "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
-        elif skip_reason == "chinese_embedded":
-            message = "字幕翻译已跳过：视频内已检测到中文字幕轨。"
-        else:
-            message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
-        return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+        message, skipped = _build_subtitle_skip_result(skip_reason=skip_reason)
+        return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=skipped)
 
     def _build_translation_summary_result(
         self,
@@ -398,19 +395,15 @@ class SubtitleTranslatorService:
         movie_title: str,
         translated_count: int,
     ) -> SubtitleTranslateResult:
-        if translated_count <= 0:
-            message = "字幕翻译已跳过：目标中文字幕文件已存在。"
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
-
-        if movie_title:
-            message = f"字幕翻译成功：{movie_title}，已生成 {translated_count} 个字幕文件。"
-        else:
-            message = f"字幕翻译成功：已生成 {translated_count} 个字幕文件。"
+        message, skipped = _build_subtitle_translation_summary(
+            movie_title=movie_title,
+            translated_count=translated_count,
+        )
         return SubtitleTranslateResult(
-            success=True,
+            success=not skipped,
             message=message,
             translated_count=translated_count,
-            skipped=False,
+            skipped=skipped,
         )
 
     def _translate_srt_text(

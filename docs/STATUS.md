@@ -10,7 +10,7 @@
 - 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
 - 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
-- 当前又从刮削后续 backlog 收掉一小格：单文件与目录型目标的 skip 文案现在都已统一走更小的结果映射；目录为空、整季每集都已有中文字幕外挂字幕、以及单文件已有中文字幕外挂/内嵌字幕的返回语义都已各自有 focused 护栏。当前 `subtitle_translator.py` 为 `531` 行。
+- 当前又从刮削后续 backlog 收掉一小格：`translate_for_import` 的 skip/success 结果构造也已下沉到更小 helper；单文件与目录型目标的 skip 文案、以及成功汇总文案现在都已统一走更小的结果映射。当前 `subtitle_translator.py` 为 `524` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 

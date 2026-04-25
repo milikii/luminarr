@@ -229,6 +229,26 @@ def _build_professional_subtitle_translation_request(
     return system_prompt, user_payload
 
 
+def _build_subtitle_skip_result(*, skip_reason: str) -> tuple[str, bool]:
+    if skip_reason == "chinese_external":
+        return "字幕翻译已跳过：已检测到中文字幕外挂字幕。", True
+    if skip_reason == "chinese_embedded":
+        return "字幕翻译已跳过：视频内已检测到中文字幕轨。", True
+    return "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。", True
+
+
+def _build_subtitle_translation_summary(
+    *,
+    movie_title: str,
+    translated_count: int,
+) -> tuple[str, bool]:
+    if translated_count <= 0:
+        return "字幕翻译已跳过：目标中文字幕文件已存在。", True
+    if movie_title:
+        return f"字幕翻译成功：{movie_title}，已生成 {translated_count} 个字幕文件。", False
+    return f"字幕翻译成功：已生成 {translated_count} 个字幕文件。", False
+
+
 def _extract_chat_completion_response_text(body: dict[str, object]) -> str:
     try:
         content = body["choices"][0]["message"]["content"]
