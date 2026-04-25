@@ -19,7 +19,6 @@ from app.services.subtitle_translation_support import (
     _find_video_files,
     _parse_ass_dialogue_lines,
     _parse_ffmpeg_subtitle_streams,
-    _parse_ffprobe_subtitle_streams,
     _parse_srt_blocks,
     _print_colored_error,
     _read_metadata_title,
@@ -30,6 +29,7 @@ from app.services.subtitle_translation_support import (
     _resolve_directory_skip_reason,
     _resolve_embedded_subtitle_output_path,
     _resolve_extracted_subtitle_file,
+    _resolve_ffprobe_subtitle_streams,
     _read_subtitle_source_text,
     _resolve_translated_subtitle_content,
     _run_subprocess_command,
@@ -196,25 +196,16 @@ class SubtitleTranslatorService:
             _print_colored_error(problem=failure.problem, fix=failure.fix)
             return [], SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
 
-        if completed.returncode != 0:
-            problem = completed.stderr.strip() or completed.stdout.strip() or f"exit={completed.returncode}"
-            message = f"字幕翻译失败：检查内嵌字幕失败：{video_path}，原因：{problem}"
-            _print_colored_error(
-                problem=message,
-                fix="确认视频文件未损坏，并检查 `ffprobe` 是否能读取该视频的字幕流信息。",
-            )
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-
-        try:
-            streams = _parse_ffprobe_subtitle_streams(completed.stdout or "{}")
-        except json.JSONDecodeError as exc:
-            message = f"字幕翻译失败：ffprobe 输出不是有效 JSON：{video_path}，原因：{exc}"
-            _print_colored_error(
-                problem=message,
-                fix="检查 `ffprobe` 输出是否被外部 wrapper 改写，确保它返回标准 JSON。",
-            )
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-        return streams, None
+        streams, parse_failure = _resolve_ffprobe_subtitle_streams(
+            video_path=video_path,
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
+        if parse_failure is not None:
+            _print_colored_error(problem=parse_failure.problem, fix=parse_failure.fix)
+            return [], SubtitleTranslateResult(success=False, message=parse_failure.problem, translated_count=0, skipped=False)
+        return streams or [], None
 
     def _probe_embedded_subtitles_with_ffmpeg(
         self,

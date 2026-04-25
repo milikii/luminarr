@@ -434,6 +434,30 @@ def _parse_ffprobe_subtitle_streams(payload_text: str) -> list[_EmbeddedSubtitle
     return result
 
 
+def _resolve_ffprobe_subtitle_streams(
+    *,
+    video_path: Path,
+    returncode: int,
+    stdout: str,
+    stderr: str,
+) -> tuple[list[_EmbeddedSubtitleStream] | None, _SubtitleCommandFailure | None]:
+    if returncode != 0:
+        problem = stderr.strip() or stdout.strip() or f"exit={returncode}"
+        return None, _SubtitleCommandFailure(
+            reason="ffprobe_failed",
+            problem=f"字幕翻译失败：检查内嵌字幕失败：{video_path}，原因：{problem}",
+            fix="确认视频文件未损坏，并检查 `ffprobe` 是否能读取该视频的字幕流信息。",
+        )
+    try:
+        return _parse_ffprobe_subtitle_streams(stdout or "{}"), None
+    except json.JSONDecodeError as exc:
+        return None, _SubtitleCommandFailure(
+            reason="ffprobe_invalid_json",
+            problem=f"字幕翻译失败：ffprobe 输出不是有效 JSON：{video_path}，原因：{exc}",
+            fix="检查 `ffprobe` 输出是否被外部 wrapper 改写，确保它返回标准 JSON。",
+        )
+
+
 def _parse_srt_blocks(content: str) -> list[_SrtBlock]:
     blocks: list[_SrtBlock] = []
     chunks = re.split(r"\n\s*\n", content.strip())

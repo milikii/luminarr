@@ -887,6 +887,30 @@ def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path:
     assert streams[0].title == "English"
 
 
+def test_probe_embedded_subtitles_fails_when_ffprobe_output_is_not_json(tmp_path: Path, monkeypatch) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout="not-json",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    streams, error = service._probe_embedded_subtitles(target_file)
+
+    assert streams == []
+    assert error is not None
+    assert error.success is False
+    assert "ffprobe 输出不是有效 JSON" in error.message
+
+
 def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_invalid(
     tmp_path: Path,
     monkeypatch,
