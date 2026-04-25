@@ -13,11 +13,10 @@ from app.services.subtitle_translation_support import (
     _build_subtitle_translation_summary,
     _extract_translations_from_response,
     _find_video_files,
-    _parse_ass_dialogue_lines,
     _print_colored_error,
     _read_metadata_title,
-    _render_ass_lines,
     _request_subtitle_chat_completion,
+    _translate_ass_subtitle_content,
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
     _resolve_directory_skip_reason,
@@ -28,8 +27,6 @@ from app.services.subtitle_translation_support import (
     _read_subtitle_source_text,
     _resolve_translated_subtitle_content,
     _run_subprocess_command,
-    _translate_blocks_in_chunks,
-    _translate_chunk_lines,
     _translate_srt_subtitle_content,
     _write_translated_subtitle_file,
 )
@@ -405,34 +402,15 @@ class SubtitleTranslatorService:
         movie_title: str,
         subtitle_path: Path,
     ) -> tuple[str | None, str | None]:
-        lines, dialogue_lines = _parse_ass_dialogue_lines(source_text)
-        if not dialogue_lines:
-            message = f"字幕翻译失败：{subtitle_path} 不是有效 ASS 或没有可翻译对话。"
-            _print_colored_error(
-                problem=message,
-                fix="确认字幕是标准 Advanced SubStation Alpha(.ass) 文件，包含 `[Script Info]` 和 `Dialogue:` 行。",
-            )
-            return None, message
-
-        translated_lines, error_message = _translate_blocks_in_chunks(
-            blocks=dialogue_lines,
-            size=60,
-            get_source_text=lambda line: line.text,
-            translate_chunk=lambda source_lines: _translate_chunk_lines(
+        return _translate_ass_subtitle_content(
+            source_text=source_text,
+            movie_title=movie_title,
+            subtitle_path=subtitle_path,
+            translate_lines=lambda source_lines, resolved_movie_title: self._translate_lines_professional(
                 source_lines=source_lines,
-                subtitle_path=subtitle_path,
-                translate_lines=lambda lines: self._translate_lines_professional(
-                    source_lines=lines,
-                    movie_title=movie_title,
-                ),
+                movie_title=resolved_movie_title,
             ),
-            build_output_block=lambda _, translated_text: translated_text,
         )
-        if translated_lines is None:
-            return None, error_message
-        for dialogue_line, translated_text in zip(dialogue_lines, translated_lines):
-            lines[dialogue_line.line_index] = dialogue_line.prefix + translated_text
-        return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
 
     def _translate_lines_professional(self, *, source_lines: list[str], movie_title: str) -> list[str]:
         system_prompt, user_payload = _build_professional_subtitle_translation_request(

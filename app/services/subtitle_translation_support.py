@@ -626,6 +626,40 @@ def _translate_srt_subtitle_content(
     return _render_srt(translated_blocks), None
 
 
+def _translate_ass_subtitle_content(
+    *,
+    source_text: str,
+    movie_title: str,
+    subtitle_path: Path,
+    translate_lines: Callable[[list[str], str], list[str]],
+) -> tuple[str | None, str | None]:
+    lines, dialogue_lines = _parse_ass_dialogue_lines(source_text)
+    if not dialogue_lines:
+        message = f"字幕翻译失败：{subtitle_path} 不是有效 ASS 或没有可翻译对话。"
+        _print_colored_error(
+            problem=message,
+            fix="确认字幕是标准 Advanced SubStation Alpha(.ass) 文件，包含 `[Script Info]` 和 `Dialogue:` 行。",
+        )
+        return None, message
+
+    translated_lines, error_message = _translate_blocks_in_chunks(
+        blocks=dialogue_lines,
+        size=60,
+        get_source_text=lambda line: line.text,
+        translate_chunk=lambda source_lines: _translate_chunk_lines(
+            source_lines=source_lines,
+            subtitle_path=subtitle_path,
+            translate_lines=lambda lines: translate_lines(lines, movie_title),
+        ),
+        build_output_block=lambda _, translated_text: translated_text,
+    )
+    if translated_lines is None:
+        return None, error_message
+    for dialogue_line, translated_text in zip(dialogue_lines, translated_lines):
+        lines[dialogue_line.line_index] = dialogue_line.prefix + translated_text
+    return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
+
+
 def _run_subprocess_command(
     *,
     command: list[str],
