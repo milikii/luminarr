@@ -32,6 +32,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - [搜索与下载审批流程](docs/assets/luminarr-detail-search-download-flow.png)
 - [导入审批与媒体识别](docs/assets/luminarr-detail-import-approval-flow.png)
 - [导入后处理流程](docs/assets/luminarr-detail-post-import-pipeline.png)
+- [字幕翻译细节流程](docs/assets/luminarr-detail-subtitle-translation.png)
 - [四渠道如何进入 shared runtime](docs/assets/luminarr-detail-shared-runtime-routing.png)
 - [任务状态与确认生命周期](docs/assets/luminarr-detail-task-lifecycle.png)
 
