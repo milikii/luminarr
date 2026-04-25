@@ -9,9 +9,9 @@ from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
+from app.services.cleanup_execution_support import execute_cleanup_delete
 from app.services.cleanup_follow_up_support import (
     append_cleanup_follow_up,
-    append_cleanup_success_follow_up,
     format_cleanup_inspect_follow_up,
     preferred_cleanup_ref,
     resolve_cleanup_blocked_event_details,
@@ -233,27 +233,32 @@ class CleanupDownloadedSourceService:
             )
             return message
 
-        try:
-            _delete_source_asset(source_path)
-        except OSError as error:
-            message = append_cleanup_follow_up(
-                CLEANUP_FAILED_TEXT.format(reason=str(error)),
-                follow_up_ref,
-                CLEANUP_FOLLOW_UP_TEMPLATE,
-            )
+        delete_result = execute_cleanup_delete(
+            delete_source_asset=_delete_source_asset,
+            source_path=source_path,
+            target_path=target_path,
+            task_id=inspection.task_id,
+            task_hash=inspection.task_hash,
+            follow_up_ref=follow_up_ref,
+            cleanup_failed_text=CLEANUP_FAILED_TEXT,
+            cleanup_succeeded_text=CLEANUP_SUCCEEDED_TEXT,
+            follow_up_template=CLEANUP_FOLLOW_UP_TEMPLATE,
+            success_follow_up_template=CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE,
+        )
+        if not delete_result.success:
             self._record_event(
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
-                event_type="cleanup.failed",
-                message=message,
+                event_type=delete_result.event_type,
+                message=delete_result.message,
                 source_path=str(source_path),
                 target_path=str(target_path),
             )
             print(
                 f"\033[31m[cleanup 执行失败]\033[0m task_ref={task_ref_for_event} "
-                f"event_type=cleanup.failed task_id={inspection.task_id} task_hash={inspection.task_hash} "
-                f"source={source_path} target={target_path} 原因={error}",
+                f"event_type={delete_result.event_type} task_id={inspection.task_id} task_hash={inspection.task_hash} "
+                f"source={source_path} target={target_path} 原因={delete_result.failure_reason}",
                 flush=True,
             )
             print(
@@ -261,28 +266,18 @@ class CleanupDownloadedSourceService:
                 "并确认库内目标路径仍然存在后再重试 cleanup。",
                 flush=True,
             )
-            return message
+            return delete_result.message
 
-        message = append_cleanup_success_follow_up(
-            CLEANUP_SUCCEEDED_TEXT.format(
-                task_id=inspection.task_id,
-                task_hash=inspection.task_hash,
-                source_path=str(source_path),
-                target_path=str(target_path),
-            ),
-            follow_up_ref,
-            CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE,
-        )
         self._record_event(
             task_ref=task_ref_for_event,
             task_id=inspection.task_id,
             task_hash=inspection.task_hash,
-            event_type="cleanup.succeeded",
-            message=message,
+            event_type=delete_result.event_type,
+            message=delete_result.message,
             source_path=str(source_path),
             target_path=str(target_path),
         )
-        return message
+        return delete_result.message
 
     def inspect_by_task_ref(
         self,
