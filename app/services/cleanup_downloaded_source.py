@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
+from app.services.cleanup_asset_support import delete_cleanup_source_asset
 from app.services.cleanup_flow_support import run_cleanup_flow
 from app.services.cleanup_blocked_support import resolve_cleanup_blocked_outcome
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
@@ -328,10 +328,7 @@ def _validate_cleanup_paths(*, source_path: Path, target_path: Path) -> str | No
 
 
 def _delete_source_asset(source_path: Path) -> None:
-    if source_path.is_dir():
-        shutil.rmtree(source_path)
-        return
-    if source_path.is_file():
-        source_path.unlink()
-        return
-    raise OSError(CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT)
+    delete_cleanup_source_asset(
+        source_path=source_path,
+        source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    )
