@@ -101,8 +101,8 @@ _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
         {
-            "title": f"title-{query}",
-            "year": 2026,
+            "title": "Dune (2021)",
+            "year": 2021,
             "quality": "1080p",
             "size": 1024,
             "indexerName": "idx",
@@ -179,7 +179,7 @@ def test_handle_message_replies_search_result() -> None:
     sent_text = reply_text.await_args.args[0]
     assert "搜索：dune ✓" in sent_text
     assert "候选结果（1 条）" in sent_text
-    assert "title-dune" in sent_text
+    assert "Dune (2021)" in sent_text
     assert "开始下载：发送 select 1" in sent_text
 
 
@@ -2112,7 +2112,7 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
     assert "待确认：下载 ⏳" in sent_text
-    assert "片名：title-dune" in sent_text
+    assert "片名：Dune (2021)" in sent_text
     assert "选择序号：1" in sent_text
     assert "确认下载：发送 confirm 1" in sent_text
     assert "取消下载：发送 cancel 1" in sent_text
@@ -2145,7 +2145,7 @@ def test_handle_callback_query_digit_routes_to_add_service() -> None:
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
     assert "待确认：下载 ⏳" in sent_text
-    assert "片名：title-dune" in sent_text
+    assert "片名：Dune (2021)" in sent_text
     assert "选择序号：1" in sent_text
     assert "确认下载：发送 confirm 1" in sent_text
 
@@ -2285,7 +2285,7 @@ def test_handle_callback_query_digit_uses_callback_context_when_effective_contex
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
     assert "待确认：下载 ⏳" in sent_text
-    assert "片名：title-dune" in sent_text
+    assert "片名：Dune (2021)" in sent_text
     assert "选择序号：1" in sent_text
     assert "确认下载：发送 confirm 1" in sent_text
 

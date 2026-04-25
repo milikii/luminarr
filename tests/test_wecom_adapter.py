@@ -65,8 +65,8 @@ _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
         {
-            "title": f"title-{query}",
-            "year": 2026,
+            "title": "Dune (2021)",
+            "year": 2021,
             "quality": "1080p",
             "size": 1024,
             "indexerName": "idx",
@@ -293,7 +293,7 @@ def test_handle_wecom_private_text_event_routes_into_shared_runtime() -> None:
     assert "搜索：dune ✓" in reply_text
     assert "- 电影信息" in reply_text
     assert "- 开始下载：发送 select 1" in reply_text
-    assert "title-dune" in reply_text
+    assert "Dune (2021)" in reply_text
 
 
 def test_handle_wecom_private_text_event_routes_cleanup_inspect_into_shared_runtime(
@@ -552,7 +552,7 @@ def test_handle_wecom_callback_http_request_routes_post_into_shared_runtime_and_
     content = _read_xml_text(reply_root, "Content")
     assert "搜索：dune ✓" in content
     assert "- 开始下载：发送 select 1" in content
-    assert "title-dune" in content
+    assert "Dune (2021)" in content
 
 
 def test_handle_wecom_callback_http_request_routes_cleanup_execution_into_shared_runtime_and_returns_encrypted_reply(
@@ -753,7 +753,7 @@ def test_wecom_webhook_server_routes_real_http_get_and_post() -> None:
     reply_xml = _decrypt_wecom_plaintext(_extract_encrypt_from_xml(reply_body))
     assert "搜索：dune ✓" in reply_xml
     assert "- 开始下载：发送 select 1" in reply_xml
-    assert "title-dune" in reply_xml
+    assert "Dune (2021)" in reply_xml
 
 
 async def _start_wecom_runtime_with_retry(max_attempts: int = 3):

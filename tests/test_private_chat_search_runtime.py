@@ -20,8 +20,8 @@ class _ExecutionGate:
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
         {
-            "title": f"title-{query}",
-            "year": 2026,
+            "title": "Dune (2021)",
+            "year": 2021,
             "quality": "1080p",
             "size": 1024,
             "indexerName": "idx",
@@ -53,7 +53,7 @@ def test_handle_search_query_fallback_routes_to_search_service() -> None:
     reply_func.assert_awaited_once()
     sent_text = reply_func.await_args.args[0]
     assert sent_text.startswith("【搜索：dune】 ✓")
-    assert "title-dune" in sent_text
+    assert "Dune (2021)" in sent_text
 
 
 def test_handle_search_query_fallback_replies_processing_path_reminder_first() -> None:

@@ -42,8 +42,8 @@ _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
         {
-            "title": f"title-{query}",
-            "year": 2026,
+            "title": "Dune (2021)",
+            "year": 2021,
             "quality": "1080p",
             "size": 1024,
             "indexerName": "idx",
@@ -578,7 +578,7 @@ def test_personal_wechat_text_service_polls_single_saved_account_and_replies(tmp
     assert "【搜索：dune】 ✓" in text
     assert "▸ 电影信息" in text
     assert "开始下载：发送 select 1" in text
-    assert "title-dune" in text
+    assert "Dune (2021)" in text
     assert getattr(opts, "base_url", "") == "https://wx.test"
     assert getattr(opts, "token", "") == "bot-token-1"
     assert getattr(opts, "context_token", "") == "ctx-1"

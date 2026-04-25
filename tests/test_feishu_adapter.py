@@ -54,8 +54,8 @@ _CHAT_SCOPED_TASK_REF = "cleanup-shortcut"
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
         {
-            "title": f"title-{query}",
-            "year": 2026,
+            "title": "Dune (2021)",
+            "year": 2021,
             "quality": "1080p",
             "size": 1024,
             "indexerName": "idx",
@@ -240,7 +240,7 @@ def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
     assert "搜索：dune ✓" in reply_text
     assert "候选结果（1 条）" in reply_text
     assert "开始下载：发送 select 1" in reply_text
-    assert "title-dune" in reply_text
+    assert "Dune (2021)" in reply_text
 
 
 def test_feishu_webhook_handler_logs_response_write_failure(capsys) -> None:

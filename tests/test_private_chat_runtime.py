@@ -48,8 +48,8 @@ from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, parse_trace_log_line
 async def _fake_search(query: str) -> list[dict[str, object]]:
     return [
         {
-            "title": f"title-{query}",
-            "year": 2026,
+            "title": "Dune (2021)",
+            "year": 2021,
             "quality": "1080p",
             "size": 1024,
             "indexerName": "idx",
@@ -98,7 +98,7 @@ def test_dispatch_private_chat_text_routes_search_without_telegram_update() -> N
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
     assert "搜索结果：dune" in sent_text
-    assert "title-dune" in sent_text
+    assert "Dune (2021)" in sent_text
 
 
 def test_dispatch_private_chat_text_writes_trace_log_when_configured(tmp_path: Path) -> None:
