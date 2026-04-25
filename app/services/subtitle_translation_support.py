@@ -196,6 +196,36 @@ def _parse_ffmpeg_subtitle_streams(output_text: str) -> list[_EmbeddedSubtitleSt
     return streams
 
 
+def _parse_ffprobe_subtitle_streams(payload_text: str) -> list[_EmbeddedSubtitleStream]:
+    payload = json.loads(payload_text or "{}")
+    streams = payload.get("streams", [])
+    if not isinstance(streams, list):
+        return []
+
+    result: list[_EmbeddedSubtitleStream] = []
+    for item in streams:
+        if not isinstance(item, dict):
+            continue
+        tags = item.get("tags", {})
+        if not isinstance(tags, dict):
+            tags = {}
+        try:
+            stream_index = int(item.get("index", -1))
+        except (TypeError, ValueError):
+            stream_index = -1
+        if stream_index < 0:
+            continue
+        result.append(
+            _EmbeddedSubtitleStream(
+                stream_index=stream_index,
+                codec_name=str(item.get("codec_name", "")).strip(),
+                language=str(tags.get("language", "")).strip(),
+                title=str(tags.get("title", "")).strip(),
+            )
+        )
+    return result
+
+
 def _parse_srt_blocks(content: str) -> list[_SrtBlock]:
     blocks: list[_SrtBlock] = []
     chunks = re.split(r"\n\s*\n", content.strip())

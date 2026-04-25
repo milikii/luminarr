@@ -394,6 +394,49 @@ def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_
     assert streams[0].codec_name == "subrip"
 
 
+def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path: Path, monkeypatch) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "index": 2,
+                            "codec_name": "subrip",
+                            "tags": {"language": "eng", "title": "English"},
+                        },
+                        {
+                            "index": "not-a-number",
+                            "codec_name": "subrip",
+                            "tags": {"language": "eng"},
+                        },
+                        {"index": -1, "codec_name": "ass", "tags": ["invalid-tags"]},
+                        "not-a-dict",
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_module.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    streams, error = service._probe_embedded_subtitles(target_file)
+
+    assert error is None
+    assert len(streams) == 1
+    assert streams[0].stream_index == 2
+    assert streams[0].language == "eng"
+    assert streams[0].title == "English"
+
+
 def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)

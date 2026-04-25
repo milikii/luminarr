@@ -21,6 +21,7 @@ from app.services.subtitle_translation_support import (
     _is_english_embedded_subtitle,
     _parse_ass_dialogue_lines,
     _parse_ffmpeg_subtitle_streams,
+    _parse_ffprobe_subtitle_streams,
     _parse_srt_blocks,
     _print_colored_error,
     _read_metadata_title,
@@ -218,7 +219,7 @@ class SubtitleTranslatorService:
             return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
 
         try:
-            payload = json.loads(completed.stdout or "{}")
+            streams = _parse_ffprobe_subtitle_streams(completed.stdout or "{}")
         except json.JSONDecodeError as exc:
             message = f"字幕翻译失败：ffprobe 输出不是有效 JSON：{video_path}，原因：{exc}"
             _print_colored_error(
@@ -226,32 +227,7 @@ class SubtitleTranslatorService:
                 fix="检查 `ffprobe` 输出是否被外部 wrapper 改写，确保它返回标准 JSON。",
             )
             return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
-
-        streams = payload.get("streams", [])
-        if not isinstance(streams, list):
-            return [], None
-        result: list[_EmbeddedSubtitleStream] = []
-        for item in streams:
-            if not isinstance(item, dict):
-                continue
-            tags = item.get("tags", {})
-            if not isinstance(tags, dict):
-                tags = {}
-            try:
-                stream_index = int(item.get("index", -1))
-            except (TypeError, ValueError):
-                stream_index = -1
-            if stream_index < 0:
-                continue
-            result.append(
-                _EmbeddedSubtitleStream(
-                    stream_index=stream_index,
-                    codec_name=str(item.get("codec_name", "")).strip(),
-                    language=str(tags.get("language", "")).strip(),
-                    title=str(tags.get("title", "")).strip(),
-                )
-            )
-        return result, None
+        return streams, None
 
     def _probe_embedded_subtitles_with_ffmpeg(
         self,
