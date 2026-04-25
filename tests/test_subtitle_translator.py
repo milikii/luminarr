@@ -844,6 +844,31 @@ def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_
     assert streams[0].codec_name == "subrip"
 
 
+def test_probe_embedded_subtitles_fails_when_ffprobe_and_ffmpeg_are_both_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        if args[0] == "ffprobe":
+            raise FileNotFoundError("ffprobe")
+        if args[0] == "ffmpeg":
+            raise FileNotFoundError("ffmpeg")
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    streams, error = service._probe_embedded_subtitles(target_file)
+
+    assert streams == []
+    assert error is not None
+    assert error.success is False
+    assert "系统缺少 ffprobe/ffmpeg" in error.message
+
+
 def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path: Path, monkeypatch) -> None:
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")

@@ -423,6 +423,13 @@ def _parse_ffmpeg_subtitle_streams(output_text: str) -> list[_EmbeddedSubtitleSt
     return streams
 
 
+def _resolve_ffmpeg_subtitle_streams(
+    *,
+    output_text: str,
+) -> list[_EmbeddedSubtitleStream]:
+    return _parse_ffmpeg_subtitle_streams(output_text)
+
+
 def _parse_ffprobe_subtitle_streams(payload_text: str) -> list[_EmbeddedSubtitleStream]:
     payload = json.loads(payload_text or "{}")
     streams = payload.get("streams", [])

@@ -18,7 +18,6 @@ from app.services.subtitle_translation_support import (
     _extract_translations_from_response,
     _find_video_files,
     _parse_ass_dialogue_lines,
-    _parse_ffmpeg_subtitle_streams,
     _parse_srt_blocks,
     _print_colored_error,
     _read_metadata_title,
@@ -30,6 +29,7 @@ from app.services.subtitle_translation_support import (
     _resolve_embedded_subtitle_extract_result,
     _resolve_embedded_subtitle_output_path,
     _resolve_ffprobe_subtitle_streams,
+    _resolve_ffmpeg_subtitle_streams,
     _read_subtitle_source_text,
     _resolve_translated_subtitle_content,
     _run_subprocess_command,
@@ -229,7 +229,9 @@ class SubtitleTranslatorService:
             _print_colored_error(problem=failure.problem, fix=failure.fix)
             return [], SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
 
-        parsed_streams = _parse_ffmpeg_subtitle_streams(completed.stderr or completed.stdout or "")
+        parsed_streams = _resolve_ffmpeg_subtitle_streams(
+            output_text=completed.stderr or completed.stdout or "",
+        )
         return parsed_streams, None
 
     def _extract_embedded_subtitle_file(
