@@ -15,10 +15,9 @@ from app.services.subtitle_translation_support import (
     _print_colored_error,
     _read_metadata_title,
     _request_subtitle_chat_completion,
+    _resolve_video_subtitle_files_for_import,
     _translate_single_subtitle_file,
     _translate_ass_subtitle_content,
-    _resolve_embedded_subtitle_stream_selection,
-    _resolve_external_subtitle_files,
     _resolve_target_subtitle_files,
     _translate_subtitle_lines_professionally,
     _translate_srt_subtitle_content,
@@ -102,23 +101,14 @@ class SubtitleTranslatorService:
         self,
         video_path: Path,
     ) -> tuple[list[_SubtitleFile], _SubtitleCommandFailure | None, str]:
-        external_subtitle_files, skip_reason = _resolve_external_subtitle_files(video_path)
-        if external_subtitle_files or skip_reason == "chinese_external":
-            return external_subtitle_files, None, skip_reason
-
-        streams, failure = self._probe_embedded_subtitle_streams(video_path)
-        if failure is not None:
-            return [], failure, "error"
-        english_stream, skip_reason = _resolve_embedded_subtitle_stream_selection(streams)
-        if english_stream is None:
-            return [], None, skip_reason
-
-        subtitle_file, failure = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
-        if failure is not None:
-            return [], failure, "error"
-        if subtitle_file is None:
-            return [], None, "none"
-        return [subtitle_file], None, skip_reason
+        return _resolve_video_subtitle_files_for_import(
+            video_path=video_path,
+            probe_embedded_subtitle_streams=self._probe_embedded_subtitle_streams,
+            extract_embedded_subtitle_file=lambda stream, resolved_video_path: self._extract_embedded_subtitle_file(
+                video_path=resolved_video_path,
+                stream=stream,
+            ),
+        )
 
     def _probe_embedded_subtitle_streams(
         self,

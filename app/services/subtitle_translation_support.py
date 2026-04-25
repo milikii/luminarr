@@ -493,6 +493,34 @@ def _resolve_target_subtitle_files(
     return None, None, _resolve_directory_skip_reason(skip_reasons)
 
 
+def _resolve_video_subtitle_files_for_import(
+    *,
+    video_path: Path,
+    probe_embedded_subtitle_streams: Callable[[Path], tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]],
+    extract_embedded_subtitle_file: Callable[
+        [_EmbeddedSubtitleStream, Path],
+        tuple[_SubtitleFile | None, _SubtitleCommandFailure | None],
+    ],
+) -> tuple[list[_SubtitleFile], _SubtitleCommandFailure | None, str]:
+    external_subtitle_files, skip_reason = _resolve_external_subtitle_files(video_path)
+    if external_subtitle_files or skip_reason == "chinese_external":
+        return external_subtitle_files, None, skip_reason
+
+    streams, failure = probe_embedded_subtitle_streams(video_path)
+    if failure is not None:
+        return [], failure, "error"
+    english_stream, skip_reason = _resolve_embedded_subtitle_stream_selection(streams)
+    if english_stream is None:
+        return [], None, skip_reason
+
+    subtitle_file, failure = extract_embedded_subtitle_file(english_stream, video_path)
+    if failure is not None:
+        return [], failure, "error"
+    if subtitle_file is None:
+        return [], None, "none"
+    return [subtitle_file], None, skip_reason
+
+
 def _is_chinese_subtitle_path(path: Path) -> bool:
     return _looks_like_chinese_subtitle_label(path.name)
 

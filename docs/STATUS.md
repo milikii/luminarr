@@ -11,6 +11,7 @@
 - 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
 - 当前又从刮削后续 backlog 再收掉几小格：字幕翻译的目标字幕解析、`ffprobe/ffmpeg` 探测执行、内嵌字幕提取执行、单文件翻译读写边界与专业翻译请求编排都已下沉到 `subtitle_translation_support.py`；连同更早收掉的 `ffmpeg` fallback 结果解析 / 错误映射与“`ffprobe` 缺失且 `ffmpeg` 也缺失时返回明确失败结果”的 focused 护栏，当前 `subtitle_translator.py` 已降到 `283` 行。
+- 当前又从刮削后续 backlog 再收掉一小格：单视频目标的外挂/内嵌字幕解析编排也已下沉到 `subtitle_translation_support.py`，`subtitle_translator.py` 当前为 `273` 行。
 - 当前又从后续结构 backlog 再收掉一组 BT 订阅小闭环：`add/list/remove/clear` 的 repo guard、扫描前的 `chat_ids/items` 读取护栏、`last_seen` 回写护栏，以及单条订阅的搜索 / pending 创建编排都已下沉到 support helper；当前 `manage_bt_subscription.py` 已降到 `900` 行。
 - 当前又从 cleanup/approval/job 三条结构 backlog 再收掉几小格：cleanup 与 correlation 的主流程、路径校验、删除资产和日志边界，approval 的身份/查询/状态/写入/读路径，以及 job 的身份、查询、写路径与 pending upsert 都已下沉到各自 helper；当前 `cleanup_downloaded_source.py` `334` 行、`cleanup_correlation_lookup.py` `215` 行、`approval_repo.py` `779` 行、`job_repo.py` `533` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
