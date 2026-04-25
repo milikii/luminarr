@@ -9,7 +9,7 @@ from app.db.job_repo import JobRepo
 from app.services.cleanup_flow_support import run_cleanup_flow
 from app.services.cleanup_blocked_support import resolve_cleanup_blocked_outcome
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
-from app.services.cleanup_execution_support import CleanupDeleteExecutionResult, execute_cleanup_delete
+from app.services.cleanup_execution_support import execute_cleanup_delete
 from app.services.cleanup_follow_up_support import (
     preferred_cleanup_ref,
 )
