@@ -13,6 +13,7 @@ from app.db.job_repo_support import (
     normalize_job_chat_task_query_identity,
     normalize_job_lease_identity,
     normalize_job_pending_cancel_identity,
+    normalize_job_pending_query_identity,
     normalize_job_pending_upsert_identity,
     normalize_job_workflow,
     resolve_job_record_from_row,
@@ -410,12 +411,8 @@ class JobRepo:
         workflow_type: str,
         chat_id: int,
     ) -> JobRecord | None:
-        chat = normalize_job_chat_identity(
+        identity = normalize_job_pending_query_identity(
             chat_id=chat_id,
-            context="pending query",
-            error_cls=JobPersistenceError,
-        )
-        workflow = normalize_job_workflow(
             workflow_type=workflow_type,
             context="pending query",
             error_cls=JobPersistenceError,
@@ -423,8 +420,8 @@ class JobRepo:
         with self._database.connect() as connection:
             row = fetch_latest_pending_job_row(
                 connection=connection,
-                chat_id=chat.chat_id,
-                workflow_type=workflow.workflow_type,
+                chat_id=identity.chat_id,
+                workflow_type=identity.workflow_type,
                 pending_state=JOB_STATE_PENDING_APPROVAL,
             )
         return resolve_job_record_from_row(

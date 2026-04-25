@@ -12,6 +12,7 @@
 - 当前又从 approval backlog 再收掉一小格：`_mark_executed()` 的身份规范化也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `714` 行。
 - 当前又从 approval backlog 再收掉一小格：多处重复的 exact-record 缺失判定已收口到 `_require_exact_approval_record()`，`approval_repo.py` 当前为 `726` 行。
 - 当前又从 job backlog 再收掉一小格：chat + task_ref 查询身份已收口到 `job_repo_support.py`，`get_pending_job_for_chat_ref()` / `get_job_for_chat_ref()` / `_get_job_for_chat_ref()` 现在共用同一组 query identity helper。
+- 当前又从 job backlog 再收掉一小格：workflow pending query 身份也已收口到 `job_repo_support.py`，`_get_latest_pending_job_for_workflow()` 现在共用同一组 pending query helper。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -32,6 +33,7 @@
 - 2026-04-25 approval executed identity follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approval_repo_rejects_missing_identity_for_write_paths or approval_repo_raises_when_mark_executed_row_missing"` 为 `2 passed, 109 deselected`。
 - 2026-04-25 approval exact-record helper follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approval_repo_raises_when_upsert_row_missing or approval_repo_approve_raises_when_row_missing or approval_repo_cancel_raises_when_row_missing or approval_repo_restore_pending_raises_when_row_missing or approval_repo_raises_when_pending_request_row_missing or approval_repo_raises_when_mark_executed_row_missing or approval_repo_raises_when_pending_expiry_row_missing"` 为 `7 passed, 104 deselected`。
 - 2026-04-25 job chat-task query helper follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "job_repo_rejects_missing_identity_for_query or get_job_for_chat_ref or get_pending_job_for_chat_ref"` 为 `1 passed, 110 deselected`。
+- 2026-04-25 job pending query helper follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "job_repo_rejects_missing_identity_for_query or get_latest_pending_job or _get_latest_pending_job_for_workflow"` 为 `1 passed, 110 deselected`。
 - 当前真实 smoke 证据仍有效：前半段 `task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status`；后半段 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
 
 ## Current biggest risk

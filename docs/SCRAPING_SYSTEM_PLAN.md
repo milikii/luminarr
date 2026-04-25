@@ -145,7 +145,7 @@ Luminarr 当前仍是：
   - 当前状态：已再前推几格；任务身份校验、approval 行查询、状态更新、executed/move 写入，以及读路径后处理都已下沉到 `approval_repo_support.py`；当前又把 `_approve/_restore_pending/_cancel` 的共享状态迁移薄壳合并到 repo 内 helper，并把 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界、`_mark_executed()` 的身份规范化，以及多处 exact-record 缺失判定继续收口，`approval_repo.py` 为 `726` 行。
   - 目标：继续按“action 族入口 / 剩余 SQL 写入边界”收口
 - `app/db/job_repo.py`
-  - 当前状态：已再前推几格；身份校验、查询 helper，以及 lease/state/completed/cancel 写路径和 pending upsert SQL 都已下沉到 `job_repo_support.py`；当前又把 `mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化，以及 chat + task_ref 查询身份继续下沉到 support helper。
+  - 当前状态：已再前推几格；身份校验、查询 helper，以及 lease/state/completed/cancel 写路径和 pending upsert SQL 都已下沉到 `job_repo_support.py`；当前又把 `mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化，以及 chat + task_ref / workflow pending 查询身份继续下沉到 support helper。
   - 目标：继续按“workflow 入口 / 剩余 SQL 边界”收口
 
 这些文件的拆解默认排在当前刮削主线之后；只有当其中某个文件直接阻塞当前 `media_identity -> scrape` 主线时，才允许提前插队。
