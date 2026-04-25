@@ -314,13 +314,12 @@ class ApprovalRepo:
                 task_ref=task_ref,
             )
             connection.commit()
-        approval_record = self._get_exact_approval_record(
+        self._require_exact_approval_record(
             action_type=action_type,
             task_id=identity.task_id,
             task_hash=identity.task_hash,
+            missing_error="approval_record missing after upsert",
         )
-        if approval_record is None:
-            raise ApprovalPersistenceError("approval_record missing after upsert")
 
     def _request_approval(
         self,
@@ -453,13 +452,12 @@ class ApprovalRepo:
             connection.commit()
         if rowcount == 1:
             return True
-        approval_record = self._get_exact_approval_record(
+        self._require_exact_approval_record(
             action_type=action_type,
             task_id=identity.task_id,
             task_hash=identity.task_hash,
+            missing_error=missing_error,
         )
-        if approval_record is None:
-            raise ApprovalPersistenceError(missing_error)
         return False
 
     def _mark_executed(
@@ -509,13 +507,12 @@ class ApprovalRepo:
             identity.current_task_id == identity.new_task_id
             and identity.current_task_hash == identity.new_task_hash
         ):
-            approval_record = self._get_exact_approval_record(
+            self._require_exact_approval_record(
                 action_type=action_type,
                 task_id=identity.current_task_id,
                 task_hash=identity.current_task_hash,
+                missing_error="approval_record missing during identity move",
             )
-            if approval_record is None:
-                raise ApprovalPersistenceError("approval_record missing during identity move")
             return
 
         with self._database.connect() as connection:
@@ -531,14 +528,13 @@ class ApprovalRepo:
         if rowcount == 1:
             return
 
-        target_record = self._get_exact_approval_record(
+        self._require_exact_approval_record(
             action_type=action_type,
             task_id=identity.new_task_id,
             task_hash=identity.new_task_hash,
+            missing_error="approval_record missing during identity move",
         )
-        if target_record is not None:
-            return
-        raise ApprovalPersistenceError("approval_record missing during identity move")
+        return
 
     def _get_approval(
         self,
@@ -613,13 +609,12 @@ class ApprovalRepo:
             context="pending expiry check",
             error_cls=ApprovalPersistenceError,
         )
-        approval_record = self._get_exact_approval_record(
+        approval_record = self._require_exact_approval_record(
             action_type=action_type,
             task_id=identity.task_id,
             task_hash=identity.task_hash,
+            missing_error="approval_record missing during pending expiry check",
         )
-        if approval_record is None:
-            raise ApprovalPersistenceError("approval_record missing during pending expiry check")
         if approval_record.status != APPROVAL_STATUS_PENDING:
             return False
         if approval_record.lease_version != identity.expected_lease_version:
@@ -651,6 +646,23 @@ class ApprovalRepo:
             row=row,
             error_cls=ApprovalPersistenceError,
         )
+
+    def _require_exact_approval_record(
+        self,
+        *,
+        action_type: str,
+        task_id: str,
+        task_hash: str,
+        missing_error: str,
+    ) -> ApprovalRecord:
+        approval_record = self._get_exact_approval_record(
+            action_type=action_type,
+            task_id=task_id,
+            task_hash=task_hash,
+        )
+        if approval_record is None:
+            raise ApprovalPersistenceError(missing_error)
+        return approval_record
 
 
 def _to_approval_record(row: Mapping[str, object]) -> ApprovalRecord:
