@@ -6,6 +6,7 @@ from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_event_support import fetch_cleanup_correlation_event
 from app.services.cleanup_correlation_result_support import build_cleanup_correlation_result
+from app.services.cleanup_task_identity_support import resolve_cleanup_task_identity
 
 CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
@@ -103,38 +104,31 @@ class CleanupCorrelationLookup:
         task_ref: str,
         chat_id: int | None,
     ) -> ResolvedCleanupTaskIdentity:
-        resolved_task_ref = task_ref
-        resolved_task_id = ""
-        resolved_task_hash = ""
-        lookup_task_ref = task_ref
-        lookup_task_id = task_ref
-        lookup_task_hash = task_ref
-
-        if self._job_repo is not None and chat_id is not None and chat_id > 0:
-            try:
-                job = self._job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-            except Exception as error:
-                _print_cleanup_job_lookup_failed_log(
-                    task_ref=task_ref,
-                    chat_id=chat_id,
-                    error=error,
-                )
-                job = None
-            if job is not None:
-                resolved_task_ref = (job.task_ref or task_ref).strip() or resolved_task_ref
-                resolved_task_id = (job.task_id or "").strip()
-                resolved_task_hash = (job.task_hash or "").strip()
-                lookup_task_ref = resolved_task_ref
-                lookup_task_id = resolved_task_id or lookup_task_id
-                lookup_task_hash = resolved_task_hash or lookup_task_hash
+        resolution = resolve_cleanup_task_identity(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            job_lookup=(
+                (lambda resolved_chat_id, resolved_task_ref: self._job_repo.get_job_for_chat_ref(
+                    chat_id=resolved_chat_id,
+                    task_ref=resolved_task_ref,
+                ))
+                if self._job_repo is not None
+                else None
+            ),
+            on_job_lookup_failed=lambda error: _print_cleanup_job_lookup_failed_log(
+                task_ref=task_ref,
+                chat_id=chat_id or 0,
+                error=error,
+            ),
+        )
 
         return ResolvedCleanupTaskIdentity(
-            lookup_task_ref=lookup_task_ref,
-            lookup_task_id=lookup_task_id,
-            lookup_task_hash=lookup_task_hash,
-            task_ref=resolved_task_ref,
-            task_id=resolved_task_id,
-            task_hash=resolved_task_hash,
+            lookup_task_ref=resolution.lookup_task_ref,
+            lookup_task_id=resolution.lookup_task_id,
+            lookup_task_hash=resolution.lookup_task_hash,
+            task_ref=resolution.task_ref,
+            task_id=resolution.task_id,
+            task_hash=resolution.task_hash,
         )
 
 
