@@ -4,6 +4,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from app.db.job_repo_support import (
+    normalize_job_chat_identity,
+    normalize_job_lease_identity,
+    normalize_job_pending_upsert_identity,
+    normalize_job_task_ref,
+    normalize_job_workflow,
+)
 from app.db.sqlite import SqliteDatabase
 
 JOB_STATE_CANCELLED = "cancelled"
@@ -95,11 +102,8 @@ class JobRepo:
         )
 
     def get_pending_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
-        cleaned_task_ref = task_ref.strip()
-        if chat_id <= 0:
-            raise JobPersistenceError("job chat identity missing for query")
-        if not cleaned_task_ref:
-            raise JobPersistenceError("job task ref missing for query")
+        chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
+        task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
         return self._select_one(
             """
             SELECT
@@ -125,20 +129,17 @@ class JobRepo:
             LIMIT 1
             """,
             (
-                chat_id,
+                chat.chat_id,
                 JOB_STATE_PENDING_APPROVAL,
-                cleaned_task_ref,
-                cleaned_task_ref,
-                cleaned_task_ref,
+                task.task_ref,
+                task.task_ref,
+                task.task_ref,
             ),
         )
 
     def get_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> JobRecord | None:
-        cleaned_task_ref = task_ref.strip()
-        if chat_id <= 0:
-            raise JobPersistenceError("job chat identity missing for query")
-        if not cleaned_task_ref:
-            raise JobPersistenceError("job task ref missing for query")
+        chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
+        task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
         return self._select_one(
             """
             SELECT
@@ -163,10 +164,10 @@ class JobRepo:
             LIMIT 1
             """,
             (
-                chat_id,
-                cleaned_task_ref,
-                cleaned_task_ref,
-                cleaned_task_ref,
+                chat.chat_id,
+                task.task_ref,
+                task.task_ref,
+                task.task_ref,
             ),
         )
 
@@ -183,8 +184,11 @@ class JobRepo:
         )
 
     def get_latest_pending_job(self, *, chat_id: int) -> JobRecord | None:
-        if chat_id <= 0:
-            raise JobPersistenceError("job chat identity missing for pending query")
+        chat = normalize_job_chat_identity(
+            chat_id=chat_id,
+            context="pending query",
+            error_cls=JobPersistenceError,
+        )
         return self._select_one(
             """
             SELECT
@@ -207,7 +211,7 @@ class JobRepo:
             ORDER BY updated_at DESC
             LIMIT 1
             """,
-            (chat_id, JOB_STATE_PENDING_APPROVAL),
+            (chat.chat_id, JOB_STATE_PENDING_APPROVAL),
         )
 
     def claim_lease(
@@ -218,13 +222,14 @@ class JobRepo:
         lease_owner: str,
         workflow_type: str,
     ) -> bool:
-        cleaned_job_id = job_id.strip()
-        cleaned_owner = lease_owner.strip()
-        cleaned_workflow = workflow_type.strip()
-        if not cleaned_job_id or not cleaned_owner or not cleaned_workflow:
-            raise JobPersistenceError("job lease identity missing")
-        if expected_version <= 0:
-            raise JobPersistenceError("job lease expected version missing")
+        identity = normalize_job_lease_identity(
+            job_id=job_id,
+            expected_version=expected_version,
+            lease_owner=lease_owner,
+            workflow_type=workflow_type,
+            context="lease",
+            error_cls=JobPersistenceError,
+        )
 
         current_time = _utcnow()
         lease_until = _format_utc(current_time + timedelta(seconds=LEASE_SECONDS))
@@ -244,11 +249,11 @@ class JobRepo:
                   AND (lease_until = '' OR lease_until <= ?)
                 """,
                 (
-                    cleaned_owner,
+                    identity.lease_owner,
                     lease_until,
-                    cleaned_job_id,
-                    expected_version,
-                    cleaned_workflow,
+                    identity.job_id,
+                    identity.expected_version,
+                    identity.workflow_type,
                     JOB_STATE_PENDING_APPROVAL,
                     current_time_text,
                 ),
@@ -256,7 +261,7 @@ class JobRepo:
             connection.commit()
         if cursor.rowcount == 1:
             return True
-        if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
+        if self._get_job_by_identity(job_id=identity.job_id, workflow_type=identity.workflow_type) is None:
             raise JobPersistenceError("job missing during lease claim")
         return False
 
@@ -397,19 +402,17 @@ class JobRepo:
         task_hash: str,
         payload_json: str,
     ) -> JobRecord | None:
-        cleaned_workflow = workflow_type.strip()
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_workflow:
-            raise JobPersistenceError("job workflow missing for pending upsert")
-        if chat_id is None or chat_id <= 0:
-            raise JobPersistenceError("job chat identity missing for pending upsert")
-        if user_id is not None and user_id <= 0:
-            raise JobPersistenceError("job user identity invalid for pending upsert")
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise JobPersistenceError("job task identity missing for pending upsert")
+        identity = normalize_job_pending_upsert_identity(
+            workflow_type=workflow_type,
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=task_ref,
+            task_id=task_id,
+            task_hash=task_hash,
+            error_cls=JobPersistenceError,
+        )
 
-        job_id = _build_job_id(cleaned_workflow, cleaned_task_hash)
+        job_id = _build_job_id(identity.workflow_type, identity.task_hash)
         with self._database.connect() as connection:
             connection.execute(
                 """
@@ -446,13 +449,13 @@ class JobRepo:
                 """,
                 (
                     job_id,
-                    int(chat_id or 0),
-                    int(user_id or 0),
-                    cleaned_workflow,
+                    identity.chat_id,
+                    identity.user_id,
+                    identity.workflow_type,
                     JOB_STATE_PENDING_APPROVAL,
-                    task_ref.strip(),
-                    cleaned_task_id,
-                    cleaned_task_hash,
+                    identity.task_ref,
+                    identity.task_id,
+                    identity.task_hash,
                     payload_json.strip(),
                 ),
             )
@@ -491,14 +494,13 @@ class JobRepo:
         chat_id: int,
         task_ref: str,
     ) -> JobRecord | None:
-        cleaned_task_ref = task_ref.strip()
-        cleaned_workflow = workflow_type.strip()
-        if chat_id <= 0:
-            raise JobPersistenceError("job chat identity missing for query")
-        if not cleaned_task_ref:
-            raise JobPersistenceError("job task ref missing for query")
-        if not cleaned_workflow:
-            raise JobPersistenceError("job workflow missing for query")
+        chat = normalize_job_chat_identity(chat_id=chat_id, context="query", error_cls=JobPersistenceError)
+        task = normalize_job_task_ref(task_ref=task_ref, context="query", error_cls=JobPersistenceError)
+        workflow = normalize_job_workflow(
+            workflow_type=workflow_type,
+            context="query",
+            error_cls=JobPersistenceError,
+        )
         return self._select_one(
             """
             SELECT
@@ -524,11 +526,11 @@ class JobRepo:
             LIMIT 1
             """,
             (
-                cleaned_workflow,
-                chat_id,
-                cleaned_task_ref,
-                cleaned_task_ref,
-                cleaned_task_ref,
+                workflow.workflow_type,
+                chat.chat_id,
+                task.task_ref,
+                task.task_ref,
+                task.task_ref,
             ),
         )
 
@@ -538,11 +540,16 @@ class JobRepo:
         workflow_type: str,
         chat_id: int,
     ) -> JobRecord | None:
-        if chat_id <= 0:
-            raise JobPersistenceError("job chat identity missing for pending query")
-        cleaned_workflow = workflow_type.strip()
-        if not cleaned_workflow:
-            raise JobPersistenceError("job workflow missing for pending query")
+        chat = normalize_job_chat_identity(
+            chat_id=chat_id,
+            context="pending query",
+            error_cls=JobPersistenceError,
+        )
+        workflow = normalize_job_workflow(
+            workflow_type=workflow_type,
+            context="pending query",
+            error_cls=JobPersistenceError,
+        )
         return self._select_one(
             """
             SELECT
@@ -565,7 +572,7 @@ class JobRepo:
             ORDER BY updated_at DESC
             LIMIT 1
             """,
-            (cleaned_workflow, chat_id, JOB_STATE_PENDING_APPROVAL),
+            (workflow.workflow_type, chat.chat_id, JOB_STATE_PENDING_APPROVAL),
         )
 
     def _set_job_state(
@@ -578,14 +585,17 @@ class JobRepo:
         next_state: str,
         bump_version: bool,
     ) -> bool:
-        cleaned_job_id = job_id.strip()
-        cleaned_owner = lease_owner.strip()
-        cleaned_workflow = workflow_type.strip()
+        lease = normalize_job_lease_identity(
+            job_id=job_id,
+            expected_version=expected_version,
+            lease_owner=lease_owner,
+            workflow_type=workflow_type,
+            context="state transition",
+            error_cls=JobPersistenceError,
+        )
         cleaned_state = next_state.strip()
-        if not cleaned_job_id or not cleaned_owner or not cleaned_workflow or not cleaned_state:
+        if not cleaned_state:
             raise JobPersistenceError("job state transition identity missing")
-        if expected_version <= 0:
-            raise JobPersistenceError("job state transition expected version missing")
 
         version_sql = "version + 1" if bump_version else "version"
         with self._database.connect() as connection:
@@ -605,23 +615,27 @@ class JobRepo:
                 """,
                 (
                     cleaned_state,
-                    cleaned_job_id,
-                    expected_version,
-                    cleaned_workflow,
-                    cleaned_owner,
+                    lease.job_id,
+                    lease.expected_version,
+                    lease.workflow_type,
+                    lease.lease_owner,
                 ),
             )
             connection.commit()
         if cursor.rowcount == 1:
             return True
-        if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
+        if self._get_job_by_identity(job_id=lease.job_id, workflow_type=lease.workflow_type) is None:
             raise JobPersistenceError("job missing during state transition")
         return False
 
     def _get_job_by_identity(self, *, job_id: str, workflow_type: str) -> JobRecord | None:
         cleaned_job_id = job_id.strip()
-        cleaned_workflow = workflow_type.strip()
-        if not cleaned_job_id or not cleaned_workflow:
+        workflow = normalize_job_workflow(
+            workflow_type=workflow_type,
+            context="internal query",
+            error_cls=JobPersistenceError,
+        )
+        if not cleaned_job_id:
             raise JobPersistenceError("job identity missing for internal query")
         return self._select_one(
             """
@@ -644,7 +658,7 @@ class JobRepo:
             WHERE job_id = ? AND workflow_type = ?
             LIMIT 1
             """,
-            (cleaned_job_id, cleaned_workflow),
+            (cleaned_job_id, workflow.workflow_type),
         )
 
     def _select_one(self, query: str, params: tuple[object, ...]) -> JobRecord | None:
