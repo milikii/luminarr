@@ -50,6 +50,45 @@ def test_translate_for_import_creates_zh_subtitle_for_file_target(tmp_path: Path
     assert "专业译文：hello movie" in payload
 
 
+def test_translate_for_import_success_message_prefers_metadata_title(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+    metadata_path = library_dir / "Interstellar (2014).metadata.json"
+    metadata_path.write_text(
+        json.dumps({"tmdb": {"title": "星际穿越", "original_title": "Interstellar"}}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-msg-1",
+            task_id="msg-1",
+            task_hash="hash-msg-1",
+            target_path=str(target_file),
+            metadata_path=str(metadata_path),
+        )
+    )
+
+    assert result.success is True
+    assert result.message == "字幕翻译成功：星际穿越，已生成 1 个字幕文件。"
+
+
 def test_translate_for_import_translates_large_srt_in_chunks(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
@@ -94,6 +133,38 @@ def test_translate_for_import_translates_large_srt_in_chunks(tmp_path: Path) -> 
     payload = translated_file.read_text(encoding="utf-8")
     assert "专业译文：line 1" in payload
     assert "专业译文：line 62" in payload
+
+
+def test_translate_for_import_skips_when_translated_subtitle_already_exists(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+    translated_file = library_dir / "Interstellar (2014).zh.srt"
+    translated_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\n你好，电影\n",
+        encoding="utf-8",
+    )
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-skip-1",
+            task_id="skip-1",
+            task_hash="hash-skip-1",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.translated_count == 0
+    assert result.message == "字幕翻译已跳过：目标中文字幕文件已存在。"
 
 
 def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: Path) -> None:

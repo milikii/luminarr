@@ -92,31 +92,15 @@ class SubtitleTranslatorService:
             return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
 
         movie_title = _read_metadata_title(Path(translate_input.metadata_path))
-        translated_count = 0
-        for subtitle_file in subtitle_files:
-            if subtitle_file.translated_path.exists():
-                continue
-            result = self._translate_single_file(
-                subtitle_file=subtitle_file,
-                movie_title=movie_title,
-            )
-            if not result.success:
-                return result
-            translated_count += 1
-
-        if translated_count <= 0:
-            message = "字幕翻译已跳过：目标中文字幕文件已存在。"
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
-
-        if movie_title:
-            message = f"字幕翻译成功：{movie_title}，已生成 {translated_count} 个字幕文件。"
-        else:
-            message = f"字幕翻译成功：已生成 {translated_count} 个字幕文件。"
-        return SubtitleTranslateResult(
-            success=True,
-            message=message,
+        translated_count, error_result = self._translate_pending_subtitle_files(
+            subtitle_files=subtitle_files,
+            movie_title=movie_title,
+        )
+        if error_result is not None:
+            return error_result
+        return self._build_translation_summary_result(
+            movie_title=movie_title,
             translated_count=translated_count,
-            skipped=False,
         )
 
     def _resolve_subtitle_files_for_translation(
@@ -171,9 +155,6 @@ class SubtitleTranslatorService:
         video_path: Path,
     ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None, str]:
         external_subtitle_paths = _find_adjacent_subtitle_paths(video_path)
-        if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
-            return [], None, "chinese_external"
-
         external_subtitle_files = [
             subtitle_file
             for path in external_subtitle_paths
@@ -181,6 +162,8 @@ class SubtitleTranslatorService:
         ]
         if external_subtitle_files:
             return external_subtitle_files, None, "external"
+        if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
+            return [], None, "chinese_external"
 
         streams, error_result = self._probe_embedded_subtitles(video_path)
         if error_result is not None:
@@ -381,6 +364,46 @@ class SubtitleTranslatorService:
                 skipped=False,
             )
         return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
+
+    def _translate_pending_subtitle_files(
+        self,
+        *,
+        subtitle_files: list[_SubtitleFile],
+        movie_title: str,
+    ) -> tuple[int, SubtitleTranslateResult | None]:
+        translated_count = 0
+        for subtitle_file in subtitle_files:
+            if subtitle_file.translated_path.exists():
+                continue
+            result = self._translate_single_file(
+                subtitle_file=subtitle_file,
+                movie_title=movie_title,
+            )
+            if not result.success:
+                return 0, result
+            translated_count += 1
+        return translated_count, None
+
+    def _build_translation_summary_result(
+        self,
+        *,
+        movie_title: str,
+        translated_count: int,
+    ) -> SubtitleTranslateResult:
+        if translated_count <= 0:
+            message = "字幕翻译已跳过：目标中文字幕文件已存在。"
+            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+
+        if movie_title:
+            message = f"字幕翻译成功：{movie_title}，已生成 {translated_count} 个字幕文件。"
+        else:
+            message = f"字幕翻译成功：已生成 {translated_count} 个字幕文件。"
+        return SubtitleTranslateResult(
+            success=True,
+            message=message,
+            translated_count=translated_count,
+            skipped=False,
+        )
 
     def _translate_srt_text(
         self,
