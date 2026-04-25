@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.db.job_event_repo import JobEvent, JobEventPersistenceError, JobEventRepo
+from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
+from app.services.cleanup_correlation_event_support import fetch_cleanup_correlation_event
 
 CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
@@ -44,51 +45,30 @@ class CleanupCorrelationLookup:
         chat_id: int | None,
     ) -> tuple[ResolvedCleanupTaskIdentity, ImportCorrelation | None]:
         resolved_identity = self.resolve_task_identity(task_ref=task_ref, chat_id=chat_id)
-        try:
-            event = self._job_event_repo.find_latest_import_correlation(
+        event = fetch_cleanup_correlation_event(
+            fetch_event=lambda: self._job_event_repo.find_latest_import_correlation(
                 task_ref=resolved_identity.lookup_task_ref,
                 task_id=resolved_identity.lookup_task_id,
                 task_hash=resolved_identity.lookup_task_hash,
-            )
-        except Exception as error:
-            if str(error) == CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[cleanup 关联结果缺失]\033[0m task_ref={task_ref} "
-                    f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
-                    f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
-                    flush=True,
-                )
-                print(
-                    "\033[33m[处理建议]\033[0m 检查 job_event 关联查询返回是否仍带有完整事件列表；"
-                    "当前会按未找到关联停路，避免把缺失真相误判成普通“没有 import 关联”。",
-                    flush=True,
-                )
-            elif _is_cleanup_correlation_row_corrupted_error(error):
-                print(
-                    f"\033[31m[cleanup 关联记录损坏]\033[0m task_ref={task_ref} "
-                    f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
-                    f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
-                    flush=True,
-                )
-                print(
-                    "\033[33m[处理建议]\033[0m 检查 job_event 导入成功关联里的 task_ref / event_type / source_path / target_path "
-                    "是否仍是完整真相；当前会按未找到关联停路，避免把坏记录误判成普通“没有 import 关联”。",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
-                    f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
-                    f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={error}",
-                    flush=True,
-                )
-                print(
-                    "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
-                    "再重试 cleanup。",
-                    flush=True,
-                )
-            return resolved_identity, None
-
+            ),
+            on_result_missing=lambda reason: _print_cleanup_correlation_result_missing_log(
+                task_ref=task_ref,
+                resolved_identity=resolved_identity,
+                reason=reason,
+            ),
+            on_row_corrupted=lambda reason: _print_cleanup_correlation_row_corrupted_log(
+                task_ref=task_ref,
+                resolved_identity=resolved_identity,
+                reason=reason,
+            ),
+            on_failed=lambda reason: _print_cleanup_correlation_lookup_failed_log(
+                task_ref=task_ref,
+                resolved_identity=resolved_identity,
+                reason=reason,
+            ),
+            result_missing_reason=CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON,
+            is_row_corrupted_reason=lambda reason: _is_cleanup_correlation_row_corrupted_reason(reason),
+        )
         if event is None:
             return resolved_identity, None
 
@@ -153,8 +133,8 @@ class CleanupCorrelationLookup:
         )
 
 
-def _is_cleanup_correlation_row_corrupted_error(error: Exception) -> bool:
-    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
+def _is_cleanup_correlation_row_corrupted_reason(reason: str) -> bool:
+    return reason.endswith("corrupted after read")
 
 
 def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: Exception) -> None:
@@ -165,6 +145,63 @@ def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: 
     print(
         "\033[33m[处理建议]\033[0m 检查 jobs 表按 chat_id/task_ref 的读取是否可用；"
         "当前会回退到原始 task_ref 继续尝试匹配 import 关联。",
+        flush=True,
+    )
+
+
+def _print_cleanup_correlation_result_missing_log(
+    *,
+    task_ref: str,
+    resolved_identity: ResolvedCleanupTaskIdentity,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup 关联结果缺失]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 关联查询返回是否仍带有完整事件列表；"
+        "当前会按未找到关联停路，避免把缺失真相误判成普通“没有 import 关联”。",
+        flush=True,
+    )
+
+
+def _print_cleanup_correlation_row_corrupted_log(
+    *,
+    task_ref: str,
+    resolved_identity: ResolvedCleanupTaskIdentity,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup 关联记录损坏]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 导入成功关联里的 task_ref / event_type / source_path / target_path "
+        "是否仍是完整真相；当前会按未找到关联停路，避免把坏记录误判成普通“没有 import 关联”。",
+        flush=True,
+    )
+
+
+def _print_cleanup_correlation_lookup_failed_log(
+    *,
+    task_ref: str,
+    resolved_identity: ResolvedCleanupTaskIdentity,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
+        "再重试 cleanup。",
         flush=True,
     )
 
