@@ -255,3 +255,156 @@ def normalize_job_lease_identity(
         lease_owner=cleaned_owner,
         expected_version=expected_version,
     )
+
+
+def update_job_lease_claim(
+    *,
+    connection: object,
+    job_id: str,
+    expected_version: int,
+    lease_owner: str,
+    workflow_type: str,
+    pending_state: str,
+    current_time_text: str,
+    lease_until: str,
+) -> int:
+    cursor = connection.execute(
+        """
+        UPDATE jobs
+        SET
+            lease_owner = ?,
+            lease_until = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = ?
+          AND version = ?
+          AND workflow_type = ?
+          AND state = ?
+          AND (lease_until = '' OR lease_until <= ?)
+        """,
+        (
+            lease_owner,
+            lease_until,
+            job_id,
+            expected_version,
+            workflow_type,
+            pending_state,
+            current_time_text,
+        ),
+    )
+    return cursor.rowcount
+
+
+def update_job_state_transition(
+    *,
+    connection: object,
+    job_id: str,
+    expected_version: int,
+    workflow_type: str,
+    lease_owner: str,
+    next_state: str,
+    bump_version: bool,
+) -> int:
+    version_sql = "version + 1" if bump_version else "version"
+    cursor = connection.execute(
+        f"""
+        UPDATE jobs
+        SET
+            state = ?,
+            version = {version_sql},
+            lease_owner = '',
+            lease_until = '',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = ?
+          AND version = ?
+          AND workflow_type = ?
+          AND lease_owner = ?
+        """,
+        (
+            next_state,
+            job_id,
+            expected_version,
+            workflow_type,
+            lease_owner,
+        ),
+    )
+    return cursor.rowcount
+
+
+def update_downloader_job_completed(
+    *,
+    connection: object,
+    job_id: str,
+    expected_version: int,
+    lease_owner: str,
+    task_id: str,
+    task_hash: str,
+    payload_json: str,
+    completed_state: str,
+    workflow_type: str,
+) -> int:
+    cursor = connection.execute(
+        """
+        UPDATE jobs
+        SET
+            state = ?,
+            task_id = ?,
+            task_hash = ?,
+            payload_json = ?,
+            version = version + 1,
+            lease_owner = '',
+            lease_until = '',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = ?
+          AND version = ?
+          AND workflow_type = ?
+          AND lease_owner = ?
+        """,
+        (
+            completed_state,
+            task_id,
+            task_hash,
+            payload_json.strip(),
+            job_id,
+            expected_version,
+            workflow_type,
+            lease_owner,
+        ),
+    )
+    return cursor.rowcount
+
+
+def update_job_cancel_pending(
+    *,
+    connection: object,
+    job_id: str,
+    expected_version: int,
+    workflow_type: str,
+    cancelled_state: str,
+    pending_state: str,
+    current_time_text: str,
+) -> int:
+    cursor = connection.execute(
+        """
+        UPDATE jobs
+        SET
+            state = ?,
+            version = version + 1,
+            lease_owner = '',
+            lease_until = '',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE job_id = ?
+          AND version = ?
+          AND workflow_type = ?
+          AND state = ?
+          AND (lease_until = '' OR lease_until <= ?)
+        """,
+        (
+            cancelled_state,
+            job_id,
+            expected_version,
+            workflow_type,
+            pending_state,
+            current_time_text,
+        ),
+    )
+    return cursor.rowcount

@@ -14,6 +14,10 @@ from app.db.job_repo_support import (
     normalize_job_task_ref,
     normalize_job_workflow,
     resolve_job_record_from_row,
+    update_downloader_job_completed,
+    update_job_cancel_pending,
+    update_job_lease_claim,
+    update_job_state_transition,
 )
 from app.db.sqlite import SqliteDatabase
 
@@ -184,31 +188,18 @@ class JobRepo:
         lease_until = _format_utc(current_time + timedelta(seconds=LEASE_SECONDS))
         current_time_text = _format_utc(current_time)
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE jobs
-                SET
-                    lease_owner = ?,
-                    lease_until = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE job_id = ?
-                  AND version = ?
-                  AND workflow_type = ?
-                  AND state = ?
-                  AND (lease_until = '' OR lease_until <= ?)
-                """,
-                (
-                    identity.lease_owner,
-                    lease_until,
-                    identity.job_id,
-                    identity.expected_version,
-                    identity.workflow_type,
-                    JOB_STATE_PENDING_APPROVAL,
-                    current_time_text,
-                ),
+            rowcount = update_job_lease_claim(
+                connection=connection,
+                job_id=identity.job_id,
+                expected_version=identity.expected_version,
+                lease_owner=identity.lease_owner,
+                workflow_type=identity.workflow_type,
+                pending_state=JOB_STATE_PENDING_APPROVAL,
+                current_time_text=current_time_text,
+                lease_until=lease_until,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return True
         if self._get_job_by_identity(job_id=identity.job_id, workflow_type=identity.workflow_type) is None:
             raise JobPersistenceError("job missing during lease claim")
@@ -268,36 +259,19 @@ class JobRepo:
             raise JobPersistenceError("downloader completed job expected version missing")
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE jobs
-                SET
-                    state = ?,
-                    task_id = ?,
-                    task_hash = ?,
-                    payload_json = ?,
-                    version = version + 1,
-                    lease_owner = '',
-                    lease_until = '',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE job_id = ?
-                  AND version = ?
-                  AND workflow_type = ?
-                  AND lease_owner = ?
-                """,
-                (
-                    JOB_STATE_COMPLETED,
-                    cleaned_task_id,
-                    cleaned_task_hash,
-                    payload_json.strip(),
-                    cleaned_job_id,
-                    expected_version,
-                    WORKFLOW_ADD_TO_DOWNLOADER,
-                    cleaned_owner,
-                ),
+            rowcount = update_downloader_job_completed(
+                connection=connection,
+                job_id=cleaned_job_id,
+                expected_version=expected_version,
+                lease_owner=cleaned_owner,
+                task_id=cleaned_task_id,
+                task_hash=cleaned_task_hash,
+                payload_json=payload_json,
+                completed_state=JOB_STATE_COMPLETED,
+                workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
             connection.commit()
-        return cursor.rowcount == 1
+        return rowcount == 1
 
     def cancel_pending_job(self, *, job_id: str, expected_version: int, workflow_type: str) -> bool:
         cleaned_job_id = job_id.strip()
@@ -309,32 +283,17 @@ class JobRepo:
 
         current_time_text = _format_utc(_utcnow())
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE jobs
-                SET
-                    state = ?,
-                    version = version + 1,
-                    lease_owner = '',
-                    lease_until = '',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE job_id = ?
-                  AND version = ?
-                  AND workflow_type = ?
-                  AND state = ?
-                  AND (lease_until = '' OR lease_until <= ?)
-                """,
-                (
-                    JOB_STATE_CANCELLED,
-                    cleaned_job_id,
-                    expected_version,
-                    cleaned_workflow,
-                    JOB_STATE_PENDING_APPROVAL,
-                    current_time_text,
-                ),
+            rowcount = update_job_cancel_pending(
+                connection=connection,
+                job_id=cleaned_job_id,
+                expected_version=expected_version,
+                workflow_type=cleaned_workflow,
+                cancelled_state=JOB_STATE_CANCELLED,
+                pending_state=JOB_STATE_PENDING_APPROVAL,
+                current_time_text=current_time_text,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return True
         if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
             raise JobPersistenceError("job missing during cancel")
@@ -512,32 +471,18 @@ class JobRepo:
         if not cleaned_state:
             raise JobPersistenceError("job state transition identity missing")
 
-        version_sql = "version + 1" if bump_version else "version"
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                f"""
-                UPDATE jobs
-                SET
-                    state = ?,
-                    version = {version_sql},
-                    lease_owner = '',
-                    lease_until = '',
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE job_id = ?
-                  AND version = ?
-                  AND workflow_type = ?
-                  AND lease_owner = ?
-                """,
-                (
-                    cleaned_state,
-                    lease.job_id,
-                    lease.expected_version,
-                    lease.workflow_type,
-                    lease.lease_owner,
-                ),
+            rowcount = update_job_state_transition(
+                connection=connection,
+                job_id=lease.job_id,
+                expected_version=lease.expected_version,
+                workflow_type=lease.workflow_type,
+                lease_owner=lease.lease_owner,
+                next_state=cleaned_state,
+                bump_version=bump_version,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return True
         if self._get_job_by_identity(job_id=lease.job_id, workflow_type=lease.workflow_type) is None:
             raise JobPersistenceError("job missing during state transition")
