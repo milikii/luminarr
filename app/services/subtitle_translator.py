@@ -7,6 +7,7 @@ from pathlib import Path
 from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
     _SubtitleFile,
+    _SubtitleCommandFailure,
     _build_embedded_subtitle_extract_command,
     _build_professional_subtitle_translation_request,
     _build_subtitle_skip_result,
@@ -22,6 +23,7 @@ from app.services.subtitle_translation_support import (
     _resolve_directory_skip_reason,
     _resolve_embedded_subtitle_extract_result,
     _resolve_embedded_subtitle_output_path,
+    _resolve_target_subtitle_files,
     _resolve_ffprobe_subtitle_streams,
     _resolve_ffmpeg_subtitle_streams,
     _read_subtitle_source_text,
@@ -73,9 +75,17 @@ class SubtitleTranslatorService:
             message = f"字幕翻译已跳过：导入目标不存在：{target_path}"
             return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
 
-        subtitle_files, resolved_result = self._resolve_subtitle_files_for_translation(target_path)
-        if resolved_result is not None:
-            return resolved_result
+        subtitle_files, resolve_failure, skip_reason = _resolve_target_subtitle_files(
+            target_path=target_path,
+            resolve_video_subtitle_files=self._resolve_video_subtitle_files,
+        )
+        if resolve_failure is not None:
+            return self._build_failed_result(
+                problem=resolve_failure.problem,
+                fix=resolve_failure.fix,
+            )
+        if subtitle_files is None:
+            return self._build_skip_result(skip_reason=skip_reason or "none")
 
         if not self._api_key:
             message = "字幕翻译失败：缺少 SUBTITLE_TRANSLATION_API_KEY，无法进行专业级翻译。"
@@ -97,72 +107,32 @@ class SubtitleTranslatorService:
             translated_count=translated_count,
         )
 
-    def _resolve_subtitle_files_for_translation(
-        self,
-        target_path: Path,
-    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
-        if target_path.is_file():
-            return self._resolve_single_video_subtitle_files(target_path)
-        return self._resolve_directory_subtitle_files(target_path)
-
-    def _resolve_single_video_subtitle_files(
-        self,
-        video_path: Path,
-    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
-        subtitle_files, error_result, skip_reason = self._resolve_video_subtitle_files(video_path)
-        if error_result is not None:
-            return [], error_result
-        if subtitle_files:
-            return subtitle_files, None
-        return [], self._build_skip_result(skip_reason=skip_reason)
-
-    def _resolve_directory_subtitle_files(
-        self,
-        target_path: Path,
-    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
-        video_files = _find_video_files(target_path)
-        if not video_files:
-            return [], self._build_skip_result(skip_reason="none")
-
-        subtitle_files: list[_SubtitleFile] = []
-        skip_reasons: list[str] = []
-        for video_path in video_files:
-            video_subtitle_files, error_result, skip_reason = self._resolve_video_subtitle_files(video_path)
-            if error_result is not None:
-                return [], error_result
-            skip_reasons.append(skip_reason)
-            subtitle_files.extend(video_subtitle_files)
-
-        if subtitle_files:
-            return subtitle_files, None
-        return [], self._build_skip_result(skip_reason=_resolve_directory_skip_reason(skip_reasons))
-
     def _resolve_video_subtitle_files(
         self,
         video_path: Path,
-    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None, str]:
+    ) -> tuple[list[_SubtitleFile], _SubtitleCommandFailure | None, str]:
         external_subtitle_files, skip_reason = _resolve_external_subtitle_files(video_path)
         if external_subtitle_files or skip_reason == "chinese_external":
             return external_subtitle_files, None, skip_reason
 
-        streams, error_result = self._probe_embedded_subtitles(video_path)
-        if error_result is not None:
-            return [], error_result, "error"
+        streams, failure = self._probe_embedded_subtitle_streams(video_path)
+        if failure is not None:
+            return [], failure, "error"
         english_stream, skip_reason = _resolve_embedded_subtitle_stream_selection(streams)
         if english_stream is None:
             return [], None, skip_reason
 
-        subtitle_file, error_result = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
-        if error_result is not None:
-            return [], error_result, "error"
+        subtitle_file, failure = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
+        if failure is not None:
+            return [], failure, "error"
         if subtitle_file is None:
             return [], None, "none"
         return [subtitle_file], None, skip_reason
 
-    def _probe_embedded_subtitles(
+    def _probe_embedded_subtitle_streams(
         self,
         video_path: Path,
-    ) -> tuple[list[_EmbeddedSubtitleStream], SubtitleTranslateResult | None]:
+    ) -> tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]:
         command = [
             "ffprobe",
             "-v",
@@ -185,9 +155,8 @@ class SubtitleTranslatorService:
         )
         if failure is not None:
             if failure.reason == "missing":
-                return self._probe_embedded_subtitles_with_ffmpeg(video_path)
-            _print_colored_error(problem=failure.problem, fix=failure.fix)
-            return [], SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
+                return self._probe_embedded_subtitles_with_ffmpeg_streams(video_path)
+            return [], failure
 
         streams, parse_failure = _resolve_ffprobe_subtitle_streams(
             video_path=video_path,
@@ -196,14 +165,13 @@ class SubtitleTranslatorService:
             stderr=completed.stderr or "",
         )
         if parse_failure is not None:
-            _print_colored_error(problem=parse_failure.problem, fix=parse_failure.fix)
-            return [], SubtitleTranslateResult(success=False, message=parse_failure.problem, translated_count=0, skipped=False)
+            return [], parse_failure
         return streams or [], None
 
-    def _probe_embedded_subtitles_with_ffmpeg(
+    def _probe_embedded_subtitles_with_ffmpeg_streams(
         self,
         video_path: Path,
-    ) -> tuple[list[_EmbeddedSubtitleStream], SubtitleTranslateResult | None]:
+    ) -> tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]:
         command = [
             "ffmpeg",
             "-hide_banner",
@@ -219,20 +187,28 @@ class SubtitleTranslatorService:
             timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常执行。",
         )
         if failure is not None:
-            _print_colored_error(problem=failure.problem, fix=failure.fix)
-            return [], SubtitleTranslateResult(success=False, message=failure.problem, translated_count=0, skipped=False)
+            return [], failure
 
         parsed_streams = _resolve_ffmpeg_subtitle_streams(
             output_text=completed.stderr or completed.stdout or "",
         )
         return parsed_streams, None
 
+    def _probe_embedded_subtitles(
+        self,
+        video_path: Path,
+    ) -> tuple[list[_EmbeddedSubtitleStream], SubtitleTranslateResult | None]:
+        streams, failure = self._probe_embedded_subtitle_streams(video_path)
+        if failure is None:
+            return streams, None
+        return [], self._build_failed_result(problem=failure.problem, fix=failure.fix)
+
     def _extract_embedded_subtitle_file(
         self,
         *,
         video_path: Path,
         stream: _EmbeddedSubtitleStream,
-    ) -> tuple[_SubtitleFile | None, SubtitleTranslateResult | None]:
+    ) -> tuple[_SubtitleFile | None, _SubtitleCommandFailure | None]:
         output_path = _resolve_embedded_subtitle_output_path(
             video_path=video_path,
             codec_name=stream.codec_name,
@@ -253,7 +229,7 @@ class SubtitleTranslatorService:
             timeout_fix="检查视频文件是否可读、体积是否异常，以及 `ffmpeg` 是否可正常抽取字幕流。",
         )
         if failure is not None:
-            return None, self._build_failed_result(problem=failure.problem, fix=failure.fix)
+            return None, failure
 
         subtitle_file, output_failure = _resolve_embedded_subtitle_extract_result(
             video_path=video_path,
@@ -263,10 +239,7 @@ class SubtitleTranslatorService:
             stderr=completed.stderr or "",
         )
         if output_failure is not None:
-            return None, self._build_failed_result(
-                problem=output_failure.problem,
-                fix=output_failure.fix,
-            )
+            return None, output_failure
         return subtitle_file, None
 
     def _translate_single_file(

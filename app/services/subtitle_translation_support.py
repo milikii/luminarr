@@ -373,6 +373,37 @@ def _find_video_files(target_path: Path) -> list[Path]:
     return sorted(candidate for candidate in target_path.rglob("*") if candidate.is_file() and candidate.suffix.lower() in _VIDEO_FILE_SUFFIXES)
 
 
+def _resolve_target_subtitle_files(
+    *,
+    target_path: Path,
+    resolve_video_subtitle_files: Callable[[Path], tuple[list[_SubtitleFile], _SubtitleCommandFailure | None, str]],
+) -> tuple[list[_SubtitleFile] | None, _SubtitleCommandFailure | None, str | None]:
+    if target_path.is_file():
+        subtitle_files, failure, skip_reason = resolve_video_subtitle_files(target_path)
+        if failure is not None:
+            return None, failure, None
+        if subtitle_files:
+            return subtitle_files, None, None
+        return None, None, skip_reason
+
+    video_files = _find_video_files(target_path)
+    if not video_files:
+        return None, None, "none"
+
+    subtitle_files: list[_SubtitleFile] = []
+    skip_reasons: list[str] = []
+    for video_path in video_files:
+        video_subtitle_files, failure, skip_reason = resolve_video_subtitle_files(video_path)
+        if failure is not None:
+            return None, failure, None
+        subtitle_files.extend(video_subtitle_files)
+        skip_reasons.append(skip_reason)
+
+    if subtitle_files:
+        return subtitle_files, None, None
+    return None, None, _resolve_directory_skip_reason(skip_reasons)
+
+
 def _is_chinese_subtitle_path(path: Path) -> bool:
     return _looks_like_chinese_subtitle_label(path.name)
 
