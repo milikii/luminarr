@@ -1,4 +1,4 @@
-# Luminarr (v70)
+# Luminarr (v71)
 
 Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 Harness，目标是把“找片、下片、入库、刷新媒体库”收成一条可控的私聊自动化链路。
 
@@ -19,21 +19,44 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 当前仓库质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`
 - 已实现但当前不纳入首版发布保证的路径，继续保留在代码和测试里，不因为发布口径收紧而回退
 
-## 3. 快速开始
+## 3. 一眼看懂
+
+如果你想先快速理解这个项目，而不是先读一堆文档，先看这两张图：
+
+![Luminarr 项目结构总览](docs/assets/luminarr-architecture-overview.png)
+
+![Luminarr 最终互动效果](docs/assets/luminarr-interaction-montage.png)
+
+更细一点的专项图：
+
+- [搜索与下载审批流程](docs/assets/luminarr-detail-search-download-flow.png)
+- [导入审批与媒体识别](docs/assets/luminarr-detail-import-approval-flow.png)
+- [导入后处理流程](docs/assets/luminarr-detail-post-import-pipeline.png)
+- [四渠道如何进入 shared runtime](docs/assets/luminarr-detail-shared-runtime-routing.png)
+- [任务状态与确认生命周期](docs/assets/luminarr-detail-task-lifecycle.png)
+
+如果你想看单个渠道里的消息细节图：
+
+- [Telegram 消息卡片图](docs/assets/luminarr-card-telegram.png)
+- [personal WeChat 消息卡片图](docs/assets/luminarr-card-personal-wechat.png)
+- [Feishu 消息卡片图](docs/assets/luminarr-card-feishu.png)
+- [WeCom 消息卡片图](docs/assets/luminarr-card-wecom.png)
+
+## 4. 快速开始
 
 - 想直接把项目跑起来：看 `docs/GETTING_STARTED.md`
 - 不会代码，只想知道先做什么：看 `docs/HUMAN_START_HERE.md`
 - 想让 AI 按仓库约定接手：看 `docs/OPERATOR_RUNBOOK.md`
 - 想理解“谁收消息、谁写库、谁调外部系统”：看 `docs/ARCHITECTURE.md`
 
-## 4. 当前状态
+## 5. 当前状态
 
 - 当前短快照和环境真相：看 `docs/STATUS.md`
 - 当前主线状态与下一步边界：看 `docs/NEXT_STEP.md`
 - 已定死的长期边界：看 `docs/DECISIONS.md`
 - 文档总入口和分流规则：看 `docs/INDEX.md`
 
-## 5. 如果你准备继续改
+## 6. 如果你准备继续改
 
 默认还是直接从 `docs/OPERATOR_RUNBOOK.md` 复制模板，不要自己重新发明长提示词。
 
@@ -50,7 +73,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 
 只有当文档真相、发布矩阵、真实 smoke 或质量入口再次漂移时，才需要回到 `docs/OPERATOR_RUNBOOK.md` 里的“收尾发布准备”模板。
 
-## 6. 文档入口
+## 7. 文档入口
 
 - `docs/HUMAN_START_HERE.md`：非技术操作者总入口
 - `docs/OPERATOR_RUNBOOK.md`：可直接复制给 AI 的短模板
