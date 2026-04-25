@@ -12,8 +12,7 @@
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
 - 当前又从刮削后续 backlog 再收掉几小格：字幕翻译的目标字幕解析、`ffprobe/ffmpeg` 探测执行、内嵌字幕提取执行、单文件翻译读写边界与专业翻译请求编排都已下沉到 `subtitle_translation_support.py`；连同更早收掉的 `ffmpeg` fallback 结果解析 / 错误映射与“`ffprobe` 缺失且 `ffmpeg` 也缺失时返回明确失败结果”的 focused 护栏，当前 `subtitle_translator.py` 已降到 `283` 行。
 - 当前又从后续结构 backlog 再收掉一组 BT 订阅小闭环：`add/list/remove/clear` 的 repo guard、扫描前的 `chat_ids/items` 读取护栏、`last_seen` 回写护栏，以及单条订阅的搜索 / pending 创建编排都已下沉到 support helper；当前 `manage_bt_subscription.py` 已降到 `900` 行。
-- 当前又从 cleanup backlog 再收掉几小格：命令解析、inspection、inspect 渲染、blocked outcome、删除执行、PT seed guard、相关日志与 cleanup 主流程编排都已下沉到 support helper；当前 `cleanup_downloaded_source.py` 已降到 `340` 行。
-- 当前又从 cleanup correlation backlog 再收掉几小格：关联事件读取护栏、路径缺失判定 / 结果构造，以及任务身份解析也已下沉到 helper；当前 `cleanup_correlation_lookup.py` 已降到 `232` 行。
+- 当前又从 cleanup backlog 再收掉几小格：命令解析、inspection、inspect/cleanup 主流程、blocked outcome、删除执行、PT seed guard、路径校验、删除资产与相关日志都已下沉到 helper；`cleanup_downloaded_source.py` 已降到 `334` 行，`cleanup_correlation_lookup.py` 已降到 `215` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -35,9 +34,7 @@
 - 2026-04-25 冷启动一致性检查：`make quality`、`make verify-mainline` 与 `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 均已复验通过；其中跨渠道搜索 smoke 的测试夹具已同步到当前搜索评分真相。
 - 2026-04-25 subtitle 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `37 passed`
 - 2026-04-25 btsub 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/manage_bt_subscription.py app/services/bt_subscription_repo_support.py app/services/bt_subscription_dispatch_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py` 为 `38 passed`
-- 2026-04-25 cleanup 结构收口 follow-up：cleanup 相关 support helper 的 `pyflakes` 与 `tests/test_cleanup_downloaded_source.py` 均通过；focused 结果为 `49 passed`
-- 2026-04-25 cleanup 结构收口 follow-up 2：`cleanup_flow_support.py` 已纳入 cleanup helper 边界；对应 `pyflakes` 与 `tests/test_cleanup_downloaded_source.py` 仍为通过，focused 结果保持 `49 passed`
-- 2026-04-25 cleanup correlation 结构收口 follow-up：新增 `cleanup_correlation_event_support.py`、`cleanup_correlation_result_support.py` 与 `cleanup_task_identity_support.py` 后，`pyflakes` 与 `tests/test_cleanup_downloaded_source.py` 仍通过；focused 结果保持 `49 passed`
+- 2026-04-25 cleanup/correlation 结构收口 follow-up：相关 helper 的 `pyflakes` 与 `tests/test_cleanup_downloaded_source.py` 持续通过；focused 结果保持 `49 passed`
 - metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`
 - 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`
