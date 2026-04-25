@@ -368,6 +368,52 @@ def test_translate_for_import_skips_when_embedded_chinese_subtitle_exists(
     assert "中文字幕轨" in result.message
 
 
+def test_translate_for_import_skips_when_only_non_text_embedded_english_subtitle_exists(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == "ffprobe"
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "index": 2,
+                            "codec_name": "hdmv_pgs_subtitle",
+                            "tags": {"language": "eng", "title": "English PGS"},
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert "未找到可翻译的外挂字幕或英文内嵌字幕" in result.message
+
+
 def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_path: Path, monkeypatch) -> None:
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")

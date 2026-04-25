@@ -10,7 +10,7 @@
 - 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
 - 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
-- 当前又从刮削后续 backlog 收掉一小格：`subtitle_translator` 的 chunk 翻译编排、异常校验，以及 `ffprobe/ffmpeg` subprocess 执行编排已继续下沉到 `app/services/subtitle_translation_support.py`，`app/services/subtitle_translator.py` 已回落到 `498` 行。
+- 当前又从刮削后续 backlog 收掉一小格：`subtitle_translator` 的 chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排，以及“可提取英文内嵌字幕结果筛选”已继续下沉到 `app/services/subtitle_translation_support.py`，`app/services/subtitle_translator.py` 已回落到 `490` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -33,7 +33,7 @@
 - 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`
 - 字幕 / 导入 focused：`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py tests/test_import_to_library.py` 为 `161 passed`
-- 字幕 focused：`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `16 passed`
+- 字幕 focused：`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `17 passed`
 - 当前真实 smoke 证据仍有效：前半段 `task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status`；后半段 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
 - 当前刮削真实 smoke 新证据：`/tmp/luminarr-real-smoke-1777048577.json` 记录了 `metadata_path`、`nfo_path`、`poster_path`、`backdrop_path` 与 Emby 返回的 `Name=Interstellar`、`Tmdb=157336`。
 - 当前刮削中文 smoke 新证据：最新样本的 `.metadata.json` 与 `.nfo` 已写入 `title=星际穿越`、`original_title=Interstellar`，Emby 对应媒体项也已返回 `Name=星际穿越`、`Tmdb=157336`。

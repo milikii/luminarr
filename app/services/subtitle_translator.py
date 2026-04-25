@@ -17,10 +17,10 @@ from app.services.subtitle_translation_support import (
     _find_video_files,
     _is_chinese_embedded_subtitle,
     _is_chinese_subtitle_path,
-    _is_english_embedded_subtitle,
     _parse_ass_dialogue_lines,
     _parse_ffmpeg_subtitle_streams,
     _parse_ffprobe_subtitle_streams,
+    _pick_extractable_english_embedded_subtitle,
     _parse_srt_blocks,
     _print_colored_error,
     _read_metadata_title,
@@ -153,15 +153,7 @@ class SubtitleTranslatorService:
 
         subtitle_files: list[_SubtitleFile] = []
         for video_path, streams in probed_streams:
-            english_stream = next(
-                (
-                    stream
-                    for stream in streams
-                    if _is_english_embedded_subtitle(stream)
-                    and stream.codec_name.casefold() in _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX
-                ),
-                None,
-            )
+            english_stream = _pick_extractable_english_embedded_subtitle(streams)
             if english_stream is None:
                 continue
             subtitle_file, error_result = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)

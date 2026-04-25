@@ -156,6 +156,20 @@ def _is_english_embedded_subtitle(stream: _EmbeddedSubtitleStream) -> bool:
     return _looks_like_english_subtitle_label(f"{stream.language} {stream.title}")
 
 
+def _pick_extractable_english_embedded_subtitle(
+    streams: list[_EmbeddedSubtitleStream],
+) -> _EmbeddedSubtitleStream | None:
+    return next(
+        (
+            stream
+            for stream in streams
+            if _is_english_embedded_subtitle(stream)
+            and stream.codec_name.casefold() in _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX
+        ),
+        None,
+    )
+
+
 def _looks_like_chinese_subtitle_label(value: str) -> bool:
     normalized = _normalize_subtitle_label(value)
     if not normalized:
