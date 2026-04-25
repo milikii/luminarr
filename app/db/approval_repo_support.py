@@ -134,6 +134,56 @@ def fetch_approval_lease_version_row(
     ).fetchone()
 
 
+def upsert_approval_row(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+    status: str,
+    lease_version: int,
+    executed_version: int,
+    task_ref: str,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO approval_record (
+            action_type,
+            task_id,
+            task_hash,
+            status,
+            lease_version,
+            executed_version,
+            last_task_ref,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(action_type, task_id, task_hash)
+        DO UPDATE SET
+            status = excluded.status,
+            lease_version = CASE
+                WHEN approval_record.lease_version > 0 THEN approval_record.lease_version
+                ELSE excluded.lease_version
+            END,
+            executed_version = CASE
+                WHEN approval_record.executed_version > 0 THEN approval_record.executed_version
+                ELSE excluded.executed_version
+            END,
+            last_task_ref = excluded.last_task_ref,
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            action_type,
+            task_id,
+            task_hash,
+            status,
+            lease_version,
+            executed_version,
+            task_ref.strip(),
+        ),
+    )
+
+
 def update_approval_status(
     *,
     connection: object,

@@ -18,6 +18,7 @@
 - 当前又从 job backlog 再收掉一小格：`mark_downloader_completed()` 的身份规范化也已下沉到 `job_repo_support.py`，`job_repo.py` 当前为 `535` 行。
 - 当前又从 job backlog 再收掉一小格：`cancel_pending_job()` 的身份规范化也已下沉到 `job_repo_support.py`，`job_repo.py` 当前为 `536` 行。
 - 当前又从 approval backlog 再收掉一小格：`_approve/_restore_pending/_cancel` 三条状态迁移薄壳已合并到共享 helper，`approval_repo.py` 当前为 `762` 行。
+- 当前又从 approval backlog 再收掉一小格：`_upsert_approval()` 的 SQL 写入边界也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `736` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -45,6 +46,7 @@
 - 2026-04-25 job completed identity follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "mark_downloader_completed or missing_identity_for_lease_and_cancel or cancel_pending_downloader_updates_persisted_truth"` 为 `2 passed, 109 deselected`
 - 2026-04-25 job cancel identity follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "cancel_pending_job or missing_identity_for_lease_and_cancel or cancel_pending_downloader_updates_persisted_truth or cancel_pending_import_updates_persisted_truth or cancel_target_missing_after_update"` 为 `4 passed, 107 deselected`
 - 2026-04-25 approval transition helper follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approve_import_requires_current_lease_version or approval_repo_approve_raises_when_row_missing or approval_repo_cancel_raises_when_row_missing or approval_repo_restore_pending_raises_when_row_missing or cancel_pending_import_updates_persisted_truth"` 为 `5 passed, 106 deselected`
+- 2026-04-25 approval upsert SQL follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approval_repo_persists_for_restart or approval_repo_raises_when_upsert_row_missing or approval_repo_rejects_missing_identity_for_write_paths"` 为 `3 passed, 108 deselected`
 - metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`
 - 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`

@@ -14,6 +14,7 @@ from app.db.approval_repo_support import (
     normalize_transition_identity,
     resolve_approval_record_from_row,
     resolve_requested_lease_version_from_row,
+    upsert_approval_row,
     update_approval_executed_version,
     update_approval_status,
 )
@@ -300,42 +301,15 @@ class ApprovalRepo:
         initial_lease_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
         initial_executed_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
         with self._database.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO approval_record (
-                    action_type,
-                    task_id,
-                    task_hash,
-                    status,
-                    lease_version,
-                    executed_version,
-                    last_task_ref,
-                    created_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT(action_type, task_id, task_hash)
-                DO UPDATE SET
-                    status = excluded.status,
-                    lease_version = CASE
-                        WHEN approval_record.lease_version > 0 THEN approval_record.lease_version
-                        ELSE excluded.lease_version
-                    END,
-                    executed_version = CASE
-                        WHEN approval_record.executed_version > 0 THEN approval_record.executed_version
-                        ELSE excluded.executed_version
-                    END,
-                    last_task_ref = excluded.last_task_ref,
-                    updated_at = CURRENT_TIMESTAMP
-                """,
-                (
-                    action_type,
-                    identity.task_id,
-                    identity.task_hash,
-                    cleaned_status,
-                    initial_lease_version,
-                    initial_executed_version,
-                    task_ref.strip(),
-                ),
+            upsert_approval_row(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                status=cleaned_status,
+                lease_version=initial_lease_version,
+                executed_version=initial_executed_version,
+                task_ref=task_ref,
             )
             connection.commit()
         approval_record = self._get_exact_approval_record(
