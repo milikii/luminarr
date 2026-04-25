@@ -260,3 +260,26 @@ def move_approval_identity_row(
         ),
     )
     return cursor.rowcount
+
+
+def resolve_approval_record_from_row(
+    *,
+    row: Mapping[str, object] | None,
+    to_approval_record: callable,
+) -> object | None:
+    if row is None:
+        return None
+    return to_approval_record(row)
+
+
+def resolve_requested_lease_version_from_row(
+    *,
+    row: Mapping[str, object] | None,
+    error_cls: type[Exception],
+) -> int | None:
+    if row is None:
+        return None
+    lease_version = int(row["lease_version"])
+    if lease_version <= 0:
+        raise error_cls("approval lease version corrupted after read")
+    return lease_version

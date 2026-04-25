@@ -12,6 +12,8 @@ from app.db.approval_repo_support import (
     normalize_approval_identity,
     normalize_move_identity,
     normalize_transition_identity,
+    resolve_approval_record_from_row,
+    resolve_requested_lease_version_from_row,
     update_approval_executed_version,
     update_approval_status,
 )
@@ -631,9 +633,10 @@ class ApprovalRepo:
                 )
                 if fallback_row is not None:
                     raise ApprovalPersistenceError("approval task hash mismatch for query")
-        if row is None:
-            return None
-        return _to_approval_record(row)
+        return resolve_approval_record_from_row(
+            row=row,
+            to_approval_record=_to_approval_record,
+        )
 
     def _get_exact_approval_record(
         self,
@@ -655,9 +658,10 @@ class ApprovalRepo:
                 task_id=identity.task_id,
                 task_hash=identity.task_hash,
             )
-        if row is None:
-            return None
-        return _to_approval_record(row)
+        return resolve_approval_record_from_row(
+            row=row,
+            to_approval_record=_to_approval_record,
+        )
 
     def _is_pending_expired(
         self,
@@ -708,12 +712,10 @@ class ApprovalRepo:
                 task_id=identity.task_id,
                 task_hash=identity.task_hash,
             )
-        if row is None:
-            return None
-        lease_version = int(row["lease_version"])
-        if lease_version <= 0:
-            raise ApprovalPersistenceError("approval lease version corrupted after read")
-        return lease_version
+        return resolve_requested_lease_version_from_row(
+            row=row,
+            error_cls=ApprovalPersistenceError,
+        )
 
 
 def _to_approval_record(row: Mapping[str, object]) -> ApprovalRecord:
