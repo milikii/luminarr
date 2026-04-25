@@ -8,11 +8,9 @@ from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
     _SubtitleFile,
     _SubtitleCommandFailure,
-    _build_professional_subtitle_translation_request,
     _build_subtitle_skip_result,
     _build_subtitle_translation_summary,
     _extract_embedded_subtitle_file_for_video,
-    _extract_translations_from_response,
     _probe_embedded_subtitle_streams_for_video,
     _print_colored_error,
     _read_metadata_title,
@@ -22,6 +20,7 @@ from app.services.subtitle_translation_support import (
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
     _resolve_target_subtitle_files,
+    _translate_subtitle_lines_professionally,
     _translate_srt_subtitle_content,
 )
 
@@ -261,21 +260,14 @@ class SubtitleTranslatorService:
         )
 
     def _translate_lines_professional(self, *, source_lines: list[str], movie_title: str) -> list[str]:
-        system_prompt, user_payload = _build_professional_subtitle_translation_request(
-            movie_title=movie_title,
+        return _translate_subtitle_lines_professionally(
             source_lines=source_lines,
+            movie_title=movie_title,
+            request_chat_completion=lambda system_prompt, user_payload: self._request_chat_completion(
+                system_prompt=system_prompt,
+                user_payload=user_payload,
+            ),
         )
-
-        response_text = self._request_chat_completion(
-            system_prompt=system_prompt,
-            user_payload=user_payload,
-        )
-        translations = _extract_translations_from_response(response_text)
-        if len(translations) != len(source_lines):
-            raise RuntimeError(
-                f"翻译行数不一致（source={len(source_lines)}, translated={len(translations)}）"
-            )
-        return [line.strip() for line in translations]
 
     def _request_chat_completion(self, *, system_prompt: str, user_payload: dict[str, object]) -> str:
         if self._request_chat_completion_func is not None:

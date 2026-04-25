@@ -334,6 +334,25 @@ def _build_professional_subtitle_translation_request(
     return system_prompt, user_payload
 
 
+def _translate_subtitle_lines_professionally(
+    *,
+    source_lines: list[str],
+    movie_title: str,
+    request_chat_completion: Callable[[str, dict[str, object]], str],
+) -> list[str]:
+    system_prompt, user_payload = _build_professional_subtitle_translation_request(
+        movie_title=movie_title,
+        source_lines=source_lines,
+    )
+    response_text = request_chat_completion(system_prompt, user_payload)
+    translations = _extract_translations_from_response(response_text)
+    if len(translations) != len(source_lines):
+        raise RuntimeError(
+            f"翻译行数不一致（source={len(source_lines)}, translated={len(translations)}）"
+        )
+    return [line.strip() for line in translations]
+
+
 def _build_subtitle_skip_result(*, skip_reason: str) -> tuple[str, bool]:
     if skip_reason == "chinese_external":
         return "字幕翻译已跳过：已检测到中文字幕外挂字幕。", True

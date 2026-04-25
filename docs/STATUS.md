@@ -10,7 +10,7 @@
 - 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
 - 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
 - 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
-- 当前又从刮削后续 backlog 收掉一小格：字幕翻译的 OpenAI 请求执行、SRT 渲染与 ASS 渲染也已下沉到 `subtitle_translation_support.py`；连同更早收掉的 `ffmpeg` fallback 结果解析 / 错误映射与“`ffprobe` 缺失且 `ffmpeg` 也缺失时返回明确失败结果”的 focused 护栏，当前 `subtitle_translator.py` 已降到 `443` 行。
+- 当前又从刮削后续 backlog 再收掉几小格：字幕翻译的目标字幕解析、`ffprobe/ffmpeg` 探测执行、内嵌字幕提取执行、单文件翻译读写边界与专业翻译请求编排都已下沉到 `subtitle_translation_support.py`；连同更早收掉的 `ffmpeg` fallback 结果解析 / 错误映射与“`ffprobe` 缺失且 `ffmpeg` 也缺失时返回明确失败结果”的 focused 护栏，当前 `subtitle_translator.py` 已降到 `283` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
@@ -30,6 +30,7 @@
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
 - 2026-04-25 冷启动一致性检查：`make quality`、`make verify-mainline` 与 `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 均已复验通过；其中跨渠道搜索 smoke 的测试夹具已同步到当前搜索评分真相。
+- 2026-04-25 subtitle 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `37 passed`
 - metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`
 - 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
 - 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`
