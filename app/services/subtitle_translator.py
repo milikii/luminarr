@@ -13,7 +13,7 @@ from app.services.subtitle_translation_support import (
     _build_embedded_subtitle_extract_command,
     _build_subtitle_file,
     _extract_translations_from_response,
-    _find_all_subtitle_paths,
+    _find_adjacent_subtitle_paths,
     _find_video_files,
     _is_chinese_embedded_subtitle,
     _is_chinese_subtitle_path,
@@ -122,21 +122,28 @@ class SubtitleTranslatorService:
         self,
         target_path: Path,
     ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
-        external_subtitle_paths = _find_all_subtitle_paths(target_path)
-        if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
+        if target_path.is_file():
+            return self._resolve_single_video_subtitle_files(target_path)
+        return self._resolve_directory_subtitle_files(target_path)
+
+    def _resolve_single_video_subtitle_files(
+        self,
+        video_path: Path,
+    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
+        subtitle_files, error_result, skip_reason = self._resolve_video_subtitle_files(video_path)
+        if error_result is not None:
+            return [], error_result
+        if subtitle_files:
+            return subtitle_files, None
+        if skip_reason == "chinese_external":
             message = "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+        elif skip_reason == "chinese_embedded":
+            message = "字幕翻译已跳过：视频内已检测到中文字幕轨。"
+        else:
+            message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
+        return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
 
-        external_subtitle_files = [
-            subtitle_file
-            for path in external_subtitle_paths
-            if (subtitle_file := _build_subtitle_file(path)) is not None
-        ]
-        if external_subtitle_files:
-            return external_subtitle_files, None
-        return self._resolve_embedded_subtitle_files(target_path)
-
-    def _resolve_embedded_subtitle_files(
+    def _resolve_directory_subtitle_files(
         self,
         target_path: Path,
     ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
@@ -145,33 +152,51 @@ class SubtitleTranslatorService:
             message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
             return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
 
-        probed_streams: list[tuple[Path, list[_EmbeddedSubtitleStream]]] = []
-        for video_path in video_files:
-            streams, error_result = self._probe_embedded_subtitles(video_path)
-            if error_result is not None:
-                return [], error_result
-            probed_streams.append((video_path, streams))
-
-        if any(any(_is_chinese_embedded_subtitle(stream) for stream in streams) for _, streams in probed_streams):
-            message = "字幕翻译已跳过：视频内已检测到中文字幕轨。"
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
-
         subtitle_files: list[_SubtitleFile] = []
-        for video_path, streams in probed_streams:
-            english_stream = _pick_extractable_english_embedded_subtitle(streams)
-            if english_stream is None:
-                continue
-            subtitle_file, error_result = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
+        for video_path in video_files:
+            video_subtitle_files, error_result, _ = self._resolve_video_subtitle_files(video_path)
             if error_result is not None:
                 return [], error_result
-            if subtitle_file is not None:
-                subtitle_files.append(subtitle_file)
+            subtitle_files.extend(video_subtitle_files)
 
         if subtitle_files:
             return subtitle_files, None
 
         message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
         return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+
+    def _resolve_video_subtitle_files(
+        self,
+        video_path: Path,
+    ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None, str]:
+        external_subtitle_paths = _find_adjacent_subtitle_paths(video_path)
+        if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
+            return [], None, "chinese_external"
+
+        external_subtitle_files = [
+            subtitle_file
+            for path in external_subtitle_paths
+            if (subtitle_file := _build_subtitle_file(path)) is not None
+        ]
+        if external_subtitle_files:
+            return external_subtitle_files, None, "external"
+
+        streams, error_result = self._probe_embedded_subtitles(video_path)
+        if error_result is not None:
+            return [], error_result, "error"
+        if any(_is_chinese_embedded_subtitle(stream) for stream in streams):
+            return [], None, "chinese_embedded"
+
+        english_stream = _pick_extractable_english_embedded_subtitle(streams)
+        if english_stream is None:
+            return [], None, "none"
+
+        subtitle_file, error_result = self._extract_embedded_subtitle_file(video_path=video_path, stream=english_stream)
+        if error_result is not None:
+            return [], error_result, "error"
+        if subtitle_file is None:
+            return [], None, "none"
+        return [subtitle_file], None, "embedded"
 
     def _probe_embedded_subtitles(
         self,

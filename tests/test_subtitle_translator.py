@@ -139,6 +139,126 @@ def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: 
     assert "[Script Info]" in payload
 
 
+def test_translate_for_import_directory_translates_each_episode_without_global_chinese_skip(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    season_dir = library_dir / "Show.S01"
+    season_dir.mkdir(parents=True)
+
+    episode1 = season_dir / "Show.S01E01.mkv"
+    episode2 = season_dir / "Show.S01E02.mkv"
+    episode1.write_bytes(b"video-1")
+    episode2.write_bytes(b"video-2")
+
+    (season_dir / "Show.S01E01.chs.srt").write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\n你好\n",
+        encoding="utf-8",
+    )
+    (season_dir / "Show.S01E02.srt").write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello episode two\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-dir-1",
+            task_id="dir-1",
+            task_hash="hash-dir-1",
+            target_path=str(season_dir),
+        )
+    )
+
+    assert result.success is True
+    assert result.translated_count == 1
+    assert not (season_dir / "Show.S01E01.zh.srt").exists()
+    assert (season_dir / "Show.S01E02.zh.srt").exists()
+    assert "专业译文：hello episode two" in (season_dir / "Show.S01E02.zh.srt").read_text(encoding="utf-8")
+
+
+def test_translate_for_import_directory_mixes_external_and_embedded_episode_subtitles(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    season_dir = library_dir / "Show.S01"
+    season_dir.mkdir(parents=True)
+
+    episode1 = season_dir / "Show.S01E01.mkv"
+    episode2 = season_dir / "Show.S01E02.mkv"
+    episode1.write_bytes(b"video-1")
+    episode2.write_bytes(b"video-2")
+    (season_dir / "Show.S01E01.srt").write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello external\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert capture_output is True
+        assert text is True
+        assert timeout == 60.0
+        if args[0] == "ffprobe":
+            assert str(episode2) in args
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "index": 2,
+                                "codec_name": "subrip",
+                                "tags": {"language": "eng", "title": "English"},
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                stderr="",
+            )
+        if args[0] == "ffmpeg":
+            Path(args[-1]).write_text(
+                "1\n00:00:01,000 --> 00:00:03,000\nhello embedded\n",
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-dir-2",
+            task_id="dir-2",
+            task_hash="hash-dir-2",
+            target_path=str(season_dir),
+        )
+    )
+
+    assert result.success is True
+    assert result.translated_count == 2
+    assert (season_dir / "Show.S01E01.zh.srt").exists()
+    assert (season_dir / "Show.S01E02.zh.srt").exists()
+    assert "专业译文：hello external" in (season_dir / "Show.S01E01.zh.srt").read_text(encoding="utf-8")
+    assert "专业译文：hello embedded" in (season_dir / "Show.S01E02.zh.srt").read_text(encoding="utf-8")
+
+
 def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path, monkeypatch) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
