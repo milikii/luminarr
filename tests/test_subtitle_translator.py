@@ -573,6 +573,49 @@ def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> No
     assert "读取字幕文件失败" in result.message
 
 
+def test_translate_for_import_fails_when_writing_translated_subtitle(tmp_path: Path, monkeypatch) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    original_write_text = Path.write_text
+
+    def failing_write_text(self: Path, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None) -> int:
+        if self.name.endswith(".zh.srt"):
+            raise OSError("disk full")
+        return original_write_text(self, data, encoding=encoding, errors=errors, newline=newline)
+
+    monkeypatch.setattr(Path, "write_text", failing_write_text)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is False
+    assert "写入字幕文件失败" in result.message
+
+
 def test_read_metadata_title_logs_metadata_read_failure(
     tmp_path: Path,
     capsys,

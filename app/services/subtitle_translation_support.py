@@ -179,6 +179,62 @@ def _resolve_extracted_subtitle_file(output_path: Path) -> tuple[_SubtitleFile |
     )
 
 
+def _read_subtitle_source_text(source_path: Path) -> tuple[str | None, _SubtitleCommandFailure | None]:
+    try:
+        return source_path.read_text(encoding="utf-8"), None
+    except Exception as exc:
+        return None, _SubtitleCommandFailure(
+            reason="read_source",
+            problem=f"读取字幕文件失败：{source_path}，原因：{exc}",
+            fix="确认字幕是 UTF-8 编码，必要时先转码后再重试。",
+        )
+
+
+def _write_translated_subtitle_file(
+    *,
+    output_path: Path,
+    rendered_output: str,
+) -> _SubtitleCommandFailure | None:
+    try:
+        output_path.write_text(rendered_output, encoding="utf-8")
+    except Exception as exc:
+        return _SubtitleCommandFailure(
+            reason="write_output",
+            problem=f"写入字幕文件失败：{output_path}，原因：{exc}",
+            fix="检查导入目录写权限和磁盘空间，再重试 confirm 导入。",
+        )
+    return None
+
+
+def _resolve_translated_subtitle_content(
+    *,
+    subtitle_file: _SubtitleFile,
+    source_text: str,
+    movie_title: str,
+    translate_srt: Callable[[str, str, Path], tuple[str | None, str | None]],
+    translate_ass: Callable[[str, str, Path], tuple[str | None, str | None]],
+) -> tuple[str | None, str | None, _SubtitleCommandFailure | None]:
+    if subtitle_file.kind == "srt":
+        rendered_output, error_message = translate_srt(
+            source_text=source_text,
+            movie_title=movie_title,
+            subtitle_path=subtitle_file.source_path,
+        )
+        return rendered_output, error_message, None
+    if subtitle_file.kind == "ass":
+        rendered_output, error_message = translate_ass(
+            source_text=source_text,
+            movie_title=movie_title,
+            subtitle_path=subtitle_file.source_path,
+        )
+        return rendered_output, error_message, None
+    return None, None, _SubtitleCommandFailure(
+        reason="unsupported_kind",
+        problem=f"字幕翻译失败：暂不支持的字幕格式：{subtitle_file.source_path}",
+        fix="确认字幕是 `.srt` 或 `.ass` 文件，再重试导入。",
+    )
+
+
 def _find_video_files(target_path: Path) -> list[Path]:
     if target_path.is_file():
         return [target_path] if target_path.suffix.lower() in _VIDEO_FILE_SUFFIXES else []

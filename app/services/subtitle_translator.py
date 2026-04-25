@@ -28,9 +28,12 @@ from app.services.subtitle_translation_support import (
     _render_srt,
     _resolve_embedded_subtitle_output_path,
     _resolve_extracted_subtitle_file,
+    _read_subtitle_source_text,
+    _resolve_translated_subtitle_content,
     _run_subprocess_command,
     _translate_blocks_in_chunks,
     _translate_chunk_lines,
+    _write_translated_subtitle_file,
 )
 
 
@@ -302,35 +305,34 @@ class SubtitleTranslatorService:
         subtitle_file: _SubtitleFile,
         movie_title: str,
     ) -> SubtitleTranslateResult:
-        try:
-            source_text = subtitle_file.source_path.read_text(encoding="utf-8")
-        except Exception as exc:
-            message = f"读取字幕文件失败：{subtitle_file.source_path}，原因：{exc}"
-            _print_colored_error(
-                problem=message,
-                fix="确认字幕是 UTF-8 编码，必要时先转码后再重试。",
+        source_text, read_failure = _read_subtitle_source_text(subtitle_file.source_path)
+        if read_failure is not None:
+            _print_colored_error(problem=read_failure.problem, fix=read_failure.fix)
+            return SubtitleTranslateResult(
+                success=False,
+                message=read_failure.problem,
+                translated_count=0,
+                skipped=False,
             )
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
 
-        if subtitle_file.kind == "srt":
-            rendered_output, error_message = self._translate_srt_text(
-                source_text=source_text,
-                movie_title=movie_title,
-                subtitle_path=subtitle_file.source_path,
-            )
-        elif subtitle_file.kind == "ass":
-            rendered_output, error_message = self._translate_ass_text(
-                source_text=source_text,
-                movie_title=movie_title,
-                subtitle_path=subtitle_file.source_path,
-            )
-        else:
-            message = f"字幕翻译失败：暂不支持的字幕格式：{subtitle_file.source_path}"
+        rendered_output, error_message, translate_failure = _resolve_translated_subtitle_content(
+            subtitle_file=subtitle_file,
+            source_text=source_text,
+            movie_title=movie_title,
+            translate_srt=self._translate_srt_text,
+            translate_ass=self._translate_ass_text,
+        )
+        if translate_failure is not None:
             _print_colored_error(
-                problem=message,
-                fix="确认字幕是 `.srt` 或 `.ass` 文件，再重试导入。",
+                problem=translate_failure.problem,
+                fix=translate_failure.fix,
             )
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
+            return SubtitleTranslateResult(
+                success=False,
+                message=translate_failure.problem,
+                translated_count=0,
+                skipped=False,
+            )
 
         if rendered_output is None:
             return SubtitleTranslateResult(
@@ -340,15 +342,18 @@ class SubtitleTranslatorService:
                 skipped=False,
             )
 
-        try:
-            subtitle_file.translated_path.write_text(rendered_output, encoding="utf-8")
-        except Exception as exc:
-            message = f"写入字幕文件失败：{subtitle_file.translated_path}，原因：{exc}"
-            _print_colored_error(
-                problem=message,
-                fix="检查导入目录写权限和磁盘空间，再重试 confirm 导入。",
+        write_failure = _write_translated_subtitle_file(
+            output_path=subtitle_file.translated_path,
+            rendered_output=rendered_output,
+        )
+        if write_failure is not None:
+            _print_colored_error(problem=write_failure.problem, fix=write_failure.fix)
+            return SubtitleTranslateResult(
+                success=False,
+                message=write_failure.problem,
+                translated_count=0,
+                skipped=False,
             )
-            return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
         return SubtitleTranslateResult(success=True, message="ok", translated_count=1, skipped=False)
 
     def _translate_srt_text(
