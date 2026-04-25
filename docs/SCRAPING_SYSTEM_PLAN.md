@@ -132,7 +132,7 @@ Luminarr 当前仍是：
 这些不是当前刮削主线的即时 blocker，但已经明确挂进后续任务，避免再次靠口头记忆：
 
 - `app/services/subtitle_translator.py`
-  - 当前状态：已再前推一格；support helper 已承接 chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排、“可提取英文内嵌字幕结果筛选”、“提取后字幕文件可用性整理”、“单文件翻译读写边界”、翻译请求载荷构造、`_request_chat_completion` 的响应解析 / 错误映射、`translate_for_import` 的 skip/success 结果构造、`_translate_single_file` / `_extract_embedded_subtitle_file` 的失败结果构造，以及“外挂字幕识别 + 中文字幕外挂 skip 优先级”“内嵌字幕流优先级判定”“ffprobe 结果解析 / 错误映射”；当前 `subtitle_translator.py` 为 `505` 行，`_probe_embedded_subtitles` 已回落到 `40` 行。
+  - 当前状态：已再前推一格；support helper 已承接 chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排、“可提取英文内嵌字幕结果筛选”、“提取后字幕文件可用性整理”、“单文件翻译读写边界”、翻译请求载荷构造、`_request_chat_completion` 的响应解析 / 错误映射、`translate_for_import` 的 skip/success 结果构造、`_translate_single_file` / `_extract_embedded_subtitle_file` 的失败结果构造，以及“外挂字幕识别 + 中文字幕外挂 skip 优先级”“内嵌字幕流优先级判定”“ffprobe 结果解析 / 错误映射”“提取结果解析 / 半成品清理”；当前 `subtitle_translator.py` 为 `501` 行。
   - 目标：继续按“外挂字幕识别 / 内嵌字幕探测 / 提取执行 / 翻译执行 / 中文跳过策略”收口剩余编排
 - `app/services/manage_bt_subscription.py`
   - 目标：按“命令解析 / 持久化 / 扫描候选 / 最后一次 seen 状态更新 / scheduler tick”拆分

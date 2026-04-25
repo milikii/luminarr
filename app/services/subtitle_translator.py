@@ -27,8 +27,8 @@ from app.services.subtitle_translation_support import (
     _resolve_embedded_subtitle_stream_selection,
     _resolve_external_subtitle_files,
     _resolve_directory_skip_reason,
+    _resolve_embedded_subtitle_extract_result,
     _resolve_embedded_subtitle_output_path,
-    _resolve_extracted_subtitle_file,
     _resolve_ffprobe_subtitle_streams,
     _read_subtitle_source_text,
     _resolve_translated_subtitle_content,
@@ -260,17 +260,13 @@ class SubtitleTranslatorService:
         if failure is not None:
             return None, self._build_failed_result(problem=failure.problem, fix=failure.fix)
 
-        if completed.returncode != 0:
-            if output_path.exists():
-                output_path.unlink(missing_ok=True)
-            problem = completed.stderr.strip() or completed.stdout.strip() or f"exit={completed.returncode}"
-            message = f"字幕翻译失败：提取英文内嵌字幕失败：{video_path}，原因：{problem}"
-            return None, self._build_failed_result(
-                problem=message,
-                fix="确认视频里确实有可提取的英文文本字幕流；若是图片字幕（PGS/VobSub），当前不会自动 OCR 翻译。",
-            )
-
-        subtitle_file, output_failure = _resolve_extracted_subtitle_file(output_path)
+        subtitle_file, output_failure = _resolve_embedded_subtitle_extract_result(
+            video_path=video_path,
+            output_path=output_path,
+            returncode=completed.returncode,
+            stdout=completed.stdout or "",
+            stderr=completed.stderr or "",
+        )
         if output_failure is not None:
             return None, self._build_failed_result(
                 problem=output_failure.problem,

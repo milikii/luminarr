@@ -193,6 +193,25 @@ def _resolve_extracted_subtitle_file(output_path: Path) -> tuple[_SubtitleFile |
     )
 
 
+def _resolve_embedded_subtitle_extract_result(
+    *,
+    video_path: Path,
+    output_path: Path,
+    returncode: int,
+    stdout: str,
+    stderr: str,
+) -> tuple[_SubtitleFile | None, _SubtitleCommandFailure | None]:
+    if returncode != 0:
+        output_path.unlink(missing_ok=True)
+        problem = stderr.strip() or stdout.strip() or f"exit={returncode}"
+        return None, _SubtitleCommandFailure(
+            reason="extract_failed",
+            problem=f"字幕翻译失败：提取英文内嵌字幕失败：{video_path}，原因：{problem}",
+            fix="确认视频里确实有可提取的英文文本字幕流；若是图片字幕（PGS/VobSub），当前不会自动 OCR 翻译。",
+        )
+    return _resolve_extracted_subtitle_file(output_path)
+
+
 def _read_subtitle_source_text(source_path: Path) -> tuple[str | None, _SubtitleCommandFailure | None]:
     try:
         return source_path.read_text(encoding="utf-8"), None

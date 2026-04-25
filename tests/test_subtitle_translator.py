@@ -968,6 +968,61 @@ def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_inv
     assert "提取后的字幕文件不可用" in result.message
 
 
+def test_translate_for_import_cleans_partial_extracted_subtitle_when_ffmpeg_extract_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert capture_output is True
+        assert text is True
+        assert timeout == 60.0
+        if args[0] == "ffprobe":
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "index": 2,
+                                "codec_name": "subrip",
+                                "tags": {"language": "eng", "title": "English"},
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                stderr="",
+            )
+        if args[0] == "ffmpeg":
+            Path(args[-1]).write_text("partial subtitle", encoding="utf-8")
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="extract failed")
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-extract-fail-cleanup",
+            task_id="extract-fail-cleanup",
+            task_hash="hash-extract-fail-cleanup",
+            target_path=str(target_file),
+        )
+    )
+
+    extracted_file = library_dir / "Interstellar (2014).srt"
+    assert result.success is False
+    assert result.skipped is False
+    assert "提取英文内嵌字幕失败" in result.message
+    assert not extracted_file.exists()
+
+
 def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
