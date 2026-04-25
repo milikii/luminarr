@@ -49,6 +49,13 @@ class DownloaderCompletedJobIdentity(JobLeaseIdentity):
     task_hash: str
 
 
+@dataclass(frozen=True, slots=True)
+class JobPendingCancelIdentity:
+    job_id: str
+    workflow_type: str
+    expected_version: int
+
+
 def normalize_job_chat_identity(*, chat_id: int, context: str, error_cls: type[Exception]) -> JobChatIdentity:
     if chat_id <= 0:
         raise error_cls(f"job chat identity missing for {context}")
@@ -294,6 +301,30 @@ def normalize_downloader_completed_job_identity(
         expected_version=lease.expected_version,
         task_id=task_key.task_id,
         task_hash=task_key.task_hash,
+    )
+
+
+def normalize_job_pending_cancel_identity(
+    *,
+    job_id: str,
+    expected_version: int,
+    workflow_type: str,
+    error_cls: type[Exception],
+) -> JobPendingCancelIdentity:
+    cleaned_job_id = job_id.strip()
+    workflow = normalize_job_workflow(
+        workflow_type=workflow_type,
+        context="cancel",
+        error_cls=error_cls,
+    )
+    if not cleaned_job_id:
+        raise error_cls("job cancel identity missing")
+    if expected_version <= 0:
+        raise error_cls("job cancel expected version missing")
+    return JobPendingCancelIdentity(
+        job_id=cleaned_job_id,
+        workflow_type=workflow.workflow_type,
+        expected_version=expected_version,
     )
 
 

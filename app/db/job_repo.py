@@ -11,6 +11,7 @@ from app.db.job_repo_support import (
     normalize_downloader_completed_job_identity,
     normalize_job_chat_identity,
     normalize_job_lease_identity,
+    normalize_job_pending_cancel_identity,
     normalize_job_pending_upsert_identity,
     normalize_job_task_ref,
     normalize_job_workflow,
@@ -277,20 +278,20 @@ class JobRepo:
         return rowcount == 1
 
     def cancel_pending_job(self, *, job_id: str, expected_version: int, workflow_type: str) -> bool:
-        cleaned_job_id = job_id.strip()
-        cleaned_workflow = workflow_type.strip()
-        if not cleaned_job_id or not cleaned_workflow:
-            raise JobPersistenceError("job cancel identity missing")
-        if expected_version <= 0:
-            raise JobPersistenceError("job cancel expected version missing")
+        identity = normalize_job_pending_cancel_identity(
+            job_id=job_id,
+            expected_version=expected_version,
+            workflow_type=workflow_type,
+            error_cls=JobPersistenceError,
+        )
 
         current_time_text = _format_utc(_utcnow())
         with self._database.connect() as connection:
             rowcount = update_job_cancel_pending(
                 connection=connection,
-                job_id=cleaned_job_id,
-                expected_version=expected_version,
-                workflow_type=cleaned_workflow,
+                job_id=identity.job_id,
+                expected_version=identity.expected_version,
+                workflow_type=identity.workflow_type,
                 cancelled_state=JOB_STATE_CANCELLED,
                 pending_state=JOB_STATE_PENDING_APPROVAL,
                 current_time_text=current_time_text,
@@ -298,7 +299,7 @@ class JobRepo:
             connection.commit()
         if rowcount == 1:
             return True
-        if self._get_job_by_identity(job_id=cleaned_job_id, workflow_type=cleaned_workflow) is None:
+        if self._get_job_by_identity(job_id=identity.job_id, workflow_type=identity.workflow_type) is None:
             raise JobPersistenceError("job missing during cancel")
         return False
 
