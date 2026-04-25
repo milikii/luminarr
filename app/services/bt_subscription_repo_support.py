@@ -96,6 +96,34 @@ def list_subscription_chat_ids(
     )
 
 
+def update_subscription_last_seen(
+    *,
+    repo: BtSubscriptionRepo,
+    chat_id: int,
+    item_id: int,
+    source: str,
+    title: str,
+    item_missing_reason: str,
+    result_missing_reason: str,
+    is_item_row_corrupted_reason: Callable[[str], bool],
+) -> BtSubscriptionRepoResult[bool]:
+    return _run_repo_call(
+        call=lambda: (
+            True
+            if repo.update_last_seen(
+                chat_id=chat_id,
+                item_id=item_id,
+                source=source,
+                title=title,
+            )
+            else None
+        ),
+        result_missing_reason=result_missing_reason,
+        item_missing_reason=item_missing_reason,
+        is_item_row_corrupted_reason=is_item_row_corrupted_reason,
+    )
+
+
 def _run_repo_call(
     *,
     call: Callable[[], _ResultT | None],

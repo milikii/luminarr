@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
+from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
 from app.services.bt_subscription_command import (
@@ -27,6 +27,7 @@ from app.services.bt_subscription_repo_support import (
     list_subscription_chat_ids,
     list_subscription_items,
     remove_subscription_item,
+    update_subscription_last_seen,
 )
 from app.services.bt_sources import resolve_bt_source
 
@@ -444,70 +445,53 @@ class ManageBtSubscriptionService:
         source: str,
         title: str,
     ) -> BtSubscriptionLastSeenUpdateResult:
-        try:
-            updated = self._bt_subscription_repo.update_last_seen(
-                chat_id=chat_id,
-                item_id=item.item_id,
-                source=source,
-                title=title,
-            )
-            if not updated:
-                raise BtSubscriptionPersistenceError(BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON)
-        except BtSubscriptionPersistenceError as error:
-            if str(error) == "bt_subscription_item missing during last_seen update":
-                _log_bt_subscription_last_seen_item_missing(
-                    item=item,
-                    chat_id=chat_id,
-                    source=source,
-                    title=title,
-                    reason=str(error),
-                )
-                return BtSubscriptionLastSeenUpdateResult(status="item_missing")
-            if str(error) == BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON:
-                _log_bt_subscription_last_seen_result_missing(
-                    item=item,
-                    chat_id=chat_id,
-                    source=source,
-                    title=title,
-                    reason=str(error),
-                )
-                return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_last_seen_row_corrupted(
-                    item=item,
-                    chat_id=chat_id,
-                    source=source,
-                    title=title,
-                    reason=str(error),
-                )
-                return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-            _log_bt_subscription_last_seen_update_failed(
+        result = update_subscription_last_seen(
+            repo=self._bt_subscription_repo,
+            chat_id=chat_id,
+            item_id=item.item_id,
+            source=source,
+            title=title,
+            item_missing_reason="bt_subscription_item missing during last_seen update",
+            result_missing_reason=BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON,
+            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+        )
+        if result.ok:
+            return BtSubscriptionLastSeenUpdateResult(status="updated")
+        if result.status == "item_missing":
+            _log_bt_subscription_last_seen_item_missing(
                 item=item,
                 chat_id=chat_id,
                 source=source,
                 title=title,
-                reason=str(error),
+                reason=result.reason,
             )
-            return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-        except Exception as error:
-            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_last_seen_row_corrupted(
-                    item=item,
-                    chat_id=chat_id,
-                    source=source,
-                    title=title,
-                    reason=str(error),
-                )
-                return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-            _log_bt_subscription_last_seen_update_failed(
+            return BtSubscriptionLastSeenUpdateResult(status="item_missing")
+        if result.status == "result_missing":
+            _log_bt_subscription_last_seen_result_missing(
                 item=item,
                 chat_id=chat_id,
                 source=source,
                 title=title,
-                reason=str(error),
+                reason=result.reason,
             )
             return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-        return BtSubscriptionLastSeenUpdateResult(status="updated")
+        if result.status == "row_corrupted":
+            _log_bt_subscription_last_seen_row_corrupted(
+                item=item,
+                chat_id=chat_id,
+                source=source,
+                title=title,
+                reason=result.reason,
+            )
+            return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
+        _log_bt_subscription_last_seen_update_failed(
+            item=item,
+            chat_id=chat_id,
+            source=source,
+            title=title,
+            reason=result.reason,
+        )
+        return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
 
 
 def _build_subscription_query(item: BtSubscriptionItem) -> str:
