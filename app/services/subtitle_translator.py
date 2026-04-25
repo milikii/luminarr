@@ -135,21 +135,25 @@ class SubtitleTranslatorService:
     ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None]:
         video_files = _find_video_files(target_path)
         if not video_files:
-            message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
-            return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+            return [], self._build_skip_result(skip_reason="none")
 
         subtitle_files: list[_SubtitleFile] = []
+        skip_reasons: list[str] = []
         for video_path in video_files:
-            video_subtitle_files, error_result, _ = self._resolve_video_subtitle_files(video_path)
+            video_subtitle_files, error_result, skip_reason = self._resolve_video_subtitle_files(video_path)
             if error_result is not None:
                 return [], error_result
+            skip_reasons.append(skip_reason)
             subtitle_files.extend(video_subtitle_files)
 
         if subtitle_files:
             return subtitle_files, None
 
-        message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
-        return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+        if skip_reasons and all(reason == "chinese_external" for reason in skip_reasons):
+            return [], self._build_skip_result(skip_reason="chinese_external")
+        if skip_reasons and all(reason == "chinese_embedded" for reason in skip_reasons):
+            return [], self._build_skip_result(skip_reason="chinese_embedded")
+        return [], self._build_skip_result(skip_reason="none")
 
     def _resolve_video_subtitle_files(
         self,
@@ -384,6 +388,15 @@ class SubtitleTranslatorService:
                 return 0, result
             translated_count += 1
         return translated_count, None
+
+    def _build_skip_result(self, *, skip_reason: str) -> SubtitleTranslateResult:
+        if skip_reason == "chinese_external":
+            message = "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
+        elif skip_reason == "chinese_embedded":
+            message = "字幕翻译已跳过：视频内已检测到中文字幕轨。"
+        else:
+            message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
+        return SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
 
     def _build_translation_summary_result(
         self,

@@ -255,6 +255,35 @@ def test_translate_for_import_directory_translates_each_episode_without_global_c
     assert "专业译文：hello episode two" in (season_dir / "Show.S01E02.zh.srt").read_text(encoding="utf-8")
 
 
+def test_translate_for_import_directory_reports_chinese_external_skip_when_all_episodes_have_chinese_subtitles(
+    tmp_path: Path,
+) -> None:
+    library_dir = tmp_path / "library"
+    season_dir = library_dir / "Show.S01"
+    season_dir.mkdir(parents=True)
+
+    for episode in ("Show.S01E01", "Show.S01E02"):
+        (season_dir / f"{episode}.mkv").write_bytes(b"video")
+        (season_dir / f"{episode}.chs.srt").write_text(
+            "1\n00:00:01,000 --> 00:00:03,000\n你好\n",
+            encoding="utf-8",
+        )
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-dir-skip",
+            task_id="dir-skip",
+            task_hash="hash-dir-skip",
+            target_path=str(season_dir),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.message == "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
+
+
 def test_translate_for_import_directory_mixes_external_and_embedded_episode_subtitles(
     tmp_path: Path,
     monkeypatch,
