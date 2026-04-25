@@ -21,13 +21,13 @@ from app.services.bt_subscription_command import (
     parse_bt_subscription_query as _parse_bt_subscription_query,
 )
 from app.services.bt_subscription_dispatch_support import dispatch_bt_subscription_item
+from app.services.bt_subscription_last_seen_support import update_bt_subscription_last_seen
 from app.services.bt_subscription_repo_support import (
     add_subscription_item,
     clear_subscription_items,
     list_subscription_chat_ids,
     list_subscription_items,
     remove_subscription_item,
-    update_subscription_last_seen,
 )
 from app.services.bt_subscription_scheduler_support import collect_bt_subscription_scheduler_notifications
 from app.services.bt_subscription_scan_support import (
@@ -69,20 +69,6 @@ class BtSubscriptionDispatchContext:
     downloader_name: str
     downloader_type: str
     download_dir: str
-
-
-@dataclass(frozen=True, slots=True)
-class BtSubscriptionLastSeenUpdateResult:
-    status: str
-
-    @property
-    def updated(self) -> bool:
-        return self.status == "updated"
-
-    @property
-    def item_missing(self) -> bool:
-        return self.status == "item_missing"
-
 
 class ManageBtSubscriptionService:
     def __init__(
@@ -340,12 +326,44 @@ class ManageBtSubscriptionService:
                 download_dir=dispatch_context.download_dir,
                 auto_import_enabled=True,
             ),
-            update_last_seen_status=lambda source, title: self._update_last_seen(
-                item=item,
+            update_last_seen_status=lambda source, title: update_bt_subscription_last_seen(
+                repo=self._bt_subscription_repo,
                 chat_id=chat_id,
+                item_id=item.item_id,
                 source=source,
                 title=title,
-            ).status,
+                item_missing_reason="bt_subscription_item missing during last_seen update",
+                result_missing_reason=BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON,
+                is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+                log_item_missing=lambda reason: _log_bt_subscription_last_seen_item_missing(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=reason,
+                ),
+                log_result_missing=lambda reason: _log_bt_subscription_last_seen_result_missing(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=reason,
+                ),
+                log_row_corrupted=lambda reason: _log_bt_subscription_last_seen_row_corrupted(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=reason,
+                ),
+                log_update_failed=lambda reason: _log_bt_subscription_last_seen_update_failed(
+                    item=item,
+                    chat_id=chat_id,
+                    source=source,
+                    title=title,
+                    reason=reason,
+                ),
+            ),
             log_scan_error=lambda query, error: _log_bt_subscription_scan_error(
                 item=item,
                 query=query,
@@ -412,63 +430,6 @@ class ManageBtSubscriptionService:
                 reason=reason,
             ),
         )
-
-    def _update_last_seen(
-        self,
-        *,
-        item: BtSubscriptionItem,
-        chat_id: int,
-        source: str,
-        title: str,
-    ) -> BtSubscriptionLastSeenUpdateResult:
-        result = update_subscription_last_seen(
-            repo=self._bt_subscription_repo,
-            chat_id=chat_id,
-            item_id=item.item_id,
-            source=source,
-            title=title,
-            item_missing_reason="bt_subscription_item missing during last_seen update",
-            result_missing_reason=BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON,
-            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
-        )
-        if result.ok:
-            return BtSubscriptionLastSeenUpdateResult(status="updated")
-        if result.status == "item_missing":
-            _log_bt_subscription_last_seen_item_missing(
-                item=item,
-                chat_id=chat_id,
-                source=source,
-                title=title,
-                reason=result.reason,
-            )
-            return BtSubscriptionLastSeenUpdateResult(status="item_missing")
-        if result.status == "result_missing":
-            _log_bt_subscription_last_seen_result_missing(
-                item=item,
-                chat_id=chat_id,
-                source=source,
-                title=title,
-                reason=result.reason,
-            )
-            return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-        if result.status == "row_corrupted":
-            _log_bt_subscription_last_seen_row_corrupted(
-                item=item,
-                chat_id=chat_id,
-                source=source,
-                title=title,
-                reason=result.reason,
-            )
-            return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-        _log_bt_subscription_last_seen_update_failed(
-            item=item,
-            chat_id=chat_id,
-            source=source,
-            title=title,
-            reason=result.reason,
-        )
-        return BtSubscriptionLastSeenUpdateResult(status="persistence_failed")
-
 
 def _pick_subscription_candidate(
     results: Sequence[Mapping[str, Any]],
