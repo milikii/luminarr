@@ -24,6 +24,7 @@ from app.services.bt_subscription_command import (
 from app.services.bt_subscription_repo_support import (
     add_subscription_item,
     clear_subscription_items,
+    list_subscription_chat_ids,
     list_subscription_items,
     remove_subscription_item,
 )
@@ -139,18 +140,19 @@ class ManageBtSubscriptionService:
     ) -> tuple[tuple[int, str], ...] | None:
         notifications: list[tuple[int, str]] = []
         scan_failed = False
-        try:
-            chat_ids = self._bt_subscription_repo.list_chat_ids()
-            if chat_ids is None:
-                raise BtSubscriptionPersistenceError("bt subscription chat list result missing")
-        except Exception as error:
-            if str(error) == "bt subscription chat list result missing":
-                _log_bt_subscription_scan_chat_ids_result_missing(reason=str(error))
-            elif _is_bt_subscription_chat_list_row_corrupted_reason(str(error)):
-                _log_bt_subscription_scan_chat_ids_row_corrupted(reason=str(error))
+        chat_ids_result = list_subscription_chat_ids(
+            repo=self._bt_subscription_repo,
+            is_chat_list_row_corrupted_reason=_is_bt_subscription_chat_list_row_corrupted_reason,
+        )
+        if not chat_ids_result.ok:
+            if chat_ids_result.status == "result_missing":
+                _log_bt_subscription_scan_chat_ids_result_missing(reason=chat_ids_result.reason)
+            elif chat_ids_result.status == "row_corrupted":
+                _log_bt_subscription_scan_chat_ids_row_corrupted(reason=chat_ids_result.reason)
             else:
-                _log_bt_subscription_scan_chat_ids_failed(reason=str(error))
+                _log_bt_subscription_scan_chat_ids_failed(reason=chat_ids_result.reason)
             return None
+        chat_ids = chat_ids_result.value or ()
         for chat_id in chat_ids:
             result = await self._scan_chat_once(
                 chat_id=chat_id,
@@ -394,18 +396,21 @@ class ManageBtSubscriptionService:
         user_id: int | None,
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> BtSubscriptionRunResult | None:
-        try:
-            items = self._bt_subscription_repo.list_items(chat_id=chat_id)
-            if items is None:
-                raise BtSubscriptionPersistenceError("bt subscription scan items result missing")
-        except Exception as error:
-            if str(error) == "bt subscription scan items result missing":
-                _log_bt_subscription_scan_items_result_missing(chat_id=chat_id, reason=str(error))
-            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_scan_items_row_corrupted(chat_id=chat_id, reason=str(error))
+        items_result = list_subscription_items(
+            repo=self._bt_subscription_repo,
+            chat_id=chat_id,
+            result_missing_reason="bt subscription scan items result missing",
+            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+        )
+        if not items_result.ok:
+            if items_result.status == "result_missing":
+                _log_bt_subscription_scan_items_result_missing(chat_id=chat_id, reason=items_result.reason)
+            elif items_result.status == "row_corrupted":
+                _log_bt_subscription_scan_items_row_corrupted(chat_id=chat_id, reason=items_result.reason)
             else:
-                _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=str(error))
+                _log_bt_subscription_scan_items_failed(chat_id=chat_id, reason=items_result.reason)
             return None
+        items = items_result.value or ()
         if not items:
             return BtSubscriptionRunResult(scanned=0, matched=0, replies=())
 

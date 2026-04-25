@@ -84,6 +84,18 @@ def clear_subscription_items(
     )
 
 
+def list_subscription_chat_ids(
+    *,
+    repo: BtSubscriptionRepo,
+    is_chat_list_row_corrupted_reason: Callable[[str], bool],
+) -> BtSubscriptionRepoResult[Sequence[int]]:
+    return _run_repo_call(
+        call=repo.list_chat_ids,
+        result_missing_reason="bt subscription chat list result missing",
+        is_item_row_corrupted_reason=is_chat_list_row_corrupted_reason,
+    )
+
+
 def _run_repo_call(
     *,
     call: Callable[[], _ResultT | None],
