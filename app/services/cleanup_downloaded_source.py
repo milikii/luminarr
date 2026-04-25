@@ -14,6 +14,7 @@ from app.services.cleanup_follow_up_support import (
 )
 from app.services.cleanup_inspect_render_support import render_cleanup_inspect_message
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
+from app.services.cleanup_logging_support import print_cleanup_blocked_log
 from app.services.cleanup_query_support import (
     parse_cleanup_inspect_query_text,
     parse_cleanup_query_text,
@@ -156,7 +157,7 @@ class CleanupDownloadedSourceService:
                 source_path=blocked_outcome.source_path,
                 target_path=blocked_outcome.target_path,
             )
-            _print_cleanup_blocked_log(
+            print_cleanup_blocked_log(
                 event_type=blocked_outcome.event_type,
                 task_ref=task_ref_for_event,
                 task_id=inspection.task_id,
@@ -356,37 +357,6 @@ def _delete_source_asset(source_path: Path) -> None:
         source_path.unlink()
         return
     raise OSError(CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT)
-
-
-def _print_cleanup_blocked_log(
-    *,
-    event_type: str,
-    task_ref: str,
-    reason: str,
-    fix_hint: str,
-    task_id: str = "",
-    task_hash: str = "",
-    source_path: str = "",
-    target_path: str = "",
-) -> None:
-    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
-    if task_id.strip():
-        details.append(f"task_id={task_id}")
-    if task_hash.strip():
-        details.append(f"task_hash={task_hash}")
-    if source_path.strip():
-        details.append(f"source={source_path}")
-    if target_path.strip():
-        details.append(f"target={target_path}")
-    details_text = " ".join(details)
-    print(
-        f"\033[31m[cleanup 执行受阻]\033[0m {details_text} 结论={reason}",
-        flush=True,
-    )
-    print(
-        f"\033[33m[处理建议]\033[0m {fix_hint}",
-        flush=True,
-    )
 
 
 def _print_cleanup_event_append_failed_log(
