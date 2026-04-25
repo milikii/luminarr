@@ -284,6 +284,27 @@ def test_translate_for_import_directory_reports_chinese_external_skip_when_all_e
     assert result.message == "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
 
 
+def test_translate_for_import_skips_when_directory_has_no_video_files(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    season_dir = library_dir / "Show.S01"
+    season_dir.mkdir(parents=True)
+    (season_dir / "notes.txt").write_text("no video here", encoding="utf-8")
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-empty-dir",
+            task_id="empty-dir",
+            task_hash="hash-empty-dir",
+            target_path=str(season_dir),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.message == "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
+
+
 def test_translate_for_import_directory_mixes_external_and_embedded_episode_subtitles(
     tmp_path: Path,
     monkeypatch,

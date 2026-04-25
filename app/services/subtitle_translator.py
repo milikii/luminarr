@@ -121,13 +121,7 @@ class SubtitleTranslatorService:
             return [], error_result
         if subtitle_files:
             return subtitle_files, None
-        if skip_reason == "chinese_external":
-            message = "字幕翻译已跳过：已检测到中文字幕外挂字幕。"
-        elif skip_reason == "chinese_embedded":
-            message = "字幕翻译已跳过：视频内已检测到中文字幕轨。"
-        else:
-            message = "字幕翻译已跳过：未找到可翻译的外挂字幕或英文内嵌字幕。"
-        return [], SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=True)
+        return [], self._build_skip_result(skip_reason=skip_reason)
 
     def _resolve_directory_subtitle_files(
         self,
