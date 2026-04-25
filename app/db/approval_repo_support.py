@@ -201,3 +201,62 @@ def normalize_move_identity(
         new_task_id=new_identity.task_id,
         new_task_hash=new_identity.task_hash,
     )
+
+
+def update_approval_executed_version(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+    executed_lease_version: int,
+) -> int:
+    cursor = connection.execute(
+        """
+        UPDATE approval_record
+        SET
+            executed_version = CASE
+                WHEN executed_version < ? THEN ?
+                ELSE executed_version
+            END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE action_type = ? AND task_id = ? AND task_hash = ?
+        """,
+        (
+            executed_lease_version,
+            executed_lease_version,
+            action_type,
+            task_id,
+            task_hash,
+        ),
+    )
+    return cursor.rowcount
+
+
+def move_approval_identity_row(
+    *,
+    connection: object,
+    action_type: str,
+    current_task_id: str,
+    current_task_hash: str,
+    new_task_id: str,
+    new_task_hash: str,
+) -> int:
+    cursor = connection.execute(
+        """
+        UPDATE approval_record
+        SET
+            task_id = ?,
+            task_hash = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE action_type = ? AND task_id = ? AND task_hash = ?
+        """,
+        (
+            new_task_id,
+            new_task_hash,
+            action_type,
+            current_task_id,
+            current_task_hash,
+        ),
+    )
+    return cursor.rowcount

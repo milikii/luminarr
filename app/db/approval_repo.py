@@ -8,9 +8,11 @@ from app.db.approval_repo_support import (
     fetch_approval_lease_version_row,
     fetch_exact_approval_row,
     fetch_latest_approval_row_for_task_id,
+    move_approval_identity_row,
     normalize_approval_identity,
     normalize_move_identity,
     normalize_transition_identity,
+    update_approval_executed_version,
     update_approval_status,
 )
 from app.db.sqlite import SqliteDatabase
@@ -539,27 +541,15 @@ class ApprovalRepo:
             raise ApprovalPersistenceError("approval executed lease version missing")
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE approval_record
-                SET
-                    executed_version = CASE
-                        WHEN executed_version < ? THEN ?
-                        ELSE executed_version
-                    END,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE action_type = ? AND task_id = ? AND task_hash = ?
-                """,
-                (
-                    executed_lease_version,
-                    executed_lease_version,
-                    action_type,
-                    identity.task_id,
-                    identity.task_hash,
-                ),
+            rowcount = update_approval_executed_version(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+                executed_lease_version=executed_lease_version,
             )
             connection.commit()
-        if cursor.rowcount != 1:
+        if rowcount != 1:
             raise ApprovalPersistenceError("approval_record missing during executed version update")
 
     def _move_approval_identity(
@@ -592,25 +582,16 @@ class ApprovalRepo:
             return
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                UPDATE approval_record
-                SET
-                    task_id = ?,
-                    task_hash = ?,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE action_type = ? AND task_id = ? AND task_hash = ?
-                """,
-                (
-                    identity.new_task_id,
-                    identity.new_task_hash,
-                    action_type,
-                    identity.current_task_id,
-                    identity.current_task_hash,
-                ),
+            rowcount = move_approval_identity_row(
+                connection=connection,
+                action_type=action_type,
+                current_task_id=identity.current_task_id,
+                current_task_hash=identity.current_task_hash,
+                new_task_id=identity.new_task_id,
+                new_task_hash=identity.new_task_hash,
             )
             connection.commit()
-        if cursor.rowcount == 1:
+        if rowcount == 1:
             return
 
         target_record = self._get_exact_approval_record(
