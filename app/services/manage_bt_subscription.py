@@ -29,6 +29,7 @@ from app.services.bt_subscription_repo_support import (
     remove_subscription_item,
     update_subscription_last_seen,
 )
+from app.services.bt_subscription_scheduler_support import collect_bt_subscription_scheduler_notifications
 from app.services.bt_subscription_scan_support import (
     BtSubscriptionRunResult,
     format_bt_subscription_run_result,
@@ -141,49 +142,30 @@ class ManageBtSubscriptionService:
         *,
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> tuple[tuple[int, str], ...] | None:
-        notifications: list[tuple[int, str]] = []
-        scan_failed = False
-        chat_ids_result = list_subscription_chat_ids(
-            repo=self._bt_subscription_repo,
-            is_chat_list_row_corrupted_reason=_is_bt_subscription_chat_list_row_corrupted_reason,
-        )
-        if not chat_ids_result.ok:
-            if chat_ids_result.status == "result_missing":
-                _log_bt_subscription_scan_chat_ids_result_missing(reason=chat_ids_result.reason)
-            elif chat_ids_result.status == "row_corrupted":
-                _log_bt_subscription_scan_chat_ids_row_corrupted(reason=chat_ids_result.reason)
-            else:
-                _log_bt_subscription_scan_chat_ids_failed(reason=chat_ids_result.reason)
-            return None
-        chat_ids = chat_ids_result.value or ()
-        for chat_id in chat_ids:
-            result = await self._scan_chat_once(
+        return await collect_bt_subscription_scheduler_notifications(
+            list_chat_ids=lambda: list_subscription_chat_ids(
+                repo=self._bt_subscription_repo,
+                is_chat_list_row_corrupted_reason=_is_bt_subscription_chat_list_row_corrupted_reason,
+            ),
+            scan_chat=lambda chat_id: self._scan_chat_once(
                 chat_id=chat_id,
                 user_id=None,
                 dispatch_context=dispatch_context,
-            )
-            if result is None:
-                scan_failed = True
-                continue
-            if result.pending_creation_failed and result.matched <= 0:
-                scan_failed = True
-                continue
-            if result.matched <= 0:
-                continue
-            notifications.append(
-                (
-                    chat_id,
-                    format_bt_subscription_run_result(
-                        result=result,
-                        run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
-                        run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
-                        pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
-                    ),
-                )
-            )
-        if scan_failed and not notifications:
-            return None
-        return tuple(notifications)
+            ),
+            format_notification=lambda result: format_bt_subscription_run_result(
+                result=result,
+                run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
+                run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
+                pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
+            ),
+            log_chat_ids_failed=lambda reason: _log_bt_subscription_scan_chat_ids_failed(reason=reason),
+            log_chat_ids_result_missing=lambda reason: _log_bt_subscription_scan_chat_ids_result_missing(
+                reason=reason
+            ),
+            log_chat_ids_row_corrupted=lambda reason: _log_bt_subscription_scan_chat_ids_row_corrupted(
+                reason=reason
+            ),
+        )
 
     def _list_text(self, *, chat_id: int) -> str:
         items = self._list_items(chat_id=chat_id)
