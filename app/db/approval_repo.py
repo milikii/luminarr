@@ -4,6 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from app.db.approval_repo_support import (
+    normalize_approval_identity,
+    normalize_move_identity,
+    normalize_transition_identity,
+)
 from app.db.sqlite import SqliteDatabase
 
 ACTION_ADD_TO_DOWNLOADER = "add_to_downloader"
@@ -276,10 +281,12 @@ class ApprovalRepo:
         task_ref: str,
         status: str,
     ) -> None:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for upsert")
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context="upsert",
+            error_cls=ApprovalPersistenceError,
+        )
         cleaned_status = _normalize_approval_status(status, context="upsert")
 
         initial_lease_version = 1 if cleaned_status == APPROVAL_STATUS_APPROVED else 0
@@ -314,8 +321,8 @@ class ApprovalRepo:
                 """,
                 (
                     action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
+                    identity.task_id,
+                    identity.task_hash,
                     cleaned_status,
                     initial_lease_version,
                     initial_executed_version,
@@ -325,8 +332,8 @@ class ApprovalRepo:
             connection.commit()
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
-            task_id=cleaned_task_id,
-            task_hash=cleaned_task_hash,
+            task_id=identity.task_id,
+            task_hash=identity.task_hash,
         )
         if approval_record is None:
             raise ApprovalPersistenceError("approval_record missing after upsert")
@@ -340,10 +347,12 @@ class ApprovalRepo:
         task_ref: str,
         timeout_seconds: int,
     ) -> int:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for pending request")
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context="pending request",
+            error_cls=ApprovalPersistenceError,
+        )
         expires_at = _format_utc(_utcnow() + timedelta(seconds=max(0, timeout_seconds)))
 
         with self._database.connect() as connection:
@@ -371,8 +380,8 @@ class ApprovalRepo:
                 """,
                 (
                     action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
+                    identity.task_id,
+                    identity.task_hash,
                     APPROVAL_STATUS_PENDING,
                     expires_at,
                     task_ref.strip(),
@@ -381,8 +390,8 @@ class ApprovalRepo:
             connection.commit()
         lease_version = self._get_requested_lease_version(
             action_type=action_type,
-            task_id=cleaned_task_id,
-            task_hash=cleaned_task_hash,
+            task_id=identity.task_id,
+            task_hash=identity.task_hash,
         )
         if lease_version is None:
             raise ApprovalPersistenceError("approval_record missing after pending request")
@@ -397,12 +406,13 @@ class ApprovalRepo:
         task_ref: str,
         expected_lease_version: int,
     ) -> bool:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for state transition")
-        if expected_lease_version <= 0:
-            raise ApprovalPersistenceError("approval expected lease version missing for state transition")
+        identity = normalize_transition_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            expected_lease_version=expected_lease_version,
+            context="state transition",
+            error_cls=ApprovalPersistenceError,
+        )
 
         with self._database.connect() as connection:
             cursor = connection.execute(
@@ -423,11 +433,11 @@ class ApprovalRepo:
                     APPROVAL_STATUS_APPROVED,
                     task_ref.strip(),
                     action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
+                    identity.task_id,
+                    identity.task_hash,
                     APPROVAL_STATUS_PENDING,
-                    expected_lease_version,
-                    expected_lease_version,
+                    identity.expected_lease_version,
+                    identity.expected_lease_version,
                 ),
             )
             connection.commit()
@@ -435,8 +445,8 @@ class ApprovalRepo:
             return True
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
-            task_id=cleaned_task_id,
-            task_hash=cleaned_task_hash,
+            task_id=identity.task_id,
+            task_hash=identity.task_hash,
         )
         if approval_record is None:
             raise ApprovalPersistenceError("approval_record missing during approve")
@@ -451,12 +461,13 @@ class ApprovalRepo:
         task_ref: str,
         expected_lease_version: int,
     ) -> bool:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for state transition")
-        if expected_lease_version <= 0:
-            raise ApprovalPersistenceError("approval expected lease version missing for state transition")
+        identity = normalize_transition_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            expected_lease_version=expected_lease_version,
+            context="state transition",
+            error_cls=ApprovalPersistenceError,
+        )
 
         with self._database.connect() as connection:
             cursor = connection.execute(
@@ -476,10 +487,10 @@ class ApprovalRepo:
                     APPROVAL_STATUS_PENDING,
                     task_ref.strip(),
                     action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
-                    expected_lease_version,
-                    expected_lease_version,
+                    identity.task_id,
+                    identity.task_hash,
+                    identity.expected_lease_version,
+                    identity.expected_lease_version,
                 ),
             )
             connection.commit()
@@ -487,8 +498,8 @@ class ApprovalRepo:
             return True
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
-            task_id=cleaned_task_id,
-            task_hash=cleaned_task_hash,
+            task_id=identity.task_id,
+            task_hash=identity.task_hash,
         )
         if approval_record is None:
             raise ApprovalPersistenceError("approval_record missing during restore")
@@ -503,12 +514,13 @@ class ApprovalRepo:
         task_ref: str,
         expected_lease_version: int,
     ) -> bool:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for state transition")
-        if expected_lease_version <= 0:
-            raise ApprovalPersistenceError("approval expected lease version missing for state transition")
+        identity = normalize_transition_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            expected_lease_version=expected_lease_version,
+            context="state transition",
+            error_cls=ApprovalPersistenceError,
+        )
 
         with self._database.connect() as connection:
             cursor = connection.execute(
@@ -529,11 +541,11 @@ class ApprovalRepo:
                     APPROVAL_STATUS_CANCELLED,
                     task_ref.strip(),
                     action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
+                    identity.task_id,
+                    identity.task_hash,
                     APPROVAL_STATUS_PENDING,
-                    expected_lease_version,
-                    expected_lease_version,
+                    identity.expected_lease_version,
+                    identity.expected_lease_version,
                 ),
             )
             connection.commit()
@@ -541,8 +553,8 @@ class ApprovalRepo:
             return True
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
-            task_id=cleaned_task_id,
-            task_hash=cleaned_task_hash,
+            task_id=identity.task_id,
+            task_hash=identity.task_hash,
         )
         if approval_record is None:
             raise ApprovalPersistenceError("approval_record missing during cancel")
@@ -556,10 +568,12 @@ class ApprovalRepo:
         task_hash: str,
         executed_lease_version: int,
     ) -> None:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for executed version update")
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context="executed version update",
+            error_cls=ApprovalPersistenceError,
+        )
         if executed_lease_version <= 0:
             raise ApprovalPersistenceError("approval executed lease version missing")
 
@@ -579,8 +593,8 @@ class ApprovalRepo:
                     executed_lease_version,
                     executed_lease_version,
                     action_type,
-                    cleaned_task_id,
-                    cleaned_task_hash,
+                    identity.task_id,
+                    identity.task_hash,
                 ),
             )
             connection.commit()
@@ -596,25 +610,21 @@ class ApprovalRepo:
         new_task_id: str,
         new_task_hash: str,
     ) -> None:
-        cleaned_current_task_id = current_task_id.strip()
-        cleaned_current_task_hash = current_task_hash.strip()
-        cleaned_new_task_id = new_task_id.strip()
-        cleaned_new_task_hash = new_task_hash.strip()
+        identity = normalize_move_identity(
+            current_task_id=current_task_id,
+            current_task_hash=current_task_hash,
+            new_task_id=new_task_id,
+            new_task_hash=new_task_hash,
+            error_cls=ApprovalPersistenceError,
+        )
         if (
-            not cleaned_current_task_id
-            or not cleaned_current_task_hash
-            or not cleaned_new_task_id
-            or not cleaned_new_task_hash
-        ):
-            raise ApprovalPersistenceError("approval task identity missing for identity move")
-        if (
-            cleaned_current_task_id == cleaned_new_task_id
-            and cleaned_current_task_hash == cleaned_new_task_hash
+            identity.current_task_id == identity.new_task_id
+            and identity.current_task_hash == identity.new_task_hash
         ):
             approval_record = self._get_exact_approval_record(
                 action_type=action_type,
-                task_id=cleaned_current_task_id,
-                task_hash=cleaned_current_task_hash,
+                task_id=identity.current_task_id,
+                task_hash=identity.current_task_hash,
             )
             if approval_record is None:
                 raise ApprovalPersistenceError("approval_record missing during identity move")
@@ -631,11 +641,11 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 """,
                 (
-                    cleaned_new_task_id,
-                    cleaned_new_task_hash,
+                    identity.new_task_id,
+                    identity.new_task_hash,
                     action_type,
-                    cleaned_current_task_id,
-                    cleaned_current_task_hash,
+                    identity.current_task_id,
+                    identity.current_task_hash,
                 ),
             )
             connection.commit()
@@ -644,8 +654,8 @@ class ApprovalRepo:
 
         target_record = self._get_exact_approval_record(
             action_type=action_type,
-            task_id=cleaned_new_task_id,
-            task_hash=cleaned_new_task_hash,
+            task_id=identity.new_task_id,
+            task_hash=identity.new_task_hash,
         )
         if target_record is not None:
             return
@@ -658,10 +668,12 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> ApprovalRecord | None:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for query")
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context="query",
+            error_cls=ApprovalPersistenceError,
+        )
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -680,7 +692,7 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (action_type, cleaned_task_id, cleaned_task_hash),
+                (action_type, identity.task_id, identity.task_hash),
             ).fetchone()
             if row is None:
                 fallback_row = connection.execute(
@@ -701,7 +713,7 @@ class ApprovalRepo:
                     ORDER BY updated_at DESC
                     LIMIT 1
                     """,
-                    (action_type, cleaned_task_id),
+                    (action_type, identity.task_id),
                 ).fetchone()
                 if fallback_row is not None:
                     raise ApprovalPersistenceError("approval task hash mismatch for query")
@@ -716,10 +728,12 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> ApprovalRecord | None:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for exact query")
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context="exact query",
+            error_cls=ApprovalPersistenceError,
+        )
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -738,7 +752,7 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (action_type, cleaned_task_id, cleaned_task_hash),
+                (action_type, identity.task_id, identity.task_hash),
             ).fetchone()
         if row is None:
             return None
@@ -752,22 +766,23 @@ class ApprovalRepo:
         task_hash: str,
         expected_lease_version: int,
     ) -> bool:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for pending expiry check")
-        if expected_lease_version <= 0:
-            raise ApprovalPersistenceError("approval expected lease version missing for pending expiry check")
+        identity = normalize_transition_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            expected_lease_version=expected_lease_version,
+            context="pending expiry check",
+            error_cls=ApprovalPersistenceError,
+        )
         approval_record = self._get_exact_approval_record(
             action_type=action_type,
-            task_id=cleaned_task_id,
-            task_hash=cleaned_task_hash,
+            task_id=identity.task_id,
+            task_hash=identity.task_hash,
         )
         if approval_record is None:
             raise ApprovalPersistenceError("approval_record missing during pending expiry check")
         if approval_record.status != APPROVAL_STATUS_PENDING:
             return False
-        if approval_record.lease_version != expected_lease_version:
+        if approval_record.lease_version != identity.expected_lease_version:
             return False
         expires_at = _parse_pending_expires_at(approval_record.expires_at)
         return expires_at <= _utcnow()
@@ -779,10 +794,12 @@ class ApprovalRepo:
         task_id: str,
         task_hash: str,
     ) -> int | None:
-        cleaned_task_id = task_id.strip()
-        cleaned_task_hash = task_hash.strip()
-        if not cleaned_task_id or not cleaned_task_hash:
-            raise ApprovalPersistenceError("approval task identity missing for requested lease query")
+        identity = normalize_approval_identity(
+            task_id=task_id,
+            task_hash=task_hash,
+            context="requested lease query",
+            error_cls=ApprovalPersistenceError,
+        )
         with self._database.connect() as connection:
             row = connection.execute(
                 """
@@ -791,7 +808,7 @@ class ApprovalRepo:
                 WHERE action_type = ? AND task_id = ? AND task_hash = ?
                 LIMIT 1
                 """,
-                (action_type, cleaned_task_id, cleaned_task_hash),
+                (action_type, identity.task_id, identity.task_hash),
             ).fetchone()
         if row is None:
             return None
