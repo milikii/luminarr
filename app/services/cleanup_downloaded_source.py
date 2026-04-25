@@ -9,6 +9,13 @@ from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
+from app.services.cleanup_follow_up_support import (
+    append_cleanup_follow_up,
+    append_cleanup_success_follow_up,
+    format_cleanup_inspect_follow_up,
+    preferred_cleanup_ref,
+    resolve_cleanup_blocked_event_details,
+)
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
 
 CLEANUP_QUERY_USAGE_TEXT = (
@@ -121,11 +128,12 @@ class CleanupDownloadedSourceService:
 
         inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
         task_ref_for_event = inspection.task_ref or cleaned_ref
-        follow_up_ref = _preferred_cleanup_ref(inspection)
+        follow_up_ref = preferred_cleanup_ref(inspection)
         if not inspection.correlation_found:
-            message = _append_cleanup_follow_up(
+            message = append_cleanup_follow_up(
                 CLEANUP_CORRELATION_MISSING_TEXT,
                 follow_up_ref,
+                CLEANUP_FOLLOW_UP_TEMPLATE,
             )
             _print_cleanup_blocked_log(
                 event_type="cleanup.correlation_missing",
@@ -148,7 +156,7 @@ class CleanupDownloadedSourceService:
         target_path = Path(inspection.target_path).expanduser()
 
         if inspection.target_exists is False:
-            message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
+            message = append_cleanup_follow_up(inspection.conclusion, follow_up_ref, CLEANUP_FOLLOW_UP_TEMPLATE)
             _print_cleanup_blocked_log(
                 event_type="cleanup.target_missing",
                 task_ref=task_ref_for_event,
@@ -171,7 +179,7 @@ class CleanupDownloadedSourceService:
             return message
 
         if inspection.source_exists is False:
-            message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
+            message = append_cleanup_follow_up(inspection.conclusion, follow_up_ref, CLEANUP_FOLLOW_UP_TEMPLATE)
             _print_cleanup_blocked_log(
                 event_type="cleanup.source_missing",
                 task_ref=task_ref_for_event,
@@ -194,8 +202,16 @@ class CleanupDownloadedSourceService:
             return message
 
         if not inspection.cleanup_allowed:
-            blocked_event_type, blocked_fix_hint = _resolve_cleanup_blocked_event_details(inspection)
-            message = _append_cleanup_follow_up(inspection.conclusion, follow_up_ref)
+            blocked_event_type, blocked_fix_hint = resolve_cleanup_blocked_event_details(
+                inspection=inspection,
+                pt_seed_window_state_unavailable_text=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT,
+                pt_seed_window_blocked_fix_hint=CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT,
+                pt_seed_window_state_unavailable_fix_hint=CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT,
+                source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+                source_type_unsupported_fix_hint=CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT,
+                guard_rejected_fix_hint=CLEANUP_GUARD_REJECTED_FIX_HINT,
+            )
+            message = append_cleanup_follow_up(inspection.conclusion, follow_up_ref, CLEANUP_FOLLOW_UP_TEMPLATE)
             _print_cleanup_blocked_log(
                 event_type=blocked_event_type,
                 task_ref=task_ref_for_event,
@@ -220,9 +236,10 @@ class CleanupDownloadedSourceService:
         try:
             _delete_source_asset(source_path)
         except OSError as error:
-            message = _append_cleanup_follow_up(
+            message = append_cleanup_follow_up(
                 CLEANUP_FAILED_TEXT.format(reason=str(error)),
                 follow_up_ref,
+                CLEANUP_FOLLOW_UP_TEMPLATE,
             )
             self._record_event(
                 task_ref=task_ref_for_event,
@@ -246,7 +263,7 @@ class CleanupDownloadedSourceService:
             )
             return message
 
-        message = _append_cleanup_success_follow_up(
+        message = append_cleanup_success_follow_up(
             CLEANUP_SUCCEEDED_TEXT.format(
                 task_id=inspection.task_id,
                 task_hash=inspection.task_hash,
@@ -254,6 +271,7 @@ class CleanupDownloadedSourceService:
                 target_path=str(target_path),
             ),
             follow_up_ref,
+            CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE,
         )
         self._record_event(
             task_ref=task_ref_for_event,
@@ -292,9 +310,21 @@ class CleanupDownloadedSourceService:
             )
         ]
         if inspection.cleanup_allowed:
-            lines.append(_format_cleanup_inspect_follow_up(inspection))
+            lines.append(
+                format_cleanup_inspect_follow_up(
+                    inspection,
+                    inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
+                    inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
+                )
+            )
         elif inspection.correlation_found:
-            lines.append(_format_cleanup_inspect_follow_up(inspection))
+            lines.append(
+                format_cleanup_inspect_follow_up(
+                    inspection,
+                    inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
+                    inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
+                )
+            )
         return "\n".join(lines)
 
     def _inspect_cleanup(
@@ -462,53 +492,6 @@ def _format_path_status(exists: bool | None) -> str:
     if exists:
         return "存在"
     return "不存在"
-
-
-def _preferred_cleanup_ref(inspection: CleanupInspection) -> str:
-    for value in (inspection.task_hash, inspection.task_id, inspection.task_ref, inspection.query_ref):
-        cleaned_value = value.strip()
-        if cleaned_value:
-            return cleaned_value
-    return inspection.query_ref
-
-
-def _resolve_cleanup_blocked_event_details(inspection: CleanupInspection) -> tuple[str, str]:
-    if inspection.conclusion.startswith("PT 最小保护窗口未满"):
-        return "cleanup.pt_seed_window_blocked", CLEANUP_PT_SEED_WINDOW_BLOCKED_FIX_HINT
-    if inspection.conclusion == CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_TEXT:
-        return "cleanup.pt_seed_window_state_unavailable", CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT
-    if inspection.conclusion == CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT:
-        return "cleanup.source_type_unsupported", CLEANUP_SOURCE_TYPE_UNSUPPORTED_FIX_HINT
-    return "cleanup.guard_rejected", CLEANUP_GUARD_REJECTED_FIX_HINT
-
-
-def _append_cleanup_follow_up(message: str, task_ref: str) -> str:
-    cleaned_ref = task_ref.strip()
-    if not cleaned_ref:
-        return message
-    return (
-        f"{message}\n"
-        f"{CLEANUP_FOLLOW_UP_TEMPLATE.format(task_ref=cleaned_ref)}"
-    )
-
-
-def _append_cleanup_success_follow_up(message: str, task_ref: str) -> str:
-    cleaned_ref = task_ref.strip()
-    if not cleaned_ref:
-        return message
-    return (
-        f"{message}\n"
-        f"{CLEANUP_SUCCESS_FOLLOW_UP_TEMPLATE.format(task_ref=cleaned_ref)}"
-    )
-
-
-def _format_cleanup_inspect_follow_up(inspection: CleanupInspection) -> str:
-    task_ref = _preferred_cleanup_ref(inspection).strip()
-    if not task_ref:
-        return ""
-    if inspection.cleanup_allowed:
-        return CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE.format(task_ref=task_ref)
-    return CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE.format(task_ref=task_ref)
 
 
 def _print_cleanup_blocked_log(
