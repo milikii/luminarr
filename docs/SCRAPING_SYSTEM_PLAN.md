@@ -132,7 +132,7 @@ Luminarr 当前仍是：
 这些不是当前刮削主线的即时 blocker，但已经明确挂进后续任务，避免再次靠口头记忆：
 
 - `app/services/subtitle_translator.py`
-  - 当前状态：已再前推一格；support helper 已承接 chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排，以及“可提取英文内嵌字幕结果筛选”，`subtitle_translator.py` 已回落到 `490` 行
+  - 当前状态：已再前推一格；support helper 已承接 chunk 翻译编排、异常校验、`ffprobe/ffmpeg` subprocess 执行编排、“可提取英文内嵌字幕结果筛选”，以及“提取后字幕文件可用性整理”，`subtitle_translator.py` 已回落到 `488` 行
   - 目标：继续按“外挂字幕识别 / 内嵌字幕探测 / 提取执行 / 翻译执行 / 中文跳过策略”收口剩余编排
 - `app/services/manage_bt_subscription.py`
   - 目标：按“命令解析 / 持久化 / 扫描候选 / 最后一次 seen 状态更新 / scheduler tick”拆分

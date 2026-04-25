@@ -136,6 +136,49 @@ def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
     return None
 
 
+def _resolve_embedded_subtitle_output_path(
+    *,
+    video_path: Path,
+    codec_name: str,
+) -> Path | None:
+    output_suffix = _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX.get(codec_name.casefold())
+    if not output_suffix:
+        return None
+    return video_path.with_suffix(output_suffix)
+
+
+def _build_embedded_subtitle_extract_command(
+    *,
+    video_path: Path,
+    stream_index: int,
+    output_path: Path,
+) -> list[str]:
+    return [
+        "ffmpeg",
+        "-y",
+        "-loglevel",
+        "error",
+        "-i",
+        str(video_path),
+        "-map",
+        f"0:{stream_index}",
+        "-c:s",
+        "ass" if output_path.suffix.lower() == ".ass" else "srt",
+        str(output_path),
+    ]
+
+
+def _resolve_extracted_subtitle_file(output_path: Path) -> tuple[_SubtitleFile | None, _SubtitleCommandFailure | None]:
+    subtitle_file = _build_subtitle_file(output_path)
+    if subtitle_file is not None:
+        return subtitle_file, None
+    return None, _SubtitleCommandFailure(
+        reason="invalid_output",
+        problem=f"字幕翻译失败：提取后的字幕文件不可用：{output_path}",
+        fix="检查提取结果是否仍是 `.srt/.ass`，并确认未被已有中文字幕命名规则过滤。",
+    )
+
+
 def _find_video_files(target_path: Path) -> list[Path]:
     if target_path.is_file():
         return [target_path] if target_path.suffix.lower() in _VIDEO_FILE_SUFFIXES else []

@@ -8,9 +8,9 @@ from pathlib import Path
 import httpx
 from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
-    _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX,
     _SubtitleFile,
     _SrtBlock,
+    _build_embedded_subtitle_extract_command,
     _build_subtitle_file,
     _extract_translations_from_response,
     _find_all_subtitle_paths,
@@ -26,6 +26,8 @@ from app.services.subtitle_translation_support import (
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _resolve_embedded_subtitle_output_path,
+    _resolve_extracted_subtitle_file,
     _run_subprocess_command,
     _translate_blocks_in_chunks,
     _translate_chunk_lines,
@@ -249,23 +251,17 @@ class SubtitleTranslatorService:
         video_path: Path,
         stream: _EmbeddedSubtitleStream,
     ) -> tuple[_SubtitleFile | None, SubtitleTranslateResult | None]:
-        output_suffix = _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX.get(stream.codec_name.casefold())
-        if not output_suffix:
+        output_path = _resolve_embedded_subtitle_output_path(
+            video_path=video_path,
+            codec_name=stream.codec_name,
+        )
+        if output_path is None:
             return None, None
-        output_path = video_path.with_suffix(output_suffix)
-        command = [
-            "ffmpeg",
-            "-y",
-            "-loglevel",
-            "error",
-            "-i",
-            str(video_path),
-            "-map",
-            f"0:{stream.stream_index}",
-            "-c:s",
-            "ass" if output_suffix == ".ass" else "srt",
-            str(output_path),
-        ]
+        command = _build_embedded_subtitle_extract_command(
+            video_path=video_path,
+            stream_index=stream.stream_index,
+            output_path=output_path,
+        )
         completed, failure = _run_subprocess_command(
             command=command,
             timeout_seconds=self._timeout_seconds,
@@ -289,14 +285,15 @@ class SubtitleTranslatorService:
             )
             return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
 
-        subtitle_file = _build_subtitle_file(output_path)
-        if subtitle_file is None:
-            message = f"字幕翻译失败：提取后的字幕文件不可用：{output_path}"
-            _print_colored_error(
-                problem=message,
-                fix="检查提取结果是否仍是 `.srt/.ass`，并确认未被已有中文字幕命名规则过滤。",
+        subtitle_file, output_failure = _resolve_extracted_subtitle_file(output_path)
+        if output_failure is not None:
+            _print_colored_error(problem=output_failure.problem, fix=output_failure.fix)
+            return None, SubtitleTranslateResult(
+                success=False,
+                message=output_failure.problem,
+                translated_count=0,
+                skipped=False,
             )
-            return None, SubtitleTranslateResult(success=False, message=message, translated_count=0, skipped=False)
         return subtitle_file, None
 
     def _translate_single_file(

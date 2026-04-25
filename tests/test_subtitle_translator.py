@@ -484,6 +484,63 @@ def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path:
     assert streams[0].title == "English"
 
 
+def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_invalid(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert capture_output is True
+        assert text is True
+        assert timeout == 60.0
+        if args[0] == "ffprobe":
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "index": 2,
+                                "codec_name": "subrip",
+                                "tags": {"language": "eng", "title": "English"},
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                stderr="",
+            )
+        if args[0] == "ffmpeg":
+            Path(args[-1]).write_text("hello movie", encoding="utf-8")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        raise AssertionError(f"unexpected command: {args}")
+
+    def fake_build_subtitle_file(_: Path) -> None:
+        return None
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+    monkeypatch.setattr(subtitle_support, "_build_subtitle_file", fake_build_subtitle_file)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-87",
+            task_id="87",
+            task_hash="hash-87",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is False
+    assert "提取后的字幕文件不可用" in result.message
+
+
 def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
