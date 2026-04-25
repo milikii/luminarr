@@ -14,13 +14,10 @@ from app.services.subtitle_translation_support import (
     _build_professional_subtitle_translation_request,
     _build_subtitle_skip_result,
     _build_subtitle_translation_summary,
-    _build_subtitle_file,
     _extract_chat_completion_response_text,
     _extract_translations_from_response,
-    _find_adjacent_subtitle_paths,
     _find_video_files,
     _is_chinese_embedded_subtitle,
-    _is_chinese_subtitle_path,
     _parse_ass_dialogue_lines,
     _parse_ffmpeg_subtitle_streams,
     _parse_ffprobe_subtitle_streams,
@@ -30,6 +27,7 @@ from app.services.subtitle_translation_support import (
     _read_metadata_title,
     _render_ass_lines,
     _render_srt,
+    _resolve_external_subtitle_files,
     _resolve_directory_skip_reason,
     _resolve_embedded_subtitle_output_path,
     _resolve_extracted_subtitle_file,
@@ -151,16 +149,9 @@ class SubtitleTranslatorService:
         self,
         video_path: Path,
     ) -> tuple[list[_SubtitleFile], SubtitleTranslateResult | None, str]:
-        external_subtitle_paths = _find_adjacent_subtitle_paths(video_path)
-        external_subtitle_files = [
-            subtitle_file
-            for path in external_subtitle_paths
-            if (subtitle_file := _build_subtitle_file(path)) is not None
-        ]
-        if external_subtitle_files:
-            return external_subtitle_files, None, "external"
-        if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
-            return [], None, "chinese_external"
+        external_subtitle_files, skip_reason = _resolve_external_subtitle_files(video_path)
+        if external_subtitle_files or skip_reason == "chinese_external":
+            return external_subtitle_files, None, skip_reason
 
         streams, error_result = self._probe_embedded_subtitles(video_path)
         if error_result is not None:

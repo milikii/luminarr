@@ -489,6 +489,46 @@ def test_translate_for_import_skips_when_chinese_external_subtitle_exists(tmp_pa
     assert "中文字幕外挂字幕" in result.message
 
 
+def test_translate_for_import_prefers_translatable_external_subtitle_over_chinese_external_subtitle(
+    tmp_path: Path,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    (library_dir / "Interstellar (2014).srt").write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+    (library_dir / "Interstellar (2014).chs.srt").write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\n你好，宇航员\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-prefer-external",
+            task_id="prefer-external",
+            task_hash="hash-prefer-external",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is True
+    assert result.skipped is False
+    assert result.translated_count == 1
+    assert "专业译文：hello movie" in (library_dir / "Interstellar (2014).zh.srt").read_text(encoding="utf-8")
+
+
 def test_translate_for_import_fails_when_ass_file_is_invalid(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)

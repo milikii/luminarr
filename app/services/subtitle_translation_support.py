@@ -136,6 +136,20 @@ def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
     return None
 
 
+def _resolve_external_subtitle_files(video_path: Path) -> tuple[list[_SubtitleFile], str]:
+    external_subtitle_paths = _find_adjacent_subtitle_paths(video_path)
+    external_subtitle_files = [
+        subtitle_file
+        for path in external_subtitle_paths
+        if (subtitle_file := _build_subtitle_file(path)) is not None
+    ]
+    if external_subtitle_files:
+        return external_subtitle_files, "external"
+    if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
+        return [], "chinese_external"
+    return [], "none"
+
+
 def _resolve_embedded_subtitle_output_path(
     *,
     video_path: Path,
