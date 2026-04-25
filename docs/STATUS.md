@@ -1,68 +1,36 @@
-# Current status (v465)
+# Current status (v466)
 
 ## Current mainline
 
-- **质量硬化**、**搜索相关性优化**、**字幕闭环补齐** 与 **刮削系统基础收口** 当前都已收工；默认分支当前保持完成态，若继续推进，优先从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 里选更小闭环。
-- 当前这轮已经先把刮削输入真相落稳：`media_identity` 已能沿着 `search -> select -> confirm download -> job_event -> import metadata` 进入导入后处理。
-- 当前这一轮又前推一格：只要 `media_identity` 里已有 `tmdb_id`，`metadata_scraper.py` 现在会直接按该 ID 取详情，不再默认走 `search_movie(title, year)` 二次猜片。
-- 当前这一轮再补一格：`.metadata.json` 之外的最小本地刮削产物 `.nfo` 已开始落地；文件型目标会写同名 `.nfo`，目录型目标会优先写到主视频旁边。
-- 当前这一轮又前推一格：本地 `poster` / `backdrop` 图片产物也已开始落地；文件型目标会写 `<basename>-poster.*` / `<basename>-backdrop.*`，目录型目标会写 `poster.*` / `backdrop.*`。
-- 当前这一轮再补一格：刮削写入策略也已明确；`.metadata.json` 默认 `overwrite`，`.nfo` 与图片默认 `missing-only`，没有来源时显式 `skip`。
-- 当前这一轮再补最后一格：真实 `import -> scrape -> subtitle -> refresh` smoke 已通过；目标路径 `/data/library/movies/luminarr-real-smoke-1777048577.mkv` 在 Emby 中已返回 `Name=Interstellar`、`Tmdb=157336`。
-- 当前这一轮又补了一格中文真相：同样的真实链路在目标路径 `/data/library/movies/luminarr-real-smoke-1777049632.mkv` 上已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`；当前本地刮削最终展示已优先中文，不再落英文片名。
-- 当前又从刮削后续 backlog 再收掉几小格：字幕翻译的目标字幕解析、`ffprobe/ffmpeg` 探测执行、内嵌字幕提取执行、单文件翻译读写边界与专业翻译请求编排都已下沉到 `subtitle_translation_support.py`；连同更早收掉的 `ffmpeg` fallback 结果解析 / 错误映射与“`ffprobe` 缺失且 `ffmpeg` 也缺失时返回明确失败结果”的 focused 护栏，当前 `subtitle_translator.py` 已降到 `283` 行。
-- 当前又从刮削后续 backlog 再收掉一小格：单视频目标的外挂/内嵌字幕解析编排也已下沉到 `subtitle_translation_support.py`，`subtitle_translator.py` 当前为 `273` 行。
-- 当前又从刮削后续 backlog 再收掉一小格：`translate_for_import()` 的前置校验也已下沉到 `subtitle_translation_support.py`，现在统一处理目标存在性、目标字幕解析、API key 缺失与 metadata title 读取；`subtitle_translator.py` 当前为 `267` 行。
-- 当前又从后续结构 backlog 再收掉一组 BT 订阅小闭环：`add/list/remove/clear` 的 repo guard、扫描前的 `chat_ids/items` 读取护栏、`last_seen` 回写护栏，以及单条订阅的搜索 / pending 创建编排都已下沉到 support helper；当前 `manage_bt_subscription.py` 已降到 `900` 行。
-- 当前又从 cleanup/approval/job 三条结构 backlog 再收掉几小格：cleanup 与 correlation 的主流程、路径校验、删除资产和日志边界，approval 的身份/查询/状态/写入/读路径，以及 job 的身份、查询、写路径与 pending upsert 都已下沉到各自 helper；当前 `cleanup_downloaded_source.py` `334` 行、`cleanup_correlation_lookup.py` `215` 行、`approval_repo.py` `779` 行、`job_repo.py` `533` 行。
-- 当前又从 job backlog 再收掉一小格：`mark_downloader_completed()` 的身份规范化也已下沉到 `job_repo_support.py`，`job_repo.py` 当前为 `535` 行。
-- 当前又从 job backlog 再收掉一小格：`cancel_pending_job()` 的身份规范化也已下沉到 `job_repo_support.py`，`job_repo.py` 当前为 `536` 行。
-- 当前又从 approval backlog 再收掉一小格：`_approve/_restore_pending/_cancel` 三条状态迁移薄壳已合并到共享 helper，`approval_repo.py` 当前为 `762` 行。
-- 当前又从 approval backlog 再收掉一小格：`_upsert_approval()` 的 SQL 写入边界也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `736` 行。
-- 当前又从 approval backlog 再收掉一小格：`_request_approval()` 的 SQL 写入边界也已下沉到 `approval_repo_support.py`，`approval_repo.py` 当前为 `715` 行。
+- **质量硬化**、**搜索相关性优化**、**字幕闭环补齐** 与 **刮削系统基础收口** 当前都已完成；默认分支继续推进时，优先从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 里选更小闭环。
+- 刮削主链当前真相已收口：`media_identity` 能沿 `search -> select -> confirm download -> job_event -> import metadata` 落稳；`metadata_scraper.py` 优先吃 `tmdb_id`；`.metadata.json` / `.nfo` / `poster` / `backdrop` 已落地；真实 `import -> scrape -> subtitle -> refresh` smoke 已确认 Emby 返回 `Name=星际穿越`、`Tmdb=157336`。
+- 字幕链当前保持完成态：外挂字幕随导入落库；已有中文字幕时跳过翻译；无外挂字幕时可探测/提取英文文本内嵌字幕再翻译。
+- 本轮又沿结构 backlog 连续收掉 5 个小闭环：
+  - `subtitle_translator.py`：`translate_for_import()` 的前置校验已下沉到 `subtitle_translation_support.py`，统一处理目标存在性、目标字幕解析、API key 缺失与 metadata title 读取；当前 `267` 行。
+  - `job_repo.py`：`mark_downloader_completed()` 与 `cancel_pending_job()` 的身份规范化已下沉到 `job_repo_support.py`；当前 `536` 行。
+  - `approval_repo.py`：`_approve/_restore_pending/_cancel` 的共享状态迁移薄壳已合并到 helper，且 `_upsert_approval()` / `_request_approval()` 的 SQL 写入边界已下沉到 `approval_repo_support.py`；当前 `715` 行。
 - 首版发布矩阵继续冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链。
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 
 ## Current health
 
-- 仓库级质量入口保持可用：`make quality`、`make verify-mainline`、`make verify-quality-gates` 当前都可复验。
-- 搜索链当前保持完成态：续作/章节别名归一、尾部版本噪音剥离、TMDB 高置信长标题命中，以及 `AMZN / DSNP / 4K / 2160p` 这类 BT 标题噪音与等价分辨率去重都已收口。
-- 字幕链当前保持完成态：外挂字幕随导入落库、已有中文字幕跳过翻译、无外挂字幕时可探测/提取英文文本字幕再翻译。
-- 当前刮削系统的输入真相已经收口：metadata 刮削现在优先消费已确认媒体身份，且有 `tmdb_id` 时会直连详情。
-- 当前刮削系统基础收口已完成：`.metadata.json` + `.nfo` + `poster` / `backdrop` 与写入策略都已落地，且真实 `import -> scrape -> subtitle -> refresh` 联调已拿到 Emby 消费证据。
-- 当前 live smoke 真相仍分两段：`search -> select -> confirm -> status` 已在真实 Prowlarr / PT Transmission 跑通；`status -> import -> confirm -> refresh` 已在真实 PT Transmission / Emby 跑通。
+- 仓库级质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`。
+- 搜索链、字幕链、刮削链当前都保持完成态；当前最大风险仍是后续若继续扩更多图片类型或更复杂命名规则，会重新拉高回归风险。
+- 当前机器环境真相保持不变：涉及内嵌字幕探测时，默认要求 `ffmpeg` / `ffprobe` 在 PATH 中可执行。
 
 ## Latest verification
 
-- `make quality`：通过；docs/tests 阶段 `28 passed`
-- `make verify-mainline`：通过
 - `make verify-quality-gates`：通过
 - `make test`：`1761 passed, 2 skipped`
-- 2026-04-25 连续施工冷启动复验：`make quality` 与 `make verify-mainline` 均通过，默认分支与当前文档真相未见漂移
-- 2026-04-25 冷启动一致性检查：`make quality`、`make verify-mainline` 与 `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 均已复验通过；其中跨渠道搜索 smoke 的测试夹具已同步到当前搜索评分真相。
-- 2026-04-25 subtitle 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `37 passed`
-- 2026-04-25 subtitle 前置校验收口 follow-up：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py tests/test_subtitle_translator.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `38 passed`
-- 2026-04-25 btsub 结构收口 follow-up：`.venv/bin/python -m pyflakes app/services/manage_bt_subscription.py app/services/bt_subscription_repo_support.py app/services/bt_subscription_dispatch_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_manage_bt_subscription.py` 为 `38 passed`
-- 2026-04-25 cleanup/approval/job 结构收口 follow-up：对应 helper 的 `pyflakes` 均通过；focused 结果分别保持为 cleanup `49 passed`、approval `147 passed, 112 deselected`、job `152 passed, 138 deselected`
-- 2026-04-25 job completed identity follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "mark_downloader_completed or missing_identity_for_lease_and_cancel or cancel_pending_downloader_updates_persisted_truth"` 为 `2 passed, 109 deselected`
-- 2026-04-25 job cancel identity follow-up：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "cancel_pending_job or missing_identity_for_lease_and_cancel or cancel_pending_downloader_updates_persisted_truth or cancel_pending_import_updates_persisted_truth or cancel_target_missing_after_update"` 为 `4 passed, 107 deselected`
-- 2026-04-25 approval transition helper follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approve_import_requires_current_lease_version or approval_repo_approve_raises_when_row_missing or approval_repo_cancel_raises_when_row_missing or approval_repo_restore_pending_raises_when_row_missing or cancel_pending_import_updates_persisted_truth"` 为 `5 passed, 106 deselected`
-- 2026-04-25 approval upsert SQL follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approval_repo_persists_for_restart or approval_repo_raises_when_upsert_row_missing or approval_repo_rejects_missing_identity_for_write_paths"` 为 `3 passed, 108 deselected`
-- 2026-04-25 approval pending request SQL follow-up：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；`.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py -k "approval_repo_raises_when_pending_request_row_missing or approval_repo_rejects_missing_identity_for_requested_lease_lookup or import_request_advances_lease_version or request_import_approval or request_downloader_approval"` 为 `3 passed, 108 deselected`
-- metadata / import / tmdb focused：`.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_metadata_scraper.py tests/test_import_to_library.py tests/test_main.py` 为 `201 passed, 4 warnings`
-- 搜索 focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_bt_candidate_scorer.py` 为 `196 passed`
-- 搜索 + TMDB focused：`.venv/bin/python -m pytest -q tests/test_search_media.py tests/test_tmdb_client.py` 为 `182 passed`
-- 字幕 focused：`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `37 passed`
-- 导入侧字幕 focused：`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k subtitle` 为 `4 passed, 145 deselected`
+- 2026-04-25 冷启动一致性检查：`make quality`、`make verify-mainline` 与 `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 均已复验通过。
+- 2026-04-25 subtitle 前置校验收口：`.venv/bin/python -m pyflakes app/services/subtitle_translator.py app/services/subtitle_translation_support.py tests/test_subtitle_translator.py` 通过；`.venv/bin/python -m pytest -q tests/test_subtitle_translator.py` 为 `38 passed`。
+- 2026-04-25 job identity 收口：`.venv/bin/python -m pyflakes app/db/job_repo.py app/db/job_repo_support.py` 通过；两组 focused 结果分别为 `2 passed, 109 deselected` 与 `4 passed, 107 deselected`。
+- 2026-04-25 approval helper / SQL 收口：`.venv/bin/python -m pyflakes app/db/approval_repo.py app/db/approval_repo_support.py` 通过；三组 focused 结果分别为 `5 passed, 106 deselected`、`3 passed, 108 deselected`、`3 passed, 108 deselected`。
 - 当前真实 smoke 证据仍有效：前半段 `task_id=17` / `task_hash=1ea022ed0c3cbe9139469a8a58f5bfcfaa1875de` 可再次进入 `status`；后半段 `task_ref=d8f737c1468646c8ab35279fa10f89f89e88428e` 可再次进入 `import_by_task_ref -> pending approval -> import.succeeded -> refresh.succeeded`。
-- 当前刮削真实 smoke 新证据：`/tmp/luminarr-real-smoke-1777048577.json` 记录了 `metadata_path`、`nfo_path`、`poster_path`、`backdrop_path` 与 Emby 返回的 `Name=Interstellar`、`Tmdb=157336`。
-- 当前刮削中文 smoke 新证据：最新样本的 `.metadata.json` 与 `.nfo` 已写入 `title=星际穿越`、`original_title=Interstellar`，Emby 对应媒体项也已返回 `Name=星际穿越`、`Tmdb=157336`。
 
 ## Current biggest risk
 
-- 当前最大刮削风险已经从“导入后重新猜片”切到“后续扩展边界”：如果继续往更多图片类型或更复杂命名规则扩，会重新拉高回归风险。
-- 当前机器环境真相要继续按当轮探针写；涉及内嵌字幕探测时，默认要求 `ffmpeg` 在 PATH 中可执行。
-- 当前最大发布前不确定性已收缩到“下一条主线该从哪个 backlog 入口继续收口”，而不是当前主链是否成立。
+- 当前最大不确定性已经不是主链是否成立，而是“下一条更保守的小闭环该优先选 subtitle / approval / job 里的哪一段剩余壳层”。
 
 ## Recommended Next Operator Command
 
