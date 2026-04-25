@@ -161,3 +161,26 @@ def print_cleanup_pt_seed_guard_state_unavailable_log(
         f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
         flush=True,
     )
+
+
+def print_cleanup_delete_failed_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    task_id: str,
+    task_hash: str,
+    source_path: str,
+    target_path: str,
+    failure_reason: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup 执行失败]\033[0m task_ref={task_ref} "
+        f"event_type={event_type} task_id={task_id} task_hash={task_hash} "
+        f"source={source_path} target={target_path} 原因={failure_reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 source_path 是否仍可访问、当前进程是否有删除权限，"
+        "并确认库内目标路径仍然存在后再重试 cleanup。",
+        flush=True,
+    )

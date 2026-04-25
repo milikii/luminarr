@@ -16,6 +16,7 @@ from app.services.cleanup_inspect_render_support import render_cleanup_inspect_m
 from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
 from app.services.cleanup_logging_support import (
     print_cleanup_blocked_log,
+    print_cleanup_delete_failed_log,
     print_cleanup_pt_seed_guard_lookup_failed_log,
     print_cleanup_pt_seed_guard_state_unavailable_log,
 )
@@ -198,16 +199,14 @@ class CleanupDownloadedSourceService:
                 source_path=str(source_path),
                 target_path=str(target_path),
             )
-            print(
-                f"\033[31m[cleanup 执行失败]\033[0m task_ref={task_ref_for_event} "
-                f"event_type={delete_result.event_type} task_id={inspection.task_id} task_hash={inspection.task_hash} "
-                f"source={source_path} target={target_path} 原因={delete_result.failure_reason}",
-                flush=True,
-            )
-            print(
-                "\033[33m[处理建议]\033[0m 检查 source_path 是否仍可访问、当前进程是否有删除权限，"
-                "并确认库内目标路径仍然存在后再重试 cleanup。",
-                flush=True,
+            print_cleanup_delete_failed_log(
+                task_ref=task_ref_for_event,
+                event_type=delete_result.event_type,
+                task_id=inspection.task_id,
+                task_hash=inspection.task_hash,
+                source_path=str(source_path),
+                target_path=str(target_path),
+                failure_reason=delete_result.failure_reason,
             )
             return delete_result.message
 
@@ -363,4 +362,3 @@ def _delete_source_asset(source_path: Path) -> None:
         source_path.unlink()
         return
     raise OSError(CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT)
-
