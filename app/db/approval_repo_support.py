@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +58,80 @@ def normalize_transition_identity(
         task_hash=identity.task_hash,
         expected_lease_version=expected_lease_version,
     )
+
+
+def fetch_exact_approval_row(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+) -> Mapping[str, object] | None:
+    return connection.execute(
+        """
+        SELECT
+            action_type,
+            task_id,
+            task_hash,
+            status,
+            lease_version,
+            executed_version,
+            expires_at,
+            last_task_ref,
+            created_at,
+            updated_at
+        FROM approval_record
+        WHERE action_type = ? AND task_id = ? AND task_hash = ?
+        LIMIT 1
+        """,
+        (action_type, task_id, task_hash),
+    ).fetchone()
+
+
+def fetch_latest_approval_row_for_task_id(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+) -> Mapping[str, object] | None:
+    return connection.execute(
+        """
+        SELECT
+            action_type,
+            task_id,
+            task_hash,
+            status,
+            lease_version,
+            executed_version,
+            expires_at,
+            last_task_ref,
+            created_at,
+            updated_at
+        FROM approval_record
+        WHERE action_type = ? AND task_id = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+        """,
+        (action_type, task_id),
+    ).fetchone()
+
+
+def fetch_approval_lease_version_row(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+) -> Mapping[str, object] | None:
+    return connection.execute(
+        """
+        SELECT lease_version
+        FROM approval_record
+        WHERE action_type = ? AND task_id = ? AND task_hash = ?
+        LIMIT 1
+        """,
+        (action_type, task_id, task_hash),
+    ).fetchone()
 
 
 def normalize_move_identity(

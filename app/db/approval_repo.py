@@ -5,6 +5,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.db.approval_repo_support import (
+    fetch_approval_lease_version_row,
+    fetch_exact_approval_row,
+    fetch_latest_approval_row_for_task_id,
     normalize_approval_identity,
     normalize_move_identity,
     normalize_transition_identity,
@@ -675,46 +678,18 @@ class ApprovalRepo:
             error_cls=ApprovalPersistenceError,
         )
         with self._database.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT
-                    action_type,
-                    task_id,
-                    task_hash,
-                    status,
-                    lease_version,
-                    executed_version,
-                    expires_at,
-                    last_task_ref,
-                    created_at,
-                    updated_at
-                FROM approval_record
-                WHERE action_type = ? AND task_id = ? AND task_hash = ?
-                LIMIT 1
-                """,
-                (action_type, identity.task_id, identity.task_hash),
-            ).fetchone()
+            row = fetch_exact_approval_row(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+            )
             if row is None:
-                fallback_row = connection.execute(
-                    """
-                    SELECT
-                        action_type,
-                        task_id,
-                        task_hash,
-                        status,
-                        lease_version,
-                        executed_version,
-                        expires_at,
-                        last_task_ref,
-                        created_at,
-                        updated_at
-                    FROM approval_record
-                    WHERE action_type = ? AND task_id = ?
-                    ORDER BY updated_at DESC
-                    LIMIT 1
-                    """,
-                    (action_type, identity.task_id),
-                ).fetchone()
+                fallback_row = fetch_latest_approval_row_for_task_id(
+                    connection=connection,
+                    action_type=action_type,
+                    task_id=identity.task_id,
+                )
                 if fallback_row is not None:
                     raise ApprovalPersistenceError("approval task hash mismatch for query")
         if row is None:
@@ -735,25 +710,12 @@ class ApprovalRepo:
             error_cls=ApprovalPersistenceError,
         )
         with self._database.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT
-                    action_type,
-                    task_id,
-                    task_hash,
-                    status,
-                    lease_version,
-                    executed_version,
-                    expires_at,
-                    last_task_ref,
-                    created_at,
-                    updated_at
-                FROM approval_record
-                WHERE action_type = ? AND task_id = ? AND task_hash = ?
-                LIMIT 1
-                """,
-                (action_type, identity.task_id, identity.task_hash),
-            ).fetchone()
+            row = fetch_exact_approval_row(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+            )
         if row is None:
             return None
         return _to_approval_record(row)
@@ -801,15 +763,12 @@ class ApprovalRepo:
             error_cls=ApprovalPersistenceError,
         )
         with self._database.connect() as connection:
-            row = connection.execute(
-                """
-                SELECT lease_version
-                FROM approval_record
-                WHERE action_type = ? AND task_id = ? AND task_hash = ?
-                LIMIT 1
-                """,
-                (action_type, identity.task_id, identity.task_hash),
-            ).fetchone()
+            row = fetch_approval_lease_version_row(
+                connection=connection,
+                action_type=action_type,
+                task_id=identity.task_id,
+                task_hash=identity.task_hash,
+            )
         if row is None:
             return None
         lease_version = int(row["lease_version"])
