@@ -138,8 +138,8 @@ Luminarr 当前仍是：
   - 当前状态：已再前推几格；CRUD 持久化 guard、扫描前的 `chat_ids/items` 读取护栏、`last_seen` 回写护栏，以及单条订阅的搜索 / pending 创建编排都已下沉到 `bt_subscription_repo_support.py` / `bt_subscription_dispatch_support.py`；当前 `manage_bt_subscription.py` 为 `900` 行。
   - 目标：继续按“命令解析 / scheduler tick 总编排 / 剩余结果封装”拆分
 - `app/services/cleanup_downloaded_source.py`
-  - 当前状态：已再前推几格；`job_event` 追加护栏、inspection 计算、follow-up / blocked detail 组装，以及删除执行与成功/失败消息组装都已下沉到 `cleanup_event_support.py` / `cleanup_inspection_support.py` / `cleanup_follow_up_support.py` / `cleanup_execution_support.py`；当前 `cleanup_downloaded_source.py` 为 `650` 行。
-  - 目标：继续按“任务解析 / 剩余主流程编排 / PT guard 与 correlation 边界”拆分
+  - 当前状态：已再前推几格；命令解析、`job_event` 追加护栏、inspection 计算、inspect 文本渲染、follow-up / blocked detail 组装、删除执行与成功/失败消息组装，以及 PT seed guard 评估都已下沉到 `cleanup_query_support.py` / `cleanup_event_support.py` / `cleanup_inspection_support.py` / `cleanup_inspect_render_support.py` / `cleanup_follow_up_support.py` / `cleanup_blocked_support.py` / `cleanup_execution_support.py` / `cleanup_seed_guard_support.py`；当前 `cleanup_downloaded_source.py` 为 `518` 行。
+  - 目标：继续按“剩余主流程编排 / correlation lookup 边界 / cleanup 失败日志收口”拆分
 - `app/db/approval_repo.py`
   - 目标：按 action 族或 query/update helper 收口，避免继续在同一文件里累加协议分支
 - `app/db/job_repo.py`
