@@ -21,6 +21,12 @@ from app.services.bt_subscription_command import (
     parse_bt_subscription_add_request,
     parse_bt_subscription_query as _parse_bt_subscription_query,
 )
+from app.services.bt_subscription_repo_support import (
+    add_subscription_item,
+    clear_subscription_items,
+    list_subscription_items,
+    remove_subscription_item,
+)
 from app.services.bt_sources import resolve_bt_source
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -212,115 +218,105 @@ class ManageBtSubscriptionService:
         year: str,
         media_kind: str,
     ):
-        try:
-            created = self._bt_subscription_repo.add_item(
+        result = add_subscription_item(
+            repo=self._bt_subscription_repo,
+            chat_id=chat_id,
+            title=title,
+            year=year,
+            media_kind=media_kind,
+            item_missing_reason=BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON,
+            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+        )
+        if result.ok:
+            return result.value
+        if result.status == "item_missing":
+            _log_bt_subscription_add_item_missing_after_insert(
                 chat_id=chat_id,
                 title=title,
                 year=year,
                 media_kind=media_kind,
-            )
-            if created is None:
-                raise BtSubscriptionPersistenceError("bt subscription add result missing")
-        except BtSubscriptionPersistenceError as error:
-            if str(error) == BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON:
-                _log_bt_subscription_add_item_missing_after_insert(
-                    chat_id=chat_id,
-                    title=title,
-                    year=year,
-                    media_kind=media_kind,
-                    reason=str(error),
-                )
-                return None
-            if str(error) == "bt subscription add result missing":
-                _log_bt_subscription_add_result_missing(
-                    chat_id=chat_id,
-                    title=title,
-                    year=year,
-                    media_kind=media_kind,
-                    reason=str(error),
-                )
-                return None
-            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_add_row_corrupted(
-                    chat_id=chat_id,
-                    title=title,
-                    year=year,
-                    media_kind=media_kind,
-                    reason=str(error),
-                )
-                return None
-            _log_bt_subscription_add_failed(
-                chat_id=chat_id,
-                title=title,
-                year=year,
-                media_kind=media_kind,
-                reason=str(error),
+                reason=result.reason,
             )
             return None
-        except Exception as error:
-            if _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_add_row_corrupted(
-                    chat_id=chat_id,
-                    title=title,
-                    year=year,
-                    media_kind=media_kind,
-                    reason=str(error),
-                )
-                return None
-            _log_bt_subscription_add_failed(
+        if result.status == "result_missing":
+            _log_bt_subscription_add_result_missing(
                 chat_id=chat_id,
                 title=title,
                 year=year,
                 media_kind=media_kind,
-                reason=str(error),
+                reason=result.reason,
             )
             return None
-        return created
+        if result.status == "row_corrupted":
+            _log_bt_subscription_add_row_corrupted(
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+                reason=result.reason,
+            )
+            return None
+        _log_bt_subscription_add_failed(
+            chat_id=chat_id,
+            title=title,
+            year=year,
+            media_kind=media_kind,
+            reason=result.reason,
+        )
+        return None
 
     def _list_items(self, *, chat_id: int):
-        try:
-            items = self._bt_subscription_repo.list_items(chat_id=chat_id)
-            if items is None:
-                raise BtSubscriptionPersistenceError("bt subscription list result missing")
-            return items
-        except Exception as error:
-            if str(error) == "bt subscription list result missing":
-                _log_bt_subscription_list_result_missing(chat_id=chat_id, reason=str(error))
-            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_list_row_corrupted(chat_id=chat_id, reason=str(error))
-            else:
-                _log_bt_subscription_list_failed(chat_id=chat_id, reason=str(error))
+        result = list_subscription_items(
+            repo=self._bt_subscription_repo,
+            chat_id=chat_id,
+            result_missing_reason="bt subscription list result missing",
+            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+        )
+        if result.ok:
+            return result.value
+        if result.status == "result_missing":
+            _log_bt_subscription_list_result_missing(chat_id=chat_id, reason=result.reason)
             return None
+        if result.status == "row_corrupted":
+            _log_bt_subscription_list_row_corrupted(chat_id=chat_id, reason=result.reason)
+            return None
+        _log_bt_subscription_list_failed(chat_id=chat_id, reason=result.reason)
+        return None
 
     def _remove_item(self, *, chat_id: int, item_id: int):
-        try:
-            removed = self._bt_subscription_repo.remove_item(chat_id=chat_id, item_id=item_id)
-            if removed is None:
-                raise BtSubscriptionPersistenceError("bt subscription remove result missing")
-            return removed
-        except Exception as error:
-            if str(error) == "bt subscription remove result missing":
-                _log_bt_subscription_remove_result_missing(chat_id=chat_id, item_id=item_id, reason=str(error))
-            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_remove_row_corrupted(chat_id=chat_id, item_id=item_id, reason=str(error))
-            else:
-                _log_bt_subscription_remove_failed(chat_id=chat_id, item_id=item_id, reason=str(error))
+        result = remove_subscription_item(
+            repo=self._bt_subscription_repo,
+            chat_id=chat_id,
+            item_id=item_id,
+            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+        )
+        if result.ok:
+            return result.value
+        if result.status == "result_missing":
+            _log_bt_subscription_remove_result_missing(chat_id=chat_id, item_id=item_id, reason=result.reason)
             return None
+        if result.status == "row_corrupted":
+            _log_bt_subscription_remove_row_corrupted(chat_id=chat_id, item_id=item_id, reason=result.reason)
+            return None
+        _log_bt_subscription_remove_failed(chat_id=chat_id, item_id=item_id, reason=result.reason)
+        return None
 
     def _clear_items(self, *, chat_id: int):
-        try:
-            deleted = self._bt_subscription_repo.clear_items(chat_id=chat_id)
-            if deleted is None:
-                raise BtSubscriptionPersistenceError("bt subscription clear result missing")
-            return deleted
-        except Exception as error:
-            if str(error) == "bt subscription clear result missing":
-                _log_bt_subscription_clear_result_missing(chat_id=chat_id, reason=str(error))
-            elif _is_bt_subscription_item_row_corrupted_reason(str(error)):
-                _log_bt_subscription_clear_row_corrupted(chat_id=chat_id, reason=str(error))
-            else:
-                _log_bt_subscription_clear_failed(chat_id=chat_id, reason=str(error))
+        result = clear_subscription_items(
+            repo=self._bt_subscription_repo,
+            chat_id=chat_id,
+            is_item_row_corrupted_reason=_is_bt_subscription_item_row_corrupted_reason,
+        )
+        if result.ok:
+            return result.value
+        if result.status == "result_missing":
+            _log_bt_subscription_clear_result_missing(chat_id=chat_id, reason=result.reason)
             return None
+        if result.status == "row_corrupted":
+            _log_bt_subscription_clear_row_corrupted(chat_id=chat_id, reason=result.reason)
+            return None
+        _log_bt_subscription_clear_failed(chat_id=chat_id, reason=result.reason)
+        return None
 
     async def _run_for_item(
         self,
