@@ -3,11 +3,12 @@
 ## Current mainline
 
 - **质量硬化** 当前保持完成态，不回退。
-- 当前默认分支主线已从“刮削系统基础收口”切到 **成人 BT 专线基础收口**；direct magnet 入口仍保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
+- 当前默认分支主线已从“成人 BT 专线基础收口”切到 **成人 BT 专线质量复验**；direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
 - 成人 BT 当前新真相已落地：
   - `adult_content_registry` 已记录 `pending / downloading / archived_present / archived_deleted`
   - BT 预览 / 批量预览 / 待确认文本已能提示历史状态
   - 成人 BT 下载完成后可进入归档，统一保留窗口到期后可清理下载器任务与源资源
+  - direct magnet 运行时选择 `BT 成人链` 时，已能直接创建成人磁力下载待确认并尽量识别番号 / 分类
 - 三座大山保持完成态：`app/services/search_media.py` `568` 行，`add_to_downloader.py` `574` 行，`import_to_library.py` `585` 行。
 - BT 来源适配当前保持：
   - 成人站点优先：`tokyotosho` / `sukebei(offkab)` / `javbus`
@@ -16,36 +17,29 @@
 
 ## Current health
 
-- 当前变更只触碰 BT/下载完成 follow-up 相关边界，没有改 movie-first PT / import / metadata 主链协议。
+- 当前这轮变更只触碰 direct magnet follow-up 与成人下载完成 sidecar 的回归边界，没有改 movie-first PT / import / metadata 主链协议。
 - 当前最大风险不是主链是否成立，而是：
-  - 成人归档 sidecar 与现有 auto-import sidecar 的共存是否还有遗漏红灯
-  - direct magnet 问询边界与成人 BT 新语义是否会在后续文档或小改里被误放宽
+  - 成人归档 sidecar 与现有 auto-import sidecar 的共存还缺一次更大的 gate / real smoke
+  - `javlibrary` 仍只停留在后续只读 helper 口径，尚未补成实际识别补全
 
 ## Latest verification
 
-- `make quality`：当前轮已重跑通过，文档一致性 gate 重新回绿
-- `make verify-mainline`：当前轮已重跑通过，shared-runtime / channel / BT follow-up focused 回归未见业务红灯
-- `make test`：`1761 passed, 2 skipped`
+- `make quality`：当前轮已按最终文档真相重跑通过
+- `make verify-mainline`：当前轮已按 direct magnet 新边界重跑通过
+- `make test`：`1888 passed, 2 skipped`
 - `.venv/bin/python -m pyflakes`：
-  - 成人内容解析 / 历史账本 / 成人归档 / 新站点模板相关文件全部通过
+  - direct magnet follow-up / 成人归档回归相关改动文件全部通过
 - focused pytest：
-  - `tests/test_adult_content.py`
-  - `tests/test_adult_archive_service.py`
-  - `tests/test_search_media.py`
-  - `tests/test_bt_sources.py`
-  - `tests/test_pure_bt.py`
-  - `tests/test_qbittorrent_client.py`
-  - `tests/test_transmission_client.py`
-  - `tests/test_add_execution_follow_up.py`
-  - `tests/test_config.py`
-  - 合计 `243 passed`
+  - `tests/test_query_text_runtime.py tests/test_private_chat_bt_processing_runtime.py`：`11 passed`
+  - `tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "magnet_routes_to_bt_direct_split or bt_processing_path or handle_bt_direct_intent_query"`：`26 passed`
+  - `tests/test_get_download_status.py -k "post_download_auto_import"`：`16 passed`
 - 运行时 focused：
-  - `tests/test_add_to_downloader.py tests/test_download_follow_up_runtime.py tests/test_get_download_status.py -k "download_monitor or auto_import or adult or confirm_add_by_task_ref_registers_download_monitor_truth or post_download_auto_import_scheduler"`：`30 passed`
-  - `tests/test_persistence_sqlite.py -k "download_monitor or adult_content_registry or sqlite or job_repo_rejects_missing_identity_for_state_transitions"`：`111 passed`
+  - `make verify-mainline` 当前轮已完整重跑 direct magnet / shared runtime / Telegram 相关子集，未见业务红灯
+  - `adult_content_registry` 命中后的归档 sidecar / `archived_deleted` skip 回归已补 focused 断言
 
 ## Current biggest risk
 
-- 当前最大不确定性已经从“成人 BT 能否接进来”转成“下一步是先补 `javlibrary` helper，还是先做更大 gate / real smoke 来压成人归档 sidecar 风险”。
+- 当前最大不确定性已经从“direct magnet 文档与代码是否一致”转成“下一步是先做成人归档 sidecar 的 real smoke，还是先补 `javlibrary` 只读 helper”。
 
 ## Recommended Next Operator Command
 

@@ -728,7 +728,7 @@
   - 历史提醒以内容 ID 为主键，不以标题近似匹配代替。
 - **原因**：
   成人 BT 的关键价值在于内容 ID 历史、分类归档和后续清理，而不是继续硬套媒体入库后半段。
-    5. `app/bot/private_chat_runtime.py` 当前维持在 `467` 行，runtime bootstrap / route block / follow-up / preparation 段继续保持收口态。
+    5. `app/bot/private_chat_runtime.py` 当前维持在 `476` 行，runtime bootstrap / route block / follow-up / preparation 段继续保持收口态。
     6. `tests/test_cleanup_docs_consistency.py` 锁住 `docs/STATUS.md` / `docs/NEXT_STEP.md` / `docs/INDEX.md` / `docs/PERSISTENCE_CLOSURE_LOG.md` 的关键字符串与分层规则。
   - **切到下一阶段 services 层数据结构降本**。该阶段可测量 Done 定义：
     - `app/services/import_to_library.py` 从当前 `2242` 行降到 `≤ 600` 行；
