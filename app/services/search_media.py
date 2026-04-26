@@ -135,10 +135,10 @@ class SearchMediaService:
             return BT_READ_ONLY_EMPTY_QUERY_TEXT
 
         raw_results = await self.search_raw_candidates(cleaned_query)
-        selected_raw_results = [_to_candidate_dict(item) for item in raw_results[: self._limit]]
-        display_results = await self._decorate_bt_read_only_display_candidates(
-            selected_raw_results,
+        display_results = await self._build_bt_read_only_display_candidates(
+            raw_results,
             lookup_query=cleaned_query,
+            limit=self._limit,
         )
         return format_bt_read_only_reply(cleaned_query, display_results)
 
@@ -340,16 +340,42 @@ class SearchMediaService:
             candidate["adult_history_status"] = record.current_status
         return candidate
 
+    async def _build_bt_read_only_display_candidates(
+        self,
+        candidates: Sequence[Mapping[str, Any]],
+        *,
+        lookup_query: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        selected_limit = max(1, limit)
+        display_candidates = [_to_candidate_dict(item) for item in candidates]
+        if not display_candidates:
+            return []
+        helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
+        if helper_match is not None:
+            display_candidates = _prioritize_bt_read_only_helper_related_candidates(
+                display_candidates,
+                helper_match=helper_match,
+            )
+        limited_candidates = display_candidates[:selected_limit]
+        return await self._decorate_bt_read_only_display_candidates(
+            limited_candidates,
+            lookup_query=lookup_query,
+            helper_match=helper_match,
+        )
+
     async def _decorate_bt_read_only_display_candidates(
         self,
         candidates: Sequence[Mapping[str, Any]],
         *,
         lookup_query: str,
+        helper_match: JavLibraryReadOnlyMatch | None = None,
     ) -> list[dict[str, Any]]:
         display_candidates = [_to_candidate_dict(item) for item in candidates]
         if not display_candidates or not any(not str(item.get("adult_content_id", "")).strip() for item in display_candidates):
             return [self._annotate_adult_history(item) for item in display_candidates]
-        helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
+        if helper_match is None:
+            helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
         if helper_match is None:
             return [self._annotate_adult_history(item) for item in display_candidates]
 
@@ -578,11 +604,58 @@ def _should_apply_bt_read_only_helper(
     helper_match: JavLibraryReadOnlyMatch,
     candidate_count: int,
 ) -> bool:
+    if _is_bt_read_only_helper_related(candidate, helper_match=helper_match):
+        return True
+    if safe_text(candidate.get("adult_content_id"), default="") == helper_match.normalized_content_id:
+        return True
+    if safe_text(candidate.get("read_only_adult_content_id"), default="") == helper_match.normalized_content_id:
+        return True
+    if safe_text(candidate.get("adult_display_id"), default="") == helper_match.display_id:
+        return True
     title = safe_text(candidate.get("title"), default="")
     if not title:
         return candidate_count == 1
     if candidate_count == 1:
         return True
+    return False
+
+
+def _prioritize_bt_read_only_helper_related_candidates(
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    helper_match: JavLibraryReadOnlyMatch,
+) -> list[dict[str, Any]]:
+    prioritized: list[dict[str, Any]] = []
+    remainder: list[dict[str, Any]] = []
+    for item in candidates:
+        candidate = _to_candidate_dict(item)
+        if _is_bt_read_only_helper_related(candidate, helper_match=helper_match):
+            prioritized.append(candidate)
+            continue
+        remainder.append(candidate)
+    return prioritized + remainder
+
+
+def _is_bt_read_only_helper_related(
+    candidate: Mapping[str, Any],
+    *,
+    helper_match: JavLibraryReadOnlyMatch,
+) -> bool:
+    title = safe_text(candidate.get("title"), default="")
+    candidate_content_id = safe_text(candidate.get("adult_content_id"), default="") or safe_text(
+        candidate.get("read_only_adult_content_id"),
+        default="",
+    )
+    if candidate_content_id == helper_match.normalized_content_id:
+        return True
+    candidate_display_id = safe_text(candidate.get("adult_display_id"), default="") or safe_text(
+        candidate.get("read_only_adult_display_id"),
+        default="",
+    )
+    if candidate_display_id == helper_match.display_id:
+        return True
+    if not title:
+        return False
     display_id_key = compact_match_key(normalize_match_key(helper_match.display_id))
     title_key = compact_match_key(normalize_match_key(title))
     if display_id_key and display_id_key in title_key:

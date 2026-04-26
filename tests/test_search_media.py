@@ -492,6 +492,63 @@ def test_search_bt_read_only_and_format_only_applies_helper_to_related_candidate
     assert "只读补全:" not in second_candidate_text
 
 
+def test_search_bt_read_only_and_format_promotes_helper_related_candidate_before_top_n_slice() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "Noise collection complete edition",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 999,
+                "size": 3 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "Another unrelated compilation",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 888,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "Secret Mission Nurse leaked cut",
+                "source": "magnet:?xt=urn:btih:cccccccccccccccccccccccccccccccccccccccc",
+                "infoHash": "cccccccccccccccccccccccccccccccccccccccc",
+                "seeders": 1,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "prowlarr",
+                "sourceProvider": "prowlarr",
+            },
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Secret Mission Nurse",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+        limit=2,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "1. Secret Mission Nurse leaked cut" in text
+    assert "2. Noise collection complete edition" in text
+    assert "Another unrelated compilation" not in text
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+
+
 def test_search_bt_read_only_and_format_suppresses_duplicate_helper_title_variants() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "SSIS-123"
