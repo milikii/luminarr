@@ -50,6 +50,9 @@ def test_handle_bt_direct_intent_query_prompts_for_processing_path() -> None:
 
     assert handled is True
     reply_func.assert_awaited_once_with(tg.BT_PROCESSING_PATH_PROMPT_TEXT)
+    sent_text = reply_func.await_args.args[0]
+    assert "观影 PT 链 / BT 成人链" in sent_text
+    assert "按观影资源流程处理 / 按成人 BT 归档流程处理" in sent_text
 
 
 def test_handle_bt_direct_intent_query_replies_service_not_ready_when_persist_fails(

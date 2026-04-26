@@ -306,6 +306,42 @@ def test_dispatch_private_chat_text_routes_bt_prompt_without_telegram_update() -
     )
 
     reply_text.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    sent_text = reply_text.await_args.args[0]
+    assert "观影 PT 链 / BT 成人链" in sent_text
+
+
+def test_dispatch_private_chat_text_routes_bt_adult_chain_to_pending_add_without_telegram_update() -> None:
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    bot_data = _build_bot_data(search_service=search_service, add_service=add_service)
+
+    first_reply = AsyncMock()
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="magnet:?xt=urn:btih:abcdef1234567890&dn=SSIS-123+sample",
+            reply_func=first_reply,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=bot_data,
+        )
+    )
+
+    second_reply = AsyncMock()
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="BT 成人链",
+            reply_func=second_reply,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=bot_data,
+        )
+    )
+
+    first_reply.assert_awaited_once_with(BT_PROCESSING_PATH_PROMPT_TEXT)
+    second_sent_text = second_reply.await_args.args[0]
+    assert "下载待确认：SSIS-123 sample" in second_sent_text
+    assert "番号: SSIS-123" in second_sent_text
+    assert "分类: censored" in second_sent_text
 
 
 def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_processing_path_persist_fails(
