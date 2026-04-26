@@ -23,8 +23,8 @@
 
 ## Latest verification
 
-- `make quality`：当前轮文档同步前曾触发 docs consistency 红灯；已按当前主线修正文档锚点后重跑中
-- `make verify-mainline`：当前轮 shared-runtime focused 回归未见业务红灯；待与最终 `make quality` 一起收口
+- `make quality`：当前轮已重跑通过，文档一致性 gate 重新回绿
+- `make verify-mainline`：当前轮已重跑通过，shared-runtime / channel / BT follow-up focused 回归未见业务红灯
 - `make test`：`1761 passed, 2 skipped`
 - `.venv/bin/python -m pyflakes`：
   - 成人内容解析 / 历史账本 / 成人归档 / 新站点模板相关文件全部通过
