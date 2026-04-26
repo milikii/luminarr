@@ -3,11 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from app.clients.web_source import (
-    looks_like_http_url,
-    looks_like_web_source_page_request,
-    resolve_supported_web_source_page_request,
-)
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
@@ -16,6 +11,10 @@ from app.services.search_candidate_state import CandidateLoadResult, CandidateSt
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services import search_reply_formatter
 from app.services.search_ambiguity_helper import format_ambiguous_clarification
+from app.services.search_media_batch_preview_support import (
+    UnsupportedBatchPreviewPageUrl,
+    search_bt_batch_preview_candidates,
+)
 from app.services.search_media_bt_ordering import order_media_bt_results
 from app.services.media_identity import build_media_identity_from_tmdb_movie, normalize_media_identity_payload
 from app.services.search_reply_formatter import (
@@ -62,10 +61,6 @@ CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败�
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 parse_movie_query = _parse_movie_query
 load_bt_scoring_rules = _load_bt_scoring_rules
-
-
-class UnsupportedBatchPreviewPageUrl(ValueError):
-    pass
 
 class SearchMediaService:
     def __init__(
@@ -136,7 +131,12 @@ class SearchMediaService:
         if request.invalid_selection:
             return BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE.format(selection=request.selection_text or "-")
         try:
-            raw_results = await self._search_bt_batch_preview_candidates(cleaned_query)
+            raw_results = await search_bt_batch_preview_candidates(
+                cleaned_query,
+                raw_search_func=self._raw_search_func,
+                raw_page_search_func=self._raw_page_search_func,
+                prepare_raw_candidates=self._bt_read_only_display.prepare_raw_candidates,
+            )
         except UnsupportedBatchPreviewPageUrl:
             return BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE.format(query=cleaned_query)
         helper_match = await self._bt_read_only_display.lookup_helper_match(cleaned_query)
@@ -162,35 +162,6 @@ class SearchMediaService:
                 return persist_error_text
         selection_label = format_bt_batch_preview_selection_label(selection.selected_indexes)
         return format_bt_batch_preview_reply(cleaned_query, display_results, selection_label=selection_label)
-
-    async def _search_bt_batch_preview_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
-        resolved_page_url = resolve_supported_web_source_page_request(query)
-        if resolved_page_url is not None:
-            if self._raw_page_search_func is None:
-                raise UnsupportedBatchPreviewPageUrl(query)
-            return await self._search_raw_page_candidates(resolved_page_url)
-        if looks_like_http_url(query) or looks_like_web_source_page_request(query):
-            raise UnsupportedBatchPreviewPageUrl(query)
-        return await self.search_raw_candidates(query)
-
-    async def _search_raw_page_candidates(self, page_url: str) -> Sequence[Mapping[str, Any]]:
-        cleaned_page_url = page_url.strip()
-        if not cleaned_page_url:
-            return ()
-        if self._raw_page_search_func is None:
-            raise UnsupportedBatchPreviewPageUrl(cleaned_page_url)
-        try:
-            raw_results = await self._raw_page_search_func(cleaned_page_url)
-        except UnsupportedBatchPreviewPageUrl:
-            raise
-        except Exception as error:
-            print(
-                f"\033[31m[BT 页面预览失败]\033[0m 页面={cleaned_page_url} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
-                flush=True,
-            )
-            raise
-        return tuple(self._bt_read_only_display.prepare_raw_candidates(raw_results, query=cleaned_page_url))
 
     async def search_and_format(
         self,

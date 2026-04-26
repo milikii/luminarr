@@ -37,11 +37,11 @@ focused tests 入口：
 - 这一组继续只动候选状态真相边界；搜索排序、BT 预览协议和回复文本协议未改。
 - `app/services/bt_read_only_display.py` 现在承接 BT 只读候选注释 / helper 贴标 / 历史提示；`search_media.py` 当前回到 `627` 行。
 - 这一轮只把成熟的展示分支和 helper lookup 从热文件里抽走，未改 `bt搜` / `bt批量` 对外协议和 helper 真相边界。
-- `app/services/search_ambiguity_helper.py` 已承接歧义澄清 helper；`app/services/search_media_bt_ordering.py` 已承接 media-BT 排序 helper；`search_media.py` 已降到 `313` 行。
-- 当前主线已重新切回本文件；下一组只动 `search_media.py` 里剩余的 batch preview 页面支持 helper，不回退 clarification / candidate / read-only truth。
+- `app/services/search_ambiguity_helper.py` 已承接歧义澄清 helper；`app/services/search_media_bt_ordering.py` 已承接 media-BT 排序 helper；`app/services/search_media_batch_preview_support.py` 已承接 batch preview 页面支持 / allowlist URL fetch 壳；`search_media.py` 已降到 `288` 行。
+- 这一步补了 `tests/test_search_media_bt_ordering.py`、`tests/test_search_media_batch_preview_support.py` 两个 focused gate；`search_media.py` 现在只保留编排层、候选持久化和回复出口，不回退 clarification / candidate / read-only truth。
 
 剩余风险：
-- `search_media.py` 当前回到 `313` 行，已比最初基线明显收口，但仍高于纯粹编排层的理想尺寸；下一步若继续瘦身，应优先沿 `search_request_context.py` / `search_reply_formatter.py` / `bt_read_only_display.py` / `search_ambiguity_helper.py` / `search_media_bt_ordering.py` 的既有边界继续拆，不要再把成熟的展示逻辑塞回主文件。
+- `search_media.py` 当前回到 `288` 行，已经进入 proof-like orchestration 区间；除非出现新的失败边界或 focused gate 缺口，否则不再为了行数继续动它。
 - 搜索链继续守住“候选和澄清状态写入失败直接 fail-closed 返回中文提示”的边界，不回退现有 `CANDIDATE_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT` 协议。
 
 focused tests 入口：
@@ -57,4 +57,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经重新切回本文件；新的最小闭环继续优先并入 2.2 的 media-BT 排序 / batch preview helper 风险组，不回到 `manage_bt_subscription.py`。
+- 当前这一条搜索主线已达到可停手完成态；本文件保留已完成的 helper 收口真相，当前唯一主线转去 import worth-it 复评估，不回到 `manage_bt_subscription.py`。
