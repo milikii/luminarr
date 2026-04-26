@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.db.job_repo import WORKFLOW_ADD_TO_DOWNLOADER
-from app.services.workflow_trace_logger import WorkflowTraceLogger
+from app.trace_logging import log_trace_event
 
 
-class AddTraceLogger:
-    def __init__(self, trace_log_path: Path | None) -> None:
-        self._trace_logger = WorkflowTraceLogger(WORKFLOW_ADD_TO_DOWNLOADER, trace_log_path)
+class WorkflowTraceLogger:
+    def __init__(self, workflow: str, trace_log_path: Path | None) -> None:
+        self._workflow = workflow
+        self._trace_log_path = trace_log_path
 
     def log(
         self,
@@ -23,10 +23,13 @@ class AddTraceLogger:
         task_hash: str = "",
         detail: str = "",
     ) -> None:
-        self._trace_logger.log(
+        log_trace_event(
+            scope="workflow",
+            workflow=self._workflow,
             event=event,
             result=result,
             stage=stage,
+            log_path=self._trace_log_path,
             chat_id=chat_id,
             user_id=user_id,
             task_ref=task_ref,
