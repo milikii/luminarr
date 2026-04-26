@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,7 +17,6 @@ from app.db.adult_content_registry_repo import (
 )
 from app.db.download_monitor_repo import DownloadMonitorRecord
 from app.db.job_event_repo import JobEventRepo
-from app.services.cleanup_asset_support import delete_cleanup_source_asset
 from app.services.import_transfer_execution import _copy_import, _hardlink_import
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
@@ -142,10 +142,12 @@ class AdultArchiveService:
         source_path = Path(import_source.download_dir) / import_source.name
         await self._remove_torrent_func(candidate.task_hash, candidate.chat_id, True)
         if source_path.exists():
-            delete_cleanup_source_asset(
-                source_path=source_path,
-                source_type_unsupported_text="成人资源源路径不是文件或目录，无法清理。",
-            )
+            if source_path.is_dir():
+                shutil.rmtree(source_path)
+            elif source_path.is_file():
+                source_path.unlink()
+            else:
+                raise OSError("成人资源源路径不是文件或目录，无法清理。")
         self._job_event_repo.append_event(
             task_ref=candidate.task_hash,
             task_id=candidate.task_id,

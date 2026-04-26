@@ -2,17 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
-from app.services.cleanup_logging_support import (
-    print_cleanup_correlation_lookup_failed_log,
-    print_cleanup_correlation_path_missing_log,
-    print_cleanup_correlation_result_missing_log,
-    print_cleanup_correlation_row_corrupted_log,
-    print_cleanup_job_lookup_failed_log,
-)
-from app.services.cleanup_task_identity_support import resolve_cleanup_task_identity
 
 CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
@@ -43,6 +36,16 @@ class CleanupCorrelationResult:
     task_hash: str
     source_path: str
     target_path: str
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupTaskIdentityResolution:
+    lookup_task_ref: str
+    lookup_task_id: str
+    lookup_task_hash: str
+    task_ref: str
+    task_id: str
+    task_hash: str
 
 
 class CleanupCorrelationLookup:
@@ -218,10 +221,14 @@ def build_cleanup_correlation_result(
 
 
 def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: Exception) -> None:
-    print_cleanup_job_lookup_failed_log(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        error=error,
+    print(
+        f"\033[31m[cleanup 任务解析失败]\033[0m chat_id={chat_id} task_ref={task_ref} 原因={error}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 jobs 表按 chat_id/task_ref 的读取是否可用；"
+        "当前会回退到原始 task_ref 继续尝试匹配 import 关联。",
+        flush=True,
     )
 
 
@@ -231,12 +238,16 @@ def _print_cleanup_correlation_result_missing_log(
     resolved_identity: ResolvedCleanupTaskIdentity,
     reason: str,
 ) -> None:
-    print_cleanup_correlation_result_missing_log(
-        task_ref=task_ref,
-        lookup_task_ref=resolved_identity.lookup_task_ref,
-        lookup_task_id=resolved_identity.lookup_task_id,
-        lookup_task_hash=resolved_identity.lookup_task_hash,
-        reason=reason,
+    print(
+        f"\033[31m[cleanup 关联结果缺失]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 关联查询返回是否仍带有完整事件列表；"
+        "当前会按未找到关联停路，避免把缺失真相误判成普通“没有 import 关联”。",
+        flush=True,
     )
 
 
@@ -246,12 +257,16 @@ def _print_cleanup_correlation_row_corrupted_log(
     resolved_identity: ResolvedCleanupTaskIdentity,
     reason: str,
 ) -> None:
-    print_cleanup_correlation_row_corrupted_log(
-        task_ref=task_ref,
-        lookup_task_ref=resolved_identity.lookup_task_ref,
-        lookup_task_id=resolved_identity.lookup_task_id,
-        lookup_task_hash=resolved_identity.lookup_task_hash,
-        reason=reason,
+    print(
+        f"\033[31m[cleanup 关联记录损坏]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 导入成功关联里的 task_ref / event_type / source_path / target_path "
+        "是否仍是完整真相；当前会按未找到关联停路，避免把坏记录误判成普通“没有 import 关联”。",
+        flush=True,
     )
 
 
@@ -261,12 +276,16 @@ def _print_cleanup_correlation_lookup_failed_log(
     resolved_identity: ResolvedCleanupTaskIdentity,
     reason: str,
 ) -> None:
-    print_cleanup_correlation_lookup_failed_log(
-        task_ref=task_ref,
-        lookup_task_ref=resolved_identity.lookup_task_ref,
-        lookup_task_id=resolved_identity.lookup_task_id,
-        lookup_task_hash=resolved_identity.lookup_task_hash,
-        reason=reason,
+    print(
+        f"\033[31m[cleanup 关联查询失败]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可读、导入成功事件是否已落盘，"
+        "再重试 cleanup。",
+        flush=True,
     )
 
 
@@ -278,12 +297,58 @@ def _print_cleanup_correlation_path_missing_log(
     source_path_missing: bool,
     target_path_missing: bool,
 ) -> None:
-    print_cleanup_correlation_path_missing_log(
-        task_ref=task_ref,
-        lookup_task_ref=resolved_identity.lookup_task_ref,
-        lookup_task_id=resolved_identity.lookup_task_id,
-        lookup_task_hash=resolved_identity.lookup_task_hash,
-        event_type=event.event_type,
-        source_path_missing=source_path_missing,
-        target_path_missing=target_path_missing,
+    missing_fields: list[str] = []
+    if source_path_missing:
+        missing_fields.append("source_path")
+    if target_path_missing:
+        missing_fields.append("target_path")
+    print(
+        f"\033[31m[cleanup 关联路径缺失]\033[0m task_ref={task_ref} "
+        f"lookup_task_ref={resolved_identity.lookup_task_ref} lookup_task_id={resolved_identity.lookup_task_id} "
+        f"lookup_task_hash={resolved_identity.lookup_task_hash} event_type={event.event_type} "
+        f"missing_fields={','.join(missing_fields)}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 import.succeeded 事件是否带有完整 source_path / target_path；"
+        "当前会按未找到关联停路，避免误删下载源资产。",
+        flush=True,
+    )
+
+
+def resolve_cleanup_task_identity(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_lookup: Callable[[int, str], Any | None] | None,
+    on_job_lookup_failed: Callable[[Exception], None],
+) -> CleanupTaskIdentityResolution:
+    resolved_task_ref = task_ref
+    resolved_task_id = ""
+    resolved_task_hash = ""
+    lookup_task_ref = task_ref
+    lookup_task_id = task_ref
+    lookup_task_hash = task_ref
+
+    if job_lookup is not None and chat_id is not None and chat_id > 0:
+        try:
+            job = job_lookup(chat_id, task_ref)
+        except Exception as error:
+            on_job_lookup_failed(error)
+            job = None
+        if job is not None:
+            resolved_task_ref = (getattr(job, "task_ref", "") or task_ref).strip() or resolved_task_ref
+            resolved_task_id = str(getattr(job, "task_id", "") or "").strip()
+            resolved_task_hash = str(getattr(job, "task_hash", "") or "").strip()
+            lookup_task_ref = resolved_task_ref
+            lookup_task_id = resolved_task_id or lookup_task_id
+            lookup_task_hash = resolved_task_hash or lookup_task_hash
+
+    return CleanupTaskIdentityResolution(
+        lookup_task_ref=lookup_task_ref,
+        lookup_task_id=lookup_task_id,
+        lookup_task_hash=lookup_task_hash,
+        task_ref=resolved_task_ref,
+        task_id=resolved_task_id,
+        task_hash=resolved_task_hash,
     )
