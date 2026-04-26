@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from app.search_title_normalization import compact_match_key, normalize_match_key
 from app.services.adult_content import AdultContentMatch, extract_exact_adult_content_match
 
 _SOURCE_PRIORITY = {
@@ -22,6 +23,30 @@ _SOURCE_PRIORITY_ALIASES = {
     "javlibrary.com": "javlibrary",
     "www.javlibrary.com": "javlibrary",
 }
+_TITLE_RELEVANCE_NOISE_TOKENS = frozenset(
+    {
+        "jav",
+        "fc2",
+        "ppv",
+        "sample",
+        "sub",
+        "subtitle",
+        "subbed",
+        "uncensored",
+        "censored",
+        "中字",
+        "字幕",
+        "中文字幕",
+        "中文",
+        "无码",
+        "有码",
+        "流出",
+        "破解",
+        "合集",
+        "complete",
+        "edition",
+    }
+)
 
 
 def order_adult_bt_candidates(
@@ -33,7 +58,7 @@ def order_adult_bt_candidates(
     annotated_results = [_to_candidate_dict(item) for item in results]
     ranked = sorted(
         annotated_results,
-        key=lambda item: _candidate_sort_key(item, query_match=query_match),
+        key=lambda item: _candidate_sort_key(item, query_match=query_match, query=query),
         reverse=True,
     )
     return ranked
@@ -59,13 +84,22 @@ def _candidate_sort_key(
     item: Mapping[str, Any],
     *,
     query_match: AdultContentMatch | None,
-) -> tuple[float, float, float, float, str]:
+    query: str,
+) -> tuple[float, float, float, float, float, str]:
     candidate_match = _resolve_candidate_match(item)
     exact_id_score = 1.0 if _content_id_matches(candidate_match, query_match=query_match) else 0.0
+    title_relevance_score = _resolve_title_relevance_score(item, query=query)
     source_priority = _resolve_source_priority(item)
     seeders = float(_safe_int(item.get("seeders")))
     size_bytes = float(_safe_int(item.get("size")))
-    return (exact_id_score, source_priority, seeders, size_bytes, str(item.get("title", "")).strip().lower())
+    return (
+        exact_id_score,
+        title_relevance_score,
+        source_priority,
+        seeders,
+        size_bytes,
+        str(item.get("title", "")).strip().lower(),
+    )
 
 
 def _resolve_candidate_match(item: Mapping[str, Any]) -> AdultContentMatch | None:
@@ -113,3 +147,38 @@ def _canonicalize_source_name(value: str) -> str:
     if not cleaned:
         return ""
     return _SOURCE_PRIORITY_ALIASES.get(cleaned, cleaned)
+
+
+def _resolve_title_relevance_score(item: Mapping[str, Any], *, query: str) -> float:
+    query_tokens = _extract_relevance_tokens(query)
+    if not query_tokens:
+        return 0.0
+
+    title = str(item.get("title", "")).strip()
+    title_tokens = _extract_relevance_tokens(title)
+    if not title_tokens:
+        return 0.0
+
+    overlap = len(query_tokens.intersection(title_tokens))
+    if overlap <= 0:
+        return 0.0
+
+    query_compact = compact_match_key(normalize_match_key(query))
+    title_compact = compact_match_key(normalize_match_key(title))
+    if query_compact and title_compact and query_compact in title_compact:
+        return float(overlap + len(query_tokens))
+    return float(overlap)
+
+
+def _extract_relevance_tokens(value: str) -> set[str]:
+    normalized = normalize_match_key(value)
+    if not normalized:
+        return set()
+    tokens: set[str] = set()
+    for token in normalized.split():
+        if token in _TITLE_RELEVANCE_NOISE_TOKENS:
+            continue
+        if len(token) <= 1:
+            continue
+        tokens.add(token)
+    return tokens

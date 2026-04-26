@@ -155,6 +155,26 @@ def test_order_adult_bt_candidates_applies_source_priority_aliases() -> None:
     assert ordered[0]["title"] == "ABP-123 offkab lower seed"
 
 
+def test_order_adult_bt_candidates_prefers_title_relevance_for_non_exact_query() -> None:
+    ordered = order_adult_bt_candidates(
+        [
+            {
+                "title": "Unrelated collection complete edition",
+                "sourceProvider": "tokyotosho",
+                "seeders": 999,
+            },
+            {
+                "title": "Secret Mission Nurse leaked cut",
+                "sourceProvider": "prowlarr",
+                "seeders": 1,
+            },
+        ],
+        query="Secret Nurse",
+    )
+
+    assert ordered[0]["title"] == "Secret Mission Nurse leaked cut"
+
+
 def test_build_adult_history_text_formats_known_states() -> None:
     assert build_adult_history_text(status=ADULT_CONTENT_STATUS_PENDING, archive_path="") == "历史: 该番号已有待确认下载记录。"
     assert build_adult_history_text(status=ADULT_CONTENT_STATUS_DOWNLOADING, archive_path="") == "历史: 该番号已有下载任务在运行。"
