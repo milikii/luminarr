@@ -53,3 +53,10 @@ def test_should_apply_bt_read_only_helper_rejects_unrelated_single_candidate() -
         {"title": "Unrelated comedy collection"},
         helper_match=_build_helper_match(),
     )
+
+
+def test_should_apply_bt_read_only_helper_ignores_generic_overlap_noise_tokens() -> None:
+    assert not should_apply_bt_read_only_helper(
+        {"title": "Unrelated collection edition"},
+        helper_match=_build_helper_match(title="SSIS-123 Secret Collection Edition"),
+    )

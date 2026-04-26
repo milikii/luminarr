@@ -7,6 +7,15 @@ from typing import Any
 from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key
 
+BT_READ_ONLY_HELPER_TITLE_NOISE_TOKENS = frozenset(
+    {
+        "collection",
+        "compilation",
+        "edition",
+        "complete",
+    }
+)
+
 
 def prepare_bt_read_only_selection_candidates(
     candidates: Sequence[Mapping[str, Any]],
@@ -70,7 +79,11 @@ def _extract_bt_read_only_helper_tokens(value: str, *, display_id: str) -> set[s
     display_id_tokens = {token for token in normalize_match_key(display_id).split() if token}
     tokens: set[str] = set()
     for token in normalized.split():
-        if token in BT_RESULT_TITLE_NOISE_TOKENS or token in display_id_tokens:
+        if (
+            token in BT_RESULT_TITLE_NOISE_TOKENS
+            or token in BT_READ_ONLY_HELPER_TITLE_NOISE_TOKENS
+            or token in display_id_tokens
+        ):
             continue
         if len(token) <= 1 or re.fullmatch(r"(?:19|20)\d{2}", token):
             continue

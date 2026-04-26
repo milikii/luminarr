@@ -529,6 +529,53 @@ def test_search_bt_read_only_and_format_does_not_apply_helper_to_single_unrelate
     assert "只读标题:" not in text
 
 
+def test_search_bt_read_only_and_format_ignores_generic_helper_overlap_tokens() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "Unrelated collection edition",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 10,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "Another unrelated compilation",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 5,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Secret Collection Edition",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "1. Unrelated collection edition" in text
+    assert "2. Another unrelated compilation" in text
+    assert "只读补全:" not in text
+    assert "只读标题:" not in text
+
+
 def test_search_bt_read_only_and_format_promotes_helper_related_candidate_before_top_n_slice() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "SSIS-123"
