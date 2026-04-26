@@ -1,4 +1,4 @@
-# Next step (v359)
+# Next step (v360)
 
 ## Current goal
 
@@ -30,6 +30,8 @@
     - exact-id helper 相关候选会在 `bt搜` top-N 和 `bt批量` 默认预览切片前前置
     - `bt批量` 显式 selection 当前复用同一 helper-aware 顺序，不再和默认预览语义漂移
     - chat 缓存当前会跟随同一 helper-aware 顺序，但 helper-only 字段仍不会写进 `candidate_mapping`
+    - 单候选无关结果与显式选中的无关候选当前都不会再兜底贴 helper
+    - helper title overlap 当前会过滤 `collection / compilation / edition / complete` 这类 generic token，减少只靠泛噪声词命中的误贴
     - `app/services/bt_read_only_helper_selection.py` 当前承接 helper relevance 选择逻辑，`search_media.py` 不继续堆同类判断
 - 当前新增真相：
   - `DOWNLOADER_INSTANCES` 当前可选第 5 段 `dispatch_download_dir`，可把下载器 API 投递路径和宿主机导入路径分开
@@ -37,7 +39,7 @@
   - `tmp_tests/verify_adult_archive_bt_real_smoke.py` 当前会先清理同 hash 旧任务，再用 `/downloads/complete` 投递，已稳定跑通“归档 -> 保留期清理”
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退。
 - 当前下一条缺口：
-  - helper relevance 当前仍主要依赖单条 helper title 和窄 token overlap；若后续还有边界噪声，需要继续收窄 helper 介入时机或只读截断策略
+  - helper relevance 当前已不再因为单候选兜底或 `collection / compilation / edition / complete` 这类 generic overlap 误贴；若后续还有边界噪声，需要继续围绕更窄 token/截断 guard 收窄 helper 介入时机
   - 后续若继续收口，只能先做更窄的 focused tests / guard，不能放宽成 helper 写真相或自动 dispatch
 
 ## User value
@@ -47,7 +49,7 @@
   - qB 成人归档成功，保留期清理成功
   - BT Transmission 成人归档成功，保留期清理成功
 - `javlibrary` exact-id helper 已经把“手动只读探索时的最小补全字段”补齐。
-- 当前 BT 只读候选相关性保护已经把 top-N / 默认预览 / 定点预览 / 缓存顺序上的 helper 相关性回退风险收口；如果继续推进，也只应该收窄 helper 介入时机或只读截断策略，不放宽自动 dispatch 边界。
+- 当前 BT 只读候选相关性保护已经把 top-N / 默认预览 / 定点预览 / 缓存顺序上的 helper 相关性回退风险收口，并额外压掉了单候选兜底误贴与 generic overlap 误贴；如果继续推进，也只应该收窄 helper 介入时机或只读截断策略，不放宽自动 dispatch 边界。
 
 ## Only do
 

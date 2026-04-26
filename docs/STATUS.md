@@ -1,4 +1,4 @@
-# Current status (v476)
+# Current status (v477)
 
 ## Current mainline
 
@@ -22,6 +22,8 @@
   - 同一番号的多候选当前只显示一次历史提示，不再在整段只读预览里重复刷屏
   - `bt搜` / `bt批量` 当前会在 top-N / 默认预览切片前先前置和 exact-id helper 明显相关的原始候选，减少边界噪声把相关条目挤出只读展示
   - `bt批量` 显式 selection 与 chat 缓存当前复用同一 helper-aware 顺序，但 helper-only 字段仍不会进入 `candidate_mapping`、待确认下载或 downloader dispatch 真相
+  - `bt搜` / `bt批量` 当前不会因为只剩单个候选或用户显式选中无关项就兜底贴 helper；无关候选继续保持 helper-free 展示与缓存
+  - helper title overlap 当前会过滤 `collection / compilation / edition / complete` 这类泛噪声 token，减少 generic overlap 把无关标题误判成相关候选
   - 成人 BT 下载完成后可进入归档，统一保留窗口到期后可清理下载器任务与源资源
   - direct magnet 运行时选择 `BT 成人链` 时，已能直接创建成人磁力下载待确认并尽量识别番号 / 分类
   - qB 导入源解析已改成优先使用真实 `content_path`，不再盲信漂移的 `save_path`
@@ -29,7 +31,7 @@
   - 路由层当前会在导入查询时优先恢复任务真相里的 host `download_dir`，不再把 Transmission RPC 的容器路径直接喂给归档/导入
   - qB 成人归档真实 smoke 已通过：归档成功、保留期清理成功、`adult_content_registry` 最终为 `archived_deleted`
   - BT Transmission 成人归档真实 smoke 已通过：归档成功、保留期清理成功、`adult_content_registry` 最终为 `archived_deleted`
-- 当前热点大文件仍需留意：`app/services/search_media.py` `778` 行，`add_to_downloader.py` `606` 行，`import_to_library.py` `649` 行；本轮已把 BT 只读 helper relevance 选择抽到 `app/services/bt_read_only_helper_selection.py` `97` 行，未改对外协议。
+- 当前热点大文件仍需留意：`app/services/search_media.py` `775` 行，`add_to_downloader.py` `606` 行，`import_to_library.py` `649` 行；BT 只读 helper relevance 选择当前位于 `app/services/bt_read_only_helper_selection.py` `104` 行，未改对外协议。
 - BT 来源适配当前保持：
   - 成人站点优先：`tokyotosho` / `sukebei(offkab)` / `javbus`
   - `Prowlarr` 成人 PT 作为补充来源
@@ -37,9 +39,9 @@
 
 ## Current health
 
-- 当前这轮变更只触碰 BT 只读 helper relevance guard、批量预览缓存边界、`search_media.py` 局部瘦身和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
+- 当前这轮变更只触碰 BT 只读 helper 介入时机 guard、generic overlap token 过滤、focused tests 和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
 - 当前成人 BT 主线的两条真实 smoke 继续保持通过态；当前更需要留意的是：
-  - 当前 BT 只读候选相关性保护已经收口：helper 相关性会在 `bt搜` top-N、`bt批量` default/selected selection 和 chat cache 顺序前统一生效，focused tests 已覆盖默认预览、定点预览和缓存边界
+  - 当前 BT 只读候选相关性保护已经继续收窄：helper 相关性会在 `bt搜` top-N、`bt批量` default/selected selection 和 chat cache 顺序前统一生效；focused tests 已覆盖默认预览、定点预览、单候选无关项、显式无关 selection 和 generic overlap 噪声边界
   - 如果后续仍出现边界噪声，只能继续收窄 helper 介入时机或只读截断策略；不能把 helper 结果写进审批真相，也不要再把 `search_media.py` 往上堆
 
 ## Latest verification
@@ -47,7 +49,7 @@
 - `make quality`：`28 passed, 0 skipped`
 - `make verify-mainline`：当前轮已通过
 - focused pytest：
-  - `tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_pure_bt.py tests/test_adult_content.py`：`209 passed, 0 skipped`
+  - `tests/test_bt_read_only_helper_selection.py tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_pure_bt.py`：`204 passed, 4 warnings`
   - `.venv/bin/python -m pyflakes app/services/search_media.py app/services/bt_read_only_helper_selection.py`：通过
 - 真实 smoke 保持通过态，本轮未改下载器 / 归档协议：
   - `.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`
@@ -66,7 +68,7 @@
 
 ## Current biggest risk
 
-- 当前最大不确定性已经从“BT 只读排序 / 展示会不会被来源别名、噪声标题和重复历史提示拖乱”收敛到“后续是否还有必要继续收窄 helper 介入时机 / 只读截断策略，以及怎样继续保持 read-only、focused 且不引入新的 helper 真相边界”。
+- 当前最大不确定性已经进一步收敛到“后续是否还会出现 helper title overlap 只靠更边缘 token 误命中的个案，以及是否还需要继续收窄只读截断策略”；若继续推进，也只能继续做更窄的 focused tests / guard，不能放宽 helper 真相边界。
 
 ## Recommended Next Operator Command
 
