@@ -167,12 +167,16 @@ class SearchMediaService:
                 available_count=selection.available_count,
             )
         selected_raw_results = [_to_candidate_dict(item) for item in selection.candidates]
+        display_results = await self._decorate_bt_read_only_display_candidates(
+            selected_raw_results,
+            lookup_query=cleaned_query,
+        )
         if chat_id is not None:
             persist_error_text = self._cache_bt_batch_preview_candidates(chat_id=chat_id, candidates=selected_raw_results)
             if persist_error_text:
                 return persist_error_text
         selection_label = format_bt_batch_preview_selection_label(selection.selected_indexes)
-        return format_bt_batch_preview_reply(cleaned_query, selected_raw_results, selection_label=selection_label)
+        return format_bt_batch_preview_reply(cleaned_query, display_results, selection_label=selection_label)
 
     async def _search_bt_batch_preview_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
         resolved_page_url = resolve_supported_web_source_page_request(query)

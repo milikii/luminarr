@@ -288,6 +288,46 @@ def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:
     assert BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection="2") in text
 
 
+def test_search_bt_batch_preview_and_format_includes_javlibrary_helper_summary() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "sample release without explicit id",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Sample Title",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(
+        service.search_bt_batch_preview_and_format(
+            BTBatchPreviewRequest(query="SSIS-123")
+        )
+    )
+
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+    assert "只读标题: SSIS-123 Sample Title" in text
+
+
 def test_search_bt_batch_preview_and_format_uses_page_fetch_for_allowlist_url() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for allowlist page preview")
@@ -1568,6 +1608,50 @@ def test_search_bt_batch_preview_and_format_for_chat_caches_candidates() -> None
 
     assert service.get_cached_candidate(1001, 1) is not None
     assert service.get_cached_candidate(1001, 2) is not None
+
+
+def test_search_bt_batch_preview_and_format_for_chat_does_not_cache_helper_only_fields() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "sample release without explicit id",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Sample Title",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(
+        service.search_bt_batch_preview_and_format_for_chat(
+            BTBatchPreviewRequest(query="SSIS-123"),
+            chat_id=1001,
+        )
+    )
+
+    cached = service.get_cached_candidate(1001, 1)
+
+    assert cached is not None
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+    assert "read_only_adult_content_id" not in cached
+    assert "read_only_adult_display_id" not in cached
+    assert "adult_content_id" not in cached
 
 
 def test_search_bt_batch_preview_and_format_for_chat_caches_page_preview_candidates() -> None:
