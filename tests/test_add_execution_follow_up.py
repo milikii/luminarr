@@ -284,3 +284,103 @@ def test_dispatch_registers_download_monitor_for_adult_candidate_even_without_au
 
     assert outcome.result is not None
     assert calls == [("42", "hash-42", "SSIS-123", 1001, 2001)]
+
+
+def test_dispatch_marks_adult_content_downloading_state() -> None:
+    registry_calls: list[dict[str, str]] = []
+    service = AddExecutionFollowUpService(
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        job_event_repo=None,
+        download_monitor_repo=None,
+        adult_content_registry_repo=type(
+            "AdultContentRegistryRepo",
+            (),
+            {"mark_downloading": lambda self, **kwargs: registry_calls.append(kwargs)},
+        )(),
+        log_trace_func=lambda **kwargs: None,
+        add_failed_text="下载投递失败，请稍后重试。",
+        download_monitor_register_result_missing_reason="download monitor state missing after register",
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:abc123",
+        title="SSIS-123",
+        source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        adult_content_id="censored:ssis-123",
+        adult_content_kind="censored",
+        adult_archive_category="censored",
+        adult_display_id="SSIS-123",
+        source_site="javbus",
+        downloader_name="qb-adult",
+        auto_import_enabled=False,
+    )
+
+    outcome = asyncio.run(
+        service.dispatch(
+            task_ref="1",
+            pending_add=pending_add,
+            chat_id=1001,
+            user_id=2001,
+        )
+    )
+
+    assert outcome.result is not None
+    assert registry_calls == [
+        {
+            "normalized_content_id": "censored:ssis-123",
+            "content_id_kind": "censored",
+            "archive_category": "censored",
+            "display_title": "SSIS-123",
+            "latest_source_site": "javbus",
+            "task_ref": "1",
+            "task_id": "42",
+            "task_hash": "hash-42",
+            "downloader_name": "qb-adult",
+        }
+    ]
+
+
+def test_dispatch_logs_adult_content_downloading_failure_without_failing_download(
+    capsys,
+) -> None:
+    service = AddExecutionFollowUpService(
+        add_torrent_func=AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42")),
+        job_event_repo=None,
+        download_monitor_repo=None,
+        adult_content_registry_repo=type(
+            "AdultContentRegistryRepo",
+            (),
+            {"mark_downloading": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        )(),
+        log_trace_func=lambda **kwargs: None,
+        add_failed_text="下载投递失败，请稍后重试。",
+        download_monitor_register_result_missing_reason="download monitor state missing after register",
+    )
+    pending_add = PendingAddContext(
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:abc123",
+        title="SSIS-123",
+        source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        adult_content_id="censored:ssis-123",
+        adult_archive_category="censored",
+        adult_display_id="SSIS-123",
+        auto_import_enabled=False,
+    )
+
+    outcome = asyncio.run(
+        service.dispatch(
+            task_ref="1",
+            pending_add=pending_add,
+            chat_id=1001,
+            user_id=2001,
+        )
+    )
+
+    assert outcome.result is not None
+    assert outcome.reply == "已添加下载：SSIS-123\n任务 ID: 42\n任务 Hash: hash-42"
+    output = capsys.readouterr().out
+    assert "[成人资源下载状态登记失败]" in output
+    assert "content_id=censored:ssis-123" in output
+    assert "db down" in output

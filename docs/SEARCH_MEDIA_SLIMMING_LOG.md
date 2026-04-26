@@ -37,6 +37,7 @@ focused tests 入口：
 - 这一组继续只动候选状态真相边界；搜索排序、BT 预览协议和回复文本协议未改。
 - `app/services/bt_read_only_display.py` 现在承接 BT 只读候选注释 / helper 贴标 / 历史提示；`search_media.py` 当前回到 `627` 行。
 - 这一轮只把成熟的展示分支和 helper lookup 从热文件里抽走，未改 `bt搜` / `bt批量` 对外协议和 helper 真相边界。
+- 当前主线已重新切回本文件；下一组只动 `search_media.py` 里剩余的 ambiguity helper、media-BT 排序 / fallback query helper 和 batch preview 页面支持 helper，不回退 clarification / candidate / read-only truth。
 
 剩余风险：
 - `search_media.py` 当前回到 `627` 行，已比最初基线明显收口，但仍高于纯粹编排层的理想尺寸；下一步若继续瘦身，应优先沿 `search_request_context.py` / `search_reply_formatter.py` / `bt_read_only_display.py` 的既有边界继续拆，不要再把成熟的展示逻辑塞回主文件。
@@ -55,4 +56,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切到 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`；本文件继续保留已完成的 clarification / candidate / reply 瘦身闭环，不回到 `manage_bt_subscription.py`。
+- 当前唯一主线已经重新切回本文件；新的最小闭环继续优先并入 2.2 的 ambiguity / 排序 / batch preview helper 风险组，不回到 `manage_bt_subscription.py`。

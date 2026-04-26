@@ -9,7 +9,7 @@ from app.db.approval_repo import ApprovalRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRecord, JobRepo
-from app.services.add_adult_pending_state import AddAdultPendingState
+from app.services.add_adult_registry_state import AddAdultRegistryState
 from app.services.add_confirm_availability_state import AddConfirmAvailabilityState
 from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,
@@ -97,7 +97,7 @@ class AddToDownloaderService:
         self._trace_logger = AddTraceLogger(trace_log_path)
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
-        self._adult_pending_state = AddAdultPendingState(adult_content_registry_repo)
+        self._adult_registry_state = AddAdultRegistryState(adult_content_registry_repo)
         self._pending_persistence_state = AddPendingPersistenceState(
             job_repo=job_repo,
             downloader_pending_job_result_missing_reason=DOWNLOADER_PENDING_JOB_RESULT_MISSING_REASON,
@@ -451,7 +451,7 @@ class AddToDownloaderService:
             log_trace=self._trace_logger.log,
         )
         if reply != ADD_PENDING_STATE_UNAVAILABLE_TEXT:
-            self._adult_pending_state.record_pending(pending_add=pending_add)
+            self._adult_registry_state.record_pending(pending_add=pending_add)
         return reply
 
     def _record_pending_job(

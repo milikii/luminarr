@@ -68,10 +68,12 @@ focused tests 入口：
 - 这一步把 `add_to_downloader.py` 从 `608` 行降到 `574` 行；`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `116 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1724 passed, 4 warnings`。
 - `app/services/add_adult_pending_state.py` 已承接成人待确认登记壳；`add_to_downloader.py` 不再直接持有 `adult_content_registry.upsert_pending()` 分支和对应失败日志，只保留 pending write-through 成功后的最外层调用，不回退待确认文本或 fail-closed 中文日志。
 - 这一步把 `add_to_downloader.py` 从 `606` 行降到 `582` 行；`.venv/bin/python -m pytest -q tests/test_add_to_downloader.py -k "adult_pending or add_candidate_source or add_by_batch_selection"` 为 `5 passed, 107 deselected`，`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `123 passed`，`make quality` 为 `32 passed`。
+- `app/services/add_adult_registry_state.py` 现在统一承接 adult pending / downloading 状态写入；`add_to_downloader.py` / `add_execution_follow_up.py` 不再各自持有 registry 写入分支和失败日志，只保留 pending / dispatch 成功后的最外层调用，不回退待确认文本、dispatch 回复或 fail-closed 中文日志。
+- 这一步把 `add_execution_follow_up.py` 从 `292` 行降到 `261` 行；`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py -k "adult_content_downloading or adult_candidate_even_without_auto_import"` 为 `3 passed, 7 deselected`，`.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py` 为 `125 passed`，`make quality` 继续 `32 passed`。
 
 剩余风险：
-- `add_to_downloader.py` 已到 `582` 行，pending 侧成人 registry 写入已收走；若还要继续动 downloader confirm 主线，优先统一 dispatch 侧成人 downloading 状态写入，不要回到 approval / lease / confirm 顺序本体。
-- 当前更大的风险不再是单个壳文件行数，而是成人 registry 状态写入还分散在 pending / dispatch 两段，后续如果没有 promoted 主线，容易再次回到为数字继续搬 wrapper 的递减施工。
+- `add_to_downloader.py` 当前 `582` 行，但剩余基本已是 public/protected proof-like wrapper；若没有新的失败边界或 focused gate 缺口，不值得继续为了数字动它。
+- downloader confirm 这条线目前可以停在完成态；当前更大的风险已经切回 `search_media.py` 里的 ambiguity / media-BT 排序 / batch preview helper。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py`
@@ -88,4 +90,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- 当前唯一主线已经切回 2.2 风险组；本文件继续承接 downloader confirm 相关瘦身闭环，不回到 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`。
+- 当前这一条 downloader confirm 主线已可停手；本文件保留已完成的 registry / wrapper 收口真相，当前唯一主线切回 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`。
