@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 
@@ -36,6 +37,15 @@ _UNCENSORED_KEYWORDS = ("无码", "uncensored", "caribbeancom", "caribbean", "1p
 _FC2_KEYWORDS = ("fc2", "ppv")
 _CENSORED_KEYWORDS = ("有码", "jav", "javbus", "javlibrary")
 _NOISE_PATTERN = re.compile(r"[^0-9a-z]+", re.IGNORECASE)
+_SEPARATOR_TRANSLATION = str.maketrans(
+    {
+        "—": "-",
+        "–": "-",
+        "−": "-",
+        "ー": "-",
+        "＿": "_",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +57,7 @@ class AdultContentMatch:
 
 
 def extract_adult_content_match(text: str, *, source_site: str = "") -> AdultContentMatch | None:
-    cleaned_text = text.strip()
+    cleaned_text = _normalize_match_text(text)
     if not cleaned_text:
         return None
 
@@ -191,10 +201,16 @@ def _match_censored(text: str) -> AdultContentMatch | None:
 
 
 def _normalize_compact_text(value: str) -> str:
-    return re.sub(r"\s+", "", value.strip()).lower()
+    normalized = _normalize_match_text(value)
+    return re.sub(r"\s+", "", normalized).lower()
 
 
 def _normalize_uncensored_serial(value: str) -> str:
-    cleaned = value.strip().replace("_", "-")
+    cleaned = _normalize_match_text(value).replace("_", "-")
     cleaned = re.sub(r"-{2,}", "-", cleaned)
     return cleaned.strip("-")
+
+
+def _normalize_match_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "")
+    return normalized.translate(_SEPARATOR_TRANSLATION).strip()

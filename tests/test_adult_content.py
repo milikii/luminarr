@@ -33,6 +33,23 @@ def test_extract_adult_content_match_supports_fc2_censored_and_uncensored_patter
     assert uncensored_match.archive_category == "uncensored"
 
 
+def test_extract_adult_content_match_normalizes_full_width_and_variant_separators() -> None:
+    censored_match = extract_adult_content_match("【ＪＡＶ】 ＳＳＩＳ－１２３ sample release")
+    assert censored_match is not None
+    assert censored_match.normalized_content_id == "censored:ssis-123"
+    assert censored_match.display_id == "SSIS-123"
+
+    fc2_match = extract_adult_content_match("ＦＣ２—ＰＰＶ—４３２１９８１")
+    assert fc2_match is not None
+    assert fc2_match.normalized_content_id == "fc2:4321981"
+    assert fc2_match.display_id == "FC2-4321981"
+
+    uncensored_match = extract_adult_content_match("Ｃａｒｉｂ－０４２１２３＿００１")
+    assert uncensored_match is not None
+    assert uncensored_match.normalized_content_id == "carib:042123-001"
+    assert uncensored_match.display_id == "CARIB-042123-001"
+
+
 def test_guess_adult_archive_category_prefers_chinese_original_and_western_keywords() -> None:
     assert guess_adult_archive_category("麻豆 国产原创") == "chinese_original"
     assert guess_adult_archive_category("Brazzers western title") == "western"
