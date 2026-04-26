@@ -49,6 +49,23 @@ def _print_downloader_route_lookup_log(
     )
 
 
+def _print_downloader_dispatch_log(
+    *,
+    title: str,
+    downloader_name: str,
+    downloader_type: str,
+    detail_label: str,
+    detail_value: str,
+    fix_hint: str,
+) -> None:
+    print(
+        f"\033[31m[{title}]\033[0m downloader_name={downloader_name or '-'} "
+        f"downloader_type={downloader_type or '-'} {detail_label}={detail_value}\n"
+        f"\033[33m[处理建议]\033[0m {fix_hint}",
+        flush=True,
+    )
+
+
 def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
     _print_downloader_route_lookup_log(
         title="下载器路由未命中",
@@ -211,20 +228,24 @@ def _resolve_downloader_name_for_task(
 
 
 def _log_downloader_instance_missing(*, downloader_name: str) -> None:
-    print(
-        f"\033[31m[下载器实例不存在]\033[0m downloader_name={downloader_name}\n"
-        "\033[33m[处理建议]\033[0m 检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，"
-        "并确认角色绑定或历史任务没有引用已删除的实例名。",
-        flush=True,
+    _print_downloader_dispatch_log(
+        title="下载器实例不存在",
+        downloader_name=downloader_name,
+        downloader_type="-",
+        detail_label="原因",
+        detail_value="instance missing",
+        fix_hint="检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，并确认角色绑定或历史任务没有引用已删除的实例名。",
     )
 
 
 def _log_downloader_client_not_configured(*, downloader_name: str, downloader_type: str) -> None:
-    print(
-        f"\033[31m[下载器客户端未配置]\033[0m downloader_name={downloader_name} downloader_type={downloader_type}\n"
-        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，"
-        "并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
-        flush=True,
+    _print_downloader_dispatch_log(
+        title="下载器客户端未配置",
+        downloader_name=downloader_name,
+        downloader_type=downloader_type,
+        detail_label="原因",
+        detail_value="client missing",
+        fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
     )
 
 
@@ -234,12 +255,13 @@ def _log_downloader_dispatch_resolution_failed(
     downloader_type: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载器投递路由失败]\033[0m downloader_name={downloader_name} "
-        f"downloader_type={downloader_type or '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，"
-        "再重试当前下载投递。",
-        flush=True,
+    _print_downloader_dispatch_log(
+        title="下载器投递路由失败",
+        downloader_name=downloader_name,
+        downloader_type=downloader_type,
+        detail_label="原因",
+        detail_value=reason,
+        fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
     )
 
 

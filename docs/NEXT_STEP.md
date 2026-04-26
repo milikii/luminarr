@@ -19,7 +19,7 @@
   - cleanup 链当前已不再保留 `cleanup_*_support.py` 文件；相关逻辑已经收回 `cleanup_downloaded_source.py`、`cleanup_correlation_lookup.py` 和 `adult_archive_service.py`
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/config.py` 当前 `454` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper
-  - `app/downloader_route_lookup.py` 当前 `395` 行；共享 route lookup 日志打印器与 import/status/remove 路由的共享前半段 helper 已落地
+  - `app/downloader_route_lookup.py` 当前 `417` 行；共享 route lookup 日志打印器、dispatch 日志打印器与 import/status/remove 路由的共享前半段 helper 已落地
 
 ## User value
 
