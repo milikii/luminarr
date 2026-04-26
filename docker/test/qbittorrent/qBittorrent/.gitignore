@@ -1,6 +1,7 @@
 GeoDB/
 logs/
 rss/
+BT_backup/
 categories.json
 lockfile
 qBittorrent-data.conf
