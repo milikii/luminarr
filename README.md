@@ -15,7 +15,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 2. 当前稳定范围
 
 - 当前首版承诺矩阵：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
-- 当前保守版发布准备与**刮削系统基础收口**都已完成；默认分支继续推进时，先按 `docs/NEXT_STEP.md` 核对当前主线是否已收工，再从 `docs/SCRAPING_SYSTEM_PLAN.md` 的后续 backlog 里选更小闭环
+- 当前保守版发布准备、搜索 helper 收口和 import worth-it 复评估都已完成；默认分支当前回到**质量硬化完成态 / worth-it 冻结**，继续推进前先按 `docs/NEXT_STEP.md` 核对是否真的出现了新的 focused gate、真实失败边界或新主线
 - 当前仓库质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`
 - 已实现但当前不纳入首版发布保证的路径，继续保留在代码和测试里，不因为发布口径收紧而回退
 
@@ -72,7 +72,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```
 
-只有当文档真相、发布矩阵、真实 smoke 或质量入口再次漂移时，才需要回到 `docs/OPERATOR_RUNBOOK.md` 里的“收尾发布准备”模板。
+只有当文档真相、真实 smoke、质量入口再次漂移，或你已经明确要切新的主线时，才需要回到 `docs/OPERATOR_RUNBOOK.md` 重新选模板。
 
 ## 7. 文档入口
 
