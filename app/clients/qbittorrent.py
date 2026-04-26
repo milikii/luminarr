@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import re
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -90,11 +91,12 @@ class QbittorrentClient:
         if not torrent_hash:
             return None
 
-        download_dir = str(torrent.get("save_path", "")).strip()
-        if not download_dir:
-            content_path = str(torrent.get("content_path", "")).strip()
-            if content_path:
-                download_dir = content_path.rsplit("/", 1)[0] if "/" in content_path else content_path
+        resolved_name = str(torrent.get("name", "")).strip() or "(no title)"
+        download_dir = _resolve_import_download_dir(
+            save_path=str(torrent.get("save_path", "")).strip(),
+            content_path=str(torrent.get("content_path", "")).strip(),
+            torrent_name=resolved_name,
+        )
         if not download_dir:
             raise QbittorrentError("missing download directory in qBittorrent response")
 
@@ -102,7 +104,7 @@ class QbittorrentClient:
         return TransmissionImportSource(
             task_id=torrent_hash,
             task_hash=torrent_hash,
-            name=str(torrent.get("name", "")).strip() or "(no title)",
+            name=resolved_name,
             download_dir=download_dir,
             is_finished=_is_finished_state(str(torrent.get("state", "")).strip(), progress=progress),
             percent_done=progress,
@@ -234,6 +236,16 @@ def _parse_info_hash_from_source(source: str) -> str:
             return ""
         return decoded.hex()
     return raw_hash.lower()
+
+
+def _resolve_import_download_dir(*, save_path: str, content_path: str, torrent_name: str) -> str:
+    cleaned_content_path = content_path.strip()
+    if cleaned_content_path:
+        content_candidate = Path(cleaned_content_path)
+        if content_candidate.name == torrent_name.strip():
+            return str(content_candidate.parent)
+        return str(content_candidate)
+    return save_path.strip()
 
 
 def _map_qb_state_to_status_code(state: str) -> int:

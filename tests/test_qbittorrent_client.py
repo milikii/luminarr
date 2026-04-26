@@ -199,6 +199,40 @@ def test_get_torrent_import_source_maps_qb_fields(monkeypatch: pytest.MonkeyPatc
     assert source.percent_done == 1.0
 
 
+def test_get_torrent_import_source_prefers_content_path_parent_when_save_path_drifts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def dispatcher(method: str, url: str, payload: dict[str, object]) -> httpx.Response:
+        if url.endswith("/auth/login"):
+            return _text_response(method, url, "Ok.")
+        if method == "GET" and url.endswith("/torrents/info"):
+            return _json_response(
+                method,
+                url,
+                [
+                    {
+                        "hash": "hash-100",
+                        "name": "SSIS-123-smoke.mp4",
+                        "state": "error",
+                        "progress": 1.0,
+                        "save_path": "/data/downloads/qb/luminarr_adult_archive_smoke",
+                        "content_path": "/data/downloads/incomplete-qb/SSIS-123-smoke.mp4",
+                    }
+                ],
+            )
+        raise AssertionError(f"unexpected request: {method} {url} {payload}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(dispatcher, **kwargs))
+
+    client = QbittorrentClient(base_url="http://qb:8080", username="user", password="pass")
+    source = asyncio.run(client.get_torrent_import_source("hash-100"))
+
+    assert source is not None
+    assert source.download_dir == "/data/downloads/incomplete-qb"
+    assert source.name == "SSIS-123-smoke.mp4"
+    assert source.is_finished is True
+
+
 def test_remove_torrent_calls_delete_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, str, dict[str, object]]] = []
 
