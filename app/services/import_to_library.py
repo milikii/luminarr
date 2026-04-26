@@ -26,8 +26,8 @@ from app.services.import_metadata_title_year import ImportMetadataTitleYearResol
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState
 from app.services.import_raw_bt_guard import ImportRawBtGuard
-from app.services.import_trace_logger import ImportTraceLogger
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
+from app.services.workflow_trace_logger import WorkflowTraceLogger
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 
@@ -97,7 +97,7 @@ class ImportToLibraryService:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = Path(library_target_dir).expanduser()
         self._job_event_repo = job_event_repo
-        self._trace_logger = ImportTraceLogger(trace_log_path)
+        self._trace_logger = WorkflowTraceLogger(WORKFLOW_IMPORT_TO_LIBRARY, trace_log_path)
         self._context_lookup = ImportContextLookup(
             job_repo=job_repo,
             approval_repo=approval_repo,
