@@ -80,10 +80,11 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "Emby / Jellyfin / Plex" in readme_text
     assert "Emby / Jellyfin / Plex" in decisions_text
     assert "保守版减法政策" in slimming_rules_text
-    assert "`CODEX_*_PROMPT.md` 视为工具配置" in slimming_rules_text
+    assert "`CODEX_*_PROMPT.md`、`*_PROMPTS.md` 这类纯工具提示词文件视为工具配置" in slimming_rules_text
     assert "60` 行以下的 support/helper 文件" in slimming_rules_text
     assert not Path("docs/CODEX_3_ROUND_PROMPT.md").exists()
     assert not Path("docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md").exists()
+    assert not Path("docs/RELEASE_PREP_PROMPTS.md").exists()
 
     assert "shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口" in next_step_text
     assert "质量硬化" in status_text
