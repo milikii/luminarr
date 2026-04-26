@@ -133,6 +133,28 @@ def test_order_adult_bt_candidates_prefers_exact_id_match_then_site_priority() -
     assert ordered[1]["title"] == "ABP-123 low seed"
 
 
+def test_order_adult_bt_candidates_applies_source_priority_aliases() -> None:
+    ordered = order_adult_bt_candidates(
+        [
+            {
+                "title": "ABP-123 prowlarr high seed",
+                "adult_content_id": "censored:abp-123",
+                "sourceProvider": "prowlarr",
+                "seeders": 999,
+            },
+            {
+                "title": "ABP-123 offkab lower seed",
+                "adult_content_id": "censored:abp-123",
+                "sourceProvider": "offkab",
+                "seeders": 10,
+            },
+        ],
+        query="ABP-123",
+    )
+
+    assert ordered[0]["title"] == "ABP-123 offkab lower seed"
+
+
 def test_build_adult_history_text_formats_known_states() -> None:
     assert build_adult_history_text(status=ADULT_CONTENT_STATUS_PENDING, archive_path="") == "历史: 该番号已有待确认下载记录。"
     assert build_adult_history_text(status=ADULT_CONTENT_STATUS_DOWNLOADING, archive_path="") == "历史: 该番号已有下载任务在运行。"

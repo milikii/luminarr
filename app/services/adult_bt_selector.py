@@ -11,6 +11,17 @@ _SOURCE_PRIORITY = {
     "javbus": 3.0,
     "prowlarr": 1.0,
 }
+_SOURCE_PRIORITY_ALIASES = {
+    "offkab": "sukebei",
+    "sukebei.nyaa.si": "sukebei",
+    "nyaa.si": "sukebei",
+    "tokyotosho.info": "tokyotosho",
+    "www.tokyotosho.info": "tokyotosho",
+    "javbus.com": "javbus",
+    "www.javbus.com": "javbus",
+    "javlibrary.com": "javlibrary",
+    "www.javlibrary.com": "javlibrary",
+}
 
 
 def order_adult_bt_candidates(
@@ -74,8 +85,8 @@ def _content_id_matches(candidate_match: AdultContentMatch | None, *, query_matc
 
 
 def _resolve_source_priority(item: Mapping[str, Any]) -> float:
-    source_provider = str(item.get("sourceProvider", "")).strip().lower()
-    indexer_name = str(item.get("indexerName", "")).strip().lower()
+    source_provider = _canonicalize_source_name(str(item.get("sourceProvider", "")).strip())
+    indexer_name = _canonicalize_source_name(str(item.get("indexerName", "")).strip())
     if source_provider in _SOURCE_PRIORITY:
         return _SOURCE_PRIORITY[source_provider]
     if indexer_name in _SOURCE_PRIORITY:
@@ -95,3 +106,10 @@ def _safe_int(value: Any) -> int:
     if resolved > 0:
         return resolved
     return 0
+
+
+def _canonicalize_source_name(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return ""
+    return _SOURCE_PRIORITY_ALIASES.get(cleaned, cleaned)
