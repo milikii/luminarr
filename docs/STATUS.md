@@ -1,9 +1,9 @@
-# Current status (v479)
+# Current status (v480)
 
 ## Current mainline
 
 - **质量硬化** 当前保持完成态，不回退。
-- 当前默认分支主线 **BT 只读候选相关性保护** 已收口完成；若继续施工，下一步优先看 **BT 只读 helper 介入时机 / 只读截断策略继续收窄**。direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
+- 当前默认分支主线切到 **验证入口收口 / 操作文档瘦身**；详细蓝图统一看 `docs/VERIFICATION_ENTRYPOINTS_PLAN.md`。
 - 成人 BT 当前新真相已落地：
   - `adult_content_registry` 已记录 `pending / downloading / archived_present / archived_deleted`
   - BT 预览 / 批量预览 / 待确认文本已能提示历史状态
@@ -39,12 +39,10 @@
 
 ## Current health
 
-- 当前这轮变更只触碰 BT 只读 helper 介入时机 guard、generic overlap token 过滤、focused tests 和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
-- 当前成人 BT 主线的两条真实 smoke 继续保持通过态；当前更需要留意的是：
-  - 当前 BT 只读候选相关性保护已经继续收窄：helper 相关性会在 `bt搜` top-N、`bt批量` default/selected selection 和 chat cache 顺序前统一生效；focused tests 已覆盖默认预览、定点预览、单候选无关项、显式无关 selection 和 generic overlap 噪声边界
-  - 如果后续仍出现边界噪声，只能继续收窄 helper 介入时机或只读截断策略；不能把 helper 结果写进审批真相，也不要再把 `search_media.py` 往上堆
-  - `search_media.py` 这一轮已把 BT 只读候选注释 / 历史 / helper 贴标抽到独立 `bt_read_only_display.py`，避免继续往同一个热点文件里加展示分支。
-  - `import_to_library.py` 这一轮已把 confirmed media identity 回查抽到独立 `import_confirmed_media_identity.py`，避免继续把 metadata tmdb_id 解析和 job_event 回查塞回主文件。
+- 当前这轮代码真相已经把 `search_media.py` 和 `import_to_library.py` 再收了一截；下一条风险更集中在：
+  - `Makefile` 的公开验证入口仍然过碎，操作者层很难一眼看出“该跑哪组验证”
+  - `docs/OPERATOR_RUNBOOK.md` 仍有过时主线残留和重复提示，文档入口比当前代码主线更难读
+  - 下一线程若不先收这两个入口，后续继续推进会更依赖人肉判断而不是文档自解释
 
 ## Later candidate line
 
@@ -85,5 +83,5 @@
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 
-保持质量硬化，不新增用户可感知功能。BT 只读候选相关性保护已收口；若继续推进，只沿着“BT 只读 helper 介入时机 / 只读截断策略继续收窄”做更窄的 focused tests / guard，不放宽成自动 dispatch 来源。
+这轮主线只做“验证入口收口 / 操作文档瘦身”：先收 Makefile 的 verify-mainline / cleanup 公开入口，再收 docs/OPERATOR_RUNBOOK.md 和相关入口文档；不改业务协议，不删 approval / lease / version / confirm / recovery 边界。
 ```

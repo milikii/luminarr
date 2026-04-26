@@ -1,4 +1,4 @@
-# docs/DECISIONS.md (v55)
+# docs/DECISIONS.md (v56)
 
 > 目的：只保留“当前仍然有效”的项目决策。
 > 说明：旧的阶段推进记录、历史 next-step 迁移、旧验收备注已清理。
@@ -760,3 +760,15 @@
   - 展示层新增的 poster / cover / detail URL 字段只允许停留在展示模型或只读 helper 字段；不得写入 `candidate_mapping`、approval、`jobs`、lease 或 downloader dispatch 真相，也不得借机放宽 exact-id helper、自动 dispatch、登录态站点、CAPTCHA 或浏览器自动化边界。
 - **原因**：
   当前用户已经明确把“好不好看、有没有海报、是不是像海报卡片而不是系统日志”当作后续价值点；但这类增强只能长在渠道回包层，不能反向污染 shared runtime、审批安全边界和 BT 只读真相收口。
+
+## D-045 验证入口与操作文档可以收口，但不以删副作用安全边界换简洁
+- **状态**：已决定
+- **日期**：2026-04-26
+- **结论**：
+  - 下一条文档/入口主线允许优先收：
+    - `Makefile` 的公开验证 target
+    - `docs/OPERATOR_RUNBOOK.md` 等操作者入口文档
+  - 这类收口的目标是减少碎片命令、过时引用和重复提示，不是把全部验证合并成一条 full pytest，更不是顺手删掉 approval / lease / version / confirm / recovery 这类副作用安全真相。
+  - 当前仓库若要继续“回归简洁”，优先应该收公开入口数量、职责边界和热点文件胶水，而不是先拿安全协议开刀。
+- **原因**：
+  当前真正过重的是入口碎片和文档噪声；而 approval / lease / confirm 这些边界虽然保守，但仍在服务下载、导入、恢复和过期拒绝的真实风险。把两者混成一件事，只会把“减噪”做成“减安全”。
