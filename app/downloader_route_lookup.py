@@ -277,10 +277,12 @@ def _resolve_downloader_client_for_lookup(
     if instance is None:
         _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
         return None
-    if instance.downloader_type == "qbittorrent":
-        client = qbittorrent_clients_by_name.get(cleaned_name)
-    else:
-        client = transmission_clients_by_name.get(cleaned_name)
+    client = _lookup_client_for_instance(
+        downloader_name=cleaned_name,
+        downloader_type=instance.downloader_type,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
     if client is None:
         _log_downloader_client_not_configured(
             downloader_name=cleaned_name or "-",
@@ -309,10 +311,12 @@ def _resolve_downloader_client_for_dispatch(
             reason="instance missing",
         )
         raise ValueError(f"unknown downloader instance: {cleaned_name}")
-    if instance.downloader_type == "qbittorrent":
-        client = qbittorrent_clients_by_name.get(cleaned_name)
-    else:
-        client = transmission_clients_by_name.get(cleaned_name)
+    client = _lookup_client_for_instance(
+        downloader_name=cleaned_name,
+        downloader_type=instance.downloader_type,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
     if client is None:
         _log_downloader_dispatch_resolution_failed(
             downloader_name=cleaned_name,
@@ -321,6 +325,18 @@ def _resolve_downloader_client_for_dispatch(
         )
         raise ValueError(f"downloader client not configured: {cleaned_name}")
     return client
+
+
+def _lookup_client_for_instance(
+    *,
+    downloader_name: str,
+    downloader_type: str,
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> TransmissionClient | QbittorrentClient | None:
+    if downloader_type == "qbittorrent":
+        return qbittorrent_clients_by_name.get(downloader_name)
+    return transmission_clients_by_name.get(downloader_name)
 
 
 def resolve_downloader_dispatch_download_dir(

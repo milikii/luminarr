@@ -13,7 +13,7 @@
 - `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件。
 - `app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 已删除；功能测试继续通过，确认这些 tuple 只是未被消费的死代码，不影响现有模块级导出形状。
 - `app/config.py` 当前 `454` 行；`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，当前不再继续在这条边界上做重复壳。
-- `app/downloader_route_lookup.py` 当前 `417` 行；重复的 route lookup 日志与 dispatch 日志已开始收成共享打印器，import/status/remove 三条路由的“先拿 route 再拿 client”前半段已抽到共享 helper，不改错误文本或路由语义。
+- `app/downloader_route_lookup.py` 当前 `433` 行；重复的 route lookup 日志与 dispatch 日志已开始收成共享打印器，import/status/remove 三条路由的“先拿 route 再拿 client”前半段已抽到共享 helper，client 选择也已改成共享壳，不改错误文本或路由语义。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
