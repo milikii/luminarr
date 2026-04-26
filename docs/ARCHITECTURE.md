@@ -1,4 +1,4 @@
-# docs/ARCHITECTURE.md (v1)
+# docs/ARCHITECTURE.md (v2)
 
 > 目的：用最直白的方式解释“谁收消息、谁做判断、谁调外部系统、谁写数据库”。
 
@@ -79,6 +79,10 @@ SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
 ### watchlist / btsub
 
 `用户文本 -> runtime -> manage_watchlist / manage_bt_subscription -> SQLite 持久化 -> 后台 tick 或手动命令再进入既有 downloader approval 边界`
+
+### BT 只读探索
+
+`用户文本(bt搜 / bt批量) -> search_media(raw BT sources) -> javlibrary exact-id read-only helper(只补展示字段与历史提示，不写 candidate_mapping / approval / jobs 真相) -> 文本回复`
 
 ### direct magnet
 

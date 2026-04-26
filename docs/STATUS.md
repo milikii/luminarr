@@ -1,12 +1,14 @@
-# Current status (v471)
+# Current status (v472)
 
 ## Current mainline
 
 - **质量硬化** 当前保持完成态，不回退。
-- 当前默认分支主线已从 **成人 BT 专线第二条真实 smoke 收口** 切到 **`javlibrary` helper 只读识别补全**；direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
+- 当前默认分支主线已从 **`javlibrary` helper 只读识别补全** 切到 **成人标题归一化回归保护**；direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
 - 成人 BT 当前新真相已落地：
   - `adult_content_registry` 已记录 `pending / downloading / archived_present / archived_deleted`
   - BT 预览 / 批量预览 / 待确认文本已能提示历史状态
+  - `bt搜` / `bt批量` 当前已接入 `javlibrary` exact-id only 只读补全，可显示 `display_id / category / title`，并复用历史状态查询
+  - `bt批量` 候选缓存当前只保留原始候选；`javlibrary` helper-only 字段不会进入 `candidate_mapping`、待确认下载或 downloader dispatch 真相
   - 成人 BT 下载完成后可进入归档，统一保留窗口到期后可清理下载器任务与源资源
   - direct magnet 运行时选择 `BT 成人链` 时，已能直接创建成人磁力下载待确认并尽量识别番号 / 分类
   - qB 导入源解析已改成优先使用真实 `content_path`，不再盲信漂移的 `save_path`
@@ -18,27 +20,24 @@
 - BT 来源适配当前保持：
   - 成人站点优先：`tokyotosho` / `sukebei(offkab)` / `javbus`
   - `Prowlarr` 成人 PT 作为补充来源
-  - `javlibrary` helper 仍待补成只读识别补全
+  - `javlibrary` 当前定位已经收口为 **BT-only read-only exact-id helper**，不放宽成自动 dispatch 来源
 
 ## Current health
 
-- 当前这轮变更只触碰 downloader 路由、BT Transmission 真实 smoke 和文档真相，没有改 movie-first PT / import / metadata 主链协议。
-- 当前成人 BT 主线的两条真实 smoke 都已有通过态证据；当前更需要留意的是：
-  - 本地容器化 Transmission 若仍只配置 host `download_dir`、未补 `dispatch_download_dir`，就可能继续把宿主机路径直接发给下载器 API
-  - `javlibrary` helper 仍缺只读识别补全，成人标题识别目前还不能把该来源当成稳定只读补充
+- 当前这轮变更只触碰 `javlibrary` helper、BT 只读展示/缓存边界和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
+- 当前成人 BT 主线的两条真实 smoke 继续保持通过态；当前更需要留意的是：
+  - `javlibrary` 当前只补 exact-id only 只读场景；非 exact-id 的噪声标题仍主要依赖站点标题和既有规则
+  - 后续如果继续补成人标题归一化，只能做更窄的 focused tests / normalization guard，不能反向把 helper 结果写进审批真相
 
 ## Latest verification
 
 - `make quality`：当前轮已通过
-- `make verify-mainline`：上一轮已通过；本轮未改 shared runtime 主链协议
-- `.venv/bin/python -m pyflakes`：
-  - `tmp_tests/verify_adult_archive_bt_real_smoke.py` 通过
+- `make verify-mainline`：当前轮已通过
 - focused pytest：
-  - `tests/test_config.py tests/test_downloader_route_lookup.py`：`36 passed, 0 skipped`
-- 运行时 focused：
-  - `.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py`：当前通过，证据文件 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`
-  - `bash -lc 'timeout 5 curl -si http://127.0.0.1:19092/transmission/rpc'`：当前返回 `409 + X-Transmission-Session-Id`
-  - `bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'`：当前通过，证据文件 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`
+  - `tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_javlibrary_helper.py tests/test_adult_content.py`：当前通过
+- 真实 smoke 保持通过态，本轮未改下载器 / 归档协议：
+  - `.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`
+  - `bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`
   - qB 当前通过态证据包含：
     - `adult_archive.succeeded`
     - `adult_archive.retention_cleanup_succeeded`
@@ -53,7 +52,7 @@
 
 ## Current biggest risk
 
-- 当前最大不确定性已经从“BT Transmission 第二条真实 smoke 能不能收口”转成“后续成人 ID 补全是否要继续把 `javlibrary` 限定在 BT-only read-only helper 边界内，而不反向污染 dispatch 主链”。
+- 当前最大不确定性已经从“`javlibrary` helper 能不能收口”转成“后续成人标题归一化如果继续推进，如何继续把它限定在更窄的 read-only / focused-regression 边界内，而不反向污染 dispatch 主链”。
 
 ## Recommended Next Operator Command
 
@@ -62,5 +61,5 @@
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 
-保持质量硬化，不新增用户可感知功能。沿着 `javlibrary` helper 只读识别补全这条新主线推进，只做 BT-only read-only 识别补充，不放宽成自动 dispatch 来源。
+保持质量硬化，不新增用户可感知功能。`javlibrary` helper 已收口为 BT-only read-only exact-id helper；下一步沿着“成人标题归一化回归保护”推进，只补更窄的 focused tests / normalization guard，不放宽成自动 dispatch 来源。
 ```
