@@ -414,6 +414,42 @@ def test_search_bt_read_only_and_format_only_applies_helper_to_related_candidate
     assert "只读补全:" not in second_candidate_text
 
 
+def test_search_bt_read_only_and_format_suppresses_duplicate_helper_title_variants() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "Secret-Mission Nurse",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="Secret Mission Nurse",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+    assert "只读标题:" not in text
+
+
 def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "dune bt"

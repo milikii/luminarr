@@ -7,7 +7,7 @@ from typing import Any
 
 from app.clients.tmdb import TmdbMovie
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
-from app.search_title_normalization import normalize_spaces
+from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
 from app.services.search_query_parser import ParsedMovieQuery
 
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
@@ -179,7 +179,13 @@ def format_read_only_adult_helper_title(item: Mapping[str, Any]) -> str:
         return ""
     helper_title = safe_text(item.get("read_only_adult_title"), default="")
     candidate_title = safe_text(item.get("title"), default="")
-    if not helper_title or helper_title == candidate_title:
+    if not helper_title:
+        return ""
+    if helper_title == candidate_title:
+        return ""
+    helper_title_key = compact_match_key(normalize_match_key(helper_title))
+    candidate_title_key = compact_match_key(normalize_match_key(candidate_title))
+    if helper_title_key and helper_title_key == candidate_title_key:
         return ""
     return f"只读标题: {helper_title}"
 
