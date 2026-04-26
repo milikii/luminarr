@@ -161,6 +161,14 @@ def _normalize_http_path(raw_value: str, *, default: str) -> str:
     return cleaned_value
 
 
+def _iter_semicolon_entries(raw_value: str) -> tuple[str, ...]:
+    return tuple(cleaned_item for raw_item in raw_value.split(";") if (cleaned_item := raw_item.strip()))
+
+
+def _split_pipe_fields(cleaned_item: str) -> list[str]:
+    return [part.strip() for part in cleaned_item.split("|")]
+
+
 def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDestinationOption, ...]:
     raw_value = _read_optional(env, "RAW_BT_DESTINATIONS")
     if not raw_value:
@@ -168,12 +176,8 @@ def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDesti
 
     options: list[RawBtDestinationOption] = []
     seen_keys: set[str] = set()
-    for raw_item in raw_value.split(";"):
-        cleaned_item = raw_item.strip()
-        if not cleaned_item:
-            continue
-
-        parts = [part.strip() for part in cleaned_item.split("|")]
+    for cleaned_item in _iter_semicolon_entries(raw_value):
+        parts = _split_pipe_fields(cleaned_item)
         if len(parts) == 2:
             key, target_dir = parts
             label = key
@@ -213,12 +217,8 @@ def _read_adult_archive_destinations(env: Mapping[str, str]) -> tuple[AdultArchi
 
     destinations: list[AdultArchiveDestination] = []
     seen_categories: set[str] = set()
-    for raw_item in raw_value.split(";"):
-        cleaned_item = raw_item.strip()
-        if not cleaned_item:
-            continue
-
-        parts = [part.strip() for part in cleaned_item.split("|")]
+    for cleaned_item in _iter_semicolon_entries(raw_value):
+        parts = _split_pipe_fields(cleaned_item)
         if len(parts) == 2:
             category, target_dir = parts
             label = category
@@ -290,12 +290,8 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
 
     instances: list[DownloaderInstanceConfig] = []
     seen_names: set[str] = set()
-    for raw_item in raw_value.split(";"):
-        cleaned_item = raw_item.strip()
-        if not cleaned_item:
-            continue
-
-        parts = [part.strip() for part in cleaned_item.split("|")]
+    for cleaned_item in _iter_semicolon_entries(raw_value):
+        parts = _split_pipe_fields(cleaned_item)
         if len(parts) not in {4, 5, 6, 7}:
             raise ConfigError(
                 "DOWNLOADER_INSTANCES format must be `name|type|base_url|download_dir`, "
