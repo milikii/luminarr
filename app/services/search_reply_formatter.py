@@ -88,6 +88,12 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         adult_summary = format_adult_candidate_summary(item)
         if adult_summary:
             lines.append(f"   {adult_summary}")
+        helper_summary = format_read_only_adult_helper_summary(item)
+        if helper_summary:
+            lines.append(f"   {helper_summary}")
+        helper_title = format_read_only_adult_helper_title(item)
+        if helper_title:
+            lines.append(f"   {helper_title}")
         history_text = safe_text(item.get("adult_history_text"), default="")
         if history_text:
             lines.append(f"   {history_text}")
@@ -117,6 +123,12 @@ def format_bt_batch_preview_reply(
         adult_summary = format_adult_candidate_summary(item)
         if adult_summary:
             lines.append(f"   {adult_summary}")
+        helper_summary = format_read_only_adult_helper_summary(item)
+        if helper_summary:
+            lines.append(f"   {helper_summary}")
+        helper_title = format_read_only_adult_helper_title(item)
+        if helper_title:
+            lines.append(f"   {helper_title}")
         history_text = safe_text(item.get("adult_history_text"), default="")
         if history_text:
             lines.append(f"   {history_text}")
@@ -141,6 +153,35 @@ def format_adult_candidate_summary(item: Mapping[str, Any]) -> str:
     if content_id:
         return f"番号: {content_id}"
     return f"分类: {category}"
+
+
+def format_read_only_adult_helper_summary(item: Mapping[str, Any]) -> str:
+    if safe_text(item.get("adult_display_id"), default=""):
+        return ""
+    provider = safe_text(item.get("read_only_adult_source_site"), default="")
+    content_id = safe_text(item.get("read_only_adult_display_id"), default="")
+    category = safe_text(item.get("read_only_adult_archive_category"), default="")
+    if not provider and not content_id and not category:
+        return ""
+
+    provider_label = provider or "helper"
+    if content_id and category:
+        return f"只读补全: {provider_label} | 番号: {content_id} | 分类: {category}"
+    if content_id:
+        return f"只读补全: {provider_label} | 番号: {content_id}"
+    if category:
+        return f"只读补全: {provider_label} | 分类: {category}"
+    return f"只读补全: {provider_label}"
+
+
+def format_read_only_adult_helper_title(item: Mapping[str, Any]) -> str:
+    if safe_text(item.get("adult_display_id"), default=""):
+        return ""
+    helper_title = safe_text(item.get("read_only_adult_title"), default="")
+    candidate_title = safe_text(item.get("title"), default="")
+    if not helper_title or helper_title == candidate_title:
+        return ""
+    return f"只读标题: {helper_title}"
 
 
 def safe_text(value: Any, default: str) -> str:

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
@@ -214,6 +215,42 @@ def test_search_bt_read_only_and_format_includes_adult_history_hint(tmp_path: Pa
 
     assert "番号: SSIS-123 | 分类: censored" in text
     assert "历史: 该番号已有待确认下载记录。" in text
+
+
+def test_search_bt_read_only_and_format_includes_javlibrary_helper_summary() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "sample release without explicit id",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Sample Title",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+    assert "只读标题: SSIS-123 Sample Title" in text
 
 
 def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:

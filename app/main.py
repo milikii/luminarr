@@ -24,6 +24,7 @@ from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
 from app.clients.jellyfin import JellyfinClient
+from app.clients.javlibrary_helper import JavLibraryReadOnlyHelperClient
 from app.clients.plex import PlexClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
@@ -271,6 +272,9 @@ def main() -> None:
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
         adult_content_registry_repo=adult_content_registry_repo,
+        adult_read_only_lookup_func=JavLibraryReadOnlyHelperClient(
+            proxy_url=settings.outbound_proxy_url,
+        ).lookup,
     )
     transmission_client = TransmissionClient(
         base_url=settings.transmission_base_url,
