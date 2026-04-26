@@ -85,15 +85,17 @@ def _candidate_sort_key(
     *,
     query_match: AdultContentMatch | None,
     query: str,
-) -> tuple[float, float, float, float, float, str]:
+) -> tuple[float, float, float, float, float, float, str]:
     candidate_match = _resolve_candidate_match(item)
     exact_id_score = 1.0 if _content_id_matches(candidate_match, query_match=query_match) else 0.0
+    explicit_id_title_score = _resolve_explicit_id_title_score(item, query_match=query_match)
     title_relevance_score = _resolve_title_relevance_score(item, query=query)
     source_priority = _resolve_source_priority(item)
     seeders = float(_safe_int(item.get("seeders")))
     size_bytes = float(_safe_int(item.get("size")))
     return (
         exact_id_score,
+        explicit_id_title_score,
         title_relevance_score,
         source_priority,
         seeders,
@@ -147,6 +149,19 @@ def _canonicalize_source_name(value: str) -> str:
     if not cleaned:
         return ""
     return _SOURCE_PRIORITY_ALIASES.get(cleaned, cleaned)
+
+
+def _resolve_explicit_id_title_score(item: Mapping[str, Any], *, query_match: AdultContentMatch | None) -> float:
+    if query_match is None:
+        return 0.0
+    title = str(item.get("title", "")).strip()
+    if not title:
+        return 0.0
+    query_display_id = compact_match_key(normalize_match_key(query_match.display_id))
+    title_compact = compact_match_key(normalize_match_key(title))
+    if not query_display_id or not title_compact:
+        return 0.0
+    return 1.0 if query_display_id in title_compact else 0.0
 
 
 def _resolve_title_relevance_score(item: Mapping[str, Any], *, query: str) -> float:

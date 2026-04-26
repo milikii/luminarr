@@ -175,6 +175,28 @@ def test_order_adult_bt_candidates_prefers_title_relevance_for_non_exact_query()
     assert ordered[0]["title"] == "Secret Mission Nurse leaked cut"
 
 
+def test_order_adult_bt_candidates_prefers_surface_exact_id_over_generic_same_id_title() -> None:
+    ordered = order_adult_bt_candidates(
+        [
+            {
+                "title": "Secret Mission Nurse complete edition",
+                "adult_content_id": "censored:ssis-123",
+                "sourceProvider": "tokyotosho",
+                "seeders": 999,
+            },
+            {
+                "title": "SSIS-123 Secret Mission Nurse",
+                "adult_content_id": "censored:ssis-123",
+                "sourceProvider": "javbus",
+                "seeders": 1,
+            },
+        ],
+        query="SSIS-123",
+    )
+
+    assert ordered[0]["title"] == "SSIS-123 Secret Mission Nurse"
+
+
 def test_build_adult_history_text_formats_known_states() -> None:
     assert build_adult_history_text(status=ADULT_CONTENT_STATUS_PENDING, archive_path="") == "历史: 该番号已有待确认下载记录。"
     assert build_adult_history_text(status=ADULT_CONTENT_STATUS_DOWNLOADING, archive_path="") == "历史: 该番号已有下载任务在运行。"
