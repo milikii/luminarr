@@ -1,10 +1,10 @@
-# Next step (v372)
+# Next step (v373)
 
 ## Current goal
 
 - 当前默认分支回到 **质量硬化完成态 / 新结构债复评估**。
 - 当前这一轮只服务两件事：
-  - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
+  - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
   - 只在出现新的 worth-it 结构债时，再进入下一个最小闭环
 - 已完成态保持，不回退：
   - `Makefile` 公开验证入口已收口：`verify-mainline` 当前改成 4 个分组 target 汇总入口，cleanup 公开入口收敛到 `test-cleanup-smoke` / `test-cleanup` / `test-cleanup-docs-gate` / `test-cleanup-window`
@@ -21,7 +21,7 @@
 
 ## User value
 
-- 当前默认分支已经把 docs 主目录历史施工文档归档完成，也把 cleanup 链支持文件和重复 trace logger 收口完成；接下来最有价值的是重新挑一条新的、真正 worth-it 的结构债，而不是继续围着已完成主线打转。
+- 当前默认分支已经把 docs 主目录历史施工文档归档完成，也把 cleanup 链支持文件、重复 trace logger 和 `_COMPAT_REEXPORTS` 清理完成；接下来最有价值的是重新挑一条新的、真正 worth-it 的结构债，而不是继续围着已完成主线打转。
 - 这一步只允许对“新的结构债”做最小闭环，不碰搜索真相、下载确认协议、shared runtime 或新的展示层扩展。
 - 先把“trace logger 已完成，不回头重建”固化下来，后续不会再被旧主线吸回去。
 
@@ -35,7 +35,7 @@
 
 ## Do not do
 
-- 不回头重建任何 `cleanup_*_support.py` 或 workflow trace 壳。
+- 不回头重建任何 `cleanup_*_support.py`、workflow trace 壳或 `_COMPAT_REEXPORTS` 兼容 tuple。
 - 不在没有新证据的情况下又绕回 `search_media.py` / `import_to_library.py` / `add_to_downloader.py`。
 - 不把“完成态冻结”误改成新的大扫除；没有显式主线时，不顺手扩到 shared runtime、消息展示层、`.env.example`、`AGENTS.md` 或新的 operator prompt 设计。
 
@@ -43,11 +43,11 @@
 
 当前这条 **质量硬化完成态 / 新结构债复评估** 主线满足：
 
-1. 已明确确认 cleanup 支持文件收口和重复 trace logger 收口都已完成。
-2. `tests/test_cleanup_downloaded_source.py`、`tests/test_cleanup_docs_consistency.py`、`tests/test_adult_archive_service.py` 与 trace focused gate 仍通过。
+1. 已明确确认 cleanup 支持文件收口、重复 trace logger 收口和 `_COMPAT_REEXPORTS` 清理都已完成。
+2. `tests/test_cleanup_downloaded_source.py`、`tests/test_cleanup_docs_consistency.py`、`tests/test_adult_archive_service.py`、trace focused gate 与 `tests/test_main.py tests/test_telegram_bot.py` 仍通过。
 3. `docs/STATUS.md`、`docs/NEXT_STEP.md` 对当前风险、完成态边界和下一候选结构债表述一致。
 
 ## After this step
 
-1. 如果后续还要继续减法，优先评估新的重复代码或结构债，例如 `_COMPAT_REEXPORTS` 或 `config.py` 重复解析逻辑。
+1. 如果后续还要继续减法，优先评估新的重复代码或结构债，例如 `config.py` 重复解析逻辑。
 2. 如果后续想切去用户可感知改进，再看 `docs/SEARCH_REPLY_PRESENTATION_PLAN.md`。

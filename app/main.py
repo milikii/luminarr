@@ -69,12 +69,6 @@ from app.services.search_media import SearchMediaService
 from app.services.subtitle_translator import SubtitleTranslatorService
 from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, configure_trace_log_file
 
-_COMPAT_REEXPORTS = (
-    DownloaderRouteLookupError,
-    _resolve_downloader_client_for_lookup,
-    _resolve_downloader_name_for_task,
-)
-
 
 async def _skip_fanart_images(_: str):
     return None
