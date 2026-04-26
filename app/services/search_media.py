@@ -1,27 +1,21 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
-from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.clients.web_source import (
     looks_like_http_url,
     looks_like_web_source_page_request,
     resolve_supported_web_source_page_request,
 )
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key, normalize_spaces
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
-from app.services.adult_bt_selector import build_adult_history_text, order_adult_bt_candidates
-from app.services.adult_content import extract_exact_adult_content_match
-from app.services.bt_read_only_helper_selection import (
-    prepare_bt_read_only_selection_candidates,
-    should_apply_bt_read_only_helper,
-)
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
+from app.services.bt_read_only_display import AdultReadOnlyLookupFunc, BtReadOnlyDisplayService
 from app.services.search_candidate_state import CandidateLoadResult, CandidateStateStore
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services.bt_sources import resolve_bt_source
@@ -81,7 +75,6 @@ CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失�
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
-AdultReadOnlyLookupFunc = Callable[[str], Awaitable[JavLibraryReadOnlyMatch | None]]
 
 
 class UnsupportedBatchPreviewPageUrl(ValueError):
@@ -114,8 +107,10 @@ class SearchMediaService:
         self._candidate_state = CandidateStateStore(repo=candidate_repo)
         self._clarification_state = ClarificationStateStore(repo=clarification_repo)
         self._lookup_movie_func = lookup_movie_func
-        self._adult_content_registry_repo = adult_content_registry_repo
-        self._adult_read_only_lookup_func = adult_read_only_lookup_func
+        self._bt_read_only_display = BtReadOnlyDisplayService(
+            adult_content_registry_repo=adult_content_registry_repo,
+            adult_read_only_lookup_func=adult_read_only_lookup_func,
+        )
         self._recent_candidates_by_chat = self._candidate_state.recent_by_chat
         self._clarification_pending_by_chat = self._clarification_state.pending_by_chat
 
@@ -131,7 +126,7 @@ class SearchMediaService:
                 flush=True,
             )
             raise
-        return tuple(self._prepare_adult_bt_candidates(raw_results, query=cleaned_query))
+        return tuple(self._bt_read_only_display.prepare_raw_candidates(raw_results, query=cleaned_query))
 
     async def search_bt_read_only_and_format(self, query: str) -> str:
         cleaned_query = normalize_spaces(query)
@@ -139,7 +134,7 @@ class SearchMediaService:
             return BT_READ_ONLY_EMPTY_QUERY_TEXT
 
         raw_results = await self.search_raw_candidates(cleaned_query)
-        display_results = await self._build_bt_read_only_display_candidates(
+        display_results = await self._bt_read_only_display.build_display_candidates(
             raw_results,
             lookup_query=cleaned_query,
             limit=self._limit,
@@ -164,8 +159,8 @@ class SearchMediaService:
             raw_results = await self._search_bt_batch_preview_candidates(cleaned_query)
         except UnsupportedBatchPreviewPageUrl:
             return BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE.format(query=cleaned_query)
-        helper_match = await self._lookup_bt_read_only_helper_match(cleaned_query)
-        selection_source_results = prepare_bt_read_only_selection_candidates(
+        helper_match = await self._bt_read_only_display.lookup_helper_match(cleaned_query)
+        selection_source_results = self._bt_read_only_display.prepare_selection_candidates(
             raw_results,
             helper_match=helper_match,
         )
@@ -176,7 +171,7 @@ class SearchMediaService:
                 available_count=selection.available_count,
             )
         selected_raw_results = [_to_candidate_dict(item) for item in selection.candidates]
-        display_results = await self._decorate_bt_read_only_display_candidates(
+        display_results = await self._bt_read_only_display.decorate_display_candidates(
             selected_raw_results,
             lookup_query=cleaned_query,
             helper_match=helper_match,
@@ -215,7 +210,7 @@ class SearchMediaService:
                 flush=True,
             )
             raise
-        return tuple(self._prepare_adult_bt_candidates(raw_results, query=cleaned_page_url))
+        return tuple(self._bt_read_only_display.prepare_raw_candidates(raw_results, query=cleaned_page_url))
 
     async def search_and_format(
         self,
@@ -292,148 +287,6 @@ class SearchMediaService:
         if self._candidate_state.persist_bt_batch_preview_candidates(chat_id=chat_id, candidates=candidates):
             return ""
         return CANDIDATE_STATE_UNAVAILABLE_TEXT
-
-    def _prepare_adult_bt_candidates(
-        self,
-        raw_results: Sequence[Mapping[str, Any]],
-        *,
-        query: str,
-    ) -> list[dict[str, Any]]:
-        prepared_results = [self._annotate_adult_candidate(item) for item in raw_results]
-        ordered_results = order_adult_bt_candidates(prepared_results, query=query)
-        return [self._annotate_adult_history(item) for item in ordered_results]
-
-    def _annotate_adult_candidate(self, item: Mapping[str, Any]) -> dict[str, Any]:
-        candidate = _to_candidate_dict(item)
-        if candidate.get("adult_content_id"):
-            if not candidate.get("adult_display_id"):
-                candidate["adult_display_id"] = candidate.get("adult_content_id", "")
-            return candidate
-        content_match = extract_exact_adult_content_match(
-            str(candidate.get("title", "")).strip(),
-            source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
-        )
-        if content_match is None:
-            return candidate
-        candidate["adult_content_id"] = content_match.normalized_content_id
-        candidate["adult_archive_category"] = content_match.archive_category
-        candidate["adult_content_kind"] = content_match.source_kind
-        candidate["adult_display_id"] = content_match.display_id
-        return candidate
-
-    def _annotate_adult_history(self, item: Mapping[str, Any]) -> dict[str, Any]:
-        candidate = _to_candidate_dict(item)
-        if self._adult_content_registry_repo is None:
-            return candidate
-        content_id = str(candidate.get("adult_content_id", "")).strip().lower() or str(
-            candidate.get("read_only_adult_content_id", "")
-        ).strip().lower()
-        if not content_id:
-            return candidate
-        try:
-            record = self._adult_content_registry_repo.get_by_content_id(normalized_content_id=content_id)
-        except Exception as error:
-            print(
-                f"\033[31m[成人资源历史查询失败]\033[0m content_id={content_id} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表读取是否正常；当前只跳过历史提示，不影响候选展示。",
-                flush=True,
-            )
-            return candidate
-        if record is None:
-            return candidate
-        history_text = build_adult_history_text(
-            status=record.current_status,
-            archive_path=record.archive_path,
-        )
-        if history_text:
-            candidate["adult_history_text"] = history_text
-            candidate["adult_history_status"] = record.current_status
-        return candidate
-
-    async def _build_bt_read_only_display_candidates(
-        self,
-        candidates: Sequence[Mapping[str, Any]],
-        *,
-        lookup_query: str,
-        limit: int,
-    ) -> list[dict[str, Any]]:
-        selected_limit = max(1, limit)
-        display_candidates = [_to_candidate_dict(item) for item in candidates]
-        if not display_candidates:
-            return []
-        helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
-        display_candidates = prepare_bt_read_only_selection_candidates(
-            display_candidates,
-            helper_match=helper_match,
-        )
-        limited_candidates = display_candidates[:selected_limit]
-        return await self._decorate_bt_read_only_display_candidates(
-            limited_candidates,
-            lookup_query=lookup_query,
-            helper_match=helper_match,
-        )
-
-    async def _decorate_bt_read_only_display_candidates(
-        self,
-        candidates: Sequence[Mapping[str, Any]],
-        *,
-        lookup_query: str,
-        helper_match: JavLibraryReadOnlyMatch | None = None,
-    ) -> list[dict[str, Any]]:
-        display_candidates = [_to_candidate_dict(item) for item in candidates]
-        if not display_candidates or not any(not str(item.get("adult_content_id", "")).strip() for item in display_candidates):
-            return [self._annotate_adult_history(item) for item in display_candidates]
-        if helper_match is None:
-            helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
-        if helper_match is None:
-            return [self._annotate_adult_history(item) for item in display_candidates]
-
-        annotated_candidates = [
-            self._apply_bt_read_only_helper_fields(
-                item,
-                helper_match=helper_match,
-            )
-            for item in display_candidates
-        ]
-        return [self._annotate_adult_history(item) for item in annotated_candidates]
-
-    async def _lookup_bt_read_only_helper_match(self, lookup_query: str) -> JavLibraryReadOnlyMatch | None:
-        if self._adult_read_only_lookup_func is None:
-            return None
-        content_match = extract_exact_adult_content_match(lookup_query, source_site="javlibrary")
-        if content_match is None or content_match.archive_category != "censored":
-            return None
-        try:
-            return await self._adult_read_only_lookup_func(content_match.display_id)
-        except Exception as error:
-            print(
-                f"\033[31m[JavLibrary 只读补全失败]\033[0m query={lookup_query} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 JavLibrary 可达性、代理和 HTML 结构；当前只跳过只读补全，不影响 BT 候选展示。",
-                flush=True,
-            )
-            return None
-
-    def _apply_bt_read_only_helper_fields(
-        self,
-        item: Mapping[str, Any],
-        *,
-        helper_match: JavLibraryReadOnlyMatch,
-    ) -> dict[str, Any]:
-        candidate = _to_candidate_dict(item)
-        if candidate.get("adult_content_id"):
-            return candidate
-        if not should_apply_bt_read_only_helper(
-            candidate,
-            helper_match=helper_match,
-        ):
-            return candidate
-        candidate["read_only_adult_content_id"] = helper_match.normalized_content_id
-        candidate["read_only_adult_display_id"] = helper_match.display_id
-        candidate["read_only_adult_archive_category"] = helper_match.archive_category
-        candidate["read_only_adult_title"] = helper_match.title
-        candidate["read_only_adult_source_site"] = helper_match.source_site
-        candidate["read_only_adult_detail_url"] = helper_match.detail_url
-        return candidate
 
     def get_cached_candidate_load_result(self, chat_id: int, index: int) -> CandidateLoadResult:
         return self._candidate_state.get_cached_candidate_load_result(chat_id, index)

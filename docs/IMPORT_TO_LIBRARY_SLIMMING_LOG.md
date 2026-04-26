@@ -1,4 +1,4 @@
-# Import to library slimming log (v15)
+# Import to library slimming log (v16)
 
 > 目的：承接当前“`import_to_library.py` 导入编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -26,6 +26,7 @@
 - `app/services/import_pending_write_through_state.py` 已承接 `import_by_task_ref()` 里的 `approval_pending -> pending job -> job_event -> trace -> reply` 顺序控制；`import_to_library.py` 不再直接持有这段待确认写入编排，不回退审批、jobs、`job_event` 或中文日志协议。
 - `app/services/import_trace_logger.py` 已承接导入链 pure trace wrapper；`import_to_library.py` 不再直接拼 trace 落盘字段，只保留 helper 调度，不回退 trace 协议。
 - `app/services/import_approval_state.py` 已承接 approval pending/approve/restore/executed、stale-check、pending-expired 和导入目标路径回查；`import_to_library.py` 只保留 wrapper 和 confirm 编排，不回退审批协议或 fail-closed 中文日志。
+- `app/services/import_confirmed_media_identity.py` 已承接 confirmed media identity 回查和 tmdb_id 提取；`import_to_library.py` 现在不再直接查 `job_event` 里的媒体身份事件，只保留 resolver 注入和调用点。
 - 这一组收口只动导入前真相重建边界；confirm 协议、pending / expired / stale 边界和现有中文日志保持不变。
 - 这一步把 `import_to_library.py` 从 `2094` 行降到 `1827` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 为 `142 passed`，全量 `.venv/bin/python -m pytest -q` 继续 `1714 passed, 2 skipped`。
 - raw_bt guard 这一步把 `import_to_library.py` 从 `729` 行降到 `684` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "raw_bt or context_lookup or payload_corrupted or query_failed"` 为 `10 passed, 132 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 为 `1718 passed, 4 warnings`。
@@ -57,6 +58,7 @@ focused tests 入口：
 - `app/services/import_confirm_expiry_state.py` 已承接 `_handle_expired_pending_confirm()` 里的 approval cancel、pending job cancel、copy-fallback cleanup 和 `import.approval_expired` 事件；`import_to_library.py` 现在只保留 expiry helper 调用，不回退 approval / jobs 超时真相、cleanup 或 expired 文本边界。
 - 这一步把 `import_to_library.py` 从 `800` 行降到 `742` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "expired_pending_confirm or expiry_lookup or cancel_pending_import or confirm_import_by_task_ref_rejects_expired_pending"` 为 `17 passed, 125 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 为 `1718 passed, 4 warnings`，真实 `/data/downloads/tr` confirm expiry smoke 继续通过。
 - `app/services/import_event_recorder.py` 已承接导入链 `job_event` append、回读异常和中文失败日志；`import_to_library.py` 现在只保留 `_record_event()` wrapper，不回退 `job_event` 真相、事件类型或失败日志边界。
+- `app/services/import_confirmed_media_identity.py` 现在承接 confirmed media identity 回查和 `tmdb_id` 提取；`import_to_library.py` 已从 `590` 行继续保持在当前收口态，不再直接查 `job_event` 里的媒体身份事件。
 - 这一步把 `import_to_library.py` 从 `742` 行降到 `729` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "record_event or confirm_import_by_task_ref or approval_expired or raw_bt"` 为 `45 passed, 97 deselected`，`.venv/bin/python -m pytest -q tests/test_import_to_library.py` 继续 `142 passed`，`make quality` 继续 `24 passed`，全量 `.venv/bin/python -m pytest -q` 为 `1718 passed, 4 warnings`，真实 `/data/downloads/tr -> /data/library/movies` event recorder smoke 继续通过。
 
 剩余风险：

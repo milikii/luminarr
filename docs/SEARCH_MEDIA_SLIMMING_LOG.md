@@ -35,9 +35,11 @@ focused tests 入口：
 - 这一组继续只动澄清态读写边界；candidate 持久化和搜索文本协议未改。
 - `app/services/search_candidate_state.py` 现在承接 candidate save / load / rollback、批量预览候选缓存和对应 fail-closed 中文日志；`search_media.py` 已从 `616` 行降到 `460` 行。
 - 这一组继续只动候选状态真相边界；搜索排序、BT 预览协议和回复文本协议未改。
+- `app/services/bt_read_only_display.py` 现在承接 BT 只读候选注释 / helper 贴标 / 历史提示；`search_media.py` 当前回到 `627` 行。
+- 这一轮只把成熟的展示分支和 helper lookup 从热文件里抽走，未改 `bt搜` / `bt批量` 对外协议和 helper 真相边界。
 
 剩余风险：
-- `search_media.py` 当前剩余 `460` 行，已低于当前阶段的单山目标；下一步不再继续把搜索链当唯一主线，除非后续回归证明 BT 预览缓存或排序段还有新的结构风险。
+- `search_media.py` 当前回到 `627` 行，已比最初基线明显收口，但仍高于纯粹编排层的理想尺寸；下一步若继续瘦身，应优先沿 `search_request_context.py` / `search_reply_formatter.py` / `bt_read_only_display.py` 的既有边界继续拆，不要再把成熟的展示逻辑塞回主文件。
 - 搜索链继续守住“候选和澄清状态写入失败直接 fail-closed 返回中文提示”的边界，不回退现有 `CANDIDATE_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT` 协议。
 
 focused tests 入口：

@@ -1,4 +1,4 @@
-# Current status (v477)
+# Current status (v479)
 
 ## Current mainline
 
@@ -31,7 +31,7 @@
   - 路由层当前会在导入查询时优先恢复任务真相里的 host `download_dir`，不再把 Transmission RPC 的容器路径直接喂给归档/导入
   - qB 成人归档真实 smoke 已通过：归档成功、保留期清理成功、`adult_content_registry` 最终为 `archived_deleted`
   - BT Transmission 成人归档真实 smoke 已通过：归档成功、保留期清理成功、`adult_content_registry` 最终为 `archived_deleted`
-- 当前热点大文件仍需留意：`app/services/search_media.py` `775` 行，`add_to_downloader.py` `606` 行，`import_to_library.py` `649` 行；BT 只读 helper relevance 选择当前位于 `app/services/bt_read_only_helper_selection.py` `104` 行，未改对外协议。
+- 当前热点大文件仍需留意：`app/services/search_media.py` `627` 行，`add_to_downloader.py` `606` 行，`import_to_library.py` `590` 行；BT 只读展示逻辑现在已抽到 `app/services/bt_read_only_display.py` `180` 行，BT 只读 helper relevance 选择仍位于 `app/services/bt_read_only_helper_selection.py` `104` 行，未改对外协议。
 - BT 来源适配当前保持：
   - 成人站点优先：`tokyotosho` / `sukebei(offkab)` / `javbus`
   - `Prowlarr` 成人 PT 作为补充来源
@@ -43,6 +43,14 @@
 - 当前成人 BT 主线的两条真实 smoke 继续保持通过态；当前更需要留意的是：
   - 当前 BT 只读候选相关性保护已经继续收窄：helper 相关性会在 `bt搜` top-N、`bt批量` default/selected selection 和 chat cache 顺序前统一生效；focused tests 已覆盖默认预览、定点预览、单候选无关项、显式无关 selection 和 generic overlap 噪声边界
   - 如果后续仍出现边界噪声，只能继续收窄 helper 介入时机或只读截断策略；不能把 helper 结果写进审批真相，也不要再把 `search_media.py` 往上堆
+  - `search_media.py` 这一轮已把 BT 只读候选注释 / 历史 / helper 贴标抽到独立 `bt_read_only_display.py`，避免继续往同一个热点文件里加展示分支。
+  - `import_to_library.py` 这一轮已把 confirmed media identity 回查抽到独立 `import_confirmed_media_identity.py`，避免继续把 metadata tmdb_id 解析和 job_event 回查塞回主文件。
+
+## Later candidate line
+
+- 当前唯一执行主线不变；若后续显式切到“消息展示体验层”，统一蓝图看 `docs/SEARCH_REPLY_PRESENTATION_PLAN.md`。
+- 这条后续候选主线固定为 `Telegram-first`：先做 Telegram richer reply，Feishu / personal WeChat / WeCom 首阶段先保留共享文本降级，不改 shared runtime / approval / dispatch 真相。
+- 成人 BT 图片目标当前记为“尽量全量带图”，但实施分阶段：先 exact-id 与稳定只读图源，再扩到泛关键词结果；拿不到稳定图源时明确降级为纯文本。
 
 ## Latest verification
 

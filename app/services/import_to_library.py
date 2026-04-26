@@ -17,6 +17,7 @@ from app.services.import_cancel_state import ImportCancelState
 from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
 from app.services.import_confirm_expiry_state import ImportConfirmExpiryState
 from app.services.import_confirm_context_guard import ImportConfirmContextGuard
+from app.services.import_confirmed_media_identity import ImportConfirmedMediaIdentityResolver
 from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_event_recorder import ImportEventRecorder
@@ -27,7 +28,6 @@ from app.services.import_prepare_state import ImportPrepareState
 from app.services.import_raw_bt_guard import ImportRawBtGuard
 from app.services.import_trace_logger import ImportTraceLogger
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
-from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_from_json
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 
@@ -138,12 +138,13 @@ class ImportToLibraryService:
             import_pending_state_unavailable_text=IMPORT_PENDING_STATE_UNAVAILABLE_TEXT,
             import_approval_pending_text_template=IMPORT_APPROVAL_PENDING_TEXT,
         )
+        self._confirmed_media_identity_resolver = ImportConfirmedMediaIdentityResolver(job_event_repo=job_event_repo)
         self._post_processing_service = ImportPostProcessingService(
             refresh_media_server_func=refresh_media_server_func,
             scrape_metadata_func=scrape_metadata_func,
             translate_subtitle_func=translate_subtitle_func,
             resolve_metadata_title_year_func=self._resolve_metadata_title_year,
-            resolve_metadata_tmdb_id_func=self._resolve_metadata_tmdb_id,
+            resolve_metadata_tmdb_id_func=self._confirmed_media_identity_resolver.resolve_tmdb_id,
             record_event_func=self._record_event,
         )
         self._prepare_state = ImportPrepareState(
@@ -189,7 +190,7 @@ class ImportToLibraryService:
         )
         self._metadata_title_year_resolver = ImportMetadataTitleYearResolver(
             resolve_normalized_naming_truth_func=self._resolve_normalized_naming_truth,
-            resolve_confirmed_media_identity_func=self._resolve_confirmed_media_identity,
+            resolve_confirmed_media_identity_func=self._confirmed_media_identity_resolver.resolve,
         )
         self._event_recorder = ImportEventRecorder(
             job_event_repo=job_event_repo,
@@ -359,35 +360,6 @@ class ImportToLibraryService:
             task_hash=task_hash,
             target_path=target_path,
         )
-
-    def _resolve_metadata_tmdb_id(self, task_id: str, task_hash: str) -> str:
-        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
-        if confirmed_media_identity is None:
-            return ""
-        return confirmed_media_identity.get("tmdb_id", "").strip()
-
-    def _resolve_confirmed_media_identity(self, *, task_id: str, task_hash: str) -> dict[str, str] | None:
-        if self._job_event_repo is None:
-            return None
-        try:
-            events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
-            if events is None:
-                raise RuntimeError("import media identity result missing")
-        except Exception as error:
-            if str(error) == "import media identity result missing":
-                _log_import_media_identity_result_missing(task_id=task_id, task_hash=task_hash, reason=str(error))
-            elif _is_import_media_identity_row_corrupted_error(error):
-                _log_import_media_identity_row_corrupted(task_id=task_id, task_hash=task_hash, reason=str(error))
-            else:
-                _log_import_media_identity_query_failed(task_id=task_id, task_hash=task_hash, reason=str(error))
-            return None
-        for event in reversed(events):
-            if event.event_type != MEDIA_IDENTITY_EVENT_TYPE:
-                continue
-            media_identity = media_identity_from_json(event.message)
-            if media_identity is not None:
-                return media_identity
-        return None
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         return self._approval_state.record_pending_approval_with_copy_fallback_reset(
@@ -611,37 +583,6 @@ def _is_job_row_corrupted_error(error: Exception) -> bool:
 
 
 def _is_import_event_row_corrupted_error(error: Exception) -> bool:
-    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
-
-
-def _log_import_media_identity_query_failed(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入媒体身份查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；"
-        "当前 metadata 入参会退回命名真相或文件名解析，避免把查询失败混成普通“无媒体身份”。",
-        flush=True,
-    )
-
-
-def _log_import_media_identity_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入媒体身份结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
-        "当前 metadata 入参会退回命名真相或文件名解析，避免把缺失真相误判成“没有已确认媒体身份”。",
-        flush=True,
-    )
-
-
-def _log_import_media_identity_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入媒体身份记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 里的 task_ref / event_type / message 等媒体身份字段是否仍是完整记录；"
-        "当前 metadata 入参会退回命名真相或文件名解析，避免把坏记录混成普通查询失败。",
-        flush=True,
-    )
-
-
-def _is_import_media_identity_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
 
 
