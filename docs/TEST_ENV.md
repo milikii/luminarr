@@ -108,6 +108,19 @@ curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Sessi
 ```
 
 - 截至 `2026-04-26` 本轮，用户 shell 已观察到 `409 + X-Transmission-Session-Id`，但当前 Codex shell 的 probe 结果写入 `/tmp/luminarr_bt_transmission_rpc_probe.json`，连续 `5/5` 次 `All connection attempts failed`
+- 当前 BT Transmission 成人归档 smoke：
+
+```bash
+bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'
+```
+
+- 截至 `2026-04-26` 本轮，这条脚本已能稳定把 blocker 收成 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`：
+  - `task_id=2`
+  - `downloadDir=/data/downloads/tr-bt`
+  - `status_code=4`
+  - `percent_done=0.0`
+  - `rate_download=0`
+- 这说明当前 BT Transmission 路径的真实问题已从“连不上 RPC”收敛到“download_dir 真相边界可能没对齐”。
 
 ---
 

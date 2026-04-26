@@ -21,8 +21,8 @@
 
 - 当前这轮变更只触碰 qB 导入源解析、qB 成人归档真实 smoke 与文档真相，没有改 movie-first PT / import / metadata 主链协议。
 - 当前最大风险不是 qB 这条链能不能成立，而是：
-  - `19092` BT Transmission 侧还没有成人归档真实 smoke 证据
-  - `19092` 的可达性在用户 shell 与当前 Codex shell 之间仍有波动，需要继续按当轮探针写真相
+  - `19092` BT Transmission 侧还没有成人归档通过态证据
+  - 当前 BT Transmission 真实 smoke 已能建任务，但任务长期停在 `status=4 / percentDone=0.0`
 
 ## Latest verification
 
@@ -36,15 +36,22 @@
 - 运行时 focused：
   - `.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py`：当前通过，证据文件 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`
   - `.venv/bin/python tmp_tests/verify_bt_transmission_rpc_probe.py`：当前产出 `/tmp/luminarr_bt_transmission_rpc_probe.json`，连续 `5/5` 次 `All connection attempts failed`
+  - `bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'`：当前产出 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`
   - qB 当前通过态证据包含：
     - `adult_archive.succeeded`
     - `adult_archive.retention_cleanup_succeeded`
     - `source_path_removed=true`
     - `qb_removed=true`
+  - BT Transmission 当前 blocker 证据包含：
+    - 任务已创建：`task_id=2`
+    - `status_code=4`
+    - `percent_done=0.0`
+    - `rate_download=0`
+    - `downloadDir=/data/downloads/tr-bt`
 
 ## Current biggest risk
 
-- 当前最大不确定性已经从“qB real smoke 能不能通过”转成“`19092` BT Transmission 在用户 shell 返回 `409`，但当前 Codex shell 连续 `5/5` 次连接失败，这是不是同一宿主机网络视角差异”。
+- 当前最大不确定性已经从“qB real smoke 能不能通过”转成“BT Transmission 当前停在 `downloadDir=/data/downloads/tr-bt` + `status=4/0.0%`，这是不是 download_dir 宿主机/容器路径边界没对齐”。
 
 ## Recommended Next Operator Command
 
