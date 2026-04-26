@@ -18,8 +18,8 @@
 
 ```text
 按 AGENTS.md + docs/STATUS.md + docs/NEXT_STEP.md 执行。
-如果 docs/NEXT_STEP.md 当前主线已完成，先做冷启动一致性检查；若无漂移，再从新的 operator 指定主线或当前结构债里选一个更小闭环。
-如果 docs/NEXT_STEP.md 当前主线已完成，不要因为旧 Done when 已满足就立刻停止；应以当前选中的更小闭环作为本轮退出条件。
+如果 docs/NEXT_STEP.md 当前主线已完成，先做冷启动一致性检查；若无漂移，默认保持冻结，只有在我显式指定新主线或你已找到新的 focused gate / 真实失败边界时才继续施工。
+如果 docs/NEXT_STEP.md 当前主线已完成，不要因为“还可以继续拆”就自行重开旧热点；没有新证据时，以完成态冻结作为本轮退出条件。
 本机真实测试环境已就绪；凡是任务需要真实 downloader / import / refresh 验证，直接执行，不要留给我。
 默认连续执行 3 轮；每轮只做一个最小闭环，自己验证、必要时更新文档、review diff、commit 并 push。
 如果遇到 blocker、违反文档边界、无法确认 commit / push 状态，或已达到 docs/NEXT_STEP.md 的 Done when 任一条，就停止并简短汇报。
@@ -33,8 +33,8 @@
 
 ```text
 按 AGENTS.md + docs/STATUS.md + docs/NEXT_STEP.md 执行。
-如果 docs/NEXT_STEP.md 当前主线已完成，先做冷启动一致性检查；若无漂移，再从新的 operator 指定主线或当前结构债里选一个更小闭环。
-如果 docs/NEXT_STEP.md 当前主线已完成，不要因为旧 Done when 已满足就立刻停止；应以当前选中的更小闭环作为本轮退出条件。
+如果 docs/NEXT_STEP.md 当前主线已完成，先做冷启动一致性检查；若无漂移，默认保持冻结，只有在我显式指定新主线或你已找到新的 focused gate / 真实失败边界时才继续施工。
+如果 docs/NEXT_STEP.md 当前主线已完成，不要因为“还可以继续拆”就自行重开旧热点；没有新证据时，以完成态冻结作为本轮退出条件。
 本机真实测试环境已就绪；凡是任务需要真实 downloader / import / refresh 验证，直接执行，不要留给我。
 默认连续执行 10 轮；每轮只做一个最小闭环，自己验证、必要时更新文档、review diff、commit 并 push。
 如果遇到 blocker、违反文档边界、无法确认 commit / push 状态、出现收益递减，或已达到 docs/NEXT_STEP.md 的 Done when 任一条，就停止并简短汇报。

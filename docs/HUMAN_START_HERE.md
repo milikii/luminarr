@@ -66,7 +66,7 @@
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 ```
 
-如果你是要回头重开“发布口径 / 质量入口 / 真实 smoke”收口，再去 `docs/OPERATOR_RUNBOOK.md` 里复制“收尾发布准备”模板。
+如果你是要回头重开新的主线，或已经确认出现了文档漂移 / focused gate 缺口 / 真实失败边界，再去 `docs/OPERATOR_RUNBOOK.md` 里重新选最接近当前场景的模板。
 
 ### 想知道项目现在稳不稳
 
