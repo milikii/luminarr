@@ -66,7 +66,7 @@
 - 长期边界层：`docs/DECISIONS.md`、`docs/ARCHITECTURE.md`
 - 施工纪律层：`docs/SLIMMING_RULES.md`
 - 历史闭环层：`docs/PERSISTENCE_CLOSURE_LOG.md`
-- 历史归档层：`archive/docs/` 下的已完成 `*_LOG.md` / `*_PLAN.md`
+- 历史归档层：`archive/docs/` 下的已完成 `*_LOG.md` / `*_PLAN.md` / `*_REDESIGN.md`
 
 ## 5. 文档维护规则
 

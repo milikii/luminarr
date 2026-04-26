@@ -736,7 +736,7 @@
     - `app/services/search_media.py` 从当前 `1018` 行降到 `≤ 600` 行；
     - 三座大山合并后 focused tests 覆盖率不跌，`make quality` / `make verify-mainline` / CI 持续绿灯；
     - 每条 service 都留有独立的 `*_SLIMMING_LOG.md` 台账记录结构降本闭环。
-  - 当前主线第 1 步：在 `docs/IMPORT_PIPELINE_REDESIGN.md` 产出路径清单 + 特殊分支 grep 计数 + pipeline 草图；**不允许**在没有该清单的情况下直接动 `import_to_library.py` 业务代码。
+  - 当前主线第 1 步：在 `archive/docs/IMPORT_PIPELINE_REDESIGN.md` 产出路径清单 + 特殊分支 grep 计数 + pipeline 草图；**不允许**在没有该清单的情况下直接动 `import_to_library.py` 业务代码。
   - 该阶段与"真实 e2e 纵深"、"新协议能力"、"新渠道接入"**不混搭**；后者另起独立阶段。
 - **原因**：
   "质量硬化"本身没有可测量的 Done 定义，`docs/STATUS.md` 连续 60+ 次复验都标"当前阶段仍在质量硬化"。继续挂在这个模糊阶段名下做结构降本，会让阶段越拖越含糊，也让每条主线的用户价值边界越来越难界定。把阶段名正式换到"services 层数据结构降本"后，Done 以"三座大山行数 ≤ 600 + focused tests 不跌 + CI 绿灯"三个可测量指标锁定，任何后续主线只要不服务这三个指标，就要显式开新阶段而不是偷偷塞进来。
