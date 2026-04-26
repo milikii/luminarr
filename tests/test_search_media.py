@@ -368,6 +368,52 @@ def test_search_bt_read_only_and_format_keeps_results_when_javlibrary_lookup_fai
     assert "timeout" in captured.out
 
 
+def test_search_bt_read_only_and_format_only_applies_helper_to_related_candidates() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "Secret Mission Nurse complete edition",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 10,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "Unrelated comedy collection",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 5,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Secret Mission Nurse",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    first_candidate_text, second_candidate_text = text.split("2. Unrelated comedy collection", 1)
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in first_candidate_text
+    assert "只读补全:" not in second_candidate_text
+
+
 def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "dune bt"
