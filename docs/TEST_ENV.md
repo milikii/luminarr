@@ -51,7 +51,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 - 当前 qB 测试栈为避免 WebUI `Host header` 端口不匹配，必须保持 `WEBUI_PORT=18098` 和 `18098:18098` 同步；不要回退成 `18098:8080`
 - qB 容器会在 `docker/test/qbittorrent/qBittorrent` 下生成 GeoDB / logs / RSS / lockfile / `qBittorrent-data.conf` 等运行态文件；这些文件不属于固定配置，不应提交到 Git
 - 当前 compose 文件在仓库里，Transmission / Emby 的实际容器配置和状态仍主要落在 `/home/alex/luminarr-test`
-- 截至 `2026-04-26` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`；`19092` 在用户 shell 中已出现 `409 + X-Transmission-Session-Id`，但当前 Codex shell 里的 `curl -si http://127.0.0.1:19092/transmission/rpc` 仍偶发退出码 `7`
+- 截至 `2026-04-26` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`19092` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`
 
 ---
 
@@ -100,27 +100,28 @@ curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Sessi
 ```
 
 说明：
-- 当前 `19092` 不能直接沿用旧的“可达”或更早的“不可达”结论；每轮都要按当轮探针重写
+- 当前 `19092` 仍应按当轮探针重写，不直接沿用更早轮次的旧结论
 - 当前补充 probe：
 
 ```bash
 .venv/bin/python tmp_tests/verify_bt_transmission_rpc_probe.py
 ```
 
-- 截至 `2026-04-26` 本轮，用户 shell 已观察到 `409 + X-Transmission-Session-Id`，但当前 Codex shell 的 probe 结果写入 `/tmp/luminarr_bt_transmission_rpc_probe.json`，连续 `5/5` 次 `All connection attempts failed`
+- 截至 `2026-04-26` 本轮，`bash -lc 'timeout 5 curl -si http://127.0.0.1:19092/transmission/rpc'` 已返回 `409 + X-Transmission-Session-Id`
 - 当前 BT Transmission 成人归档 smoke：
 
 ```bash
 bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'
 ```
 
-- 截至 `2026-04-26` 本轮，这条脚本已能稳定把 blocker 收成 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`：
-  - `task_id=2`
-  - `downloadDir=/data/downloads/tr-bt`
-  - `status_code=4`
-  - `percent_done=0.0`
-  - `rate_download=0`
-- 这说明当前 BT Transmission 路径的真实问题已从“连不上 RPC”收敛到“download_dir 真相边界可能没对齐”。
+- 截至 `2026-04-26` 本轮，这条脚本当前通过，并把证据写到 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`。
+- 当前通过态证据包含：
+  - `session_snapshot.download_dir=/downloads/complete`
+  - `archive_reply=成人资源归档成功`
+  - `cleanup_reply=成人资源保留期清理完成`
+  - `registry_statuses.after_archive=archived_present`
+  - `registry_statuses.after_cleanup=archived_deleted`
+- 脚本当前会先清理同 info hash 的旧任务，再用 `dispatch_download_dir=/downloads/complete` 投递，并在归档/清理阶段恢复 host `download_dir=/data/downloads/tr-bt`。
 
 ---
 
@@ -230,12 +231,13 @@ TRANSMISSION_USERNAME=
 TRANSMISSION_PASSWORD=
 
 # 可选：如果你要让 PT / BT 在本地测试栈里明确分流到两台 Transmission
-DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt"
+# 当前第 5 段 dispatch_download_dir 供下载器 API 投递使用；第 4 段 download_dir 仍是宿主机导入/归档路径
+DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr|/downloads/complete;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt|/downloads/complete"
 PT_DOWNLOADER=tr-pt
 BT_DOWNLOADER=tr-bt
 
 # 可选：如果你要顺手验证 qBittorrent 协议
-DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt;qb-smoke|qbittorrent|http://127.0.0.1:18098|/data/downloads/qb"
+DOWNLOADER_INSTANCES="tr-pt|transmission|http://127.0.0.1:19091|/data/downloads/tr|/downloads/complete;tr-bt|transmission|http://127.0.0.1:19092|/data/downloads/tr-bt|/downloads/complete;qb-smoke|qbittorrent|http://127.0.0.1:18098|/data/downloads/qb"
 
 # Emby
 EMBY_BASE_URL=http://127.0.0.1:18096
@@ -252,6 +254,7 @@ SQLITE_DB_PATH=/home/alex/projects/luminarr/data/luminarr.db
 - 当前代码读取的是 `TRANSMISSION_BASE_URL`，不是 `TRANSMISSION_HOST`
 - 当前代码读取的是 `TRANSMISSION_USERNAME` / `TRANSMISSION_PASSWORD`，不是 `TRANSMISSION_USER` / `TRANSMISSION_PASS`
 - 如果你准备直接用 `set -a && . ./.env && set +a` 导入环境，`DOWNLOADER_INSTANCES` 这种带 `;` 的值要整个包进引号；否则 shell 会把后半段当成新命令执行
+- `DOWNLOADER_INSTANCES` 当前可选第 5 段 `dispatch_download_dir`；如果是本地 Docker 里的 Transmission，这一段应写容器内路径 `/downloads/complete`
 - 如果你要验证 PT / BT 双 Transmission 分流，当前代码要靠 `DOWNLOADER_INSTANCES + PT_DOWNLOADER + BT_DOWNLOADER` 明确绑定；只填 `TRANSMISSION_BASE_URL` 时，两条链都会落回默认 Transmission
 - 如果你要验证 qBittorrent 协议，当前测试栈的 `qb-smoke` 实例可以直接写进 `DOWNLOADER_INSTANCES`；截至 `2026-04-24` 本机 probe，`18098/api/v2/torrents/info` 已返回 `200 OK`
 - 当前代码读取的是 `LIBRARY_TARGET_DIR`，不是 `LIBRARY_MOVIES_PATH`
