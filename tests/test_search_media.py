@@ -253,6 +253,121 @@ def test_search_bt_read_only_and_format_includes_javlibrary_helper_summary() -> 
     assert "只读标题: SSIS-123 Sample Title" in text
 
 
+def test_search_bt_read_only_and_format_uses_javlibrary_helper_for_history_lookup(tmp_path: Path) -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "sample release without explicit id",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Sample Title",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    database = SqliteDatabase(str(tmp_path / "adult-helper.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.upsert_pending(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="tokyotosho",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:hash",
+        downloader_name="bt",
+    )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_content_registry_repo=registry_repo,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+    assert "历史: 该番号已有待确认下载记录。" in text
+
+
+def test_search_bt_read_only_and_format_skips_javlibrary_lookup_when_candidate_already_has_adult_id() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "SSIS-123 sample release",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(_: str) -> JavLibraryReadOnlyMatch | None:
+        raise AssertionError("helper lookup should be skipped when candidate already has adult id")
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert "番号: SSIS-123 | 分类: censored" in text
+    assert "只读补全:" not in text
+
+
+def test_search_bt_read_only_and_format_keeps_results_when_javlibrary_lookup_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "sample release without explicit id",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def failing_helper_lookup(_: str) -> JavLibraryReadOnlyMatch | None:
+        raise RuntimeError("timeout")
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=failing_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+    captured = capsys.readouterr()
+
+    assert "1. sample release without explicit id" in text
+    assert "只读补全:" not in text
+    assert "[JavLibrary 只读补全失败]" in captured.out
+    assert "timeout" in captured.out
+
+
 def test_search_bt_batch_preview_and_format_uses_raw_search_func() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "dune bt"

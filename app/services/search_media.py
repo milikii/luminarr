@@ -347,6 +347,8 @@ class SearchMediaService:
         lookup_query: str,
     ) -> list[dict[str, Any]]:
         display_candidates = [_to_candidate_dict(item) for item in candidates]
+        if not display_candidates or not any(not str(item.get("adult_content_id", "")).strip() for item in display_candidates):
+            return [self._annotate_adult_history(item) for item in display_candidates]
         helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
         if helper_match is None:
             return [self._annotate_adult_history(item) for item in display_candidates]
