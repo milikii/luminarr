@@ -285,7 +285,10 @@ def _resolve_downloader_client_for_lookup(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionClient | QbittorrentClient | None:
     cleaned_name = downloader_name.strip()
-    instance = downloader_instances_by_name.get(cleaned_name)
+    instance = _lookup_downloader_instance(
+        downloader_name=cleaned_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+    )
     if instance is None:
         _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
         return None
@@ -315,7 +318,10 @@ def _resolve_downloader_client_for_dispatch(
     cleaned_name = downloader_name.strip()
     if not cleaned_name:
         return transmission_client
-    instance = downloader_instances_by_name.get(cleaned_name)
+    instance = _lookup_downloader_instance(
+        downloader_name=cleaned_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+    )
     if instance is None:
         _log_downloader_dispatch_resolution_failed(
             downloader_name=cleaned_name,
@@ -349,6 +355,14 @@ def _lookup_client_for_instance(
     if downloader_type == "qbittorrent":
         return qbittorrent_clients_by_name.get(downloader_name)
     return transmission_clients_by_name.get(downloader_name)
+
+
+def _lookup_downloader_instance(
+    *,
+    downloader_name: str,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+) -> DownloaderInstanceConfig | None:
+    return downloader_instances_by_name.get(downloader_name)
 
 
 def resolve_downloader_dispatch_download_dir(
