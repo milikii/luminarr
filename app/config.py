@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from typing import TypeVar
+
+_T = TypeVar("_T")
 
 
 class ConfigError(ValueError):
@@ -169,86 +172,80 @@ def _split_pipe_fields(cleaned_item: str) -> list[str]:
     return [part.strip() for part in cleaned_item.split("|")]
 
 
-def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDestinationOption, ...]:
-    raw_value = _read_optional(env, "RAW_BT_DESTINATIONS")
+def _read_semicolon_delimited_records(
+    env: Mapping[str, str],
+    *,
+    env_key: str,
+    parser: Callable[[list[str]], _T],
+) -> tuple[_T, ...]:
+    raw_value = _read_optional(env, env_key)
     if not raw_value:
         return ()
+    return tuple(parser(_split_pipe_fields(cleaned_item)) for cleaned_item in _iter_semicolon_entries(raw_value))
 
-    options: list[RawBtDestinationOption] = []
-    seen_keys: set[str] = set()
-    for cleaned_item in _iter_semicolon_entries(raw_value):
-        parts = _split_pipe_fields(cleaned_item)
-        if len(parts) == 2:
-            key, target_dir = parts
-            label = key
-        elif len(parts) == 3:
-            key, label, target_dir = parts
-        else:
-            raise ConfigError(
-                "RAW_BT_DESTINATIONS format must be `key|target_dir` or `key|label|target_dir`, separated by `;`"
-            )
 
-        normalized_key = key.lower().strip()
-        if not normalized_key:
-            raise ConfigError("RAW_BT_DESTINATIONS key cannot be empty")
-        if normalized_key in seen_keys:
-            raise ConfigError(f"RAW_BT_DESTINATIONS contains duplicate key: {normalized_key}")
-        if not label:
-            raise ConfigError(f"RAW_BT_DESTINATIONS label cannot be empty: {normalized_key}")
-        if not target_dir:
-            raise ConfigError(f"RAW_BT_DESTINATIONS target_dir cannot be empty: {normalized_key}")
-
-        seen_keys.add(normalized_key)
-        options.append(
-            RawBtDestinationOption(
-                key=normalized_key,
-                label=label,
-                target_dir=target_dir,
-            )
+def _parse_raw_bt_destination(parts: list[str]) -> RawBtDestinationOption:
+    if len(parts) == 2:
+        key, target_dir = parts
+        label = key
+    elif len(parts) == 3:
+        key, label, target_dir = parts
+    else:
+        raise ConfigError(
+            "RAW_BT_DESTINATIONS format must be `key|target_dir` or `key|label|target_dir`, separated by `;`"
         )
 
-    return tuple(options)
+    normalized_key = key.lower().strip()
+    if not normalized_key:
+        raise ConfigError("RAW_BT_DESTINATIONS key cannot be empty")
+    if not label:
+        raise ConfigError(f"RAW_BT_DESTINATIONS label cannot be empty: {normalized_key}")
+    if not target_dir:
+        raise ConfigError(f"RAW_BT_DESTINATIONS target_dir cannot be empty: {normalized_key}")
+
+    return RawBtDestinationOption(
+        key=normalized_key,
+        label=label,
+        target_dir=target_dir,
+    )
+
+
+def _parse_adult_archive_destination(parts: list[str]) -> AdultArchiveDestination:
+    if len(parts) == 2:
+        category, target_dir = parts
+        label = category
+    elif len(parts) == 3:
+        category, label, target_dir = parts
+    else:
+        raise ConfigError(
+            "ADULT_ARCHIVE_DESTINATIONS format must be `category|target_dir` or `category|label|target_dir`, separated by `;`"
+        )
+
+    normalized_category = category.lower().strip()
+    if not normalized_category:
+        raise ConfigError("ADULT_ARCHIVE_DESTINATIONS category cannot be empty")
+    if not label:
+        raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS label cannot be empty: {normalized_category}")
+    if not target_dir:
+        raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS target_dir cannot be empty: {normalized_category}")
+
+    return AdultArchiveDestination(
+        category=normalized_category,
+        label=label,
+        target_dir=target_dir,
+    )
+
+
+def _read_raw_bt_destination_options(env: Mapping[str, str]) -> tuple[RawBtDestinationOption, ...]:
+    return _read_semicolon_delimited_records(env, env_key="RAW_BT_DESTINATIONS", parser=_parse_raw_bt_destination)
 
 
 def _read_adult_archive_destinations(env: Mapping[str, str]) -> tuple[AdultArchiveDestination, ...]:
-    raw_value = _read_optional(env, "ADULT_ARCHIVE_DESTINATIONS")
-    if not raw_value:
-        return ()
-
-    destinations: list[AdultArchiveDestination] = []
-    seen_categories: set[str] = set()
-    for cleaned_item in _iter_semicolon_entries(raw_value):
-        parts = _split_pipe_fields(cleaned_item)
-        if len(parts) == 2:
-            category, target_dir = parts
-            label = category
-        elif len(parts) == 3:
-            category, label, target_dir = parts
-        else:
-            raise ConfigError(
-                "ADULT_ARCHIVE_DESTINATIONS format must be `category|target_dir` or `category|label|target_dir`, separated by `;`"
-            )
-
-        normalized_category = category.lower().strip()
-        if not normalized_category:
-            raise ConfigError("ADULT_ARCHIVE_DESTINATIONS category cannot be empty")
-        if normalized_category in seen_categories:
-            raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS contains duplicate category: {normalized_category}")
-        if not label:
-            raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS label cannot be empty: {normalized_category}")
-        if not target_dir:
-            raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS target_dir cannot be empty: {normalized_category}")
-
-        seen_categories.add(normalized_category)
-        destinations.append(
-            AdultArchiveDestination(
-                category=normalized_category,
-                label=label,
-                target_dir=target_dir,
-            )
-        )
-
-    return tuple(destinations)
+    return _read_semicolon_delimited_records(
+        env,
+        env_key="ADULT_ARCHIVE_DESTINATIONS",
+        parser=_parse_adult_archive_destination,
+    )
 
 
 def _read_bt_web_sources(env: Mapping[str, str]) -> tuple[str, ...]:
@@ -290,8 +287,7 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
 
     instances: list[DownloaderInstanceConfig] = []
     seen_names: set[str] = set()
-    for cleaned_item in _iter_semicolon_entries(raw_value):
-        parts = _split_pipe_fields(cleaned_item)
+    def parse_instance(parts: list[str]) -> DownloaderInstanceConfig:
         if len(parts) not in {4, 5, 6, 7}:
             raise ConfigError(
                 "DOWNLOADER_INSTANCES format must be `name|type|base_url|download_dir`, "
@@ -328,17 +324,18 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
             raise ConfigError(f"DOWNLOADER_INSTANCES dispatch_download_dir cannot be empty: {name}")
 
         seen_names.add(name)
-        instances.append(
-            DownloaderInstanceConfig(
-                name=name,
-                downloader_type=downloader_type,
-                base_url=base_url,
-                download_dir=download_dir,
-                dispatch_download_dir=dispatch_download_dir,
-                username=username,
-                password=password,
-            )
+        return DownloaderInstanceConfig(
+            name=name,
+            downloader_type=downloader_type,
+            base_url=base_url,
+            download_dir=download_dir,
+            dispatch_download_dir=dispatch_download_dir,
+            username=username,
+            password=password,
         )
+
+    for cleaned_item in _iter_semicolon_entries(raw_value):
+        instances.append(parse_instance(_split_pipe_fields(cleaned_item)))
 
     return tuple(instances)
 
