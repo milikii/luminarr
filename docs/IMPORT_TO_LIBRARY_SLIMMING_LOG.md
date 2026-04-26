@@ -1,4 +1,4 @@
-# Import to library slimming log (v16)
+# Import to library slimming log (v17)
 
 > 目的：承接当前“`import_to_library.py` 导入编排层瘦身 / 模块化”主线的详细台账。
 > 约束：`docs/STATUS.md` 只保留当前快照；新的闭环优先合并进下面分组，不逐天追加 dated 小节。
@@ -65,6 +65,7 @@ focused tests 入口：
 - context / approval / jobs / file-transfer / cancel / prepare / execution-tail / confirm-gate / confirm-expiry / event-recorder / raw_bt-guard / confirm-context-guard / metadata-title-year / pending-approval-write-through / trace wrapper 十五段都已离开主文件；`import_to_library.py` 已到 `585` 行并满足 `≤ 600`。
 - 导入链当前不再为了行数继续硬拆；只有出现新的 focused gate 价值或新的失败边界，才允许再动 `import_to_library.py`。当前唯一主线已切去 `add_to_downloader.py` 最后 `8` 行 worth-it 复评估。
 - 这一组继续守住“导入成功是真相，metadata / subtitle / refresh 失败不回滚导入成功”的边界，并保持显式中文日志 + `[处理建议]`。
+- `import_to_library.py` 当前 `590` 行；`.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt or copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"` 为 `30 passed, 119 deselected`，`.venv/bin/python -m pyflakes app/services/import_to_library.py` 继续干净。当前剩余内容主要是 service 装配、public entrypoint 和 thin wrapper，复评估后确认没有 worth-it 闭环，默认保持冻结。
 
 focused tests 入口：
 - `.venv/bin/python -m pytest -q tests/test_import_to_library.py -k "copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`
@@ -81,4 +82,4 @@ focused tests 入口：
 
 - 补完一个最小闭环后，先判断它属于 2.1~2.2 哪个风险分组，把路径或行为差异合并进去；不要新增 dated 小节。
 - `docs/STATUS.md` 最多补一句当前结论或一条最新风险；不回灌长台账。
-- `import_to_library.py` 已满足 `≤ 600`；本文件继续承接 import 已完成闭环的详细台账，当前唯一主线已切去 downloader 侧最后 `8` 行 worth-it 复评估。
+- `import_to_library.py` 已满足 `≤ 600` 且当前没有 worth-it 闭环；本文件继续承接 import 已完成闭环的详细台账，除非后续出现新的 focused gate / 失败边界，否则不再回到这条主线。

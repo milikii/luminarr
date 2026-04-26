@@ -23,6 +23,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
     status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
+    slimming_rules_text = Path("docs/SLIMMING_RULES.md").read_text(encoding="utf-8")
     agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
 
     assert "docs/HUMAN_START_HERE.md" in readme_text
@@ -33,6 +34,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/STATUS.md" in readme_text
     assert "docs/NEXT_STEP.md" in readme_text
     assert "docs/DECISIONS.md" in readme_text
+    assert "docs/SLIMMING_RULES.md" not in readme_text
     assert "再去 `docs/OPERATOR_RUNBOOK.md` 按场景复制一条模板" in readme_text
     assert "直接复制 `docs/STATUS.md` 末尾的 `Recommended Next Operator Command`" in readme_text
     assert "docs/POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md" not in readme_text
@@ -77,6 +79,11 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/STATUS.md" in agents_text
     assert "Emby / Jellyfin / Plex" in readme_text
     assert "Emby / Jellyfin / Plex" in decisions_text
+    assert "保守版减法政策" in slimming_rules_text
+    assert "`CODEX_*_PROMPT.md` 视为工具配置" in slimming_rules_text
+    assert "60` 行以下的 support/helper 文件" in slimming_rules_text
+    assert not Path("docs/CODEX_3_ROUND_PROMPT.md").exists()
+    assert not Path("docs/CODEX_LOW_TOKEN_10_ROUND_PROMPT.md").exists()
 
     assert "shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口" in next_step_text
     assert "质量硬化" in status_text
@@ -130,14 +137,6 @@ def test_current_doc_truth_keeps_runtime_lines_and_channel_scope_aligned() -> No
     assert "`app/bot/private_chat_runtime.py` 当前维持在 `476` 行" in decisions_text
     assert "代码里已经有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口" in history_text
     assert "当前仍然只有 Telegram。" not in history_text
-
-
-def test_codex_prompt_prevents_returning_to_same_proof_family() -> None:
-    prompt_text = Path("docs/CODEX_3_ROUND_PROMPT.md").read_text(encoding="utf-8")
-
-    assert "不得回到刚收口主线所属能力族里再拆更小 proof" in prompt_text
-    assert "同一能力族如果已经连续完成 2 条 proof-only 主线" in prompt_text
-    assert "必须切到真实 side-effect smoke、结构降本主线或新的用户可感知协议能力" in prompt_text
 
 
 def test_persistence_closure_log_keeps_current_line_detail() -> None:

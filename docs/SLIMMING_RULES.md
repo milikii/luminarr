@@ -1,22 +1,30 @@
-# docs/SLIMMING_RULES.md (v1)
+# docs/SLIMMING_RULES.md (v2)
 
 > 目的：把"编排层瘦身 / 模块化"这类主线的共用纪律固化，让 Codex 不用每次重新拍板。
 >
 > 适用范围：`docs/NEXT_STEP.md` 里所有 `XXX.py 瘦身 / 模块化` 主线（`telegram_bot.py` / `import_to_library.py` / `add_to_downloader.py` / `search_media.py` / `manage_bt_subscription.py` / `cleanup_downloaded_source.py` / `private_chat_runtime.py` / `app/main.py`），以及将来任何以"拆大文件、不改行为"为目标的主线。
 
+## 0. 保守版减法政策
+
+- 默认顺序是：**保留稳定边界 > 归档历史台账 > 删除纯工具产物**。
+- `*_PLAN.md` / `*_LOG.md` 只在它们仍承载当前真相、当前边界或当前测试入口时保留；完成态历史优先归档，纯一次性记录再删除。
+- `CODEX_*_PROMPT.md` 视为工具配置，不算项目文档；只要不再被引用，就优先删除。
+- `logs/`、`tmp_tests/` 这类运行产物继续按忽略策略处理，不纳入项目真相。
+
 ## 1. 什么算"瘦身"
 
 - **只**拆代码组织，不改对外行为、不改真相边界、不改副作用。
-- 允许：抽函数到新模块、把类里相对独立的一组方法搬到新文件、提出共享常量。
+- 允许：抽函数到新模块、把类里相对独立的一组方法搬到新文件、提出共享常量；只有当 helper 真正承载稳定职责边界时，才值得保留。
 - 不允许：改 approval / jobs / job_event / SQLite schema / 审批协议 / 用户侧文本 / 中文日志文本 / error reason 字符串。
 - 任何会让调用方感知到的 API 变化都视为**另一个主线**，不走瘦身 PR。
 
 ## 2. 拆分粒度
 
-- **每个 commit 只拆出一个 helper 模块或一组同属职责的方法。** 不要一次把一个大文件拆成 5 个模块。
+- **每个 commit 只拆出一个 helper 模块或一组同属职责的方法。** 不要一次把一个大文件拆成 5 个模块，也不要为了凑文件数继续拆碎稳定职责。
 - 单次瘦身 commit 的代码改动（含新增、删除、移动行）目标控制在 **< 400 行 diff**。超过就拆成两个 commit。
 - 新文件放在原文件所在目录（`app/services/` 或 `app/bot/`），命名遵循现有风格（小写+下划线）。
 - 不要引入新的子包层级（如 `app/services/download/...`），除非单个主线拆完明显分簇后，用户显式同意引入。
+- `60` 行以下的 support/helper 文件只有在“稳定、复用、确实能让调用方更单一”时才保留；否则优先并回调用方或同类文件。
 
 ## 3. 命名约定
 

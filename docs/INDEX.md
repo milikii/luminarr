@@ -39,6 +39,7 @@
 
 - `docs/PERSISTENCE_CLOSURE_LOG.md`：当前真相闭环细节
 - `docs/TEST_ENV.md`：真实 downloader / import / refresh 联调
+- `docs/SLIMMING_RULES.md`：编排层瘦身和文档减法的通用纪律
 - 对应主线的 `*_LOG.md` / `*_PLAN.md`：只在当前任务直接相关时再打开
 
 ## 3. 如果你是开发者 / fork 维护者
@@ -64,6 +65,7 @@
 - 运行与启动层：`docs/GETTING_STARTED.md`、`docs/TEST_ENV.md`
 - 当前施工真相层：`docs/STATUS.md`、`docs/NEXT_STEP.md`
 - 长期边界层：`docs/DECISIONS.md`、`docs/ARCHITECTURE.md`
+- 施工纪律层：`docs/SLIMMING_RULES.md`
 - 历史闭环层：`docs/PERSISTENCE_CLOSURE_LOG.md`、各 `*_LOG.md` / `*_PLAN.md`
 
 ## 5. 文档维护规则
@@ -72,6 +74,7 @@
 - `docs/HUMAN_START_HERE.md` 只服务非技术操作者；`AGENTS.md` 只服务 AI 执行。
 - `docs/STATUS.md` 只保留当前短快照；不要把长台账再写回去。
 - `docs/NEXT_STEP.md` 只写当前唯一主线、当前用户价值、边界和退出条件。
+- `docs/SLIMMING_RULES.md` 只写结构减法和文档减法的共用纪律，不写当前主线台账。
 - 新闭环优先并入 `docs/PERSISTENCE_CLOSURE_LOG.md` 2.1~2.5 现有主题分组，不新开按日期堆叠的小节。
 - 运行方式、环境变量、启动入口只写在 `docs/GETTING_STARTED.md` 和 `.env.example`。
 - 系统结构解释只写在 `docs/ARCHITECTURE.md`。
