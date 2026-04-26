@@ -85,6 +85,7 @@
 - 当前主线和下一步：`docs/NEXT_STEP.md`
 - 当前状态：`docs/STATUS.md`
 - 历史详细闭环：`docs/PERSISTENCE_CLOSURE_LOG.md`
+- 已完成主线的旧施工台账：`archive/docs/`
 - 启动、环境、测试栈：`docs/GETTING_STARTED.md`、`docs/TEST_ENV.md`
 
 ## 5. 失败先看哪里

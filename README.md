@@ -15,7 +15,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 2. 当前稳定范围
 
 - 当前首版承诺矩阵：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
-- 当前保守版发布准备、搜索 helper 收口和 import worth-it 复评估都已完成；默认分支当前回到**质量硬化完成态 / worth-it 冻结**，继续推进前先按 `docs/NEXT_STEP.md` 核对是否真的出现了新的 focused gate、真实失败边界或新主线
+- 当前保守版发布准备、搜索 helper 收口和 import worth-it 复评估都已完成；当前默认分支正在做**历史 docs 归档减法**，把已完成主线台账从 `docs/` 主目录移到 `archive/docs/`，继续推进前先按 `docs/NEXT_STEP.md` 确认当前是不是仍在入口/归档收口，而不是误回旧热点代码
 - 当前仓库质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`
 - 已实现但当前不纳入首版发布保证的路径，继续保留在代码和测试里，不因为发布口径收紧而回退
 
@@ -56,6 +56,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 当前主线状态与下一步边界：看 `docs/NEXT_STEP.md`
 - 已定死的长期边界：看 `docs/DECISIONS.md`
 - 文档总入口和分流规则：看 `docs/INDEX.md`
+- 已完成主线的历史台账：看 `archive/docs/`
 
 ## 6. 如果你准备继续改
 
