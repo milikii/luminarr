@@ -37,6 +37,16 @@ _UNCENSORED_KEYWORDS = ("无码", "uncensored", "caribbeancom", "caribbean", "1p
 _FC2_KEYWORDS = ("fc2", "ppv")
 _CENSORED_KEYWORDS = ("有码", "jav", "javbus", "javlibrary")
 _NOISE_PATTERN = re.compile(r"[^0-9a-z]+", re.IGNORECASE)
+_UNCENSORED_PREFIX_ALIASES = {
+    "carib": "carib",
+    "caribbeancom": "carib",
+    "1pon": "1pon",
+    "1pondo": "1pon",
+    "10mu": "10mu",
+    "10musume": "10mu",
+    "paco": "paco",
+    "pacopacomama": "paco",
+}
 _SEPARATOR_TRANSLATION = str.maketrans(
     {
         "—": "-",
@@ -140,7 +150,7 @@ def _match_uncensored(text: str) -> AdultContentMatch | None:
         matched = pattern.search(text)
         if matched is None:
             continue
-        prefix = _normalize_compact_text(str(matched.group("prefix") or ""))
+        prefix = _canonicalize_uncensored_prefix(str(matched.group("prefix") or ""))
         serial = _normalize_uncensored_serial(str(matched.group("serial") or ""))
         if not prefix or not serial:
             continue
@@ -214,3 +224,8 @@ def _normalize_uncensored_serial(value: str) -> str:
 def _normalize_match_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value or "")
     return normalized.translate(_SEPARATOR_TRANSLATION).strip()
+
+
+def _canonicalize_uncensored_prefix(value: str) -> str:
+    prefix = _normalize_compact_text(value)
+    return _UNCENSORED_PREFIX_ALIASES.get(prefix, prefix)

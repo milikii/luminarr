@@ -50,6 +50,21 @@ def test_extract_adult_content_match_normalizes_full_width_and_variant_separator
     assert uncensored_match.display_id == "CARIB-042123-001"
 
 
+def test_extract_adult_content_match_canonicalizes_uncensored_prefix_aliases() -> None:
+    alias_samples = (
+        ("Caribbeancom-042123-001", "carib:042123-001", "CARIB-042123-001"),
+        ("1Pondo-042123-001", "1pon:042123-001", "1PON-042123-001"),
+        ("10Musume-042123-001", "10mu:042123-001", "10MU-042123-001"),
+        ("PacoPacomama-042123-001", "paco:042123-001", "PACO-042123-001"),
+    )
+
+    for text, expected_id, expected_display in alias_samples:
+        match = extract_adult_content_match(text)
+        assert match is not None
+        assert match.normalized_content_id == expected_id
+        assert match.display_id == expected_display
+
+
 def test_guess_adult_archive_category_prefers_chinese_original_and_western_keywords() -> None:
     assert guess_adult_archive_category("麻豆 国产原创") == "chinese_original"
     assert guess_adult_archive_category("Brazzers western title") == "western"
