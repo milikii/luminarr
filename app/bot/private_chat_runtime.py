@@ -161,6 +161,9 @@ async def _handle_bt_follow_up_routes(
     bot_data: MutableMapping[str, object],
     reply_func: PrivateChatReplyFunc,
     chat_id: int | None,
+    user_id: int | None,
+    channel: str,
+    resolve_bt_downloader_execution,
     tg,
 ) -> _BtFollowUpPrecheck | None:
     bt_follow_up_precheck = await _resolve_bt_follow_up_precheck(
@@ -177,6 +180,9 @@ async def _handle_bt_follow_up_routes(
         bot_data=bot_data,
         reply_func=reply_func,
         chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        resolve_bt_downloader_execution=resolve_bt_downloader_execution,
         bt_processing_path_pending=bt_follow_up_precheck.bt_processing_path_pending,
         bt_processing_path=bt_follow_up_precheck.bt_processing_path,
         bt_processing_shortcut=bt_follow_up_precheck.bt_processing_shortcut,
@@ -435,6 +441,9 @@ async def handle_private_chat_query_text(
         bot_data=bot_data,
         reply_func=runtime.reply_func,
         chat_id=chat_id,
+        user_id=user_id,
+        channel=channel,
+        resolve_bt_downloader_execution=runtime.resolve_bt_downloader_execution,
         tg=runtime.tg,
     )
     if bt_follow_up_precheck is None:

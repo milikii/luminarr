@@ -47,6 +47,8 @@ def test_extract_bt_batch_request_wrappers_delegate_to_pure_bt_parser() -> None:
 
 def test_parse_bt_choices_resolve_supported_aliases() -> None:
     assert parse_bt_classification_choice(" 动漫 ") == "anime"
+    assert parse_bt_processing_path_choice(" 观影 PT 链 ") == "media_import"
+    assert parse_bt_processing_path_choice(" BT 成人链 ") == "adult_bt"
     assert parse_bt_processing_path_choice(" pure-bt ") == "pure_bt"
     assert parse_bt_processing_path_legacy_shortcut("电视剧") == ("media_import", "series")
     assert parse_bt_processing_path_legacy_shortcut("其他BT") == ("pure_bt", None)

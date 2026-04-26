@@ -13,6 +13,10 @@ from app.services.pure_bt import (
 FRUSTRATION_TEXTS = frozenset({"不对", "停", "重来", "换一个", "算了", "取消"})
 BT_READ_ONLY_PREFIXES = ("bt搜 ", "bt search ")
 BT_PROCESSING_PATH_ALIASES = {
+    "观影pt链": "media_import",
+    "观影pt": "media_import",
+    "pt观影链": "media_import",
+    "pt观影": "media_import",
     "影视入库链": "media_import",
     "影视入库": "media_import",
     "入库链": "media_import",
@@ -20,6 +24,12 @@ BT_PROCESSING_PATH_ALIASES = {
     "mediaimport": "media_import",
     "media-import": "media_import",
     "media_import": "media_import",
+    "bt成人链": "adult_bt",
+    "成人bt链": "adult_bt",
+    "成人链": "adult_bt",
+    "adultbt": "adult_bt",
+    "adult-bt": "adult_bt",
+    "adult_bt": "adult_bt",
     "纯bt下载链": "pure_bt",
     "纯bt下载": "pure_bt",
     "纯bt": "pure_bt",
