@@ -160,7 +160,12 @@ class SearchMediaService:
             raw_results = await self._search_bt_batch_preview_candidates(cleaned_query)
         except UnsupportedBatchPreviewPageUrl:
             return BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE.format(query=cleaned_query)
-        selection = select_batch_preview_candidates(raw_results, request=request, default_limit=self._limit)
+        helper_match = await self._lookup_bt_read_only_helper_match(cleaned_query)
+        selection_source_results = self._prepare_bt_read_only_selection_candidates(
+            raw_results,
+            helper_match=helper_match,
+        )
+        selection = select_batch_preview_candidates(selection_source_results, request=request, default_limit=self._limit)
         if selection.out_of_range:
             return BT_BATCH_PREVIEW_OUT_OF_RANGE_TEMPLATE.format(
                 selection=request.selection_text or "-",
@@ -170,6 +175,7 @@ class SearchMediaService:
         display_results = await self._decorate_bt_read_only_display_candidates(
             selected_raw_results,
             lookup_query=cleaned_query,
+            helper_match=helper_match,
         )
         if chat_id is not None:
             persist_error_text = self._cache_bt_batch_preview_candidates(chat_id=chat_id, candidates=selected_raw_results)
@@ -352,15 +358,28 @@ class SearchMediaService:
         if not display_candidates:
             return []
         helper_match = await self._lookup_bt_read_only_helper_match(lookup_query)
-        if helper_match is not None:
-            display_candidates = _prioritize_bt_read_only_helper_related_candidates(
-                display_candidates,
-                helper_match=helper_match,
-            )
+        display_candidates = self._prepare_bt_read_only_selection_candidates(
+            display_candidates,
+            helper_match=helper_match,
+        )
         limited_candidates = display_candidates[:selected_limit]
         return await self._decorate_bt_read_only_display_candidates(
             limited_candidates,
             lookup_query=lookup_query,
+            helper_match=helper_match,
+        )
+
+    def _prepare_bt_read_only_selection_candidates(
+        self,
+        candidates: Sequence[Mapping[str, Any]],
+        *,
+        helper_match: JavLibraryReadOnlyMatch | None,
+    ) -> list[dict[str, Any]]:
+        display_candidates = [_to_candidate_dict(item) for item in candidates]
+        if helper_match is None:
+            return display_candidates
+        return _prioritize_bt_read_only_helper_related_candidates(
+            display_candidates,
             helper_match=helper_match,
         )
 
