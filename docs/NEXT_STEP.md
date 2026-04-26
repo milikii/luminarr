@@ -4,7 +4,7 @@
 
 - 当前唯一主线切到 **`downloader_route_lookup.py` 重复日志/路由壳收口 / 质量硬化**。
 - 当前这一轮只服务两件事：
-  - 收掉 `downloader_route_lookup.py` 里重复的日志函数和同构的路由序幕
+  - 收掉 `downloader_route_lookup.py` 里重复的日志函数、同构的路由序幕和单用途 helper 壳
   - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析逻辑收口、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
 - 已完成态保持，不回退：
   - `Makefile` 公开验证入口已收口：`verify-mainline` 当前改成 4 个分组 target 汇总入口，cleanup 公开入口收敛到 `test-cleanup-smoke` / `test-cleanup` / `test-cleanup-docs-gate` / `test-cleanup-window`
@@ -19,12 +19,12 @@
   - cleanup 链当前已不再保留 `cleanup_*_support.py` 文件；相关逻辑已经收回 `cleanup_downloaded_source.py`、`cleanup_correlation_lookup.py` 和 `adult_archive_service.py`
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `492` 行；共享 route lookup / dispatch 日志打印器、client candidate 纯解析 helper、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地
+- `app/downloader_route_lookup.py` 当前 `400` 行；共享 route lookup / dispatch 日志打印器、client candidate 纯解析 helper、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地，单用途 payload / import 源归一 / 实例查找壳已继续收回调用点
 
 ## User value
 
-- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是先收 `downloader_route_lookup.py` 里重复的日志/路由壳。
-- 这一步只允许对下载器路由的重复日志/路由边界做最小闭环，不碰搜索真相、下载确认协议、shared runtime 或新的展示层扩展。
+- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里重复的日志/路由壳和单用途 helper 壳。
+- 这一步只允许对下载器路由的重复日志/路由边界和单用途 helper 壳做最小闭环，不碰搜索真相、下载确认协议、shared runtime 或新的展示层扩展。
 - 先把路由重复壳压薄，后续才有资格再评估更大的下载器路由结构债。
 
 ## Only do

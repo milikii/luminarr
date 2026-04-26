@@ -19,19 +19,6 @@ class ResolvedDownloaderTaskRoute:
     download_dir: str
 
 
-def _resolve_downloader_payload_value(payload_json: str, key: str) -> tuple[str, str | None]:
-    cleaned_payload = payload_json.strip()
-    if not cleaned_payload:
-        return "", "payload_json empty"
-    try:
-        payload = json.loads(cleaned_payload)
-    except json.JSONDecodeError:
-        return "", "payload_json invalid json"
-    if not isinstance(payload, dict):
-        return "", "payload_json not object"
-    return str(payload.get(key, "")).strip(), None
-
-
 def _print_downloader_issue_log(
     *,
     title: str,
@@ -111,16 +98,28 @@ def _resolve_downloader_task_route(
     if downloader_job is None:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
         return None
-    payload_values = _read_downloader_route_payload_values(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        payload_json=downloader_job.payload_json,
-        first_key="downloader_name",
-        second_key="download_dir",
-    )
-    if payload_values is None:
+    cleaned_payload = downloader_job.payload_json.strip()
+    if not cleaned_payload:
+        _log_downloader_route_payload_corruption(task_ref=task_ref, chat_id=chat_id, reason="payload_json empty")
         return None
-    downloader_name, download_dir = payload_values
+    try:
+        payload = json.loads(cleaned_payload)
+    except json.JSONDecodeError:
+        _log_downloader_route_payload_corruption(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            reason="payload_json invalid json",
+        )
+        return None
+    if not isinstance(payload, dict):
+        _log_downloader_route_payload_corruption(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            reason="payload_json not object",
+        )
+        return None
+    downloader_name = str(payload.get("downloader_name", "")).strip()
+    download_dir = str(payload.get("download_dir", "")).strip()
     if not downloader_name:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
         return None
@@ -128,82 +127,6 @@ def _resolve_downloader_task_route(
         downloader_name=downloader_name,
         download_dir=download_dir,
     )
-
-
-def _read_downloader_route_payload_value(
-    *,
-    task_ref: str,
-    chat_id: int | None,
-    payload_json: str,
-    key: str,
-) -> str | None:
-    value, payload_error = _resolve_downloader_payload_value(payload_json, key)
-    if payload_error is not None:
-        _log_downloader_route_payload_corruption(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            reason=payload_error,
-        )
-        return None
-    return value
-
-
-def _read_downloader_route_payload_values(
-    *,
-    task_ref: str,
-    chat_id: int | None,
-    payload_json: str,
-    first_key: str,
-    second_key: str,
-) -> tuple[str, str] | None:
-    first_value = _read_downloader_route_payload_value(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        payload_json=payload_json,
-        key=first_key,
-    )
-    if first_value is None:
-        return None
-    second_value = _read_downloader_route_payload_value(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        payload_json=payload_json,
-        key=second_key,
-    )
-    if second_value is None:
-        return None
-    return first_value, second_value
-
-
-def _normalize_import_source_download_dir(
-    *,
-    import_source: TransmissionImportSource,
-    host_download_dir: str,
-) -> TransmissionImportSource:
-    cleaned_download_dir = host_download_dir.strip()
-    if not cleaned_download_dir or cleaned_download_dir == import_source.download_dir:
-        return import_source
-    return TransmissionImportSource(
-        task_id=import_source.task_id,
-        task_hash=import_source.task_hash,
-        name=import_source.name,
-        download_dir=cleaned_download_dir,
-        is_finished=import_source.is_finished,
-        percent_done=import_source.percent_done,
-    )
-
-
-def _resolve_host_download_dir_for_route(
-    *,
-    route: ResolvedDownloaderTaskRoute,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-) -> str:
-    if route.download_dir.strip():
-        return route.download_dir
-    instance = downloader_instances_by_name.get(route.downloader_name)
-    if instance is None:
-        return ""
-    return instance.download_dir
 
 
 def _resolve_lookup_client_for_task(
@@ -302,17 +225,13 @@ def _resolve_downloader_client_candidate(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> tuple[str, DownloaderInstanceConfig | None, TransmissionClient | QbittorrentClient | None]:
     cleaned_name = downloader_name.strip()
-    instance = _lookup_downloader_instance(
-        downloader_name=cleaned_name,
-        downloader_instances_by_name=downloader_instances_by_name,
-    )
+    instance = downloader_instances_by_name.get(cleaned_name)
     if instance is None:
         return cleaned_name, None, None
-    client = _lookup_client_for_instance(
-        downloader_name=cleaned_name,
-        downloader_type=instance.downloader_type,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    client = (
+        qbittorrent_clients_by_name.get(cleaned_name)
+        if instance.downloader_type == "qbittorrent"
+        else transmission_clients_by_name.get(cleaned_name)
     )
     if client is None:
         return cleaned_name, instance, None
@@ -378,26 +297,6 @@ def _resolve_downloader_client_for_dispatch(
     return client
 
 
-def _lookup_client_for_instance(
-    *,
-    downloader_name: str,
-    downloader_type: str,
-    transmission_clients_by_name: dict[str, TransmissionClient],
-    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
-) -> TransmissionClient | QbittorrentClient | None:
-    if downloader_type == "qbittorrent":
-        return qbittorrent_clients_by_name.get(downloader_name)
-    return transmission_clients_by_name.get(downloader_name)
-
-
-def _lookup_downloader_instance(
-    *,
-    downloader_name: str,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-) -> DownloaderInstanceConfig | None:
-    return downloader_instances_by_name.get(downloader_name)
-
-
 def resolve_downloader_dispatch_download_dir(
     *,
     downloader_name: str,
@@ -440,12 +339,21 @@ async def _get_torrent_import_source_with_routing(
     import_source = await client.get_torrent_import_source(task_ref)
     if import_source is None:
         return None
-    return _normalize_import_source_download_dir(
-        import_source=import_source,
-        host_download_dir=_resolve_host_download_dir_for_route(
-            route=route,
-            downloader_instances_by_name=downloader_instances_by_name,
-        ),
+    host_download_dir = route.download_dir.strip()
+    if not host_download_dir:
+        instance = downloader_instances_by_name.get(route.downloader_name)
+        if instance is not None:
+            host_download_dir = instance.download_dir.strip()
+    cleaned_host_download_dir = host_download_dir.strip()
+    if not cleaned_host_download_dir or cleaned_host_download_dir == import_source.download_dir:
+        return import_source
+    return TransmissionImportSource(
+        task_id=import_source.task_id,
+        task_hash=import_source.task_hash,
+        name=import_source.name,
+        download_dir=cleaned_host_download_dir,
+        is_finished=import_source.is_finished,
+        percent_done=import_source.percent_done,
     )
 
 

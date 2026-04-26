@@ -13,17 +13,17 @@
 - `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件。
 - `app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 已删除；功能测试继续通过，确认这些 tuple 只是未被消费的死代码，不影响现有模块级导出形状。
 - `app/config.py` 当前 `457` 行；`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory，当前不再继续在这条边界上做重复壳。
-- `app/downloader_route_lookup.py` 当前 `492` 行；重复的 route lookup / dispatch 日志已收成共享打印器，实例查找 + client 选择已抽成纯解析 helper，import/status/remove 三条路由的“先拿 route 再拿 client”前半段仍保持共享壳，不改错误文本或路由语义。
+- `app/downloader_route_lookup.py` 当前 `400` 行；重复的 route lookup / dispatch 日志已收成共享打印器，payload 读取、实例查找、client 选择和 import 源 download_dir 归一的单用途壳已继续并回调用点，import/status/remove 三条路由的“先拿 route 再拿 client”前半段仍保持共享壳，不改错误文本或路由语义。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
 
-- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理和 `config.py` 重复解析逻辑都已完成，这轮主风险转到 downloader 路由重复日志/路由序幕，如果不沿稳定边界推进，很容易又变成大改。
-- 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理和 `config.py` 收口都已落地；当前最小风险继续落在 `downloader_route_lookup.py`，但已先收掉两组共享日志/路由前半段，不要回头重建旧壳层。
+- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理和 `config.py` 重复解析逻辑都已完成，这轮主风险继续转到 downloader 路由重复日志/路由序幕，如果不沿稳定边界推进，很容易又变成大改。
+- 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理和 `config.py` 收口都已落地；当前最小风险继续落在 `downloader_route_lookup.py`，但已继续收掉单用途 helper 壳，不要回头重建旧壳层。
 
 ## Later candidate line
 
-- 当前 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理和 `config.py` 重复解析逻辑都已完成；当前更保守候选已切到 `downloader_route_lookup.py` 重复日志/路由壳，再之后才是用户可感知改进。
+- 当前 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理和 `config.py` 重复解析逻辑都已完成；当前更保守候选仍是 `downloader_route_lookup.py` 重复日志/路由壳，再之后才是用户可感知改进。
 - 这条后续候选主线固定为 `Telegram-first`：先做 Telegram richer reply，Feishu / personal WeChat / WeCom 首阶段先保留共享文本降级，不改 shared runtime / approval / dispatch 真相。
 - 成人 BT 图片目标当前记为“尽量全量带图”，但实施分阶段；拿不到稳定图源时明确降级为纯文本。
 
