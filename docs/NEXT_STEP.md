@@ -1,8 +1,8 @@
-# Next step (v357)
+# Next step (v358)
 
 ## Current goal
 
-- 当前主线已从 **成人标题归一化回归保护** 切到 **BT 只读排序 / 展示保护**。
+- 当前主线已从 **BT 只读排序 / 展示保护** 切到 **BT 只读候选相关性保护**。
 - 当前完成态保持：
   - 成人 BT 站点优先、Prowlarr 成人 PT 补充
   - 成人内容 ID 识别与历史账本
@@ -21,14 +21,19 @@
     - keyword-only 成人分类猜测不会再写进 BT 候选真相、待确认上下文或 JavLibrary helper 入口
     - JavLibrary helper 当前只会补到仍与当前 exact-id 相关的只读候选
     - 只读展示会压掉仅空格 / 连接符差异的重复 helper 标题
+  - BT 只读排序 / 展示保护当前也已收口：
+    - `offkab / sukebei.nyaa.si / javbus.com / tokyotosho.info` 这类来源别名会映射到既有站点优先级
+    - 非 exact-id 只读查询会先按标题相关性排序，再回退到站点优先级 / 做种数
+    - exact-id 查询会优先展示标题表面带明确番号的候选
+    - 同一番号的多候选只显示一次历史提示
 - 当前新增真相：
   - `DOWNLOADER_INSTANCES` 当前可选第 5 段 `dispatch_download_dir`，可把下载器 API 投递路径和宿主机导入路径分开
   - 路由层当前会在导入查询时优先恢复任务真相里的 host `download_dir`
   - `tmp_tests/verify_adult_archive_bt_real_smoke.py` 当前会先清理同 hash 旧任务，再用 `/downloads/complete` 投递，已稳定跑通“归档 -> 保留期清理”
 - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态：`app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退。
 - 当前下一条缺口：
-  - BT 只读结果 / 批量预览当前虽然已补最小 helper 展示保护，但排序与展示回退仍主要靠已有格式化逻辑和现有 BT 候选顺序
-  - 后续若继续收口，只能先做更窄的 focused display / ordering guard，不能放宽成 helper 写真相或自动 dispatch
+  - helper 相关性当前仍发生在 top-N 候选切片之后；当边界噪声候选在切片前挤进来时，更相关的 helper 候选仍可能被挤出只读展示
+  - 后续若继续收口，只能先做更窄的 focused relevance guard，不能放宽成 helper 写真相或自动 dispatch
 
 ## User value
 
@@ -37,12 +42,12 @@
   - qB 成人归档成功，保留期清理成功
   - BT Transmission 成人归档成功，保留期清理成功
 - `javlibrary` exact-id helper 已经把“手动只读探索时的最小补全字段”补齐。
-- 当前切到更窄的 BT 只读排序 / 展示保护，可以继续在不放宽自动 dispatch 边界的前提下，降低只读预览排序漂移、重复信息和展示回退的风险。
+- 当前切到更窄的 BT 只读候选相关性保护，可以继续在不放宽自动 dispatch 边界的前提下，降低 top-N 切片前后的相关性回退风险。
 
 ## Only do
 
-- 继续沿当前主线时，只做 **BT 只读排序 / 展示保护** 这条更窄的小闭环：
-  - 优先补 focused tests、排序 guard 和只读展示回退保护
+- 继续沿当前主线时，只做 **BT 只读候选相关性保护** 这条更窄的小闭环：
+  - 优先补 focused tests、candidate relevance guard 和只读展示回退保护
   - 只服务成人 BT 支线，不进 PT 主链
   - 不放宽 `javlibrary` 的 exact-id only / BT-only / read-only 边界
   - 保持当前 qB / BT Transmission 真实 smoke 结果、测试环境与文档一致
@@ -57,14 +62,14 @@
 
 ## Done when
 
-当前这条 **BT 只读排序 / 展示保护** 主线满足：
+当前这条 **BT 只读候选相关性保护** 主线满足：
 
-1. BT 只读结果 / 批量预览的排序、重复信息压制和展示回退都有 focused regression tests 保护。
+1. BT 只读结果 / 批量预览的 candidate relevance、top-N 切片前后顺序和展示回退都有 focused regression tests 保护。
 2. `javlibrary` helper 继续保持 exact-id only、BT-only、read-only，不写审批真相。
 3. `make quality`、相关 focused tests 和文档都已同步。
 4. 现有 qB / BT Transmission 成人归档真实 smoke 通过态不回退。
 
 ## After this step
 
-1. 如果 BT 只读排序 / 展示保护也收口，再看是否还有必要补更窄的 read-only candidate relevance guard。
+1. 如果 BT 只读候选相关性保护也收口，再看是否还有必要继续收窄 helper 介入时机或只读截断策略。
 2. 如果后续仍想扩大成人识别覆盖，优先继续加 focused tests 和只读证据，不要先扩成自动 dispatch。

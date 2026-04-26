@@ -1,9 +1,9 @@
-# Current status (v474)
+# Current status (v475)
 
 ## Current mainline
 
 - **质量硬化** 当前保持完成态，不回退。
-- 当前默认分支主线已从 **成人标题归一化回归保护** 切到 **BT 只读排序 / 展示保护**；direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
+- 当前默认分支主线已从 **BT 只读排序 / 展示保护** 切到 **BT 只读候选相关性保护**；direct magnet 入口继续保留“观影 PT 链 / BT 成人链”问询，不自动假定成人链。
 - 成人 BT 当前新真相已落地：
   - `adult_content_registry` 已记录 `pending / downloading / archived_present / archived_deleted`
   - BT 预览 / 批量预览 / 待确认文本已能提示历史状态
@@ -16,6 +16,10 @@
   - keyword-only 成人分类猜测当前不会再写进 BT 候选真相、待确认上下文或 JavLibrary helper 入口；这些路径只接受 exact-id
   - JavLibrary helper 当前只会给和当前 exact-id 仍有明显标题关联的只读候选补元数据，不再把 query 级补全误贴到无关噪声结果
   - 只读展示当前会压掉“仅空格/连接符差异”的重复 helper 标题行
+  - 成人 BT 只读排序当前已补 source alias 优先级归一化：`offkab / sukebei.nyaa.si / javbus.com / tokyotosho.info` 这类真实来源别名会吃到既有站点优先级
+  - 非 exact-id 只读查询当前会先按标题相关性重排，再按站点优先级 / 做种数收口，不再轻易让无关高种噪声标题排到相关候选前面
+  - exact-id 只读查询当前会优先展示标题表面就带明确番号的候选，再回退到 generic title + 站点补完
+  - 同一番号的多候选当前只显示一次历史提示，不再在整段只读预览里重复刷屏
   - 成人 BT 下载完成后可进入归档，统一保留窗口到期后可清理下载器任务与源资源
   - direct magnet 运行时选择 `BT 成人链` 时，已能直接创建成人磁力下载待确认并尽量识别番号 / 分类
   - qB 导入源解析已改成优先使用真实 `content_path`，不再盲信漂移的 `save_path`
@@ -31,17 +35,17 @@
 
 ## Current health
 
-- 当前这轮变更只触碰 `adult_content` 识别归一化、`bt_sources` / `add_pending_context` 的 exact/fallback 分层、`javlibrary` helper 注入边界、BT 只读展示去重和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
+- 当前这轮变更只触碰 `adult_bt_selector` 排序键、`search_reply_formatter` 只读展示去重和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
 - 当前成人 BT 主线的两条真实 smoke 继续保持通过态；当前更需要留意的是：
-  - `javlibrary` 当前只补 exact-id only 只读场景；非 exact-id 的噪声标题虽然新增了本地别名/噪声规则，但仍主要依赖站点标题和既有规则
-  - 下一条 BT 只读排序 / 展示保护如果继续推进，仍要保持 focused tests 优先，不能把 helper 结果写进审批真相，也不要继续把 `search_media.py` 往上堆
+  - 当前 BT 只读排序 / 展示保护已经收口，但 helper 相关性判断仍发生在 top-N 选取之后；边界噪声候选仍可能在切片前挤掉更相关结果
+  - 下一条 BT 只读候选相关性保护如果继续推进，仍要保持 focused tests 优先，不能把 helper 结果写进审批真相，也不要继续把 `search_media.py` 往上堆
 
 ## Latest verification
 
 - `make quality`：`28 passed, 0 skipped`
 - `make verify-mainline`：当前轮已通过
 - focused pytest：
-  - `tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_javlibrary_helper.py tests/test_adult_content.py tests/test_bt_sources.py tests/test_add_pending_context.py`：`216 passed, 0 skipped`
+  - `tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_javlibrary_helper.py tests/test_adult_content.py tests/test_bt_sources.py tests/test_add_pending_context.py`：`221 passed, 0 skipped`
 - 真实 smoke 保持通过态，本轮未改下载器 / 归档协议：
   - `.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`
   - `bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`
@@ -59,7 +63,7 @@
 
 ## Current biggest risk
 
-- 当前最大不确定性已经从“成人标题识别会不会因为变体/别名回退”进一步收敛到“后续 BT 只读排序 / 展示保护怎么继续保持只读、focused、且不再把 `search_media.py` 继续堆大”。
+- 当前最大不确定性已经从“BT 只读排序 / 展示会不会被来源别名、噪声标题和重复历史提示拖乱”收敛到“后续 BT 只读候选相关性保护怎么继续保持只读、focused，且不在 top-N 切片前后引入新的 helper 真相边界”。
 
 ## Recommended Next Operator Command
 
@@ -68,5 +72,5 @@
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 
-保持质量硬化，不新增用户可感知功能。成人标题归一化回归保护已收口；下一步沿着“BT 只读排序 / 展示保护”推进，只补更窄的 focused tests / display guard，不放宽成自动 dispatch 来源。
+保持质量硬化，不新增用户可感知功能。BT 只读排序 / 展示保护已收口；下一步沿着“BT 只读候选相关性保护”推进，只补更窄的 focused tests / relevance guard，不放宽成自动 dispatch 来源。
 ```
