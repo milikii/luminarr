@@ -3,8 +3,9 @@
 ## Current goal
 
 - 当前唯一主线切到 **`downloader_route_lookup.py` 重复日志/路由壳收口 / 质量硬化**。
-- 当前这一轮只服务两件事：
+- 当前这一轮主要服务以下收口：
   - 收掉 `downloader_route_lookup.py` 里重复的日志函数、同构的路由序幕和单用途 helper 壳
+  - 顺手收掉 `app/main.py` 里残余的 downloader client 本地死壳
   - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析逻辑收口、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
 - 已完成态保持，不回退：
   - `Makefile` 公开验证入口已收口：`verify-mainline` 当前改成 4 个分组 target 汇总入口，cleanup 公开入口收敛到 `test-cleanup-smoke` / `test-cleanup` / `test-cleanup-docs-gate` / `test-cleanup-window`
@@ -18,8 +19,9 @@
   - `app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退
   - cleanup 链当前已不再保留 `cleanup_*_support.py` 文件；相关逻辑已经收回 `cleanup_downloaded_source.py`、`cleanup_correlation_lookup.py` 和 `adult_archive_service.py`
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
+  - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `400` 行；共享 route lookup / dispatch 日志打印器、client candidate 纯解析 helper、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地，单用途 payload / import 源归一 / 实例查找壳已继续收回调用点
+- `app/downloader_route_lookup.py` 当前 `386` 行；共享 route lookup / dispatch 日志打印器、client candidate 纯解析 helper、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地，单用途 payload / import 源归一 / 实例查找壳已继续收回调用点
 
 ## User value
 

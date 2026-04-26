@@ -285,19 +285,6 @@ def main() -> None:
     transmission_clients_by_name = _build_transmission_clients_by_name(settings.downloader_instances)
     qbittorrent_clients_by_name = _build_qbittorrent_clients_by_name(settings.downloader_instances)
 
-    def resolve_downloader_client_by_name(
-        downloader_name: str,
-    ) -> TransmissionClient | QbittorrentClient:
-        cleaned_name = downloader_name.strip()
-        if not cleaned_name:
-            return transmission_client
-        instance = downloader_instances_by_name.get(cleaned_name)
-        if instance is None:
-            return transmission_client
-        if instance.downloader_type == "qbittorrent":
-            return qbittorrent_clients_by_name.get(cleaned_name, transmission_client)
-        return transmission_clients_by_name.get(cleaned_name, transmission_client)
-
     async def add_torrent_with_routing(source: str, downloader_name: str = "", download_dir: str = "") -> TransmissionTask:
         client = _resolve_downloader_client_for_dispatch(
             downloader_name=downloader_name,

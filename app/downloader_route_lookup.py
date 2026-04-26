@@ -35,19 +35,11 @@ def _print_downloader_issue_log(
     )
 
 
-def _format_downloader_task_context(*, task_ref: str, chat_id: int | None) -> str:
-    return f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}"
-
-
-def _format_downloader_dispatch_context(*, downloader_name: str, downloader_type: str) -> str:
-    return f"{downloader_name} downloader_type={downloader_type}"
-
-
 def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
     _print_downloader_issue_log(
         title="下载器路由未命中",
         context_label="task_ref",
-        context_value=_format_downloader_task_context(task_ref=task_ref, chat_id=chat_id),
+        context_value=f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}",
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
@@ -58,7 +50,7 @@ def _log_downloader_route_lookup_error(*, task_ref: str, chat_id: int | None, er
     _print_downloader_issue_log(
         title="下载器路由查询失败",
         context_label="task_ref",
-        context_value=_format_downloader_task_context(task_ref=task_ref, chat_id=chat_id),
+        context_value=f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}",
         detail_label="错误",
         detail_value=str(error),
         fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
@@ -74,7 +66,7 @@ def _log_downloader_route_payload_corruption(
     _print_downloader_issue_log(
         title="下载器路由载荷损坏",
         context_label="task_ref",
-        context_value=_format_downloader_task_context(task_ref=task_ref, chat_id=chat_id),
+        context_value=f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}",
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
@@ -188,10 +180,7 @@ def _log_downloader_client_not_configured(*, downloader_name: str, downloader_ty
     _print_downloader_issue_log(
         title="下载器客户端未配置",
         context_label="downloader_name",
-        context_value=_format_downloader_dispatch_context(
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-        ),
+        context_value=f"{downloader_name} downloader_type={downloader_type}",
         detail_label="原因",
         detail_value="client missing",
         fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
@@ -207,10 +196,7 @@ def _log_downloader_dispatch_resolution_failed(
     _print_downloader_issue_log(
         title="下载器投递路由失败",
         context_label="downloader_name",
-        context_value=_format_downloader_dispatch_context(
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-        ),
+        context_value=f"{downloader_name} downloader_type={downloader_type}",
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
