@@ -14,5 +14,4 @@ build/
 *.db
 logs/
 codex.log
-tmp_tests/
 codex.md

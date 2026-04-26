@@ -1,4 +1,4 @@
-# docs/HUMAN_START_HERE.md (v4)
+# docs/HUMAN_START_HERE.md (v5)
 
 > 目的：给**不会写代码**的人一个稳定入口，知道“先看哪里、下一句怎么发、结果去哪里看、失败先去哪里查”。
 
@@ -86,13 +86,13 @@
 - 当前状态：`docs/STATUS.md`
 - 历史详细闭环：`docs/PERSISTENCE_CLOSURE_LOG.md`
 - 已完成主线的旧施工台账：`archive/docs/`
-- 启动、环境、测试栈：`docs/GETTING_STARTED.md`、`docs/TEST_ENV.md`
+- 启动、环境：`docs/GETTING_STARTED.md`
 
 ## 5. 失败先看哪里
 
 - 启动失败：`docs/GETTING_STARTED.md`
 - 当前主线为什么没继续：`docs/STATUS.md` + `docs/NEXT_STEP.md`
-- 真实 downloader / import / refresh 环境：`docs/TEST_ENV.md`
+- 真实 downloader / import / refresh 环境：看当前公开验证入口和 `docs/STATUS.md`
 - AI 为什么不该那样改：`AGENTS.md`
 - 不知道该给 AI 发哪一句：先回 `docs/OPERATOR_RUNBOOK.md`
 

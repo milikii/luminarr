@@ -43,6 +43,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/STATUS.md" in human_start_text
     assert "docs/OPERATOR_RUNBOOK.md" in human_start_text
     assert "docs/GETTING_STARTED.md" in human_start_text
+    assert "docs/TEST_ENV.md" not in human_start_text
     assert "AGENTS.md" in human_start_text
     assert "不确定文档、最近提交、当前状态有没有漂移" in human_start_text
     assert "这一轮只改文档与 docs gate" in human_start_text
@@ -63,12 +64,14 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/OPERATOR_RUNBOOK.md" in index_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in index_text
     assert "archive/docs/" in index_text
+    assert "docs/TEST_ENV.md" not in index_text
     assert "先看 `docs/STATUS.md`" in index_text
     assert "Recommended Next Operator Command" in index_text
 
     assert "docs/HUMAN_START_HERE.md" in getting_started_text
     assert "docs/STATUS.md" in getting_started_text
     assert "docs/OPERATOR_RUNBOOK.md" in getting_started_text
+    assert "docs/TEST_ENV.md" not in getting_started_text
 
     assert "shared private-chat runtime" in architecture_text
     assert "docs/STATUS.md" in decisions_text
@@ -78,6 +81,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/NEXT_STEP.md" in agents_text
     assert "docs/DECISIONS.md" in agents_text
     assert "docs/STATUS.md" in agents_text
+    assert "docs/TEST_ENV.md" not in decisions_text
     assert "Emby / Jellyfin / Plex" in readme_text
     assert "Emby / Jellyfin / Plex" in decisions_text
     assert "保守版减法政策" in slimming_rules_text
@@ -125,7 +129,7 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     assert "cold-start consistency audit" not in status_text
     assert "git log --oneline -20" not in status_text
     assert "git grep -n 'except Exception" not in status_text
-    assert re.search(r"`app/services/search_media\.py` `\d+` 行", status_text)
+    assert re.search(r"`cleanup_\*_support\.py` .*6", status_text)
 
 
 def test_current_doc_truth_keeps_runtime_lines_and_channel_scope_aligned() -> None:
@@ -203,8 +207,9 @@ def test_archived_history_docs_are_moved_out_of_active_docs_root() -> None:
 def test_active_docs_root_stays_small_and_current() -> None:
     active_docs = sorted(path.name for path in Path("docs").glob("*.md"))
 
-    assert len(active_docs) <= 16
+    assert len(active_docs) <= 15
     assert not any(name.endswith("_SLIMMING_LOG.md") for name in active_docs)
     assert "SEARCH_REPLY_PRESENTATION_PLAN.md" in active_docs
     assert "STATUS.md" in active_docs
     assert "NEXT_STEP.md" in active_docs
+    assert "TEST_ENV.md" not in active_docs

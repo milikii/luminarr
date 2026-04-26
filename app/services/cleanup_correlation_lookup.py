@@ -1,19 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
-from app.services.cleanup_correlation_event_support import fetch_cleanup_correlation_event
-from app.services.cleanup_correlation_flow_support import run_cleanup_correlation_lookup
-from app.services.cleanup_correlation_logging_support import (
+from app.services.cleanup_logging_support import (
     print_cleanup_correlation_lookup_failed_log,
     print_cleanup_correlation_path_missing_log,
     print_cleanup_correlation_result_missing_log,
     print_cleanup_correlation_row_corrupted_log,
     print_cleanup_job_lookup_failed_log,
 )
-from app.services.cleanup_correlation_result_support import build_cleanup_correlation_result
 from app.services.cleanup_task_identity_support import resolve_cleanup_task_identity
 
 CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
@@ -36,6 +34,15 @@ class ResolvedCleanupTaskIdentity:
     task_ref: str
     task_id: str
     task_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupCorrelationResult:
+    task_ref: str
+    task_id: str
+    task_hash: str
+    source_path: str
+    target_path: str
 
 
 class CleanupCorrelationLookup:
@@ -83,29 +90,29 @@ class CleanupCorrelationLookup:
                     reason=reason,
                 ),
                 result_missing_reason=CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON,
-                is_row_corrupted_reason=lambda reason: _is_cleanup_correlation_row_corrupted_reason(reason),
+                is_row_corrupted_reason=_is_cleanup_correlation_row_corrupted_reason,
             ),
             build_correlation_result=lambda resolved_identity, event: (
-                (lambda correlation: None if correlation is None else ImportCorrelation(
+                None
+                if (correlation := build_cleanup_correlation_result(
+                    event=event,
+                    fallback_task_ref=resolved_identity.task_ref,
+                    fallback_task_id=resolved_identity.task_id,
+                    fallback_task_hash=resolved_identity.task_hash,
+                    on_path_missing=lambda source_path_missing, target_path_missing: _print_cleanup_correlation_path_missing_log(
+                        task_ref=task_ref,
+                        resolved_identity=resolved_identity,
+                        event=event,
+                        source_path_missing=source_path_missing,
+                        target_path_missing=target_path_missing,
+                    ),
+                )) is None
+                else ImportCorrelation(
                     task_ref=correlation.task_ref,
                     task_id=correlation.task_id,
                     task_hash=correlation.task_hash,
                     source_path=correlation.source_path,
                     target_path=correlation.target_path,
-                ))(
-                    build_cleanup_correlation_result(
-                        event=event,
-                        fallback_task_ref=resolved_identity.task_ref,
-                        fallback_task_id=resolved_identity.task_id,
-                        fallback_task_hash=resolved_identity.task_hash,
-                        on_path_missing=lambda source_path_missing, target_path_missing: _print_cleanup_correlation_path_missing_log(
-                            task_ref=task_ref,
-                            resolved_identity=resolved_identity,
-                            event=event,
-                            source_path_missing=source_path_missing,
-                            target_path_missing=target_path_missing,
-                        ),
-                    )
                 )
             ),
         )
@@ -146,6 +153,68 @@ class CleanupCorrelationLookup:
 
 def _is_cleanup_correlation_row_corrupted_reason(reason: str) -> bool:
     return reason.endswith("corrupted after read")
+
+
+def run_cleanup_correlation_lookup(
+    *,
+    resolve_task_identity: Callable[[str, int | None], ResolvedCleanupTaskIdentity],
+    fetch_event: Callable[[ResolvedCleanupTaskIdentity], object | None],
+    build_correlation_result: Callable[[ResolvedCleanupTaskIdentity, object], CleanupCorrelationResult | None],
+    task_ref: str,
+    chat_id: int | None,
+) -> tuple[ResolvedCleanupTaskIdentity, CleanupCorrelationResult | None]:
+    resolved_identity = resolve_task_identity(task_ref, chat_id)
+    event = fetch_event(resolved_identity)
+    if event is None:
+        return resolved_identity, None
+    correlation = build_correlation_result(resolved_identity, event)
+    return resolved_identity, correlation
+
+
+def fetch_cleanup_correlation_event(
+    *,
+    fetch_event: Callable[[], object | None],
+    on_result_missing: Callable[[str], None],
+    on_row_corrupted: Callable[[str], None],
+    on_failed: Callable[[str], None],
+    result_missing_reason: str,
+    is_row_corrupted_reason: Callable[[str], bool],
+) -> object | None:
+    try:
+        return fetch_event()
+    except Exception as error:
+        reason = str(error)
+        if reason == result_missing_reason:
+            on_result_missing(reason)
+            return None
+        if is_row_corrupted_reason(reason):
+            on_row_corrupted(reason)
+            return None
+        on_failed(reason)
+        return None
+
+
+def build_cleanup_correlation_result(
+    *,
+    event: object,
+    fallback_task_ref: str,
+    fallback_task_id: str,
+    fallback_task_hash: str,
+    on_path_missing: Callable[[bool, bool], None],
+) -> CleanupCorrelationResult | None:
+    source_path = str(getattr(event, "source_path", "")).strip()
+    target_path = str(getattr(event, "target_path", "")).strip()
+    if not source_path or not target_path:
+        on_path_missing(not source_path, not target_path)
+        return None
+
+    return CleanupCorrelationResult(
+        task_ref=str(getattr(event, "task_ref", "")).strip() or fallback_task_ref,
+        task_id=str(getattr(event, "task_id", "")).strip() or fallback_task_id,
+        task_hash=str(getattr(event, "task_hash", "")).strip() or fallback_task_hash,
+        source_path=source_path,
+        target_path=target_path,
+    )
 
 
 def _print_cleanup_job_lookup_failed_log(*, task_ref: str, chat_id: int, error: Exception) -> None:

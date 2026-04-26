@@ -1,4 +1,4 @@
-# docs/INDEX.md (v12)
+# docs/INDEX.md (v13)
 
 > 目的：先按你的身份分流，再决定读哪份文档；不要一上来翻完整个仓库文档表。
 
@@ -38,7 +38,6 @@
 按需再读：
 
 - `docs/PERSISTENCE_CLOSURE_LOG.md`：当前真相闭环细节
-- `docs/TEST_ENV.md`：真实 downloader / import / refresh 联调
 - `docs/SLIMMING_RULES.md`：编排层瘦身和文档减法的通用纪律
 - `archive/docs/`：只在需要回查旧主线实现细节时再打开；默认不要先读
 
@@ -61,7 +60,7 @@
 ## 4. 文档分层
 
 - 操作者入口层：`README.md`、`docs/HUMAN_START_HERE.md`、`docs/OPERATOR_RUNBOOK.md`
-- 运行与启动层：`docs/GETTING_STARTED.md`、`docs/TEST_ENV.md`
+- 运行与启动层：`docs/GETTING_STARTED.md`
 - 当前施工真相层：`docs/STATUS.md`、`docs/NEXT_STEP.md`
 - 长期边界层：`docs/DECISIONS.md`、`docs/ARCHITECTURE.md`
 - 施工纪律层：`docs/SLIMMING_RULES.md`

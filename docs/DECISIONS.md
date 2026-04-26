@@ -236,7 +236,6 @@
 - **日期**：2026-04-03
 - **结论**：
   - WSL Docker 的 Transmission + Emby 测试栈是正式本地集成验证基线。
-  - `docs/TEST_ENV.md` 是该测试栈正式入口。
   - 涉及 `add_to_downloader` / `import_to_library` / `refresh_media_server` / 相关持久化协议的端到端任务，不得只靠 mock。
 - **原因**：
   硬链接、下载器 RPC、媒体库刷新都要靠真实文件系统和真实接口验证。
@@ -291,7 +290,7 @@
     - `docker-compose.yml`
   - `Makefile` 只作为命令缩写入口，不是唯一入口；即使系统里没有 `make`，仓库也必须还能按直接命令运行。
   - 当前应用本身不自动读取 `.env`；环境变量由 shell 或 `docker compose` 注入。
-  - 容器入口继续保持最小，不把 Transmission / Emby / Prowlarr 一起内置进主 compose；这些依赖仍按现有外部服务或 `docs/TEST_ENV.md` 说明接入。
+  - 容器入口继续保持最小，不把 Transmission / Emby / Prowlarr 一起内置进主 compose；这些依赖仍按现有外部服务接入。
 - **原因**：
   你当前主要依赖 Codex 推进，但最终仍需要一个人类能实际启动和验证的最小入口；同时仓库不应该因为缺少 `make` 而无法使用。
   这只是兼容捷径，不是新的主交互形状。

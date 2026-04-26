@@ -1,33 +1,17 @@
 from __future__ import annotations
 
+import re
+import shutil
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
-from app.services.cleanup_asset_support import delete_cleanup_source_asset
-from app.services.cleanup_flow_support import run_cleanup_flow
-from app.services.cleanup_blocked_support import resolve_cleanup_blocked_outcome
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
-from app.services.cleanup_execution_support import execute_cleanup_delete
-from app.services.cleanup_follow_up_support import (
-    preferred_cleanup_ref,
-)
-from app.services.cleanup_inspect_render_support import render_cleanup_inspect_message
-from app.services.cleanup_inspect_flow_support import run_cleanup_inspect_flow
-from app.services.cleanup_inspection_support import CleanupInspection, build_cleanup_inspection
-from app.services.cleanup_logging_support import (
-    print_cleanup_blocked_log,
-    print_cleanup_delete_failed_log,
-    print_cleanup_pt_seed_guard_lookup_failed_log,
-    print_cleanup_pt_seed_guard_state_unavailable_log,
-)
-from app.services.cleanup_path_guard_support import validate_cleanup_paths
-from app.services.cleanup_query_support import (
-    parse_cleanup_inspect_query_text,
-    parse_cleanup_query_text,
-)
-from app.services.cleanup_seed_guard_support import evaluate_cleanup_pt_seed_window
 
 CLEANUP_QUERY_USAGE_TEXT = (
     "cleanup 用法：\n"
@@ -109,6 +93,43 @@ CLEANUP_PT_SEED_WINDOW_STATE_UNAVAILABLE_FIX_HINT = (
 )
 CLEANUP_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
 _SQLITE_UTC_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupInspection:
+    query_ref: str
+    task_ref: str
+    task_id: str
+    task_hash: str
+    source_path: str
+    target_path: str
+    correlation_found: bool
+    source_exists: bool | None
+    target_exists: bool | None
+    cleanup_allowed: bool
+    conclusion: str
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupBlockedOutcome:
+    event_type: str
+    message: str
+    fix_hint: str
+    source_path: str = ""
+    target_path: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupDeleteExecutionResult:
+    success: bool
+    event_type: str
+    message: str
+    failure_reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupFlowResult:
+    message: str
 
 
 class CleanupDownloadedSourceService:
@@ -205,20 +226,15 @@ class CleanupDownloadedSourceService:
         *,
         chat_id: int | None = None,
     ) -> str:
-        return run_cleanup_inspect_flow(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            usage_text=CLEANUP_INSPECT_QUERY_USAGE_TEXT,
-            inspect_cleanup=lambda resolved_task_ref, resolved_chat_id: self._inspect_cleanup(
-                task_ref=resolved_task_ref,
-                chat_id=resolved_chat_id,
-            ),
-            render_message=lambda inspection: render_cleanup_inspect_message(
-                inspection=inspection,
-                inspect_result_template=CLEANUP_INSPECT_RESULT_TEMPLATE,
-                inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
-                inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
-            ),
+        cleaned_ref = task_ref.strip()
+        if not cleaned_ref:
+            return CLEANUP_INSPECT_QUERY_USAGE_TEXT
+        inspection = self._inspect_cleanup(task_ref=cleaned_ref, chat_id=chat_id)
+        return render_cleanup_inspect_message(
+            inspection=inspection,
+            inspect_result_template=CLEANUP_INSPECT_RESULT_TEMPLATE,
+            inspect_ready_follow_up_template=CLEANUP_INSPECT_READY_FOLLOW_UP_TEMPLATE,
+            inspect_blocked_follow_up_template=CLEANUP_INSPECT_BLOCKED_FOLLOW_UP_TEMPLATE,
         )
 
     def _inspect_cleanup(
@@ -260,18 +276,48 @@ class CleanupDownloadedSourceService:
         source_path: str = "",
         target_path: str = "",
     ) -> None:
-        from app.services.cleanup_event_support import append_cleanup_event
-
-        append_cleanup_event(
-            job_event_repo=self._job_event_repo,
-            task_ref=task_ref,
-            task_id=task_id,
-            task_hash=task_hash,
-            event_type=event_type,
-            message=message,
-            source_path=source_path,
-            target_path=target_path,
-        )
+        try:
+            self._job_event_repo.append_event(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                event_type=event_type,
+                message=message,
+                source_path=source_path,
+                target_path=target_path,
+            )
+        except Exception as error:
+            if str(error) == CLEANUP_EVENT_RESULT_MISSING_REASON:
+                print_cleanup_event_append_result_missing_log(
+                    task_ref=task_ref,
+                    event_type=event_type,
+                    task_id=task_id,
+                    task_hash=task_hash,
+                    source_path=source_path,
+                    target_path=target_path,
+                    reason="cleanup event missing after append",
+                )
+                return
+            if _is_cleanup_event_row_corrupted_error(error):
+                print_cleanup_event_append_row_corrupted_log(
+                    task_ref=task_ref,
+                    event_type=event_type,
+                    task_id=task_id,
+                    task_hash=task_hash,
+                    source_path=source_path,
+                    target_path=target_path,
+                    reason=str(error),
+                )
+                return
+            print_cleanup_event_append_failed_log(
+                task_ref=task_ref,
+                event_type=event_type,
+                task_id=task_id,
+                task_hash=task_hash,
+                source_path=source_path,
+                target_path=target_path,
+                error=error,
+            )
 
     def _evaluate_pt_seed_window(
         self,
@@ -311,24 +357,604 @@ def _is_cleanup_event_row_corrupted_error(error: Exception) -> bool:
 
 
 def parse_cleanup_query(text: str) -> str | None:
-    return parse_cleanup_query_text(text)
+    cleaned_text = text.strip()
+    matched = re.match(r"^(?:(?i:cleanup)|清理)(?:\s+(.*))?$", cleaned_text)
+    if not matched:
+        return None
+    return (matched.group(1) or "").strip()
 
 
 def parse_cleanup_inspect_query(text: str) -> str | None:
-    return parse_cleanup_inspect_query_text(text)
+    cleaned_text = text.strip()
+    matched = re.match(r"^(?:(?i:cleanup)\s+(?i:inspect)|清理检查)(?:\s+(.*))?$", cleaned_text)
+    if not matched:
+        return None
+    return (matched.group(1) or "").strip()
 
 
 def _validate_cleanup_paths(*, source_path: Path, target_path: Path) -> str | None:
-    return validate_cleanup_paths(
-        source_path=source_path,
-        target_path=target_path,
-        source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
-        guard_rejected_text=CLEANUP_GUARD_REJECTED_TEXT,
-    )
+    if not source_path.is_file() and not source_path.is_dir():
+        return CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT
+
+    source_resolved = source_path.resolve(strict=True)
+    target_resolved = target_path.resolve(strict=True)
+    if (
+        source_resolved == target_resolved
+        or source_resolved in target_resolved.parents
+        or target_resolved in source_resolved.parents
+    ):
+        return CLEANUP_GUARD_REJECTED_TEXT.format(
+            source_path=str(source_path),
+            target_path=str(target_path),
+        )
+    return None
 
 
 def _delete_source_asset(source_path: Path) -> None:
-    delete_cleanup_source_asset(
-        source_path=source_path,
-        source_type_unsupported_text=CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    if source_path.is_dir():
+        shutil.rmtree(source_path)
+        return
+    if source_path.is_file():
+        source_path.unlink()
+        return
+    raise OSError(CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT)
+
+
+def build_cleanup_inspection(
+    *,
+    task_ref: str,
+    resolved_identity: Any,
+    correlation: Any,
+    correlation_missing_text: str,
+    target_missing_text: str,
+    source_missing_text: str,
+    validate_cleanup_paths: Callable[[Path, Path], str | None],
+    evaluate_pt_seed_window: Callable[[str, str, str], str | None],
+) -> CleanupInspection:
+    if correlation is None:
+        return CleanupInspection(
+            query_ref=task_ref,
+            task_ref=resolved_identity.task_ref,
+            task_id=resolved_identity.task_id,
+            task_hash=resolved_identity.task_hash,
+            source_path="",
+            target_path="",
+            correlation_found=False,
+            source_exists=None,
+            target_exists=None,
+            cleanup_allowed=False,
+            conclusion=correlation_missing_text,
+        )
+
+    source_path = Path(correlation.source_path).expanduser()
+    target_path = Path(correlation.target_path).expanduser()
+    target_exists = target_path.exists()
+    source_exists = source_path.exists()
+
+    if not target_exists:
+        conclusion = target_missing_text.format(target_path=str(target_path))
+        cleanup_allowed = False
+    elif not source_exists:
+        conclusion = source_missing_text.format(source_path=str(source_path))
+        cleanup_allowed = False
+    else:
+        guard_rejection = validate_cleanup_paths(source_path, target_path)
+        if guard_rejection is not None:
+            conclusion = guard_rejection
+            cleanup_allowed = False
+        else:
+            pt_seed_guard_conclusion = evaluate_pt_seed_window(
+                correlation.task_ref.strip() or resolved_identity.task_ref or task_ref,
+                correlation.task_id.strip() or resolved_identity.task_id,
+                correlation.task_hash.strip() or resolved_identity.task_hash,
+            )
+            if pt_seed_guard_conclusion is not None:
+                conclusion = pt_seed_guard_conclusion
+                cleanup_allowed = False
+            else:
+                conclusion = "已通过 cleanup 预检，可执行清理下载源资产。"
+                cleanup_allowed = True
+
+    return CleanupInspection(
+        query_ref=task_ref,
+        task_ref=correlation.task_ref.strip() or resolved_identity.task_ref,
+        task_id=correlation.task_id.strip() or resolved_identity.task_id,
+        task_hash=correlation.task_hash.strip() or resolved_identity.task_hash,
+        source_path=str(source_path),
+        target_path=str(target_path),
+        correlation_found=True,
+        source_exists=source_exists,
+        target_exists=target_exists,
+        cleanup_allowed=cleanup_allowed,
+        conclusion=conclusion,
     )
+
+
+def preferred_cleanup_ref(inspection: CleanupInspection) -> str:
+    for value in (inspection.task_hash, inspection.task_id, inspection.task_ref, inspection.query_ref):
+        cleaned_value = value.strip()
+        if cleaned_value:
+            return cleaned_value
+    return inspection.query_ref
+
+
+def resolve_cleanup_blocked_event_details(
+    *,
+    inspection: CleanupInspection,
+    pt_seed_window_state_unavailable_text: str,
+    pt_seed_window_blocked_fix_hint: str,
+    pt_seed_window_state_unavailable_fix_hint: str,
+    source_type_unsupported_text: str,
+    source_type_unsupported_fix_hint: str,
+    guard_rejected_fix_hint: str,
+) -> tuple[str, str]:
+    if inspection.conclusion.startswith("PT 最小保护窗口未满"):
+        return "cleanup.pt_seed_window_blocked", pt_seed_window_blocked_fix_hint
+    if inspection.conclusion == pt_seed_window_state_unavailable_text:
+        return "cleanup.pt_seed_window_state_unavailable", pt_seed_window_state_unavailable_fix_hint
+    if inspection.conclusion == source_type_unsupported_text:
+        return "cleanup.source_type_unsupported", source_type_unsupported_fix_hint
+    return "cleanup.guard_rejected", guard_rejected_fix_hint
+
+
+def append_cleanup_follow_up(message: str, task_ref: str, follow_up_template: str) -> str:
+    cleaned_ref = task_ref.strip()
+    if not cleaned_ref:
+        return message
+    return f"{message}\n{follow_up_template.format(task_ref=cleaned_ref)}"
+
+
+def append_cleanup_success_follow_up(message: str, task_ref: str, success_follow_up_template: str) -> str:
+    cleaned_ref = task_ref.strip()
+    if not cleaned_ref:
+        return message
+    return f"{message}\n{success_follow_up_template.format(task_ref=cleaned_ref)}"
+
+
+def format_cleanup_inspect_follow_up(
+    inspection: CleanupInspection,
+    *,
+    inspect_ready_follow_up_template: str,
+    inspect_blocked_follow_up_template: str,
+) -> str:
+    task_ref = preferred_cleanup_ref(inspection).strip()
+    if not task_ref:
+        return ""
+    if inspection.cleanup_allowed:
+        return inspect_ready_follow_up_template.format(task_ref=task_ref)
+    return inspect_blocked_follow_up_template.format(task_ref=task_ref)
+
+
+def resolve_cleanup_blocked_outcome(
+    *,
+    inspection: CleanupInspection,
+    follow_up_ref: str,
+    correlation_missing_text: str,
+    correlation_missing_fix_hint: str,
+    target_missing_fix_hint: str,
+    source_missing_fix_hint: str,
+    pt_seed_window_state_unavailable_text: str,
+    pt_seed_window_blocked_fix_hint: str,
+    pt_seed_window_state_unavailable_fix_hint: str,
+    source_type_unsupported_text: str,
+    source_type_unsupported_fix_hint: str,
+    guard_rejected_fix_hint: str,
+    follow_up_template: str,
+) -> CleanupBlockedOutcome | None:
+    if not inspection.correlation_found:
+        return CleanupBlockedOutcome(
+            event_type="cleanup.correlation_missing",
+            message=append_cleanup_follow_up(
+                correlation_missing_text,
+                follow_up_ref,
+                follow_up_template,
+            ),
+            fix_hint=correlation_missing_fix_hint,
+        )
+
+    if inspection.target_exists is False:
+        return CleanupBlockedOutcome(
+            event_type="cleanup.target_missing",
+            message=append_cleanup_follow_up(inspection.conclusion, follow_up_ref, follow_up_template),
+            fix_hint=target_missing_fix_hint,
+            source_path=inspection.source_path,
+            target_path=inspection.target_path,
+        )
+
+    if inspection.source_exists is False:
+        return CleanupBlockedOutcome(
+            event_type="cleanup.source_missing",
+            message=append_cleanup_follow_up(inspection.conclusion, follow_up_ref, follow_up_template),
+            fix_hint=source_missing_fix_hint,
+            source_path=inspection.source_path,
+            target_path=inspection.target_path,
+        )
+
+    if inspection.cleanup_allowed:
+        return None
+
+    event_type, fix_hint = resolve_cleanup_blocked_event_details(
+        inspection=inspection,
+        pt_seed_window_state_unavailable_text=pt_seed_window_state_unavailable_text,
+        pt_seed_window_blocked_fix_hint=pt_seed_window_blocked_fix_hint,
+        pt_seed_window_state_unavailable_fix_hint=pt_seed_window_state_unavailable_fix_hint,
+        source_type_unsupported_text=source_type_unsupported_text,
+        source_type_unsupported_fix_hint=source_type_unsupported_fix_hint,
+        guard_rejected_fix_hint=guard_rejected_fix_hint,
+    )
+    return CleanupBlockedOutcome(
+        event_type=event_type,
+        message=append_cleanup_follow_up(inspection.conclusion, follow_up_ref, follow_up_template),
+        fix_hint=fix_hint,
+        source_path=inspection.source_path,
+        target_path=inspection.target_path,
+    )
+
+
+def execute_cleanup_delete(
+    *,
+    delete_source_asset: Callable[[Path], None],
+    source_path: Path,
+    target_path: Path,
+    task_id: str,
+    task_hash: str,
+    follow_up_ref: str,
+    cleanup_failed_text: str,
+    cleanup_succeeded_text: str,
+    follow_up_template: str,
+    success_follow_up_template: str,
+) -> CleanupDeleteExecutionResult:
+    try:
+        delete_source_asset(source_path)
+    except OSError as error:
+        return CleanupDeleteExecutionResult(
+            success=False,
+            event_type="cleanup.failed",
+            message=append_cleanup_follow_up(
+                cleanup_failed_text.format(reason=str(error)),
+                follow_up_ref,
+                follow_up_template,
+            ),
+            failure_reason=str(error),
+        )
+
+    return CleanupDeleteExecutionResult(
+        success=True,
+        event_type="cleanup.succeeded",
+        message=append_cleanup_success_follow_up(
+            cleanup_succeeded_text.format(
+                task_id=task_id,
+                task_hash=task_hash,
+                source_path=str(source_path),
+                target_path=str(target_path),
+            ),
+            follow_up_ref,
+            success_follow_up_template,
+        ),
+    )
+
+
+def render_cleanup_inspect_message(
+    *,
+    inspection: CleanupInspection,
+    inspect_result_template: str,
+    inspect_ready_follow_up_template: str,
+    inspect_blocked_follow_up_template: str,
+) -> str:
+    lines = [
+        inspect_result_template.format(
+            query_ref=inspection.query_ref,
+            task_id=inspection.task_id or "-",
+            task_hash=inspection.task_hash or "-",
+            correlation_status="已找到" if inspection.correlation_found else "未找到",
+            source_path=inspection.source_path or "-",
+            source_status=_format_cleanup_path_status(inspection.source_exists),
+            target_path=inspection.target_path or "-",
+            target_status=_format_cleanup_path_status(inspection.target_exists),
+            guardrail_status="允许 cleanup" if inspection.cleanup_allowed else "拒绝 cleanup",
+            conclusion=inspection.conclusion,
+        )
+    ]
+    if inspection.cleanup_allowed or inspection.correlation_found:
+        lines.append(
+            format_cleanup_inspect_follow_up(
+                inspection,
+                inspect_ready_follow_up_template=inspect_ready_follow_up_template,
+                inspect_blocked_follow_up_template=inspect_blocked_follow_up_template,
+            )
+        )
+    return "\n".join(lines)
+
+
+def run_cleanup_flow(
+    *,
+    task_ref: str,
+    query_usage_text: str,
+    inspect_cleanup: Callable[[str, int | None], CleanupInspection],
+    preferred_cleanup_ref: Callable[[CleanupInspection], str],
+    resolve_blocked_outcome: Callable[[CleanupInspection, str], CleanupBlockedOutcome | None],
+    record_event: Callable[[str, CleanupInspection, str, str, str, str], None],
+    log_blocked: Callable[[str, CleanupInspection, str, str, str], None],
+    execute_delete: Callable[[Path, Path, CleanupInspection, str], CleanupDeleteExecutionResult],
+    log_delete_failed: Callable[[str, CleanupInspection, Path, Path, CleanupDeleteExecutionResult], None],
+    chat_id: int | None = None,
+) -> CleanupFlowResult:
+    cleaned_ref = task_ref.strip()
+    if not cleaned_ref:
+        return CleanupFlowResult(message=query_usage_text)
+
+    inspection = inspect_cleanup(cleaned_ref, chat_id)
+    task_ref_for_event = inspection.task_ref or cleaned_ref
+    follow_up_ref = preferred_cleanup_ref(inspection)
+    blocked_outcome = resolve_blocked_outcome(inspection, follow_up_ref)
+    if blocked_outcome is not None:
+        record_event(
+            task_ref_for_event,
+            inspection,
+            blocked_outcome.event_type,
+            blocked_outcome.message,
+            blocked_outcome.source_path,
+            blocked_outcome.target_path,
+        )
+        log_blocked(
+            task_ref_for_event,
+            inspection,
+            blocked_outcome.event_type,
+            blocked_outcome.fix_hint,
+            blocked_outcome.source_path,
+            blocked_outcome.target_path,
+        )
+        return CleanupFlowResult(message=blocked_outcome.message)
+
+    source_path = Path(inspection.source_path).expanduser()
+    target_path = Path(inspection.target_path).expanduser()
+    delete_result = execute_delete(source_path, target_path, inspection, follow_up_ref)
+    record_event(
+        task_ref_for_event,
+        inspection,
+        delete_result.event_type,
+        delete_result.message,
+        str(source_path),
+        str(target_path),
+    )
+    if not delete_result.success:
+        log_delete_failed(task_ref_for_event, inspection, source_path, target_path, delete_result)
+    return CleanupFlowResult(message=delete_result.message)
+
+
+def evaluate_cleanup_pt_seed_window(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    pt_min_seed_hours: int,
+    download_monitor_repo: Any,
+    sqlite_utc_format: str,
+    state_unavailable_text: str,
+    blocked_template: str,
+    on_state_unavailable: Callable[[str], None],
+    on_lookup_failed: Callable[[Exception], None],
+) -> str | None:
+    cleaned_task_ref = task_ref.strip().lower()
+    if pt_min_seed_hours <= 0 or cleaned_task_ref.startswith("bt-"):
+        return None
+    if download_monitor_repo is None:
+        on_state_unavailable("download_monitor_repo missing")
+        return state_unavailable_text
+
+    try:
+        record = download_monitor_repo.get_record(task_id=task_id, task_hash=task_hash)
+    except Exception as error:
+        on_lookup_failed(error)
+        return state_unavailable_text
+
+    if record is None or not record.completion_observed_at.strip():
+        on_state_unavailable("completion_observed_at missing")
+        return state_unavailable_text
+
+    try:
+        completion_observed_at = datetime.strptime(record.completion_observed_at, sqlite_utc_format).replace(tzinfo=UTC)
+    except ValueError:
+        on_state_unavailable(f"invalid completion_observed_at: {record.completion_observed_at}")
+        return state_unavailable_text
+
+    elapsed_hours = max(0.0, (datetime.now(UTC) - completion_observed_at).total_seconds() / 3600.0)
+    if elapsed_hours < float(pt_min_seed_hours):
+        return blocked_template.format(
+            elapsed_hours=elapsed_hours,
+            required_hours=pt_min_seed_hours,
+        )
+    return None
+
+
+def print_cleanup_blocked_log(
+    *,
+    event_type: str,
+    task_ref: str,
+    reason: str,
+    fix_hint: str,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
+    print(
+        f"\033[31m[cleanup 执行受阻]\033[0m {details_text} 结论={reason}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {fix_hint}",
+        flush=True,
+    )
+
+
+def print_cleanup_event_append_failed_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    error: Exception,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
+    print(
+        f"\033[31m[cleanup 事件写入失败]\033[0m {details_text} 原因={error}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可写、磁盘是否只读或已满；"
+        "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘。",
+        flush=True,
+    )
+
+
+def print_cleanup_event_append_result_missing_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    reason: str,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
+    print(
+        f"\033[31m[cleanup 事件结果缺失]\033[0m {details_text} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的 cleanup 事件；"
+        "当前 cleanup 文本结果已返回，但这次执行记录真相还没有确认落稳。",
+        flush=True,
+    )
+
+
+def print_cleanup_event_append_row_corrupted_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    reason: str,
+    task_id: str = "",
+    task_hash: str = "",
+    source_path: str = "",
+    target_path: str = "",
+) -> None:
+    details = [f"task_ref={task_ref}", f"event_type={event_type}"]
+    if task_id.strip():
+        details.append(f"task_id={task_id}")
+    if task_hash.strip():
+        details.append(f"task_hash={task_hash}")
+    if source_path.strip():
+        details.append(f"source={source_path}")
+    if target_path.strip():
+        details.append(f"target={target_path}")
+    details_text = " ".join(details)
+    print(
+        f"\033[31m[cleanup 事件记录损坏]\033[0m {details_text} 原因={reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 是否仍是完整真相；"
+        "当前 cleanup 文本结果已返回，但不会把这条坏事件当成已稳定落盘。",
+        flush=True,
+    )
+
+
+def print_cleanup_pt_seed_guard_lookup_failed_log(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    error: Exception,
+    state_unavailable_fix_hint: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup PT 保护查询失败]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
+        f"task_hash={task_hash or '-'} 错误={error}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
+        flush=True,
+    )
+
+
+def print_cleanup_pt_seed_guard_state_unavailable_log(
+    *,
+    task_ref: str,
+    task_id: str,
+    task_hash: str,
+    reason: str,
+    state_unavailable_fix_hint: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup PT 保护真相缺失]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
+        f"task_hash={task_hash or '-'} 原因={reason}",
+        flush=True,
+    )
+    print(
+        f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
+        flush=True,
+    )
+
+
+def print_cleanup_delete_failed_log(
+    *,
+    task_ref: str,
+    event_type: str,
+    task_id: str,
+    task_hash: str,
+    source_path: str,
+    target_path: str,
+    failure_reason: str,
+) -> None:
+    print(
+        f"\033[31m[cleanup 执行失败]\033[0m task_ref={task_ref} "
+        f"event_type={event_type} task_id={task_id} task_hash={task_hash} "
+        f"source={source_path} target={target_path} 原因={failure_reason}",
+        flush=True,
+    )
+    print(
+        "\033[33m[处理建议]\033[0m 检查 source_path 是否仍可访问、当前进程是否有删除权限，"
+        "并确认库内目标路径仍然存在后再重试 cleanup。",
+        flush=True,
+    )
+
+
+def _format_cleanup_path_status(exists: bool | None) -> str:
+    if exists is None:
+        return "未找到关联"
+    if exists:
+        return "存在"
+    return "不存在"
