@@ -148,6 +148,24 @@ curl -si http://127.0.0.1:18098/api/v2/torrents/info | grep -q "200 OK" && echo 
 curl -si http://127.0.0.1:18098/api/v2/torrents/info
 ```
 
+成人归档 smoke：
+
+```bash
+.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py
+```
+
+说明：
+- 这条脚本当前会用真实 qB Web API、真实 torrent/webseed 和真实 adult archive sidecar 验证“归档 -> 保留期清理”链路。
+- 截至 `2026-04-26` 本轮 probe，脚本已稳定把 blocker 收成 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`。
+- 当前 blocker 不是 repo 侧路由，而是 qB 测试栈宿主机目录权限：
+  - `/data/downloads/qb`
+  - `/data/downloads/incomplete-qb`
+  当前实际 owner/group 为 `nobody:nogroup` 且权限 `755`，与 compose 里的 `PUID=1000` / `PGID=1000` 不一致。
+- 同轮 qB 日志已命中：
+  - `file_open (/data/downloads/incomplete-qb/SSIS-123-smoke.mp4) error: Permission denied`
+  - `storage move failed. mkdir (): Permission denied`
+- 如果你准备继续这条真实 smoke，先在宿主机修正 qB 下载目录权限，再重跑上面的脚本；当前最直接的修复方式是让这两个目录与 qB 容器的 `PUID/PGID` 对齐。
+
 ---
 
 ## 路径约束（硬链接必须满足）
