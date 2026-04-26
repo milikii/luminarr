@@ -31,6 +31,7 @@ from app.services.add_to_downloader import (
     AddToDownloaderService,
     PendingAddContext,
 )
+from app.services.add_pending_context import build_bt_task_ref, build_pending_add_context
 from app.services.search_media import SearchMediaService
 from app.trace_logging import parse_trace_log_line
 
@@ -97,6 +98,91 @@ def test_add_by_batch_selection_returns_multiple_pending_approvals_for_bt_batch(
 
     assert ADD_APPROVAL_PENDING_TEXT.format(title="Dune: Part Two", task_ref="1") in reply
     assert ADD_APPROVAL_PENDING_TEXT.format(title="Dune: Part One", task_ref="2") in reply
+
+
+def test_add_candidate_source_records_adult_pending_registry_state() -> None:
+    registry_calls: list[dict[str, str]] = []
+    registry_repo = type(
+        "AdultContentRegistryRepo",
+        (),
+        {"upsert_pending": lambda self, **kwargs: registry_calls.append(kwargs)},
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        adult_content_registry_repo=registry_repo,
+    )
+
+    expected_pending = build_pending_add_context(
+        task_ref=build_bt_task_ref("magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12"),
+        title="SSIS-123",
+        source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        adult_content_id="censored:ssis-123",
+        adult_content_kind="censored",
+        adult_archive_category="censored",
+        adult_display_id="SSIS-123",
+    )
+
+    reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+
+    assert reply == ADD_APPROVAL_PENDING_TEXT.format(title="SSIS-123", task_ref=expected_pending.task_ref) + "\n番号: SSIS-123\n分类: censored"
+    assert registry_calls == [
+        {
+            "normalized_content_id": "censored:ssis-123",
+            "content_id_kind": "censored",
+            "archive_category": "censored",
+            "display_title": "SSIS-123",
+            "latest_source_site": "",
+            "task_ref": expected_pending.task_ref,
+            "task_id": expected_pending.task_id,
+            "task_hash": expected_pending.task_hash,
+            "downloader_name": "",
+        }
+    ]
+
+
+def test_add_candidate_source_logs_adult_pending_registry_failure_without_failing_pending_reply(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    expected_pending = build_pending_add_context(
+        task_ref=build_bt_task_ref("magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12"),
+        title="SSIS-123",
+        source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        adult_content_id="censored:ssis-123",
+        adult_content_kind="censored",
+        adult_archive_category="censored",
+        adult_display_id="SSIS-123",
+    )
+    registry_repo = type(
+        "AdultContentRegistryRepo",
+        (),
+        {"upsert_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+    )()
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        adult_content_registry_repo=registry_repo,
+    )
+
+    reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+
+    assert reply == ADD_APPROVAL_PENDING_TEXT.format(title="SSIS-123", task_ref=expected_pending.task_ref) + "\n番号: SSIS-123\n分类: censored"
+    output = capsys.readouterr().out
+    assert "[成人资源待确认登记失败]" in output
+    assert f"task_ref={expected_pending.task_ref}" in output
+    assert "db down" in output
 
 
 def test_confirm_add_by_task_ref_dispatches_download() -> None:

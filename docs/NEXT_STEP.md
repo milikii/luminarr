@@ -4,7 +4,7 @@
 
 - 当前唯一主线切回 **`add_to_downloader.py` confirm wrapper 收口 / 质量硬化**。
 - 这一轮只服务两件事：
-  - 收 `app/services/add_to_downloader.py` 里仍堆在壳文件里的 confirm / pending wrapper、成人 pending 记录壳或 trace glue
+  - 收 `app/services/add_to_downloader.py` / `app/services/add_execution_follow_up.py` 里仍分散的成人 registry 状态写入壳，优先统一 pending / dispatch 两段
   - 保持刚完成的 `Makefile` 公开验证入口收口和操作者文档瘦身完成态，不回退
 - 已完成态保持，不回退：
   - `Makefile` 公开验证入口已收口：`verify-mainline` 当前改成 4 个分组 target 汇总入口，cleanup 公开入口当前收敛到 `test-cleanup-smoke` / `test-cleanup` / `test-cleanup-docs-gate` / `test-cleanup-window`
@@ -14,7 +14,8 @@
   - `search_media.py` 当前 `628` 行，BT 只读展示逻辑已抽到 `app/services/bt_read_only_display.py`
   - `import_to_library.py` 当前 `590` 行，confirmed media identity 回查已抽到 `app/services/import_confirmed_media_identity.py`
   - `app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退
-- 这条主线的详细蓝图统一看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`。
+  - `app/services/add_adult_pending_state.py` 已承接成人待确认登记；`add_to_downloader.py` 当前 `582` 行，不回退待确认文本或 fail-closed 中文日志
+  - 这条主线的详细蓝图统一看 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`。
 
 ## User value
 
@@ -25,9 +26,8 @@
 ## Only do
 
 - 只收 `add_to_downloader.py` 当前仍直连的稳定壳层：
-  - pending / approval / job wrapper
-  - 成人 pending 记录壳
-  - trace glue
+  - 成人 pending / downloading registry 状态写入壳
+  - 若还存在稳定 trace glue，再做一组最小收口
 - 每轮只做一个最小闭环；同步补对应 focused tests、`docs/STATUS.md`、`docs/NEXT_STEP.md` 和 `docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md`。
 - 继续保持当前搜索 / 导入 / 成人 BT / 验证入口已收口真相与文档一致。
 
@@ -42,7 +42,7 @@
 
 当前这条 **`add_to_downloader.py` confirm wrapper 收口 / 质量硬化** 主线满足：
 
-1. `add_to_downloader.py` 至少再抽走一组稳定 wrapper / 壳层职责，或让壳文件职责明显更单一。
+1. downloader confirm 这条线至少再抽走一组稳定 registry / wrapper 职责，或明确证明只剩 proof-like wrapper 并切换下一热点文件。
 2. `tests/test_add_execution_follow_up.py`、`tests/test_add_to_downloader.py`、`tests/test_private_chat_confirm_runtime.py` 与这轮涉及的质量 gate 均通过。
 3. `docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md` 对当前风险和下一线程表述一致。
 
