@@ -10,13 +10,13 @@
 - `app/services/add_adult_registry_state.py` 已统一 adult pending / downloading 状态写入；`add_to_downloader.py` `582` 行只剩 proof-like wrapper，可先停手不回退。
 - `search_media.py` 已降到 `288` 行，歧义澄清 / media-BT 排序 / batch preview 页面支持 helper 都已抽出；`import_to_library.py` 当前 `590` 行，经 focused gate + pyflakes 复核后继续保持 proof-like orchestration 冻结态。
 - `cleanup_correlation_lookup.py` 已收回 task identity、correlation lookup、correlation logging 全部薄壳；`cleanup_downloaded_source.py` 已收回 inspect / path guard / query / event / flow / blocked / execution / follow-up / seed-guard / logging / 资产删除 全部薄壳；`adult_archive_service.py` 也不再依赖 cleanup 资产删除 helper。`cleanup_*_support.py` 当前为 `0` 个。
-- `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`app/services/add_trace_logger.py`、`app/services/import_trace_logger.py` 都已改为只承接各自 workflow 常量绑定。
+- `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 已直接改用共享实现，`import_trace_logger.py` 仍是最后一层 workflow 常量绑定壳。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
 
-- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件收口已经完成，这轮主风险不再是 cleanup 碎片文件，而是 add / import 虽然共享了底层实现，但仍各自保留一层重复 trace logger 壳。
-- 当前归档迁移和 cleanup 收口都已落地；下一条最小风险应继续收这最后一层重复壳，而不是回头再造 `cleanup_*_support.py`。
+- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件收口已经完成，这轮主风险不再是 cleanup 碎片文件，而是 import 链还保留最后一层重复 trace logger 壳。
+- 当前归档迁移和 cleanup 收口都已落地；下一条最小风险应直接收掉 `import_trace_logger.py`，而不是回头再造 `cleanup_*_support.py`。
 
 ## Later candidate line
 
@@ -41,7 +41,7 @@
 
 ## Current biggest risk
 
-- 当前 biggest risk 已不再是 cleanup 支持文件；下一轮如果继续减法，应直接把 add / import 两边最后一层 trace logger 壳收回调用方，而不是回头再造 `cleanup_*_support.py`。
+- 当前 biggest risk 已不再是 cleanup 支持文件；下一轮如果继续减法，应直接把 `import_trace_logger.py` 这最后一层 trace 壳收回调用方，而不是回头再造 `cleanup_*_support.py`。
 
 ## Recommended Next Operator Command
 

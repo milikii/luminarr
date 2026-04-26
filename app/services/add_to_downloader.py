@@ -32,8 +32,8 @@ from app.services.add_pending_persistence import AddPendingPersistenceState
 from app.services.add_pending_write_through_state import AddPendingWriteThroughState
 from app.services.add_request_facade import AddPendingRequestFacade
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
-from app.services.add_trace_logger import AddTraceLogger
 from app.services.search_media import SearchMediaService
+from app.services.workflow_trace_logger import WorkflowTraceLogger
 
 AddTorrentFunc = Callable[..., Awaitable[TransmissionTask]]
 
@@ -94,7 +94,7 @@ class AddToDownloaderService:
         self._job_repo = job_repo
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
-        self._trace_logger = AddTraceLogger(trace_log_path)
+        self._trace_logger = WorkflowTraceLogger("add_to_downloader", trace_log_path)
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
         self._adult_registry_state = AddAdultRegistryState(adult_content_registry_repo)
