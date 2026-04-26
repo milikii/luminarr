@@ -180,6 +180,27 @@ def _resolve_downloader_client_for_dispatch(
     return client
 
 
+def resolve_downloader_dispatch_download_dir(
+    *,
+    downloader_name: str,
+    requested_download_dir: str,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+) -> str:
+    cleaned_download_dir = requested_download_dir.strip()
+    cleaned_name = downloader_name.strip()
+    if not cleaned_download_dir or not cleaned_name:
+        return cleaned_download_dir
+    instance = downloader_instances_by_name.get(cleaned_name)
+    if instance is None:
+        return cleaned_download_dir
+    dispatch_download_dir = instance.dispatch_download_dir.strip()
+    if not dispatch_download_dir:
+        return cleaned_download_dir
+    if cleaned_download_dir != instance.download_dir:
+        return cleaned_download_dir
+    return dispatch_download_dir
+
+
 async def _get_torrent_import_source_with_routing(
     *,
     task_ref: str,

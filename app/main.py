@@ -51,6 +51,7 @@ from app.downloader_route_lookup import (
     _resolve_downloader_client_for_lookup,
     _resolve_downloader_client_for_dispatch,
     _resolve_downloader_name_for_task,
+    resolve_downloader_dispatch_download_dir,
 )
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.adult_archive_service import AdultArchiveService
@@ -301,7 +302,12 @@ def main() -> None:
             transmission_clients_by_name=transmission_clients_by_name,
             qbittorrent_clients_by_name=qbittorrent_clients_by_name,
         )
-        return await client.add_torrent(source, download_dir=download_dir)
+        resolved_download_dir = resolve_downloader_dispatch_download_dir(
+            downloader_name=downloader_name,
+            requested_download_dir=download_dir,
+            downloader_instances_by_name=downloader_instances_by_name,
+        )
+        return await client.add_torrent(source, download_dir=resolved_download_dir)
 
     async def get_torrent_status_with_routing(task_ref: str, chat_id: int | None = None) -> TransmissionTaskStatus | None:
         return await _get_torrent_status_with_routing(
