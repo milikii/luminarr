@@ -77,6 +77,7 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         return BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query=query)
 
     lines = [f"BT 只读探索结果：{query}"]
+    seen_history_content_ids: set[str] = set()
     for index, item in enumerate(candidates, start=1):
         title = safe_text(item.get("title"), default="(no title)")
         indexer = safe_indexer(item.get("indexer"), item.get("indexerName"))
@@ -94,7 +95,7 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         helper_title = format_read_only_adult_helper_title(item)
         if helper_title:
             lines.append(f"   {helper_title}")
-        history_text = safe_text(item.get("adult_history_text"), default="")
+        history_text = resolve_read_only_history_text(item, seen_content_ids=seen_history_content_ids)
         if history_text:
             lines.append(f"   {history_text}")
         lines.append(f"   链接参考: {format_bt_source_reference(item)}")
@@ -112,6 +113,7 @@ def format_bt_batch_preview_reply(
         return BT_BATCH_PREVIEW_NO_RESULT_TEXT_TEMPLATE.format(query=query)
 
     lines = [f"BT 批量预览结果：{query}"]
+    seen_history_content_ids: set[str] = set()
     for index, item in enumerate(candidates, start=1):
         title = safe_text(item.get("title"), default="(no title)")
         indexer = safe_indexer(item.get("indexer"), item.get("indexerName"))
@@ -129,7 +131,7 @@ def format_bt_batch_preview_reply(
         helper_title = format_read_only_adult_helper_title(item)
         if helper_title:
             lines.append(f"   {helper_title}")
-        history_text = safe_text(item.get("adult_history_text"), default="")
+        history_text = resolve_read_only_history_text(item, seen_content_ids=seen_history_content_ids)
         if history_text:
             lines.append(f"   {history_text}")
         lines.append(f"   链接参考: {format_bt_source_reference(item)}")
@@ -188,6 +190,22 @@ def format_read_only_adult_helper_title(item: Mapping[str, Any]) -> str:
     if helper_title_key and helper_title_key == candidate_title_key:
         return ""
     return f"只读标题: {helper_title}"
+
+
+def resolve_read_only_history_text(item: Mapping[str, Any], *, seen_content_ids: set[str]) -> str:
+    history_text = safe_text(item.get("adult_history_text"), default="")
+    if not history_text:
+        return ""
+    content_id = safe_text(item.get("adult_content_id"), default="") or safe_text(
+        item.get("read_only_adult_content_id"),
+        default="",
+    )
+    if not content_id:
+        return history_text
+    if content_id in seen_content_ids:
+        return ""
+    seen_content_ids.add(content_id)
+    return history_text
 
 
 def safe_text(value: Any, default: str) -> str:

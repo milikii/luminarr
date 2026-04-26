@@ -305,6 +305,55 @@ def test_search_bt_read_only_and_format_uses_javlibrary_helper_for_history_looku
     assert "历史: 该番号已有待确认下载记录。" in text
 
 
+def test_search_bt_read_only_and_format_suppresses_duplicate_history_for_same_content_id(tmp_path: Path) -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "SSIS-123 first release",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "SSIS-123 second release",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 5,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "javbus",
+                "sourceProvider": "javbus",
+            },
+        ]
+
+    database = SqliteDatabase(str(tmp_path / "adult-history.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.upsert_pending(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="tokyotosho",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:hash",
+        downloader_name="bt",
+    )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_content_registry_repo=registry_repo,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert text.count("历史: 该番号已有待确认下载记录。") == 1
+
+
 def test_search_bt_read_only_and_format_skips_javlibrary_lookup_when_candidate_already_has_adult_id() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "SSIS-123"
@@ -552,6 +601,55 @@ def test_search_bt_batch_preview_and_format_includes_javlibrary_helper_summary()
 
     assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
     assert "只读标题: SSIS-123 Sample Title" in text
+
+
+def test_search_bt_batch_preview_and_format_suppresses_duplicate_history_for_same_content_id(tmp_path: Path) -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "SSIS-123 first release",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "SSIS-123 second release",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 5,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "javbus",
+                "sourceProvider": "javbus",
+            },
+        ]
+
+    database = SqliteDatabase(str(tmp_path / "adult-batch-history.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.upsert_pending(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="tokyotosho",
+        task_ref="1",
+        task_id="selection:1",
+        task_hash="candidate:hash",
+        downloader_name="bt",
+    )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_content_registry_repo=registry_repo,
+    )
+    text = _run(service.search_bt_batch_preview_and_format(BTBatchPreviewRequest(query="SSIS-123")))
+
+    assert text.count("历史: 该番号已有待确认下载记录。") == 1
 
 
 def test_search_bt_batch_preview_and_format_uses_page_fetch_for_allowlist_url() -> None:
