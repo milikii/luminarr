@@ -32,20 +32,42 @@ def _resolve_downloader_payload_value(payload_json: str, key: str) -> tuple[str,
     return str(payload.get(key, "")).strip(), None
 
 
-def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
+def _print_downloader_route_lookup_log(
+    *,
+    title: str,
+    task_ref: str,
+    chat_id: int | None,
+    detail_label: str,
+    detail_value: str,
+    fix_hint: str,
+) -> None:
     print(
-        f"\033[31m[下载器路由未命中]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，"
-        "并确认状态/导入查询使用的是同一私聊会话。",
+        f"\033[31m[{title}]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} "
+        f"{detail_label}={detail_value}\n"
+        f"\033[33m[处理建议]\033[0m {fix_hint}",
         flush=True,
     )
 
 
+def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
+    _print_downloader_route_lookup_log(
+        title="下载器路由未命中",
+        task_ref=task_ref,
+        chat_id=chat_id,
+        detail_label="原因",
+        detail_value=reason,
+        fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
+    )
+
+
 def _log_downloader_route_lookup_error(*, task_ref: str, chat_id: int | None, error: Exception) -> None:
-    print(
-        f"\033[31m[下载器路由查询失败]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} 错误={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
-        flush=True,
+    _print_downloader_route_lookup_log(
+        title="下载器路由查询失败",
+        task_ref=task_ref,
+        chat_id=chat_id,
+        detail_label="错误",
+        detail_value=str(error),
+        fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
     )
 
 
@@ -55,10 +77,13 @@ def _log_downloader_route_payload_corruption(
     chat_id: int | None,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载器路由载荷损坏]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
-        flush=True,
+    _print_downloader_route_lookup_log(
+        title="下载器路由载荷损坏",
+        task_ref=task_ref,
+        chat_id=chat_id,
+        detail_label="原因",
+        detail_value=reason,
+        fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
     )
 
 
@@ -139,6 +164,34 @@ def _resolve_host_download_dir_for_route(
     if instance is None:
         return ""
     return instance.download_dir
+
+
+def _resolve_lookup_client_for_task(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+    operation: str,
+) -> tuple[ResolvedDownloaderTaskRoute, TransmissionClient | QbittorrentClient]:
+    route = _resolve_downloader_task_route(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+    )
+    if route is None:
+        raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
+    client = _resolve_downloader_client_for_lookup(
+        downloader_name=route.downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
+    if client is None:
+        raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
+    return route, client
 
 
 def _resolve_downloader_name_for_task(
@@ -278,21 +331,15 @@ async def _get_torrent_import_source_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionImportSource | None:
-    route = _resolve_downloader_task_route(
+    route, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
-    )
-    if route is None:
-        raise DownloaderRouteLookupError(f"downloader route unavailable for import task: {task_ref}")
-    client = _resolve_downloader_client_for_lookup(
-        downloader_name=route.downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        operation="import",
     )
-    if client is None:
-        raise DownloaderRouteLookupError(f"downloader client unavailable for import task: {task_ref}")
     import_source = await client.get_torrent_import_source(task_ref)
     if import_source is None:
         return None
@@ -314,21 +361,15 @@ async def _get_torrent_status_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionTaskStatus | None:
-    downloader_name = _resolve_downloader_name_for_task(
+    _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
-    )
-    if downloader_name is None:
-        raise DownloaderRouteLookupError(f"downloader route unavailable for status task: {task_ref}")
-    client = _resolve_downloader_client_for_lookup(
-        downloader_name=downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        operation="status",
     )
-    if client is None:
-        raise DownloaderRouteLookupError(f"downloader client unavailable for status task: {task_ref}")
     return await client.get_torrent_status(task_ref)
 
 
@@ -342,19 +383,13 @@ async def _remove_torrent_with_routing(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     delete_local_data: bool,
 ) -> None:
-    downloader_name = _resolve_downloader_name_for_task(
+    _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
-    )
-    if downloader_name is None:
-        raise DownloaderRouteLookupError(f"downloader route unavailable for remove task: {task_ref}")
-    client = _resolve_downloader_client_for_lookup(
-        downloader_name=downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        operation="remove",
     )
-    if client is None:
-        raise DownloaderRouteLookupError(f"downloader client unavailable for remove task: {task_ref}")
     await client.remove_torrent(task_ref, delete_local_data=delete_local_data)
