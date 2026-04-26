@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTaskStatus
+from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -1397,6 +1398,120 @@ def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(cap
     output = capsys.readouterr().out
     assert "[自动导入聊天身份无效]" in output
     assert "chat_id=0" in output
+
+
+def test_post_download_auto_import_run_for_record_routes_adult_task_to_archive_service(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "adult.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.mark_downloading(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="javbus",
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        downloader_name="bt-main",
+    )
+    auto_import = AsyncMock(return_value="不应走到这里")
+    adult_archive_service = type(
+        "AdultArchiveService",
+        (),
+        {"run_for_record": AsyncMock(return_value="成人资源归档成功")},
+    )()
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=None,
+        job_event_repo=type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: []})(),
+        auto_import_func=auto_import,
+        adult_content_registry_repo=registry_repo,
+        adult_archive_service=adult_archive_service,
+    )
+    record = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "SSIS-123 sample",
+            "chat_id": 1001,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15 00:00:00",
+            "last_observed_at": "2026-04-15 00:00:00",
+            "created_at": "2026-04-15 00:00:00",
+            "updated_at": "2026-04-15 00:00:00",
+        },
+    )()
+
+    reply = asyncio.run(auto_import_service.run_for_record(record))
+
+    assert reply == "成人资源归档成功"
+    auto_import.assert_not_awaited()
+    adult_archive_service.run_for_record.assert_awaited_once()
+
+
+def test_post_download_auto_import_run_for_record_skips_archived_deleted_adult_task(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "adult.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.mark_downloading(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="javbus",
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        downloader_name="bt-main",
+    )
+    registry_repo.mark_archived_deleted(
+        normalized_content_id="censored:ssis-123",
+        archive_path="/data/adult/censored/SSIS-123",
+        task_id="87",
+        task_hash="hash-87",
+    )
+    auto_import = AsyncMock(return_value="不应走到这里")
+    adult_archive_service = type(
+        "AdultArchiveService",
+        (),
+        {"run_for_record": AsyncMock(return_value="不应走到这里")},
+    )()
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=None,
+        job_event_repo=type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: []})(),
+        auto_import_func=auto_import,
+        adult_content_registry_repo=registry_repo,
+        adult_archive_service=adult_archive_service,
+    )
+    record = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "SSIS-123 sample",
+            "chat_id": 1001,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15 00:00:00",
+            "last_observed_at": "2026-04-15 00:00:00",
+            "created_at": "2026-04-15 00:00:00",
+            "updated_at": "2026-04-15 00:00:00",
+        },
+    )()
+
+    reply = asyncio.run(auto_import_service.run_for_record(record))
+
+    assert reply is None
+    auto_import.assert_not_awaited()
+    adult_archive_service.run_for_record.assert_not_awaited()
 
 
 def test_post_download_auto_import_run_for_record_raises_when_skip_event_write_fails(capsys) -> None:
