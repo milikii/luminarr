@@ -29,6 +29,7 @@ class DownloaderInstanceConfig:
     downloader_type: str
     base_url: str
     download_dir: str
+    dispatch_download_dir: str = ""
     username: str = ""
     password: str = ""
 
@@ -295,20 +296,29 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
             continue
 
         parts = [part.strip() for part in cleaned_item.split("|")]
-        if len(parts) not in {4, 6}:
+        if len(parts) not in {4, 5, 6, 7}:
             raise ConfigError(
-                "DOWNLOADER_INSTANCES format must be `name|type|base_url|download_dir` or `name|type|base_url|download_dir|username|password`, separated by `;`"
+                "DOWNLOADER_INSTANCES format must be `name|type|base_url|download_dir`, "
+                "`name|type|base_url|download_dir|dispatch_download_dir`, "
+                "`name|type|base_url|download_dir|username|password` or "
+                "`name|type|base_url|download_dir|dispatch_download_dir|username|password`, separated by `;`"
             )
 
         name = parts[0]
         downloader_type = _normalize_downloader_type(parts[1])
         base_url = parts[2].rstrip("/")
         download_dir = parts[3]
+        dispatch_download_dir = ""
         username = ""
         password = ""
+        if len(parts) in {5, 7}:
+            dispatch_download_dir = parts[4]
         if len(parts) == 6:
             username = parts[4]
             password = parts[5]
+        if len(parts) == 7:
+            username = parts[5]
+            password = parts[6]
 
         if not name:
             raise ConfigError("DOWNLOADER_INSTANCES name cannot be empty")
@@ -318,6 +328,8 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
             raise ConfigError(f"DOWNLOADER_INSTANCES base_url cannot be empty: {name}")
         if not download_dir:
             raise ConfigError(f"DOWNLOADER_INSTANCES download_dir cannot be empty: {name}")
+        if len(parts) in {5, 7} and not dispatch_download_dir:
+            raise ConfigError(f"DOWNLOADER_INSTANCES dispatch_download_dir cannot be empty: {name}")
 
         seen_names.add(name)
         instances.append(
@@ -326,6 +338,7 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
                 downloader_type=downloader_type,
                 base_url=base_url,
                 download_dir=download_dir,
+                dispatch_download_dir=dispatch_download_dir,
                 username=username,
                 password=password,
             )
