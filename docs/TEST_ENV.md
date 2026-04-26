@@ -51,7 +51,7 @@ docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml down
 - 当前 qB 测试栈为避免 WebUI `Host header` 端口不匹配，必须保持 `WEBUI_PORT=18098` 和 `18098:18098` 同步；不要回退成 `18098:8080`
 - qB 容器会在 `docker/test/qbittorrent/qBittorrent` 下生成 GeoDB / logs / RSS / lockfile / `qBittorrent-data.conf` 等运行态文件；这些文件不属于固定配置，不应提交到 Git
 - 当前 compose 文件在仓库里，Transmission / Emby 的实际容器配置和状态仍主要落在 `/home/alex/luminarr-test`
-- 截至 `2026-04-24` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`；`19092` 端口监听仍在，但 `curl -si http://127.0.0.1:19092/transmission/rpc` 本轮连续两次退出码 `7`
+- 截至 `2026-04-26` 本轮复验，`19091` RPC 返回 `409 + X-Transmission-Session-Id`、`18096` 返回 `ServerName`、`18098/api/v2/torrents/info` 返回 `200 OK`；`19092` 在用户 shell 中已出现 `409 + X-Transmission-Session-Id`，但当前 Codex shell 里的 `curl -si http://127.0.0.1:19092/transmission/rpc` 仍偶发退出码 `7`
 
 ---
 
@@ -101,6 +101,13 @@ curl -si http://127.0.0.1:19092/transmission/rpc | grep -q "X-Transmission-Sessi
 
 说明：
 - 当前 `19092` 不能直接沿用旧的“可达”或更早的“不可达”结论；每轮都要按当轮探针重写
+- 当前补充 probe：
+
+```bash
+.venv/bin/python tmp_tests/verify_bt_transmission_rpc_probe.py
+```
+
+- 截至 `2026-04-26` 本轮，用户 shell 已观察到 `409 + X-Transmission-Session-Id`，但当前 Codex shell 的 probe 结果写入 `/tmp/luminarr_bt_transmission_rpc_probe.json`，连续 `5/5` 次 `All connection attempts failed`
 
 ---
 
@@ -156,15 +163,15 @@ curl -si http://127.0.0.1:18098/api/v2/torrents/info
 
 说明：
 - 这条脚本当前会用真实 qB Web API、真实 torrent/webseed 和真实 adult archive sidecar 验证“归档 -> 保留期清理”链路。
-- 截至 `2026-04-26` 本轮 probe，脚本已稳定把 blocker 收成 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`。
-- 当前 blocker 不是 repo 侧路由，而是 qB 测试栈宿主机目录权限：
-  - `/data/downloads/qb`
-  - `/data/downloads/incomplete-qb`
-  当前实际 owner/group 为 `nobody:nogroup` 且权限 `755`，与 compose 里的 `PUID=1000` / `PGID=1000` 不一致。
-- 同轮 qB 日志已命中：
-  - `file_open (/data/downloads/incomplete-qb/SSIS-123-smoke.mp4) error: Permission denied`
-  - `storage move failed. mkdir (): Permission denied`
-- 如果你准备继续这条真实 smoke，先在宿主机修正 qB 下载目录权限，再重跑上面的脚本；当前最直接的修复方式是让这两个目录与 qB 容器的 `PUID/PGID` 对齐。
+- 截至 `2026-04-26` 本轮 probe，脚本已通过，并把证据写到 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`。
+- 当前通过态证据包含：
+  - `archive_reply=成人资源归档成功`
+  - `cleanup_reply=成人资源保留期清理完成`
+  - `registry_statuses.after_archive=archived_present`
+  - `registry_statuses.after_cleanup=archived_deleted`
+  - `qb_removed=true`
+  - `source_path_removed=true`
+- 这轮通过前，宿主机上需要先把 `/data/downloads/qb` 与 `/data/downloads/incomplete-qb` 的 owner 修到 `1000:1000`；单纯 `chmod` 不足以让 qB 容器按 `PUID/PGID` 正常落盘。
 
 ---
 
