@@ -2257,6 +2257,68 @@ def test_search_bt_batch_preview_and_format_for_chat_keeps_helper_reorder_out_of
     assert "adult_content_id" not in second_cached
 
 
+def test_search_bt_batch_preview_and_format_for_chat_selected_unrelated_candidate_stays_helper_free() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "Noise collection complete edition",
+                "source": "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "Another unrelated compilation",
+                "source": "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "Secret Mission Nurse leaked cut",
+                "source": "magnet:?xt=urn:btih:cccccccccccccccccccccccccccccccccccccccc",
+                "infoHash": "cccccccccccccccccccccccccccccccccccccccc",
+                "indexerName": "prowlarr",
+                "sourceProvider": "prowlarr",
+            },
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Secret Mission Nurse",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+        )
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+        limit=2,
+    )
+    text = _run(
+        service.search_bt_batch_preview_and_format_for_chat(
+            BTBatchPreviewRequest(query="SSIS-123", selected_indexes=(2,), selection_text="2"),
+            chat_id=1001,
+        )
+    )
+
+    cached = service.get_cached_candidate(1001, 1)
+
+    assert "1. Noise collection complete edition" in text
+    assert "只读补全:" not in text
+    assert "只读标题:" not in text
+    assert cached is not None
+    assert cached["title"] == "Noise collection complete edition"
+    assert "read_only_adult_content_id" not in cached
+    assert "read_only_adult_display_id" not in cached
+    assert "adult_content_id" not in cached
+
+
 def test_search_bt_batch_preview_and_format_for_chat_caches_page_preview_candidates() -> None:
     async def unexpected_raw_search(_: str) -> list[dict[str, object]]:
         raise AssertionError("keyword raw search should not be used for allowlist page preview")
