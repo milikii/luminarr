@@ -92,6 +92,32 @@ def test_bt_source_adapter_skips_candidates_without_title_or_source() -> None:
     assert results == []
 
 
+def test_bt_source_adapter_only_persists_exact_adult_id_and_skips_keyword_only_guess() -> None:
+    async def adult_search(_: str) -> list[dict[str, object]]:
+        return [
+            {
+                "title": "【中文字幕】 一本道 042123_001 1080p 无码流出",
+                "downloadUrl": "https://example.com/1pon-042123-001.torrent",
+            },
+            {
+                "title": "麻豆 中文字幕 无码流出 合集",
+                "downloadUrl": "https://example.com/madou-collection.torrent",
+            },
+        ]
+
+    adapter = BtSourceAdapter((BtSourceProvider(name="adult", search_func=adult_search),))
+
+    results = asyncio.run(adapter.search("adult"))
+
+    assert len(results) == 2
+    assert results[0]["adult_content_id"] == "1pon:042123-001"
+    assert results[0]["adult_archive_category"] == "uncensored"
+    assert results[0]["adult_display_id"] == "1PON-042123-001"
+    assert "adult_content_id" not in results[1]
+    assert "adult_archive_category" not in results[1]
+    assert "adult_display_id" not in results[1]
+
+
 def test_parse_web_source_html_extracts_size_and_seeders_for_nyaa() -> None:
     html = """
     <table>

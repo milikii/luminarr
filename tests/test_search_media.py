@@ -368,6 +368,35 @@ def test_search_bt_read_only_and_format_keeps_results_when_javlibrary_lookup_fai
     assert "timeout" in captured.out
 
 
+def test_search_bt_read_only_and_format_skips_javlibrary_lookup_for_keyword_only_adult_guess() -> None:
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "麻豆 中文字幕 无码流出"
+        return [
+            {
+                "title": "麻豆 中文字幕 无码流出 合集",
+                "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(_: str) -> JavLibraryReadOnlyMatch | None:
+        raise AssertionError("helper lookup should be skipped when query has no exact adult id")
+
+    service = SearchMediaService(
+        _fake_search_with_results,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("麻豆 中文字幕 无码流出"))
+
+    assert "麻豆 中文字幕 无码流出 合集" in text
+    assert "只读补全:" not in text
+
+
 def test_search_bt_read_only_and_format_only_applies_helper_to_related_candidates() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "SSIS-123"

@@ -7,7 +7,7 @@ from urllib.parse import quote_plus, urljoin, urlparse
 
 import httpx
 
-from app.services.adult_content import extract_adult_content_match
+from app.services.adult_content import extract_exact_adult_content_match
 
 _TAG_PATTERN = re.compile(r"<[^>]+>")
 _TITLE_PATTERN = re.compile(r"<title[^>]*>(?P<title>.*?)</title>", re.IGNORECASE | re.DOTALL)
@@ -83,7 +83,7 @@ def _build_search_url(display_id: str) -> str:
 
 
 def _normalize_expected_display_id(lookup_text: str) -> str:
-    content_match = extract_adult_content_match(lookup_text, source_site="javlibrary")
+    content_match = extract_exact_adult_content_match(lookup_text, source_site="javlibrary")
     if content_match is None or content_match.archive_category != "censored":
         return ""
     return content_match.display_id.strip().upper()
@@ -113,7 +113,7 @@ def _extract_read_only_match(
 ) -> JavLibraryReadOnlyMatch | None:
     detail_id = _extract_detail_id(html) or expected_display_id
     title = _extract_detail_title(html) or detail_id
-    content_match = extract_adult_content_match(f"{detail_id} {title}", source_site="javlibrary")
+    content_match = extract_exact_adult_content_match(f"{detail_id} {title}", source_site="javlibrary")
     if content_match is None or content_match.archive_category != "censored":
         return None
     return JavLibraryReadOnlyMatch(
@@ -152,7 +152,7 @@ def _extract_detail_id(html: str) -> str:
     if matched is None:
         return ""
     detail_id = _clean_html_text(str(matched.group("id") or ""))
-    content_match = extract_adult_content_match(detail_id, source_site="javlibrary")
+    content_match = extract_exact_adult_content_match(detail_id, source_site="javlibrary")
     if content_match is None:
         return ""
     return content_match.display_id
@@ -161,7 +161,7 @@ def _extract_detail_id(html: str) -> str:
 def _looks_like_expected_display_id(text: str, *, expected_display_id: str) -> bool:
     if not text:
         return False
-    content_match = extract_adult_content_match(text, source_site="javlibrary")
+    content_match = extract_exact_adult_content_match(text, source_site="javlibrary")
     if content_match is not None:
         return content_match.display_id == expected_display_id
     return expected_display_id.lower() in text.strip().lower()

@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from app.services.adult_content import extract_adult_content_match
+from app.services.adult_content import extract_exact_adult_content_match
 from app.services.media_identity import normalize_media_identity_payload
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
@@ -80,7 +80,7 @@ class AddPendingContextBuilder:
 
         title = str(candidate.get("title", "")).strip() or "(no title)"
         media_identity = normalize_media_identity_payload(candidate.get("media_identity"))
-        adult_content_match = extract_adult_content_match(
+        adult_content_match = extract_exact_adult_content_match(
             title,
             source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
         )
@@ -121,7 +121,9 @@ class AddPendingContextBuilder:
         if not cleaned_source:
             return PendingAddBuildResult(pending_add=None, error_text=CANDIDATE_SOURCE_MISSING_TEXT)
         cleaned_title = title.strip() or "(no title)"
-        adult_content_match = extract_adult_content_match(cleaned_title) or extract_adult_content_match(cleaned_source)
+        adult_content_match = extract_exact_adult_content_match(cleaned_title) or extract_exact_adult_content_match(
+            cleaned_source
+        )
 
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(

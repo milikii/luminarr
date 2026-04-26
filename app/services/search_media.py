@@ -16,7 +16,7 @@ from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.services.adult_bt_selector import build_adult_history_text, order_adult_bt_candidates
-from app.services.adult_content import extract_adult_content_match
+from app.services.adult_content import extract_exact_adult_content_match
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates, load_bt_scoring_rules
 from app.services.search_candidate_state import CandidateLoadResult, CandidateStateStore
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
@@ -299,7 +299,7 @@ class SearchMediaService:
             if not candidate.get("adult_display_id"):
                 candidate["adult_display_id"] = candidate.get("adult_content_id", "")
             return candidate
-        content_match = extract_adult_content_match(
+        content_match = extract_exact_adult_content_match(
             str(candidate.get("title", "")).strip(),
             source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
         )
@@ -366,7 +366,7 @@ class SearchMediaService:
     async def _lookup_bt_read_only_helper_match(self, lookup_query: str) -> JavLibraryReadOnlyMatch | None:
         if self._adult_read_only_lookup_func is None:
             return None
-        content_match = extract_adult_content_match(lookup_query, source_site="javlibrary")
+        content_match = extract_exact_adult_content_match(lookup_query, source_site="javlibrary")
         if content_match is None or content_match.archive_category != "censored":
             return None
         try:

@@ -11,7 +11,13 @@ from app.db.adult_content_registry_repo import (
 )
 from app.db.sqlite import SqliteDatabase
 from app.services.adult_bt_selector import build_adult_history_text, order_adult_bt_candidates
-from app.services.adult_content import build_fallback_content_id, extract_adult_content_match, guess_adult_archive_category
+from app.services.adult_content import (
+    build_fallback_content_id,
+    extract_adult_content_match,
+    extract_exact_adult_content_match,
+    guess_adult_archive_category,
+    is_fallback_adult_content_match,
+)
 
 
 def test_extract_adult_content_match_supports_fc2_censored_and_uncensored_patterns() -> None:
@@ -63,6 +69,28 @@ def test_extract_adult_content_match_canonicalizes_uncensored_prefix_aliases() -
         assert match is not None
         assert match.normalized_content_id == expected_id
         assert match.display_id == expected_display
+
+
+def test_extract_exact_adult_content_match_strips_noise_and_normalizes_localized_aliases() -> None:
+    uncensored_match = extract_exact_adult_content_match("【中文字幕】 一本道 042123_001 1080p 无码流出")
+    assert uncensored_match is not None
+    assert uncensored_match.normalized_content_id == "1pon:042123-001"
+    assert uncensored_match.display_id == "1PON-042123-001"
+
+    tokyohot_match = extract_exact_adult_content_match("東京熱 n1234 HDR 4K sample")
+    assert tokyohot_match is not None
+    assert tokyohot_match.normalized_content_id == "tokyohot:n1234"
+    assert tokyohot_match.display_id == "TOKYOHOT-N1234"
+
+
+def test_extract_exact_adult_content_match_rejects_keyword_only_fallback_guess() -> None:
+    exact_match = extract_exact_adult_content_match("麻豆 中文字幕 无码流出 合集")
+    assert exact_match is None
+
+    fallback_match = extract_adult_content_match("麻豆 中文字幕 无码流出 合集")
+    assert fallback_match is not None
+    assert fallback_match.archive_category == "chinese_original"
+    assert is_fallback_adult_content_match(fallback_match) is True
 
 
 def test_guess_adult_archive_category_prefers_chinese_original_and_western_keywords() -> None:

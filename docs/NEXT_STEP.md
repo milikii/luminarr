@@ -1,4 +1,4 @@
-# Next step (v356)
+# Next step (v357)
 
 ## Current goal
 
@@ -16,6 +16,9 @@
   - 成人标题归一化回归保护当前也已收口：
     - 全角 / 变体分隔符输入会先归一化后再做 adult id 识别
     - 常见 uncensored 前缀别名会收口到同一 `normalized_content_id`
+    - `一本道 / カリビアンコム / 天然むすめ / パコパコママ / 東京熱` 这类本地化站点别名会先映射回既有 exact-id 规则
+    - 常见分辨率 / 编码 / 字幕 / 流出噪声词会在 exact-id 提取前先剥离
+    - keyword-only 成人分类猜测不会再写进 BT 候选真相、待确认上下文或 JavLibrary helper 入口
     - JavLibrary helper 当前只会补到仍与当前 exact-id 相关的只读候选
     - 只读展示会压掉仅空格 / 连接符差异的重复 helper 标题
 - 当前新增真相：

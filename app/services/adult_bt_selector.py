@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from app.services.adult_content import AdultContentMatch, extract_adult_content_match
+from app.services.adult_content import AdultContentMatch, extract_exact_adult_content_match
 
 _SOURCE_PRIORITY = {
     "tokyotosho": 4.0,
@@ -18,7 +18,7 @@ def order_adult_bt_candidates(
     *,
     query: str,
 ) -> list[dict[str, Any]]:
-    query_match = extract_adult_content_match(query)
+    query_match = extract_exact_adult_content_match(query)
     annotated_results = [_to_candidate_dict(item) for item in results]
     ranked = sorted(
         annotated_results,
@@ -61,7 +61,7 @@ def _resolve_candidate_match(item: Mapping[str, Any]) -> AdultContentMatch | Non
     raw_match = item.get("adult_content_match")
     if isinstance(raw_match, AdultContentMatch):
         return raw_match
-    return extract_adult_content_match(
+    return extract_exact_adult_content_match(
         str(item.get("title", "")).strip(),
         source_site=str(item.get("sourceProvider", "")).strip() or str(item.get("indexerName", "")).strip(),
     )

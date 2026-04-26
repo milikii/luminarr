@@ -47,6 +47,14 @@ _UNCENSORED_PREFIX_ALIASES = {
     "paco": "paco",
     "pacopacomama": "paco",
 }
+_TEXT_ALIAS_REPLACEMENTS = (
+    ("カリビアンコム", "caribbeancom"),
+    ("カリビアン", "caribbean"),
+    ("一本道", "1pondo"),
+    ("天然むすめ", "10musume"),
+    ("パコパコママ", "pacopacomama"),
+    ("東京熱", "tokyohot"),
+)
 _SEPARATOR_TRANSLATION = str.maketrans(
     {
         "—": "-",
@@ -55,6 +63,13 @@ _SEPARATOR_TRANSLATION = str.maketrans(
         "ー": "-",
         "＿": "_",
     }
+)
+_EXACT_MATCH_NOISE_PATTERN = re.compile(
+    r"(?:"
+    r"\b(?:2160p|1080p|720p|480p|4k|8k|x264|x265|h264|h265|hevc|avc|aac|flac|web(?:-?dl|rip)?|bluray|bdrip|remux|uhd|hdr|dv|sample|sub(?:bed|title)?|chs|cht)\b"
+    r"|中字|字幕|中文|无码|有码|uncensored|censored|流出|破解"
+    r")",
+    re.IGNORECASE,
 )
 
 
@@ -67,25 +82,13 @@ class AdultContentMatch:
 
 
 def extract_adult_content_match(text: str, *, source_site: str = "") -> AdultContentMatch | None:
+    exact_match = extract_exact_adult_content_match(text, source_site=source_site)
+    if exact_match is not None:
+        return exact_match
+
     cleaned_text = _normalize_match_text(text)
     if not cleaned_text:
         return None
-
-    fc2_match = _match_fc2(cleaned_text)
-    if fc2_match is not None:
-        return fc2_match
-
-    uncensored_match = _match_uncensored(cleaned_text)
-    if uncensored_match is not None:
-        return uncensored_match
-
-    chinese_original_match = _match_chinese_original(cleaned_text)
-    if chinese_original_match is not None:
-        return chinese_original_match
-
-    censored_match = _match_censored(cleaned_text)
-    if censored_match is not None:
-        return censored_match
 
     fallback_category = guess_adult_archive_category(cleaned_text, source_site=source_site)
     if fallback_category == "other_adult":
@@ -99,15 +102,36 @@ def extract_adult_content_match(text: str, *, source_site: str = "") -> AdultCon
     )
 
 
+def extract_exact_adult_content_match(text: str, *, source_site: str = "") -> AdultContentMatch | None:
+    del source_site
+    cleaned_text = _normalize_exact_match_text(text)
+    if not cleaned_text:
+        return None
+
+    fc2_match = _match_fc2(cleaned_text)
+    if fc2_match is not None:
+        return fc2_match
+
+    uncensored_match = _match_uncensored(cleaned_text)
+    if uncensored_match is not None:
+        return uncensored_match
+
+    chinese_original_match = _match_chinese_original(cleaned_text)
+    if chinese_original_match is not None and not is_fallback_adult_content_match(chinese_original_match):
+        return chinese_original_match
+
+    return _match_censored(cleaned_text)
+
+
 def guess_adult_archive_category(text: str, *, source_site: str = "") -> str:
     normalized_text = _normalize_compact_text(text)
     normalized_site = _normalize_compact_text(source_site)
     if any(keyword in normalized_text for keyword in _FC2_KEYWORDS):
         return "fc2"
-    if any(keyword in normalized_text for keyword in _UNCENSORED_KEYWORDS):
-        return "uncensored"
     if any(keyword in normalized_text for keyword in _CHINESE_ORIGINAL_KEYWORDS):
         return "chinese_original"
+    if any(keyword in normalized_text for keyword in _UNCENSORED_KEYWORDS):
+        return "uncensored"
     if any(keyword in normalized_text for keyword in _WESTERN_KEYWORDS):
         return "western"
     if normalized_site in {"javbus", "javlibrary"}:
@@ -125,6 +149,12 @@ def build_fallback_content_id(text: str, *, category: str) -> str:
     if not compact:
         compact = "unknown"
     return f"{category}:{compact[:64]}"
+
+
+def is_fallback_adult_content_match(match: AdultContentMatch | None) -> bool:
+    if match is None:
+        return False
+    return match.display_id.strip().lower() == match.normalized_content_id.strip().lower()
 
 
 def _match_fc2(text: str) -> AdultContentMatch | None:
@@ -154,7 +184,7 @@ def _match_uncensored(text: str) -> AdultContentMatch | None:
         serial = _normalize_uncensored_serial(str(matched.group("serial") or ""))
         if not prefix or not serial:
             continue
-        display_id = f"{prefix.upper()}-{serial}"
+        display_id = f"{prefix.upper()}-{serial.upper()}"
         return AdultContentMatch(
             normalized_content_id=f"{prefix}:{serial}",
             archive_category="uncensored",
@@ -223,9 +253,19 @@ def _normalize_uncensored_serial(value: str) -> str:
 
 def _normalize_match_text(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value or "")
+    for source, replacement in _TEXT_ALIAS_REPLACEMENTS:
+        normalized = normalized.replace(source, replacement)
     return normalized.translate(_SEPARATOR_TRANSLATION).strip()
 
 
 def _canonicalize_uncensored_prefix(value: str) -> str:
     prefix = _normalize_compact_text(value)
     return _UNCENSORED_PREFIX_ALIASES.get(prefix, prefix)
+
+
+def _normalize_exact_match_text(value: str) -> str:
+    normalized = _normalize_match_text(value)
+    if not normalized:
+        return ""
+    normalized = _EXACT_MATCH_NOISE_PATTERN.sub(" ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()

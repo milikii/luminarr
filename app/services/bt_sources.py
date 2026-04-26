@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.clients.web_source import UnsupportedWebSourcePageError
-from app.services.adult_content import extract_adult_content_match
+from app.services.adult_content import extract_exact_adult_content_match
 from app.services.media_name_parser import parse_media_name
 
 BtSourceSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -128,7 +128,7 @@ def normalize_bt_candidate(
     normalized_candidate["sourceProvider"] = provider_name.strip() or "unknown"
     normalized_candidate["providerIndex"] = provider_index
     normalized_candidate["parsedMediaName"] = parse_media_name(title)
-    adult_content_match = extract_adult_content_match(title, source_site=provider_name)
+    adult_content_match = extract_exact_adult_content_match(title, source_site=provider_name)
     if adult_content_match is not None:
         normalized_candidate["adult_content_id"] = adult_content_match.normalized_content_id
         normalized_candidate["adult_archive_category"] = adult_content_match.archive_category

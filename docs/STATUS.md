@@ -1,4 +1,4 @@
-# Current status (v473)
+# Current status (v474)
 
 ## Current mainline
 
@@ -11,6 +11,9 @@
   - `bt批量` 候选缓存当前只保留原始候选；`javlibrary` helper-only 字段不会进入 `candidate_mapping`、待确认下载或 downloader dispatch 真相
   - 成人标题识别当前会先归一化全角 / 变体分隔符；`FC2`、`censored`、`uncensored` exact-id 输入会落到同一条识别真相
   - `caribbeancom / carib`、`1pondo / 1pon`、`10musume / 10mu`、`pacopacomama / paco` 当前会收口到同一 `normalized_content_id`
+  - `一本道 / カリビアンコム / 天然むすめ / パコパコママ / 東京熱` 这类常见本地化站点别名当前会先归一化到既有 exact-id 规则
+  - 常见分辨率 / 编码 / 字幕 / 流出噪声词当前会在 exact-id 提取前先剥离，不再要求标题足够“干净”才命中番号
+  - keyword-only 成人分类猜测当前不会再写进 BT 候选真相、待确认上下文或 JavLibrary helper 入口；这些路径只接受 exact-id
   - JavLibrary helper 当前只会给和当前 exact-id 仍有明显标题关联的只读候选补元数据，不再把 query 级补全误贴到无关噪声结果
   - 只读展示当前会压掉“仅空格/连接符差异”的重复 helper 标题行
   - 成人 BT 下载完成后可进入归档，统一保留窗口到期后可清理下载器任务与源资源
@@ -28,9 +31,9 @@
 
 ## Current health
 
-- 当前这轮变更只触碰 `adult_content` 识别归一化、`javlibrary` helper 注入边界、BT 只读展示去重和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
+- 当前这轮变更只触碰 `adult_content` 识别归一化、`bt_sources` / `add_pending_context` 的 exact/fallback 分层、`javlibrary` helper 注入边界、BT 只读展示去重和文档真相，没有改 downloader dispatch、approval、import 或 metadata 主链协议。
 - 当前成人 BT 主线的两条真实 smoke 继续保持通过态；当前更需要留意的是：
-  - `javlibrary` 当前只补 exact-id only 只读场景；非 exact-id 的噪声标题仍主要依赖站点标题和既有规则
+  - `javlibrary` 当前只补 exact-id only 只读场景；非 exact-id 的噪声标题虽然新增了本地别名/噪声规则，但仍主要依赖站点标题和既有规则
   - 下一条 BT 只读排序 / 展示保护如果继续推进，仍要保持 focused tests 优先，不能把 helper 结果写进审批真相，也不要继续把 `search_media.py` 往上堆
 
 ## Latest verification
@@ -38,7 +41,7 @@
 - `make quality`：`28 passed, 0 skipped`
 - `make verify-mainline`：当前轮已通过
 - focused pytest：
-  - `tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_javlibrary_helper.py tests/test_adult_content.py`：`196 passed, 0 skipped`
+  - `tests/test_search_media.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_bt_batch_confirm_runtime.py tests/test_javlibrary_helper.py tests/test_adult_content.py tests/test_bt_sources.py tests/test_add_pending_context.py`：`216 passed, 0 skipped`
 - 真实 smoke 保持通过态，本轮未改下载器 / 归档协议：
   - `.venv/bin/python tmp_tests/verify_adult_archive_qb_real_smoke.py`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_qb_real_smoke/evidence.json`
   - `bash -lc 'cd /home/alex/projects/luminarr && .venv/bin/python tmp_tests/verify_adult_archive_bt_real_smoke.py'`：上一轮通过，证据文件 `/tmp/luminarr_adult_archive_bt_real_smoke/evidence.json`
@@ -56,7 +59,7 @@
 
 ## Current biggest risk
 
-- 当前最大不确定性已经从“成人标题识别会不会因为变体/别名回退”收敛到“后续 BT 只读排序 / 展示保护怎么继续保持只读、focused、且不再把 `search_media.py` 继续堆大”。
+- 当前最大不确定性已经从“成人标题识别会不会因为变体/别名回退”进一步收敛到“后续 BT 只读排序 / 展示保护怎么继续保持只读、focused、且不再把 `search_media.py` 继续堆大”。
 
 ## Recommended Next Operator Command
 
