@@ -184,55 +184,58 @@ def _read_semicolon_delimited_records(
     return tuple(parser(_split_pipe_fields(cleaned_item)) for cleaned_item in _iter_semicolon_entries(raw_value))
 
 
-def _parse_raw_bt_destination(parts: list[str]) -> RawBtDestinationOption:
+def _parse_labelled_destination_record(
+    parts: list[str],
+    *,
+    kind: str,
+    empty_value_name: str,
+    build: Callable[[str, str, str], _T],
+) -> _T:
     if len(parts) == 2:
-        key, target_dir = parts
-        label = key
+        raw_value, target_dir = parts
+        label = raw_value
     elif len(parts) == 3:
-        key, label, target_dir = parts
+        raw_value, label, target_dir = parts
     else:
         raise ConfigError(
-            "RAW_BT_DESTINATIONS format must be `key|target_dir` or `key|label|target_dir`, separated by `;`"
+            f"{kind} format must be `{empty_value_name}|target_dir` or "
+            f"`{empty_value_name}|label|target_dir`, separated by `;`"
         )
 
-    normalized_key = key.lower().strip()
-    if not normalized_key:
-        raise ConfigError("RAW_BT_DESTINATIONS key cannot be empty")
+    normalized_value = raw_value.lower().strip()
+    if not normalized_value:
+        raise ConfigError(f"{kind} {empty_value_name} cannot be empty")
     if not label:
-        raise ConfigError(f"RAW_BT_DESTINATIONS label cannot be empty: {normalized_key}")
+        raise ConfigError(f"{kind} label cannot be empty: {normalized_value}")
     if not target_dir:
-        raise ConfigError(f"RAW_BT_DESTINATIONS target_dir cannot be empty: {normalized_key}")
+        raise ConfigError(f"{kind} target_dir cannot be empty: {normalized_value}")
 
-    return RawBtDestinationOption(
-        key=normalized_key,
-        label=label,
-        target_dir=target_dir,
+    return build(normalized_value, label, target_dir)
+
+
+def _parse_raw_bt_destination(parts: list[str]) -> RawBtDestinationOption:
+    return _parse_labelled_destination_record(
+        parts,
+        kind="RAW_BT_DESTINATIONS",
+        empty_value_name="key",
+        build=lambda key, label, target_dir: RawBtDestinationOption(
+            key=key,
+            label=label,
+            target_dir=target_dir,
+        ),
     )
 
 
 def _parse_adult_archive_destination(parts: list[str]) -> AdultArchiveDestination:
-    if len(parts) == 2:
-        category, target_dir = parts
-        label = category
-    elif len(parts) == 3:
-        category, label, target_dir = parts
-    else:
-        raise ConfigError(
-            "ADULT_ARCHIVE_DESTINATIONS format must be `category|target_dir` or `category|label|target_dir`, separated by `;`"
-        )
-
-    normalized_category = category.lower().strip()
-    if not normalized_category:
-        raise ConfigError("ADULT_ARCHIVE_DESTINATIONS category cannot be empty")
-    if not label:
-        raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS label cannot be empty: {normalized_category}")
-    if not target_dir:
-        raise ConfigError(f"ADULT_ARCHIVE_DESTINATIONS target_dir cannot be empty: {normalized_category}")
-
-    return AdultArchiveDestination(
-        category=normalized_category,
-        label=label,
-        target_dir=target_dir,
+    return _parse_labelled_destination_record(
+        parts,
+        kind="ADULT_ARCHIVE_DESTINATIONS",
+        empty_value_name="category",
+        build=lambda category, label, target_dir: AdultArchiveDestination(
+            category=category,
+            label=label,
+            target_dir=target_dir,
+        ),
     )
 
 

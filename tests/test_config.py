@@ -342,6 +342,32 @@ def test_load_settings_reads_adult_archive_destinations() -> None:
     assert settings.adult_bt_retention_hours == 120
 
 
+def test_load_settings_rejects_empty_raw_bt_destination_key() -> None:
+    with pytest.raises(ConfigError, match="RAW_BT_DESTINATIONS key cannot be empty"):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "RAW_BT_DESTINATIONS": "|下载目录|/data/raw/downloads",
+            }
+        )
+
+
+def test_load_settings_rejects_empty_adult_archive_destination_label() -> None:
+    with pytest.raises(ConfigError, match="ADULT_ARCHIVE_DESTINATIONS label cannot be empty: fc2"):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "ADULT_ARCHIVE_DESTINATIONS": "fc2||/data/adult/fc2",
+            }
+        )
+
+
 def test_load_settings_reads_downloader_instances_and_role_binding() -> None:
     settings = load_settings(
         {
