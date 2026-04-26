@@ -9,7 +9,7 @@
 - `qB` 导入源解析继续优先真实 `content_path`；`DOWNLOADER_INSTANCES` 的 `dispatch_download_dir` 与宿主机导入路径保持分离；路由层继续优先任务真相里的 host `download_dir`。
 - `app/services/add_adult_registry_state.py` 已统一 adult pending / downloading 状态写入；`add_to_downloader.py` `582` 行只剩 proof-like wrapper，可先停手不回退。
 - `search_media.py` 已降到 `288` 行，歧义澄清 / media-BT 排序 / batch preview 页面支持 helper 都已抽出；`import_to_library.py` 当前 `590` 行，经 focused gate + pyflakes 复核后继续保持 proof-like orchestration 冻结态。
-- 当前文档减法已把 `docs/` 顶层 Markdown 从 `47` 个收口到 `18` 个；29 个已完成 `*_PLAN.md` / `*_SLIMMING_LOG.md` / 历史风险日志已移到 `archive/docs/`，当前热点代码文件仍保持：`app/services/search_media.py` `288` 行、`add_to_downloader.py` `582` 行、`import_to_library.py` `590` 行；当前入口改为按需回查归档。
+- 当前文档减法已把 `docs/` 顶层 Markdown 从 `47` 个收口到 `16` 个；31 个已完成 `*_PLAN.md` / `*_SLIMMING_LOG.md` / 历史风险日志已移到 `archive/docs/`，当前热点代码文件仍保持：`app/services/search_media.py` `288` 行、`add_to_downloader.py` `582` 行、`import_to_library.py` `590` 行；当前入口改为按需回查归档。
 
 ## Current health
 
@@ -32,7 +32,7 @@
   - `tests/test_search_media_bt_ordering.py tests/test_search_media.py -k "orders_media_bt_candidates or fallback_query or quality_from_title"`：`6 passed, 183 deselected`
   - `tests/test_search_media_batch_preview_support.py tests/test_search_media.py -k "batch_preview or page_url or unsupported"`：`70 passed, 118 deselected`
   - `tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt or copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`：`30 passed, 119 deselected`
-  - `tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`：`25 passed`
+  - `tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`：`26 passed`
 - 真实 smoke 保持通过态，本轮未改下载器 / 归档协议。
 
 ## Current biggest risk

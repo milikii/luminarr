@@ -198,3 +198,13 @@ def test_archived_history_docs_are_moved_out_of_active_docs_root() -> None:
     for name in archived:
         assert not Path("docs", name).exists()
         assert Path("archive", "docs", name).exists()
+
+
+def test_active_docs_root_stays_small_and_current() -> None:
+    active_docs = sorted(path.name for path in Path("docs").glob("*.md"))
+
+    assert len(active_docs) <= 16
+    assert not any(name.endswith("_SLIMMING_LOG.md") for name in active_docs)
+    assert "SEARCH_REPLY_PRESENTATION_PLAN.md" in active_docs
+    assert "STATUS.md" in active_docs
+    assert "NEXT_STEP.md" in active_docs
