@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTaskStatus
@@ -10,6 +11,12 @@ from app.db.job_repo import JobRepo
 
 class DownloaderRouteLookupError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedDownloaderTaskRoute:
+    downloader_name: str
+    download_dir: str
 
 
 def _resolve_downloader_payload_value(payload_json: str, key: str) -> tuple[str, str | None]:
@@ -55,12 +62,12 @@ def _log_downloader_route_payload_corruption(
     )
 
 
-def _resolve_downloader_name_for_task(
+def _resolve_downloader_task_route(
     *,
     task_ref: str,
     chat_id: int | None,
     job_repo: JobRepo,
-) -> str | None:
+) -> ResolvedDownloaderTaskRoute | None:
     if chat_id is None or chat_id <= 0:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="chat_id missing")
         return None
@@ -83,10 +90,71 @@ def _resolve_downloader_name_for_task(
             reason=payload_error,
         )
         return None
-    if downloader_name:
-        return downloader_name
-    _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
-    return None
+    if not downloader_name:
+        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
+        return None
+    download_dir, payload_error = _resolve_downloader_payload_value(
+        downloader_job.payload_json,
+        "download_dir",
+    )
+    if payload_error is not None:
+        _log_downloader_route_payload_corruption(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            reason=payload_error,
+        )
+        return None
+    return ResolvedDownloaderTaskRoute(
+        downloader_name=downloader_name,
+        download_dir=download_dir,
+    )
+
+
+def _normalize_import_source_download_dir(
+    *,
+    import_source: TransmissionImportSource,
+    host_download_dir: str,
+) -> TransmissionImportSource:
+    cleaned_download_dir = host_download_dir.strip()
+    if not cleaned_download_dir or cleaned_download_dir == import_source.download_dir:
+        return import_source
+    return TransmissionImportSource(
+        task_id=import_source.task_id,
+        task_hash=import_source.task_hash,
+        name=import_source.name,
+        download_dir=cleaned_download_dir,
+        is_finished=import_source.is_finished,
+        percent_done=import_source.percent_done,
+    )
+
+
+def _resolve_host_download_dir_for_route(
+    *,
+    route: ResolvedDownloaderTaskRoute,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+) -> str:
+    if route.download_dir.strip():
+        return route.download_dir
+    instance = downloader_instances_by_name.get(route.downloader_name)
+    if instance is None:
+        return ""
+    return instance.download_dir
+
+
+def _resolve_downloader_name_for_task(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+) -> str | None:
+    route = _resolve_downloader_task_route(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+    )
+    if route is None:
+        return None
+    return route.downloader_name
 
 
 def _log_downloader_instance_missing(*, downloader_name: str) -> None:
@@ -210,22 +278,31 @@ async def _get_torrent_import_source_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionImportSource | None:
-    downloader_name = _resolve_downloader_name_for_task(
+    route = _resolve_downloader_task_route(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
     )
-    if downloader_name is None:
+    if route is None:
         raise DownloaderRouteLookupError(f"downloader route unavailable for import task: {task_ref}")
     client = _resolve_downloader_client_for_lookup(
-        downloader_name=downloader_name,
+        downloader_name=route.downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if client is None:
         raise DownloaderRouteLookupError(f"downloader client unavailable for import task: {task_ref}")
-    return await client.get_torrent_import_source(task_ref)
+    import_source = await client.get_torrent_import_source(task_ref)
+    if import_source is None:
+        return None
+    return _normalize_import_source_download_dir(
+        import_source=import_source,
+        host_download_dir=_resolve_host_download_dir_for_route(
+            route=route,
+            downloader_instances_by_name=downloader_instances_by_name,
+        ),
+    )
 
 
 async def _get_torrent_status_with_routing(
