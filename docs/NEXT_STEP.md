@@ -16,7 +16,7 @@
   - `search_media.py` 当前 `288` 行，歧义澄清 / media-BT 排序 / batch preview 页面支持 helper 已抽到独立模块
   - `import_to_library.py` 当前 `590` 行，confirmed media identity 回查已抽到 `app/services/import_confirmed_media_identity.py`，focused gate + pyflakes 复评估已确认当前没有 worth-it 闭环
   - `app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退
-  - `cleanup_correlation_lookup.py` 已收回 `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` 三个微文件；`cleanup_downloaded_source.py` 已收回 `cleanup_inspect_flow_support.py` / `cleanup_path_guard_support.py` / `cleanup_query_support.py` / `cleanup_event_support.py` 四个薄壳；`cleanup_flow_support.py` 已收回 `cleanup_blocked_support.py` / `cleanup_execution_support.py` / `cleanup_follow_up_support.py` / `cleanup_inspect_render_support.py` 四个薄壳；`cleanup_logging_support.py` 已收回 `cleanup_correlation_logging_support.py`
+  - `cleanup_correlation_lookup.py` 已收回 `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` 三个微文件；`cleanup_downloaded_source.py` 已收回 `cleanup_inspect_flow_support.py` / `cleanup_path_guard_support.py` / `cleanup_query_support.py` / `cleanup_event_support.py` 四个薄壳；`cleanup_flow_support.py` 已收回 `cleanup_blocked_support.py` / `cleanup_execution_support.py` / `cleanup_follow_up_support.py` / `cleanup_inspect_render_support.py` 四个薄壳；`cleanup_logging_support.py` 已收回 `cleanup_correlation_logging_support.py`；无调用点的 `cleanup_asset_support.py` 已删除
 
 ## User value
 
@@ -43,7 +43,7 @@
 
 当前这条 **`cleanup_*_support.py` 代码碎片收口 / 质量硬化** 主线满足：
 
-1. `cleanup_*_support.py` 数量继续下降，当前剩余数量以 `6` 为基线，且优先通过合并而不是新拆薄壳来收口。
+1. `cleanup_*_support.py` 数量继续下降，当前剩余数量以 `5` 为基线，且优先通过合并而不是新拆薄壳来收口。
 2. `tests/test_cleanup_downloaded_source.py` 和 `tests/test_cleanup_docs_consistency.py` 仍通过。
 3. `docs/STATUS.md`、`docs/NEXT_STEP.md` 和 cleanup 相关文档对当前收口方向和剩余碎片表述一致。
 

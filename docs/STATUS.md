@@ -9,13 +9,13 @@
 - `qB` 导入源解析继续优先真实 `content_path`；`DOWNLOADER_INSTANCES` 的 `dispatch_download_dir` 与宿主机导入路径保持分离；路由层继续优先任务真相里的 host `download_dir`。
 - `app/services/add_adult_registry_state.py` 已统一 adult pending / downloading 状态写入；`add_to_downloader.py` `582` 行只剩 proof-like wrapper，可先停手不回退。
 - `search_media.py` 已降到 `288` 行，歧义澄清 / media-BT 排序 / batch preview 页面支持 helper 都已抽出；`import_to_library.py` 当前 `590` 行，经 focused gate + pyflakes 复核后继续保持 proof-like orchestration 冻结态。
-- `cleanup_correlation_lookup.py` 已收回 `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` 三个微文件；`cleanup_downloaded_source.py` 已收回 `cleanup_inspect_flow_support.py` / `cleanup_path_guard_support.py` / `cleanup_query_support.py` / `cleanup_event_support.py` 四个薄壳；`cleanup_flow_support.py` 已收回 `cleanup_blocked_support.py` / `cleanup_execution_support.py` / `cleanup_follow_up_support.py` / `cleanup_inspect_render_support.py`；`cleanup_logging_support.py` 已收回 `cleanup_correlation_logging_support.py`；`cleanup_*_support.py` 现剩 6 个。
+- `cleanup_correlation_lookup.py` 已收回 `cleanup_correlation_event_support.py` / `cleanup_correlation_flow_support.py` / `cleanup_correlation_result_support.py` 三个微文件；`cleanup_downloaded_source.py` 已收回 `cleanup_inspect_flow_support.py` / `cleanup_path_guard_support.py` / `cleanup_query_support.py` / `cleanup_event_support.py` 四个薄壳；`cleanup_flow_support.py` 已收回 `cleanup_blocked_support.py` / `cleanup_execution_support.py` / `cleanup_follow_up_support.py` / `cleanup_inspect_render_support.py`；`cleanup_logging_support.py` 已收回 `cleanup_correlation_logging_support.py`；无调用点的 `cleanup_asset_support.py` 已删除，`cleanup_*_support.py` 现剩 5 个。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
 
 - 代码热点线当前都已经回到 proof-like orchestration；这轮主风险转到了 cleanup 链的小文件碎片化，如果不继续收口，`cleanup_*_support.py` 很快又会堆回去。
-- 当前归档迁移已经落地，cleanup 入口已经收回一批薄壳，但 `cleanup_*_support.py` 仍需继续收口，避免把“单点薄壳”继续留在主目录。
+- 当前归档迁移已经落地，cleanup 入口已经收回一批薄壳；下一条最小风险是继续删掉无调用点或只服务单点的 cleanup support，避免把“单点薄壳”继续留在主目录。
 
 ## Later candidate line
 
@@ -39,7 +39,7 @@
 
 ## Current biggest risk
 
-- `cleanup_*_support.py` 还剩 6 个碎片文件；如果下一轮不继续收口这些真正的薄壳，cleanup 链会很快又回到碎片化。
+- `cleanup_*_support.py` 还剩 5 个碎片文件；如果下一轮不继续收口这些真正的薄壳，cleanup 链会很快又回到碎片化。
 
 ## Recommended Next Operator Command
 
