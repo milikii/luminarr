@@ -2,7 +2,7 @@
 
 > 目的：把“电影 / PT 搜索结果 + BT 只读结果”的展示体验增强主线先定义清楚，作为当前质量硬化之后的后续候选主线。
 >
-> 当前定位：这不是当前执行主线；当前唯一施工真相仍看 `docs/NEXT_STEP.md`。旧的 shared delivery 蓝图继续保留在 `docs/SHARED_DELIVERY_UX_PLAN.md` 作为历史参考。
+> 当前定位：这不是当前执行主线；当前唯一施工真相仍看 `docs/NEXT_STEP.md`。旧的 shared delivery 蓝图继续保留在 `archive/docs/SHARED_DELIVERY_UX_PLAN.md` 作为历史参考。
 
 ## 1. 要解决的真实问题
 

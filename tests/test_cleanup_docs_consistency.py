@@ -62,6 +62,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "docs/HUMAN_START_HERE.md" in index_text
     assert "docs/OPERATOR_RUNBOOK.md" in index_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in index_text
+    assert "archive/docs/" in index_text
     assert "先看 `docs/STATUS.md`" in index_text
     assert "Recommended Next Operator Command" in index_text
 
@@ -159,102 +160,39 @@ def test_persistence_closure_log_keeps_current_line_detail() -> None:
     assert "search clarification clear fail-closed tests" in log_text
 
 
-def test_download_completion_polling_log_keeps_completed_line_detail() -> None:
-    log_text = Path("docs/DOWNLOAD_COMPLETION_POLLING_LOG.md").read_text(encoding="utf-8")
+def test_archived_history_docs_are_moved_out_of_active_docs_root() -> None:
+    archived = (
+        "ADD_TO_DOWNLOADER_SLIMMING_LOG.md",
+        "APP_MAIN_SLIMMING_LOG.md",
+        "BT_BATCH_PLAN.md",
+        "BT_PAGE_RANGE_PLAN.md",
+        "BT_REAL_DISPATCH_SMOKE_PLAN.md",
+        "BT_SCORING_LOG.md",
+        "BT_SCORING_PLAN.md",
+        "CLEANUP_SLIMMING_LOG.md",
+        "DOWNLOAD_COMPLETION_POLLING_LOG.md",
+        "FEISHU_EVENT_PARSER_DEDUPE_LOG.md",
+        "FEISHU_LONG_CONNECTION_RISK_LOG.md",
+        "GET_DOWNLOAD_STATUS_SLIMMING_LOG.md",
+        "IMPORT_TO_LIBRARY_SLIMMING_LOG.md",
+        "JELLYFIN_PLEX_PLAN.md",
+        "JELLYFIN_PLEX_REAL_VERIFICATION_PLAN.md",
+        "JELLYFIN_REAL_VERIFICATION_PLAN.md",
+        "MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md",
+        "POST_DOWNLOAD_AUTO_IMPORT_SLIMMING_LOG.md",
+        "PRIVATE_CHAT_RUNTIME_SLIMMING_LOG.md",
+        "PT_LIVE_SEEDING_PLAN.md",
+        "QUICK_START_PLAN.md",
+        "RELEASE_PREP_PLAN.md",
+        "SEARCH_MEDIA_SLIMMING_LOG.md",
+        "SERIES_ANIME_NAMING_LOG.md",
+        "SERIES_ANIME_NAMING_PLAN.md",
+        "SHARED_DELIVERY_UX_LOG.md",
+        "SHARED_DELIVERY_UX_PLAN.md",
+        "TELEGRAM_BOT_SLIMMING_LOG.md",
+        "VERIFICATION_ENTRYPOINTS_PLAN.md",
+    )
 
-    assert "## 1. Completed line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-
-    assert "待轮询列表读取 / fail-closed 边界" in log_text
-    assert "轮询启动 / 停机 / 状态查询边界" in log_text
-    assert "downloader.completed_observed + auto_import boundary" in log_text
-    assert 'tests/test_telegram_bot.py -k "pending_list"' in log_text
-    assert 'tests/test_telegram_bot.py -k "download_completion_polling or post_download_auto_import_scheduler"' in log_text
-
-
-def test_search_media_slimming_log_keeps_current_line_detail() -> None:
-    log_text = Path("docs/SEARCH_MEDIA_SLIMMING_LOG.md").read_text(encoding="utf-8")
-
-    assert "## 1. Completed line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-
-    assert "query 解析 / TMDB 查询 / 搜索请求编排" in log_text
-    assert "歧义澄清 / 候选持久化 / 回复格式化" in log_text
-    assert 'tests/test_search_media.py -k "parse_movie_query or tmdb or search_and_format_with_results or search_backend_failure"' in log_text
-    assert 'tests/test_search_media.py -k "clarification or candidate or quality_from_title"' in log_text
-
-
-def test_cleanup_slimming_log_keeps_current_line_detail() -> None:
-    log_text = Path("docs/CLEANUP_SLIMMING_LOG.md").read_text(encoding="utf-8")
-
-    assert "## 1. Current line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-
-    assert "身份解析 / import 关联" in log_text
-    assert "inspect / execution 主路径" in log_text
-    assert "路径校验 / source 删除 / follow-up / 事件落盘与中文日志" in log_text
-    assert 'tests/test_cleanup_downloaded_source.py -k "parse_cleanup_query or parse_cleanup_inspect_query or inspect_by_task_ref or resolves_chat_scoped_task_ref"' in log_text
-    assert 'tests/test_cleanup_downloaded_source.py -k "cleanup_by_task_ref or inspect_by_task_ref"' in log_text
-    assert 'tests/test_cleanup_downloaded_source.py -k "delete_failure or source_type_unsupported or event_append_failure or missing_appended_event_result"' in log_text
-
-
-def test_manage_bt_subscription_slimming_log_keeps_completed_line_detail() -> None:
-    log_text = Path("docs/MANAGE_BT_SUBSCRIPTION_SLIMMING_LOG.md").read_text(encoding="utf-8")
-
-    assert "## 1. Completed line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-
-    assert "清单增删 / 标题解析 / 回复文本" in log_text
-    assert "扫描候选筛选 / `last_seen` 更新 / scheduler tick" in log_text
-    assert 'tests/test_manage_bt_subscription.py -k "parse_bt_subscription_query or add or list or remove or clear"' in log_text
-    assert 'tests/test_manage_bt_subscription.py -k "run_once or scheduler_tick or last_seen"' in log_text
-
-
-def test_add_to_downloader_slimming_log_keeps_completed_line_detail() -> None:
-    log_text = Path("docs/ADD_TO_DOWNLOADER_SLIMMING_LOG.md").read_text(encoding="utf-8")
-
-    assert "## 1. Completed line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-
-    assert "app/services/add_pending_context.py" in log_text
-    assert "候选选择 / 来源解析 / 待确认写入" in log_text
-    assert "confirm 执行 / 下载监控登记 / 事件落盘" in log_text
-    assert 'tests/test_add_to_downloader.py -k "add_by_selection or add_candidate_source or record_pending_approval or record_pending_job"' in log_text
-    assert 'tests/test_add_to_downloader.py -k "rebuild_confirm_context or claim_pending_job or confirm_add_by_task_ref or register_download_monitor or record_event"' in log_text
-
-
-def test_import_to_library_slimming_log_keeps_current_line_detail() -> None:
-    log_text = Path("docs/IMPORT_TO_LIBRARY_SLIMMING_LOG.md").read_text(encoding="utf-8")
-
-    assert "## 1. Completed line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-    assert "app/services/import_context_lookup.py" in log_text
-    assert "导入前上下文重建 / raw_bt 判定" in log_text
-    assert "执行模式 / copy-fallback / 文件系统导入执行 / metadata / subtitle / refresh 收尾" in log_text
-    assert 'tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt"' in log_text
-    assert 'tests/test_import_to_library.py -k "copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"' in log_text
-
-
-def test_telegram_bot_slimming_log_keeps_completed_line_detail() -> None:
-    log_text = Path("docs/TELEGRAM_BOT_SLIMMING_LOG.md").read_text(encoding="utf-8")
-
-    assert "## 1. Completed line" in log_text
-    assert "## 2. Risk groups" in log_text
-    assert "## 3. Focused verification" in log_text
-    assert "## 4. Maintenance rule" in log_text
-
-    assert "app/bot/telegram_runtime_adapter.py" in log_text
-    assert "收包回包 / shared runtime wrapper" in log_text
-    assert 'tests/test_telegram_bot.py -k "handle_callback_query or build_application"' in log_text
+    for name in archived:
+        assert not Path("docs", name).exists()
+        assert Path("archive", "docs", name).exists()

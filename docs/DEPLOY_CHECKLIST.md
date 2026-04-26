@@ -94,7 +94,7 @@ docker compose up -d
 - 项目入口先读：`README.md` -> `docs/INDEX.md` -> `docs/GETTING_STARTED.md`
 - 当前主线和退出条件：`docs/NEXT_STEP.md`
 - 当前状态快照：`docs/STATUS.md`
-- 当前 quick start 蓝图：`docs/QUICK_START_PLAN.md`
+- 历史 quick start 蓝图：`archive/docs/QUICK_START_PLAN.md`
 - 应用日志：`docker compose logs -f luminarr` 或 `logs/trace.log`
 - 数据真相：`data/luminarr.db`
 - 更新版本：`git pull` 后重新 `docker compose up -d --build`

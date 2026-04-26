@@ -1,4 +1,4 @@
-# docs/INDEX.md (v11)
+# docs/INDEX.md (v12)
 
 > 目的：先按你的身份分流，再决定读哪份文档；不要一上来翻完整个仓库文档表。
 
@@ -40,7 +40,7 @@
 - `docs/PERSISTENCE_CLOSURE_LOG.md`：当前真相闭环细节
 - `docs/TEST_ENV.md`：真实 downloader / import / refresh 联调
 - `docs/SLIMMING_RULES.md`：编排层瘦身和文档减法的通用纪律
-- 对应主线的 `*_LOG.md` / `*_PLAN.md`：只在当前任务直接相关时再打开
+- `archive/docs/`：只在需要回查旧主线实现细节时再打开；默认不要先读
 
 ## 3. 如果你是开发者 / fork 维护者
 
@@ -56,8 +56,7 @@
 只有在你要接手旧主线或排旧债时，再去看：
 
 - `docs/PERSISTENCE_CLOSURE_LOG.md`
-- 当前相关的 `*_SLIMMING_LOG.md`
-- 当前相关的 `*_PLAN.md`
+- `archive/docs/` 下对应历史 `*_SLIMMING_LOG.md` / `*_PLAN.md`
 
 ## 4. 文档分层
 
@@ -66,7 +65,8 @@
 - 当前施工真相层：`docs/STATUS.md`、`docs/NEXT_STEP.md`
 - 长期边界层：`docs/DECISIONS.md`、`docs/ARCHITECTURE.md`
 - 施工纪律层：`docs/SLIMMING_RULES.md`
-- 历史闭环层：`docs/PERSISTENCE_CLOSURE_LOG.md`、各 `*_LOG.md` / `*_PLAN.md`
+- 历史闭环层：`docs/PERSISTENCE_CLOSURE_LOG.md`
+- 历史归档层：`archive/docs/` 下的已完成 `*_LOG.md` / `*_PLAN.md`
 
 ## 5. 文档维护规则
 
