@@ -121,35 +121,47 @@ def _resolve_downloader_task_route(
     if downloader_job is None:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
         return None
-    downloader_name, payload_error = _resolve_downloader_payload_value(
-        downloader_job.payload_json,
-        "downloader_name",
+    downloader_name = _read_downloader_route_payload_value(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        payload_json=downloader_job.payload_json,
+        key="downloader_name",
     )
-    if payload_error is not None:
-        _log_downloader_route_payload_corruption(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            reason=payload_error,
-        )
+    if downloader_name is None:
         return None
     if not downloader_name:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
         return None
-    download_dir, payload_error = _resolve_downloader_payload_value(
-        downloader_job.payload_json,
-        "download_dir",
+    download_dir = _read_downloader_route_payload_value(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        payload_json=downloader_job.payload_json,
+        key="download_dir",
     )
-    if payload_error is not None:
-        _log_downloader_route_payload_corruption(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            reason=payload_error,
-        )
+    if download_dir is None:
         return None
     return ResolvedDownloaderTaskRoute(
         downloader_name=downloader_name,
         download_dir=download_dir,
     )
+
+
+def _read_downloader_route_payload_value(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    payload_json: str,
+    key: str,
+) -> str | None:
+    value, payload_error = _resolve_downloader_payload_value(payload_json, key)
+    if payload_error is not None:
+        _log_downloader_route_payload_corruption(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            reason=payload_error,
+        )
+        return None
+    return value
 
 
 def _normalize_import_source_download_dir(
