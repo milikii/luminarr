@@ -32,45 +32,35 @@ def _resolve_downloader_payload_value(payload_json: str, key: str) -> tuple[str,
     return str(payload.get(key, "")).strip(), None
 
 
-def _print_downloader_route_lookup_log(
+def _print_downloader_issue_log(
     *,
     title: str,
-    task_ref: str,
-    chat_id: int | None,
+    context_label: str,
+    context_value: str,
     detail_label: str,
     detail_value: str,
     fix_hint: str,
 ) -> None:
     print(
-        f"\033[31m[{title}]\033[0m task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'} "
-        f"{detail_label}={detail_value}\n"
+        f"\033[31m[{title}]\033[0m {context_label}={context_value or '-'} {detail_label}={detail_value}\n"
         f"\033[33m[处理建议]\033[0m {fix_hint}",
         flush=True,
     )
 
 
-def _print_downloader_dispatch_log(
-    *,
-    title: str,
-    downloader_name: str,
-    downloader_type: str,
-    detail_label: str,
-    detail_value: str,
-    fix_hint: str,
-) -> None:
-    print(
-        f"\033[31m[{title}]\033[0m downloader_name={downloader_name or '-'} "
-        f"downloader_type={downloader_type or '-'} {detail_label}={detail_value}\n"
-        f"\033[33m[处理建议]\033[0m {fix_hint}",
-        flush=True,
-    )
+def _format_downloader_task_context(*, task_ref: str, chat_id: int | None) -> str:
+    return f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}"
+
+
+def _format_downloader_dispatch_context(*, downloader_name: str, downloader_type: str) -> str:
+    return f"{downloader_name} downloader_type={downloader_type}"
 
 
 def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
-    _print_downloader_route_lookup_log(
+    _print_downloader_issue_log(
         title="下载器路由未命中",
-        task_ref=task_ref,
-        chat_id=chat_id,
+        context_label="task_ref",
+        context_value=_format_downloader_task_context(task_ref=task_ref, chat_id=chat_id),
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
@@ -78,10 +68,10 @@ def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, 
 
 
 def _log_downloader_route_lookup_error(*, task_ref: str, chat_id: int | None, error: Exception) -> None:
-    _print_downloader_route_lookup_log(
+    _print_downloader_issue_log(
         title="下载器路由查询失败",
-        task_ref=task_ref,
-        chat_id=chat_id,
+        context_label="task_ref",
+        context_value=_format_downloader_task_context(task_ref=task_ref, chat_id=chat_id),
         detail_label="错误",
         detail_value=str(error),
         fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
@@ -94,10 +84,10 @@ def _log_downloader_route_payload_corruption(
     chat_id: int | None,
     reason: str,
 ) -> None:
-    _print_downloader_route_lookup_log(
+    _print_downloader_issue_log(
         title="下载器路由载荷损坏",
-        task_ref=task_ref,
-        chat_id=chat_id,
+        context_label="task_ref",
+        context_value=_format_downloader_task_context(task_ref=task_ref, chat_id=chat_id),
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
@@ -261,10 +251,10 @@ def _resolve_downloader_name_for_task(
 
 
 def _log_downloader_instance_missing(*, downloader_name: str) -> None:
-    _print_downloader_dispatch_log(
+    _print_downloader_issue_log(
         title="下载器实例不存在",
-        downloader_name=downloader_name,
-        downloader_type="-",
+        context_label="downloader_name",
+        context_value=downloader_name,
         detail_label="原因",
         detail_value="instance missing",
         fix_hint="检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，并确认角色绑定或历史任务没有引用已删除的实例名。",
@@ -272,10 +262,13 @@ def _log_downloader_instance_missing(*, downloader_name: str) -> None:
 
 
 def _log_downloader_client_not_configured(*, downloader_name: str, downloader_type: str) -> None:
-    _print_downloader_dispatch_log(
+    _print_downloader_issue_log(
         title="下载器客户端未配置",
-        downloader_name=downloader_name,
-        downloader_type=downloader_type,
+        context_label="downloader_name",
+        context_value=_format_downloader_dispatch_context(
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+        ),
         detail_label="原因",
         detail_value="client missing",
         fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
@@ -288,14 +281,42 @@ def _log_downloader_dispatch_resolution_failed(
     downloader_type: str,
     reason: str,
 ) -> None:
-    _print_downloader_dispatch_log(
+    _print_downloader_issue_log(
         title="下载器投递路由失败",
-        downloader_name=downloader_name,
-        downloader_type=downloader_type,
+        context_label="downloader_name",
+        context_value=_format_downloader_dispatch_context(
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+        ),
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
     )
+
+
+def _resolve_downloader_client_candidate(
+    *,
+    downloader_name: str,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> tuple[str, DownloaderInstanceConfig | None, TransmissionClient | QbittorrentClient | None]:
+    cleaned_name = downloader_name.strip()
+    instance = _lookup_downloader_instance(
+        downloader_name=cleaned_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+    )
+    if instance is None:
+        return cleaned_name, None, None
+    client = _lookup_client_for_instance(
+        downloader_name=cleaned_name,
+        downloader_type=instance.downloader_type,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
+    if client is None:
+        return cleaned_name, instance, None
+    return cleaned_name, instance, client
 
 
 def _resolve_downloader_client_for_lookup(
@@ -305,20 +326,15 @@ def _resolve_downloader_client_for_lookup(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionClient | QbittorrentClient | None:
-    cleaned_name = downloader_name.strip()
-    instance = _lookup_downloader_instance(
-        downloader_name=cleaned_name,
+    cleaned_name, instance, client = _resolve_downloader_client_candidate(
+        downloader_name=downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
         _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
         return None
-    client = _lookup_client_for_instance(
-        downloader_name=cleaned_name,
-        downloader_type=instance.downloader_type,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
-    )
     if client is None:
         _log_downloader_client_not_configured(
             downloader_name=cleaned_name or "-",
@@ -339,9 +355,11 @@ def _resolve_downloader_client_for_dispatch(
     cleaned_name = downloader_name.strip()
     if not cleaned_name:
         return transmission_client
-    instance = _lookup_downloader_instance(
+    cleaned_name, instance, client = _resolve_downloader_client_candidate(
         downloader_name=cleaned_name,
         downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
         _log_downloader_dispatch_resolution_failed(
@@ -350,12 +368,6 @@ def _resolve_downloader_client_for_dispatch(
             reason="instance missing",
         )
         raise ValueError(f"unknown downloader instance: {cleaned_name}")
-    client = _lookup_client_for_instance(
-        downloader_name=cleaned_name,
-        downloader_type=instance.downloader_type,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
-    )
     if client is None:
         _log_downloader_dispatch_resolution_failed(
             downloader_name=cleaned_name,

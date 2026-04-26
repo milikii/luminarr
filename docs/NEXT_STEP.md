@@ -19,7 +19,7 @@
   - cleanup 链当前已不再保留 `cleanup_*_support.py` 文件；相关逻辑已经收回 `cleanup_downloaded_source.py`、`cleanup_correlation_lookup.py` 和 `adult_archive_service.py`
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/config.py` 当前 `454` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper
-  - `app/downloader_route_lookup.py` 当前 `445` 行；共享 route lookup 日志打印器、dispatch 日志打印器、client 选择壳、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地
+- `app/downloader_route_lookup.py` 当前 `492` 行；共享 route lookup / dispatch 日志打印器、client candidate 纯解析 helper、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地
 
 ## User value
 
@@ -30,7 +30,8 @@
 ## Only do
 
 - 只在 `downloader_route_lookup.py` 这条线里动下面这些稳定边界：
-  - 7 个 `_log_*` 函数的共享化
+  - `_log_*` 函数继续优先复用共享打印器
+  - 实例查找 + client 选择继续优先复用纯解析 helper
   - 3 个路由函数里可提取的公共序幕
   - 不改变现有错误文本、路由语义或导入/状态协议
 - 每轮仍只做一个最小闭环；同步补对应 focused tests、`docs/STATUS.md`、`docs/NEXT_STEP.md` 和相关主线文档。

@@ -6,6 +6,7 @@ from app.clients.transmission import TransmissionImportSource
 from app.config import DownloaderInstanceConfig
 from app.downloader_route_lookup import (
     _get_torrent_import_source_with_routing,
+    _resolve_downloader_client_candidate,
     resolve_downloader_dispatch_download_dir,
 )
 
@@ -112,3 +113,26 @@ def test_get_torrent_import_source_with_routing_restores_host_download_dir() -> 
     assert import_source is not None
     assert import_source.download_dir == "/data/downloads/tr-bt"
     assert import_source.name == "SSIS-456-smoke.mp4"
+
+
+def test_resolve_downloader_client_candidate_strips_name_and_returns_client() -> None:
+    client = object()
+    cleaned_name, instance, resolved_client = _resolve_downloader_client_candidate(
+        downloader_name="  tr-bt  ",
+        downloader_instances_by_name={
+            "tr-bt": DownloaderInstanceConfig(
+                name="tr-bt",
+                downloader_type="transmission",
+                base_url="http://127.0.0.1:19092",
+                download_dir="/data/downloads/tr-bt",
+                dispatch_download_dir="/downloads/complete",
+            )
+        },
+        transmission_clients_by_name={"tr-bt": client},
+        qbittorrent_clients_by_name={},
+    )
+
+    assert cleaned_name == "tr-bt"
+    assert instance is not None
+    assert instance.downloader_type == "transmission"
+    assert resolved_client is client
