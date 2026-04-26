@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 
 import httpx
 
-from app.clients.transmission import TransmissionClient
+from app.clients.transmission import TransmissionClient, TransmissionImportSource
 from app.config import AdultArchiveDestination
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorRecord
@@ -32,8 +32,9 @@ ARCHIVE_DIR = SMOKE_ROOT / "archive" / "censored"
 WEBSEED_ROOT = SMOKE_ROOT / "webseed"
 SOURCE_NAME = "SSIS-456-smoke.mp4"
 WEBSEED_FILE_PATH = WEBSEED_ROOT / SOURCE_NAME
-DOWNLOAD_DIR = Path("/data/downloads/tr-bt")
-SOURCE_PATH = DOWNLOAD_DIR / SOURCE_NAME
+HOST_DOWNLOAD_DIR = Path("/data/downloads/tr-bt")
+DISPATCH_DOWNLOAD_DIR = "/downloads/complete"
+SOURCE_PATH = HOST_DOWNLOAD_DIR / SOURCE_NAME
 TORRENT_PATH = SMOKE_ROOT / "SSIS-456-smoke.torrent"
 DB_PATH = SMOKE_ROOT / "state.sqlite3"
 EVIDENCE_PATH = SMOKE_ROOT / "evidence.json"
@@ -186,6 +187,21 @@ async def _transmission_rpc(method: str, arguments: dict[str, Any]) -> dict[str,
     raise RuntimeError(f"transmission rpc failed: {method}")
 
 
+async def _capture_session_snapshot() -> dict[str, Any]:
+    payload = await _transmission_rpc("session-get", {})
+    arguments = payload.get("arguments")
+    if not isinstance(arguments, dict):
+        return {"error": "session-get missing arguments"}
+    return {
+        "download_dir": str(arguments.get("download-dir", "")).strip(),
+        "incomplete_dir": str(arguments.get("incomplete-dir", "")).strip(),
+        "incomplete_dir_enabled": bool(arguments.get("incomplete-dir-enabled")),
+        "download_queue_enabled": bool(arguments.get("download-queue-enabled")),
+        "download_queue_size": arguments.get("download-queue-size"),
+        "start_added_torrents": bool(arguments.get("start-added-torrents")),
+    }
+
+
 async def main() -> int:
     import shutil
 
@@ -198,10 +214,13 @@ async def main() -> int:
     torrent_url = ""
     webseed_urls: tuple[str, ...] = ()
     last_status_snapshot: dict[str, Any] | None = None
+    last_import_source_snapshot: dict[str, Any] | None = None
+    session_snapshot: dict[str, Any] | None = None
 
     try:
-        DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        HOST_DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
         SOURCE_PATH.write_bytes(SOURCE_BYTES)
+        session_snapshot = await _capture_session_snapshot()
         with _StaticFileServer(SMOKE_ROOT) as static_server:
             torrent_bytes, info_hash = _build_single_file_torrent_bytes(
                 file_name=SOURCE_NAME,
@@ -212,7 +231,11 @@ async def main() -> int:
             torrent_url = _resolve_torrent_url(port=static_server.port)
 
             client = TransmissionClient(TR_BASE_URL)
-            task = await client.add_torrent(torrent_url, "/data/downloads/tr-bt")
+            try:
+                await client.remove_torrent(info_hash, delete_local_data=True)
+            except Exception:
+                pass
+            task = await client.add_torrent(torrent_url, DISPATCH_DOWNLOAD_DIR)
             await _transmission_rpc("torrent-verify", {"ids": [task.task_hash]})
             task_id, task_hash, task_name = await _wait_until_finished(client, task.task_hash)
 
@@ -233,7 +256,17 @@ async def main() -> int:
             )
 
             async def _get_import_source(task_ref: str, _chat_id: int | None = None, _user_id: int | None = None):
-                return await client.get_torrent_import_source(task_ref)
+                import_source = await client.get_torrent_import_source(task_ref)
+                if import_source is None:
+                    return None
+                return TransmissionImportSource(
+                    task_id=import_source.task_id,
+                    task_hash=import_source.task_hash,
+                    name=import_source.name,
+                    download_dir=str(HOST_DOWNLOAD_DIR),
+                    is_finished=import_source.is_finished,
+                    percent_done=import_source.percent_done,
+                )
 
             async def _remove_torrent(task_ref: str, _chat_id: int | None = None, delete_local_data: bool = True):
                 await client.remove_torrent(task_ref, delete_local_data=delete_local_data)
@@ -300,6 +333,9 @@ async def main() -> int:
             evidence = {
                 "status": "passed",
                 "transmission_base_url": TR_BASE_URL,
+                "dispatch_download_dir": DISPATCH_DOWNLOAD_DIR,
+                "host_download_dir": str(HOST_DOWNLOAD_DIR),
+                "session_snapshot": session_snapshot,
                 "torrent_url": torrent_url,
                 "webseed_urls": webseed_urls,
                 "task_id": task_id,
@@ -331,16 +367,38 @@ async def main() -> int:
                 }
         except Exception as snapshot_error:
             last_status_snapshot = {"error": str(snapshot_error)}
+        try:
+            import_source = await TransmissionClient(TR_BASE_URL).get_torrent_import_source(info_hash)
+            if import_source is not None:
+                last_import_source_snapshot = {
+                    "task_id": import_source.task_id,
+                    "task_hash": import_source.task_hash,
+                    "name": import_source.name,
+                    "download_dir": import_source.download_dir,
+                    "is_finished": import_source.is_finished,
+                    "percent_done": import_source.percent_done,
+                }
+        except Exception as snapshot_error:
+            last_import_source_snapshot = {"error": str(snapshot_error)}
+        if session_snapshot is None:
+            try:
+                session_snapshot = await _capture_session_snapshot()
+            except Exception as snapshot_error:
+                session_snapshot = {"error": str(snapshot_error)}
         evidence = {
             "status": "failed",
             "error": str(error),
             "transmission_base_url": TR_BASE_URL,
+            "dispatch_download_dir": DISPATCH_DOWNLOAD_DIR,
+            "host_download_dir": str(HOST_DOWNLOAD_DIR),
+            "session_snapshot": session_snapshot,
             "torrent_url": torrent_url,
             "webseed_urls": webseed_urls,
             "info_hash": info_hash,
             "source_path_exists": SOURCE_PATH.exists(),
-            "download_dir_exists": DOWNLOAD_DIR.exists(),
+            "download_dir_exists": HOST_DOWNLOAD_DIR.exists(),
             "last_status_snapshot": last_status_snapshot,
+            "last_import_source_snapshot": last_import_source_snapshot,
         }
         EVIDENCE_PATH.write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")
         print(EVIDENCE_PATH)
