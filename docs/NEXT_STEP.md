@@ -17,7 +17,7 @@
   - `import_to_library.py` 当前 `590` 行，confirmed media identity 回查已抽到 `app/services/import_confirmed_media_identity.py`，focused gate + pyflakes 复评估已确认当前没有 worth-it 闭环
   - `app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退
   - cleanup 链当前已不再保留 `cleanup_*_support.py` 文件；相关逻辑已经收回 `cleanup_downloaded_source.py`、`cleanup_correlation_lookup.py` 和 `adult_archive_service.py`
-  - `app/services/workflow_trace_logger.py` 已落地；`add_trace_logger.py` 已改为只承接 add workflow 常量绑定
+  - `app/services/workflow_trace_logger.py` 已落地；`add_trace_logger.py`、`import_trace_logger.py` 都已改为只承接 workflow 常量绑定
 
 ## User value
 

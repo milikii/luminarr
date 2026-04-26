@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.db.job_repo import WORKFLOW_IMPORT_TO_LIBRARY
-from app.trace_logging import log_trace_event
+from app.services.workflow_trace_logger import WorkflowTraceLogger
 
 
 class ImportTraceLogger:
     def __init__(self, trace_log_path: Path | None) -> None:
-        self._trace_log_path = trace_log_path
+        self._trace_logger = WorkflowTraceLogger(WORKFLOW_IMPORT_TO_LIBRARY, trace_log_path)
 
     def log(
         self,
@@ -23,13 +23,10 @@ class ImportTraceLogger:
         task_hash: str = "",
         detail: str = "",
     ) -> None:
-        log_trace_event(
-            scope="workflow",
-            workflow=WORKFLOW_IMPORT_TO_LIBRARY,
+        self._trace_logger.log(
             event=event,
             result=result,
             stage=stage,
-            log_path=self._trace_log_path,
             chat_id=chat_id,
             user_id=user_id,
             task_ref=task_ref,
