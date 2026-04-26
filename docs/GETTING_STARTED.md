@@ -248,12 +248,6 @@ make help
 - `make lint`：跑最小静态检查（当前为 `pyflakes app tests`）
 - `make verify-mainline`：跑当前主线 focused 验证入口
 - `make test-cleanup-smoke`：跑四渠道 cleanup smoke gate
-- `make test-cleanup-service-not-ready`：跑 cleanup service-not-ready 专项 smoke
-- `make test-cleanup-telegram`：跑 Telegram cleanup 入口回归
-- `make test-cleanup-personal-wechat`：跑 personal WeChat cleanup 入口回归
-- `make test-cleanup-feishu`：跑 Feishu cleanup 入口回归
-- `make test-cleanup-wecom`：跑 WeCom cleanup 入口回归
-- `make test-cleanup-feishu-webhook`：跑 Feishu webhook cleanup 入口回归
 - `make test-cleanup`：跑 cleanup 聚合回归
 - `make test-docs`：跑文档一致性 gate
 - `make test-cleanup-docs-gate`：跑 cleanup verification docs gate
@@ -261,19 +255,13 @@ make help
 - `make sync-cleanup-doc-snapshots`：顺序执行固定的 cleanup 验证命令，并把 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 里的固定快照行同步到最新结果；现在也会一起刷新环境就绪、Telegram Bot API 就绪、当前运行进程和仓库内真实 smoke 证据快照
 - 应用通过 `make run` 或 `.venv/bin/python -m app.main` 启动后，会把最小可追溯 trace 追加到 `logs/trace.log`；当前 trace 会覆盖 shared private-chat 入站/回包，以及下载/导入待确认与 confirm 执行关键节点
 - 真实私聊里的 `cleanup` / `cleanup inspect` 回复也会继续把 `[cleanup 私聊 smoke]` 追加到 `logs/cleanup-private-chat-smoke.log`，`make sync-cleanup-doc-snapshots` 就靠这份日志识别窗口内真实 smoke 证据
-- 没有 `make` 时，`make test-cleanup-service-not-ready` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py -k service_not_ready`
-- 没有 `make` 时，`make test-cleanup-telegram` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_telegram_bot.py -k cleanup`
-- 没有 `make` 时，`make test-cleanup-personal-wechat` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_personal_wechat_text.py -k cleanup`
-- 没有 `make` 时，`make test-cleanup-feishu` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k cleanup`
-- 没有 `make` 时，`make test-cleanup-wecom` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_wecom_adapter.py -k cleanup`
-- 没有 `make` 时，`make test-cleanup-feishu-webhook` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_feishu_adapter.py -k "webhook_http_request and cleanup"`
 - 没有 `make` 时，`make test-cleanup` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`
 - 没有 `make` 时，`make test-cleanup-docs-gate` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make test-cleanup-window` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py && .venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup && .venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make sync-cleanup-doc-snapshots` 的等价一行命令是：`.venv/bin/python -m app.maintenance.cleanup_verification_docs full_suite cleanup_service smoke_gate focused_cleanup docs_gate focused_config makefile_env_guard compile_check docs_consistency env_readiness telegram_bot_api local_smoke_evidence runtime_process`
 - 没有 `make` 时，`make quality` 的等价一行命令是：`python3 -m compileall app tests && .venv/bin/python -m pyflakes app tests && .venv/bin/python -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`
 - 没有 `make` 时，`make lint` 的等价一行命令是：`.venv/bin/python -m pyflakes app tests`
-- 没有 `make` 时，`make verify-mainline` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event" && .venv/bin/python -m pytest -q tests/test_telegram_bot.py -k "pending_list or download_completion_polling or post_download_auto_import_scheduler"`
+- 没有 `make` 时，`make verify-mainline` 不再维护为一条超长等价一行命令；直接按 `Makefile` 里的 `verify-mainline-status-and-channels`、`verify-mainline-bt-paths`、`verify-mainline-execution-paths`、`verify-mainline-user-intents` 4 组顺序逐组执行即可。
 - `make compile`：跑 `compileall`
 - `make run`：读取 `.env` 后启动应用
 - `make docker-build`：构建镜像
@@ -331,5 +319,5 @@ make run
 - 想理解“代码为什么这么分”：读 `docs/ARCHITECTURE.md`
 - 想知道“当前正在做什么”：读 `docs/NEXT_STEP.md`
 - 想知道“现在做到哪里”：先读 `docs/STATUS.md`
-- 想看“当前完成态主线蓝图和刚完成的部署入口”：先读 `docs/JELLYFIN_PLEX_PLAN.md`，再读 `docs/BT_SCORING_PLAN.md`、`docs/QUICK_START_PLAN.md` 和 `docs/DEPLOY_CHECKLIST.md`；更早完成的 shared delivery 主线看 `docs/SHARED_DELIVERY_UX_LOG.md`；更早完成的 `series / anime` 主线看 `docs/SERIES_ANIME_NAMING_LOG.md`；更早完成的 `app/main.py` 主线看 `docs/APP_MAIN_SLIMMING_LOG.md`；更早完成的持久化收口详细台账读 `docs/PERSISTENCE_CLOSURE_LOG.md`
+- 想看“最近完成了哪些闭环”：读 `docs/PERSISTENCE_CLOSURE_LOG.md`
 - 想看“所有文档地图”：读 `docs/INDEX.md`

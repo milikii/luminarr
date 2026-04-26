@@ -67,22 +67,6 @@
 
 - 想知道 AI 做完没有：看 `docs/STATUS.md`
 - 想知道当前唯一主线是什么：看 `docs/NEXT_STEP.md`
+- 想知道最常用的验证 / 启动入口：看 `docs/GETTING_STARTED.md`
 - 想知道它到底改了什么：看最新 commit 和相关台账
 - 想判断下一轮该复制哪句：回到本页第 `0` 节
-- 想直接复制当前阶段的完整版长提示词：看 `docs/RELEASE_PREP_PROMPTS.md`
-
-## 6. 收尾发布准备（默认 3 轮）
-
-适用：当文档真相、发布矩阵、真实 smoke 或发布前质量 gate 再次漂移时，你希望 Codex 重新把它们收成首版发布准备状态。
-
-```text
-按 AGENTS.md + docs/STATUS.md + docs/NEXT_STEP.md + docs/RELEASE_PREP_PROMPTS.md 的“收尾发布准备（默认推进版）”执行。
-```
-
-## 7. 收尾发布准备（保守版）
-
-适用：你想更保守地重开一次发布口径、质量入口和真实 smoke 收口，不急着恢复完整支持矩阵推进。
-
-```text
-按 AGENTS.md + docs/STATUS.md + docs/NEXT_STEP.md + docs/RELEASE_PREP_PROMPTS.md 的“收尾发布准备（保守质量优先版）”执行。
-```
