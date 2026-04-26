@@ -8,12 +8,12 @@
 - 成人 BT / qB / Transmission 当前真相继续保持：exact-id read-only helper 只补展示字段，helper-only 字段不进 truth，归档 / 保留期清理继续可用，真实归档 smoke 通过。
 - `qB` 导入源解析继续优先真实 `content_path`；`DOWNLOADER_INSTANCES` 的 `dispatch_download_dir` 与宿主机导入路径保持分离；路由层继续优先任务真相里的 host `download_dir`。
 - `app/services/add_adult_registry_state.py` 已统一 adult pending / downloading 状态写入；`add_to_downloader.py` `582` 行只剩 proof-like wrapper，可先停手不回退。
-- `search_media.py` 已降到 `549` 行，歧义澄清 helper 已抽出；当前热点大文件仍需留意：`search_media.py` `549` 行，`add_to_downloader.py` `582` 行，`import_to_library.py` `590` 行；`app/services/bt_read_only_display.py` `180` 行、`app/services/bt_read_only_helper_selection.py` `104` 行继续维持既有收口。
+- `search_media.py` 已降到 `313` 行，歧义澄清 helper 和 media-BT 排序 helper 已抽出；当前热点大文件仍需留意：`app/services/search_media.py` `313` 行，`add_to_downloader.py` `582` 行，`import_to_library.py` `590` 行；`app/services/bt_read_only_display.py` `180` 行、`app/services/bt_read_only_helper_selection.py` `104` 行继续维持既有收口。
 
 ## Current health
 
 - 这轮已经把 adult registry 的 pending / dispatch 两段统一到 `app/services/add_adult_registry_state.py`；downloader confirm 主线可以先停在 proof-like wrapper。
-- 下一条风险集中到 `search_media.py`：media-BT 排序回退和 batch preview 页面支持仍堆在同一热点文件里。
+- 下一条风险集中到 `search_media.py`：batch preview 页面支持仍堆在同一热点文件里。
 - 如果后续继续把 confirm / pending 小修直接落在壳文件里，主链维护成本会回升。
 
 ## Later candidate line
@@ -34,7 +34,7 @@
 
 ## Current biggest risk
 
-- `search_media.py` 现为 `549` 行；若下一轮继续把排序 / batch preview 小修直接堆回主文件，候选持久化、只读展示和 query fallback 的维护成本会重新回升。
+- `search_media.py` 现为 `313` 行；若下一轮继续把 batch preview 小修直接堆回主文件，`app/services/search_media.py` 的候选持久化、只读展示和 query fallback 维护成本会重新回升。
 
 ## Recommended Next Operator Command
 

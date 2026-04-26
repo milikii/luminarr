@@ -37,11 +37,11 @@ focused tests 入口：
 - 这一组继续只动候选状态真相边界；搜索排序、BT 预览协议和回复文本协议未改。
 - `app/services/bt_read_only_display.py` 现在承接 BT 只读候选注释 / helper 贴标 / 历史提示；`search_media.py` 当前回到 `627` 行。
 - 这一轮只把成熟的展示分支和 helper lookup 从热文件里抽走，未改 `bt搜` / `bt批量` 对外协议和 helper 真相边界。
-- `app/services/search_ambiguity_helper.py` 已承接歧义澄清 helper；`search_media.py` 已降到 `549` 行。
-- 当前主线已重新切回本文件；下一组只动 `search_media.py` 里剩余的 media-BT 排序 / fallback query helper 和 batch preview 页面支持 helper，不回退 clarification / candidate / read-only truth。
+- `app/services/search_ambiguity_helper.py` 已承接歧义澄清 helper；`app/services/search_media_bt_ordering.py` 已承接 media-BT 排序 helper；`search_media.py` 已降到 `313` 行。
+- 当前主线已重新切回本文件；下一组只动 `search_media.py` 里剩余的 batch preview 页面支持 helper，不回退 clarification / candidate / read-only truth。
 
 剩余风险：
-- `search_media.py` 当前回到 `549` 行，已比最初基线明显收口，但仍高于纯粹编排层的理想尺寸；下一步若继续瘦身，应优先沿 `search_request_context.py` / `search_reply_formatter.py` / `bt_read_only_display.py` / `search_ambiguity_helper.py` 的既有边界继续拆，不要再把成熟的展示逻辑塞回主文件。
+- `search_media.py` 当前回到 `313` 行，已比最初基线明显收口，但仍高于纯粹编排层的理想尺寸；下一步若继续瘦身，应优先沿 `search_request_context.py` / `search_reply_formatter.py` / `bt_read_only_display.py` / `search_ambiguity_helper.py` / `search_media_bt_ordering.py` 的既有边界继续拆，不要再把成熟的展示逻辑塞回主文件。
 - 搜索链继续守住“候选和澄清状态写入失败直接 fail-closed 返回中文提示”的边界，不回退现有 `CANDIDATE_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT` / `CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT` 协议。
 
 focused tests 入口：

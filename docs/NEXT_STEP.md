@@ -12,7 +12,7 @@
   - 成人 BT 站点优先、历史账本、只读补全、归档与保留期清理
   - 更早完成的 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口** 继续保持完成态
   - `app/services/add_adult_registry_state.py` 已承接 adult pending / downloading 状态写入；`add_to_downloader.py` 当前 `582` 行，只剩 proof-like wrapper
-  - `search_media.py` 当前 `549` 行，歧义澄清 helper 已抽到 `app/services/search_ambiguity_helper.py`
+  - `search_media.py` 当前 `313` 行，歧义澄清 helper 和 media-BT 排序 helper 已抽到独立模块
   - `import_to_library.py` 当前 `590` 行，confirmed media identity 回查已抽到 `app/services/import_confirmed_media_identity.py`
   - `app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `276` 行，不回退
   - 这条主线的详细蓝图统一看 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`。
@@ -26,7 +26,6 @@
 ## Only do
 
 - 只收 `search_media.py` 当前仍直连的稳定 helper：
-  - media-BT 排序 / fallback query 推导 / 去重
   - batch preview 页面支持 / allowlist URL fetch 壳
 - 每轮只做一个最小闭环；同步补对应 focused tests、`docs/STATUS.md`、`docs/NEXT_STEP.md` 和 `docs/SEARCH_MEDIA_SLIMMING_LOG.md`。
 - 继续保持当前 downloader / 导入 / 成人 BT / 验证入口已收口真相与文档一致。
@@ -40,9 +39,9 @@
 
 ## Done when
 
-当前这条 **`search_media.py` media-BT 排序 / batch preview helper 收口 / 质量硬化** 主线满足：
+当前这条 **`search_media.py` batch preview helper 收口 / 质量硬化** 主线满足：
 
-1. `search_media.py` 至少再抽走一组稳定 helper 职责，或让主文件对排序 / batch preview 的职责明显更单一。
+1. `search_media.py` 至少再抽走一组稳定 helper 职责，或让主文件对 batch preview 的职责明显更单一。
 2. `tests/test_search_media.py` 的相关 focused gate 与这轮涉及的质量 gate 均通过。
 3. `docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/SEARCH_MEDIA_SLIMMING_LOG.md` 对当前风险和下一线程表述一致。
 
