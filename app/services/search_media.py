@@ -392,7 +392,6 @@ class SearchMediaService:
             self._apply_bt_read_only_helper_fields(
                 item,
                 helper_match=helper_match,
-                candidate_count=len(display_candidates),
             )
             for item in display_candidates
         ]
@@ -419,7 +418,6 @@ class SearchMediaService:
         item: Mapping[str, Any],
         *,
         helper_match: JavLibraryReadOnlyMatch,
-        candidate_count: int,
     ) -> dict[str, Any]:
         candidate = _to_candidate_dict(item)
         if candidate.get("adult_content_id"):
@@ -427,7 +425,6 @@ class SearchMediaService:
         if not should_apply_bt_read_only_helper(
             candidate,
             helper_match=helper_match,
-            candidate_count=candidate_count,
         ):
             return candidate
         candidate["read_only_adult_content_id"] = helper_match.normalized_content_id

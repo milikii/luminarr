@@ -30,14 +30,8 @@ def should_apply_bt_read_only_helper(
     candidate: Mapping[str, Any],
     *,
     helper_match: JavLibraryReadOnlyMatch,
-    candidate_count: int,
 ) -> bool:
-    if _is_bt_read_only_helper_related(candidate, helper_match=helper_match):
-        return True
-    title = _safe_text(candidate.get("title"), default="")
-    if not title:
-        return candidate_count == 1
-    return candidate_count == 1
+    return _is_bt_read_only_helper_related(candidate, helper_match=helper_match)
 
 
 def _is_bt_read_only_helper_related(

@@ -38,7 +38,6 @@ def test_should_apply_bt_read_only_helper_accepts_related_title_overlap() -> Non
     assert should_apply_bt_read_only_helper(
         {"title": "Secret Mission Nurse leaked cut"},
         helper_match=_build_helper_match(),
-        candidate_count=2,
     )
 
 
@@ -46,5 +45,11 @@ def test_should_apply_bt_read_only_helper_rejects_unrelated_candidate_in_multi_r
     assert not should_apply_bt_read_only_helper(
         {"title": "Unrelated comedy collection"},
         helper_match=_build_helper_match(),
-        candidate_count=2,
+    )
+
+
+def test_should_apply_bt_read_only_helper_rejects_unrelated_single_candidate() -> None:
+    assert not should_apply_bt_read_only_helper(
+        {"title": "Unrelated comedy collection"},
+        helper_match=_build_helper_match(),
     )
