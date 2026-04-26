@@ -129,7 +129,7 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     assert "cold-start consistency audit" not in status_text
     assert "git log --oneline -20" not in status_text
     assert "git grep -n 'except Exception" not in status_text
-    assert re.search(r"`cleanup_\*_support\.py` .*5", status_text)
+    assert "`cleanup_*_support.py` 当前为 `0` 个" in status_text
 
 
 def test_current_doc_truth_keeps_runtime_lines_and_channel_scope_aligned() -> None:
