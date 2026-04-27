@@ -6,6 +6,8 @@ from pathlib import Path
 from telegram.error import TelegramError
 from telegram.ext import Application
 
+from app.operational_logging import emit_operational_log
+
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
@@ -38,9 +40,10 @@ async def _send_telegram_media(
     caption: str | None,
 ) -> object:
     if not file_path.is_file():
-        print(
-            f"\033[31m[Telegram 媒资发送失败]\033[0m chat_id={chat_id} 文件不存在={file_path}\n"
-            "\033[33m[处理建议]\033[0m 检查二维码/文件是否已生成到本地路径，并确认当前进程对该路径有读取权限。"
+        emit_operational_log(
+            title="Telegram 媒资发送失败",
+            detail=f"chat_id={chat_id} 文件不存在={file_path}",
+            fix_hint="检查二维码/文件是否已生成到本地路径，并确认当前进程对该路径有读取权限。",
         )
         raise FileNotFoundError(str(file_path))
 
@@ -58,9 +61,10 @@ async def _send_telegram_media(
             filename=file_path.name,
         )
     except TelegramError as error:
-        print(
-            f"\033[31m[Telegram 媒资发送失败]\033[0m chat_id={chat_id} 文件={file_path} 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 Telegram chat_id 是否仍有效、Bot 是否具备发送媒资权限，以及本地文件是否可被 Telegram API 正常读取。"
+        emit_operational_log(
+            title="Telegram 媒资发送失败",
+            detail=f"chat_id={chat_id} 文件={file_path} 原因={error}",
+            fix_hint="检查 Telegram chat_id 是否仍有效、Bot 是否具备发送媒资权限，以及本地文件是否可被 Telegram API 正常读取。",
         )
         raise
 
