@@ -178,15 +178,6 @@ def _resolve_lookup_client_for_task(
     return route, instance, client
 
 
-def _resolve_downloader_instance(
-    *,
-    downloader_name: str,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-) -> tuple[str, DownloaderInstanceConfig | None]:
-    cleaned_name = downloader_name.strip()
-    return cleaned_name, downloader_instances_by_name.get(cleaned_name)
-
-
 def _resolve_downloader_client_candidate(
     *,
     downloader_name: str,
@@ -194,10 +185,8 @@ def _resolve_downloader_client_candidate(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> tuple[str, DownloaderInstanceConfig | None, TransmissionClient | QbittorrentClient | None]:
-    cleaned_name, instance = _resolve_downloader_instance(
-        downloader_name=downloader_name,
-        downloader_instances_by_name=downloader_instances_by_name,
-    )
+    cleaned_name = downloader_name.strip()
+    instance = downloader_instances_by_name.get(cleaned_name)
     if instance is None:
         return cleaned_name, None, None
     client = (
@@ -260,10 +249,8 @@ def resolve_downloader_dispatch_download_dir(
     downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
 ) -> str:
     cleaned_download_dir = requested_download_dir.strip()
-    cleaned_name, instance = _resolve_downloader_instance(
-        downloader_name=downloader_name,
-        downloader_instances_by_name=downloader_instances_by_name,
-    )
+    cleaned_name = downloader_name.strip()
+    instance = downloader_instances_by_name.get(cleaned_name)
     if not cleaned_download_dir or not cleaned_name:
         return cleaned_download_dir
     if instance is None:
