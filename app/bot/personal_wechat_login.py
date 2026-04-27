@@ -8,6 +8,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.operational_logging import emit_operational_log
+
 PERSONAL_WECHAT_LOGIN_SERVICE_KEY = "personal_wechat_login_service"
 PERSONAL_WECHAT_LOGIN_QR_CAPTION = "微信登录二维码（PNG 图片）"
 PERSONAL_WECHAT_LOGIN_STARTED_TEXT = (
@@ -90,20 +92,20 @@ def _cleanup_qr_artifact(artifact: QrArtifact | None) -> None:
     except FileNotFoundError:
         pass
     except OSError as error:
-        print(
-            f"\033[31m[personal WeChat 二维码清理失败]\033[0m 路径={artifact.file_path} 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查临时二维码文件是否被占用，并在需要时手动清理遗留 PNG 文件。",
-            flush=True,
+        emit_operational_log(
+            title="personal WeChat 二维码清理失败",
+            detail=f"路径={artifact.file_path} 原因={error}",
+            fix_hint="检查临时二维码文件是否被占用，并在需要时手动清理遗留 PNG 文件。",
         )
     try:
         shutil.rmtree(artifact.dir_path)
     except FileNotFoundError:
         pass
     except OSError as error:
-        print(
-            f"\033[31m[personal WeChat 二维码清理失败]\033[0m 路径={artifact.dir_path} 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查临时二维码目录是否被占用，并在需要时手动清理遗留目录。",
-            flush=True,
+        emit_operational_log(
+            title="personal WeChat 二维码清理失败",
+            detail=f"路径={artifact.dir_path} 原因={error}",
+            fix_hint="检查临时二维码目录是否被占用，并在需要时手动清理遗留目录。",
         )
 
 
@@ -156,9 +158,10 @@ class PersonalWeChatLoginService:
             return PERSONAL_WECHAT_LOGIN_NOT_READY_TEXT
         if not self.is_available():
             reason = _PERSONAL_WECHAT_IMPORT_ERROR or "wechat-clawbot dependency is missing"
-            print(
-                f"\033[31m[personal WeChat 登录未就绪]\033[0m 原因={reason}\n"
-                "\033[33m[处理建议]\033[0m 安装 wechat-clawbot，并确认 qrcode PNG 依赖可用。"
+            emit_operational_log(
+                title="personal WeChat 登录未就绪",
+                detail=f"原因={reason}",
+                fix_hint="安装 wechat-clawbot，并确认 qrcode PNG 依赖可用。",
             )
             return PERSONAL_WECHAT_LOGIN_NOT_READY_TEXT
 
@@ -176,9 +179,10 @@ class PersonalWeChatLoginService:
                     try:
                         await send_media_func(chat_id, artifact.file_path, PERSONAL_WECHAT_LOGIN_QR_CAPTION)
                     except Exception as error:
-                        print(
-                            f"\033[31m[personal WeChat 二维码回传失败]\033[0m chat_id={chat_id} 原因={error}\n"
-                            "\033[33m[处理建议]\033[0m 检查 Telegram 私聊是否仍有效，并确认临时二维码文件仍可读取。"
+                        emit_operational_log(
+                            title="personal WeChat 二维码回传失败",
+                            detail=f"chat_id={chat_id} 原因={error}",
+                            fix_hint="检查 Telegram 私聊是否仍有效，并确认临时二维码文件仍可读取。",
                         )
                         return PERSONAL_WECHAT_LOGIN_START_FAILED_TEMPLATE.format(reason="二维码回传失败，请查看日志")
                     return PERSONAL_WECHAT_LOGIN_REUSED_TEXT
@@ -189,9 +193,10 @@ class PersonalWeChatLoginService:
                     force=True,
                 )
             except Exception as error:
-                print(
-                    f"\033[31m[personal WeChat 登录启动失败]\033[0m 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查当前环境是否能访问微信 iLink 服务，并确认依赖安装完整。"
+                emit_operational_log(
+                    title="personal WeChat 登录启动失败",
+                    detail=f"原因={error}",
+                    fix_hint="检查当前环境是否能访问微信 iLink 服务，并确认依赖安装完整。",
                 )
                 return PERSONAL_WECHAT_LOGIN_START_FAILED_TEMPLATE.format(reason=str(error))
 
@@ -200,18 +205,20 @@ class PersonalWeChatLoginService:
             message = str(getattr(start_result, "message", "") or "").strip()
             if not qr_content or not session_key:
                 reason = message or "未拿到二维码内容"
-                print(
-                    f"\033[31m[personal WeChat 登录启动失败]\033[0m 原因={reason}\n"
-                    "\033[33m[处理建议]\033[0m 检查微信二维码接口返回值是否变化。"
+                emit_operational_log(
+                    title="personal WeChat 登录启动失败",
+                    detail=f"原因={reason}",
+                    fix_hint="检查微信二维码接口返回值是否变化。",
                 )
                 return PERSONAL_WECHAT_LOGIN_START_FAILED_TEMPLATE.format(reason=reason)
 
             try:
                 qr_artifact = self._qr_artifact_builder(qr_content)
             except Exception as error:
-                print(
-                    f"\033[31m[personal WeChat 二维码生成失败]\033[0m 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 qrcode PNG 依赖，并确认 /tmp 可写。"
+                emit_operational_log(
+                    title="personal WeChat 二维码生成失败",
+                    detail=f"原因={error}",
+                    fix_hint="检查 qrcode PNG 依赖，并确认 /tmp 可写。",
                 )
                 return PERSONAL_WECHAT_LOGIN_START_FAILED_TEMPLATE.format(reason="二维码文件生成失败，请查看日志")
 
@@ -219,9 +226,10 @@ class PersonalWeChatLoginService:
                 await send_media_func(chat_id, qr_artifact.file_path, PERSONAL_WECHAT_LOGIN_QR_CAPTION)
             except Exception as error:
                 _cleanup_qr_artifact(qr_artifact)
-                print(
-                    f"\033[31m[personal WeChat 二维码回传失败]\033[0m chat_id={chat_id} 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 Telegram 文件发送权限，并确认当前私聊仍可接收文档。"
+                emit_operational_log(
+                    title="personal WeChat 二维码回传失败",
+                    detail=f"chat_id={chat_id} 原因={error}",
+                    fix_hint="检查 Telegram 文件发送权限，并确认当前私聊仍可接收文档。",
                 )
                 return PERSONAL_WECHAT_LOGIN_START_FAILED_TEMPLATE.format(reason="二维码回传失败，请查看日志")
 
@@ -264,9 +272,10 @@ class PersonalWeChatLoginService:
             )
             if not bool(getattr(wait_result, "connected", False)):
                 reason = str(getattr(wait_result, "message", "") or "登录未完成").strip()
-                print(
-                    f"\033[31m[personal WeChat 登录未完成]\033[0m chat_id={chat_id} 原因={reason}\n"
-                    "\033[33m[处理建议]\033[0m 重新发送“微信登录”获取新二维码，并在有效期内完成扫码。"
+                emit_operational_log(
+                    title="personal WeChat 登录未完成",
+                    detail=f"chat_id={chat_id} 原因={reason}",
+                    fix_hint="重新发送“微信登录”获取新二维码，并在有效期内完成扫码。",
                 )
                 await self._notify_result(
                     chat_id=chat_id,
@@ -281,9 +290,10 @@ class PersonalWeChatLoginService:
             user_id = str(getattr(wait_result, "user_id", "") or "-").strip() or "-"
             if not account_id or not bot_token:
                 reason = "登录成功回包缺少 account_id 或 bot_token"
-                print(
-                    f"\033[31m[personal WeChat 登录结果无效]\033[0m chat_id={chat_id} 原因={reason}\n"
-                    "\033[33m[处理建议]\033[0m 检查微信 iLink 登录回包结构是否变化。"
+                emit_operational_log(
+                    title="personal WeChat 登录结果无效",
+                    detail=f"chat_id={chat_id} 原因={reason}",
+                    fix_hint="检查微信 iLink 登录回包结构是否变化。",
                 )
                 await self._notify_result(
                     chat_id=chat_id,
@@ -312,9 +322,10 @@ class PersonalWeChatLoginService:
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            print(
-                f"\033[31m[personal WeChat 登录等待失败]\033[0m chat_id={chat_id} 原因={error}\n"
-                "\033[33m[处理建议]\033[0m 检查微信 iLink 长轮询是否可达，并重新发送“微信登录”触发新一轮登录。"
+            emit_operational_log(
+                title="personal WeChat 登录等待失败",
+                detail=f"chat_id={chat_id} 原因={error}",
+                fix_hint="检查微信 iLink 长轮询是否可达，并重新发送“微信登录”触发新一轮登录。",
             )
             await self._notify_result(
                 chat_id=chat_id,
@@ -338,9 +349,10 @@ class PersonalWeChatLoginService:
         try:
             await send_text_func(chat_id=chat_id, text=text)
         except Exception as error:
-            print(
-                f"\033[31m[personal WeChat 登录结果通知失败]\033[0m chat_id={chat_id} 原因={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 Telegram bot 是否仍可向该私聊发文本消息。"
+            emit_operational_log(
+                title="personal WeChat 登录结果通知失败",
+                detail=f"chat_id={chat_id} 原因={error}",
+                fix_hint="检查 Telegram bot 是否仍可向该私聊发文本消息。",
             )
 
     async def _finalize_active_login(self) -> None:

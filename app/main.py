@@ -5,13 +5,11 @@ from pathlib import Path
 import httpx
 from telegram.error import NetworkError
 
-from app.bot.feishu_adapter import FEISHU_ENCRYPT_KEY_BOT_DATA_KEY, build_feishu_reply_text_func
 from app.bot.feishu_long_connection import (
     FEISHU_LONG_CONNECTION_SERVICE_KEY,
     FeishuLongConnectionConfig,
     FeishuLongConnectionService,
 )
-from app.bot.feishu_webhook_server import FeishuWebhookServerConfig
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
@@ -462,22 +460,13 @@ def main() -> None:
             app_secret=settings.feishu_app_secret,
             base_url=settings.feishu_base_url,
         )
-        if settings.feishu_inbound_mode == "long_connection":
-            application.bot_data[FEISHU_LONG_CONNECTION_SERVICE_KEY] = FeishuLongConnectionService(
-                config=FeishuLongConnectionConfig(
-                    app_id=settings.feishu_app_id,
-                    app_secret=settings.feishu_app_secret,
-                ),
-                feishu_client=feishu_client,
-            )
-        else:
-            application.bot_data[FEISHU_ENCRYPT_KEY_BOT_DATA_KEY] = settings.feishu_encrypt_key
-            application.bot_data["feishu_webhook_reply_text_func"] = build_feishu_reply_text_func(feishu_client)
-            application.bot_data["feishu_webhook_server_config"] = FeishuWebhookServerConfig(
-                host=settings.feishu_webhook_host,
-                port=settings.feishu_webhook_port,
-                path=settings.feishu_webhook_path,
-            )
+        application.bot_data[FEISHU_LONG_CONNECTION_SERVICE_KEY] = FeishuLongConnectionService(
+            config=FeishuLongConnectionConfig(
+                app_id=settings.feishu_app_id,
+                app_secret=settings.feishu_app_secret,
+            ),
+            feishu_client=feishu_client,
+        )
     if settings.wecom_token and settings.wecom_encoding_aes_key and settings.wecom_receive_id:
         application.bot_data[WECOM_TOKEN_BOT_DATA_KEY] = settings.wecom_token
         application.bot_data[WECOM_ENCODING_AES_KEY_BOT_DATA_KEY] = settings.wecom_encoding_aes_key

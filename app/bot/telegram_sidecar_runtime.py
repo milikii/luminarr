@@ -18,12 +18,6 @@ from app.bot.feishu_long_connection import (
     FEISHU_LONG_CONNECTION_SERVICE_KEY,
     FeishuLongConnectionService,
 )
-from app.bot.feishu_webhook_server import (
-    FeishuWebhookServerConfig,
-    FeishuWebhookServerRuntime,
-    start_feishu_webhook_server,
-    stop_feishu_webhook_server,
-)
 from app.bot.personal_wechat_login import PersonalWeChatLoginService
 from app.bot.wecom_webhook_server import (
     WeComWebhookServerConfig,
@@ -50,9 +44,6 @@ POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY = "post_download_auto_import_task"
 POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY = "post_download_auto_import_stop_event"
 DOWNLOAD_COMPLETION_POLLING_TASK_KEY = "download_completion_polling_task"
 DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY = "download_completion_polling_stop_event"
-FEISHU_WEBHOOK_SERVER_CONFIG_KEY = "feishu_webhook_server_config"
-FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY = "feishu_webhook_reply_text_func"
-FEISHU_WEBHOOK_SERVER_RUNTIME_KEY = "feishu_webhook_server_runtime"
 WECOM_WEBHOOK_SERVER_CONFIG_KEY = "wecom_webhook_server_config"
 WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
@@ -68,9 +59,6 @@ class TelegramSidecarRuntimeConfig:
     get_download_status_service_key: str
     download_completion_polling_stop_event_key: str
     download_completion_polling_task_key: str
-    feishu_webhook_server_config_key: str
-    feishu_webhook_reply_text_func_key: str
-    feishu_webhook_server_runtime_key: str
     wecom_webhook_server_config_key: str
     wecom_webhook_server_runtime_key: str
     personal_wechat_login_service_key: str
@@ -84,9 +72,6 @@ TELEGRAM_SIDECAR_RUNTIME_CONFIG = TelegramSidecarRuntimeConfig(
     get_download_status_service_key=GET_DOWNLOAD_STATUS_SERVICE_KEY,
     download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
     download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
-    feishu_webhook_server_config_key=FEISHU_WEBHOOK_SERVER_CONFIG_KEY,
-    feishu_webhook_reply_text_func_key=FEISHU_WEBHOOK_REPLY_TEXT_FUNC_KEY,
-    feishu_webhook_server_runtime_key=FEISHU_WEBHOOK_SERVER_RUNTIME_KEY,
     wecom_webhook_server_config_key=WECOM_WEBHOOK_SERVER_CONFIG_KEY,
     wecom_webhook_server_runtime_key=WECOM_WEBHOOK_SERVER_RUNTIME_KEY,
     personal_wechat_login_service_key="personal_wechat_login_service",
@@ -95,7 +80,6 @@ TELEGRAM_SIDECAR_RUNTIME_CONFIG = TelegramSidecarRuntimeConfig(
 
 
 async def start_telegram_sidecars(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
-    _start_feishu_webhook_server_if_configured(application, config=config)
     _start_wecom_webhook_server_if_configured(application, config=config)
     await _start_feishu_long_connection_if_configured(application)
     await _start_personal_wechat_text_service_if_available(application)
@@ -103,7 +87,6 @@ async def start_telegram_sidecars(application: Application, *, config: TelegramS
 
 
 async def stop_telegram_sidecars(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
-    _stop_feishu_webhook_server_if_running(application, config=config)
     _stop_wecom_webhook_server_if_running(application, config=config)
     await _shutdown_feishu_long_connection_if_running(application)
     await _shutdown_personal_wechat_text_service_if_running(application)
@@ -300,44 +283,6 @@ async def _stop_post_download_auto_import_scheduler(
         download_completion_polling_stop_event_key=config.download_completion_polling_stop_event_key,
         download_completion_polling_task_key=config.download_completion_polling_task_key,
     )
-
-
-def _start_feishu_webhook_server_if_configured(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
-    existing_runtime = application.bot_data.get(config.feishu_webhook_server_runtime_key)
-    if isinstance(existing_runtime, FeishuWebhookServerRuntime):
-        return
-
-    server_config = application.bot_data.get(config.feishu_webhook_server_config_key)
-    reply_text_func = application.bot_data.get(config.feishu_webhook_reply_text_func_key)
-    if server_config is None and reply_text_func is None:
-        return
-    if not isinstance(server_config, FeishuWebhookServerConfig) or not callable(reply_text_func):
-        print(
-            "\033[31m[Feishu webhook 配置不完整]\033[0m 缺少 server config 或 reply sender。\n"
-            "\033[33m[处理建议]\033[0m 同时配置 FEISHU_APP_ID/FEISHU_APP_SECRET，并在启动阶段注入 webhook host/port/path。"
-        )
-        return
-    try:
-        runtime = start_feishu_webhook_server(
-            loop=asyncio.get_running_loop(),
-            config=server_config,
-            bot_data=application.bot_data,
-            reply_text_func=reply_text_func,
-        )
-    except OSError as error:
-        print(
-            f"\033[31m[Feishu webhook 启动失败]\033[0m 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 FEISHU_WEBHOOK_HOST/PORT 是否可绑定，或确认端口未被占用。"
-        )
-        raise
-    application.bot_data[config.feishu_webhook_server_runtime_key] = runtime
-
-
-def _stop_feishu_webhook_server_if_running(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
-    runtime = application.bot_data.pop(config.feishu_webhook_server_runtime_key, None)
-    if not isinstance(runtime, FeishuWebhookServerRuntime):
-        return
-    stop_feishu_webhook_server(runtime)
 
 
 async def _start_feishu_long_connection_if_configured(application: Application) -> None:

@@ -135,23 +135,22 @@ class AddConfirmApprovalState:
             )
         except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_PENDING_EXPIRY_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[下载确认过期结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里的待确认下载审批是否仍存在，并确认对应 lease_version 没有被其他路径抢先改写；"
-                    "当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“未过期”。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载确认过期结果缺失",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 表里的待确认下载审批是否仍存在，并确认对应 lease_version 没有被其他路径抢先改写；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“未过期”。",
                 )
             elif str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[下载确认过期审批记录损坏]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；"
-                    "当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通“未过期”。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载确认过期审批记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通“未过期”。",
                 )
             else:
-                print(
-                    f"\033[31m[下载确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载确认过期判断失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
                 )
             return None
 
@@ -182,23 +181,22 @@ class AddConfirmApprovalState:
                 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON,
                 DOWNLOADER_PENDING_APPROVAL_NONE_REASON,
             }:
-                print(
-                    f"\033[31m[下载待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认审批的 lease_version；"
-                    "当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认下载。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载待确认审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 approval_record 写入后回读是否仍能拿到当前待确认审批的 lease_version；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认下载。",
                 )
             elif str(error) == DOWNLOADER_PENDING_APPROVAL_ROW_CORRUPTED_REASON:
-                print(
-                    f"\033[31m[下载待确认审批记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record.lease_version 是否仍是正整数真相；"
-                    "当前请求会直接返回待确认状态写入失败，避免把坏审批记录误报成可确认下载。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载待确认审批记录损坏",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 approval_record.lease_version 是否仍是正整数真相；当前请求会直接返回待确认状态写入失败，避免把坏审批记录误报成可确认下载。",
                 )
             else:
-                print(
-                    f"\033[31m[下载待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认下载。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载待确认审批落盘失败",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认下载。",
                 )
             return 0
 
@@ -239,22 +237,23 @@ class AddConfirmApprovalState:
                 DOWNLOADER_APPROVE_RESULT_MISSING_REASON,
                 DOWNLOADER_APPROVE_RESULT_NONE_REASON,
             }:
-                print(
-                    f"\033[31m[下载确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认下载审批是否仍存在，以及审批更新后是否还能回读到该行；"
-                    "当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通已确认或普通状态冲突。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载确认审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 表里该待确认下载审批是否仍存在，以及审批更新后是否还能回读到该行；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通已确认或普通状态冲突。",
                 )
                 return None
-            print(
-                f"\033[31m[下载确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成下载已确认。",
-                flush=True,
+            emit_operational_log(
+                title="下载确认审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成下载已确认。",
             )
             return None
         if not approved:
-            print(
-                f"\033[31m[下载确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record approve rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在、lease_version 是否匹配；当前 confirm 会按 not pending 处理，避免把审批真相状态冲突误判成已确认。",
-                flush=True,
+            emit_operational_log(
+                title="下载确认审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record approve rejected current state",
+                fix_hint="检查 SQLite/approval_record 表里的待确认下载审批是否仍存在、lease_version 是否匹配；当前 confirm 会按 not pending 处理，避免把审批真相状态冲突误判成已确认。",
             )
             return False
 
@@ -291,20 +290,23 @@ class AddConfirmApprovalState:
                 DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON,
                 DOWNLOADER_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON,
             }:
-                print(
-                    f"\033[31m[下载审批回退结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载审批回退结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}",
+                    fix_hint="检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
                 )
             else:
-                print(
-                    f"\033[31m[下载审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载审批回退失败",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
                 )
             return None
         if restored is False:
-            print(
-                f"\033[31m[下载审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
-                flush=True,
+            emit_operational_log(
+                title="下载审批回退失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state",
+                fix_hint="检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
             )
             return False
         return True
@@ -339,23 +341,24 @@ class AddConfirmApprovalState:
                 DOWNLOADER_CANCEL_APPROVAL_RESULT_MISSING_REASON,
                 DOWNLOADER_CANCEL_APPROVAL_NONE_REASON,
             }:
-                print(
-                    f"\033[31m[下载取消审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认下载审批是否仍存在，以及取消更新后是否还能回读到该行；"
-                    "当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消下载”。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载取消审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 表里该待确认下载审批是否仍存在，以及取消更新后是否还能回读到该行；当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消下载”。",
                 )
                 return False
-            print(
-                f"\033[31m[下载取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认状态可能仍残留。",
-                flush=True,
+            emit_operational_log(
+                title="下载取消审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认状态可能仍残留。",
             )
             return False
         if not cancelled:
             self.pending_add_identities.add(identity)
-            print(
-                f"\033[31m[下载取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消下载”。",
-                flush=True,
+            emit_operational_log(
+                title="下载取消审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch",
+                fix_hint="检查 SQLite/approval_record 表里的待确认下载审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消下载”。",
             )
             return False
         return True
@@ -383,23 +386,22 @@ class AddConfirmApprovalState:
             )
         except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_EXECUTED_LEASE_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[下载执行版号结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 更新后该审批行是否仍存在，并确认 executed_version 已被正确回写；"
-                    "当前进程内 lease 版本已前进，但持久化真相还没有确认落稳。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载执行版号结果缺失",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 更新后该审批行是否仍存在，并确认 executed_version 已被正确回写；当前进程内 lease 版本已前进，但持久化真相还没有确认落稳。",
                 )
             elif str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[下载执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 里的 lease_version / executed_version 等字段是否仍是完整真相；"
-                    "当前进程内 lease 版本已前进，但不会把坏审批记录当成已稳定回写。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载执行版号记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 里的 lease_version / executed_version 等字段是否仍是完整真相；当前进程内 lease 版本已前进，但不会把坏审批记录当成已稳定回写。",
                 )
             else:
-                print(
-                    f"\033[31m[下载执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载执行版号回写失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
                 )
             return None
         return True
@@ -422,9 +424,10 @@ class AddConfirmApprovalState:
                 new_task_hash=new_task_hash,
             )
         except (ApprovalPersistenceError, sqlite3.Error) as error:
-            print(
-                f"\033[31m[下载审批身份迁移失败]\033[0m current_task_id={current_task_id} current_task_hash={current_task_hash} new_task_id={new_task_id} new_task_hash={new_task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的下载审批是否仍存在，并确认 confirm 后审批主键已切到真实下载任务身份；当前下载已执行，但重启后的 stale confirm 保护可能不稳。",
-                flush=True,
+            emit_operational_log(
+                title="下载审批身份迁移失败",
+                detail=f"current_task_id={current_task_id} current_task_hash={current_task_hash} new_task_id={new_task_id} new_task_hash={new_task_hash} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表里的下载审批是否仍存在，并确认 confirm 后审批主键已切到真实下载任务身份；当前下载已执行，但重启后的 stale confirm 保护可能不稳。",
             )
             return None
         return True

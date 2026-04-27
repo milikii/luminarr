@@ -27,7 +27,7 @@
 
 如果你要补**当前 cleanup 验证窗口**里的“四渠道真实私聊 smoke”退出条件，还要额外满足：
 
-- `.env` 里至少有可用的 `TELEGRAM_BOT_TOKEN`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`FEISHU_ENCRYPT_KEY`、`WECOM_TOKEN`、`WECOM_ENCODING_AES_KEY`、`WECOM_RECEIVE_ID`
+- `.env` 里至少有可用的 `TELEGRAM_BOT_TOKEN`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`WECOM_TOKEN`、`WECOM_ENCODING_AES_KEY`、`WECOM_RECEIVE_ID`
 - personal WeChat 需要本地已有可用登录态；它不靠 `.env` 三元组启动
 - 只跑 `pytest` 只能证明 shared runtime 协议没回退，不能替代四渠道真实私聊 smoke 证据
 
@@ -59,11 +59,11 @@ cp .env.example .env
 - 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
 - `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；如果你填了多实例但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
 - direct magnet 入口当前仍会先问“观影 PT 链 / BT 成人链”；不会因为你配置了成人 BT 站点就自动走成人链
-- Feishu / WeCom 三元组都必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
+- Feishu SDK 长连接只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对配置；WeCom 三元组必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
 
 补 WeCom 真实私聊 smoke 前，可以先在 `app.main` 已运行的前提下，用 `curl -si http://127.0.0.1:18889/wecom/callback` 确认本地 callback 已经监听；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 里的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于入口已就绪，不等于真实私聊 smoke 已完成；如果直接拿到 `connection refused`，先回头确认应用是否真的已启动。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改，不要死抄这里的样例。
 
-如果你要跑 Feishu，但不想额外折腾公网 HTTPS 回调，可以把 `FEISHU_INBOUND_MODE=long_connection`；这时 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET` 仍然必填，但 `FEISHU_ENCRYPT_KEY` 可以留空。
+Feishu 当前只保留 SDK 长连接入口；不再需要配置公网 HTTPS webhook、`FEISHU_INBOUND_MODE` 或 `FEISHU_ENCRYPT_KEY`。
 
 ## 4. 启动本地测试栈（需要真实 import / refresh 时）
 
@@ -165,7 +165,7 @@ docker compose logs -f luminarr
 - **Telegram Bot Token**：当前是启动硬必填。Telegram 私聊入口无论你用不用都必须先有 token。
 - **可选：OpenAI / 字幕翻译 Key**：仅影响 `.srt` 字幕自动翻译。
 - **可选：`ffmpeg`（`ffprobe` 可选）**：只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要；当前代码默认直接从 `PATH` 调用，若缺少 `ffprobe` 会自动回退到 `ffmpeg -i` 做探测。
-- **可选：Feishu / WeCom webhook 三元组**：只有你真的要用这两个渠道才填；当前都是"要么都空、要么都填"。
+- **可选：Feishu SDK / WeCom webhook 凭据**：Feishu 只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对填写；WeCom 仍需三元组“要么都空、要么都填”。
 
 如果这台机器不能直连公网（Telegram / TMDB / Fanart / BT 外站），再加一条 `OUTBOUND_PROXY_URL=http://192.168.2.110:7890` 走宿主机或旁路由代理；Transmission / Emby / Prowlarr 这类本地地址仍然直连，不吃代理。
 
@@ -178,7 +178,7 @@ docker compose logs -f luminarr
 
 如果你把依赖服务和 Luminarr 放进**同一个 compose** 里（本项目当前不推荐，见 `docs/DECISIONS.md` D-019），那就用 service 名而不是 IP：例如 `http://transmission:9091`。
 
-Feishu / WeCom webhook 的入站端口（默认 `18095` / `18097`）已经在 compose 里映射出来；想让外部能回调，还要自己在路由器 / 反代上开好这两个端口的公网入口。
+WeCom webhook 的入站端口（默认 `18097`）已经在 compose 里映射出来；想让外部能回调，还要自己在路由器 / 反代上开好这个端口的公网入口。Feishu 当前走 SDK 长连接，不需要本地 webhook 入站端口。
 
 **硬链接 / `SHARED_MEDIA_ROOT` 具体是什么意思**
 
@@ -290,7 +290,7 @@ make run
 ### 为什么 Feishu / WeCom 不配也能启动
 
 因为这两个渠道当前是可选入口。
-只要对应的三元组配置留空，启动时就不会挂 webhook server。
+只要 Feishu 应用凭据或 WeCom 三元组留空，对应渠道就不会启动。
 
 ### 为什么 Docker Compose 里还要挂 `/data`
 

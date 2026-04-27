@@ -9,6 +9,7 @@ from pathlib import Path
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
+from app.operational_logging import emit_operational_log
 
 PERSONAL_WECHAT_CHANNEL = "personal_wechat"
 PERSONAL_WECHAT_TEXT_SERVICE_KEY = "personal_wechat_text_service"
@@ -243,9 +244,10 @@ class PersonalWeChatTextService:
 
         if not self.is_available():
             reason = _PERSONAL_WECHAT_TEXT_IMPORT_ERROR or "wechat-clawbot dependency is missing"
-            print(
-                f"\033[31m[personal WeChat 私聊文本未就绪]\033[0m 原因={reason}\n"
-                "\033[33m[处理建议]\033[0m 安装 wechat-clawbot，并确认当前环境可访问微信 iLink 服务。"
+            emit_operational_log(
+                title="personal WeChat 私聊文本未就绪",
+                detail=f"原因={reason}",
+                fix_hint="安装 wechat-clawbot，并确认当前环境可访问微信 iLink 服务。",
             )
             return
 
@@ -267,7 +269,11 @@ class PersonalWeChatTextService:
             ),
             name="personal_wechat_text_poll",
         )
-        print(f"\033[32m[personal WeChat 私聊文本已启动]\033[0m account_id={account_id}")
+        emit_operational_log(
+            title="personal WeChat 私聊文本已启动",
+            detail=f"account_id={account_id}",
+            fix_hint="personal WeChat 私聊文本长轮询正在运行。",
+        )
 
     async def shutdown(self) -> None:
         stop_event = self._stop_event
@@ -306,16 +312,18 @@ class PersonalWeChatTextService:
 
         if not resolved_accounts:
             if empty_token_accounts:
-                print(
-                    "\033[31m[personal WeChat 私聊文本未启动]\033[0m 原因=检测到已保存账号，但缺少可用 token。\n"
-                    "\033[33m[处理建议]\033[0m 重新发送“微信登录”刷新当前 personal WeChat 凭据。"
+                emit_operational_log(
+                    title="personal WeChat 私聊文本未启动",
+                    detail="原因=检测到已保存账号，但缺少可用 token。",
+                    fix_hint="重新发送“微信登录”刷新当前 personal WeChat 凭据。",
                 )
             return None
 
         if len(resolved_accounts) > 1:
-            print(
-                "\033[31m[personal WeChat 私聊文本未启动]\033[0m 原因=当前检测到多个已保存的 personal WeChat 账号。\n"
-                "\033[33m[处理建议]\033[0m 当前只支持单账号最小基线，请只保留一个可用账号后重启服务。"
+            emit_operational_log(
+                title="personal WeChat 私聊文本未启动",
+                detail="原因=当前检测到多个已保存的 personal WeChat 账号。",
+                fix_hint="当前只支持单账号最小基线，请只保留一个可用账号后重启服务。",
             )
             return None
 
@@ -359,21 +367,26 @@ class PersonalWeChatTextService:
                     if self._is_session_expired(response):
                         self._pause_session(account_id)
                         pause_seconds = self._get_remaining_pause_seconds(account_id)
-                        print(
-                            f"\033[31m[personal WeChat 会话已过期]\033[0m account_id={account_id} "
-                            f"errcode={getattr(response, 'errcode', None)} errmsg={getattr(response, 'errmsg', '')}\n"
-                            "\033[33m[处理建议]\033[0m 重新发送“微信登录”刷新凭据，并在下次启动后重试 personal WeChat 私聊。"
+                        emit_operational_log(
+                            title="personal WeChat 会话已过期",
+                            detail=(
+                                f"account_id={account_id} errcode={getattr(response, 'errcode', None)} "
+                                f"errmsg={getattr(response, 'errmsg', '')}"
+                            ),
+                            fix_hint="重新发送“微信登录”刷新凭据，并在下次启动后重试 personal WeChat 私聊。",
                         )
                         consecutive_failures = 0
                         await self._sleep_with_stop(delay_seconds=pause_seconds, stop_event=stop_event)
                         continue
 
                     consecutive_failures += 1
-                    print(
-                        f"\033[31m[personal WeChat 长轮询失败]\033[0m account_id={account_id} "
-                        f"ret={getattr(response, 'ret', None)} errcode={getattr(response, 'errcode', None)} "
-                        f"errmsg={getattr(response, 'errmsg', '')}\n"
-                        "\033[33m[处理建议]\033[0m 检查微信 iLink 服务、当前登录态和网络连通性。"
+                    emit_operational_log(
+                        title="personal WeChat 长轮询失败",
+                        detail=(
+                            f"account_id={account_id} ret={getattr(response, 'ret', None)} "
+                            f"errcode={getattr(response, 'errcode', None)} errmsg={getattr(response, 'errmsg', '')}"
+                        ),
+                        fix_hint="检查微信 iLink 服务、当前登录态和网络连通性。",
                     )
                     await self._sleep_for_failure(
                         consecutive_failures=consecutive_failures,
@@ -403,9 +416,10 @@ class PersonalWeChatTextService:
                 if stop_event.is_set():
                     return
                 consecutive_failures += 1
-                print(
-                    f"\033[31m[personal WeChat 长轮询异常]\033[0m account_id={account_id} 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查当前 personal WeChat 凭据、微信 iLink 服务和本地网络后重试。"
+                emit_operational_log(
+                    title="personal WeChat 长轮询异常",
+                    detail=f"account_id={account_id} 原因={error}",
+                    fix_hint="检查当前 personal WeChat 凭据、微信 iLink 服务和本地网络后重试。",
                 )
                 await self._sleep_for_failure(
                     consecutive_failures=consecutive_failures,
@@ -453,10 +467,10 @@ class PersonalWeChatTextService:
                 reply_text_func=reply_text_func,
             )
         except Exception as error:
-            print(
-                f"\033[31m[personal WeChat 私聊消息处理失败]\033[0m account_id={account_id} "
-                f"user_id={parsed_event.from_user_id} 原因={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 shared private-chat runtime 依赖、当前登录态和微信文本消息内容。"
+            emit_operational_log(
+                title="personal WeChat 私聊消息处理失败",
+                detail=f"account_id={account_id} user_id={parsed_event.from_user_id} 原因={error}",
+                fix_hint="检查 shared private-chat runtime 依赖、当前登录态和微信文本消息内容。",
             )
 
     async def _sleep_for_failure(

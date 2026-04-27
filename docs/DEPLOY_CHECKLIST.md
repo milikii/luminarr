@@ -74,7 +74,7 @@ docker compose up -d
 ## Phase 4：渠道补齐入口
 
 - 只想先跑最小闭环：Telegram 就够了
-- 要补 Feishu：默认走 webhook；如果不想折腾公网 HTTPS，可以把 `FEISHU_INBOUND_MODE=long_connection`
+- 要补 Feishu：当前只走 SDK 长连接；确认 `FEISHU_APP_ID`、`FEISHU_APP_SECRET` 要么都空、要么都填
 - 要补 WeCom：确认 `WECOM_TOKEN`、`WECOM_ENCODING_AES_KEY`、`WECOM_RECEIVE_ID` 三项要么都空、要么都填
 - 要补 personal WeChat：先在本地 Python 运行里完成扫码登录，再考虑容器化；它依赖本地登录态，不靠 `.env` 里的 webhook 三元组启动
 

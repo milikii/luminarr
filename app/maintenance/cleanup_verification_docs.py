@@ -63,7 +63,17 @@ IMPORT_REFRESH_ENV_KEYS = (
 FOUR_CHANNEL_SMOKE_ENV_KEYS = (
     "FEISHU_APP_ID",
     "FEISHU_APP_SECRET",
-    "FEISHU_ENCRYPT_KEY",
+    "WECOM_TOKEN",
+    "WECOM_ENCODING_AES_KEY",
+    "WECOM_RECEIVE_ID",
+)
+
+FEISHU_SMOKE_ENV_KEYS = (
+    "FEISHU_APP_ID",
+    "FEISHU_APP_SECRET",
+)
+
+WECOM_SMOKE_ENV_KEYS = (
     "WECOM_TOKEN",
     "WECOM_ENCODING_AES_KEY",
     "WECOM_RECEIVE_ID",
@@ -79,18 +89,18 @@ ENV_READINESS_COMMAND_DISPLAY = (
     "bash -lc 'source ~/.bashrc >/dev/null 2>&1; python3 -c "
     "\"import os; keys=[\\\"TELEGRAM_BOT_TOKEN\\\",\\\"PROWLARR_BASE_URL\\\",\\\"PROWLARR_API_KEY\\\","
     "\\\"TRANSMISSION_BASE_URL\\\",\\\"EMBY_BASE_URL\\\",\\\"EMBY_API_KEY\\\",\\\"FEISHU_APP_ID\\\","
-    "\\\"FEISHU_APP_SECRET\\\",\\\"FEISHU_ENCRYPT_KEY\\\",\\\"WECOM_TOKEN\\\",\\\"WECOM_ENCODING_AES_KEY\\\","
+    "\\\"FEISHU_APP_SECRET\\\",\\\"WECOM_TOKEN\\\",\\\"WECOM_ENCODING_AES_KEY\\\","
     "\\\"WECOM_RECEIVE_ID\\\"]; print(\\\"\\\\n\\\".join(f\\\"{k}=\\\" + "
     "(\\\"set\\\" if os.getenv(k,\\\"\\\").strip().strip('\\\"\\'') else \\\"missing\\\") for k in keys))\"' ; "
     "python3 -c \"import subprocess; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
-    "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
+    "'WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; "
     "rows=dict(line.split('=', 1) for line in subprocess.run(['cmd.exe','/c','set'], capture_output=True).stdout.decode('utf-8', errors='ignore').splitlines() if '=' in line); "
     "lookup={key.lower(): value.strip().strip('\\\"\\'') for key, value in rows.items()}; "
     "print('\\\\n'.join(f'{k}=' + ('set' if lookup.get(k.lower(), '') else 'missing') for k in keys))\" ; "
     "python3 -c \"from pathlib import Path; keys=['TELEGRAM_BOT_TOKEN','PROWLARR_BASE_URL','PROWLARR_API_KEY',"
     "'TRANSMISSION_BASE_URL','EMBY_BASE_URL','EMBY_API_KEY','FEISHU_APP_ID','FEISHU_APP_SECRET',"
-    "'FEISHU_ENCRYPT_KEY','WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; data={}; "
+    "'WECOM_TOKEN','WECOM_ENCODING_AES_KEY','WECOM_RECEIVE_ID']; data={}; "
     "env_path=Path('.env'); text=env_path.read_text(encoding='utf-8') if env_path.exists() else ''; "
     "lines=(line.strip() for line in text.splitlines()); "
     "pairs=(line.partition('=') for line in lines if line and not line.startswith('#') and '=' in line); "
@@ -215,9 +225,9 @@ def _run_env_readiness_snapshot(cwd: Path) -> str:
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS) and _all_env_keys_ready(
         merged_status, IMPORT_REFRESH_ENV_KEYS
     ):
-        missing_channels = ("feishu",) * (not _all_env_keys_ready(merged_status, FOUR_CHANNEL_SMOKE_ENV_KEYS[:3])) + (
+        missing_channels = ("feishu",) * (not _all_env_keys_ready(merged_status, FEISHU_SMOKE_ENV_KEYS)) + (
             "wecom",
-        ) * (not _all_env_keys_ready(merged_status, FOUR_CHANNEL_SMOKE_ENV_KEYS[3:]))
+        ) * (not _all_env_keys_ready(merged_status, WECOM_SMOKE_ENV_KEYS))
         return f"local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: {','.join(missing_channels)}; personal_wechat login state not checked"
     if _all_env_keys_ready(merged_status, LOCAL_RUNTIME_ENV_KEYS):
         return "local runtime env ready; import/refresh env incomplete"

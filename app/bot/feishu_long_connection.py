@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from app.clients.feishu import FeishuClient
+from app.operational_logging import emit_operational_log
 
 if TYPE_CHECKING:
     from app.bot.feishu_adapter import FeishuPrivateTextEvent
@@ -55,9 +56,10 @@ class FeishuLongConnectionService:
             return
         if not self.is_available():
             reason = _FEISHU_LONG_CONNECTION_IMPORT_ERROR or "lark-oapi dependency is missing"
-            print(
-                f"\033[31m[Feishu 长连接未就绪]\033[0m 原因={reason}\n"
-                "\033[33m[处理建议]\033[0m 安装 lark-oapi，并确认当前环境可访问 Feishu 长连接服务。"
+            emit_operational_log(
+                title="Feishu 长连接未就绪",
+                detail=f"原因={reason}",
+                fix_hint="安装 lark-oapi，并确认当前环境可访问 Feishu 长连接服务。",
             )
             return
 
@@ -73,7 +75,11 @@ class FeishuLongConnectionService:
         )
         thread.start()
         self._thread = thread
-        print("\033[32m[Feishu 长连接已启动]\033[0m 当前入站将通过官方 SDK 长连接接收事件。")
+        emit_operational_log(
+            title="Feishu 长连接已启动",
+            detail="当前入站将通过官方 SDK 长连接接收事件。",
+            fix_hint="Feishu 长连接正在接收事件。",
+        )
 
     async def shutdown(self) -> None:
         loop = self._thread_loop
@@ -106,11 +112,10 @@ class FeishuLongConnectionService:
             loop.call_soon_threadsafe(loop.stop)
         except Exception as error:
             if not self._is_expected_loop_stop_error(error):
-                print(
-                    f"\033[31m[Feishu 长连接关闭失败]\033[0m 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 Feishu 线程事件循环是否仍可停止；"
-                    "如服务仍在运行，可稍后重试停机或检查上游 SDK 状态。",
-                    flush=True,
+                emit_operational_log(
+                    title="Feishu 长连接关闭失败",
+                    detail=f"原因={error}",
+                    fix_hint="检查 Feishu 线程事件循环是否仍可停止；如服务仍在运行，可稍后重试停机或检查上游 SDK 状态。",
                 )
 
     @staticmethod
@@ -153,20 +158,20 @@ class FeishuLongConnectionService:
                 return
             if not isinstance(error, Exception):
                 raise
-            print(
-                f"\033[31m[Feishu 长连接启动失败]\033[0m 原因={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 FEISHU_APP_ID/FEISHU_APP_SECRET，以及当前网络是否可访问 Feishu 长连接服务。"
+            emit_operational_log(
+                title="Feishu 长连接启动失败",
+                detail=f"原因={error}",
+                fix_hint="检查 FEISHU_APP_ID/FEISHU_APP_SECRET，以及当前网络是否可访问 Feishu 长连接服务。",
             )
         finally:
             try:
                 thread_loop.stop()
             except Exception as error:
                 if not self._is_expected_loop_stop_error(error):
-                    print(
-                        f"\033[31m[Feishu 长连接停止失败]\033[0m 原因={error}\n"
-                        "\033[33m[处理建议]\033[0m 检查 Feishu 线程事件循环是否仍可停止；"
-                        "如当前进程还在运行，可稍后重试停机或检查上游 SDK 状态。",
-                        flush=True,
+                    emit_operational_log(
+                        title="Feishu 长连接停止失败",
+                        detail=f"原因={error}",
+                        fix_hint="检查 Feishu 线程事件循环是否仍可停止；如当前进程还在运行，可稍后重试停机或检查上游 SDK 状态。",
                     )
             thread_loop.close()
 
@@ -196,7 +201,8 @@ class FeishuLongConnectionService:
         try:
             future.result()
         except Exception as error:
-            print(
-                f"\033[31m[Feishu 长连接事件处理失败]\033[0m 原因={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 Feishu 事件内容、shared private-chat runtime 依赖和回复链路。"
+            emit_operational_log(
+                title="Feishu 长连接事件处理失败",
+                detail=f"原因={error}",
+                fix_hint="检查 Feishu 事件内容、shared private-chat runtime 依赖和回复链路。",
             )

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from app.operational_logging import emit_operational_log
+
 
 @dataclass(frozen=True, slots=True)
 class WeComWebhookServerConfig:
@@ -48,15 +50,19 @@ def start_wecom_webhook_server(
     try:
         server = HTTPServer((config.host, config.port), handler_class)
     except OSError as error:
-        print(
-            f"\033[31m[WeCom webhook 启动失败]\033[0m 地址=http://{config.host}:{config.port}{config.path} 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查监听地址/端口是否被占用，并确认当前进程有权限绑定该端口。",
-            flush=True,
+        emit_operational_log(
+            title="WeCom webhook 启动失败",
+            detail=f"地址=http://{config.host}:{config.port}{config.path} 原因={error}",
+            fix_hint="检查监听地址/端口是否被占用，并确认当前进程有权限绑定该端口。",
         )
         raise
     thread = threading.Thread(target=server.serve_forever, name="wecom-webhook-server", daemon=True)
     thread.start()
-    print(f"\033[32m[WeCom webhook 已启动]\033[0m 地址=http://{config.host}:{server.server_address[1]}{config.path}")
+    emit_operational_log(
+        title="WeCom webhook 已启动",
+        detail=f"地址=http://{config.host}:{server.server_address[1]}{config.path}",
+        fix_hint="WeCom webhook 正在监听回调请求。",
+    )
     return WeComWebhookServerRuntime(server=server, thread=thread, path=config.path)
 
 
@@ -112,9 +118,10 @@ def _build_handler_class(
             try:
                 response = future.result(timeout=30.0)
             except Exception as error:
-                print(
-                    f"\033[31m[WeCom webhook HTTP 入口失败]\033[0m 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查事件循环是否仍在运行，以及 WeCom webhook 路径配置是否正确。"
+                emit_operational_log(
+                    title="WeCom webhook HTTP 入口失败",
+                    detail=f"原因={error}",
+                    fix_hint="检查事件循环是否仍在运行，以及 WeCom webhook 路径配置是否正确。",
                 )
                 response = _HttpResponse(
                     status_code=500,
@@ -134,10 +141,10 @@ def _build_handler_class(
                 if body:
                     self.wfile.write(body)
             except OSError as error:
-                print(
-                    f"\033[31m[WeCom webhook 回包失败]\033[0m 路径={self.path} 原因={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查回调对端是否提前断开连接，并确认当前 WeCom 回包链仍可写 socket。",
-                    flush=True,
+                emit_operational_log(
+                    title="WeCom webhook 回包失败",
+                    detail=f"路径={self.path} 原因={error}",
+                    fix_hint="检查回调对端是否提前断开连接，并确认当前 WeCom 回包链仍可写 socket.",
                 )
 
     return WeComWebhookHandler

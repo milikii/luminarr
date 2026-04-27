@@ -363,7 +363,7 @@
 - **原因**：
   这样能在不改审批、作业、候选缓存和持久化协议的前提下，先把 Feishu 私聊最小文本入口接进现有主链，保持 diff 最小且风险可控。
 
-## D-024 Feishu 当前只做最小私聊文本 webhook + reply 闭环
+## D-024 Feishu 当前只做最小私聊文本 SDK 长连接 + reply 闭环
 - **状态**：已决定
 - **日期**：2026-04-05
 - **结论**：
@@ -372,8 +372,7 @@
     - 文本消息
     - 文本回复
   - Feishu 适配层当前负责：
-    - webhook 请求入口
-    - Feishu payload 解析
+    - SDK 事件解析
     - 调用 shared private-chat text runtime
     - 把 runtime 产出的文本回发到原 Feishu 会话
   - 现有 workflow / approval / jobs / lease / SQLite 真相边界保持不变。
@@ -381,26 +380,8 @@
     - 通用 webhook 总线
     - 通用多渠道平台
     - 群聊 / 卡片 / 按钮回调
-  - webhook 事件验签作为下一刀单独补，不和这一步的最小收发闭环混在一起。
 - **原因**：
-  先把 Feishu 的“真实请求进来、文本能回去”补成最小闭环，再做安全加固，能把 diff 控制在最小范围内，也更容易验证 Telegram 主链不回退。
-
-## D-025 Feishu 事件验签使用原始请求体 + timestamp + nonce + Encrypt Key，且不干扰 URL 验证
-- **状态**：已决定
-- **日期**：2026-04-05
-- **结论**：
-  - Feishu 非 `url_verification` webhook 请求在进入 shared private-chat text runtime 前，必须先做验签。
-  - 当前最小验签输入固定为：
-    - 原始 HTTP request body
-    - `X-Lark-Request-Timestamp`
-    - `X-Lark-Request-Nonce`
-    - `X-Lark-Signature`
-    - `FEISHU_ENCRYPT_KEY`
-  - `url_verification` 仍按 Feishu challenge 原样返回，不走这层签名拒绝。
-  - 缺失签名、签名不匹配、时间戳不是合法整数时，必须在适配层显式拒绝并打印中文日志，不得进入现有 workflow / service。
-  - 当前这一步只做签名校验，不做消息体解密、不做群聊/卡片/按钮回调。
-- **原因**：
-  这一步的目标是先把 Feishu 请求来源校验补上，同时保持现有文本入站链最小改动；URL 验证和后续更重的加解密能力不应混在同一步里。
+  先把 Feishu 的“真实 SDK 事件进来、文本能回去”补成最小闭环，能把 diff 控制在最小范围内，也更容易验证 Telegram 主链不回退。
 
 ## D-026 WeCom 先补已解密私聊文本适配内核，私聊会话外部标识暂复用 `FromUserName`
 - **状态**：已决定

@@ -42,12 +42,7 @@ def test_load_settings_reads_token() -> None:
     assert settings.sqlite_db_path == "/data/luminarr.db"
     assert settings.feishu_app_id == ""
     assert settings.feishu_app_secret == ""
-    assert settings.feishu_encrypt_key == ""
-    assert settings.feishu_inbound_mode == "webhook"
     assert settings.feishu_base_url == "https://open.feishu.cn"
-    assert settings.feishu_webhook_host == "0.0.0.0"
-    assert settings.feishu_webhook_port == 18095
-    assert settings.feishu_webhook_path == "/feishu/webhook"
     assert settings.wecom_token == ""
     assert settings.wecom_encoding_aes_key == ""
     assert settings.wecom_receive_id == ""
@@ -273,21 +268,13 @@ def test_load_settings_reads_feishu_settings() -> None:
             "TRANSMISSION_BASE_URL": "http://transmission:9091/",
             "FEISHU_APP_ID": "cli_a",
             "FEISHU_APP_SECRET": "sec_b",
-            "FEISHU_ENCRYPT_KEY": "encrypt-key-42",
             "FEISHU_BASE_URL": "https://open.feishu.test/",
-            "FEISHU_WEBHOOK_HOST": "127.0.0.1",
-            "FEISHU_WEBHOOK_PORT": "18096",
-            "FEISHU_WEBHOOK_PATH": "hooks/feishu",
         }
     )
 
     assert settings.feishu_app_id == "cli_a"
     assert settings.feishu_app_secret == "sec_b"
-    assert settings.feishu_encrypt_key == "encrypt-key-42"
     assert settings.feishu_base_url == "https://open.feishu.test"
-    assert settings.feishu_webhook_host == "127.0.0.1"
-    assert settings.feishu_webhook_port == 18096
-    assert settings.feishu_webhook_path == "/hooks/feishu"
 
 
 def test_load_settings_reads_wecom_settings() -> None:
@@ -314,38 +301,6 @@ def test_load_settings_reads_wecom_settings() -> None:
     assert settings.wecom_webhook_path == "/hooks/wecom"
 
 
-def test_load_settings_reads_feishu_long_connection_mode_without_encrypt_key() -> None:
-    settings = load_settings(
-        {
-            "TELEGRAM_BOT_TOKEN": "token-value",
-            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
-            "PROWLARR_API_KEY": "api-key",
-            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
-            "FEISHU_APP_ID": "cli_a",
-            "FEISHU_APP_SECRET": "sec_b",
-            "FEISHU_INBOUND_MODE": "long_connection",
-        }
-    )
-
-    assert settings.feishu_inbound_mode == "long_connection"
-    assert settings.feishu_app_id == "cli_a"
-    assert settings.feishu_app_secret == "sec_b"
-    assert settings.feishu_encrypt_key == ""
-
-
-def test_load_settings_rejects_invalid_feishu_inbound_mode() -> None:
-    with pytest.raises(ConfigError, match="FEISHU_INBOUND_MODE"):
-        load_settings(
-            {
-                "TELEGRAM_BOT_TOKEN": "token-value",
-                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
-                "PROWLARR_API_KEY": "api-key",
-                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
-                "FEISHU_INBOUND_MODE": "sdk",
-            }
-        )
-
-
 def test_load_settings_strips_whitespace_from_lower_choice_fields() -> None:
     settings = load_settings(
         {
@@ -354,12 +309,10 @@ def test_load_settings_strips_whitespace_from_lower_choice_fields() -> None:
             "PROWLARR_API_KEY": "api-key",
             "TRANSMISSION_BASE_URL": "http://transmission:9091/",
             "MEDIA_SERVER_PROVIDER": " Plex ",
-            "FEISHU_INBOUND_MODE": " long_connection ",
         }
     )
 
     assert settings.media_server_provider == "plex"
-    assert settings.feishu_inbound_mode == "long_connection"
 
 
 def test_load_settings_reads_raw_bt_destinations() -> None:
@@ -614,29 +567,6 @@ def test_load_settings_requires_complete_feishu_credentials() -> None:
                 "PROWLARR_API_KEY": "api-key",
                 "TRANSMISSION_BASE_URL": "http://transmission:9091",
                 "FEISHU_APP_ID": "cli_a",
-            }
-        )
-    with pytest.raises(ConfigError):
-        load_settings(
-            {
-                "TELEGRAM_BOT_TOKEN": "token",
-                "PROWLARR_BASE_URL": "http://prowlarr:9696",
-                "PROWLARR_API_KEY": "api-key",
-                "TRANSMISSION_BASE_URL": "http://transmission:9091",
-                "FEISHU_ENCRYPT_KEY": "encrypt-key-42",
-            }
-        )
-
-
-def test_load_settings_rejects_invalid_feishu_webhook_port() -> None:
-    with pytest.raises(ConfigError):
-        load_settings(
-            {
-                "TELEGRAM_BOT_TOKEN": "token",
-                "PROWLARR_BASE_URL": "http://prowlarr:9696",
-                "PROWLARR_API_KEY": "api-key",
-                "TRANSMISSION_BASE_URL": "http://transmission:9091",
-                "FEISHU_WEBHOOK_PORT": "abc",
             }
         )
 

@@ -238,7 +238,6 @@ def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypat
         "EMBY_API_KEY",
         "FEISHU_APP_ID",
         "FEISHU_APP_SECRET",
-        "FEISHU_ENCRYPT_KEY",
         "WECOM_TOKEN",
         "WECOM_ENCODING_AES_KEY",
         "WECOM_RECEIVE_ID",
@@ -249,7 +248,7 @@ def test_run_env_readiness_snapshot_returns_missing_when_env_is_absent(monkeypat
 
 
 def test_run_env_readiness_snapshot_returns_runtime_ready_when_import_env_is_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
         monkeypatch.delenv(key, raising=False)
     (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\n", encoding="utf-8")
     assert _run_env_readiness_snapshot(tmp_path) == "local runtime env ready; import/refresh env incomplete"
@@ -311,7 +310,6 @@ def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_abs
         "EMBY_API_KEY",
         "FEISHU_APP_ID",
         "FEISHU_APP_SECRET",
-        "FEISHU_ENCRYPT_KEY",
         "WECOM_TOKEN",
         "WECOM_ENCODING_AES_KEY",
         "WECOM_RECEIVE_ID",
@@ -339,23 +337,23 @@ def test_run_env_readiness_snapshot_reads_local_env_file_when_process_env_is_abs
 
 
 def test_run_env_readiness_snapshot_treats_unreadable_env_file_as_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
         monkeypatch.delenv(key, raising=False)
     env_path = tmp_path / ".env"; env_path.write_text("TELEGRAM_BOT_TOKEN=token\n", encoding="utf-8"); original_read_text = Path.read_text; monkeypatch.setattr(Path, "read_text", lambda self, *args, **kwargs: (_ for _ in ()).throw(PermissionError("blocked")) if self == env_path else original_read_text(self, *args, **kwargs))
     assert _run_env_readiness_snapshot(tmp_path) == "missing local runtime env"
 
 
 def test_run_env_readiness_snapshot_lists_only_missing_channel_groups(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
         monkeypatch.delenv(key, raising=False)
-    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\nEMBY_BASE_URL=http://127.0.0.1:18096\nEMBY_API_KEY=emby-key\nFEISHU_APP_ID=id\nFEISHU_APP_SECRET=secret\nFEISHU_ENCRYPT_KEY=key\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\nEMBY_BASE_URL=http://127.0.0.1:18096\nEMBY_API_KEY=emby-key\nFEISHU_APP_ID=id\nFEISHU_APP_SECRET=secret\n", encoding="utf-8")
     assert _run_env_readiness_snapshot(tmp_path) == "local runtime/import env ready; four-channel cleanup smoke env incomplete; missing channels: wecom; personal_wechat login state not checked"
 
 
 def test_run_env_readiness_snapshot_returns_ready_when_all_channel_groups_are_configured(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ENCRYPT_KEY", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
+    for key in ("TELEGRAM_BOT_TOKEN", "PROWLARR_BASE_URL", "PROWLARR_API_KEY", "TRANSMISSION_BASE_URL", "EMBY_BASE_URL", "EMBY_API_KEY", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "WECOM_TOKEN", "WECOM_ENCODING_AES_KEY", "WECOM_RECEIVE_ID"):
         monkeypatch.delenv(key, raising=False)
-    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\nEMBY_BASE_URL=http://127.0.0.1:18096\nEMBY_API_KEY=emby-key\nFEISHU_APP_ID=id\nFEISHU_APP_SECRET=secret\nFEISHU_ENCRYPT_KEY=key\nWECOM_TOKEN=token\nWECOM_ENCODING_AES_KEY=aes\nWECOM_RECEIVE_ID=wxid\n", encoding="utf-8")
+    (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=token\nPROWLARR_BASE_URL=http://127.0.0.1:9696\nPROWLARR_API_KEY=prowlarr-key\nTRANSMISSION_BASE_URL=http://127.0.0.1:19091\nEMBY_BASE_URL=http://127.0.0.1:18096\nEMBY_API_KEY=emby-key\nFEISHU_APP_ID=id\nFEISHU_APP_SECRET=secret\nWECOM_TOKEN=token\nWECOM_ENCODING_AES_KEY=aes\nWECOM_RECEIVE_ID=wxid\n", encoding="utf-8")
     assert _run_env_readiness_snapshot(tmp_path) == "four-channel cleanup smoke env ready"
 
 
