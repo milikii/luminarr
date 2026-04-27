@@ -1,4 +1,4 @@
-# Next step (v378)
+# Next step (v379)
 
 ## Current goal
 
@@ -6,6 +6,7 @@
 - cleanup / adult archive 的最新回归已补齐并通过，但当前主线仍保持在 `downloader_route_lookup.py`，不切换施工边界。
 - 当前这一轮主要服务以下收口：
   - 收掉 `downloader_route_lookup.py` 里重复的日志函数、同构的路由序幕和单用途 helper 壳
+  - 把 `_resolve_downloader_client_candidate` 合并回两个实际调用点，减少一层只在本文件内部转手的薄壳
   - 把 `import` 路由里的 host `download_dir` 回填收成 `route.download_dir` / `instance.download_dir` 的直接合并，不再保留空的 `instance is None` 兜底分支
   - 顺手收掉 `app/main.py` 里 route helper 残余死导入
   - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析逻辑收口、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
@@ -23,7 +24,7 @@
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/bot/personal_wechat_login.py` 与 `app/bot/personal_wechat_text.py` 的无消费者 `__all__` 纯导出列表也已删掉；`app/db/__init__.py` 的死 re-export 已清掉，`app/bot/telegram_bot.py` 保留显式公共 `__all__` 边界以维持 quality gate
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `357` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，downloader instance strip + lookup 与 host download_dir fallback 也已收口；`_resolve_lookup_client_for_task()` 现在直接把 resolved `instance` 带回 import 路由，`_resolve_downloader_instance` 这层薄壳也已删，当前 `_log_*` 已归零，`_resolve_route_host_download_dir` 也已删，剩余候选继续限制在更薄的公共 helper 或 route 死壳
+- `app/downloader_route_lookup.py` 当前 `320` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，downloader instance strip + lookup 与 host download_dir fallback 也已收口；`_resolve_lookup_client_for_task()` 现在直接把 resolved `instance` 带回 import 路由，`_resolve_downloader_instance` / `_resolve_downloader_client_candidate` 这两层薄壳也已删，当前 `_log_*` 已归零，`_resolve_route_host_download_dir` 也已删，剩余候选继续限制在 `resolve_downloader_dispatch_download_dir` 和 route 死壳
 - `app/config.py` 当前 `556` 行；base URL 现在统一走 shared normalization helper，读 base URL 的 env 路径也抽成 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` / `DOWNLOADER_INSTANCES.downloader_type` / `*_optional_int*` / `SUBTITLE_TRANSLATION_TIMEOUT_SECONDS` 也共用 shared validator helper，继续保留既有的 semicolon / pipe 解析收口，不回头扩张 settings 语义。
 
 ## User value
