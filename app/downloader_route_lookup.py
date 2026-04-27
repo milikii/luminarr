@@ -235,15 +235,28 @@ async def _get_torrent_status_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionTaskStatus | None:
-    _, _, client = _resolve_lookup_client_for_task(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        job_repo=job_repo,
-        downloader_instances_by_name=downloader_instances_by_name,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
-        operation="status",
-    )
+    try:
+        _, _, client = _resolve_lookup_client_for_task(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            job_repo=job_repo,
+            downloader_instances_by_name=downloader_instances_by_name,
+            transmission_clients_by_name=transmission_clients_by_name,
+            qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+            operation="status",
+        )
+    except RuntimeError as error:
+        if isinstance(error, DownloaderRouteLookupError):
+            raise
+        _print_downloader_issue_log(
+            title="下载器路由查询失败",
+            context_label="task_ref",
+            context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
+            detail_label="错误",
+            detail_value=str(error),
+            fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
+        )
+        raise DownloaderRouteLookupError(f"downloader route unavailable for status task: {task_ref}") from error
     return await client.get_torrent_status(task_ref)
 
 

@@ -52,6 +52,7 @@ from app.downloader_route_lookup import (
     _print_downloader_issue_log,
     _resolve_downloader_instance_and_client,
 )
+from app.operational_logging import emit_operational_log
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.adult_archive_service import AdultArchiveService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
@@ -72,7 +73,11 @@ def _run_application_polling(application) -> None:
     try:
         application.run_polling(drop_pending_updates=True)
     except NetworkError as error:
-        print(f"\033[31m[Telegram 启动失败]\033[0m 错误={error}\n\033[33m[处理建议]\033[0m 检查当前网络、DNS 和 `TELEGRAM_BOT_TOKEN` 是否可访问 Telegram Bot API 后重试。", flush=True)
+        emit_operational_log(
+            title="Telegram 启动失败",
+            detail=f"错误={error}",
+            fix_hint="检查当前网络、DNS 和 `TELEGRAM_BOT_TOKEN` 是否可访问 Telegram Bot API 后重试。",
+        )
         raise
 
 
@@ -140,10 +145,10 @@ def resolve_downloader_dispatch_download_dir(
 
 def _log_missing_media_server_settings(*, provider: str, missing_keys: list[str]) -> None:
     joined_keys = ", ".join(missing_keys)
-    print(
-        f"\033[31m[媒体服务器配置缺失]\033[0m provider={provider} 缺少={joined_keys}\n"
-        "\033[33m[处理建议]\033[0m 补齐该 provider 对应的地址和凭据；当前会保留导入成功真相，但跳过媒体库刷新。",
-        flush=True,
+    emit_operational_log(
+        title="媒体服务器配置缺失",
+        detail=f"provider={provider} 缺少={joined_keys}",
+        fix_hint="补齐该 provider 对应的地址和凭据；当前会保留导入成功真相，但跳过媒体库刷新。",
     )
 
 
@@ -226,9 +231,10 @@ def main() -> None:
     for source_name in settings.bt_web_sources:
         rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
         if rule is None:
-            print(
-                f"\033[31m[BT 外部站点源配置无效]\033[0m 来源={source_name}\n"
-                "\033[33m[处理建议]\033[0m 检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。"
+            emit_operational_log(
+                title="BT 外部站点源配置无效",
+                detail=f"来源={source_name}",
+                fix_hint="检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。",
             )
             continue
         client = WebSourceClient(rule=rule, proxy_url=settings.outbound_proxy_url)
