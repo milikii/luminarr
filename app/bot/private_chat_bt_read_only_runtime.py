@@ -17,7 +17,8 @@ def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
             title="BT 只读探索失败",
             detail=f"查询={query} 原因={error}",
             fix_hint="检查 BT 来源配置、站点可达性和网络连通性后重试。",
-        )
+        ),
+        flush=True,
     )
 
 

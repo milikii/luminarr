@@ -9,6 +9,7 @@ import httpx
 
 from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
 from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
+from app.operational_logging import format_operational_log_message
 from app.services.adult_bt_selector import build_adult_history_text, order_adult_bt_candidates
 from app.services.adult_content import extract_exact_adult_content_match
 from app.services.bt_read_only_helper_selection import (
@@ -105,8 +106,11 @@ class BtReadOnlyDisplayService:
             return await self.adult_read_only_lookup_func(content_match.display_id)
         except httpx.HTTPError as error:
             print(
-                f"\033[31m[JavLibrary 只读补全失败]\033[0m query={lookup_query} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 JavLibrary 可达性、代理和 HTML 结构；当前只跳过只读补全，不影响 BT 候选展示.",
+                format_operational_log_message(
+                    title="JavLibrary 只读补全失败",
+                    detail=f"query={lookup_query} 错误={error}",
+                    fix_hint="检查 JavLibrary 可达性、代理和 HTML 结构；当前只跳过只读补全，不影响 BT 候选展示。",
+                ),
                 flush=True,
             )
             return None
@@ -142,8 +146,11 @@ class BtReadOnlyDisplayService:
             record = self.adult_content_registry_repo.get_by_content_id(normalized_content_id=content_id)
         except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
             print(
-                f"\033[31m[成人资源历史查询失败]\033[0m content_id={content_id} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表读取是否正常；当前只跳过历史提示，不影响候选展示。",
+                format_operational_log_message(
+                    title="成人资源历史查询失败",
+                    detail=f"content_id={content_id} 错误={error}",
+                    fix_hint="检查 adult_content_registry 表读取是否正常；当前只跳过历史提示，不影响候选展示。",
+                ),
                 flush=True,
             )
             return candidate

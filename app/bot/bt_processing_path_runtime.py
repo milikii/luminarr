@@ -1,16 +1,29 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 from collections.abc import MutableMapping
 from typing import Literal
 
+from app.bot.bt_pending_runtime import (
+    BT_PENDING_CLEAR_RESULT_MISSING_REASON as _BT_PENDING_CLEAR_RESULT_MISSING_REASON,
+    BT_PENDING_MISSING_AFTER_UPSERT_REASON as _BT_PENDING_MISSING_AFTER_UPSERT_REASON,
+    BT_PENDING_REPO_KEY as _BT_PENDING_REPO_KEY,
+    deserialize_bt_pending_payload as _deserialize_bt_pending_payload,
+    is_bt_pending_row_corrupted_reason as _is_bt_pending_row_corrupted_reason,
+    log_bt_pending_clear_failed as _log_bt_pending_clear_failed,
+    log_bt_pending_clear_result_missing as _log_bt_pending_clear_result_missing,
+    log_bt_pending_missing_after_upsert as _log_bt_pending_missing_after_upsert,
+    log_bt_pending_payload_corruption as _log_bt_pending_payload_corruption,
+    log_bt_pending_persist_failed as _log_bt_pending_persist_failed,
+    log_bt_pending_read_failed as _log_bt_pending_read_failed,
+    log_bt_pending_row_corrupted as _log_bt_pending_row_corrupted,
+    resolve_bt_pending_repo as _resolve_bt_pending_repo,
+    serialize_bt_pending_payload as _serialize_bt_pending_payload,
+)
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_PROCESSING_PATH,
     BtPendingPersistenceError,
-    BtPendingRepo,
 )
-from app.operational_logging import format_operational_log_message
 
 BT_PROCESSING_PATH_PROMPT_TEXT = (
     "已识别为直接磁力下载需求。\n"
@@ -23,10 +36,6 @@ BT_PROCESSING_PATH_PENDING_REMINDER_TEXT = (
     "请回复：观影 PT 链 / BT 成人链"
 )
 BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY = "bt_processing_path_pending_by_chat"
-_BT_PENDING_REPO_KEY = "bt_pending_repo"
-_BT_PENDING_MISSING_AFTER_UPSERT_REASON = "bt_pending_state missing after upsert"
-_BT_PENDING_CLEAR_RESULT_MISSING_REASON = "bt_pending_state clear result missing"
-_BT_PENDING_STAGE_EMPTY_AFTER_READ_REASON = "bt_pending_state stage empty after read"
 
 
 def _resolve_bt_processing_path_pending_by_chat(bot_data: MutableMapping[str, object]) -> dict[int, str]:
@@ -36,119 +45,6 @@ def _resolve_bt_processing_path_pending_by_chat(bot_data: MutableMapping[str, ob
     resolved_pending_by_chat: dict[int, str] = {}
     bot_data[BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
     return resolved_pending_by_chat
-
-
-def _resolve_bt_pending_repo(
-    bot_data: MutableMapping[str, object],
-    bt_pending_repo_key: str,
-) -> BtPendingRepo | None:
-    pending_repo = bot_data.get(bt_pending_repo_key)
-    if isinstance(pending_repo, BtPendingRepo):
-        return pending_repo
-    return None
-
-
-def _serialize_bt_pending_payload(payload: dict[str, object]) -> str:
-    try:
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    except TypeError:
-        return "{}"
-
-
-def _deserialize_bt_pending_payload(payload_json: str) -> tuple[dict[str, object], str | None]:
-    if not payload_json.strip():
-        return {}, "payload_json empty"
-    try:
-        payload = json.loads(payload_json)
-    except json.JSONDecodeError:
-        return {}, "payload_json invalid json"
-    if not isinstance(payload, dict):
-        return {}, "payload_json not object"
-    return payload, None
-
-
-def _log_bt_pending_payload_corruption(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理载荷损坏",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint="检查 bt_pending_state.payload_json 是否仍是合法 JSON，且包含当前 stage 需要的字段。",
-        ),
-        flush=True,
-    )
-
-
-def _log_bt_pending_clear_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理清理失败",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint="检查 bt_pending_state 表删除是否正常；当前进程内待处理状态已尽量清掉，但重启后旧状态可能仍残留。",
-        ),
-        flush=True,
-    )
-
-
-def _log_bt_pending_clear_result_missing(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理清理结果缺失",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint="检查 bt_pending_state 删除返回是否仍带有明确结果；当前进程内待处理状态已尽量回滚，避免把缺失真相误判成已清理成功。",
-        ),
-        flush=True,
-    )
-
-
-def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理读取失败",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint="检查 bt_pending_state 表读取是否正常；当前相关入口会按状态不可用处理，避免把 SQLite 读取异常误判成“没有待处理状态”。",
-        ),
-        flush=True,
-    )
-
-
-def _log_bt_pending_row_corrupted(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理记录损坏",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint="检查 bt_pending_state.stage 是否仍是完整真相；当前相关入口会按状态不可用处理，避免把坏记录误判成“没有待处理状态”。",
-        ),
-        flush=True,
-    )
-
-
-def _is_bt_pending_row_corrupted_reason(reason: str) -> bool:
-    return reason == _BT_PENDING_STAGE_EMPTY_AFTER_READ_REASON
-
-
-def _log_bt_pending_persist_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理持久化失败",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint="检查 bt_pending_state 表写入是否正常；当前进程内待处理状态仍保留，但重启后可能丢失这一步的上下文。",
-        ),
-        flush=True,
-    )
-
-
-def _log_bt_pending_missing_after_upsert(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 待处理写入后记录缺失",
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint=(
-                "检查 bt_pending_state 表是否被并发删除或触发器回滚；"
-                "如需继续当前 BT follow-up，请先确认 SQLite 写入后能立即回读该记录。"
-            ),
-        ),
-        flush=True,
-    )
 
 
 def set_bt_processing_path_pending(

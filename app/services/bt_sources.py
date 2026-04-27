@@ -223,7 +223,8 @@ def _log_bt_source_provider_error(*, provider_name: str, query: str, error: Exce
             title="BT 来源搜索失败",
             detail=f"来源={provider_name} 查询={query} 原因={error}",
             fix_hint="检查对应来源配置、站点可达性和网络连通性后重试。",
-        )
+        ),
+        flush=True,
     )
 
 
@@ -233,5 +234,6 @@ def _log_bt_source_provider_page_error(*, provider_name: str, page_url: str, err
             title="BT 页面预览失败",
             detail=f"来源={provider_name} 页面={page_url} 原因={error}",
             fix_hint="检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
-        )
+        ),
+        flush=True,
     )

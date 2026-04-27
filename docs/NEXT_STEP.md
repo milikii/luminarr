@@ -1,16 +1,16 @@
-# Next step (v391)
+# Next step (v392)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环：`search_clarification_state`、`add_pending_presence_state`、`import_pending_write_through_state`、`add_confirm_job_state`、`import_cancel_state`、`import_confirm_expiry_state`、`search_candidate_state`、`add_confirm_context_state`、`import_prepare_state`、`private_chat_cleanup_runtime` 的日志边界已统一到共享 operational logging helper，并同步 STATUS/NEXT_STEP 当前真相。
+- 本轮已完成 10 个最小闭环：新增共享 `bt_pending_runtime`，并把 `bt_processing_path`、`bt_classification`、`bt_tmdb_association`、`raw_bt_destination` 的 BT pending repo 解析、payload 编解码和持久化日志统一到该边界；pure BT、BT TMDB、BT read-only、BT source 日志也已统一到 shared operational formatter / flush 边界，并同步 STATUS/NEXT_STEP 当前真相。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码、search/web/BT 展示、candidate/clarification、Telegram delivery/update、import pending/approval/event 等异常边界已持续收口。
-  - 本轮又继续把 clarification、pending add、import pending write-through、confirm job、import cancel/expiry、candidate、confirm context、import prepare、cleanup runtime 的日志边界统一到共享 operational logging helper。
+  - 本轮又继续把 BT pending 四段 follow-up runtime 的重复 repo/payload/logging helper 收成共享边界，并统一 pure BT / BT TMDB / BT read-only / BT source 日志格式。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
   - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
@@ -20,7 +20,7 @@
 ## User value
 
 - 减少持久化异常和操作失败只能靠猜的场景，同时保持现有用户行为、协议和持久化真相不变。
-- 默认分支继续可用；质量 gate 和 mainline gate 已覆盖本轮触及路径。
+- 默认分支继续可用；focused gate 已覆盖本轮触及路径，质量 gate 和 mainline gate 继续作为退出条件。
 - 成人 BT 后续可以切，但默认先把质量债继续压低，避免在不稳边界上扩功能。
 
 ## Only do

@@ -1,19 +1,33 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from app.bot.bt_classification_runtime import BT_CLASSIFICATION_PROMPT_TEXT, set_bt_classification_pending
+from app.bot.bt_pending_runtime import (
+    BT_PENDING_CLEAR_RESULT_MISSING_REASON,
+    BT_PENDING_MISSING_AFTER_UPSERT_REASON,
+    deserialize_bt_pending_payload as _deserialize_bt_pending_payload,
+    is_bt_pending_row_corrupted_reason,
+    log_bt_pending_clear_failed as _log_bt_pending_clear_failed,
+    log_bt_pending_clear_result_missing as _log_bt_pending_clear_result_missing,
+    log_bt_pending_missing_after_upsert as _log_bt_pending_missing_after_upsert,
+    log_bt_pending_payload_corruption as _log_bt_pending_payload_corruption,
+    log_bt_pending_persist_failed as _log_bt_pending_persist_failed,
+    log_bt_pending_read_failed as _log_bt_pending_read_failed,
+    log_bt_pending_row_corrupted as _log_bt_pending_row_corrupted,
+    resolve_bt_pending_repo as _resolve_bt_pending_repo,
+    serialize_bt_pending_payload as _serialize_bt_pending_payload,
+)
 from app.bot.raw_bt_destination_runtime import can_dispatch_bt_source
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
     BtPendingPersistenceError,
-    BtPendingRepo,
 )
+from app.operational_logging import format_operational_log_message
 from app.services.add_to_downloader import BT_SOURCE_UNSUPPORTED_TEXT, AddToDownloaderService
 from app.services.search_request_context import parse_movie_query
 
@@ -89,8 +103,12 @@ def resolve_bt_tmdb_candidates_lookup(
 
 def log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
     print(
-        f"\033[31m[BT TMDB 关联失败]\033[0m 类型={media_kind} 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。"
+        format_operational_log_message(
+            title="BT TMDB 关联失败",
+            detail=f"类型={media_kind} 查询={query} 原因={error}",
+            fix_hint="检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。",
+        ),
+        flush=True,
     )
 
 
@@ -103,92 +121,6 @@ def _resolve_bt_tmdb_association_pending_by_chat(
     resolved_pending_by_chat: dict[int, BtTmdbAssociationPending] = {}
     bot_data[BT_TMDB_ASSOCIATION_PENDING_BY_CHAT_KEY] = resolved_pending_by_chat
     return resolved_pending_by_chat
-
-
-def _resolve_bt_pending_repo(
-    bot_data: MutableMapping[str, object],
-    bt_pending_repo_key: str,
-) -> BtPendingRepo | None:
-    pending_repo = bot_data.get(bt_pending_repo_key)
-    if isinstance(pending_repo, BtPendingRepo):
-        return pending_repo
-    return None
-
-
-def _serialize_bt_pending_payload(payload: dict[str, object]) -> str:
-    try:
-        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
-    except TypeError:
-        return "{}"
-
-
-def _deserialize_bt_pending_payload(payload_json: str) -> tuple[dict[str, object], str | None]:
-    if not payload_json.strip():
-        return {}, "payload_json empty"
-    try:
-        payload = json.loads(payload_json)
-    except json.JSONDecodeError:
-        return {}, "payload_json invalid json"
-    if not isinstance(payload, dict):
-        return {}, "payload_json not object"
-    return payload, None
-
-
-def _log_bt_pending_payload_corruption(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理载荷损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.payload_json 是否仍是合法 JSON，且包含当前 stage 需要的字段。",
-        flush=True,
-    )
-
-
-def _log_bt_pending_clear_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理清理失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表删除是否正常；当前进程内待处理状态已尽量清掉，但重启后旧状态可能仍残留。",
-        flush=True,
-    )
-
-
-def _log_bt_pending_clear_result_missing(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理清理结果缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 删除返回是否仍带有明确结果；当前进程内待处理状态已尽量回滚，避免把缺失真相误判成已清理成功。",
-        flush=True,
-    )
-
-
-def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理读取失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表读取是否正常；当前相关入口会按状态不可用处理，避免把 SQLite 读取异常误判成“没有待处理状态”。",
-        flush=True,
-    )
-
-
-def _log_bt_pending_row_corrupted(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理记录损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.stage 是否仍是完整真相；当前相关入口会按状态不可用处理，避免把坏记录误判成“没有待处理状态”。",
-        flush=True,
-    )
-
-
-def _log_bt_pending_persist_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理持久化失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表写入是否正常；当前进程内待处理状态仍保留，但重启后可能丢失这一步的上下文。",
-        flush=True,
-    )
-
-
-def _log_bt_pending_missing_after_upsert(*, chat_id: int | None, stage: str, reason: str) -> None:
-    print(
-        f"\033[31m[BT 待处理写入后记录缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表是否被并发删除或触发器回滚；"
-        "如需继续当前 BT follow-up，请先确认 SQLite 写入后能立即回读该记录。",
-        flush=True,
-    )
 
 
 def set_bt_tmdb_association_pending(
@@ -213,7 +145,7 @@ def set_bt_tmdb_association_pending(
             payload_json=_serialize_bt_pending_payload({"media_kind": media_kind, "source": source.strip()}),
         )
     except BtPendingPersistenceError as error:
-        if str(error) == "bt_pending_state missing after upsert":
+        if str(error) == BT_PENDING_MISSING_AFTER_UPSERT_REASON:
             _log_bt_pending_missing_after_upsert(
                 chat_id=chat_id,
                 stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
@@ -256,7 +188,7 @@ def get_bt_tmdb_association_pending(
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
     except (BtPendingPersistenceError, sqlite3.Error) as error:
-        if str(error) == "bt_pending_state stage empty after read":
+        if is_bt_pending_row_corrupted_reason(str(error)):
             _log_bt_pending_row_corrupted(
                 chat_id=chat_id,
                 stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
@@ -313,10 +245,10 @@ def clear_bt_tmdb_association_pending(
     try:
         cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_TMDB_ASSOCIATION)
         if cleared_result is None:
-            raise BtPendingPersistenceError("bt_pending_state clear result missing")
+            raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
         return cleared_result or cleared
     except (BtPendingPersistenceError, sqlite3.Error) as error:
-        if str(error) == "bt_pending_state clear result missing":
+        if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
             _log_bt_pending_clear_result_missing(
                 chat_id=chat_id,
                 stage=BT_PENDING_STAGE_TMDB_ASSOCIATION,
