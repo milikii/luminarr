@@ -9,6 +9,7 @@ from app.clients.transmission import TransmissionTask
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.operational_logging import emit_operational_log
 from app.services.add_adult_registry_state import AddAdultRegistryState
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json
 from app.services.add_pending_context import PendingAddContext
@@ -139,6 +140,7 @@ class AddExecutionFollowUpService:
     ) -> None:
         if self._job_event_repo is None:
             return
+        detail = f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type}"
         try:
             self._job_event_repo.append_event(
                 task_ref=task_ref,
@@ -149,23 +151,22 @@ class AddExecutionFollowUpService:
             )
         except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error) == "job_event missing after append":
-                print(
-                    f"\033[31m[下载事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误=downloader event missing after append\n"
-                    "\033[33m[处理建议]\033[0m 检查 job_event 写入后是否还能立即回读到该条下载事件；"
-                    "当前流程会继续执行，但这条下载事件真相可能没有落稳。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载事件结果缺失",
+                    detail=f"{detail} 错误=downloader event missing after append",
+                    fix_hint="检查 job_event 写入后是否还能立即回读到该条下载事件；当前流程会继续执行，但这条下载事件真相可能没有落稳。",
                 )
             elif _is_downloader_event_row_corrupted_error(error):
-                print(
-                    f"\033[31m[下载事件记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type 等真相字段是否仍然完整；"
-                    "当前流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载事件记录损坏",
+                    detail=f"{detail} 错误={error}",
+                    fix_hint="检查 job_event 读回事件里的 task_ref / event_type 等真相字段是否仍然完整；当前流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
                 )
             else:
-                print(
-                    f"\033[31m[下载事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载事件落盘失败",
+                    detail=f"{detail} 错误={error}",
+                    fix_hint="检查 SQLite/job_event 表写入是否正常；当前流程会继续执行，但这条下载事件可能没有落盘。",
                 )
 
     def record_media_identity_event(
@@ -200,6 +201,7 @@ class AddExecutionFollowUpService:
     ) -> None:
         if self._download_monitor_repo is None:
             return
+        detail = f"task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id}"
         try:
             self._download_monitor_repo.register_download(
                 task_id=task_id,
@@ -210,23 +212,22 @@ class AddExecutionFollowUpService:
             )
         except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
             if str(error) == self._download_monitor_register_result_missing_reason:
-                print(
-                    f"\033[31m[下载监控登记结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 download_monitor 写入后回读是否仍能拿到刚登记的任务状态；"
-                    "当前下载已投递，但后续状态跟踪和自动导入真相还没有确认落稳。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载监控登记结果缺失",
+                    detail=f"{detail} 错误={error}",
+                    fix_hint="检查 download_monitor 写入后回读是否仍能拿到刚登记的任务状态；当前下载已投递，但后续状态跟踪和自动导入真相还没有确认落稳。",
                 )
             elif _is_download_monitor_register_row_corrupted_error(error):
-                print(
-                    f"\033[31m[下载监控登记记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 download_monitor 读回记录里的 task_id / task_hash / chat_id / user_id 等真相字段是否仍然完整；"
-                    "当前下载已投递，但后续状态跟踪和自动导入不会把这条坏记录当成已稳定登记。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载监控登记记录损坏",
+                    detail=f"{detail} 错误={error}",
+                    fix_hint="检查 download_monitor 读回记录里的 task_id / task_hash / chat_id / user_id 等真相字段是否仍然完整；当前下载已投递，但后续状态跟踪和自动导入不会把这条坏记录当成已稳定登记。",
                 )
             else:
-                print(
-                    f"\033[31m[下载监控登记失败]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载监控登记失败",
+                    detail=f"{detail} 错误={error}",
+                    fix_hint="检查 SQLite/download_monitor 表写入是否正常；当前下载已投递，但后续状态跟踪和自动导入可能不会推进。",
                 )
 
     async def _invoke_add_torrent(self, pending_add: PendingAddContext) -> TransmissionTask:
@@ -245,12 +246,13 @@ class AddExecutionFollowUpService:
         return await self._add_torrent_func(pending_add.source)
 
     def _log_dispatch_error(self, *, pending_add: PendingAddContext, error: Exception) -> None:
-        print(
-            "\033[31m[下载投递失败]\033[0m "
-            f"标题={pending_add.title} 下载器={pending_add.downloader_name or 'legacy-transmission'} "
-            f"类型={pending_add.downloader_type or 'transmission'} 目标目录={pending_add.download_dir or '-'} "
-            f"原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查下载器地址、认证信息、目标目录和磁力链接后重试。"
+        emit_operational_log(
+            title="下载投递失败",
+            detail=(
+                f"标题={pending_add.title} 下载器={pending_add.downloader_name or 'legacy-transmission'} "
+                f"类型={pending_add.downloader_type or 'transmission'} 目标目录={pending_add.download_dir or '-'} 原因={error}"
+            ),
+            fix_hint="检查下载器地址、认证信息、目标目录和磁力链接后重试。",
         )
 
 
