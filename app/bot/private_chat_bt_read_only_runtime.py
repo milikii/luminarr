@@ -6,19 +6,16 @@ from app.bot.query_text_runtime import (
     extract_bt_batch_preview_request,
     extract_bt_read_only_query,
 )
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
 
 def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 只读探索失败",
-            detail=f"查询={query} 原因={error}",
-            fix_hint="检查 BT 来源配置、站点可达性和网络连通性后重试。",
-        ),
-        flush=True,
+    emit_operational_log(
+        title="BT 只读探索失败",
+        detail=f"查询={query} 原因={error}",
+        fix_hint="检查 BT 来源配置、站点可达性和网络连通性后重试。",
     )
 
 
