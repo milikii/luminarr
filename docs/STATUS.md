@@ -3,12 +3,12 @@
 ## Current mainline
 - **质量硬化** 当前保持完成态，不回退。
 - `config.py` 重复解析逻辑已收口：`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` / `DOWNLOADER_INSTANCES` 共用解析 helper，base URL 也统一走 shared normalization helper，且读 base URL 的 env 路径也抽成了 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 现在也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` / `DOWNLOADER_INSTANCES.downloader_type` / `*_optional_int*` / `SUBTITLE_TRANSLATION_TIMEOUT_SECONDS` 也共用 shared validator helper。
-- `app/downloader_route_lookup.py` 当前 `369` 行；task route / dispatch 日志已直接落到共享打印器，instance strip/lookup 与 host `download_dir` fallback 已收口，`_log_*` 已归零。
+- `app/downloader_route_lookup.py` 当前 `357` 行；task route / dispatch 日志已直接落到共享打印器，instance strip/lookup 与 host `download_dir` fallback 已收口，`_log_*` 已归零，`_resolve_route_host_download_dir` 这个单消费者薄壳已删。
 - `cleanup_*_support.py` 当前为 `0` 个；cleanup 收口、重复 trace logger、`_COMPAT_REEXPORTS`、无消费者 `__all__` 都已保持完成态。
 - `app/main.py` 残余 downloader client 死壳已删，`tests/test_main.py` 现在直接 import `app.downloader_route_lookup` 真实边界。
 
 ## Current health
-- 代码热点线已回到 proof-like orchestration；当前最小风险仍在 `downloader_route_lookup.py` 是否还值得继续收单消费者 helper。
+- 代码热点线已回到 proof-like orchestration；当前最小风险仍在 `downloader_route_lookup.py` 是否还值得继续收更薄的公共 helper 或干脆停在当前壳收口态。
 - 当前归档迁移、cleanup 收口、trace logger 收口、`config.py` 收口、`app/main.py` 死壳清理和 route helper 错误边界修正都已落地。
 
 ## Latest verification
@@ -18,7 +18,7 @@
 - `make verify-mainline`：当前完成态保持通过
 
 ## Current biggest risk
-- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应沿 `downloader_route_lookup.py` 的剩余单消费者 helper / 死壳推进，而不是把范围扩成整份路由系统重写。
+- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应只沿 `downloader_route_lookup.py` 里还能再压薄的共享 helper 推进，而不是把范围扩成整份路由系统重写。
 
 ## Recommended Next Operator Command
 

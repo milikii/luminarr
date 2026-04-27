@@ -21,13 +21,13 @@
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/bot/personal_wechat_login.py` 与 `app/bot/personal_wechat_text.py` 的无消费者 `__all__` 纯导出列表也已删掉；`app/db/__init__.py` 的死 re-export 已清掉，`app/bot/telegram_bot.py` 保留显式公共 `__all__` 边界以维持 quality gate
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `369` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，downloader instance strip + lookup 与 host download_dir fallback 也已收口；当前 `_log_*` 已归零，剩余候选继续限制在单消费者薄壳或 route 死壳
+- `app/downloader_route_lookup.py` 当前 `357` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，downloader instance strip + lookup 与 host download_dir fallback 也已收口；当前 `_log_*` 已归零，`_resolve_route_host_download_dir` 也已删，剩余候选继续限制在更薄的公共 helper 或 route 死壳
 - `app/config.py` 当前 `556` 行；base URL 现在统一走 shared normalization helper，读 base URL 的 env 路径也抽成 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` / `DOWNLOADER_INSTANCES.downloader_type` / `*_optional_int*` / `SUBTITLE_TRANSLATION_TIMEOUT_SECONDS` 也共用 shared validator helper，继续保留既有的 semicolon / pipe 解析收口，不回头扩张 settings 语义。
 
 ## User value
 
-- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里剩余的单消费者 helper 壳和 route 死壳。
-- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里剩余的单消费者 helper 壳和 route 死壳，尤其是 payload/host download_dir 这类还能继续压薄的薄壳。
+- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里剩余的公共 helper 薄壳或 route 死壳。
+- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里剩余的公共 helper 薄壳或 route 死壳，尤其是还能再压薄的 download_dir 路径。
 - 这一步只允许对下载器路由的重复日志/路由边界和单用途 helper 壳做最小闭环，不碰搜索真相、下载确认协议、shared runtime 或新的展示层扩展。
 - 先把路由重复壳压薄，后续才有资格再评估更大的下载器路由结构债。
 
@@ -37,7 +37,7 @@
   - `_log_*` 函数继续优先复用共享打印器
   - 实例查找 + client 选择继续优先复用纯解析 helper
   - 3 个路由函数里可提取的公共序幕
-  - import host `download_dir` 回填与 dispatch/download_dir 分流边界上的剩余单消费者薄壳
+  - import host `download_dir` 回填与 dispatch/download_dir 分流边界上的剩余薄壳
   - 不改变现有错误文本、路由语义或导入/状态协议
 - 每轮仍只做一个最小闭环；同步补对应 focused tests、`docs/STATUS.md`、`docs/NEXT_STEP.md` 和相关主线文档。
 - 继续保持当前 downloader / 搜索 / 导入 / 成人 BT / 验证入口已收口真相与文档一致。
