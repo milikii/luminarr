@@ -5,7 +5,7 @@ import sqlite3
 from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.post_download_auto_import import AutoImportStateUnavailableError, PostDownloadAutoImportService
 
 STATUS_OBSERVATION_WARNING_TEXT = "注意：下载状态观察落盘失败，自动导入跟进可能未推进，请稍后重试。"
@@ -136,12 +136,10 @@ def _log_download_monitor_observation_failed(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载状态观察落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表写入是否正常；"
-        "当前请求仍会返回下载状态文本，但下载完成观察和后续自动导入可能不会推进。",
-        flush=True,
+    emit_operational_log(
+        title="下载状态观察落盘失败",
+        detail=_status_follow_up_detail(task_ref=task_ref, task_status=task_status, reason=reason),
+        fix_hint="检查 SQLite/download_monitor 表写入是否正常；当前请求仍会返回下载状态文本，但下载完成观察和后续自动导入可能不会推进。",
     )
 
 
@@ -151,12 +149,10 @@ def _log_download_monitor_observation_result_missing(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载状态观察结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor 返回是否仍带有完整 update 和 record；"
-        "当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
-        flush=True,
+    emit_operational_log(
+        title="下载状态观察结果缺失",
+        detail=_status_follow_up_detail(task_ref=task_ref, task_status=task_status, reason=reason),
+        fix_hint="检查 download_monitor 返回是否仍带有完整 update 和 record；当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
     )
 
 
@@ -166,12 +162,10 @@ def _log_download_monitor_completion_flag_missing(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载状态观察完成标记缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor 更新结果是否仍带有完整的 newly_completed 真相；"
-        "当前请求仍会返回下载状态文本，但不会把这次完成观察继续推进到后续自动导入。",
-        flush=True,
+    emit_operational_log(
+        title="下载状态观察完成标记缺失",
+        detail=_status_follow_up_detail(task_ref=task_ref, task_status=task_status, reason=reason),
+        fix_hint="检查 download_monitor 更新结果是否仍带有完整的 newly_completed 真相；当前请求仍会返回下载状态文本，但不会把这次完成观察继续推进到后续自动导入。",
     )
 
 
@@ -181,12 +175,10 @@ def _log_download_monitor_observation_row_corrupted(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载状态观察记录损坏]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 download_monitor 读回记录里的 task_id / task_hash / status_code / percent_done 等真相字段是否仍然完整；"
-        "当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
-        flush=True,
+    emit_operational_log(
+        title="下载状态观察记录损坏",
+        detail=_status_follow_up_detail(task_ref=task_ref, task_status=task_status, reason=reason),
+        fix_hint="检查 download_monitor 读回记录里的 task_id / task_hash / status_code / percent_done 等真相字段是否仍然完整；当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
     )
 
 
@@ -196,12 +188,15 @@ def _log_download_completion_event_result_missing(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载完成观察事件结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；"
-        "当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
-        flush=True,
+    emit_operational_log(
+        title="下载完成观察事件结果缺失",
+        detail=_status_follow_up_detail(
+            task_ref=task_ref,
+            task_status=task_status,
+            reason=reason,
+            event_type="downloader.completed_observed",
+        ),
+        fix_hint="检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
     )
 
 
@@ -211,12 +206,15 @@ def _log_download_completion_event_row_corrupted(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载完成观察事件记录损坏]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 完成观察记录里的 task_ref / event_type 等字段是否仍是完整真相；"
-        "当前请求仍会返回下载状态文本，但这次完成观察事件不会当成已稳定落盘。",
-        flush=True,
+    emit_operational_log(
+        title="下载完成观察事件记录损坏",
+        detail=_status_follow_up_detail(
+            task_ref=task_ref,
+            task_status=task_status,
+            reason=reason,
+            event_type="downloader.completed_observed",
+        ),
+        fix_hint="检查 job_event 完成观察记录里的 task_ref / event_type 等字段是否仍是完整真相；当前请求仍会返回下载状态文本，但这次完成观察事件不会当成已稳定落盘。",
     )
 
 
@@ -226,12 +224,15 @@ def _log_download_completion_event_append_failed(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载完成观察事件落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；"
-        "当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
-        flush=True,
+    emit_operational_log(
+        title="下载完成观察事件落盘失败",
+        detail=_status_follow_up_detail(
+            task_ref=task_ref,
+            task_status=task_status,
+            reason=reason,
+            event_type="downloader.completed_observed",
+        ),
+        fix_hint="检查 SQLite/job_event 表写入是否正常；当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
     )
 
 
@@ -241,12 +242,10 @@ def _log_status_auto_import_state_unavailable(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[下载状态自动导入状态读取失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor、job_event 和自动导入审批链路是否正常；"
-        "当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
-        flush=True,
+    emit_operational_log(
+        title="下载状态自动导入状态读取失败",
+        detail=_status_follow_up_detail(task_ref=task_ref, task_status=task_status, reason=reason),
+        fix_hint="检查 SQLite/download_monitor、job_event 和自动导入审批链路是否正常；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
     )
 
 
@@ -256,14 +255,22 @@ def _log_status_auto_import_follow_up_failed(
     task_status: TransmissionTaskStatus,
     reason: str,
 ) -> None:
-    print(
-        format_operational_log_message(
-            title="下载状态自动导入跟进失败",
-            detail=f"task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={reason}",
-            fix_hint="检查自动导入后半段依赖、SQLite 和导入审批链路；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
-        ),
-        flush=True,
+    emit_operational_log(
+        title="下载状态自动导入跟进失败",
+        detail=_status_follow_up_detail(task_ref=task_ref, task_status=task_status, reason=reason),
+        fix_hint="检查自动导入后半段依赖、SQLite 和导入审批链路；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
     )
+
+
+def _status_follow_up_detail(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+    event_type: str = "",
+) -> str:
+    event_detail = f" event_type={event_type}" if event_type else ""
+    return f"task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash}{event_detail} 错误={reason}"
 
 
 def _is_download_monitor_observation_row_corrupted_error(error: Exception) -> bool:
