@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
-from app.services.add_to_downloader import AddToDownloaderService
+from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
 from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_ADD_USAGE_TEXT,
     BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
     BT_SUBSCRIPTION_USAGE_TEXT,
     BtSubscriptionCommand,
+    bt_subscription_media_kind_label,
     format_bt_subscription_add_result,
     format_bt_subscription_clear_result,
     format_bt_subscription_list,
@@ -20,20 +21,14 @@ from app.services.bt_subscription_command import (
     parse_bt_subscription_add_request,
     parse_bt_subscription_query as _parse_bt_subscription_query,
 )
-from app.services.bt_subscription_dispatch_support import dispatch_bt_subscription_item
-from app.services.bt_subscription_last_seen_support import update_bt_subscription_last_seen
 from app.services.bt_subscription_repo_support import (
+    BtSubscriptionRepoResult,
     add_subscription_item,
     clear_subscription_items,
     list_subscription_chat_ids,
     list_subscription_items,
     remove_subscription_item,
-)
-from app.services.bt_subscription_scheduler_support import collect_bt_subscription_scheduler_notifications
-from app.services.bt_subscription_scan_support import (
-    BtSubscriptionRunResult,
-    format_bt_subscription_run_result,
-    scan_bt_subscription_items,
+    update_subscription_last_seen,
 )
 from app.services.bt_sources import resolve_bt_source
 
@@ -65,10 +60,236 @@ parse_bt_subscription_query = _parse_bt_subscription_query
 
 
 @dataclass(frozen=True, slots=True)
+class BtSubscriptionRunResult:
+    scanned: int
+    matched: int
+    replies: tuple[str, ...]
+    pending_creation_failed: bool = False
+
+
+LogSubscriptionLastSeenReasonFunc = Callable[[str], None]
+ListSubscriptionItemsFunc = Callable[[], BtSubscriptionRepoResult[Sequence[BtSubscriptionItem]]]
+RunSubscriptionItemFunc = Callable[[BtSubscriptionItem], Awaitable[tuple[str | None, bool]]]
+LogSubscriptionScanItemsReasonFunc = Callable[[str], None]
+SearchSubscriptionResultsFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
+ResolveSubscriptionCandidateFunc = Callable[[Sequence[Mapping[str, Any]], BtSubscriptionItem], tuple[str, str] | None]
+CreateSubscriptionPendingFunc = Callable[[str, str], Awaitable[str]]
+UpdateSubscriptionLastSeenStatusFunc = Callable[[str, str], str]
+LogSubscriptionScanErrorFunc = Callable[[str, Exception], None]
+LogSubscriptionPendingCreationFailedFunc = Callable[[str, str, str], None]
+ListSubscriptionChatIdsFunc = Callable[[], BtSubscriptionRepoResult[Sequence[int]]]
+ScanSubscriptionChatFunc = Callable[[int], Awaitable[BtSubscriptionRunResult | None]]
+FormatSubscriptionNotificationFunc = Callable[[BtSubscriptionRunResult], str]
+LogSubscriptionSchedulerReasonFunc = Callable[[str], None]
+
+
+@dataclass(frozen=True, slots=True)
 class BtSubscriptionDispatchContext:
     downloader_name: str
     downloader_type: str
     download_dir: str
+
+
+@dataclass(frozen=True, slots=True)
+class BtSubscriptionItemDispatchResult:
+    reply: str | None
+    pending_creation_failed: bool = False
+
+
+def update_bt_subscription_last_seen(
+    *,
+    repo: BtSubscriptionRepo,
+    chat_id: int,
+    item_id: int,
+    source: str,
+    title: str,
+    item_missing_reason: str,
+    result_missing_reason: str,
+    is_item_row_corrupted_reason: Callable[[str], bool],
+    log_item_missing: LogSubscriptionLastSeenReasonFunc,
+    log_result_missing: LogSubscriptionLastSeenReasonFunc,
+    log_row_corrupted: LogSubscriptionLastSeenReasonFunc,
+    log_update_failed: LogSubscriptionLastSeenReasonFunc,
+) -> str:
+    result = update_subscription_last_seen(
+        repo=repo,
+        chat_id=chat_id,
+        item_id=item_id,
+        source=source,
+        title=title,
+        item_missing_reason=item_missing_reason,
+        result_missing_reason=result_missing_reason,
+        is_item_row_corrupted_reason=is_item_row_corrupted_reason,
+    )
+    if result.ok:
+        return "updated"
+    if result.status == "item_missing":
+        log_item_missing(result.reason)
+        return "item_missing"
+    if result.status == "result_missing":
+        log_result_missing(result.reason)
+        return "persistence_failed"
+    if result.status == "row_corrupted":
+        log_row_corrupted(result.reason)
+        return "persistence_failed"
+    log_update_failed(result.reason)
+    return "persistence_failed"
+
+
+async def collect_bt_subscription_scheduler_notifications(
+    *,
+    list_chat_ids: ListSubscriptionChatIdsFunc,
+    scan_chat: ScanSubscriptionChatFunc,
+    format_notification: FormatSubscriptionNotificationFunc,
+    log_chat_ids_failed: LogSubscriptionSchedulerReasonFunc,
+    log_chat_ids_result_missing: LogSubscriptionSchedulerReasonFunc,
+    log_chat_ids_row_corrupted: LogSubscriptionSchedulerReasonFunc,
+) -> tuple[tuple[int, str], ...] | None:
+    chat_ids_result = list_chat_ids()
+    if not chat_ids_result.ok:
+        if chat_ids_result.status == "result_missing":
+            log_chat_ids_result_missing(chat_ids_result.reason)
+        elif chat_ids_result.status == "row_corrupted":
+            log_chat_ids_row_corrupted(chat_ids_result.reason)
+        else:
+            log_chat_ids_failed(chat_ids_result.reason)
+        return None
+
+    notifications: list[tuple[int, str]] = []
+    scan_failed = False
+    for chat_id in chat_ids_result.value or ():
+        result = await scan_chat(chat_id)
+        if result is None:
+            scan_failed = True
+            continue
+        if result.pending_creation_failed and result.matched <= 0:
+            scan_failed = True
+            continue
+        if result.matched <= 0:
+            continue
+        notifications.append((chat_id, format_notification(result)))
+    if scan_failed and not notifications:
+        return None
+    return tuple(notifications)
+
+
+async def scan_bt_subscription_items(
+    *,
+    list_items: ListSubscriptionItemsFunc,
+    run_for_item: RunSubscriptionItemFunc,
+    log_items_failed: LogSubscriptionScanItemsReasonFunc,
+    log_items_result_missing: LogSubscriptionScanItemsReasonFunc,
+    log_items_row_corrupted: LogSubscriptionScanItemsReasonFunc,
+) -> BtSubscriptionRunResult | None:
+    items_result = list_items()
+    if not items_result.ok:
+        if items_result.status == "result_missing":
+            log_items_result_missing(items_result.reason)
+        elif items_result.status == "row_corrupted":
+            log_items_row_corrupted(items_result.reason)
+        else:
+            log_items_failed(items_result.reason)
+        return None
+
+    items = items_result.value or ()
+    if not items:
+        return BtSubscriptionRunResult(scanned=0, matched=0, replies=())
+
+    replies: list[str] = []
+    matched = 0
+    pending_creation_failed = False
+    for item in items:
+        reply, item_pending_creation_failed = await run_for_item(item)
+        pending_creation_failed = pending_creation_failed or item_pending_creation_failed
+        if reply is None:
+            continue
+        matched += 1
+        replies.append(reply)
+    return BtSubscriptionRunResult(
+        scanned=len(items),
+        matched=matched,
+        replies=tuple(replies),
+        pending_creation_failed=pending_creation_failed,
+    )
+
+
+def format_bt_subscription_run_result(
+    *,
+    result: BtSubscriptionRunResult,
+    run_done_template: str,
+    run_no_new_template: str,
+    pending_creation_warning_text: str,
+) -> str:
+    header = (
+        run_done_template.format(scanned=result.scanned, matched=result.matched)
+        if result.matched > 0
+        else run_no_new_template.format(scanned=result.scanned)
+    )
+    if not result.replies:
+        return header
+    body = "\n\n".join(result.replies)
+    if result.pending_creation_failed:
+        body = f"{body}\n\n{pending_creation_warning_text}"
+    return f"{header}\n\n{body}"
+
+
+async def dispatch_bt_subscription_item(
+    *,
+    item: BtSubscriptionItem,
+    search_func: SearchSubscriptionResultsFunc,
+    resolve_candidate: ResolveSubscriptionCandidateFunc,
+    create_pending: CreateSubscriptionPendingFunc,
+    update_last_seen_status: UpdateSubscriptionLastSeenStatusFunc,
+    log_scan_error: LogSubscriptionScanErrorFunc,
+    log_pending_creation_failed: LogSubscriptionPendingCreationFailedFunc,
+    last_seen_update_warning_text: str,
+    last_seen_item_missing_warning_text: str,
+) -> BtSubscriptionItemDispatchResult:
+    query = _build_subscription_query(item)
+    try:
+        results = await search_func(query)
+    except Exception as error:
+        log_scan_error(query, error)
+        return BtSubscriptionItemDispatchResult(reply=None)
+
+    resolved_candidate = resolve_candidate(results, item)
+    if resolved_candidate is None:
+        return BtSubscriptionItemDispatchResult(reply=None)
+    selected_source, candidate_title = resolved_candidate
+
+    pending_text = await create_pending(selected_source, candidate_title)
+    if pending_text == ADD_PENDING_STATE_UNAVAILABLE_TEXT:
+        log_pending_creation_failed(selected_source, candidate_title, pending_text)
+        return BtSubscriptionItemDispatchResult(reply=None, pending_creation_failed=True)
+    if "下载待确认：" not in pending_text:
+        return BtSubscriptionItemDispatchResult(reply=None)
+
+    year_text = item.year if item.year else "-"
+    reply = (
+        f"BT 订阅命中新资源：{item.title} ({year_text})\n"
+        f"类型: {bt_subscription_media_kind_label(item.media_kind)}\n"
+        f"命中资源: {candidate_title}\n\n"
+        f"{pending_text}"
+    )
+    last_seen_status = update_last_seen_status(selected_source, candidate_title)
+    if last_seen_status == "updated":
+        return BtSubscriptionItemDispatchResult(reply=reply)
+    if last_seen_status == "item_missing":
+        return BtSubscriptionItemDispatchResult(
+            reply=f"{reply}\n\n{last_seen_item_missing_warning_text}",
+        )
+    return BtSubscriptionItemDispatchResult(
+        reply=f"{reply}\n\n{last_seen_update_warning_text}",
+    )
+
+
+def _build_subscription_query(item: BtSubscriptionItem) -> str:
+    title = item.title.strip()
+    year = item.year.strip()
+    if title and year:
+        return f"{title} {year}"
+    return title
+
 
 class ManageBtSubscriptionService:
     def __init__(

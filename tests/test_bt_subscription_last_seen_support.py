@@ -4,7 +4,7 @@ from pathlib import Path
 
 from app.db.bt_subscription_repo import BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
-from app.services.bt_subscription_last_seen_support import update_bt_subscription_last_seen
+from app.services.manage_bt_subscription import update_bt_subscription_last_seen
 
 
 def test_update_bt_subscription_last_seen_returns_updated_when_repo_write_succeeds(tmp_path: Path) -> None:

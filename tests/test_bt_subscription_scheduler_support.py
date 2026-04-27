@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from app.services.bt_subscription_repo_support import BtSubscriptionRepoResult
-from app.services.bt_subscription_scan_support import BtSubscriptionRunResult
-from app.services.bt_subscription_scheduler_support import (
+from app.services.manage_bt_subscription import (
+    BtSubscriptionRunResult,
     collect_bt_subscription_scheduler_notifications,
 )
+from app.services.bt_subscription_repo_support import BtSubscriptionRepoResult
 
 
 def test_collect_bt_subscription_scheduler_notifications_returns_none_for_result_missing() -> None:

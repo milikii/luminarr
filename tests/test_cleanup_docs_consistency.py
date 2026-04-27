@@ -206,6 +206,26 @@ def test_archived_history_docs_are_moved_out_of_active_docs_root() -> None:
         assert Path("archive", "docs", name).exists()
 
 
+def test_small_single_consumer_support_files_stay_collapsed() -> None:
+    collapsed = (
+        "app/services/bt_subscription_dispatch_support.py",
+        "app/services/bt_subscription_last_seen_support.py",
+        "app/services/bt_subscription_scan_support.py",
+        "app/services/bt_subscription_scheduler_support.py",
+        "app/services/search_media_batch_preview_support.py",
+    )
+    for path_text in collapsed:
+        assert not Path(path_text).exists()
+
+    remaining_support_files = sorted(str(path) for path in Path("app").rglob("*_support.py"))
+    assert remaining_support_files == [
+        "app/db/approval_repo_support.py",
+        "app/db/job_repo_support.py",
+        "app/services/bt_subscription_repo_support.py",
+        "app/services/subtitle_translation_support.py",
+    ]
+
+
 def test_active_docs_root_stays_small_and_current() -> None:
     active_docs = sorted(path.name for path in Path("docs").glob("*.md"))
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable
 from pathlib import Path
 
+import httpx
 import pytest
 
 from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
@@ -4557,7 +4558,7 @@ def test_search_and_format_fallbacks_to_normalized_query_when_tmdb_failed() -> N
         return []
 
     async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
-        raise RuntimeError("tmdb unavailable")
+        raise httpx.ConnectError("tmdb unavailable", request=httpx.Request("GET", "https://example.com"))
 
     service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
     text = _run(service.search_and_format("Dune 2021"))
@@ -4573,7 +4574,7 @@ def test_search_and_format_logs_tmdb_failure(capsys) -> None:
         return []
 
     async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
-        raise RuntimeError("tmdb unavailable")
+        raise httpx.ConnectError("tmdb unavailable", request=httpx.Request("GET", "https://example.com"))
 
     service = SearchMediaService(fake_search, lookup_movie_func=fake_tmdb_lookup)
 

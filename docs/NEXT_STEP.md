@@ -1,43 +1,43 @@
-# Next step (v381)
+# Next step (v382)
 
 ## Current goal
 
-- 当前唯一主线切到 **文档入口收口 / 当前真相对齐**。
-- 本轮只修 README、`docs/STATUS.md`、`docs/NEXT_STEP.md`、入口 runbook 和 docs gate 的漂移；不改业务代码、不改协议、不改 SQLite 真相边界。
-- 需要立刻收掉的文档问题：
-  - README 不再声明具体施工热点，当前施工真相只看 `docs/STATUS.md` 和 `docs/NEXT_STEP.md`。
-  - `docs/STATUS.md` 保持短快照，不再展开大段 helper 清扫流水。
-  - `docs/NEXT_STEP.md` 只写当前唯一主线、边界和退出条件，不继续复制旧热点台账。
-  - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件的精确行数；长期决策只记录边界，不记录瞬时行数。
-- 已完成态保持，不回退：cleanup 支持文件收口、workflow trace 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析收口、downloader route helper 收口、以及 **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**。
+- 当前唯一主线切到 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
+- 已完成态保持，不回退：
+  - README 不再承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
+  - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
+  - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
+  - import transfer、TMDB fallback、WeCom base64 解码的异常边界已收窄。
+  - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不再作为长期文档真相。
+- 剩余 `*_support.py` 都是较大边界，不再因为文件名机械强拆；下一步优先从更小的 broad `except Exception` 或日志打印点继续收。
 
 ## User value
 
-- 用户不用在 README、STATUS、NEXT_STEP、runbook 之间判断哪个才是当前主线。
-- 后续是否切成人 BT 能基于干净文档判断，而不是被旧的 route/helper 收口描述误导。
-- 文档测试继续保护入口结构，但不再把过期行数当成必须维护的“真相”。
+- 继续降低“代码说一套、文档说一套、测试又锁旧事实”的维护成本。
+- 减少异常被吞掉后只能靠猜的场景，同时保持现有用户行为、协议和持久化真相不变。
+- 成人 BT 后续可以切，但默认先把质量债继续压低，避免在不稳的边界上扩功能。
 
 ## Only do
 
-- 只做文档入口与 docs gate 对齐；允许更新 `tests/test_cleanup_docs_consistency.py` 这类文档守卫测试。
-- 保留四渠道和 `codex.md` 会话落盘的既定边界，不把它们写成待删除项。
-- 成人 BT 只写当前完成态和后续候选，不新增功能、不改 `.env.example` 配置语义。
+- 每轮只挑一个最小闭环：明确异常类型、收掉单消费者薄壳、或把重复打印收成现有共享边界。
+- 只改有 focused tests 能覆盖的路径；没有测试先补最小测试。
+- 更新 STATUS/NEXT_STEP/codex.md，保持当前真相和验证结果一致。
 
 ## Do not do
 
-- 不切成人 BT 新功能，不扩 BT 协议，不改下载/导入/审批/清理行为。
-- 不继续顺手拆 `main.py`、`config.py`、`*_support.py` 或日志系统；这些是后续代码质量主线，不混进本轮文档收口。
-- 不把历史台账重新搬回 `docs/STATUS.md` 或 `docs/NEXT_STEP.md`。
+- 不切成人 BT 新功能，不扩 BT 协议，不改下载/导入/审批/清理语义。
+- 不强拆 `approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py` 这类较大文件。
+- 不把 `config.py` 改成 YAML，不改部署配置格式，不动 SQLite schema。
 
 ## Done when
 
-1. README 不再携带过时施工主线，当前主线只从 STATUS/NEXT_STEP 读取。
-2. STATUS 能明确回答“先文档，成人 BT 后续再切”，同时保留最近验证快照。
-3. NEXT_STEP 足够短，且只描述本轮文档收口边界。
-4. docs gate 不再锁死易漂移行数，并且 `make quality` 通过。
+1. 这一轮选中的质量债闭环有明确 diff、focused tests 和文档同步。
+2. `make quality` 通过。
+3. 已收掉的小 support 文件不回归。
+4. 下一候选仍能从 STATUS/NEXT_STEP 直接判断，不需要回读历史台账。
 
 ## After this step
 
-1. 文档收口通过后，再评估成人 BT 后续缺口；如果用户明确切成人 BT，先写一个最小缺口清单和 focused gate，再动代码。
-2. 如果用户没有明确切功能，下一条默认仍走质量债：日志、`except Exception`、`main()` DI 或 support 文件收口，按最小闭环推进。
+1. 若继续质量债，优先评估 broad `except Exception` 热点、`print(` 日志边界或 `app/main.py` DI。
+2. 若用户明确切成人 BT，则先写成人 BT 缺口清单和 focused gate，再动功能代码。

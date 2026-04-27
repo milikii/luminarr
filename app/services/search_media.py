@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
+from app.clients.web_source import (
+    looks_like_http_url,
+    looks_like_web_source_page_request,
+    resolve_supported_web_source_page_request,
+)
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
@@ -11,10 +16,6 @@ from app.services.search_candidate_state import CandidateLoadResult, CandidateSt
 from app.services.search_clarification_state import ClarificationQueryLoadResult, ClarificationStateStore
 from app.services import search_reply_formatter
 from app.services.search_ambiguity_helper import format_ambiguous_clarification
-from app.services.search_media_batch_preview_support import (
-    UnsupportedBatchPreviewPageUrl,
-    search_bt_batch_preview_candidates,
-)
 from app.services.search_media_bt_ordering import order_media_bt_results
 from app.services.media_identity import build_media_identity_from_tmdb_movie, normalize_media_identity_payload
 from app.services.search_reply_formatter import (
@@ -61,6 +62,61 @@ CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败�
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 parse_movie_query = _parse_movie_query
 load_bt_scoring_rules = _load_bt_scoring_rules
+
+BatchPreviewSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
+PrepareRawCandidatesFunc = Callable[[Sequence[Mapping[str, Any]], str], Sequence[Mapping[str, Any]]]
+
+
+class UnsupportedBatchPreviewPageUrl(ValueError):
+    pass
+
+
+async def search_bt_batch_preview_candidates(
+    query: str,
+    *,
+    raw_search_func: BatchPreviewSearchFunc,
+    raw_page_search_func: BatchPreviewSearchFunc | None,
+    prepare_raw_candidates: PrepareRawCandidatesFunc,
+) -> Sequence[Mapping[str, Any]]:
+    resolved_page_url = resolve_supported_web_source_page_request(query)
+    if resolved_page_url is not None:
+        if raw_page_search_func is None:
+            raise UnsupportedBatchPreviewPageUrl(query)
+        return await search_raw_page_candidates(
+            resolved_page_url,
+            raw_page_search_func=raw_page_search_func,
+            prepare_raw_candidates=prepare_raw_candidates,
+        )
+    if looks_like_http_url(query) or looks_like_web_source_page_request(query):
+        raise UnsupportedBatchPreviewPageUrl(query)
+    raw_results = await raw_search_func(query)
+    return tuple(prepare_raw_candidates(raw_results, query=query))
+
+
+async def search_raw_page_candidates(
+    page_url: str,
+    *,
+    raw_page_search_func: BatchPreviewSearchFunc | None,
+    prepare_raw_candidates: PrepareRawCandidatesFunc,
+) -> Sequence[Mapping[str, Any]]:
+    cleaned_page_url = page_url.strip()
+    if not cleaned_page_url:
+        return ()
+    if raw_page_search_func is None:
+        raise UnsupportedBatchPreviewPageUrl(cleaned_page_url)
+    try:
+        raw_results = await raw_page_search_func(cleaned_page_url)
+    except UnsupportedBatchPreviewPageUrl:
+        raise
+    except Exception as error:
+        print(
+            f"\033[31m[BT 页面预览失败]\033[0m 页面={cleaned_page_url} 错误={error}\n"
+            "\033[33m[处理建议]\033[0m 检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
+            flush=True,
+        )
+        raise
+    return tuple(prepare_raw_candidates(raw_results, query=cleaned_page_url))
+
 
 class SearchMediaService:
     def __init__(

@@ -243,7 +243,7 @@ def _copy_import(
     if source_path.is_dir():
         try:
             shutil.copytree(source_path, target_path, copy_function=shutil.copy2)
-        except Exception:
+        except (OSError, shutil.Error):
             _cleanup_partial_target(target_path)
             raise
         return
@@ -316,7 +316,7 @@ def _hardlink_file_pairs(transfer_pairs: list[tuple[Path, Path]]) -> None:
         for source_path, target_path in transfer_pairs:
             os.link(source_path, target_path)
             created_targets.append(target_path)
-    except Exception:
+    except (OSError, shutil.Error):
         _cleanup_partial_targets(created_targets)
         raise
 
@@ -330,7 +330,7 @@ def _copy_file_pairs(transfer_pairs: list[tuple[Path, Path]]) -> None:
             shutil.copy2(source_path, target_path)
             created_targets.append(target_path)
             current_target = None
-    except Exception:
+    except (OSError, shutil.Error):
         cleanup_targets = list(created_targets)
         if current_target is not None:
             cleanup_targets.append(current_target)

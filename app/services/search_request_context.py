@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+import httpx
 
 from app.search_title_normalization import compact_match_key, is_confident_title_match, normalize_match_key, normalize_spaces
 from app.clients.tmdb import TmdbMovie
@@ -30,7 +33,7 @@ async def build_search_request_context(
     if lookup_movie_func is not None:
         try:
             tmdb_movie = await lookup_movie_func(parsed_query.title, parsed_query.year)
-        except Exception as error:
+        except (httpx.HTTPError, json.JSONDecodeError) as error:
             print(
                 f"\033[31m[TMDB 查询失败]\033[0m query={user_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}\n\033[33m[处理建议]\033[0m 检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但海报卡片和标题归一化结果可能缺失。",
                 flush=True,

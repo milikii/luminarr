@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import os
 import time
@@ -449,7 +450,7 @@ def _build_callback_signature(
 def _decode_encoding_aes_key(encoding_aes_key: str) -> bytes:
     try:
         aes_key = base64.b64decode(f"{encoding_aes_key.strip()}=", validate=True)
-    except Exception as error:  # pragma: no cover - py312 raises binascii.Error
+    except binascii.Error as error:
         raise ValueError("EncodingAESKey 不是合法的 base64 字符串") from error
     if len(aes_key) != 32:
         raise ValueError(f"EncodingAESKey 解码后长度异常：{len(aes_key)}")
@@ -462,7 +463,7 @@ def _decode_wecom_base64(raw_value: str) -> bytes:
     normalized_value = normalized_value + ("=" * padding_needed)
     try:
         return base64.b64decode(normalized_value, validate=True)
-    except Exception as error:  # pragma: no cover - py312 raises binascii.Error
+    except binascii.Error as error:
         raise ValueError("密文不是合法的 base64 字符串") from error
 
 

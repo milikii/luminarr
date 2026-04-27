@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from app.services.search_media_batch_preview_support import (
+from app.services.search_media import (
     UnsupportedBatchPreviewPageUrl,
     search_bt_batch_preview_candidates,
     search_raw_page_candidates,

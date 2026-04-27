@@ -4,7 +4,7 @@ import asyncio
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
 from app.services.bt_subscription_repo_support import BtSubscriptionRepoResult
-from app.services.bt_subscription_scan_support import (
+from app.services.manage_bt_subscription import (
     BtSubscriptionRunResult,
     format_bt_subscription_run_result,
     scan_bt_subscription_items,
