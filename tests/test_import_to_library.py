@@ -29,6 +29,7 @@ from app.db.job_repo import (
     JobRepo,
 )
 from app.db.sqlite import SqliteDatabase
+from app.downloader_route_lookup import DownloaderRouteLookupError
 from app.services.import_to_library import (
     ConfirmExecutionContext,
     CONFIRM_QUERY_USAGE_TEXT,
@@ -2153,7 +2154,10 @@ def test_prepare_import_logs_target_dir_create_failure(
 
 
 def test_prepare_import_logs_query_failure(capsys: pytest.CaptureFixture[str]) -> None:
-    service = ImportToLibraryService(AsyncMock(side_effect=RuntimeError("route unavailable")), "/data/library/movies")
+    service = ImportToLibraryService(
+        AsyncMock(side_effect=DownloaderRouteLookupError("route unavailable")),
+        "/data/library/movies",
+    )
 
     prepared, message = _run(service._prepare_import("87", chat_id=1001))
 
@@ -2164,6 +2168,16 @@ def test_prepare_import_logs_query_failure(capsys: pytest.CaptureFixture[str]) -
     assert "task_ref=87" in output
     assert "route unavailable" in output
     assert "[处理建议]" in output
+
+
+def test_prepare_import_propagates_unexpected_query_failure() -> None:
+    service = ImportToLibraryService(
+        AsyncMock(side_effect=RuntimeError("programming error")),
+        "/data/library/movies",
+    )
+
+    with pytest.raises(RuntimeError, match="programming error"):
+        _run(service._prepare_import("87", chat_id=1001))
 
 
 def test_prepare_import_logs_source_missing(

@@ -5,8 +5,12 @@ import sqlite3
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from app.clients.transmission import TransmissionImportSource
+import httpx
+
+from app.clients.qbittorrent import QbittorrentError
+from app.clients.transmission import TransmissionError, TransmissionImportSource
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.downloader_route_lookup import DownloaderRouteLookupError
 from app.services.import_transfer_execution import PreparedImport
 from app.services.media_name_parser import parse_media_name
 
@@ -48,7 +52,7 @@ class ImportPrepareState:
     ) -> tuple[PreparedImport | None, str]:
         try:
             import_source = await self._get_import_source(task_ref, chat_id=chat_id)
-        except Exception as error:
+        except (DownloaderRouteLookupError, QbittorrentError, TransmissionError, httpx.HTTPError) as error:
             print(
                 f"\033[31m[导入源查询失败]\033[0m task_ref={task_ref} chat_id={chat_id or 0} 错误={error}\n\033[33m[处理建议]\033[0m 检查下载器状态查询、下载器路由和网络连通性；当前请求会返回查询失败文本，并记录 `import.query_failed` 事件。",
                 flush=True,
