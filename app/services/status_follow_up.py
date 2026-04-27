@@ -5,6 +5,7 @@ import sqlite3
 from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.operational_logging import format_operational_log_message
 from app.services.post_download_auto_import import AutoImportStateUnavailableError, PostDownloadAutoImportService
 
 STATUS_OBSERVATION_WARNING_TEXT = "注意：下载状态观察落盘失败，自动导入跟进可能未推进，请稍后重试。"
@@ -256,10 +257,11 @@ def _log_status_auto_import_follow_up_failed(
     reason: str,
 ) -> None:
     print(
-        f"\033[31m[下载状态自动导入跟进失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
-        f"task_hash={task_status.task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查自动导入后半段依赖、SQLite 和导入审批链路；"
-        "当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
+        format_operational_log_message(
+            title="下载状态自动导入跟进失败",
+            detail=f"task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={reason}",
+            fix_hint="检查自动导入后半段依赖、SQLite 和导入审批链路；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
+        ),
         flush=True,
     )
 
