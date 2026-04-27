@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Generic, TypeVar
@@ -145,8 +146,6 @@ def _run_repo_call(
         if is_item_row_corrupted_reason(reason):
             return BtSubscriptionRepoResult(status="row_corrupted", reason=reason)
         return BtSubscriptionRepoResult(status="failed", reason=reason)
-    except Exception as error:
+    except sqlite3.Error as error:
         reason = str(error)
-        if is_item_row_corrupted_reason(reason):
-            return BtSubscriptionRepoResult(status="row_corrupted", reason=reason)
         return BtSubscriptionRepoResult(status="failed", reason=reason)

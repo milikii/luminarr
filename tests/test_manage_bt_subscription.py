@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from pathlib import Path
 
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
@@ -161,7 +162,7 @@ def test_manage_bt_subscription_add_surfaces_row_corruption(tmp_path: Path, caps
     repo = BtSubscriptionRepo(database)
 
     def _corrupted_add_item(**_: object) -> None:
-        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+        raise BtSubscriptionPersistenceError("bt_subscription_item media kind corrupted after read")
 
     repo.add_item = _corrupted_add_item  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -181,7 +182,7 @@ def test_manage_bt_subscription_add_returns_failure_text_when_repo_raises(tmp_pa
     repo = BtSubscriptionRepo(database)
 
     def _crash_add_item(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.add_item = _crash_add_item  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -200,7 +201,7 @@ def test_manage_bt_subscription_list_returns_failure_text_when_repo_raises(tmp_p
     repo = BtSubscriptionRepo(database)
 
     def _crash_list_items(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.list_items = _crash_list_items  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -239,7 +240,7 @@ def test_manage_bt_subscription_list_surfaces_row_corruption(tmp_path: Path, cap
     repo = BtSubscriptionRepo(database)
 
     def _corrupted_list_items(**_: object) -> None:
-        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+        raise BtSubscriptionPersistenceError("bt_subscription_item media kind corrupted after read")
 
     repo.list_items = _corrupted_list_items  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -259,7 +260,7 @@ def test_manage_bt_subscription_remove_returns_failure_text_when_repo_raises(tmp
     repo = BtSubscriptionRepo(database)
 
     def _crash_remove_item(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.remove_item = _crash_remove_item  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -298,7 +299,7 @@ def test_manage_bt_subscription_remove_surfaces_row_corruption(tmp_path: Path, c
     repo = BtSubscriptionRepo(database)
 
     def _corrupted_remove_item(**_: object) -> None:
-        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+        raise BtSubscriptionPersistenceError("bt_subscription_item media kind corrupted after read")
 
     repo.remove_item = _corrupted_remove_item  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -318,7 +319,7 @@ def test_manage_bt_subscription_clear_returns_failure_text_when_repo_raises(tmp_
     repo = BtSubscriptionRepo(database)
 
     def _crash_clear_items(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.clear_items = _crash_clear_items  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -357,7 +358,7 @@ def test_manage_bt_subscription_clear_surfaces_row_corruption(tmp_path: Path, ca
     repo = BtSubscriptionRepo(database)
 
     def _corrupted_clear_items(**_: object) -> None:
-        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+        raise BtSubscriptionPersistenceError("bt_subscription_item media kind corrupted after read")
 
     repo.clear_items = _corrupted_clear_items  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -638,7 +639,7 @@ def test_bt_subscription_run_once_logs_row_corruption_during_last_seen_update(tm
     assert created is not None
 
     def _corrupted_update_last_seen(**_: object) -> bool:
-        raise RuntimeError("bt_subscription_item media kind corrupted after read")
+        raise BtSubscriptionPersistenceError("bt_subscription_item media kind corrupted after read")
 
     repo.update_last_seen = _corrupted_update_last_seen  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -670,7 +671,7 @@ def test_bt_subscription_run_once_returns_failure_text_when_scan_items_raise(tmp
     repo = BtSubscriptionRepo(database)
 
     def _crash_list_items(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.list_items = _crash_list_items  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -909,7 +910,7 @@ def test_bt_subscription_scheduler_tick_skips_chat_when_scan_items_raise(tmp_pat
     repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
 
     def _crash_list_items(*, chat_id: int) -> None:
-        raise RuntimeError(f"db down for {chat_id}")
+        raise sqlite3.OperationalError(f"db down for {chat_id}")
 
     repo.list_items = _crash_list_items  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -1026,7 +1027,7 @@ def test_bt_subscription_scheduler_tick_returns_none_when_chat_id_lookup_raises(
     repo = BtSubscriptionRepo(database)
 
     def _crash_list_chat_ids() -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.list_chat_ids = _crash_list_chat_ids  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
@@ -1136,7 +1137,7 @@ def test_bt_subscription_scheduler_tick_warns_when_last_seen_update_raises(tmp_p
     assert created is not None
 
     def _crash_update_last_seen(**_: object) -> bool:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.update_last_seen = _crash_update_last_seen  # type: ignore[method-assign]
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
