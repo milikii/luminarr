@@ -5,6 +5,8 @@
 - `config.py` 重复解析逻辑已收口：`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` / `DOWNLOADER_INSTANCES` 共用解析 helper，base URL 也统一走 shared normalization helper，且读 base URL 的 env 路径也抽成了 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 现在也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` / `DOWNLOADER_INSTANCES.downloader_type` / `*_optional_int*` / `SUBTITLE_TRANSLATION_TIMEOUT_SECONDS` 也共用 shared validator helper。
 - `app/downloader_route_lookup.py` 当前 `267` 行；task route / dispatch 日志已直接落到共享打印器，instance strip/lookup 与 host `download_dir` fallback 已收口，`_log_*` 已归零，`_resolve_route_host_download_dir` 这个单消费者薄壳已删，`_resolve_downloader_client_candidate` 已收回到两个实际调用点，`_resolve_downloader_instance_and_client` 现在承接两条真实调用点，`_resolve_downloader_task_route` 已从两字段 dataclass 收成 tuple，`_resolve_downloader_client_for_dispatch` 和 `resolve_downloader_dispatch_download_dir` 现已挪到 `app/main.py`，`import` 路由里的 host `download_dir` 回填现在直接用 `route.download_dir` / `instance.download_dir` 合并结果，不再保留空的 `instance is None` 兜底分支。
 - `app/main.py` 当前 `482` 行；下载器投递分流 helper 现在由 main 编排层持有，`_resolve_downloader_client_for_dispatch` 与 `resolve_downloader_dispatch_download_dir` 都已迁入这里，BT source provider 组装和 fanart / download_image 的顶层壳也已收进 `main()`。
+- `app/services/search_media.py` 当前 `274` 行；BT batch preview 缓存转手壳已并回调用点，`_to_candidate_dict` / `_attach_media_identity_to_candidate` 也已收口到 inline 变换。
+- `app/services/metadata_scraper.py` 当前 `384` 行；metadata / NFO sidecar 路径、图片 artifact 路径、字符串归一化、text artifact 写入和 NFO 拼装小壳都已并回入口。
 - `cleanup_*_support.py` 当前为 `0` 个；cleanup 收口、重复 trace logger、`_COMPAT_REEXPORTS`、无消费者 `__all__` 都已保持完成态。
 - `app/main.py` 残余 downloader client 死壳已删，`tests/test_main.py` 现在直接 import `app.downloader_route_lookup` 真实边界。
 
@@ -22,7 +24,7 @@
 - `make verify-mainline`：通过
 
 ## Current biggest risk
-- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应只沿 `app/main.py` 里还能再压薄的 dispatch helper 推进，而不是把范围扩成整份路由系统重写。
+- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应只沿 `app/main.py`、`app/services/search_media.py` 或 `app/services/metadata_scraper.py` 里还能再压薄的单消费者 helper 推进，而不是把范围扩成整份路由系统重写。
 
 ## Recommended Next Operator Command
 

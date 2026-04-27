@@ -150,16 +150,18 @@ class SearchMediaService:
                 selection=request.selection_text or "-",
                 available_count=selection.available_count,
             )
-        selected_raw_results = [_to_candidate_dict(item) for item in selection.candidates]
+        selected_raw_results = [{str(key): value for key, value in item.items()} for item in selection.candidates]
         display_results = await self._bt_read_only_display.decorate_display_candidates(
             selected_raw_results,
             lookup_query=cleaned_query,
             helper_match=helper_match,
         )
         if chat_id is not None:
-            persist_error_text = self._cache_bt_batch_preview_candidates(chat_id=chat_id, candidates=selected_raw_results)
-            if persist_error_text:
-                return persist_error_text
+            if not self._candidate_state.persist_bt_batch_preview_candidates(
+                chat_id=chat_id,
+                candidates=selected_raw_results,
+            ):
+                return CANDIDATE_STATE_UNAVAILABLE_TEXT
         selection_label = format_bt_batch_preview_selection_label(selection.selected_indexes)
         return format_bt_batch_preview_reply(cleaned_query, display_results, selection_label=selection_label)
 
@@ -199,11 +201,17 @@ class SearchMediaService:
             query=request_context.resolved_query or cleaned_query,
             load_bt_scoring_rules_func=load_bt_scoring_rules,
         )
-        selected_raw_results = [_to_candidate_dict(item) for item in ordered_raw_results[: self._limit]]
+        selected_raw_results = [{str(key): value for key, value in item.items()} for item in ordered_raw_results[: self._limit]]
         if media_identity is not None:
-            selected_raw_results = [
-                _attach_media_identity_to_candidate(item, media_identity=media_identity) for item in selected_raw_results
-            ]
+            normalized_media_identity = normalize_media_identity_payload(media_identity)
+            if normalized_media_identity is not None:
+                selected_raw_results = [
+                    {
+                        **item,
+                        "media_identity": normalized_media_identity,
+                    }
+                    for item in selected_raw_results
+                ]
         if chat_id is not None:
             self._recent_candidates_by_chat[chat_id] = selected_raw_results
             if selected_raw_results:
@@ -235,11 +243,6 @@ class SearchMediaService:
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
         return self.get_cached_candidate_load_result(chat_id, index).candidate
 
-    def _cache_bt_batch_preview_candidates(self, *, chat_id: int, candidates: list[dict[str, Any]]) -> str:
-        if self._candidate_state.persist_bt_batch_preview_candidates(chat_id=chat_id, candidates=candidates):
-            return ""
-        return CANDIDATE_STATE_UNAVAILABLE_TEXT
-
     def get_cached_candidate_load_result(self, chat_id: int, index: int) -> CandidateLoadResult:
         return self._candidate_state.get_cached_candidate_load_result(chat_id, index)
 
@@ -269,20 +272,3 @@ class SearchMediaService:
 
     def _load_persisted_candidate(self, *, chat_id: int, index: int) -> CandidateLoadResult:
         return self._candidate_state.load_persisted_candidate(chat_id=chat_id, index=index)
-
-
-def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {str(key): value for key, value in item.items()}
-
-
-def _attach_media_identity_to_candidate(
-    item: Mapping[str, Any],
-    *,
-    media_identity: Mapping[str, Any],
-) -> dict[str, Any]:
-    candidate = _to_candidate_dict(item)
-    normalized_media_identity = normalize_media_identity_payload(media_identity)
-    if normalized_media_identity is None:
-        return candidate
-    candidate["media_identity"] = normalized_media_identity
-    return candidate

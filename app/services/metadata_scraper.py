@@ -90,8 +90,34 @@ class MetadataScraperService:
             )
             return MetadataScrapeResult(success=False, message=message)
 
-        metadata_path = _resolve_metadata_sidecar_path(target_path)
-        nfo_path = _resolve_nfo_sidecar_path(target_path)
+        if target_path.is_dir():
+            metadata_path = target_path / ".luminarr.metadata.json"
+        else:
+            metadata_path = target_path.with_suffix(".metadata.json")
+        if target_path.is_file():
+            nfo_path = target_path.with_suffix(".nfo")
+        else:
+            primary_video_path = None
+            if target_path.exists() and target_path.is_dir():
+                video_suffixes = {".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"}
+                candidates = sorted(
+                    candidate
+                    for candidate in target_path.rglob("*")
+                    if candidate.is_file() and candidate.suffix.lower() in video_suffixes
+                )
+                if candidates:
+                    if len(candidates) == 1:
+                        primary_video_path = candidates[0]
+                    else:
+                        normalized_dir_name = "".join(ch for ch in target_path.name.casefold() if ch.isalnum())
+                        for candidate in candidates:
+                            if "".join(ch for ch in candidate.stem.casefold() if ch.isalnum()) == normalized_dir_name:
+                                primary_video_path = candidate
+                                break
+            if primary_video_path is not None:
+                nfo_path = primary_video_path.with_suffix(".nfo")
+            else:
+                nfo_path = target_path / "movie.nfo"
         payload = {
             "task_ref": scrape_input.task_ref,
             "task_id": scrape_input.task_id,
@@ -108,22 +134,54 @@ class MetadataScraperService:
                 "backdrop_url": fanart_images.backdrop_url if fanart_images is not None else "",
             },
         }
-        error_result = _write_text_artifact(
+        if _resolve_write_strategy_for_path(
             artifact_path=metadata_path,
-            content=json.dumps(payload, ensure_ascii=False, indent=2),
-            label="metadata",
-            write_strategy=WRITE_STRATEGY_OVERWRITE,
-        )
-        if error_result is not None:
-            return error_result
-        error_result = _write_text_artifact(
+            default_strategy=WRITE_STRATEGY_OVERWRITE,
+        ) != WRITE_STRATEGY_SKIP:
+            try:
+                metadata_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception as exc:
+                message = f"写入 metadata 文件失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
+                )
+                return MetadataScrapeResult(success=False, message=message)
+        if _resolve_write_strategy_for_path(
             artifact_path=nfo_path,
-            content=_render_movie_nfo(tmdb_movie=tmdb_movie, fanart_images=fanart_images),
-            label="NFO",
-            write_strategy=WRITE_STRATEGY_MISSING_ONLY,
-        )
-        if error_result is not None:
-            return error_result
+            default_strategy=WRITE_STRATEGY_MISSING_ONLY,
+        ) != WRITE_STRATEGY_SKIP:
+            try:
+                nfo_lines = [
+                    "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>",
+                    "<movie>",
+                    f"  <title>{escape(tmdb_movie.title)}</title>",
+                    f"  <originaltitle>{escape(tmdb_movie.original_title or tmdb_movie.title)}</originaltitle>",
+                ]
+                if tmdb_movie.year:
+                    nfo_lines.append(f"  <year>{escape(tmdb_movie.year)}</year>")
+                if tmdb_movie.tmdb_id:
+                    nfo_lines.append(f"  <tmdbid>{escape(tmdb_movie.tmdb_id)}</tmdbid>")
+                    nfo_lines.append(f"  <uniqueid type=\"tmdb\" default=\"true\">{escape(tmdb_movie.tmdb_id)}</uniqueid>")
+                if fanart_images is not None and fanart_images.poster_url:
+                    nfo_lines.append(f"  <thumb aspect=\"poster\">{escape(fanart_images.poster_url)}</thumb>")
+                if fanart_images is not None and fanart_images.backdrop_url:
+                    nfo_lines.extend(
+                        [
+                            "  <fanart>",
+                            f"    <thumb>{escape(fanart_images.backdrop_url)}</thumb>",
+                            "  </fanart>",
+                        ]
+                    )
+                nfo_lines.append("</movie>")
+                nfo_path.write_text("\n".join(nfo_lines) + "\n", encoding="utf-8")
+            except Exception as exc:
+                message = f"写入 NFO 文件失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
+                )
+                return MetadataScrapeResult(success=False, message=message)
         image_artifacts, error_result = await self._write_image_artifacts(
             target_path=target_path,
             fanart_images=fanart_images,
@@ -222,7 +280,33 @@ class MetadataScraperService:
         if fanart_images is None or self._download_image_func is None:
             return [], None
 
-        artifact_specs = _build_image_artifact_specs(target_path=target_path, fanart_images=fanart_images)
+        def cleanup_written_artifacts() -> None:
+            for artifact_path in reversed(created_paths):
+                try:
+                    if artifact_path.exists():
+                        artifact_path.unlink()
+                except OSError:
+                    continue
+
+        artifact_specs: list[tuple[str, str, Path]] = []
+        if fanart_images.poster_url:
+            poster_suffix = Path(urlparse(fanart_images.poster_url).path).suffix.lower()
+            if poster_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                poster_suffix = ".jpg"
+            if target_path.is_file():
+                poster_path = target_path.with_name(f"{target_path.stem}-poster{poster_suffix}")
+            else:
+                poster_path = target_path / f"poster{poster_suffix}"
+            artifact_specs.append(("poster", fanart_images.poster_url, poster_path))
+        if fanart_images.backdrop_url:
+            backdrop_suffix = Path(urlparse(fanart_images.backdrop_url).path).suffix.lower()
+            if backdrop_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                backdrop_suffix = ".jpg"
+            if target_path.is_file():
+                backdrop_path = target_path.with_name(f"{target_path.stem}-backdrop{backdrop_suffix}")
+            else:
+                backdrop_path = target_path / f"backdrop{backdrop_suffix}"
+            artifact_specs.append(("backdrop", fanart_images.backdrop_url, backdrop_path))
         created_paths: list[Path] = []
         for label, image_url, artifact_path in artifact_specs:
             if _resolve_write_strategy_for_path(
@@ -233,7 +317,7 @@ class MetadataScraperService:
             try:
                 payload = await self._download_image_func(image_url)
             except Exception as exc:
-                _cleanup_written_artifacts(created_paths)
+                cleanup_written_artifacts()
                 message = f"下载 {label} 图片失败：{exc}"
                 _print_colored_error(
                     problem=message,
@@ -241,7 +325,7 @@ class MetadataScraperService:
                 )
                 return [], MetadataScrapeResult(success=False, message=message)
             if not payload:
-                _cleanup_written_artifacts(created_paths)
+                cleanup_written_artifacts()
                 message = f"下载 {label} 图片失败：响应为空"
                 _print_colored_error(
                     problem=message,
@@ -251,7 +335,7 @@ class MetadataScraperService:
             try:
                 artifact_path.write_bytes(payload)
             except Exception as exc:
-                _cleanup_written_artifacts(created_paths)
+                cleanup_written_artifacts()
                 message = f"写入 {label} 图片失败：{exc}"
                 _print_colored_error(
                     problem=message,
@@ -260,109 +344,6 @@ class MetadataScraperService:
                 return [], MetadataScrapeResult(success=False, message=message)
             created_paths.append(artifact_path)
         return created_paths, None
-
-
-def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
-    if target_path.is_dir():
-        return target_path / ".luminarr.metadata.json"
-    return target_path.with_suffix(".metadata.json")
-
-
-def _resolve_nfo_sidecar_path(target_path: Path) -> Path:
-    if target_path.is_file():
-        return target_path.with_suffix(".nfo")
-    primary_video_path = _find_primary_video_file(target_path)
-    if primary_video_path is not None:
-        return primary_video_path.with_suffix(".nfo")
-    return target_path / "movie.nfo"
-
-
-def _find_primary_video_file(target_path: Path) -> Path | None:
-    if not target_path.exists() or not target_path.is_dir():
-        return None
-    video_suffixes = {".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"}
-    candidates = sorted(
-        candidate
-        for candidate in target_path.rglob("*")
-        if candidate.is_file() and candidate.suffix.lower() in video_suffixes
-    )
-    if not candidates:
-        return None
-    if len(candidates) == 1:
-        return candidates[0]
-    normalized_dir_name = _normalize_for_match(target_path.name)
-    for candidate in candidates:
-        if _normalize_for_match(candidate.stem) == normalized_dir_name:
-            return candidate
-    return None
-
-
-def _render_movie_nfo(*, tmdb_movie: TmdbMovie, fanart_images: FanartMovieImages | None) -> str:
-    lines = [
-        "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>",
-        "<movie>",
-        f"  <title>{escape(tmdb_movie.title)}</title>",
-        f"  <originaltitle>{escape(tmdb_movie.original_title or tmdb_movie.title)}</originaltitle>",
-    ]
-    if tmdb_movie.year:
-        lines.append(f"  <year>{escape(tmdb_movie.year)}</year>")
-    if tmdb_movie.tmdb_id:
-        lines.append(f"  <tmdbid>{escape(tmdb_movie.tmdb_id)}</tmdbid>")
-        lines.append(f"  <uniqueid type=\"tmdb\" default=\"true\">{escape(tmdb_movie.tmdb_id)}</uniqueid>")
-    if fanart_images is not None and fanart_images.poster_url:
-        lines.append(f"  <thumb aspect=\"poster\">{escape(fanart_images.poster_url)}</thumb>")
-    if fanart_images is not None and fanart_images.backdrop_url:
-        lines.extend(
-            [
-                "  <fanart>",
-                f"    <thumb>{escape(fanart_images.backdrop_url)}</thumb>",
-                "  </fanart>",
-            ]
-        )
-    lines.append("</movie>")
-    return "\n".join(lines) + "\n"
-
-
-def _normalize_for_match(value: str) -> str:
-    return "".join(ch for ch in value.casefold() if ch.isalnum())
-
-
-def _build_image_artifact_specs(
-    *,
-    target_path: Path,
-    fanart_images: FanartMovieImages,
-) -> list[tuple[str, str, Path]]:
-    specs: list[tuple[str, str, Path]] = []
-    if fanart_images.poster_url:
-        specs.append(("poster", fanart_images.poster_url, _resolve_image_artifact_path(target_path, "poster", fanart_images.poster_url)))
-    if fanart_images.backdrop_url:
-        specs.append(("backdrop", fanart_images.backdrop_url, _resolve_image_artifact_path(target_path, "backdrop", fanart_images.backdrop_url)))
-    return specs
-
-
-def _resolve_image_artifact_path(target_path: Path, label: str, image_url: str) -> Path:
-    suffix = _resolve_image_suffix(image_url)
-    if target_path.is_file():
-        return target_path.with_name(f"{target_path.stem}-{label}{suffix}")
-    return target_path / f"{label}{suffix}"
-
-
-def _resolve_image_suffix(image_url: str) -> str:
-    path = urlparse(image_url).path
-    suffix = Path(path).suffix.lower()
-    if suffix in {".jpg", ".jpeg", ".png", ".webp"}:
-        return suffix
-    return ".jpg"
-
-
-def _cleanup_written_artifacts(created_paths: list[Path]) -> None:
-    for artifact_path in reversed(created_paths):
-        try:
-            if artifact_path.exists():
-                artifact_path.unlink()
-        except OSError:
-            continue
-
 
 def _print_colored_error(*, problem: str, fix: str) -> None:
     print(f"\033[31m[元数据刮削失败]\033[0m {problem}", flush=True)
@@ -374,7 +355,11 @@ def _resolve_chinese_scrape_movie(
     tmdb_movie: TmdbMovie,
     failure_message: str,
 ) -> tuple[TmdbMovie | None, MetadataScrapeResult | None]:
-    chinese_title = _resolve_preferred_chinese_title(tmdb_movie)
+    chinese_title = ""
+    if re.search(r"[\u4e00-\u9fff]", tmdb_movie.title):
+        chinese_title = tmdb_movie.title.strip()
+    elif re.search(r"[\u4e00-\u9fff]", tmdb_movie.original_title):
+        chinese_title = tmdb_movie.original_title.strip()
     if not chinese_title:
         _print_colored_error(
             problem=failure_message,
@@ -391,45 +376,6 @@ def _resolve_chinese_scrape_movie(
         ),
         None,
     )
-
-
-def _resolve_preferred_chinese_title(tmdb_movie: TmdbMovie) -> str:
-    if _contains_chinese(tmdb_movie.title):
-        return tmdb_movie.title.strip()
-    if _contains_chinese(tmdb_movie.original_title):
-        return tmdb_movie.original_title.strip()
-    return ""
-
-
-def _contains_chinese(value: str) -> bool:
-    return bool(re.search(r"[\u4e00-\u9fff]", value))
-
-
-def _write_text_artifact(
-    *,
-    artifact_path: Path,
-    content: str,
-    label: str,
-    write_strategy: str,
-) -> MetadataScrapeResult | None:
-    resolved_strategy = _resolve_write_strategy_for_path(
-        artifact_path=artifact_path,
-        default_strategy=write_strategy,
-    )
-    if resolved_strategy == WRITE_STRATEGY_SKIP:
-        return None
-    try:
-        artifact_path.write_text(content, encoding="utf-8")
-    except Exception as exc:
-        message = f"写入 {label} 文件失败：{exc}"
-        _print_colored_error(
-            problem=message,
-            fix="检查导入目录写权限和磁盘空间，再重试确认导入。",
-        )
-        return MetadataScrapeResult(success=False, message=message)
-    return None
-
-
 def _resolve_write_strategy_for_path(*, artifact_path: Path, default_strategy: str) -> str:
     if default_strategy == WRITE_STRATEGY_OVERWRITE:
         return WRITE_STRATEGY_OVERWRITE

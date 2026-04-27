@@ -138,15 +138,6 @@ def resolve_downloader_dispatch_download_dir(
     return cleaned_download_dir
 
 
-def _log_media_server_config_missing(provider: str, missing_keys: tuple[str, ...]) -> None:
-    joined_keys = ", ".join(missing_keys)
-    print(
-        f"\033[31m[媒体服务器配置缺失]\033[0m provider={provider} 缺少={joined_keys}\n"
-        "\033[33m[处理建议]\033[0m 补齐该 provider 对应的地址和凭据；当前会保留导入成功真相，但跳过媒体库刷新。",
-        flush=True,
-    )
-
-
 def _build_refresh_media_server_func(settings):
     provider_name = settings.media_server_provider
     target_url = ""
@@ -157,7 +148,12 @@ def _build_refresh_media_server_func(settings):
         if not settings.jellyfin_api_key:
             missing_keys.append("JELLYFIN_API_KEY")
         if missing_keys:
-            _log_media_server_config_missing("jellyfin", tuple(missing_keys))
+            joined_keys = ", ".join(missing_keys)
+            print(
+                f"\033[31m[媒体服务器配置缺失]\033[0m provider=jellyfin 缺少={joined_keys}\n"
+                "\033[33m[处理建议]\033[0m 补齐该 provider 对应的地址和凭据；当前会保留导入成功真相，但跳过媒体库刷新。",
+                flush=True,
+            )
             return None
         target_url = settings.jellyfin_base_url
         refresh_func = JellyfinClient(
@@ -171,7 +167,12 @@ def _build_refresh_media_server_func(settings):
         if not settings.plex_token:
             missing_keys.append("PLEX_TOKEN")
         if missing_keys:
-            _log_media_server_config_missing("plex", tuple(missing_keys))
+            joined_keys = ", ".join(missing_keys)
+            print(
+                f"\033[31m[媒体服务器配置缺失]\033[0m provider=plex 缺少={joined_keys}\n"
+                "\033[33m[处理建议]\033[0m 补齐该 provider 对应的地址和凭据；当前会保留导入成功真相，但跳过媒体库刷新。",
+                flush=True,
+            )
             return None
         target_url = settings.plex_base_url
         refresh_func = PlexClient(
