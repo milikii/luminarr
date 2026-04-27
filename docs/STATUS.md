@@ -13,7 +13,7 @@
 - `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件。
 - `app/main.py` 里的 downloader client 本地死壳已删掉；`app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 也已删除；`app/bot/personal_wechat_login.py` 与 `app/bot/personal_wechat_text.py` 的无消费者 `__all__` 纯导出列表继续保持删除态，`app/db/__init__.py` 的死 re-export 已清掉，`app/bot/telegram_bot.py` 当前改为显式公共 `__all__` 边界以维持 pyflakes 绿灯，功能测试继续通过，不影响现有直接导入形状。
 - `app/config.py` 当前 `457` 行；`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory，当前不再继续在这条边界上做重复壳。
-- `app/downloader_route_lookup.py` 当前 `386` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove 的 client-only 序幕、import host download_dir 回填和 import source `download_dir` 重建都已收成共享 helper；本轮继续把 downloader instance strip + lookup、host download_dir fallback 都合成共享解析 helper，并把实例不存在 / 客户端未配置 / 投递失败三类日志并到同一共享打印入口，`_log_*` 当前降到 `4` 个，不改错误文本、路由语义或导入/状态协议。
+- `app/downloader_route_lookup.py` 当前 `384` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove 的 client-only 序幕、import host download_dir 回填和 import source `download_dir` 重建都已收成共享 helper；本轮继续把 downloader instance strip + lookup、host download_dir fallback 都合成共享解析 helper，并把 task route / client resolution 两侧日志都并到共享打印入口，`_log_*` 当前降到 `2` 个，不改错误文本、路由语义或导入/状态协议。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health

@@ -47,41 +47,22 @@ def _print_downloader_issue_log(
     )
 
 
-def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
-    _print_downloader_issue_log(
-        title="下载器路由未命中",
-        context_label="task_ref",
-        context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
-        detail_label="原因",
-        detail_value=reason,
-        fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
-    )
-
-
-def _log_downloader_route_lookup_error(*, task_ref: str, chat_id: int | None, error: Exception) -> None:
-    _print_downloader_issue_log(
-        title="下载器路由查询失败",
-        context_label="task_ref",
-        context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
-        detail_label="错误",
-        detail_value=str(error),
-        fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
-    )
-
-
-def _log_downloader_route_payload_corruption(
+def _log_downloader_task_route_issue(
     *,
+    title: str,
     task_ref: str,
     chat_id: int | None,
-    reason: str,
+    detail_label: str,
+    detail_value: str,
+    fix_hint: str,
 ) -> None:
     _print_downloader_issue_log(
-        title="下载器路由载荷损坏",
+        title=title,
         context_label="task_ref",
         context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
-        detail_label="原因",
-        detail_value=reason,
-        fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
+        detail_label=detail_label,
+        detail_value=detail_value,
+        fix_hint=fix_hint,
     )
 
 
@@ -92,15 +73,36 @@ def _resolve_downloader_task_route(
     job_repo: JobRepo,
 ) -> ResolvedDownloaderTaskRoute | None:
     if chat_id is None or chat_id <= 0:
-        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="chat_id missing")
+        _log_downloader_task_route_issue(
+            title="下载器路由未命中",
+            task_ref=task_ref,
+            chat_id=chat_id,
+            detail_label="原因",
+            detail_value="chat_id missing",
+            fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
+        )
         return None
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
     except Exception as error:
-        _log_downloader_route_lookup_error(task_ref=task_ref, chat_id=chat_id, error=error)
+        _log_downloader_task_route_issue(
+            title="下载器路由查询失败",
+            task_ref=task_ref,
+            chat_id=chat_id,
+            detail_label="错误",
+            detail_value=str(error),
+            fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
+        )
         return None
     if downloader_job is None:
-        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
+        _log_downloader_task_route_issue(
+            title="下载器路由未命中",
+            task_ref=task_ref,
+            chat_id=chat_id,
+            detail_label="原因",
+            detail_value="downloader job missing",
+            fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
+        )
         return None
     cleaned_payload = downloader_job.payload_json.strip()
     payload_reason: str | None = None
@@ -115,16 +117,26 @@ def _resolve_downloader_task_route(
             if not isinstance(payload, dict):
                 payload_reason = "payload_json not object"
     if payload_reason is not None:
-        _log_downloader_route_payload_corruption(
+        _log_downloader_task_route_issue(
+            title="下载器路由载荷损坏",
             task_ref=task_ref,
             chat_id=chat_id,
-            reason=payload_reason,
+            detail_label="原因",
+            detail_value=payload_reason,
+            fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
         )
         return None
     downloader_name = str(payload.get("downloader_name", "")).strip()
     download_dir = str(payload.get("download_dir", "")).strip()
     if not downloader_name:
-        _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
+        _log_downloader_task_route_issue(
+            title="下载器路由未命中",
+            task_ref=task_ref,
+            chat_id=chat_id,
+            detail_label="原因",
+            detail_value="downloader_name missing",
+            fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
+        )
         return None
     return ResolvedDownloaderTaskRoute(
         downloader_name=downloader_name,
