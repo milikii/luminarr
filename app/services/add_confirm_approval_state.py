@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass, field
 
-from app.db.approval_repo import APPROVAL_STATUS_PENDING, DEFAULT_PENDING_TIMEOUT_SECONDS, ApprovalRepo
+from app.db.approval_repo import (
+    APPROVAL_STATUS_PENDING,
+    DEFAULT_PENDING_TIMEOUT_SECONDS,
+    ApprovalPersistenceError,
+    ApprovalRepo,
+)
 
 PENDING_LEASE_LOOKUP_FAILED = -1
 DOWNLOADER_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
@@ -51,7 +57,7 @@ class AddConfirmApprovalState:
 
         try:
             approval_record = self.approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[下载待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前调用会按状态读取失败处理，避免把持久化真相异常继续混成进程内版号兜底。",
                 flush=True,
@@ -82,7 +88,7 @@ class AddConfirmApprovalState:
             return None
         try:
             approval_record = self.approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
                 print(
                     f"\033[31m[下载确认执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通没有待确认下载。",
@@ -121,7 +127,7 @@ class AddConfirmApprovalState:
                 task_hash=task_hash,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_PENDING_EXPIRY_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[下载确认过期结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
@@ -163,9 +169,9 @@ class AddConfirmApprovalState:
                 timeout_seconds=DEFAULT_PENDING_TIMEOUT_SECONDS,
             )
             if type(requested_lease) is not int or requested_lease <= 0:
-                raise RuntimeError(DOWNLOADER_PENDING_APPROVAL_NONE_REASON)
+                raise ApprovalPersistenceError(DOWNLOADER_PENDING_APPROVAL_NONE_REASON)
             lease_version = requested_lease
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 DOWNLOADER_PENDING_APPROVAL_RESULT_MISSING_REASON,
                 DOWNLOADER_PENDING_APPROVAL_NONE_REASON,
@@ -221,8 +227,8 @@ class AddConfirmApprovalState:
                 expected_lease_version=expected_lease_version,
             )
             if approved is None:
-                raise RuntimeError(DOWNLOADER_APPROVE_RESULT_NONE_REASON)
-        except Exception as error:
+                raise ApprovalPersistenceError(DOWNLOADER_APPROVE_RESULT_NONE_REASON)
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 DOWNLOADER_APPROVE_RESULT_MISSING_REASON,
                 DOWNLOADER_APPROVE_RESULT_NONE_REASON,
@@ -273,8 +279,8 @@ class AddConfirmApprovalState:
                 expected_lease_version=expected_lease_version,
             )
             if restored is None:
-                raise RuntimeError(DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON)
-        except Exception as error:
+                raise ApprovalPersistenceError(DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON)
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 DOWNLOADER_RESTORE_PENDING_APPROVAL_RESULT_MISSING_REASON,
                 DOWNLOADER_RESTORE_PENDING_APPROVAL_ROW_MISSING_REASON,
@@ -320,8 +326,8 @@ class AddConfirmApprovalState:
                 expected_lease_version=expected_lease_version,
             )
             if cancelled is None:
-                raise RuntimeError(DOWNLOADER_CANCEL_APPROVAL_NONE_REASON)
-        except Exception as error:
+                raise ApprovalPersistenceError(DOWNLOADER_CANCEL_APPROVAL_NONE_REASON)
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             self.pending_add_identities.add(identity)
             if str(error) in {
                 DOWNLOADER_CANCEL_APPROVAL_RESULT_MISSING_REASON,
@@ -369,7 +375,7 @@ class AddConfirmApprovalState:
                 task_hash=task_hash,
                 executed_lease_version=executed_lease_version,
             )
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_EXECUTED_LEASE_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[下载执行版号结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
@@ -409,7 +415,7 @@ class AddConfirmApprovalState:
                 new_task_id=new_task_id,
                 new_task_hash=new_task_hash,
             )
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[下载审批身份迁移失败]\033[0m current_task_id={current_task_id} current_task_hash={current_task_hash} new_task_id={new_task_id} new_task_hash={new_task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的下载审批是否仍存在，并确认 confirm 后审批主键已切到真实下载任务身份；当前下载已执行，但重启后的 stale confirm 保护可能不稳。",
                 flush=True,

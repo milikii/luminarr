@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from app.db.approval_repo import ApprovalRecord
-from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.db.approval_repo import ApprovalPersistenceError, ApprovalRecord
+from app.db.job_repo import (
+    JOB_STATE_PENDING_APPROVAL,
+    JobPersistenceError,
+    JobRecord,
+    JobRepo,
+    WORKFLOW_ADD_TO_DOWNLOADER,
+)
 from app.services.add_confirm_approval_state import AddConfirmApprovalState
 from app.services.add_pending_context import PendingAddContext, pending_add_from_json
 
@@ -54,7 +61,7 @@ class AddConfirmContextState:
             return None, False
         try:
             job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) in self._job_row_corrupted_reasons:
                 print(
                     f"\033[31m[下载确认上下文记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里该待确认下载任务的 job_id / chat_id / task_id / task_hash / version 是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏记录误判成“没有待确认下载”。",
@@ -85,7 +92,7 @@ class AddConfirmContextState:
                     task_id=job.task_id,
                     task_hash=job.task_hash,
                 )
-            except Exception as error:
+            except (ApprovalPersistenceError, sqlite3.Error) as error:
                 print(
                     f"\033[31m[下载确认审批查询失败]\033[0m task_ref={task_ref} task_id={job.task_id} task_hash={job.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通未确认状态。",
                     flush=True,
@@ -140,8 +147,8 @@ class AddConfirmContextState:
                     workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
                 )
                 if cancelled is None:
-                    raise RuntimeError(self._downloader_cancel_pending_job_result_missing_reason)
-            except Exception as error:
+                    raise JobPersistenceError(self._downloader_cancel_pending_job_result_missing_reason)
+            except (JobPersistenceError, sqlite3.Error) as error:
                 if str(error) in {
                     self._downloader_cancel_pending_job_result_missing_reason,
                     self._downloader_cancel_pending_job_row_missing_reason,

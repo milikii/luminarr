@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
+
 from app.db.approval_repo import DEFAULT_PENDING_TIMEOUT_SECONDS
-from app.db.job_repo import JobRepo
+from app.db.job_repo import JobPersistenceError, JobRepo
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.add_pending_context import PendingAddContext, pending_add_to_json
 
@@ -39,8 +41,8 @@ class AddPendingPersistenceState:
                 payload_json=pending_add_to_json(pending_add),
             )
             if pending_job is None:
-                raise RuntimeError(self._downloader_pending_job_none_reason)
-        except Exception as error:
+                raise JobPersistenceError(self._downloader_pending_job_none_reason)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 self._downloader_pending_job_result_missing_reason,
                 self._downloader_pending_job_none_reason,

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 
-from app.db.job_repo import JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.add_pending_context import PendingAddContext, pending_add_from_json
 
 ResolvePendingLeaseVersionFunc = Callable[..., int]
@@ -52,7 +53,7 @@ class AddCancelState:
         if self._job_repo is not None:
             try:
                 pending_job = self._job_repo.get_latest_pending_downloader_job(chat_id=chat_id)
-            except Exception as error:
+            except (JobPersistenceError, sqlite3.Error) as error:
                 print(
                     f"\033[31m[下载取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；若当前进程里也没有待确认上下文，当前取消会直接返回状态读取失败，避免把持久化异常误判成“没有待取消下载”。",
                     flush=True,
@@ -166,8 +167,8 @@ class AddCancelState:
                 workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
             if cancelled is None:
-                raise RuntimeError(self._downloader_cancel_pending_job_result_missing_reason)
-        except Exception as error:
+                raise JobPersistenceError(self._downloader_cancel_pending_job_result_missing_reason)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 self._downloader_cancel_pending_job_result_missing_reason,
                 self._downloader_cancel_pending_job_row_missing_reason,

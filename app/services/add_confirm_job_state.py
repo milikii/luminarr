@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.db.job_repo import JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
+import sqlite3
+
+from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
 from app.services.add_pending_context import PendingAddContext, pending_add_to_json
 
 DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
@@ -23,7 +25,7 @@ class AddConfirmJobState:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[下载确认任务抢占结果缺失]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n"
@@ -61,7 +63,7 @@ class AddConfirmJobState:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_ADD_TO_DOWNLOADER,
             )
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_RESTORE_PENDING_JOB_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[下载确认任务回退结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
@@ -101,8 +103,8 @@ class AddConfirmJobState:
                 payload_json=pending_add_to_json(completed_add),
             )
             if marked is None:
-                raise RuntimeError(DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
-        except Exception as error:
+                raise JobPersistenceError(DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) == DOWNLOADER_MARK_COMPLETED_JOB_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[下载确认任务完结结果缺失]\033[0m job_id={job_id} task_ref={completed_add.task_ref} task_id={completed_add.task_id} task_hash={completed_add.task_hash} version={expected_version} lease_owner={lease_owner} 错误={error}\n"

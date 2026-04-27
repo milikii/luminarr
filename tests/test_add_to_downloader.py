@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -9,10 +10,15 @@ import pytest
 
 from app.clients.transmission import TransmissionTask
 from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError
-from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, DEFAULT_PENDING_TIMEOUT_SECONDS, ApprovalRepo
+from app.db.approval_repo import (
+    APPROVAL_STATUS_CANCELLED,
+    DEFAULT_PENDING_TIMEOUT_SECONDS,
+    ApprovalPersistenceError,
+    ApprovalRepo,
+)
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
-from app.db.job_repo import JOB_STATE_CANCELLED, JobRecord, JobRepo
+from app.db.job_repo import JOB_STATE_CANCELLED, JobPersistenceError, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import (
     ADD_APPROVAL_PENDING_TEXT,
@@ -304,14 +310,14 @@ def test_confirm_add_by_task_ref_without_pending_request_returns_not_pending() -
 
 
 def test_has_pending_add_logs_job_lookup_failure(capsys) -> None:
-    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     assert service.has_pending_add(1001, "1") is None
     assert "[下载待确认查询失败]" in capsys.readouterr().out
 
 
 def test_has_pending_add_uses_in_memory_pending_when_job_lookup_fails(capsys) -> None:
-    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
         add_torrent_func=AsyncMock(),
@@ -355,7 +361,7 @@ def test_has_pending_add_returns_state_unavailable_when_job_row_missing_with_in_
 
 
 def test_cancel_pending_add_logs_job_lookup_failure(capsys) -> None:
-    job_repo = type("BoomJobRepo", (), {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("BoomJobRepo", (), {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     assert service.cancel_pending_add(1001) == ADD_CANCEL_STATE_UNAVAILABLE_TEXT
     assert "[下载取消查询失败]" in capsys.readouterr().out
@@ -371,7 +377,7 @@ def test_cancel_pending_add_keeps_lookup_failure_when_job_lookup_fails_with_in_m
         "BoomJobRepo",
         (),
         {
-            "get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_pending_job should not be called")),
         },
     )()
@@ -426,7 +432,7 @@ def test_cancel_pending_add_logs_payload_corruption(capsys) -> None:
 
 
 def test_rebuild_confirm_context_logs_job_lookup_failure(capsys) -> None:
-    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     context, lookup_failed = service._rebuild_confirm_context(task_ref="1", chat_id=1001)
     assert context is None
@@ -440,7 +446,7 @@ def test_rebuild_confirm_context_logs_job_row_corruption(capsys) -> None:
         (),
         {
             "get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job row identity corrupted after read")
+                JobPersistenceError("job row identity corrupted after read")
             )
         },
     )()
@@ -462,7 +468,7 @@ def test_rebuild_confirm_context_logs_job_row_corruption(capsys) -> None:
 def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
     job = type("Job", (), {"payload_json": "{\"task_ref\":\"1\",\"task_id\":\"selection:1\",\"task_hash\":\"abc123\",\"title\":\"Dune: Part Two\",\"source\":\"https://example.com/dune.torrent\"}", "task_id": "selection:1", "task_hash": "abc123"})()
     job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
-    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo, approval_repo=approval_repo)
     context, lookup_failed = service._rebuild_confirm_context(task_ref="1", chat_id=1001)
     assert context is not None
@@ -490,7 +496,7 @@ def test_rebuild_confirm_context_logs_payload_corruption(capsys) -> None:
 
 
 def test_confirm_add_by_task_ref_returns_state_unavailable_on_context_lookup_failure(capsys) -> None:
-    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -514,7 +520,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_on_context_row_corrup
         (),
         {
             "get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job row version corrupted after read")
+                JobPersistenceError("job row version corrupted after read")
             )
         },
     )()
@@ -554,7 +560,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_on_context_payload_co
 
 
 def test_confirm_add_by_task_ref_uses_in_memory_pending_when_context_lookup_fails(capsys) -> None:
-    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("BoomJobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -642,7 +648,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_job_row_missing_
 
 
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert service._record_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123") == 0
     output = capsys.readouterr().out
@@ -654,7 +660,7 @@ def test_record_pending_approval_logs_missing_pending_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing after pending request"))},
+        {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(ApprovalPersistenceError("approval_record missing after pending request"))},
     )()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert service._record_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123") == 0
@@ -681,7 +687,7 @@ def test_record_pending_approval_logs_row_corruption(capsys) -> None:
         {
             "request_downloader_approval": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row lease version corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row lease version corrupted after read"))
         },
     )()
     service = AddToDownloaderService(
@@ -697,7 +703,7 @@ def test_record_pending_approval_logs_row_corruption(capsys) -> None:
 
 
 def test_record_pending_job_logs_persistence_failure_with_full_pending_context(capsys) -> None:
-    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
         add_torrent_func=AsyncMock(),
@@ -722,7 +728,7 @@ def test_record_pending_job_logs_missing_pending_job_result(capsys) -> None:
     job_repo = type(
         "JobRepo",
         (),
-        {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job missing after pending upsert"))},
+        {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("job missing after pending upsert"))},
     )()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -773,7 +779,7 @@ def test_record_pending_job_logs_row_corruption(capsys) -> None:
         {
             "upsert_downloader_job_pending": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("job row version corrupted after read"))
+            ).throw(JobPersistenceError("job row version corrupted after read"))
         },
     )()
     service = AddToDownloaderService(
@@ -797,7 +803,7 @@ def test_record_pending_job_logs_row_corruption(capsys) -> None:
 
 
 def test_record_downloader_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     service._pending_add_identities.add(("selection:1", "abc123"))
     service._pending_add_lease_versions[("selection:1", "abc123")] = 1
@@ -809,7 +815,7 @@ def test_record_downloader_approval_logs_missing_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during approve"))},
+        {"approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(ApprovalPersistenceError("approval_record missing during approve"))},
     )()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -867,7 +873,7 @@ def test_record_downloader_approval_logs_rejected_current_state(capsys) -> None:
 
 
 def test_cancel_pending_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert service._cancel_pending_approval(task_ref="1", task_id="selection:1", task_hash="abc123", expected_lease_version=1) is False
     assert "[下载取消审批更新失败]" in capsys.readouterr().out
@@ -877,7 +883,7 @@ def test_cancel_pending_approval_logs_missing_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during cancel"))},
+        {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(ApprovalPersistenceError("approval_record missing during cancel"))},
     )()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -920,7 +926,7 @@ def test_cancel_pending_approval_logs_missing_result_when_repo_returns_none(caps
 
 
 def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"mark_downloader_executed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"mark_downloader_executed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert (
         service._record_executed_lease_version(
@@ -941,7 +947,7 @@ def test_record_executed_lease_version_logs_missing_result(capsys) -> None:
         (),
         {
             "mark_downloader_executed": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("approval_record missing during executed version update")
+                ApprovalPersistenceError("approval_record missing during executed version update")
             )
         },
     )()
@@ -972,7 +978,7 @@ def test_record_executed_lease_version_logs_row_corruption(capsys) -> None:
         {
             "mark_downloader_executed": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row executed version corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row executed version corrupted after read"))
         },
     )()
     service = AddToDownloaderService(
@@ -999,7 +1005,7 @@ def test_move_completed_approval_identity_logs_persistence_failure(capsys) -> No
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"move_downloader_approval_identity": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"move_downloader_approval_identity": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -1023,7 +1029,7 @@ def test_move_completed_approval_identity_logs_persistence_failure(capsys) -> No
 
 
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     assert service._record_pending_job(
         chat_id=1001,
@@ -1044,7 +1050,7 @@ def test_record_pending_job_logs_persistence_failure(capsys) -> None:
 def test_add_by_selection_returns_state_unavailable_when_pending_approval_persist_fails() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     _run(search_service.search_and_format("dune", chat_id=1001))
-    approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"request_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(
         search_service=search_service,
         add_torrent_func=AsyncMock(),
@@ -1082,7 +1088,7 @@ def test_add_by_selection_returns_state_unavailable_when_pending_job_persist_fai
             "cancel_downloader": lambda self, **kwargs: True,
         },
     )()
-    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(
         search_service=search_service,
         add_torrent_func=AsyncMock(),
@@ -1128,7 +1134,7 @@ def test_add_candidate_source_returns_state_unavailable_when_pending_job_persist
             "cancel_downloader": lambda self, **kwargs: True,
         },
     )()
-    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"upsert_downloader_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
         add_torrent_func=AsyncMock(),
@@ -1176,7 +1182,7 @@ def test_add_candidate_source_returns_state_unavailable_when_pending_job_result_
 
 
 def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     job = JobRecord(
         job_id="job-1",
@@ -1208,7 +1214,7 @@ def test_claim_pending_job_logs_missing_result(capsys) -> None:
         {
             "claim_lease": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("job missing during lease claim"))
+            ).throw(JobPersistenceError("job missing during lease claim"))
         },
     )()
     service = AddToDownloaderService(
@@ -1288,7 +1294,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_rais
         (),
         {
             "get_downloader_job_for_chat_ref": lambda self, **kwargs: job,
-            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     approval_repo = type(
@@ -1340,7 +1346,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_claim_lease_resu
         (),
         {
             "get_downloader_job_for_chat_ref": lambda self, **kwargs: job,
-            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job missing during lease claim")),
+            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("job missing during lease claim")),
         },
     )()
     approval_repo = type(
@@ -1422,7 +1428,7 @@ def test_confirm_add_by_task_ref_returns_not_pending_when_claim_lease_is_rejecte
 
 
 def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     service._restore_pending_job(job_id="job-1", expected_version=3, lease_owner="downloader_confirm:1")
     output = capsys.readouterr().out
@@ -1436,7 +1442,7 @@ def test_restore_pending_job_logs_missing_result(capsys) -> None:
         (),
         {
             "release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job missing during state transition")
+                JobPersistenceError("job missing during state transition")
             )
         },
     )()
@@ -1463,7 +1469,7 @@ def test_restore_pending_job_logs_rejected_current_state(capsys) -> None:
 
 
 def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"mark_downloader_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"mark_downloader_completed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     assert (
         service._mark_completed_job(
@@ -1534,7 +1540,7 @@ def test_mark_completed_job_logs_rejected_current_state(capsys) -> None:
 
 
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert (
         service._restore_pending_approval(
@@ -1576,7 +1582,7 @@ def test_restore_pending_approval_logs_missing_row_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during restore"))},
+        {"restore_downloader_pending": lambda self, **kwargs: (_ for _ in ()).throw(ApprovalPersistenceError("approval_record missing during restore"))},
     )()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -1617,7 +1623,7 @@ def test_restore_pending_approval_logs_rejected_current_state(capsys) -> None:
 
 
 def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     service._pending_add_identities.add(("selection:1", "abc123"))
     service._pending_add_lease_versions[("selection:1", "abc123")] = 3
@@ -1654,7 +1660,7 @@ def test_resolve_pending_lease_version_logs_missing_approval_row_with_in_memory_
 
 
 def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert service._find_version_stale_rejection_text(task_id="selection:1", task_hash="abc123") == ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
@@ -1685,7 +1691,7 @@ def test_find_version_stale_rejection_text_logs_row_corruption(capsys) -> None:
         {
             "get_downloader_approval": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row executed version corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row executed version corrupted after read"))
         },
     )()
     service = AddToDownloaderService(
@@ -1703,7 +1709,7 @@ def test_find_version_stale_rejection_text_logs_row_corruption(capsys) -> None:
 
 
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"is_downloader_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"is_downloader_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), approval_repo=approval_repo)
     assert service._is_pending_approval_expired(task_id="selection:1", task_hash="abc123", expected_lease_version=2) is None
     output = capsys.readouterr().out
@@ -1718,7 +1724,7 @@ def test_is_pending_approval_expired_logs_missing_approval_result(capsys) -> Non
         {
             "is_downloader_pending_expired": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval_record missing during pending expiry check"))
+            ).throw(ApprovalPersistenceError("approval_record missing during pending expiry check"))
         },
     )()
     service = AddToDownloaderService(
@@ -1742,7 +1748,7 @@ def test_is_pending_approval_expired_logs_row_corruption(capsys) -> None:
         {
             "is_downloader_pending_expired": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row status corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row status corrupted after read"))
         },
     )()
     service = AddToDownloaderService(
@@ -1777,7 +1783,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_lookup_
         updated_at="2026-04-15 00:00:00",
     )
     job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: job})()
-    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     add_torrent = AsyncMock()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
@@ -1855,7 +1861,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_expiry_lookup_fa
         (),
         {
             "get_downloader_approval": lambda self, **kwargs: approval_record,
-            "is_downloader_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "is_downloader_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     add_torrent = AsyncMock()
@@ -1908,7 +1914,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_approval_update_
         {
             "get_downloader_approval": lambda self, **kwargs: approval_record,
             "is_downloader_pending_expired": lambda self, **kwargs: False,
-            "approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "approve_downloader": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
@@ -1988,7 +1994,7 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_pending_lease_lo
     approval_records = iter(
         (
             type("ApprovalRecord", (), {"lease_version": 0, "executed_version": 0})(),
-            RuntimeError("db down"),
+            sqlite3.OperationalError("db down"),
         )
     )
 
@@ -2053,7 +2059,7 @@ def test_cancel_pending_add_logs_job_cancel_failure(capsys) -> None:
         (),
         {
             "get_latest_pending_downloader_job": lambda self, chat_id: pending_job,
-            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: True})()
@@ -2108,7 +2114,7 @@ def test_cancel_pending_add_logs_missing_job_cancel_result(capsys) -> None:
 
 
 def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(search_service=SearchMediaService(_fake_search_with_download_url), add_torrent_func=AsyncMock(), job_repo=job_repo)
     service._is_pending_approval_expired = lambda **kwargs: True
     context = ConfirmExecutionContext(
@@ -2150,7 +2156,7 @@ def test_handle_expired_pending_confirm_logs_missing_job_during_cancel(capsys) -
         (),
         {
             "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job missing during cancel")
+                JobPersistenceError("job missing during cancel")
             )
         },
     )()
@@ -2234,7 +2240,7 @@ def test_handle_expired_pending_confirm_logs_job_cancel_state_rejection(capsys) 
 
 
 def test_handle_expired_pending_confirm_returns_state_unavailable_when_approval_cancel_fails(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),
         add_torrent_func=AsyncMock(),
@@ -2461,7 +2467,7 @@ def test_cancel_pending_add_returns_state_unavailable_when_pending_lease_lookup_
         "ApprovalRepo",
         (),
         {
-            "get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "get_downloader_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             "cancel_downloader": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_downloader should not be called")),
         },
     )()
@@ -2550,7 +2556,7 @@ def test_add_by_selection_returns_lookup_failed_when_candidate_lookup_fails() ->
     failing_repo = type(
         "BoomRepo",
         (),
-        {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     add_torrent = AsyncMock()
     service = AddToDownloaderService(
@@ -2570,7 +2576,7 @@ def test_add_by_selection_returns_lookup_failed_when_range_probe_fails() -> None
             _ = chat_id
             if index == 2:
                 return None
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     add_torrent = AsyncMock()
     service = AddToDownloaderService(
@@ -2653,7 +2659,8 @@ def test_confirm_add_by_task_ref_appends_warning_when_executed_version_write_fai
             "get_downloader_approval": lambda self, **kwargs: approval_record,
             "is_downloader_pending_expired": lambda self, **kwargs: False,
             "approve_downloader": lambda self, **kwargs: True,
-            "mark_downloader_executed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "mark_downloader_executed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
+            "move_downloader_approval_identity": lambda self, **kwargs: None,
         },
     )()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
@@ -2699,7 +2706,7 @@ def test_confirm_add_by_task_ref_appends_warning_when_job_completion_write_fails
         {
             "get_downloader_job_for_chat_ref": lambda self, **kwargs: job,
             "claim_lease": lambda self, **kwargs: True,
-            "mark_downloader_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "mark_downloader_completed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     approval_repo = type(
@@ -2710,6 +2717,7 @@ def test_confirm_add_by_task_ref_appends_warning_when_job_completion_write_fails
             "is_downloader_pending_expired": lambda self, **kwargs: False,
             "approve_downloader": lambda self, **kwargs: True,
             "mark_downloader_executed": lambda self, **kwargs: None,
+            "move_downloader_approval_identity": lambda self, **kwargs: None,
         },
     )()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
@@ -2766,6 +2774,7 @@ def test_confirm_add_by_task_ref_appends_warning_when_job_completion_result_is_m
             "is_downloader_pending_expired": lambda self, **kwargs: False,
             "approve_downloader": lambda self, **kwargs: True,
             "mark_downloader_executed": lambda self, **kwargs: None,
+            "move_downloader_approval_identity": lambda self, **kwargs: None,
         },
     )()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
@@ -2822,7 +2831,7 @@ def test_confirm_add_by_task_ref_appends_warning_when_approval_identity_move_fai
             "is_downloader_pending_expired": lambda self, **kwargs: False,
             "approve_downloader": lambda self, **kwargs: True,
             "mark_downloader_executed": lambda self, **kwargs: None,
-            "move_downloader_approval_identity": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "move_downloader_approval_identity": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="hash-42"))
@@ -2873,11 +2882,11 @@ def test_confirm_add_by_task_ref_returns_state_unavailable_when_dispatch_failure
 
         def restore_downloader_pending(self, **_: object) -> bool:
             if restore_mode == "raise":
-                raise RuntimeError("db down")
+                raise sqlite3.OperationalError("db down")
             if restore_mode == "missing":
                 return None
             if restore_mode == "missing_row":
-                raise RuntimeError("approval_record missing during restore")
+                raise ApprovalPersistenceError("approval_record missing during restore")
             return False
 
     search_service = SearchMediaService(_fake_search_with_download_url)

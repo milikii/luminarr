@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 
-from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobRepo
+from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRepo
 from app.services.add_pending_context import PendingAddContext
 
 GetInMemoryPendingFunc = Callable[..., PendingAddContext | None]
@@ -29,7 +30,7 @@ class AddPendingPresenceState:
             return in_memory_pending is not None
         try:
             job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=cleaned_ref)
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[下载待确认查询失败]\033[0m chat_id={chat_id} task_ref={cleaned_ref} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表查询是否正常；若当前进程里也没有待确认上下文，这次请求会直接返回服务未就绪，避免把持久化异常误判成“没有待确认下载”。",
                 flush=True,
