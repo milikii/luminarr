@@ -84,19 +84,22 @@ class StatusFollowUpRecorder:
                 )
             except (JobEventPersistenceError, sqlite3.Error) as error:
                 if str(error) == DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON:
-                    print(
-                        f"\033[31m[下载完成观察事件结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
-                        flush=True,
+                    _log_download_completion_event_result_missing(
+                        task_ref=task_ref,
+                        task_status=task_status,
+                        reason=str(error),
                     )
                 elif _is_completion_event_row_corrupted_error(error):
-                    print(
-                        f"\033[31m[下载完成观察事件记录损坏]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 完成观察记录里的 task_ref / event_type 等字段是否仍是完整真相；当前请求仍会返回下载状态文本，但这次完成观察事件不会当成已稳定落盘。",
-                        flush=True,
+                    _log_download_completion_event_row_corrupted(
+                        task_ref=task_ref,
+                        task_status=task_status,
+                        reason=str(error),
                     )
                 else:
-                    print(
-                        f"\033[31m[下载完成观察事件落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
-                        flush=True,
+                    _log_download_completion_event_append_failed(
+                        task_ref=task_ref,
+                        task_status=task_status,
+                        reason=str(error),
                     )
                 follow_up_parts.append(STATUS_COMPLETION_EVENT_WARNING_TEXT)
         if self._post_download_auto_import_service is None:
@@ -180,6 +183,51 @@ def _log_download_monitor_observation_row_corrupted(
         f"task_hash={task_status.task_hash} 错误={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 download_monitor 读回记录里的 task_id / task_hash / status_code / percent_done 等真相字段是否仍然完整；"
         "当前请求仍会返回下载状态文本，但这次完成观察和后续自动导入不会继续推进。",
+        flush=True,
+    )
+
+
+def _log_download_completion_event_result_missing(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载完成观察事件结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；"
+        "当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
+        flush=True,
+    )
+
+
+def _log_download_completion_event_row_corrupted(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载完成观察事件记录损坏]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 job_event 完成观察记录里的 task_ref / event_type 等字段是否仍是完整真相；"
+        "当前请求仍会返回下载状态文本，但这次完成观察事件不会当成已稳定落盘。",
+        flush=True,
+    )
+
+
+def _log_download_completion_event_append_failed(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载完成观察事件落盘失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；"
+        "当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
         flush=True,
     )
 
