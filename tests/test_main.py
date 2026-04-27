@@ -154,8 +154,7 @@ def test_resolve_downloader_client_for_lookup_returns_route_instance_and_client(
         operation="import",
     )
 
-    assert route.downloader_name == "pt-main"
-    assert route.download_dir == "/data/downloads/tr"
+    assert route == ("pt-main", "/data/downloads/tr")
     assert instance is not None
     assert instance.downloader_type == "transmission"
     assert resolved_client is client

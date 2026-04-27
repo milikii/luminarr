@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTaskStatus
@@ -11,12 +10,6 @@ from app.db.job_repo import JobRepo
 
 class DownloaderRouteLookupError(RuntimeError):
     pass
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedDownloaderTaskRoute:
-    downloader_name: str
-    download_dir: str
 
 
 def _format_task_route_context(*, task_ref: str, chat_id: int | None) -> str:
@@ -52,7 +45,7 @@ def _resolve_downloader_task_route(
     task_ref: str,
     chat_id: int | None,
     job_repo: JobRepo,
-) -> ResolvedDownloaderTaskRoute | None:
+) -> tuple[str, str] | None:
     if chat_id is None or chat_id <= 0:
         _print_downloader_issue_log(
             title="下载器路由未命中",
@@ -119,10 +112,7 @@ def _resolve_downloader_task_route(
             fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
         )
         return None
-    return ResolvedDownloaderTaskRoute(
-        downloader_name=downloader_name,
-        download_dir=download_dir,
-    )
+    return downloader_name, download_dir
 
 
 def _resolve_lookup_client_for_task(
@@ -135,7 +125,7 @@ def _resolve_lookup_client_for_task(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     operation: str,
 ) -> tuple[
-    ResolvedDownloaderTaskRoute,
+    tuple[str, str],
     DownloaderInstanceConfig | None,
     TransmissionClient | QbittorrentClient,
 ]:
@@ -146,8 +136,9 @@ def _resolve_lookup_client_for_task(
     )
     if route is None:
         raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
+    downloader_name, _ = route
     cleaned_name, instance, client = _resolve_downloader_instance_and_client(
-        downloader_name=route.downloader_name,
+        downloader_name=downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
@@ -280,7 +271,9 @@ async def _get_torrent_import_source_with_routing(
     import_source = await client.get_torrent_import_source(task_ref)
     if import_source is None:
         return None
-    host_download_dir = route.download_dir.strip() or instance.download_dir.strip()
+    _, route_download_dir = route
+    route_download_dir = route_download_dir.strip()
+    host_download_dir = route_download_dir or instance.download_dir.strip()
     if not host_download_dir or host_download_dir == import_source.download_dir:
         return import_source
     return TransmissionImportSource(
