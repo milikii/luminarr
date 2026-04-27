@@ -103,27 +103,22 @@ def _resolve_downloader_task_route(
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
         return None
     cleaned_payload = downloader_job.payload_json.strip()
+    payload_reason: str | None = None
     if not cleaned_payload:
+        payload_reason = "payload_json empty"
+    else:
+        try:
+            payload = json.loads(cleaned_payload)
+        except json.JSONDecodeError:
+            payload_reason = "payload_json invalid json"
+        else:
+            if not isinstance(payload, dict):
+                payload_reason = "payload_json not object"
+    if payload_reason is not None:
         _log_downloader_route_payload_corruption(
             task_ref=task_ref,
             chat_id=chat_id,
-            reason="payload_json empty",
-        )
-        return None
-    try:
-        payload = json.loads(cleaned_payload)
-    except json.JSONDecodeError:
-        _log_downloader_route_payload_corruption(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            reason="payload_json invalid json",
-        )
-        return None
-    if not isinstance(payload, dict):
-        _log_downloader_route_payload_corruption(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            reason="payload_json not object",
+            reason=payload_reason,
         )
         return None
     downloader_name = str(payload.get("downloader_name", "")).strip()
@@ -318,14 +313,13 @@ async def _get_torrent_import_source_with_routing(
         instance = downloader_instances_by_name.get(route.downloader_name)
         if instance is not None:
             host_download_dir = instance.download_dir.strip()
-    cleaned_host_download_dir = host_download_dir.strip()
-    if not cleaned_host_download_dir or cleaned_host_download_dir == import_source.download_dir:
+    if not host_download_dir or host_download_dir == import_source.download_dir:
         return import_source
     return TransmissionImportSource(
         task_id=import_source.task_id,
         task_hash=import_source.task_hash,
         name=import_source.name,
-        download_dir=cleaned_host_download_dir,
+        download_dir=host_download_dir,
         is_finished=import_source.is_finished,
         percent_done=import_source.percent_done,
     )
