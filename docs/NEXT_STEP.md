@@ -1,4 +1,4 @@
-# Next step (v376)
+# Next step (v377)
 
 ## Current goal
 
@@ -21,7 +21,7 @@
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/main.py`、`app/bot/telegram_bot.py`、`app/bot/personal_wechat_login.py`、`app/bot/personal_wechat_text.py` 和 `app/db/__init__.py` 的无消费者 `__all__` 纯导出列表也已删掉
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `491` 行；task/downloader 日志上下文、payload JSON 解析、payload 字段读取、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，剩余候选应继续限制在单消费者薄壳或 route 死壳
+- `app/downloader_route_lookup.py` 当前 `415` 行；task/downloader 日志上下文、payload JSON 解析、payload 字段读取、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，剩余候选应继续限制在单消费者薄壳或 route 死壳
 
 ## User value
 
