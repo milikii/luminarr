@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
+from app.operational_logging import emit_operational_log
 from app.services.search_request_context import parse_movie_query
 
 WATCHLIST_USAGE_TEXT = (
@@ -309,10 +310,10 @@ def _log_watchlist_add_failed(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[想看写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
+    _print_watchlist_issue(
+        title="想看写入失败",
+        detail=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。",
     )
 
 
@@ -324,11 +325,10 @@ def _log_watchlist_add_item_missing_after_insert(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[想看写入后条目缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表是否被并发删除或触发器回滚；"
-        "如需继续添加，请先确认 SQLite 写入后能立即回读该条目。"
+    _print_watchlist_issue(
+        title="想看写入后条目缺失",
+        detail=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 watchlist_item 表是否被并发删除或触发器回滚；如需继续添加，请先确认 SQLite 写入后能立即回读该条目。",
     )
 
 
@@ -340,11 +340,10 @@ def _log_watchlist_add_result_missing(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[想看写入结果缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 插入返回是否仍带有明确结果；"
-        "当前会按写入失败处理，避免把缺失真相误判成“已成功加入想看”。"
+    _print_watchlist_issue(
+        title="想看写入结果缺失",
+        detail=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 watchlist_item 插入返回是否仍带有明确结果；当前会按写入失败处理，避免把缺失真相误判成“已成功加入想看”。",
     )
 
 
@@ -356,81 +355,87 @@ def _log_watchlist_add_row_corrupted(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[想看写入命中坏记录]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按写入失败处理，避免把损坏记录误判成可复用旧条目或成功新建条目。"
+    _print_watchlist_issue(
+        title="想看写入命中坏记录",
+        detail=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按写入失败处理，避免把损坏记录误判成可复用旧条目或成功新建条目。",
     )
 
 
 def _log_watchlist_list_failed(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 watchlist_item 表是否正常。"
+    _print_watchlist_issue(
+        title="想看清单读取失败",
+        detail=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 SQLite 是否可读，以及 watchlist_item 表是否正常。",
     )
 
 
 def _log_watchlist_list_result_missing(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看清单结果缺失]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 查询返回是否仍带有完整列表；"
-        "当前会按读取失败处理，避免把缺失真相误判成“清单为空”。"
+    _print_watchlist_issue(
+        title="想看清单结果缺失",
+        detail=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 watchlist_item 查询返回是否仍带有完整列表；当前会按读取失败处理，避免把缺失真相误判成“清单为空”。",
     )
 
 
 def _log_watchlist_list_row_corrupted(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看清单记录损坏]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按读取失败处理，避免把损坏记录误判成正常清单。"
+    _print_watchlist_issue(
+        title="想看清单记录损坏",
+        detail=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按读取失败处理，避免把损坏记录误判成正常清单。",
     )
 
 
 def _log_watchlist_remove_failed(*, chat_id: int, item_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。"
+    _print_watchlist_issue(
+        title="想看删除失败",
+        detail=f"chat_id={chat_id} item_id={item_id} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写，以及 watchlist_item 表和当前条目是否正常。",
     )
 
 
 def _log_watchlist_remove_result_missing(*, chat_id: int, item_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看删除结果缺失]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 删除查询返回是否仍带有完整结果；"
-        "当前会按删除失败处理，避免把缺失真相误判成“条目不存在”。"
+    _print_watchlist_issue(
+        title="想看删除结果缺失",
+        detail=f"chat_id={chat_id} item_id={item_id} 原因={reason}",
+        fix_hint="检查 watchlist_item 删除查询返回是否仍带有完整结果；当前会按删除失败处理，避免把缺失真相误判成“条目不存在”。",
     )
 
 
 def _log_watchlist_remove_row_corrupted(*, chat_id: int, item_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看删除命中坏记录]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按删除失败处理，避免把损坏记录误判成可正常删除或“条目不存在”。"
+    _print_watchlist_issue(
+        title="想看删除命中坏记录",
+        detail=f"chat_id={chat_id} item_id={item_id} 原因={reason}",
+        fix_hint="检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按删除失败处理，避免把损坏记录误判成可正常删除或“条目不存在”。",
     )
 
 
 def _log_watchlist_clear_failed(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看清单清空失败]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 watchlist_item 表是否正常。"
+    _print_watchlist_issue(
+        title="想看清单清空失败",
+        detail=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写，以及 watchlist_item 表是否正常。",
     )
 
 
 def _log_watchlist_clear_result_missing(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看清单清空结果缺失]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 清空查询返回是否仍带有完整结果；"
-        "当前会按清空失败处理，避免把缺失真相误判成“本来就是空的”。"
+    _print_watchlist_issue(
+        title="想看清单清空结果缺失",
+        detail=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 watchlist_item 清空查询返回是否仍带有完整结果；当前会按清空失败处理，避免把缺失真相误判成“本来就是空的”。",
     )
 
 
 def _log_watchlist_clear_row_corrupted(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[想看清单清空命中坏记录]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按清空失败处理，避免把损坏记录误判成可正常清空或“清单本来就是空的”。"
+    _print_watchlist_issue(
+        title="想看清单清空命中坏记录",
+        detail=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按清空失败处理，避免把损坏记录误判成可正常清空或“清单本来就是空的”。",
     )
+
+
+def _print_watchlist_issue(*, title: str, detail: str, fix_hint: str) -> None:
+    emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
 
 
 def _is_watchlist_row_corrupted_reason(reason: str) -> bool:
