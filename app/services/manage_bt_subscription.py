@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.operational_logging import format_operational_log_message
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
@@ -775,8 +776,11 @@ def _log_bt_subscription_scan_error(
     error: Exception,
 ) -> None:
     print(
-        f"\033[31m[BT 订阅扫描失败]\033[0m 条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 Prowlarr 地址、API Key 和网络连通性后重试。"
+        format_operational_log_message(
+            title="BT 订阅扫描失败",
+            detail=f"条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}",
+            fix_hint="检查 Prowlarr 地址、API Key 和网络连通性后重试。",
+        )
     )
 
 
