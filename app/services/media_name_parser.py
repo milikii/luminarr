@@ -112,7 +112,7 @@ def _load_naming_rules_cached(config_path: str) -> NamingRules:
     path = Path(config_path)
     try:
         return _parse_naming_rules_yaml(path.read_text(encoding="utf-8"))
-    except Exception as error:
+    except (OSError, UnicodeError, ValueError, SyntaxError) as error:
         print(
             f"\033[31m[命名规则文件读取失败]\033[0m path={path} 错误={error}\n"
             "\033[33m[处理建议]\033[0m 检查 app/services/naming_rules.yml 缩进、引号和 aliases 列表格式；"
@@ -636,7 +636,7 @@ def _parse_yaml_scalar(value: str) -> str:
 def _parse_inline_yaml_list(value: str) -> list[str]:
     try:
         parsed = ast.literal_eval(value)
-    except Exception as error:
+    except (ValueError, SyntaxError) as error:
         raise ValueError(f"inline list malformed: {value}") from error
     if not isinstance(parsed, list):
         raise ValueError(f"inline list malformed: {value}")

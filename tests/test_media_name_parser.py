@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import app.services.media_name_parser as parser_module
 from app.services.media_name_parser import load_naming_rules, parse_media_name
 
 
@@ -244,3 +245,26 @@ def test_load_naming_rules_falls_back_to_builtin_defaults_for_missing_file(tmp_p
 
     assert parsed.title == "Dune"
     assert parsed.quality_tags == ("1080p",)
+
+
+def test_load_naming_rules_falls_back_for_malformed_inline_list(tmp_path: Path) -> None:
+    rules_path = tmp_path / "naming_rules.yml"
+    rules_path.write_text("quality_whitelist: [1080p\n", encoding="utf-8")
+
+    parsed = parse_media_name("Dune 1080p", naming_rules=load_naming_rules(rules_path))
+
+    assert parsed.title == "Dune"
+    assert parsed.quality_tags == ("1080p",)
+
+
+def test_load_naming_rules_propagates_unexpected_parser_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    rules_path = tmp_path / "naming_rules.yml"
+    rules_path.write_text("strip_tags: []\n", encoding="utf-8")
+
+    def _raise_unexpected(_: str) -> parser_module.NamingRules:
+        raise RuntimeError("programming error")
+
+    monkeypatch.setattr(parser_module, "_parse_naming_rules_yaml", _raise_unexpected)
+
+    with pytest.raises(RuntimeError, match="programming error"):
+        load_naming_rules(rules_path)
