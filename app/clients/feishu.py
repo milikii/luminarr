@@ -5,6 +5,8 @@ import time
 
 import httpx
 
+from app.operational_logging import emit_operational_log
+
 
 class FeishuClientError(RuntimeError):
     """Raised when Feishu API calls fail."""
@@ -128,4 +130,4 @@ class FeishuClient:
         return payload
 
     def _log_api_error(self, *, title: str, detail: str, fix_hint: str) -> None:
-        print(f"\033[31m[{title}]\033[0m {detail}\n\033[33m[处理建议]\033[0m {fix_hint}")
+        emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
