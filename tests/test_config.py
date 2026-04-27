@@ -414,6 +414,21 @@ def test_load_settings_reads_downloader_instances_and_role_binding() -> None:
     assert settings.downloader_role_binding.bt_downloader == "qb-main"
 
 
+def test_load_settings_normalizes_downloader_type_aliases() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "DOWNLOADER_INSTANCES": "tr-main|tr|http://transmission:9091|/data/downloads/tr;qb-main|qb|http://qb:8080|/data/downloads/qb",
+        }
+    )
+
+    assert settings.downloader_instances[0].downloader_type == "transmission"
+    assert settings.downloader_instances[1].downloader_type == "qbittorrent"
+
+
 def test_load_settings_reads_downloader_dispatch_download_dir() -> None:
     settings = load_settings(
         {

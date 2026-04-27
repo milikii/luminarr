@@ -109,6 +109,22 @@ def _normalize_proxy_url(raw_value: str) -> str:
     raise ConfigError("OUTBOUND_PROXY_URL must start with http://, https:// or socks5://")
 
 
+def _resolve_lower_choice(
+    raw_value: str,
+    *,
+    aliases: Mapping[str, str],
+    default: str,
+    error_message: str,
+) -> str:
+    normalized_value = raw_value.strip().lower()
+    if not normalized_value:
+        return default
+    resolved_value = aliases.get(normalized_value, "")
+    if not resolved_value:
+        raise ConfigError(error_message)
+    return resolved_value
+
+
 def _read_optional(env: Mapping[str, str], key: str) -> str:
     return env.get(key, "").strip()
 
@@ -163,12 +179,12 @@ def _read_optional_lower_choice(
     allowed_values: tuple[str, ...],
     error_message: str,
 ) -> str:
-    raw_value = _read_optional(env, key).lower()
-    if not raw_value:
-        return default
-    if raw_value not in allowed_values:
-        raise ConfigError(error_message)
-    return raw_value
+    return _resolve_lower_choice(
+        _read_optional(env, key),
+        aliases={allowed_value: allowed_value for allowed_value in allowed_values},
+        default=default,
+        error_message=error_message,
+    )
 
 
 def _read_feishu_inbound_mode(env: Mapping[str, str]) -> str:
@@ -295,19 +311,17 @@ def _read_bt_web_sources(env: Mapping[str, str]) -> tuple[str, ...]:
 
 
 def _normalize_downloader_type(raw_value: str) -> str:
-    normalized_value = raw_value.strip().lower()
-    aliases = {
-        "transmission": "transmission",
-        "tr": "transmission",
-        "qbittorrent": "qbittorrent",
-        "qb": "qbittorrent",
-    }
-    resolved_value = aliases.get(normalized_value, "")
-    if not resolved_value:
-        raise ConfigError(
-            f"DOWNLOADER_INSTANCES downloader_type must be transmission or qbittorrent, got: {raw_value}"
-        )
-    return resolved_value
+    return _resolve_lower_choice(
+        raw_value,
+        aliases={
+            "transmission": "transmission",
+            "tr": "transmission",
+            "qbittorrent": "qbittorrent",
+            "qb": "qbittorrent",
+        },
+        default="",
+        error_message=f"DOWNLOADER_INSTANCES downloader_type must be transmission or qbittorrent, got: {raw_value}",
+    )
 
 
 def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstanceConfig, ...]:
