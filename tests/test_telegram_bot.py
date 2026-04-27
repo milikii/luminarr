@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from collections.abc import Awaitable
 from pathlib import Path
 from types import SimpleNamespace
@@ -1346,7 +1347,7 @@ def test_bt_classification_pending_logs_missing_query_after_restart(
 def test_bt_classification_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1365,7 +1366,7 @@ def test_bt_classification_pending_logs_read_failure(capsys: pytest.CaptureFixtu
 def test_set_bt_classification_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1392,7 +1393,7 @@ def test_set_bt_classification_pending_logs_persistence_failure(capsys: pytest.C
 def test_clear_bt_classification_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1500,7 +1501,7 @@ def test_pop_bt_classification_pending_logs_missing_clear_result_after_restart(
 def test_pop_bt_classification_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1523,7 +1524,7 @@ def test_pop_bt_classification_pending_logs_persistence_failure(capsys: pytest.C
 def test_pop_bt_classification_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1784,7 +1785,7 @@ def test_set_raw_bt_destination_pending_logs_persistence_failure(capsys: pytest.
 def test_enter_media_import_bt_flow_returns_service_not_ready_when_classification_persist_fails() -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(

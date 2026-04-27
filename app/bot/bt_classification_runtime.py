@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import MutableMapping
 from typing import Literal
 
@@ -162,7 +163,7 @@ def set_bt_classification_pending(
             )
         pending_by_chat.pop(chat_id, None)
         return False
-    except Exception as error:
+    except sqlite3.Error as error:
         _log_bt_pending_persist_failed(
             chat_id=chat_id,
             stage=BT_PENDING_STAGE_CLASSIFICATION,
@@ -189,7 +190,7 @@ def is_bt_classification_pending(
         return False
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
-    except Exception as error:
+    except (BtPendingPersistenceError, sqlite3.Error) as error:
         if _is_bt_pending_row_corrupted_reason(str(error)):
             _log_bt_pending_row_corrupted(
                 chat_id=chat_id,
@@ -240,7 +241,7 @@ def clear_bt_classification_pending(
         if cleared_result is None:
             raise BtPendingPersistenceError(_BT_PENDING_CLEAR_RESULT_MISSING_REASON)
         return cleared_result or cleared
-    except Exception as error:
+    except (BtPendingPersistenceError, sqlite3.Error) as error:
         if str(error) == _BT_PENDING_CLEAR_RESULT_MISSING_REASON:
             _log_bt_pending_clear_result_missing(
                 chat_id=chat_id,
@@ -274,7 +275,7 @@ def pop_bt_classification_pending(
                 )
                 if cleared_result is None:
                     raise BtPendingPersistenceError(_BT_PENDING_CLEAR_RESULT_MISSING_REASON)
-            except Exception as error:
+            except (BtPendingPersistenceError, sqlite3.Error) as error:
                 pending_by_chat[chat_id] = pending_query
                 if str(error) == _BT_PENDING_CLEAR_RESULT_MISSING_REASON:
                     _log_bt_pending_clear_result_missing(
@@ -296,7 +297,7 @@ def pop_bt_classification_pending(
         return None
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
-    except Exception as error:
+    except (BtPendingPersistenceError, sqlite3.Error) as error:
         if _is_bt_pending_row_corrupted_reason(str(error)):
             _log_bt_pending_row_corrupted(
                 chat_id=chat_id,
@@ -328,7 +329,7 @@ def pop_bt_classification_pending(
         cleared_result = pending_repo.clear_pending(chat_id=chat_id, expected_stage=BT_PENDING_STAGE_CLASSIFICATION)
         if cleared_result is None:
             raise BtPendingPersistenceError(_BT_PENDING_CLEAR_RESULT_MISSING_REASON)
-    except Exception as error:
+    except (BtPendingPersistenceError, sqlite3.Error) as error:
         pending_by_chat[chat_id] = pending_query
         if str(error) == _BT_PENDING_CLEAR_RESULT_MISSING_REASON:
             _log_bt_pending_clear_result_missing(

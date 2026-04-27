@@ -664,7 +664,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_bt_classificati
             self._calls += 1
             if self._calls == 1:
                 return None
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     reply_text = AsyncMock()
 
@@ -692,7 +692,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_classifica
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
             if expected_stage == "classification":
-                raise RuntimeError("db down")
+                raise sqlite3.OperationalError("db down")
             return False
 
     reply_text = AsyncMock()
@@ -789,7 +789,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_bt_classifica
 ) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     database = _make_database(tmp_path)
     reply_text = AsyncMock()
