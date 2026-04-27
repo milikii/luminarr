@@ -181,28 +181,30 @@ class ImportApprovalState:
                 IMPORT_APPROVE_RESULT_MISSING_REASON,
                 IMPORT_APPROVE_RESULT_NONE_REASON,
             }:
-                print(
-                    f"\033[31m[导入确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及审批更新后是否还能回读到该行；"
-                    "当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通已确认或普通状态冲突。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 表里该待确认导入审批是否仍存在，以及审批更新后是否还能回读到该行；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通已确认或普通状态冲突。",
                 )
                 return None
-            print(
-                f"\033[31m[导入确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成导入已确认。",
-                flush=True,
+            emit_operational_log(
+                title="导入确认审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成导入已确认。",
             )
             return None
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成导入已确认。",
-                flush=True,
+            emit_operational_log(
+                title="导入确认审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相更新失败误判成导入已确认。",
             )
             return None
         if not approved:
-            print(
-                f"\033[31m[导入确认审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record approve rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在、lease_version 是否匹配；当前 confirm 会按 not pending 处理，避免把审批真相状态冲突误判成已确认。",
-                flush=True,
+            emit_operational_log(
+                title="导入确认审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record approve rejected current state",
+                fix_hint="检查 SQLite/approval_record 表里的待确认导入审批是否仍存在、lease_version 是否匹配；当前 confirm 会按 not pending 处理，避免把审批真相状态冲突误判成已确认。",
             )
             return False
 
@@ -235,9 +237,10 @@ class ImportApprovalState:
                 expected_lease_version=expected_lease_version,
             )
             if restored is None:
-                print(
-                    f"\033[31m[导入审批回退结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因=import restore pending approval result missing\n\033[33m[处理建议]\033[0m 检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入审批回退结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因=import restore pending approval result missing",
+                    fix_hint="检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
                 )
                 return None
         except ApprovalPersistenceError as error:
@@ -245,26 +248,30 @@ class ImportApprovalState:
                 "import restore pending approval result missing",
                 "approval_record missing during restore",
             }:
-                print(
-                    f"\033[31m[导入审批回退结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入审批回退结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 原因={error}",
+                    fix_hint="检查 approval_record 回退后是否还能立即回读到 pending 审批真相；当前进程内待确认身份已回退，但持久化审批状态还没有确认回退成功。",
                 )
             else:
-                print(
-                    f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入审批回退失败",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
                 )
             return None
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
-                flush=True,
+            emit_operational_log(
+                title="导入审批回退失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
             )
             return None
         if restored is False:
-            print(
-                f"\033[31m[导入审批回退失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
-                flush=True,
+            emit_operational_log(
+                title="导入审批回退失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误=approval_record restore rejected current state",
+                fix_hint="检查 SQLite/approval_record 表里的审批行是否仍存在、lease_version 是否匹配；当前进程内待确认身份已回退，但重启后审批状态可能不一致。",
             )
             return False
         return True
@@ -290,29 +297,29 @@ class ImportApprovalState:
             )
         except ApprovalPersistenceError as error:
             if str(error) == IMPORT_EXECUTED_LEASE_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[导入执行版号结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 更新后该审批行是否仍存在，并确认 executed_version 已被正确回写；"
-                    "当前进程内 lease 版本已前进，但持久化真相还没有确认落稳。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入执行版号结果缺失",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 更新后该审批行是否仍存在，并确认 executed_version 已被正确回写；当前进程内 lease 版本已前进，但持久化真相还没有确认落稳。",
                 )
             elif str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[导入执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 里的 lease_version / executed_version 等字段是否仍是完整真相；"
-                    "当前进程内 lease 版本已前进，但不会把坏审批记录当成已稳定回写。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入执行版号记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 里的 lease_version / executed_version 等字段是否仍是完整真相；当前进程内 lease 版本已前进，但不会把坏审批记录当成已稳定回写。",
                 )
             else:
-                print(
-                    f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入执行版号回写失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
                 )
             return None
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入执行版号回写失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
-                flush=True,
+            emit_operational_log(
+                title="导入执行版号回写失败",
+                detail=f"task_id={task_id} task_hash={task_hash} lease_version={executed_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前进程内 lease 版本已前进，但持久化真相可能仍停留在旧值。",
             )
             return None
         return True
@@ -335,9 +342,10 @@ class ImportApprovalState:
         try:
             approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
         except (ApprovalPersistenceError, sqlite3.Error) as error:
-            print(
-                f"\033[31m[导入待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前调用会按状态读取失败处理，避免把持久化真相异常继续混成进程内版号兜底。",
-                flush=True,
+            emit_operational_log(
+                title="导入待确认版号查询失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表查询是否正常；当前调用会按状态读取失败处理，避免把持久化真相异常继续混成进程内版号兜底。",
             )
             if not allow_in_memory_fallback_on_error:
                 return PENDING_LEASE_LOOKUP_FAILED
@@ -346,9 +354,10 @@ class ImportApprovalState:
             return self.pending_import_lease_versions.get(identity, 1)
         if approval_record is None:
             if identity in self.pending_import_identities:
-                print(
-                    f"\033[31m[导入待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误=approval_record missing while in-memory pending exists\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前调用会按状态读取失败处理，避免把审批真相缺口继续混成进程内版号兜底。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入待确认版号查询失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误=approval_record missing while in-memory pending exists",
+                    fix_hint="检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前调用会按状态读取失败处理，避免把审批真相缺口继续混成进程内版号兜底。",
                 )
                 if not allow_in_memory_fallback_on_error:
                     return PENDING_LEASE_LOOKUP_FAILED
@@ -367,26 +376,30 @@ class ImportApprovalState:
             approval_record = self._approval_repo.get_import_approval(task_id=task_id, task_hash=task_hash)
         except ApprovalPersistenceError as error:
             if str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[导入确认执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通没有待确认导入。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认执行版号记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通没有待确认导入。",
                 )
             else:
-                print(
-                    f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认执行版号查询失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
                 )
             return self._import_confirm_state_unavailable_text
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
-                flush=True,
+            emit_operational_log(
+                title="导入确认执行版号查询失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认导入。",
             )
             return self._import_confirm_state_unavailable_text
         if approval_record is None:
-            print(
-                f"\033[31m[导入确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误=approval_record missing during stale check\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通没有待确认导入。",
-                flush=True,
+            emit_operational_log(
+                title="导入确认执行版号查询失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误=approval_record missing during stale check",
+                fix_hint="检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通没有待确认导入。",
             )
             return self._import_confirm_state_unavailable_text
         if approval_record.lease_version <= 0:
@@ -411,29 +424,29 @@ class ImportApprovalState:
             )
         except JobEventPersistenceError as error:
             if str(error) == IMPORT_TARGET_LOOKUP_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[导入目标路径结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 job_event 关联查询返回是否仍带有完整事件列表；"
-                    "当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“无导入目标路径”。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入目标路径结果缺失",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 job_event 关联查询返回是否仍带有完整事件列表；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“无导入目标路径”。",
                 )
             elif self._is_import_target_lookup_row_corrupted_error(error):
-                print(
-                    f"\033[31m[导入目标路径记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 job_event 导入成功关联里的 task_ref / event_type / target_path / message "
-                    "是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏记录误判成普通“无导入目标路径”。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入目标路径记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 job_event 导入成功关联里的 task_ref / event_type / target_path / message 是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏记录误判成普通“无导入目标路径”。",
                 )
             else:
-                print(
-                    f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入目标路径查询失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
                 )
             return ImportTargetLookupResult(lookup_failed=True)
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入目标路径查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
-                flush=True,
+            emit_operational_log(
+                title="导入目标路径查询失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 SQLite/job_event 表读取是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“无导入目标路径”。",
             )
             return ImportTargetLookupResult(lookup_failed=True)
         if correlation is None:
@@ -441,11 +454,10 @@ class ImportApprovalState:
         target_path = correlation.target_path.strip() or correlation.message.strip()
         if target_path:
             return ImportTargetLookupResult(target_path=target_path)
-        print(
-            f"\033[31m[导入目标路径缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误=import correlation target path missing\n"
-            "\033[33m[处理建议]\033[0m 检查 import.succeeded 事件是否仍带有 target_path 或 message；"
-            "当前会按无导入目标路径处理，避免把结构化路径缺失误判成普通“没有历史导入终态”。",
-            flush=True,
+        emit_operational_log(
+            title="导入目标路径缺失",
+            detail=f"task_id={task_id} task_hash={task_hash} 错误=import correlation target path missing",
+            fix_hint="检查 import.succeeded 事件是否仍带有 target_path 或 message；当前会按无导入目标路径处理，避免把结构化路径缺失误判成普通“没有历史导入终态”。",
         )
         return ImportTargetLookupResult()
 
@@ -466,28 +478,28 @@ class ImportApprovalState:
             )
         except ApprovalPersistenceError as error:
             if str(error) == IMPORT_PENDING_EXPIRY_RESULT_MISSING_REASON:
-                print(
-                    f"\033[31m[导入确认过期结果缺失]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里的待确认导入审批是否仍存在，并确认对应 lease_version 没有被其他路径抢先改写；"
-                    "当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“未过期”。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认过期结果缺失",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 表里的待确认导入审批是否仍存在，并确认对应 lease_version 没有被其他路径抢先改写；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“未过期”。",
                 )
             elif str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[导入确认过期审批记录损坏]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；"
-                    "当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通“未过期”。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认过期审批记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通“未过期”。",
                 )
             else:
-                print(
-                    f"\033[31m[导入确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认过期判断失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
                 )
             return None
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入确认过期判断失败]\033[0m task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
-                flush=True,
+            emit_operational_log(
+                title="导入确认过期判断失败",
+                detail=f"task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成“未过期”。",
             )
             return None
