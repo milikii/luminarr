@@ -155,21 +155,26 @@ class AdultArchiveService:
                 source_path.unlink()
             else:
                 raise OSError("成人资源源路径不是文件或目录，无法清理。")
-        self._job_event_repo.append_event(
-            task_ref=candidate.task_hash,
-            task_id=candidate.task_id,
-            task_hash=candidate.task_hash,
-            event_type="adult_archive.retention_cleanup_succeeded",
-            message=registry_record.archive_path,
-            source_path=str(source_path),
-            target_path=registry_record.archive_path,
-        )
-        self._registry_repo.mark_archived_deleted(
-            normalized_content_id=registry_record.normalized_content_id,
-            archive_path=registry_record.archive_path,
-            task_id=candidate.task_id,
-            task_hash=candidate.task_hash,
-        )
+        try:
+            self._job_event_repo.append_event(
+                task_ref=candidate.task_hash,
+                task_id=candidate.task_id,
+                task_hash=candidate.task_hash,
+                event_type="adult_archive.retention_cleanup_succeeded",
+                message=registry_record.archive_path,
+                source_path=str(source_path),
+                target_path=registry_record.archive_path,
+            )
+            self._registry_repo.mark_archived_deleted(
+                normalized_content_id=registry_record.normalized_content_id,
+                archive_path=registry_record.archive_path,
+                task_id=candidate.task_id,
+                task_hash=candidate.task_hash,
+            )
+        except (AdultContentRegistryPersistenceError, JobEventPersistenceError, sqlite3.Error) as error:
+            raise AdultArchiveStateUnavailableError(
+                f"adult archive cleanup state persist failed for {candidate.task_id}/{candidate.task_hash}: {error}"
+            ) from error
         return (
             f"成人资源保留期清理完成：{registry_record.display_title or import_source.name}\n"
             f"任务 Hash: {candidate.task_hash}\n"
