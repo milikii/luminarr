@@ -11,6 +11,7 @@ from app.db.approval_repo import (
     ApprovalRepo,
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.operational_logging import emit_operational_log
 
 PENDING_LEASE_LOOKUP_FAILED = -1
 IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON = "approval_record missing after pending request"
@@ -80,9 +81,10 @@ class ImportApprovalState:
                 timeout_seconds=DEFAULT_PENDING_TIMEOUT_SECONDS,
             )
             if type(requested_lease) is not int or requested_lease <= 0:
-                print(
-                    f"\033[31m[导入待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={IMPORT_PENDING_APPROVAL_NONE_REASON}\n\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认导入审批的 lease_version；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入待确认审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={IMPORT_PENDING_APPROVAL_NONE_REASON}",
+                    fix_hint="检查 approval_record 写入后回读是否仍能拿到当前待确认导入审批的 lease_version；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
                 )
                 return 0
             lease_version = requested_lease
@@ -91,29 +93,29 @@ class ImportApprovalState:
                 IMPORT_PENDING_APPROVAL_RESULT_MISSING_REASON,
                 IMPORT_PENDING_APPROVAL_NONE_REASON,
             }:
-                print(
-                    f"\033[31m[导入待确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 写入后回读是否仍能拿到当前待确认导入审批的 lease_version；"
-                    "当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入待确认审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 approval_record 写入后回读是否仍能拿到当前待确认导入审批的 lease_version；当前请求会直接返回待确认状态写入失败，避免把缺失真相误报成可确认导入。",
                 )
             elif str(error) == IMPORT_PENDING_APPROVAL_ROW_CORRUPTED_REASON:
-                print(
-                    f"\033[31m[导入待确认审批记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record.lease_version 是否仍是正整数真相；"
-                    "当前请求会直接返回待确认状态写入失败，避免把坏审批记录误报成可确认导入。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入待确认审批记录损坏",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 approval_record.lease_version 是否仍是正整数真相；当前请求会直接返回待确认状态写入失败，避免把坏审批记录误报成可确认导入。",
                 )
             else:
-                print(
-                    f"\033[31m[导入待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认导入。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入待确认审批落盘失败",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认导入。",
                 )
             return 0
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入待确认审批落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认导入。",
-                flush=True,
+            emit_operational_log(
+                title="导入待确认审批落盘失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表写入是否正常；当前请求会直接返回待确认状态写入失败，避免把审批真相缺口误报成可确认导入。",
             )
             return 0
 
@@ -168,9 +170,10 @@ class ImportApprovalState:
                 expected_lease_version=expected_lease_version,
             )
             if approved is None:
-                print(
-                    f"\033[31m[导入确认审批结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={IMPORT_APPROVE_RESULT_NONE_REASON}\n\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及审批更新后是否还能回读到该行；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通已确认或普通状态冲突。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入确认审批结果缺失",
+                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={IMPORT_APPROVE_RESULT_NONE_REASON}",
+                    fix_hint="检查 approval_record 表里该待确认导入审批是否仍存在，以及审批更新后是否还能回读到该行；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通已确认或普通状态冲突。",
                 )
                 return None
         except ApprovalPersistenceError as error:
