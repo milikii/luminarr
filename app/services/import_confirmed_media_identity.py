@@ -4,6 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.operational_logging import emit_operational_log
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_from_json
 
 IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON = "import media identity result missing"
@@ -44,29 +45,26 @@ class ImportConfirmedMediaIdentityResolver:
 
 
 def _log_import_media_identity_query_failed(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入媒体身份查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；"
-        "当前 metadata 入参会退回命名真相或文件名解析，避免把查询失败混成普通“无媒体身份”。",
-        flush=True,
+    emit_operational_log(
+        title="导入媒体身份查询失败",
+        detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+        fix_hint="检查 SQLite/job_event 表读取是否正常；当前 metadata 入参会退回命名真相或文件名解析，避免把查询失败混成普通“无媒体身份”。",
     )
 
 
 def _log_import_media_identity_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入媒体身份结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
-        "当前 metadata 入参会退回命名真相或文件名解析，避免把缺失真相误判成“没有已确认媒体身份”。",
-        flush=True,
+    emit_operational_log(
+        title="导入媒体身份结果缺失",
+        detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+        fix_hint="检查 job_event 查询返回是否仍带有完整结果；当前 metadata 入参会退回命名真相或文件名解析，避免把缺失真相误判成“没有已确认媒体身份”。",
     )
 
 
 def _log_import_media_identity_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入媒体身份记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 里的 task_ref / event_type / message 等媒体身份字段是否仍是完整记录；"
-        "当前 metadata 入参会退回命名真相或文件名解析，避免把坏记录混成普通查询失败。",
-        flush=True,
+    emit_operational_log(
+        title="导入媒体身份记录损坏",
+        detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+        fix_hint="检查 job_event 里的 task_ref / event_type / message 等媒体身份字段是否仍是完整记录；当前 metadata 入参会退回命名真相或文件名解析，避免把坏记录混成普通查询失败。",
     )
 
 
