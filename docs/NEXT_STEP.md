@@ -1,18 +1,17 @@
-# Next step (v396)
+# Next step (v397)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环：把 `app/main.py`、`telegram_update_runtime`、`telegram_delivery_runtime`、`channel_identity`、`download_follow_up_runtime`、`metadata_scraper`、`subtitle_translation_support`、`manage_watchlist`、`manage_bt_subscription`、`cleanup_correlation_lookup` 的剩余手写/间接 ANSI 日志继续统一到 shared `emit_operational_log` 边界。
-- 本轮还修复了下载状态路由和 cleanup correlation 的失败边界：状态查询路由读取异常会包装成明确 `DownloaderRouteLookupError`；cleanup correlation 的 `job_event` 查询运行时错误会进入既有查询失败边界，不再跨渠道泄出异常。
-- focused tests 已覆盖本轮触及路径；`tests/test_main.py`、`tests/test_downloader_route_lookup.py`、`tests/test_telegram_runtime_adapter.py`、`tests/test_telegram_delivery_runtime.py`、`tests/test_feishu_adapter.py`、`tests/test_wecom_adapter.py`、`tests/test_personal_wechat_text.py`、`tests/test_download_follow_up_runtime.py`、`tests/test_metadata_scraper.py`、`tests/test_subtitle_translator.py`、`tests/test_manage_watchlist.py`、`tests/test_manage_bt_subscription.py`、`tests/test_bt_subscription_last_seen_support.py`、`tests/test_bt_subscription_scan_support.py`、`tests/test_bt_subscription_scheduler_support.py`、`tests/test_cleanup_downloaded_source.py`、`tests/test_cleanup_cross_channel_smoke.py`、`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/BT 主线语义不变。
+- 本轮已完成 10 个最小闭环：把 `auto_import_batch`、`search_request_context`、`media_name_parser`、`bt_candidate_scorer`、`import_to_library`、`import_transfer_execution`、`post_download_auto_import`、`cleanup_downloaded_source`、`import_job_state`、`import_approval_state` 的剩余手写 ANSI 日志统一到 shared `emit_operational_log` 边界。
+- focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码、search/web/BT 展示、candidate/clarification、Telegram delivery/update、import pending/approval/event 等异常边界已持续收口。
-  - downloader route lookup、confirm / cleanup / frustration / BT read-only / raw BT / BT TMDB / BT pending、Feishu client、web source、main startup、Telegram update/delivery、channel identity、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation 的日志出口已统一到 shared operational logging。
+  - downloader route lookup、confirm / cleanup / frustration / BT read-only / raw BT / BT TMDB / BT pending、Feishu client、web source、main startup、Telegram update/delivery、channel identity、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation、auto-import/search/naming/scoring/import/cleanup 的日志出口已统一到 shared operational logging。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
   - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
@@ -21,7 +20,7 @@
 
 ## User value
 
-- 减少持久化异常和操作失败只能靠猜的场景，同时保持现有用户行为、协议和持久化真相不变。
+- 减少持久化异常、配置回退、导入执行失败和 cleanup 失败只能靠猜的场景，同时保持现有用户行为、协议和持久化真相不变。
 - 默认分支继续可用；focused gate 已覆盖本轮触及路径，质量 gate 和 mainline gate 继续作为退出条件。
 - 成人 BT 后续可以切，但默认先把质量债继续压低，避免在不稳边界上扩功能。
 
