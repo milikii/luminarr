@@ -157,7 +157,7 @@ class CandidateStateStore:
                 flush=True,
             )
             return CandidateLoadResult(load_failed=True)
-        except Exception as error:
+        except (CandidatePersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[搜索候选读取失败]\033[0m chat_id={chat_id} index={index} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表读取是否正常；当前相关入口会按候选读取失败或状态不可用处理，避免把持久化异常误判成“无候选”。",
                 flush=True,

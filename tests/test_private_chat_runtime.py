@@ -1132,7 +1132,11 @@ def test_dispatch_private_chat_text_stops_on_cached_candidate_lookup_failure(
     reply_text = AsyncMock()
     search_service = SearchMediaService(
         _fake_search,
-        candidate_repo=type("BoomRepo", (), {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError("db down"))})(),
+        candidate_repo=type(
+            "BoomRepo",
+            (),
+            {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+        )(),
     )
 
     asyncio.run(
