@@ -30,6 +30,7 @@ from app.bot.telegram_bot import (
     TELEGRAM_SEND_TEXT_FUNC_KEY,
 )
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
+from app.db.clarification_repo import ClarificationPersistenceError
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.bt_pending_repo import BtPendingRepo
@@ -1165,7 +1166,7 @@ def test_dispatch_private_chat_text_stops_on_clarification_lookup_failure(
         clarification_repo=type(
             "BoomRepo",
             (),
-            {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(ClarificationPersistenceError("db down"))},
         )(),
     )
 
@@ -1293,7 +1294,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_clarification_c
         clarification_repo=type(
             "BoomRepo",
             (),
-            {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(ClarificationPersistenceError("db down"))},
         )(),
     )
     search_service._clarification_pending_by_chat[1001] = "dune"
@@ -1355,7 +1356,7 @@ def test_dispatch_private_chat_text_digit_stops_on_clarification_lookup_failure(
         clarification_repo=type(
             "BoomRepo",
             (),
-            {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(ClarificationPersistenceError("db down"))},
         )(),
     )
 
