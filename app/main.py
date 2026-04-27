@@ -51,7 +51,6 @@ from app.downloader_route_lookup import (
     _get_torrent_status_with_routing,
     _resolve_downloader_client_for_lookup,
     _resolve_downloader_client_for_dispatch,
-    _resolve_downloader_name_for_task,
     resolve_downloader_dispatch_download_dir,
 )
 from app.services.add_to_downloader import AddToDownloaderService
