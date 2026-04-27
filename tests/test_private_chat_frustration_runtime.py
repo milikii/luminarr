@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
@@ -156,7 +157,7 @@ def test_handle_frustration_query_logs_pending_job_lookup_failure(
     reply_func = AsyncMock()
     execution_gate = _ExecutionGate()
     job_repo = JobRepo(_make_database(tmp_path))
-    job_repo.get_latest_pending_job = Mock(side_effect=RuntimeError("sqlite busy"))  # type: ignore[method-assign]
+    job_repo.get_latest_pending_job = Mock(side_effect=sqlite3.OperationalError("sqlite busy"))  # type: ignore[method-assign]
 
     handled = asyncio.run(
         handle_frustration_query(

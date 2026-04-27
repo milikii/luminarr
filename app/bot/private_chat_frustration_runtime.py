@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Awaitable, Callable, MutableMapping
 
 from app.bot.bt_classification_runtime import (
@@ -14,6 +15,7 @@ from app.bot.execution_runtime import run_sync_with_policy
 from app.bot.query_text_runtime import is_frustration_text
 from app.bot.raw_bt_destination_runtime import clear_raw_bt_destination_pending
 from app.bot.bt_tmdb_association_runtime import clear_bt_tmdb_association_pending
+from app.db.job_repo import JobPersistenceError
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
@@ -88,7 +90,7 @@ async def _cancel_pending_job_for_frustration(
         return False
     try:
         pending_job = job_repo.get_latest_pending_job(chat_id=chat_id)
-    except Exception as error:
+    except (JobPersistenceError, sqlite3.Error) as error:
         _log_pending_job_lookup_failed(chat_id=chat_id, reason=str(error))
         await reply_func(tg.SERVICE_NOT_READY_TEXT)
         return True
