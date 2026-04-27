@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTask
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError
 from app.db.approval_repo import APPROVAL_STATUS_CANCELLED, DEFAULT_PENDING_TIMEOUT_SECONDS, ApprovalRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
@@ -162,7 +163,7 @@ def test_add_candidate_source_logs_adult_pending_registry_failure_without_failin
     registry_repo = type(
         "AdultContentRegistryRepo",
         (),
-        {"upsert_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"upsert_pending": lambda self, **kwargs: (_ for _ in ()).throw(AdultContentRegistryPersistenceError("db down"))},
     )()
     service = AddToDownloaderService(
         search_service=SearchMediaService(_fake_search_with_download_url),

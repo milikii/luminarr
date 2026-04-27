@@ -1,7 +1,8 @@
-# Current status (v503)
+# Current status (v504)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；**文档入口收口 / 当前真相对齐** 已完成并推送；当前切回 **质量债硬化 / import 持久化异常边界收口 + 小 support 文件收口**。
+- 本轮继续收口 12 处小异常边界：`search_request_context` 的搜索源失败日志、`web_source` 的搜索/分页/详情 HTTP 边界、`bt_read_only_display` 的 JavLibrary 只读补全和成人历史查询、`import_confirmed_media_identity` 的 job_event 回读、`add_adult_registry_state` 的成人待确认/下载状态登记、`import_context_lookup` 的 job/approval/raw BT 回读；这些路径不再吞泛 `Exception`，只兜明确 HTTP、JSON、repo persistence 或 SQLite 异常。
 - 本轮继续收口 10 处状态边界：`search_candidate_state` 的持久化/回读/回滚边界、`search_clarification_state` 的持久化/回读/清理边界，统一收窄为 `CandidatePersistenceError` / `ClarificationPersistenceError` 和 `sqlite3.Error`，不再吞泛 `Exception`。
 - 本轮继续收口 Telegram 出站与去重边界：`telegram_update_runtime` 只兜 `TelegramUpdatePersistenceError` / `sqlite3.Error`，去重结果缺失也改为专用异常；`telegram_delivery_runtime` 只兜 `TelegramError`。
 - 本轮连续收掉 10 处持久化/回读边界：`ImportEventRecorder`、`ImportApprovalState` 的 pending / approve / restore / executed / pending lease / stale target / expiry / event lookup 分支，以及 `ImportPendingWriteThroughState` 的取消回退分支；都改成只兜 `ApprovalPersistenceError`、`JobEventPersistenceError` 或 `sqlite3.Error`，不再吞泛 `Exception`。
@@ -13,9 +14,13 @@
 
 ## Current health
 - 默认分支最近业务回归保持绿灯；本轮 focused tests 已覆盖 import 持久化边界、import transfer、search media、BT subscription、WeCom 和 docs gate.
-- 下一轮如果继续质量债，优先挑剩余 broad `except Exception`、日志打印边界或 `main()` DI；不要为了凑数字强拆剩余大 support 文件。
+- 下一轮如果继续质量债，优先挑 `status_follow_up`、download follow-up runtime、剩余小 broad `except Exception`、日志打印边界或 `main()` DI；不要为了凑数字强拆剩余大 support 文件。
 
 ## Latest verification
+- `tests/test_bt_sources.py tests/test_bt_read_only_display.py tests/test_import_confirmed_media_identity.py tests/test_import_context_lookup.py`：`31 passed`
+- `tests/test_search_media.py -k "javlibrary_lookup_fails or search_backend_failure or tmdb_failed or tmdb_failure" tests/test_add_to_downloader.py -k "adult_pending_registry_failure" tests/test_add_execution_follow_up.py -k "adult_content_downloading_failure" tests/test_import_to_library.py -k "correlation_lookup or raw_bt or rebuild_confirm_context"`：`14 passed, 442 deselected`
+- `make quality`：通过（`27 passed`）
+- `make verify-mainline`：通过
 - `tests/test_search_media.py -k "candidate or clarification"`：`48 passed, 137 deselected`
 - `tests/test_telegram_runtime_adapter.py tests/test_telegram_delivery_runtime.py`：`13 passed, 4 warnings`
 - `tests/test_telegram_bot.py -k "telegram_media_sender"`：`4 passed, 190 deselected`

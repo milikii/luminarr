@@ -270,7 +270,11 @@ def test_confirm_import_by_task_ref_usage_when_empty() -> None:
 
 
 def test_rebuild_confirm_context_logs_job_lookup_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     context, lookup_failed = service._rebuild_confirm_context(task_ref="87", chat_id=1001)
     assert context is None
@@ -292,7 +296,11 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
         },
     )()
     job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
-    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(ApprovalPersistenceError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo, approval_repo=approval_repo)
     context, lookup_failed = service._rebuild_confirm_context(task_ref="87", chat_id=1001)
     assert context is not None
@@ -376,7 +384,11 @@ def test_is_raw_bt_task_logs_payload_corruption(
 
 
 def test_import_by_task_ref_returns_query_failed_when_raw_bt_lookup_fails(capsys: pytest.CaptureFixture[str]) -> None:
-    job_repo = type("JobRepo", (), {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type(
+        "JobRepo",
+        (),
+        {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("db down"))},
+    )()
     get_import_source = AsyncMock()
     service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
 

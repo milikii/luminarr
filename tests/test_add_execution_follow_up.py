@@ -5,6 +5,7 @@ import json
 from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionTask
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError
 from app.db.job_event_repo import JobEventRepo, JobEventPersistenceError
 from app.db.sqlite import SqliteDatabase
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError
@@ -351,7 +352,7 @@ def test_dispatch_logs_adult_content_downloading_failure_without_failing_downloa
         adult_content_registry_repo=type(
             "AdultContentRegistryRepo",
             (),
-            {"mark_downloading": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"mark_downloading": lambda self, **kwargs: (_ for _ in ()).throw(AdultContentRegistryPersistenceError("db down"))},
         )(),
         log_trace_func=lambda **kwargs: None,
         add_failed_text="下载投递失败，请稍后重试。",

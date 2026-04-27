@@ -403,7 +403,7 @@ def test_search_bt_read_only_and_format_keeps_results_when_javlibrary_lookup_fai
         ]
 
     async def failing_helper_lookup(_: str) -> JavLibraryReadOnlyMatch | None:
-        raise RuntimeError("timeout")
+        raise httpx.ConnectError("timeout", request=httpx.Request("GET", "https://example.com"))
 
     service = SearchMediaService(
         _fake_search_with_results,
@@ -4610,11 +4610,11 @@ def test_search_and_format_logs_tmdb_failure(capsys) -> None:
 
 def test_search_and_format_logs_search_backend_failure(capsys) -> None:
     async def fake_search(_: str) -> list[dict[str, object]]:
-        raise RuntimeError("indexer unavailable")
+        raise httpx.ConnectError("indexer unavailable", request=httpx.Request("GET", "https://example.com"))
 
     service = SearchMediaService(fake_search)
 
-    with pytest.raises(RuntimeError, match="indexer unavailable"):
+    with pytest.raises(httpx.ConnectError, match="indexer unavailable"):
         _run(service.search_and_format("Dune 2021"))
 
     output = capsys.readouterr().out

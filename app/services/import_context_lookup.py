@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from app.db.approval_repo import ApprovalRecord, ApprovalRepo
-from app.db.job_repo import JobRecord, JobRepo
+from app.db.approval_repo import ApprovalPersistenceError, ApprovalRecord, ApprovalRepo
+from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +62,7 @@ class ImportContextLookup:
             return ConfirmContextLookupResult(context=None)
         try:
             job = self._job_repo.get_import_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             error_kind = "row_corrupted" if self._is_job_row_corrupted_error(error) else "lookup_failed"
             return ConfirmContextLookupResult(
                 context=None,
@@ -81,7 +82,7 @@ class ImportContextLookup:
                     task_id=job.task_id,
                     task_hash=job.task_hash,
                 )
-            except Exception as error:
+            except (ApprovalPersistenceError, sqlite3.Error) as error:
                 approval_lookup_failed = True
                 approval_error_detail = str(error)
         return ConfirmContextLookupResult(
@@ -103,7 +104,7 @@ class ImportContextLookup:
             return RawBtTaskLookupResult(is_raw_bt=False)
         try:
             downloader_job = self._job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             error_kind = "row_corrupted" if self._is_job_row_corrupted_error(error) else "lookup_failed"
             return RawBtTaskLookupResult(is_raw_bt=None, error_kind=error_kind, detail=str(error))
         if downloader_job is None:

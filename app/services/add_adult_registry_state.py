@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.db.adult_content_registry_repo import AdultContentRegistryRepo
+import sqlite3
+
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.services.add_pending_context import PendingAddContext
 
 
@@ -25,7 +27,7 @@ class AddAdultRegistryState:
                 task_hash=pending_add.task_hash,
                 downloader_name=pending_add.downloader_name,
             )
-        except Exception as error:
+        except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[成人资源待确认登记失败]\033[0m content_id={pending_add.adult_content_id} "
                 f"task_ref={pending_add.task_ref} task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}\n"
@@ -57,7 +59,7 @@ class AddAdultRegistryState:
                 task_hash=task_hash,
                 downloader_name=pending_add.downloader_name,
             )
-        except Exception as error:
+        except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[成人资源下载状态登记失败]\033[0m content_id={pending_add.adult_content_id} task_ref={task_ref} "
                 f"task_id={task_id} task_hash={task_hash} 错误={error}\n"

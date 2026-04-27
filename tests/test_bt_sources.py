@@ -200,6 +200,56 @@ def test_web_source_client_passes_proxy_to_httpx(monkeypatch) -> None:
     assert client_kwargs[0]["proxy"] == "http://192.168.2.110:7890"
 
 
+def test_web_source_client_search_logs_http_failure(monkeypatch, capsys) -> None:
+    class FakeAsyncClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str) -> httpx.Response:
+            raise httpx.ConnectError("network down", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = WebSourceClient(rule=NYAA_RULE)
+    result = asyncio.run(client.search("frieren"))
+
+    assert result == []
+    output = capsys.readouterr().out
+    assert "[BT 外部站点源失败]" in output
+    assert "来源=nyaa" in output
+
+
+def test_web_source_client_search_page_logs_http_failure(monkeypatch, capsys) -> None:
+    class FakeAsyncClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str) -> httpx.Response:
+            raise httpx.ConnectError("network down", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = WebSourceClient(rule=NYAA_RULE)
+    result = asyncio.run(client.search_page("https://nyaa.si/?q=frieren"))
+
+    assert result == []
+    output = capsys.readouterr().out
+    assert "[BT 外部站点源失败]" in output
+    assert "查询=https://nyaa.si/?q=frieren" in output
+
+
 def test_web_source_client_search_supports_javbus_detail_follow_up(monkeypatch) -> None:
     requests: list[str] = []
 
@@ -246,6 +296,49 @@ def test_web_source_client_search_supports_javbus_detail_follow_up(monkeypatch) 
     assert len(results) == 1
     assert results[0]["title"] == "SSIS-123 Sample Title"
     assert results[0]["source"].startswith("magnet:?xt=urn:btih:BBBBBBBB")
+
+
+def test_web_source_client_search_skips_failed_javbus_detail(monkeypatch, capsys) -> None:
+    requests: list[str] = []
+
+    class FakeAsyncClient:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        async def __aenter__(self) -> FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def get(self, url: str) -> httpx.Response:
+            requests.append(url)
+            if url == "https://www.javbus.com/search/SSIS-123":
+                return httpx.Response(
+                    200,
+                    text=(
+                        '<a class="movie-box" href="/SSIS-123">'
+                        '<img title="SSIS-123 Sample Title" />'
+                        "<date>SSIS-123</date>"
+                        "</a>"
+                    ),
+                    request=httpx.Request("GET", url),
+                )
+            raise httpx.ConnectError("detail down", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: FakeAsyncClient(**kwargs))
+
+    client = WebSourceClient(rule=JAVBUS_RULE)
+    results = asyncio.run(client.search("SSIS-123"))
+
+    assert requests == [
+        "https://www.javbus.com/search/SSIS-123",
+        "https://www.javbus.com/SSIS-123",
+    ]
+    assert results == []
+    output = capsys.readouterr().out
+    assert "[BT 外部站点源失败]" in output
+    assert "查询=https://www.javbus.com/SSIS-123" in output
 
 
 def test_is_supported_web_source_page_url_accepts_nyaa_user_search_list_home_pagination_sort_and_category_sort_pages() -> None:

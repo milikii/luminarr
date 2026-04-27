@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
@@ -18,8 +19,8 @@ class ImportConfirmedMediaIdentityResolver:
         try:
             events = self.job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
             if events is None:
-                raise RuntimeError(IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON)
-        except Exception as error:
+                raise JobEventPersistenceError(IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON)
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error) == IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON:
                 _log_import_media_identity_result_missing(task_id=task_id, task_hash=task_hash, reason=str(error))
             elif _is_import_media_identity_row_corrupted_error(error):

@@ -102,7 +102,7 @@ class WebSourceClient:
 
         try:
             response = await self._get(self._build_search_url(cleaned_query))
-        except Exception as error:
+        except httpx.HTTPError as error:
             _log_web_source_error(source_name=self._rule.name, query=cleaned_query, error=error)
             return []
 
@@ -119,7 +119,7 @@ class WebSourceClient:
 
         try:
             response = await self._get(cleaned_page_url)
-        except Exception as error:
+        except httpx.HTTPError as error:
             _log_web_source_error(source_name=self._rule.name, query=cleaned_page_url, error=error)
             return []
 
@@ -131,7 +131,7 @@ class WebSourceClient:
         for title, detail_url in entries[:5]:
             try:
                 detail_response = await self._get(detail_url)
-            except Exception as error:
+            except httpx.HTTPError as error:
                 _log_web_source_error(source_name=self._rule.name, query=detail_url, error=error)
                 continue
             source = _extract_source(detail_response.text, base_url=self._rule.base_url)
