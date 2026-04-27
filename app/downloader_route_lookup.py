@@ -47,6 +47,19 @@ def _print_downloader_issue_log(
     )
 
 
+def _load_downloader_route_payload(payload_json: str) -> tuple[dict[str, object] | None, str | None]:
+    cleaned_payload = payload_json.strip()
+    if not cleaned_payload:
+        return None, "payload_json empty"
+    try:
+        payload = json.loads(cleaned_payload)
+    except json.JSONDecodeError:
+        return None, "payload_json invalid json"
+    if not isinstance(payload, dict):
+        return None, "payload_json not object"
+    return payload, None
+
+
 def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
     _print_downloader_issue_log(
         title="下载器路由未命中",
@@ -102,24 +115,12 @@ def _resolve_downloader_task_route(
     if downloader_job is None:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
         return None
-    cleaned_payload = downloader_job.payload_json.strip()
-    if not cleaned_payload:
-        _log_downloader_route_payload_corruption(task_ref=task_ref, chat_id=chat_id, reason="payload_json empty")
-        return None
-    try:
-        payload = json.loads(cleaned_payload)
-    except json.JSONDecodeError:
+    payload, payload_problem = _load_downloader_route_payload(downloader_job.payload_json)
+    if payload is None:
         _log_downloader_route_payload_corruption(
             task_ref=task_ref,
             chat_id=chat_id,
-            reason="payload_json invalid json",
-        )
-        return None
-    if not isinstance(payload, dict):
-        _log_downloader_route_payload_corruption(
-            task_ref=task_ref,
-            chat_id=chat_id,
-            reason="payload_json not object",
+            reason=payload_problem or "payload_json invalid",
         )
         return None
     downloader_name = str(payload.get("downloader_name", "")).strip()
