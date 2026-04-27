@@ -129,7 +129,14 @@ def _read_optional(env: Mapping[str, str], key: str) -> str:
     return env.get(key, "").strip()
 
 
-def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
+def _read_optional_int_with_validator(
+    env: Mapping[str, str],
+    key: str,
+    default: int,
+    *,
+    predicate: Callable[[int], bool],
+    error_message: str,
+) -> int:
     raw_value = _read_optional(env, key)
     if not raw_value:
         return default
@@ -137,22 +144,29 @@ def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
         value = int(raw_value)
     except ValueError as error:
         raise ConfigError(f"{key} must be an integer") from error
-    if value <= 0:
-        raise ConfigError(f"{key} must be a positive integer")
+    if not predicate(value):
+        raise ConfigError(error_message)
     return value
+
+
+def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
+    return _read_optional_int_with_validator(
+        env,
+        key,
+        default,
+        predicate=lambda value: value > 0,
+        error_message=f"{key} must be a positive integer",
+    )
 
 
 def _read_optional_non_negative_int(env: Mapping[str, str], key: str, default: int) -> int:
-    raw_value = _read_optional(env, key)
-    if not raw_value:
-        return default
-    try:
-        value = int(raw_value)
-    except ValueError as error:
-        raise ConfigError(f"{key} must be an integer") from error
-    if value < 0:
-        raise ConfigError(f"{key} must be a non-negative integer")
-    return value
+    return _read_optional_int_with_validator(
+        env,
+        key,
+        default,
+        predicate=lambda value: value >= 0,
+        error_message=f"{key} must be a non-negative integer",
+    )
 
 
 def _normalize_http_path(raw_value: str, *, default: str) -> str:
