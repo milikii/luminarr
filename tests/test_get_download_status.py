@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.clients.transmission import TransmissionTaskStatus
+from app.clients.transmission import TransmissionError, TransmissionTaskStatus
 from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
@@ -94,13 +94,13 @@ def test_get_status_text_not_found() -> None:
 
 
 def test_get_status_text_handles_query_error() -> None:
-    service = GetDownloadStatusService(AsyncMock(side_effect=RuntimeError("boom")))
+    service = GetDownloadStatusService(AsyncMock(side_effect=TransmissionError("boom")))
     text = _run(service.get_status_text("87"))
     assert text == STATUS_QUERY_FAILED_TEXT
 
 
 def test_get_status_text_logs_query_error(capsys) -> None:
-    service = GetDownloadStatusService(AsyncMock(side_effect=RuntimeError("boom")))
+    service = GetDownloadStatusService(AsyncMock(side_effect=TransmissionError("boom")))
 
     text = _run(service.get_status_text("87", chat_id=1001))
 

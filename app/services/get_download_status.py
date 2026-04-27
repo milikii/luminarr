@@ -3,9 +3,13 @@ from __future__ import annotations
 import re
 from collections.abc import Awaitable, Callable
 
-from app.clients.transmission import TransmissionTaskStatus
+import httpx
+
+from app.clients.qbittorrent import QbittorrentError
+from app.clients.transmission import TransmissionError, TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
+from app.downloader_route_lookup import DownloaderRouteLookupError
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.status_delivery import (
     SUPPORTED_DELIVERY_CHANNELS,
@@ -61,7 +65,7 @@ class GetDownloadStatusService:
                 task_status = await self._get_status_func(cleaned_ref, chat_id)
             else:
                 task_status = await self._get_status_func(cleaned_ref)
-        except Exception as error:
+        except (DownloaderRouteLookupError, QbittorrentError, TransmissionError, httpx.HTTPError) as error:
             print(
                 f"\033[31m[下载状态查询失败]\033[0m task_ref={cleaned_ref} chat_id={chat_id or '-'} 错误={error}\n\033[33m[处理建议]\033[0m 检查下载器 RPC、下载器路由和网络连通性；当前请求会返回查询失败文本，但这次状态读取没有拿到真实结果。",
                 flush=True,
