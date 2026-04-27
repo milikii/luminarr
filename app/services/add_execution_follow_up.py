@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -59,7 +60,7 @@ class AddExecutionFollowUpService:
     ) -> AddExecutionOutcome:
         try:
             task = await self._invoke_add_torrent(pending_add)
-        except Exception as error:
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             self._log_dispatch_error(pending_add=pending_add, error=error)
             self.record_event(
                 task_ref=task_ref,
@@ -146,7 +147,7 @@ class AddExecutionFollowUpService:
                 event_type=event_type,
                 message=message,
             )
-        except Exception as error:
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error) == "job_event missing after append":
                 print(
                     f"\033[31m[下载事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} 错误=downloader event missing after append\n"
@@ -207,7 +208,7 @@ class AddExecutionFollowUpService:
                 chat_id=chat_id,
                 user_id=user_id,
             )
-        except Exception as error:
+        except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
             if str(error) == self._download_monitor_register_result_missing_reason:
                 print(
                     f"\033[31m[下载监控登记结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 标题={title} chat_id={chat_id} user_id={user_id} 错误={error}\n"

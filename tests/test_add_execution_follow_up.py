@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionTask
@@ -20,7 +21,7 @@ def test_record_event_logs_persistence_failure(capsys) -> None:
         job_event_repo=type(
             "JobEventRepo",
             (),
-            {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
         )(),
         download_monitor_repo=None,
         log_trace_func=lambda **kwargs: None,
@@ -47,7 +48,7 @@ def test_record_event_logs_missing_appended_event_result(capsys) -> None:
         job_event_repo=type(
             "JobEventRepo",
             (),
-            {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append"))},
+            {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(JobEventPersistenceError("job_event missing after append"))},
         )(),
         download_monitor_repo=None,
         log_trace_func=lambda **kwargs: None,
@@ -108,7 +109,7 @@ def test_register_download_monitor_logs_persistence_failure(capsys) -> None:
         download_monitor_repo=type(
             "DownloadMonitorRepo",
             (),
-            {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"register_download": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
         )(),
         log_trace_func=lambda **kwargs: None,
         add_failed_text="下载投递失败，请稍后重试。",
@@ -137,7 +138,7 @@ def test_register_download_monitor_logs_missing_registered_result(capsys) -> Non
             (),
             {
                 "register_download": lambda self, **kwargs: (_ for _ in ()).throw(
-                    RuntimeError("download monitor state missing after register")
+                    DownloadMonitorPersistenceError("download monitor state missing after register")
                 )
             },
         )(),
