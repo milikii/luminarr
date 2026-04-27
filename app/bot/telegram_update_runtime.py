@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.operational_logging import emit_operational_log
 
 
 def build_telegram_reply_func(
@@ -147,21 +148,23 @@ def _log_telegram_update_record_error(
 ) -> None:
     error_text = str(error)
     if error_text == "telegram update record result missing":
-        print(
-            f"\033[31m[Telegram 更新去重结果缺失]\033[0m source_type={source_type} "
-            f"source_id={source_id.strip() or '-'} chat_id={chat_id if chat_id is not None else '-'} "
-            f"user_id={user_id if user_id is not None else '-'} 原因={error_text}\n"
-            "\033[33m[处理建议]\033[0m 检查 telegram_updates 写入返回是否仍带有明确布尔结果；"
-            "当前 update 会停止继续处理，避免把去重真相缺口误判成普通重复消息。",
-            flush=True,
+        emit_operational_log(
+            title="Telegram 更新去重结果缺失",
+            detail=(
+                f"source_type={source_type} source_id={source_id.strip() or '-'} "
+                f"chat_id={chat_id if chat_id is not None else '-'} "
+                f"user_id={user_id if user_id is not None else '-'} 原因={error_text}"
+            ),
+            fix_hint="检查 telegram_updates 写入返回是否仍带有明确布尔结果；当前 update 会停止继续处理，避免把去重真相缺口误判成普通重复消息。",
         )
         return
 
-    print(
-        f"\033[31m[Telegram 更新去重落盘失败]\033[0m source_type={source_type} "
-        f"source_id={source_id.strip() or '-'} chat_id={chat_id if chat_id is not None else '-'} "
-        f"user_id={user_id if user_id is not None else '-'} 原因={error_text}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/telegram_updates 表写入是否正常；"
-        "当前 update 会停止继续处理，避免在去重真相缺失时重复执行副作用。",
-        flush=True,
+    emit_operational_log(
+        title="Telegram 更新去重落盘失败",
+        detail=(
+            f"source_type={source_type} source_id={source_id.strip() or '-'} "
+            f"chat_id={chat_id if chat_id is not None else '-'} "
+            f"user_id={user_id if user_id is not None else '-'} 原因={error_text}"
+        ),
+        fix_hint="检查 SQLite/telegram_updates 表写入是否正常；当前 update 会停止继续处理，避免在去重真相缺失时重复执行副作用。",
     )
