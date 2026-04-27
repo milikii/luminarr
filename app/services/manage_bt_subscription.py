@@ -827,25 +827,26 @@ def _log_bt_subscription_scan_chat_ids_row_corrupted(*, reason: str) -> None:
 
 
 def _log_bt_subscription_list_failed(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅清单读取失败]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。"
+    _print_bt_subscription_issue(
+        title="BT 订阅清单读取失败",
+        context=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 SQLite 是否可读，以及 bt_subscription_item 表是否正常。",
     )
 
 
 def _log_bt_subscription_list_result_missing(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅清单结果缺失]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 查询返回是否仍带有完整列表；"
-        "当前会按读取失败处理，避免把缺失真相误判成“清单为空”。"
+    _print_bt_subscription_issue(
+        title="BT 订阅清单结果缺失",
+        context=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 查询返回是否仍带有完整列表；当前会按读取失败处理，避免把缺失真相误判成“清单为空”。",
     )
 
 
 def _log_bt_subscription_list_row_corrupted(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅清单记录损坏]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按读取失败处理，避免把损坏记录误判成正常订阅清单。"
+    _print_bt_subscription_issue(
+        title="BT 订阅清单记录损坏",
+        context=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按读取失败处理，避免把损坏记录误判成正常订阅清单。",
     )
 
 
@@ -1033,6 +1034,11 @@ def _log_bt_subscription_pending_creation_failed(
         f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。"
     )
+
+
+def _print_bt_subscription_issue(*, title: str, context: str, fix_hint: str) -> None:
+    print(f"\033[31m[{title}]\033[0m {context}\n\033[33m[处理建议]\033[0m {fix_hint}")
+
 
 def _is_bt_subscription_item_row_corrupted_reason(reason: str) -> bool:
     return reason in {
