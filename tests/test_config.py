@@ -250,6 +250,20 @@ def test_load_settings_strips_whitespace_from_subtitle_timeout() -> None:
     assert settings.subtitle_translation_timeout_seconds == 45.0
 
 
+def test_load_settings_strips_whitespace_from_optional_int_fields() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "PT_MIN_SEED_HOURS": " 12 ",
+        }
+    )
+
+    assert settings.pt_min_seed_hours == 12
+
+
 def test_load_settings_reads_feishu_settings() -> None:
     settings = load_settings(
         {
