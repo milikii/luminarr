@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import Literal, Protocol
@@ -218,7 +219,7 @@ def set_raw_bt_destination_pending(
             )
         pending_by_chat.pop(chat_id, None)
         return False
-    except Exception as error:
+    except sqlite3.Error as error:
         _log_bt_pending_persist_failed(
             chat_id=chat_id,
             stage=BT_PENDING_STAGE_RAW_BT_DESTINATION,
@@ -246,7 +247,7 @@ def get_raw_bt_destination_pending(
         return None
     try:
         pending_state = pending_repo.get_pending(chat_id=chat_id)
-    except Exception as error:
+    except (BtPendingPersistenceError, sqlite3.Error) as error:
         if _is_bt_pending_row_corrupted_reason(str(error)):
             _log_bt_pending_row_corrupted(
                 chat_id=chat_id,
@@ -323,7 +324,7 @@ def clear_raw_bt_destination_pending(
         if cleared_result is None:
             raise BtPendingPersistenceError(BT_PENDING_CLEAR_RESULT_MISSING_REASON)
         return cleared_result or cleared
-    except Exception as error:
+    except (BtPendingPersistenceError, sqlite3.Error) as error:
         if str(error) == BT_PENDING_CLEAR_RESULT_MISSING_REASON:
             _log_bt_pending_clear_result_missing(
                 chat_id=chat_id,

@@ -1002,7 +1002,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_raw_bt_destinat
             self._calls += 1
             if self._calls <= 3:
                 return None
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     reply_text = AsyncMock()
 
@@ -1029,7 +1029,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_raw_bt_destin
 ) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     reply_text = AsyncMock()
 
@@ -1096,7 +1096,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_when_raw_bt_destin
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
             if expected_stage == "raw_bt_destination":
-                raise RuntimeError("db down")
+                raise sqlite3.OperationalError("db down")
             return False
 
     database = _make_database(tmp_path)
