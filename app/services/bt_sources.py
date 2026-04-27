@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.clients.web_source import UnsupportedWebSourcePageError
+from app.operational_logging import format_operational_log_message
 from app.services.adult_content import extract_exact_adult_content_match
 from app.services.media_name_parser import parse_media_name
 
@@ -218,13 +219,19 @@ def _safe_int(value: Any) -> int:
 
 def _log_bt_source_provider_error(*, provider_name: str, query: str, error: Exception) -> None:
     print(
-        f"\033[31m[BT 来源搜索失败]\033[0m 来源={provider_name} 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查对应来源配置、站点可达性和网络连通性后重试。"
+        format_operational_log_message(
+            title="BT 来源搜索失败",
+            detail=f"来源={provider_name} 查询={query} 原因={error}",
+            fix_hint="检查对应来源配置、站点可达性和网络连通性后重试。",
+        )
     )
 
 
 def _log_bt_source_provider_page_error(*, provider_name: str, page_url: str, error: Exception) -> None:
     print(
-        f"\033[31m[BT 页面预览失败]\033[0m 来源={provider_name} 页面={page_url} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。"
+        format_operational_log_message(
+            title="BT 页面预览失败",
+            detail=f"来源={provider_name} 页面={page_url} 原因={error}",
+            fix_hint="检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
+        )
     )
