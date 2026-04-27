@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 
+from app.operational_logging import emit_operational_log
+
 
 def project_channel_chat_id(*, channel: str, external_chat_id: str) -> int | None:
     return _project_channel_identity(
@@ -29,10 +31,10 @@ def _project_channel_identity(
     cleaned_kind = principal_kind.strip().lower()
     cleaned_external_id = external_id.strip()
     if not cleaned_channel or not cleaned_kind or not cleaned_external_id:
-        print(
-            f"\033[31m[渠道身份缺失]\033[0m channel={cleaned_channel or '-'} principal={cleaned_kind or '-'} external_id={cleaned_external_id or '-'}\n"
-            "\033[33m[处理建议]\033[0m 检查渠道适配层是否把 chat_id/user_id 解析为空，并确认当前事件确实来自私聊文本入口。",
-            flush=True,
+        emit_operational_log(
+            title="渠道身份缺失",
+            detail=f"channel={cleaned_channel or '-'} principal={cleaned_kind or '-'} external_id={cleaned_external_id or '-'}",
+            fix_hint="检查渠道适配层是否把 chat_id/user_id 解析为空，并确认当前事件确实来自私聊文本入口。",
         )
         return None
 
