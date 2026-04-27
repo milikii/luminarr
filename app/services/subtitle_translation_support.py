@@ -10,6 +10,8 @@ from typing import TypeVar
 
 import httpx
 
+from app.operational_logging import emit_operational_log
+
 
 @dataclass(frozen=True, slots=True)
 class _SrtBlock:
@@ -1069,5 +1071,4 @@ def _read_metadata_title(metadata_path: Path) -> str:
 
 
 def _print_colored_error(*, problem: str, fix: str) -> None:
-    print(f"\033[31m[字幕翻译失败]\033[0m {problem}", flush=True)
-    print(f"\033[33m[处理建议]\033[0m {fix}", flush=True)
+    emit_operational_log(title="字幕翻译失败", detail=problem, fix_hint=fix)
