@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -152,8 +153,8 @@ class ImportPrepareState:
         try:
             events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
             if events is None:
-                raise RuntimeError("import naming truth result missing")
-        except Exception as error:
+                raise JobEventPersistenceError("import naming truth result missing")
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error) == "import naming truth result missing":
                 _log_import_naming_truth_result_missing(task_id=task_id, task_hash=task_hash, reason=str(error))
             elif _is_import_naming_truth_row_corrupted_error(error):
