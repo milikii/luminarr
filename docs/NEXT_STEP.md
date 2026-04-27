@@ -1,12 +1,11 @@
-# Next step (v375)
+# Next step (v376)
 
 ## Current goal
 
 - 当前唯一主线切到 **`downloader_route_lookup.py` 重复日志/路由壳收口 / 质量硬化**。
 - 当前这一轮主要服务以下收口：
   - 收掉 `downloader_route_lookup.py` 里重复的日志函数、同构的路由序幕和单用途 helper 壳
-  - 顺手收掉 `app/main.py` 里残余的 downloader client 本地死壳
-  - 顺手收掉若干模块里无消费者的 `__all__` 纯导出列表
+  - 顺手收掉 `app/main.py` 里 route helper 残余死导入
   - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析逻辑收口、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
 - 已完成态保持，不回退：
   - `Makefile` 公开验证入口已收口：`verify-mainline` 当前改成 4 个分组 target 汇总入口，cleanup 公开入口收敛到 `test-cleanup-smoke` / `test-cleanup` / `test-cleanup-docs-gate` / `test-cleanup-window`
@@ -22,11 +21,11 @@
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
   - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/main.py`、`app/bot/telegram_bot.py`、`app/bot/personal_wechat_login.py`、`app/bot/personal_wechat_text.py` 和 `app/db/__init__.py` 的无消费者 `__all__` 纯导出列表也已删掉
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `386` 行；共享 route lookup / dispatch 日志打印器、client candidate 纯解析 helper、payload key 读取壳与 import/status/remove 路由的共享前半段 helper 已落地，单用途 payload / import 源归一 / 实例查找壳已继续收回调用点
+- `app/downloader_route_lookup.py` 当前 `491` 行；task/downloader 日志上下文、payload JSON 解析、payload 字段读取、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，剩余候选应继续限制在单消费者薄壳或 route 死壳
 
 ## User value
 
-- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里重复的日志/路由壳和单用途 helper 壳。
+- 当前默认分支已经把 docs 归档、cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 和 `config.py` 重复解析都收口完成；接下来最有价值的是继续收 `downloader_route_lookup.py` 里剩余的单消费者 helper 壳和 route 死壳。
 - 这一步只允许对下载器路由的重复日志/路由边界和单用途 helper 壳做最小闭环，不碰搜索真相、下载确认协议、shared runtime 或新的展示层扩展。
 - 先把路由重复壳压薄，后续才有资格再评估更大的下载器路由结构债。
 
@@ -36,6 +35,7 @@
   - `_log_*` 函数继续优先复用共享打印器
   - 实例查找 + client 选择继续优先复用纯解析 helper
   - 3 个路由函数里可提取的公共序幕
+  - import host `download_dir` 回填与 route/client require helper 的剩余单消费者薄壳
   - 不改变现有错误文本、路由语义或导入/状态协议
 - 每轮仍只做一个最小闭环；同步补对应 focused tests、`docs/STATUS.md`、`docs/NEXT_STEP.md` 和相关主线文档。
 - 继续保持当前 downloader / 搜索 / 导入 / 成人 BT / 验证入口已收口真相与文档一致。
@@ -52,9 +52,10 @@
 
 1. `_log_*` 函数数量下降，且优先通过共享实现而不是复制新日志壳来收口。
 2. `tests/test_downloader_route_lookup.py`、`tests/test_main.py` 与相关 focused gate 仍通过。
-3. `docs/STATUS.md`、`docs/NEXT_STEP.md` 对当前路由收口方向和下一候选结构债表述一致。
+3. `app/main.py` 不再保留对 route helper 的误导性死导入，测试直接依赖真实边界。
+4. `docs/STATUS.md`、`docs/NEXT_STEP.md` 对当前路由收口方向和下一候选结构债表述一致。
 
 ## After this step
 
-1. 如果路由线也收得差不多了，再评估 `_COMPAT_REEXPORTS` 的残余依赖或更大的配置层结构债。
+1. 如果路由线也收得差不多了，再评估 `downloader_route_lookup.py` 剩余单消费者 helper 是否值得继续并回调用点；确认不 worth-it 后再评估更大的配置层结构债。
 2. 如果后续想切去用户可感知改进，再看 `docs/SEARCH_REPLY_PRESENTATION_PLAN.md`。

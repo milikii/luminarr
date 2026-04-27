@@ -1,4 +1,4 @@
-# Current status (v494)
+# Current status (v495)
 
 ## Current mainline
 
@@ -13,17 +13,17 @@
 - `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件。
 - `app/main.py` 里的 downloader client 本地死壳已删掉；`app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 也已删除；`app/main.py`、`app/bot/telegram_bot.py`、`app/bot/personal_wechat_login.py`、`app/bot/personal_wechat_text.py` 和 `app/db/__init__.py` 的无消费者 `__all__` 纯导出列表也已清掉，功能测试继续通过，不影响现有直接导入形状。
 - `app/config.py` 当前 `457` 行；`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory，当前不再继续在这条边界上做重复壳。
-- `app/downloader_route_lookup.py` 当前 `386` 行；重复的 route lookup / dispatch 日志已收成共享打印器，payload 读取、实例查找、client 选择和 import 源 download_dir 归一的单用途壳已继续并回调用点，import/status/remove 三条路由的“先拿 route 再拿 client”前半段仍保持共享壳，不改错误文本或路由语义。
+- `app/downloader_route_lookup.py` 当前 `491` 行；task/downloader 日志上下文、payload JSON 解析、payload 字段读取、lookup route/client 抛错、status/remove 的 client-only 序幕、import host download_dir 回填和 import source `download_dir` 重建都已收成共享 helper，不改错误文本、路由语义或导入/状态协议。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
 
-- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 重复解析逻辑和 `app/main.py` 残余 downloader client 本地死壳都已完成，这轮主风险继续转到 downloader 路由重复日志/路由序幕，如果不沿稳定边界推进，很容易又变成大改。
-- 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 收口和 `app/main.py` 残余下载器本地死壳清理都已落地；当前最小风险继续落在 `downloader_route_lookup.py`，但已继续收掉单用途 helper 壳，不要回头重建旧壳层。
+- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 重复解析逻辑、`app/main.py` 残余 downloader client 本地死壳和 route helper 侧的重复上下文/抛错/回填壳都已完成，这轮主风险继续落在 `downloader_route_lookup.py` 是否还存在值得继续收的“只被单点消费的薄壳”。
+- 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 收口、`app/main.py` 残余下载器本地死壳清理和 `tests/test_main.py` 对 route helper 的错误边界依赖修正都已落地；当前最小风险仍在 `downloader_route_lookup.py`，但应继续沿小 helper/死壳减法推进，不要回头重建旧壳层。
 
 ## Later candidate line
 
-- 当前 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理和 `config.py` 重复解析逻辑都已完成；当前更保守候选仍是 `downloader_route_lookup.py` 重复日志/路由壳，再之后才是用户可感知改进。
+- 当前 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理和 `config.py` 重复解析逻辑都已完成；当前更保守候选仍是 `downloader_route_lookup.py` 剩余单消费者薄壳/重复 helper，再之后才是用户可感知改进。
 - 这条后续候选主线固定为 `Telegram-first`：先做 Telegram richer reply，Feishu / personal WeChat / WeCom 首阶段先保留共享文本降级，不改 shared runtime / approval / dispatch 真相。
 - 成人 BT 图片目标当前记为“尽量全量带图”，但实施分阶段；拿不到稳定图源时明确降级为纯文本。
 
@@ -43,11 +43,13 @@
 - `tests/test_config.py`：`34 passed`
 - `tests/test_downloader_route_lookup.py tests/test_main.py`：`28 passed`
 - `tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`：`26 passed`
+- 本轮 focused gate：
+  - `tests/test_downloader_route_lookup.py tests/test_main.py`：`28 passed`
 - 真实 smoke 保持通过态，本轮未改下载器 / 归档协议。
 
 ## Current biggest risk
 
-- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应沿 `downloader_route_lookup.py` 的重复日志/路由壳推进，而不是把范围扩成整份路由系统重写。
+- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应沿 `downloader_route_lookup.py` 的剩余单消费者 helper / 死壳推进，而不是把范围扩成整份路由系统重写。
 
 ## Recommended Next Operator Command
 
@@ -56,5 +58,5 @@
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 
-这轮 `config.py` 重复解析逻辑收口已完成。若继续，默认不要回头重建 cleanup 薄壳、workflow trace 壳或兼容 tuple；优先挑 `downloader_route_lookup.py` 的重复日志/路由壳做一个最小闭环。
+这轮 `downloader_route_lookup.py` 的 task/downloader 日志上下文、payload 解析/读取、lookup 抛错、status/remove 路由序幕和 import download_dir 回填壳已继续收口。若继续，默认不要回头重建 cleanup 薄壳、workflow trace 壳或兼容 tuple；优先挑 `downloader_route_lookup.py` 剩余单消费者 helper 或 route 死壳做一个更小闭环。
 ```
