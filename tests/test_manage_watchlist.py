@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from app.db.sqlite import SqliteDatabase
-from app.db.watchlist_repo import WatchlistRepo
+from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.services.manage_watchlist import (
     WATCHLIST_ADD_FAILED_TEXT,
     WATCHLIST_ADD_USAGE_TEXT,
@@ -100,7 +100,7 @@ def test_manage_watchlist_list_returns_failure_text_when_repo_raises(tmp_path: P
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _crash_list_items(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.list_items = _crash_list_items  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -135,7 +135,7 @@ def test_manage_watchlist_list_surfaces_row_corruption(tmp_path: Path, capsys) -
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _corrupted_list_items(**_: object) -> None:
-        raise RuntimeError("watchlist_item media kind corrupted after read")
+        raise WatchlistPersistenceError("watchlist_item media kind corrupted after read")
 
     repo.list_items = _corrupted_list_items  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -187,7 +187,7 @@ def test_manage_watchlist_add_surfaces_row_corruption(tmp_path: Path, capsys) ->
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _corrupted_add_item(**_: object) -> None:
-        raise RuntimeError("watchlist_item media kind corrupted after read")
+        raise WatchlistPersistenceError("watchlist_item media kind corrupted after read")
 
     repo.add_item = _corrupted_add_item  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -205,7 +205,7 @@ def test_manage_watchlist_add_returns_failure_text_when_repo_raises(tmp_path: Pa
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _crash_add_item(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.add_item = _crash_add_item  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -222,7 +222,7 @@ def test_manage_watchlist_remove_returns_failure_text_when_repo_raises(tmp_path:
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _crash_remove_item(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.remove_item = _crash_remove_item  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -257,7 +257,7 @@ def test_manage_watchlist_remove_surfaces_row_corruption(tmp_path: Path, capsys)
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _corrupted_remove_item(**_: object) -> None:
-        raise RuntimeError("watchlist_item media kind corrupted after read")
+        raise WatchlistPersistenceError("watchlist_item media kind corrupted after read")
 
     repo.remove_item = _corrupted_remove_item  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -275,7 +275,7 @@ def test_manage_watchlist_clear_returns_failure_text_when_repo_raises(tmp_path: 
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _crash_clear_items(**_: object) -> None:
-        raise RuntimeError("db down")
+        raise sqlite3.OperationalError("db down")
 
     repo.clear_items = _crash_clear_items  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)
@@ -310,7 +310,7 @@ def test_manage_watchlist_clear_surfaces_row_corruption(tmp_path: Path, capsys) 
     repo = WatchlistRepo(_make_database(tmp_path))
 
     def _corrupted_clear_items(**_: object) -> None:
-        raise RuntimeError("watchlist_item media kind corrupted after read")
+        raise WatchlistPersistenceError("watchlist_item media kind corrupted after read")
 
     repo.clear_items = _corrupted_clear_items  # type: ignore[method-assign]
     service = ManageWatchlistService(repo)

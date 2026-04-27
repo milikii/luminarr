@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import re
 from dataclasses import dataclass
 
@@ -188,16 +189,7 @@ class ManageWatchlistService:
                 reason=str(error),
             )
             return None
-        except Exception as error:
-            if _is_watchlist_row_corrupted_reason(str(error)):
-                _log_watchlist_add_row_corrupted(
-                    chat_id=chat_id,
-                    title=title,
-                    year=year,
-                    media_kind=media_kind,
-                    reason=str(error),
-                )
-                return None
+        except sqlite3.Error as error:
             _log_watchlist_add_failed(
                 chat_id=chat_id,
                 title=title,
@@ -214,7 +206,7 @@ class ManageWatchlistService:
             if items is None:
                 raise WatchlistPersistenceError("watchlist list result missing")
             return items
-        except Exception as error:
+        except (WatchlistPersistenceError, sqlite3.Error) as error:
             if str(error) == "watchlist list result missing":
                 _log_watchlist_list_result_missing(chat_id=chat_id, reason=str(error))
             elif _is_watchlist_row_corrupted_reason(str(error)):
@@ -229,7 +221,7 @@ class ManageWatchlistService:
             if removed is None:
                 raise WatchlistPersistenceError("watchlist remove result missing")
             return removed
-        except Exception as error:
+        except (WatchlistPersistenceError, sqlite3.Error) as error:
             if str(error) == "watchlist remove result missing":
                 _log_watchlist_remove_result_missing(chat_id=chat_id, item_id=item_id, reason=str(error))
             elif _is_watchlist_row_corrupted_reason(str(error)):
@@ -244,7 +236,7 @@ class ManageWatchlistService:
             if deleted is None:
                 raise WatchlistPersistenceError("watchlist clear result missing")
             return deleted
-        except Exception as error:
+        except (WatchlistPersistenceError, sqlite3.Error) as error:
             if str(error) == "watchlist clear result missing":
                 _log_watchlist_clear_result_missing(chat_id=chat_id, reason=str(error))
             elif _is_watchlist_row_corrupted_reason(str(error)):
