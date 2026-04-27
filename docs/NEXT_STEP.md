@@ -54,6 +54,7 @@
 1. `_log_*` 函数数量下降，且优先通过共享实现而不是复制新日志壳来收口。
 2. `tests/test_downloader_route_lookup.py`、`tests/test_main.py` 与相关 focused gate 仍通过。
 3. `app/main.py` 不再保留对 route helper 的误导性死导入，测试直接依赖真实边界。
+   当前 `tests/test_main.py` 对 route helper 的依赖已改为直接 import `app.downloader_route_lookup`。
 4. `docs/STATUS.md`、`docs/NEXT_STEP.md` 对当前路由收口方向和下一候选结构债表述一致。
 
 ## After this step

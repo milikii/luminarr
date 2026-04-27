@@ -20,6 +20,7 @@
 
 - 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 重复解析逻辑、`app/main.py` 残余 downloader client 本地死壳和 route helper 侧的重复上下文/抛错/回填壳都已完成，这轮主风险继续落在 `downloader_route_lookup.py` 是否还存在值得继续收的“只被单点消费的薄壳”，当前已继续压薄 payload corruption 与 host download_dir fallback。
 - 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 收口、`app/main.py` 残余下载器本地死壳清理和 `tests/test_main.py` 对 route helper 的错误边界依赖修正都已落地；当前最小风险仍在 `downloader_route_lookup.py`，但应继续沿小 helper/死壳减法推进，不要回头重建旧壳层。
+- `tests/test_main.py` 里 downloader route helper 相关断言当前已直接 import `app.downloader_route_lookup` 真实边界，不再借 `app.main` 中转。
 
 ## Later candidate line
 

@@ -6,13 +6,16 @@ from types import SimpleNamespace
 import pytest
 from telegram.error import NetworkError
 
-from app.downloader_route_lookup import DownloaderRouteLookupError, _resolve_downloader_task_route
-from app.downloader_route_lookup import _resolve_lookup_client_for_task
-from app.main import (
-    _build_refresh_media_server_func,
+from app.downloader_route_lookup import (
+    DownloaderRouteLookupError,
     _get_torrent_import_source_with_routing,
     _get_torrent_status_with_routing,
     _resolve_downloader_client_for_dispatch,
+    _resolve_downloader_task_route,
+    _resolve_lookup_client_for_task,
+)
+from app.main import (
+    _build_refresh_media_server_func,
     _run_application_polling,
 )
 
