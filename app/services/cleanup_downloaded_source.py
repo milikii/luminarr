@@ -12,6 +12,7 @@ from typing import Any
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
+from app.operational_logging import emit_operational_log
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
 
 CLEANUP_QUERY_USAGE_TEXT = (
@@ -789,13 +790,10 @@ def print_cleanup_blocked_log(
     if target_path.strip():
         details.append(f"target={target_path}")
     details_text = " ".join(details)
-    print(
-        f"\033[31m[cleanup 执行受阻]\033[0m {details_text} 结论={reason}",
-        flush=True,
-    )
-    print(
-        f"\033[33m[处理建议]\033[0m {fix_hint}",
-        flush=True,
+    emit_operational_log(
+        title="cleanup 执行受阻",
+        detail=f"{details_text} 结论={reason}",
+        fix_hint=fix_hint,
     )
 
 
@@ -819,14 +817,10 @@ def print_cleanup_event_append_failed_log(
     if target_path.strip():
         details.append(f"target={target_path}")
     details_text = " ".join(details)
-    print(
-        f"\033[31m[cleanup 事件写入失败]\033[0m {details_text} 原因={error}",
-        flush=True,
-    )
-    print(
-        "\033[33m[处理建议]\033[0m 检查 SQLite job_event 是否可写、磁盘是否只读或已满；"
-        "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘。",
-        flush=True,
+    emit_operational_log(
+        title="cleanup 事件写入失败",
+        detail=f"{details_text} 原因={error}",
+        fix_hint="检查 SQLite job_event 是否可写、磁盘是否只读或已满；当前 cleanup 文本结果已返回，但这次执行记录未成功落盘。",
     )
 
 
@@ -850,14 +844,10 @@ def print_cleanup_event_append_result_missing_log(
     if target_path.strip():
         details.append(f"target={target_path}")
     details_text = " ".join(details)
-    print(
-        f"\033[31m[cleanup 事件结果缺失]\033[0m {details_text} 原因={reason}",
-        flush=True,
-    )
-    print(
-        "\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的 cleanup 事件；"
-        "当前 cleanup 文本结果已返回，但这次执行记录真相还没有确认落稳。",
-        flush=True,
+    emit_operational_log(
+        title="cleanup 事件结果缺失",
+        detail=f"{details_text} 原因={reason}",
+        fix_hint="检查 job_event 写入后回读是否仍能拿到刚追加的 cleanup 事件；当前 cleanup 文本结果已返回，但这次执行记录真相还没有确认落稳。",
     )
 
 
@@ -881,14 +871,10 @@ def print_cleanup_event_append_row_corrupted_log(
     if target_path.strip():
         details.append(f"target={target_path}")
     details_text = " ".join(details)
-    print(
-        f"\033[31m[cleanup 事件记录损坏]\033[0m {details_text} 原因={reason}",
-        flush=True,
-    )
-    print(
-        "\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 是否仍是完整真相；"
-        "当前 cleanup 文本结果已返回，但不会把这条坏事件当成已稳定落盘。",
-        flush=True,
+    emit_operational_log(
+        title="cleanup 事件记录损坏",
+        detail=f"{details_text} 原因={reason}",
+        fix_hint="检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 是否仍是完整真相；当前 cleanup 文本结果已返回，但不会把这条坏事件当成已稳定落盘。",
     )
 
 
@@ -900,14 +886,10 @@ def print_cleanup_pt_seed_guard_lookup_failed_log(
     error: Exception,
     state_unavailable_fix_hint: str,
 ) -> None:
-    print(
-        f"\033[31m[cleanup PT 保护查询失败]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
-        f"task_hash={task_hash or '-'} 错误={error}",
-        flush=True,
-    )
-    print(
-        f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
-        flush=True,
+    emit_operational_log(
+        title="cleanup PT 保护查询失败",
+        detail=f"task_ref={task_ref} task_id={task_id or '-'} task_hash={task_hash or '-'} 错误={error}",
+        fix_hint=state_unavailable_fix_hint,
     )
 
 
@@ -919,14 +901,10 @@ def print_cleanup_pt_seed_guard_state_unavailable_log(
     reason: str,
     state_unavailable_fix_hint: str,
 ) -> None:
-    print(
-        f"\033[31m[cleanup PT 保护真相缺失]\033[0m task_ref={task_ref} task_id={task_id or '-'} "
-        f"task_hash={task_hash or '-'} 原因={reason}",
-        flush=True,
-    )
-    print(
-        f"\033[33m[处理建议]\033[0m {state_unavailable_fix_hint}",
-        flush=True,
+    emit_operational_log(
+        title="cleanup PT 保护真相缺失",
+        detail=f"task_ref={task_ref} task_id={task_id or '-'} task_hash={task_hash or '-'} 原因={reason}",
+        fix_hint=state_unavailable_fix_hint,
     )
 
 
@@ -940,16 +918,13 @@ def print_cleanup_delete_failed_log(
     target_path: str,
     failure_reason: str,
 ) -> None:
-    print(
-        f"\033[31m[cleanup 执行失败]\033[0m task_ref={task_ref} "
-        f"event_type={event_type} task_id={task_id} task_hash={task_hash} "
-        f"source={source_path} target={target_path} 原因={failure_reason}",
-        flush=True,
-    )
-    print(
-        "\033[33m[处理建议]\033[0m 检查 source_path 是否仍可访问、当前进程是否有删除权限，"
-        "并确认库内目标路径仍然存在后再重试 cleanup。",
-        flush=True,
+    emit_operational_log(
+        title="cleanup 执行失败",
+        detail=(
+            f"task_ref={task_ref} event_type={event_type} task_id={task_id} task_hash={task_hash} "
+            f"source={source_path} target={target_path} 原因={failure_reason}"
+        ),
+        fix_hint="检查 source_path 是否仍可访问、当前进程是否有删除权限，并确认库内目标路径仍然存在后再重试 cleanup。",
     )
 
 
