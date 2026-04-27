@@ -10,6 +10,7 @@ import re
 
 from app.clients.fanart import FanartMovieImages
 from app.clients.tmdb import TmdbMovie
+from app.operational_logging import emit_operational_log
 
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
 LookupMovieByTmdbIdFunc = Callable[[str], Awaitable[TmdbMovie | None]]
@@ -346,8 +347,7 @@ class MetadataScraperService:
         return created_paths, None
 
 def _print_colored_error(*, problem: str, fix: str) -> None:
-    print(f"\033[31m[元数据刮削失败]\033[0m {problem}", flush=True)
-    print(f"\033[33m[处理建议]\033[0m {fix}", flush=True)
+    emit_operational_log(title="元数据刮削失败", detail=problem, fix_hint=fix)
 
 
 def _resolve_chinese_scrape_movie(
