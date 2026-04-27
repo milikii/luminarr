@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from app.clients.transmission import TransmissionImportSource
 from app.config import DownloaderInstanceConfig
 from app.downloader_route_lookup import (
     _get_torrent_import_source_with_routing,
     _remove_torrent_with_routing,
+    _resolve_downloader_instance_and_client,
     resolve_downloader_dispatch_download_dir,
 )
 
@@ -133,6 +136,48 @@ def test_get_torrent_import_source_with_routing_restores_host_download_dir() -> 
     assert import_source.name == "SSIS-456-smoke.mp4"
 
 
+@pytest.mark.parametrize(
+    ("downloader_type", "downloader_name", "expected_client"),
+    [
+        ("transmission", "tr-bt", "transmission"),
+        ("qbittorrent", "qb-bt", "qbittorrent"),
+    ],
+)
+def test_resolve_downloader_instance_and_client_selects_expected_client(
+    downloader_type: str,
+    downloader_name: str,
+    expected_client: str,
+) -> None:
+    transmission_client = object()
+    qbittorrent_client = object()
+    cleaned_name, instance, resolved_client = _resolve_downloader_instance_and_client(
+        downloader_name=f"  {downloader_name}  ",
+        downloader_instances_by_name={
+            "tr-bt": DownloaderInstanceConfig(
+                name="tr-bt",
+                downloader_type="transmission",
+                base_url="http://127.0.0.1:19092",
+                download_dir="/data/downloads/tr-bt",
+                dispatch_download_dir="/downloads/complete",
+            ),
+            "qb-bt": DownloaderInstanceConfig(
+                name="qb-bt",
+                downloader_type="qbittorrent",
+                base_url="http://127.0.0.1:18098",
+                download_dir="/data/downloads/qb-bt",
+                dispatch_download_dir="/downloads/complete",
+            ),
+        },
+        transmission_clients_by_name={"tr-bt": transmission_client},
+        qbittorrent_clients_by_name={"qb-bt": qbittorrent_client},
+    )
+
+    assert cleaned_name == downloader_name
+    assert instance is not None
+    assert instance.downloader_type == downloader_type
+    assert resolved_client is (transmission_client if expected_client == "transmission" else qbittorrent_client)
+
+
 def test_get_torrent_import_source_with_routing_falls_back_to_instance_download_dir() -> None:
     class FakeJobRepo:
         def get_downloader_job_for_chat_ref(self, *, chat_id: int, task_ref: str):
@@ -224,6 +269,8 @@ def test_get_torrent_import_source_with_routing_keeps_client_dir_when_host_dir_u
 
     assert import_source is not None
     assert import_source.download_dir == "/downloads/complete"
+
+
 def test_remove_torrent_with_routing_uses_routed_client() -> None:
     calls: list[tuple[str, bool]] = []
 

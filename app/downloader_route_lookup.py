@@ -146,15 +146,12 @@ def _resolve_lookup_client_for_task(
     )
     if route is None:
         raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
-    cleaned_name = route.downloader_name.strip()
-    instance = downloader_instances_by_name.get(cleaned_name)
-    client = None
-    if instance is not None:
-        client = (
-            qbittorrent_clients_by_name.get(cleaned_name)
-            if instance.downloader_type == "qbittorrent"
-            else transmission_clients_by_name.get(cleaned_name)
-        )
+    cleaned_name, instance, client = _resolve_downloader_instance_and_client(
+        downloader_name=route.downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
     if instance is None:
         _print_downloader_issue_log(
             title="下载器实例不存在",
@@ -179,6 +176,27 @@ def _resolve_lookup_client_for_task(
         )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     return route, instance, client
+
+
+def _resolve_downloader_instance_and_client(
+    *,
+    downloader_name: str,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+) -> tuple[str, DownloaderInstanceConfig | None, TransmissionClient | QbittorrentClient | None]:
+    cleaned_name = downloader_name.strip()
+    instance = downloader_instances_by_name.get(cleaned_name)
+    if instance is None:
+        return cleaned_name, None, None
+    client = (
+        qbittorrent_clients_by_name.get(cleaned_name)
+        if instance.downloader_type == "qbittorrent"
+        else transmission_clients_by_name.get(cleaned_name)
+    )
+    return cleaned_name, instance, client
+
+
 def _resolve_downloader_client_for_dispatch(
     *,
     downloader_name: str,
@@ -190,14 +208,12 @@ def _resolve_downloader_client_for_dispatch(
     cleaned_name = downloader_name.strip()
     if not cleaned_name:
         return transmission_client
-    instance = downloader_instances_by_name.get(cleaned_name)
-    client = None
-    if instance is not None:
-        client = (
-            qbittorrent_clients_by_name.get(cleaned_name)
-            if instance.downloader_type == "qbittorrent"
-            else transmission_clients_by_name.get(cleaned_name)
-        )
+    cleaned_name, instance, client = _resolve_downloader_instance_and_client(
+        downloader_name=cleaned_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+    )
     if instance is None:
         _print_downloader_issue_log(
             title="下载器投递路由失败",
