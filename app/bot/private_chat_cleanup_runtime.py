@@ -4,15 +4,18 @@ from collections.abc import Awaitable, Callable, MutableMapping
 
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.execution_runtime import run_sync_with_policy
+from app.operational_logging import format_operational_log_message
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
 
 def _log_cleanup_service_not_ready(*, action: str, query: str) -> None:
     print(
-        f"\033[31m[cleanup 服务未就绪]\033[0m 动作={action} 查询={query.strip() or '-'}\n"
-        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 cleanup_downloaded_source_service，"
-        "并确认 CleanupDownloadedSourceService 实例创建成功后重试。"
+        format_operational_log_message(
+            title="cleanup 服务未就绪",
+            detail=f"动作={action} 查询={query.strip() or '-'}",
+            fix_hint="检查应用启动阶段是否已注入 cleanup_downloaded_source_service，并确认 CleanupDownloadedSourceService 实例创建成功后重试。",
+        )
     )
 
 
