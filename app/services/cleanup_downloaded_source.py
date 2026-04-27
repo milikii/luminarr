@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.services.cleanup_correlation_lookup import CleanupCorrelationLookup
@@ -745,7 +745,7 @@ def evaluate_cleanup_pt_seed_window(
 
     try:
         record = download_monitor_repo.get_record(task_id=task_id, task_hash=task_hash)
-    except Exception as error:
+    except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
         on_lookup_failed(error)
         return state_unavailable_text
 

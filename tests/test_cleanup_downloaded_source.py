@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.clients.transmission import TransmissionTaskStatus
-from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
@@ -143,6 +143,57 @@ def test_cleanup_by_task_ref_rejects_when_pt_seed_window_truth_missing(tmp_path:
     assert "[处理建议]" in captured.out
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert events[-1].event_type == "cleanup.pt_seed_window_state_unavailable"
+
+
+def test_cleanup_by_task_ref_logs_pt_seed_window_lookup_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    monitor_repo = DownloadMonitorRepo(database)
+    _create_import_correlation(event_repo, tmp_path=tmp_path, task_ref="87")
+    service = CleanupDownloadedSourceService(
+        event_repo,
+        download_monitor_repo=monitor_repo,
+        pt_min_seed_hours=1,
+    )
+
+    def _raise_lookup_error(**_: object) -> None:
+        raise DownloadMonitorPersistenceError("mock monitor lookup denied")
+
+    monkeypatch.setattr(monitor_repo, "get_record", _raise_lookup_error)
+
+    reply = service.cleanup_by_task_ref("87")
+
+    assert "PT 最小保护窗口真相不可用" in reply
+    captured = capsys.readouterr()
+    assert "[cleanup PT 保护查询失败]" in captured.out
+    assert "mock monitor lookup denied" in captured.out
+
+
+def test_cleanup_by_task_ref_propagates_unexpected_pt_seed_window_lookup_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    database = _make_database(tmp_path)
+    event_repo = JobEventRepo(database)
+    monitor_repo = DownloadMonitorRepo(database)
+    _create_import_correlation(event_repo, tmp_path=tmp_path, task_ref="87")
+    service = CleanupDownloadedSourceService(
+        event_repo,
+        download_monitor_repo=monitor_repo,
+        pt_min_seed_hours=1,
+    )
+
+    def _raise_lookup_error(**_: object) -> None:
+        raise RuntimeError("programming error")
+
+    monkeypatch.setattr(monitor_repo, "get_record", _raise_lookup_error)
+
+    with pytest.raises(RuntimeError, match="programming error"):
+        service.cleanup_by_task_ref("87")
 
 
 def test_inspect_by_task_ref_skips_pt_seed_window_for_bt_task(tmp_path: Path) -> None:
@@ -1236,7 +1287,7 @@ def test_cleanup_by_task_ref_logs_missing_appended_event_result(
     service = CleanupDownloadedSourceService(event_repo)
 
     def _raise_missing_result(**_: object) -> None:
-        raise RuntimeError("job_event missing after append")
+        raise JobEventPersistenceError("job_event missing after append")
 
     monkeypatch.setattr(event_repo, "append_event", _raise_missing_result)
 
