@@ -6,11 +6,11 @@ import pytest
 
 from app.clients.transmission import TransmissionImportSource
 from app.config import DownloaderInstanceConfig
+from app.main import resolve_downloader_dispatch_download_dir
 from app.downloader_route_lookup import (
     _get_torrent_import_source_with_routing,
     _remove_torrent_with_routing,
     _resolve_downloader_instance_and_client,
-    resolve_downloader_dispatch_download_dir,
 )
 
 

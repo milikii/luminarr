@@ -188,68 +188,6 @@ def _resolve_downloader_instance_and_client(
     return cleaned_name, instance, client
 
 
-def _resolve_downloader_client_for_dispatch(
-    *,
-    downloader_name: str,
-    transmission_client: TransmissionClient,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-    transmission_clients_by_name: dict[str, TransmissionClient],
-    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
-) -> TransmissionClient | QbittorrentClient:
-    cleaned_name = downloader_name.strip()
-    if not cleaned_name:
-        return transmission_client
-    cleaned_name, instance, client = _resolve_downloader_instance_and_client(
-        downloader_name=cleaned_name,
-        downloader_instances_by_name=downloader_instances_by_name,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
-    )
-    if instance is None:
-        _print_downloader_issue_log(
-            title="下载器投递路由失败",
-            context_label="downloader_name",
-            context_value=_format_downloader_context(downloader_name=cleaned_name, downloader_type="-"),
-            detail_label="原因",
-            detail_value="instance missing",
-            fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
-        )
-        raise ValueError(f"unknown downloader instance: {cleaned_name}")
-    if client is None:
-        _print_downloader_issue_log(
-            title="下载器投递路由失败",
-            context_label="downloader_name",
-            context_value=_format_downloader_context(
-                downloader_name=cleaned_name,
-                downloader_type=instance.downloader_type,
-            ),
-            detail_label="原因",
-            detail_value="client not configured",
-            fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
-        )
-        raise ValueError(f"downloader client not configured: {cleaned_name}")
-    return client
-
-
-def resolve_downloader_dispatch_download_dir(
-    *,
-    downloader_name: str,
-    requested_download_dir: str,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-) -> str:
-    cleaned_download_dir = requested_download_dir.strip()
-    cleaned_name = downloader_name.strip()
-    if not cleaned_download_dir or not cleaned_name:
-        return cleaned_download_dir
-    instance = downloader_instances_by_name.get(cleaned_name)
-    if instance is None:
-        return cleaned_download_dir
-    dispatch_download_dir = instance.dispatch_download_dir.strip()
-    if dispatch_download_dir and cleaned_download_dir == instance.download_dir:
-        return dispatch_download_dir
-    return cleaned_download_dir
-
-
 async def _get_torrent_import_source_with_routing(
     *,
     task_ref: str,

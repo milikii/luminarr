@@ -10,12 +10,12 @@ from app.downloader_route_lookup import (
     DownloaderRouteLookupError,
     _get_torrent_import_source_with_routing,
     _get_torrent_status_with_routing,
-    _resolve_downloader_client_for_dispatch,
     _resolve_downloader_task_route,
     _resolve_lookup_client_for_task,
 )
 from app.main import (
     _build_refresh_media_server_func,
+    _resolve_downloader_client_for_dispatch,
     _run_application_polling,
 )
 
