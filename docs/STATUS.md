@@ -1,9 +1,9 @@
-# Current status (v496)
+# Current status (v497)
 
 ## Current mainline
 - **质量硬化** 当前保持完成态，不回退。
 - `config.py` 重复解析逻辑已收口：`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` / `DOWNLOADER_INSTANCES` 共用解析 helper，base URL 也统一走 shared normalization helper，且读 base URL 的 env 路径也抽成了 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 现在也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` / `DOWNLOADER_INSTANCES.downloader_type` / `*_optional_int*` / `SUBTITLE_TRANSLATION_TIMEOUT_SECONDS` 也共用 shared validator helper。
-- `app/downloader_route_lookup.py` 当前 `357` 行；task route / dispatch 日志已直接落到共享打印器，instance strip/lookup 与 host `download_dir` fallback 已收口，`_log_*` 已归零，`_resolve_route_host_download_dir` 这个单消费者薄壳已删。
+- `app/downloader_route_lookup.py` 当前 `357` 行；task route / dispatch 日志已直接落到共享打印器，instance strip/lookup 与 host `download_dir` fallback 已收口，`_log_*` 已归零，`_resolve_route_host_download_dir` 这个单消费者薄壳已删，`import` 路由里的 host `download_dir` 回填现在直接用 `route.download_dir` / `instance.download_dir` 合并结果，不再保留空的 `instance is None` 兜底分支。
 - `cleanup_*_support.py` 当前为 `0` 个；cleanup 收口、重复 trace logger、`_COMPAT_REEXPORTS`、无消费者 `__all__` 都已保持完成态。
 - `app/main.py` 残余 downloader client 死壳已删，`tests/test_main.py` 现在直接 import `app.downloader_route_lookup` 真实边界。
 
@@ -16,8 +16,10 @@
 - `tests/test_config.py tests/test_downloader_route_lookup.py tests/test_main.py`：`71 passed, 4 warnings`
 - `tests/test_downloader_route_lookup.py tests/test_main.py`：`33 passed, 4 warnings`
 - `tests/test_adult_archive_service.py tests/test_cleanup_downloaded_source.py tests/test_cleanup_cross_channel_smoke.py`：`427 passed, 4 warnings`
+- `tests/test_cleanup_downloaded_source.py tests/test_cleanup_cross_channel_smoke.py`：`425 passed, 4 warnings`
 - `make quality`：通过
 - `make verify-mainline`：当前完成态保持通过
+- `make verify-mainline`：通过
 
 ## Current biggest risk
 - 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应只沿 `downloader_route_lookup.py` 里还能再压薄的共享 helper 推进，而不是把范围扩成整份路由系统重写。

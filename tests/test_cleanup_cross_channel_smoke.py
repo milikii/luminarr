@@ -90,7 +90,7 @@ def _build_cleanup_service(
     target_dir = base_dir / "library"
     target_dir.mkdir(parents=True)
     target_file = target_dir / "Dune (2021).mkv"
-    target_file.hardlink_to(source_file)
+    target_file.write_bytes(b"demo")
 
     database = _make_database(base_dir)
     event_repo = JobEventRepo(database)

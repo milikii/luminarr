@@ -284,11 +284,7 @@ async def _get_torrent_import_source_with_routing(
     import_source = await client.get_torrent_import_source(task_ref)
     if import_source is None:
         return None
-    host_download_dir = route.download_dir.strip()
-    if not host_download_dir:
-        if instance is None:
-            return import_source
-        host_download_dir = instance.download_dir.strip()
+    host_download_dir = route.download_dir.strip() or instance.download_dir.strip()
     if not host_download_dir or host_download_dir == import_source.download_dir:
         return import_source
     return TransmissionImportSource(

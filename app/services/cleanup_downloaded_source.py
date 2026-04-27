@@ -376,8 +376,8 @@ def _validate_cleanup_paths(*, source_path: Path, target_path: Path) -> str | No
     if not source_path.is_file() and not source_path.is_dir():
         return CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT
 
-    source_resolved = source_path.resolve(strict=True)
-    target_resolved = target_path.resolve(strict=True)
+    source_resolved = source_path.resolve(strict=False)
+    target_resolved = target_path.resolve(strict=False)
     if (
         source_resolved == target_resolved
         or source_resolved in target_resolved.parents

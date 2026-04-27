@@ -1,4 +1,4 @@
-# Next step (v377)
+# Next step (v378)
 
 ## Current goal
 
@@ -6,6 +6,7 @@
 - cleanup / adult archive 的最新回归已补齐并通过，但当前主线仍保持在 `downloader_route_lookup.py`，不切换施工边界。
 - 当前这一轮主要服务以下收口：
   - 收掉 `downloader_route_lookup.py` 里重复的日志函数、同构的路由序幕和单用途 helper 壳
+  - 把 `import` 路由里的 host `download_dir` 回填收成 `route.download_dir` / `instance.download_dir` 的直接合并，不再保留空的 `instance is None` 兜底分支
   - 顺手收掉 `app/main.py` 里 route helper 残余死导入
   - 保持刚完成的 cleanup 支持文件收口、重复 trace logger 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析逻辑收口、docs 归档减法、`search_media.py` / `import_to_library.py` 冻结态和 downloader adult registry 收口完成态，不回退
 - 已完成态保持，不回退：
