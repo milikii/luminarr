@@ -1112,7 +1112,7 @@ def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
     service = CleanupDownloadedSourceService(event_repo)
 
     def _raise_append_error(**_: object) -> None:
-        raise RuntimeError("mock append denied")
+        raise JobEventPersistenceError("mock append denied")
 
     monkeypatch.setattr(event_repo, "append_event", _raise_append_error)
 
@@ -1131,6 +1131,22 @@ def test_cleanup_by_task_ref_logs_event_append_failure_without_hiding_success(
     assert f"target={target_file}" in captured.out
     assert "mock append denied" in captured.out
     assert "当前 cleanup 文本结果已返回，但这次执行记录未成功落盘" in captured.out
+
+
+def test_cleanup_by_task_ref_propagates_unexpected_event_append_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_repo = JobEventRepo(_make_database(tmp_path))
+    service = CleanupDownloadedSourceService(event_repo)
+
+    def _raise_append_error(**_: object) -> None:
+        raise RuntimeError("programming error")
+
+    monkeypatch.setattr(event_repo, "append_event", _raise_append_error)
+
+    with pytest.raises(RuntimeError, match="programming error"):
+        service.cleanup_by_task_ref("87")
 
 
 def test_cleanup_by_task_ref_logs_event_append_failure_with_chat_scoped_identity(
@@ -1170,7 +1186,7 @@ def test_cleanup_by_task_ref_logs_event_append_failure_with_chat_scoped_identity
     service = CleanupDownloadedSourceService(event_repo, job_repo=job_repo)
 
     def _raise_append_error(**_: object) -> None:
-        raise RuntimeError("mock append denied")
+        raise JobEventPersistenceError("mock append denied")
 
     monkeypatch.setattr(event_repo, "append_event", _raise_append_error)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -286,7 +287,7 @@ class CleanupDownloadedSourceService:
                 source_path=source_path,
                 target_path=target_path,
             )
-        except Exception as error:
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error) == CLEANUP_EVENT_RESULT_MISSING_REASON:
                 print_cleanup_event_append_result_missing_log(
                     task_ref=task_ref,
