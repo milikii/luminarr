@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
@@ -34,8 +35,8 @@ def load_completed_auto_import_candidates(
     try:
         candidates = download_monitor_repo.list_completed_for_auto_import(limit=limit)
         if candidates is None:
-            raise AutoImportCompletedListUnavailableError(AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON)
-    except Exception as error:
+            raise DownloadMonitorPersistenceError(AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON)
+    except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
         if str(error) == AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON:
             print(
                 f"\033[31m[自动导入候选结果缺失]\033[0m limit={limit} 错误={error}\n"
