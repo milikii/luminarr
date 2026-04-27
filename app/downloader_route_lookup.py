@@ -19,6 +19,10 @@ class ResolvedDownloaderTaskRoute:
     download_dir: str
 
 
+def _format_task_route_context(*, task_ref: str, chat_id: int | None) -> str:
+    return f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}"
+
+
 def _print_downloader_issue_log(
     *,
     title: str,
@@ -39,7 +43,7 @@ def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, 
     _print_downloader_issue_log(
         title="下载器路由未命中",
         context_label="task_ref",
-        context_value=f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}",
+        context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
@@ -50,7 +54,7 @@ def _log_downloader_route_lookup_error(*, task_ref: str, chat_id: int | None, er
     _print_downloader_issue_log(
         title="下载器路由查询失败",
         context_label="task_ref",
-        context_value=f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}",
+        context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
         detail_label="错误",
         detail_value=str(error),
         fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
@@ -66,7 +70,7 @@ def _log_downloader_route_payload_corruption(
     _print_downloader_issue_log(
         title="下载器路由载荷损坏",
         context_label="task_ref",
-        context_value=f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}",
+        context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
