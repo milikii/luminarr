@@ -7,8 +7,9 @@ from typing import Any
 
 import httpx
 
-from app.search_title_normalization import compact_match_key, is_confident_title_match, normalize_match_key, normalize_spaces
 from app.clients.tmdb import TmdbMovie
+from app.operational_logging import emit_operational_log
+from app.search_title_normalization import compact_match_key, is_confident_title_match, normalize_match_key, normalize_spaces
 from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -34,9 +35,10 @@ async def build_search_request_context(
         try:
             tmdb_movie = await lookup_movie_func(parsed_query.title, parsed_query.year)
         except (httpx.HTTPError, json.JSONDecodeError) as error:
-            print(
-                f"\033[31m[TMDB 查询失败]\033[0m query={user_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}\n\033[33m[处理建议]\033[0m 检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但海报卡片和标题归一化结果可能缺失。",
-                flush=True,
+            emit_operational_log(
+                title="TMDB 查询失败",
+                detail=f"query={user_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}",
+                fix_hint="检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但海报卡片和标题归一化结果可能缺失。",
             )
 
     tmdb_confident = _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=tmdb_movie)
@@ -115,9 +117,10 @@ async def _search_candidates_with_logging(
         return await _search_first_non_empty(search_func, ordered_queries)
     except (httpx.HTTPError, json.JSONDecodeError) as error:
         query_display = " | ".join(query for query in ordered_queries if query.strip()) or user_query
-        print(
-            f"\033[31m[搜索源查询失败]\033[0m query={user_query} ordered_queries={query_display} 错误={error}\n\033[33m[处理建议]\033[0m 检查 Prowlarr/BT 来源、代理和网络连通性；当前搜索未拿到结果，且这不是正常的“无候选”状态。",
-            flush=True,
+        emit_operational_log(
+            title="搜索源查询失败",
+            detail=f"query={user_query} ordered_queries={query_display} 错误={error}",
+            fix_hint="检查 Prowlarr/BT 来源、代理和网络连通性；当前搜索未拿到结果，且这不是正常的“无候选”状态。",
         )
         raise
 
