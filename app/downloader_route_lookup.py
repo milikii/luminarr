@@ -134,7 +134,11 @@ def _resolve_lookup_client_for_task(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     operation: str,
-) -> tuple[ResolvedDownloaderTaskRoute, TransmissionClient | QbittorrentClient]:
+) -> tuple[
+    ResolvedDownloaderTaskRoute,
+    DownloaderInstanceConfig | None,
+    TransmissionClient | QbittorrentClient,
+]:
     route = _resolve_downloader_task_route(
         task_ref=task_ref,
         chat_id=chat_id,
@@ -171,7 +175,7 @@ def _resolve_lookup_client_for_task(
             fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
         )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
-    return route, client
+    return route, instance, client
 
 
 def _resolve_downloader_instance(
@@ -281,7 +285,7 @@ async def _get_torrent_import_source_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionImportSource | None:
-    route, client = _resolve_lookup_client_for_task(
+    route, instance, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
@@ -295,10 +299,6 @@ async def _get_torrent_import_source_with_routing(
         return None
     host_download_dir = route.download_dir.strip()
     if not host_download_dir:
-        _, instance = _resolve_downloader_instance(
-            downloader_name=route.downloader_name,
-            downloader_instances_by_name=downloader_instances_by_name,
-        )
         if instance is None:
             return import_source
         host_download_dir = instance.download_dir.strip()
@@ -323,7 +323,7 @@ async def _get_torrent_status_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionTaskStatus | None:
-    _, client = _resolve_lookup_client_for_task(
+    _, _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
@@ -345,7 +345,7 @@ async def _remove_torrent_with_routing(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     delete_local_data: bool,
 ) -> None:
-    _, client = _resolve_lookup_client_for_task(
+    _, _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,

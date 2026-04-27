@@ -8,12 +8,13 @@
 - `app/main.py` 残余 downloader client 死壳已删，`tests/test_main.py` 现在直接 import `app.downloader_route_lookup` 真实边界。
 
 ## Current health
-- 代码热点线已回到 proof-like orchestration；当前最小风险仍在 `downloader_route_lookup.py` 是否还值得继续收更薄的公共 helper 或干脆停在当前壳收口态。
+- 代码热点线已回到 proof-like orchestration；`downloader_route_lookup.py` 现在已把 resolved `instance` 直接带回 import 路由，当前最小风险仍在是否还值得继续收更薄的公共 helper，或干脆停在当前壳收口态。
 - 当前归档迁移、cleanup 收口、trace logger 收口、`config.py` 收口、`app/main.py` 死壳清理和 route helper 错误边界修正都已落地；cleanup hardlink 语义保持原状，新增的 adult archive 2 参兼容回归也已补上。
 
 ## Latest verification
 - `tests/test_config.py`：`39 passed, 0 skipped`
 - `tests/test_config.py tests/test_downloader_route_lookup.py tests/test_main.py`：`71 passed, 4 warnings`
+- `tests/test_downloader_route_lookup.py tests/test_main.py`：`33 passed, 4 warnings`
 - `tests/test_adult_archive_service.py tests/test_cleanup_downloaded_source.py tests/test_cleanup_cross_channel_smoke.py`：`427 passed, 4 warnings`
 - `make quality`：通过
 - `make verify-mainline`：当前完成态保持通过

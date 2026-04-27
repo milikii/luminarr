@@ -136,6 +136,31 @@ def test_resolve_downloader_client_for_lookup_logs_missing_client(capsys: pytest
     assert "[处理建议]" in captured.out
 
 
+def test_resolve_downloader_client_for_lookup_returns_route_instance_and_client() -> None:
+    client = object()
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(
+            payload_json='{"downloader_name":"pt-main","download_dir":"/data/downloads/tr"}',
+        ),
+    )
+
+    route, instance, resolved_client = _resolve_lookup_client_for_task(
+        task_ref="87",
+        chat_id=1001,
+        job_repo=job_repo,
+        downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+        transmission_clients_by_name={"pt-main": client},
+        qbittorrent_clients_by_name={},
+        operation="import",
+    )
+
+    assert route.downloader_name == "pt-main"
+    assert route.download_dir == "/data/downloads/tr"
+    assert instance is not None
+    assert instance.downloader_type == "transmission"
+    assert resolved_client is client
+
+
 def test_get_torrent_import_source_with_routing_raises_when_route_lookup_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
