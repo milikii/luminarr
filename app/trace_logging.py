@@ -4,12 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 import json
 from pathlib import Path
-import re
 from zoneinfo import ZoneInfo
 
+from app.operational_logging import format_operational_log_message, strip_ansi_escape, summarize_first_non_empty_line
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
-ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 TRACE_LOG_LABEL = "[trace]"
 DEFAULT_TRACE_LOG_FILE = "trace.log"
 TRACE_LOG_PATH_BOT_DATA_KEY = "trace_log_path"
@@ -45,9 +44,14 @@ def configure_trace_log_file(
         log_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as error:
         print(
-            f"\033[31m[trace 日志目录不可写]\033[0m 路径={log_path.parent} 错误={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 `LUMINARR_LOG_DIR`、当前工作目录和 logs 目录权限；"
-            "确认 `make run` / `.venv/bin/python -m app.main` 使用的是可写目录。",
+            format_operational_log_message(
+                title="trace 日志目录不可写",
+                detail=f"路径={log_path.parent} 错误={error}",
+                fix_hint=(
+                    "检查 `LUMINARR_LOG_DIR`、当前工作目录和 logs 目录权限；"
+                    "确认 `make run` / `.venv/bin/python -m app.main` 使用的是可写目录。"
+                ),
+            ),
             flush=True,
         )
         return None
@@ -137,7 +141,7 @@ def log_trace_event(
 
 
 def parse_trace_log_line(line: str) -> TraceLogEntry | None:
-    cleaned_line = ANSI_ESCAPE_RE.sub("", line).strip()
+    cleaned_line = strip_ansi_escape(line).strip()
     prefix = f"{TRACE_LOG_LABEL} "
     if not cleaned_line.startswith(prefix):
         return None
@@ -172,23 +176,24 @@ def parse_trace_log_line(line: str) -> TraceLogEntry | None:
 
 
 def _summarize_reply_head(reply_text: str) -> str:
-    for line in reply_text.splitlines():
-        cleaned_line = re.sub(r"\s+", " ", line.strip())
-        if cleaned_line:
-            return cleaned_line
-    return "-"
+    return summarize_first_non_empty_line(reply_text)
 
 
 def _append_trace_log_line(log_line: str, *, log_path: Path) -> None:
-    cleaned_line = ANSI_ESCAPE_RE.sub("", log_line)
+    cleaned_line = strip_ansi_escape(log_line)
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(f"{cleaned_line}\n")
     except OSError as error:
         print(
-            f"\033[31m[trace 日志落盘失败]\033[0m 路径={log_path} 错误={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 `LUMINARR_LOG_DIR` 是否可写，确认没有把同名路径占成文件或只读挂载；"
-            "修复后重新运行应用。",
+            format_operational_log_message(
+                title="trace 日志落盘失败",
+                detail=f"路径={log_path} 错误={error}",
+                fix_hint=(
+                    "检查 `LUMINARR_LOG_DIR` 是否可写，确认没有把同名路径占成文件或只读挂载；"
+                    "修复后重新运行应用。"
+                ),
+            ),
             flush=True,
         )
