@@ -45,7 +45,6 @@ from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.db.watchlist_repo import WatchlistRepo
 from app.downloader_route_lookup import (
-    DownloaderRouteLookupError,
     _get_torrent_import_source_with_routing,
     _remove_torrent_with_routing,
     _get_torrent_status_with_routing,
