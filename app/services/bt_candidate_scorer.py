@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.operational_logging import emit_operational_log
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key
 
 _INFO_HASH_PATTERN = re.compile(r"xt=urn:btih:([0-9a-z]{32,40})", re.IGNORECASE)
@@ -384,9 +385,10 @@ def _parse_yaml_scalar(text: str) -> str | float | None:
 
 
 def _log_bt_scoring_rules_warning(*, path: Path, reason: str) -> None:
-    print(
-        f"\033[33m[BT 评分规则文件回退]\033[0m 文件={path} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 YAML 键名、缩进和数值格式；修正后重新运行相关 BT 评分测试。"
+    emit_operational_log(
+        title="BT 评分规则文件回退",
+        detail=f"文件={path} 原因={reason}",
+        fix_hint="检查 YAML 键名、缩进和数值格式；修正后重新运行相关 BT 评分测试。",
     )
 
 
