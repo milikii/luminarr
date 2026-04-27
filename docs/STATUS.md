@@ -11,15 +11,15 @@
 - `search_media.py` 已降到 `288` 行，歧义澄清 / media-BT 排序 / batch preview 页面支持 helper 都已抽出；`import_to_library.py` 当前 `590` 行，经 focused gate + pyflakes 复核后继续保持 proof-like orchestration 冻结态。
 - `cleanup_correlation_lookup.py` 已收回 task identity、correlation lookup、correlation logging 全部薄壳；`cleanup_downloaded_source.py` 已收回 inspect / path guard / query / event / flow / blocked / execution / follow-up / seed-guard / logging / 资产删除 全部薄壳；`adult_archive_service.py` 也不再依赖 cleanup 资产删除 helper。`cleanup_*_support.py` 当前为 `0` 个。
 - `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件。
-- `app/main.py` 里的 downloader client 本地死壳已删掉；`app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 也已删除，功能测试继续通过，确认这些 tuple 只是未被消费的死代码，不影响现有模块级导出形状。
+- `app/main.py` 里的 downloader client 本地死壳已删掉；`app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 也已删除；`app/main.py`、`app/bot/telegram_bot.py`、`app/bot/personal_wechat_login.py`、`app/bot/personal_wechat_text.py` 和 `app/db/__init__.py` 的无消费者 `__all__` 纯导出列表也已清掉，功能测试继续通过，不影响现有直接导入形状。
 - `app/config.py` 当前 `457` 行；`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory，当前不再继续在这条边界上做重复壳。
 - `app/downloader_route_lookup.py` 当前 `386` 行；重复的 route lookup / dispatch 日志已收成共享打印器，payload 读取、实例查找、client 选择和 import 源 download_dir 归一的单用途壳已继续并回调用点，import/status/remove 三条路由的“先拿 route 再拿 client”前半段仍保持共享壳，不改错误文本或路由语义。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
 
-- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析逻辑和 `app/main.py` 残余 downloader client 本地死壳都已完成，这轮主风险继续转到 downloader 路由重复日志/路由序幕，如果不沿稳定边界推进，很容易又变成大改。
-- 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 收口和 `app/main.py` 残余下载器本地死壳清理都已落地；当前最小风险继续落在 `downloader_route_lookup.py`，但已继续收掉单用途 helper 壳，不要回头重建旧壳层。
+- 代码热点线当前都已经回到 proof-like orchestration；cleanup 支持文件、重复 trace logger、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 重复解析逻辑和 `app/main.py` 残余 downloader client 本地死壳都已完成，这轮主风险继续转到 downloader 路由重复日志/路由序幕，如果不沿稳定边界推进，很容易又变成大改。
+- 当前归档迁移、cleanup 收口、trace logger 收口、`_COMPAT_REEXPORTS` 清理、无消费者 `__all__` 清理、`config.py` 收口和 `app/main.py` 残余下载器本地死壳清理都已落地；当前最小风险继续落在 `downloader_route_lookup.py`，但已继续收掉单用途 helper 壳，不要回头重建旧壳层。
 
 ## Later candidate line
 
@@ -39,7 +39,7 @@
 - `tests/test_import_to_library.py -k "context_lookup or context_row_corruption or raw_bt or copy_fallback or cross_filesystem or hardlink_failure or metadata_scrape or subtitle_translate or refresh"`：`30 passed, 119 deselected`
 - `tests/test_cleanup_downloaded_source.py tests/test_cleanup_docs_consistency.py tests/test_adult_archive_service.py`：`57 passed`
 - `tests/test_workflow_trace_logger.py tests/test_trace_logging.py tests/test_add_to_downloader.py -k "trace_log"`：`5 passed, 111 deselected`
-- `tests/test_main.py tests/test_telegram_bot.py`：`217 passed`
+- `tests/test_main.py tests/test_telegram_bot.py tests/test_personal_wechat_login.py tests/test_personal_wechat_text.py`：`255 passed`
 - `tests/test_config.py`：`34 passed`
 - `tests/test_downloader_route_lookup.py tests/test_main.py`：`28 passed`
 - `tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`：`26 passed`

@@ -513,13 +513,3 @@ class PersonalWeChatTextService:
         if pause_session is None:
             return
         pause_session(account_id)
-
-
-__all__ = [
-    "PERSONAL_WECHAT_CHANNEL",
-    "PERSONAL_WECHAT_TEXT_SERVICE_KEY",
-    "PersonalWeChatPrivateTextEvent",
-    "PersonalWeChatTextService",
-    "handle_personal_wechat_private_text_event",
-    "parse_personal_wechat_private_text_event",
-]

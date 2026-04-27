@@ -353,15 +353,3 @@ class PersonalWeChatLoginService:
         qr_artifact = self._active_qr_artifact
         self._active_qr_artifact = None
         _cleanup_qr_artifact(qr_artifact)
-
-
-__all__ = [
-    "PERSONAL_WECHAT_LOGIN_BUSY_TEXT",
-    "PERSONAL_WECHAT_LOGIN_NOT_READY_TEXT",
-    "PERSONAL_WECHAT_LOGIN_QR_CAPTION",
-    "PERSONAL_WECHAT_LOGIN_REUSED_TEXT",
-    "PERSONAL_WECHAT_LOGIN_SERVICE_KEY",
-    "PERSONAL_WECHAT_LOGIN_STARTED_TEXT",
-    "PersonalWeChatLoginService",
-    "parse_personal_wechat_login_query",
-]
