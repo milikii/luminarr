@@ -137,10 +137,12 @@ def test_current_doc_truth_keeps_runtime_lines_and_channel_scope_aligned() -> No
     decisions_text = Path("docs/DECISIONS.md").read_text(encoding="utf-8")
     history_text = Path("docs/HISTORY.md").read_text(encoding="utf-8")
 
-    assert "`app/bot/private_chat_runtime.py` 当前 `476` 行" in next_step_text
-    assert "`app/bot/telegram_bot.py` 当前 `220` 行" in next_step_text
-    assert "`app/bot/telegram_bot.py` 当前维持在 `220` 行" in decisions_text
-    assert "`app/bot/private_chat_runtime.py` 当前维持在 `476` 行" in decisions_text
+    assert "app/bot/private_chat_runtime.py" in next_step_text
+    assert "app/bot/telegram_bot.py" in next_step_text
+    assert "精确行数以代码为准" in next_step_text
+    assert "精确行数不是长期决策真相" in decisions_text
+    assert "当前 `220` 行" not in next_step_text
+    assert "当前维持在 `220` 行" not in decisions_text
     assert "代码里已经有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口" in history_text
     assert "当前仍然只有 Telegram。" not in history_text
 

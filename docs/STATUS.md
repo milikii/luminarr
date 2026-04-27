@@ -1,30 +1,28 @@
-# Current status (v499)
+# Current status (v500)
 
 ## Current mainline
-- **质量硬化** 当前保持完成态，不回退。
-- `config.py` 重复解析逻辑已收口：`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` / `DOWNLOADER_INSTANCES` 共用解析 helper，base URL 也统一走 shared normalization helper，且读 base URL 的 env 路径也抽成了 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 现在也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` / `DOWNLOADER_INSTANCES.downloader_type` / `*_optional_int*` / `SUBTITLE_TRANSLATION_TIMEOUT_SECONDS` 也共用 shared validator helper。
-- `app/downloader_route_lookup.py` 当前 `267` 行；task route / dispatch 日志已直接落到共享打印器，instance strip/lookup 与 host `download_dir` fallback 已收口，`_log_*` 已归零，`_resolve_route_host_download_dir` 这个单消费者薄壳已删，`_resolve_downloader_client_candidate` 已收回到两个实际调用点，`_resolve_downloader_instance_and_client` 现在承接两条真实调用点，`_resolve_downloader_task_route` 已从两字段 dataclass 收成 tuple，`_resolve_downloader_client_for_dispatch` 和 `resolve_downloader_dispatch_download_dir` 现已挪到 `app/main.py`，`import` 路由里的 host `download_dir` 回填现在直接用 `route.download_dir` / `instance.download_dir` 合并结果，不再保留空的 `instance is None` 兜底分支。
-- `app/main.py` 当前 `482` 行；下载器投递分流 helper 现在由 main 编排层持有，`_resolve_downloader_client_for_dispatch` 与 `resolve_downloader_dispatch_download_dir` 都已迁入这里，BT source provider 组装和 fanart / download_image 的顶层壳也已收进 `main()`。
-- `app/services/search_media.py` 当前 `274` 行；BT batch preview 缓存转手壳已并回调用点，`_to_candidate_dict` / `_attach_media_identity_to_candidate` 也已收口到 inline 变换。
-- `app/services/metadata_scraper.py` 当前 `384` 行；metadata / NFO sidecar 路径、图片 artifact 路径、字符串归一化、text artifact 写入和 NFO 拼装小壳都已并回入口。
-- `cleanup_*_support.py` 当前为 `0` 个；cleanup 收口、重复 trace logger、`_COMPAT_REEXPORTS`、无消费者 `__all__` 都已保持完成态。
-- `app/main.py` 残余 downloader client 死壳已删，`tests/test_main.py` 现在直接 import `app.downloader_route_lookup` 真实边界。
+- **质量硬化** 继续保持完成态；当前最小闭环切到 **文档入口收口 / 当前真相对齐**，不改业务代码。
+- 这轮先修文档漂移：README 不再写具体施工热点；`docs/STATUS.md` 只写短快照；`docs/NEXT_STEP.md` 只写当前唯一主线、边界和退出条件。
+- 成人 BT 不是空白：当前已有 PT/BT 分流、BT 成人链问询、成人归档目录配置、`adult_content_registry`、归档保留期清理、只读补全和展示基础；但成人 BT 继续扩功能不是本轮主线。
+- `cleanup_*_support.py` 当前为 `0` 个；cleanup 收口、workflow trace 收口、`_COMPAT_REEXPORTS` 清理、`config.py` 重复解析收口和 downloader route helper 收口继续保持完成态。
 
 ## Current health
-- 代码热点线已回到 proof-like orchestration；`downloader_route_lookup.py` 现在已把 resolved `instance` 直接带回 import 路由，且 `_resolve_downloader_instance` / `_resolve_downloader_client_candidate` 这两层薄壳都已删，dispatch 选择逻辑已迁到 `app/main.py`，当前最小风险转为是否还值得继续压薄 `app/main.py` 里的这两个 dispatch helper，或干脆停在当前壳收口态。
-- 当前归档迁移、cleanup 收口、trace logger 收口、`config.py` 收口、`app/main.py` 死壳清理和 route helper 错误边界修正都已落地；cleanup hardlink 语义保持原状，新增的 adult archive 2 参兼容回归也已补上。
+- 默认分支最近业务回归保持绿灯；当前风险主要来自文档入口重复、过时主线残留和 docs gate 锁死易漂移事实。
+- 先完成文档收口，再决定下一条业务主线；在文档真相未对齐前，不切成人 BT 新功能，也不继续扩大 downloader route 收口范围。
 
 ## Latest verification
+- `tests/test_cleanup_docs_consistency.py`：`7 passed`
 - `tests/test_config.py`：`39 passed, 0 skipped`
 - `tests/test_config.py tests/test_downloader_route_lookup.py tests/test_main.py`：`71 passed, 4 warnings`
 - `tests/test_downloader_route_lookup.py tests/test_main.py`：`34 passed, 4 warnings`
 - `.venv/bin/python -m pytest tests/test_main.py tests/test_downloader_route_lookup.py`：`34 passed, 4 warnings`
 - `tests/test_cleanup_downloaded_source.py tests/test_cleanup_cross_channel_smoke.py`：`425 passed, 4 warnings`
-- `make quality`：通过
+- `make quality`：通过（`26 passed`）
 - `make verify-mainline`：通过
 
 ## Current biggest risk
-- 当前 biggest risk 已不再是 cleanup 支持文件、trace logger 重复壳、`_COMPAT_REEXPORTS` 或 `config.py`；下一轮如果继续减法，应只沿 `app/main.py`、`app/services/search_media.py` 或 `app/services/metadata_scraper.py` 里还能再压薄的单消费者 helper 推进，而不是把范围扩成整份路由系统重写。
+- 若跳过文档收口直接继续成人 BT 或继续拆 helper，后续 agent 会同时被 README、STATUS、NEXT_STEP 里的旧主线牵引，增加误改范围。
+- 当前成人 BT 后续仍可作为候选主线，但必须在文档入口稳定后再切，并先明确缺口与退出条件。
 
 ## Recommended Next Operator Command
 
@@ -33,5 +31,5 @@
 ```text
 按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。
 
-这轮 `downloader_route_lookup.py` 的 task/downloader 日志上下文、payload 解析/读取、lookup 抛错、status/remove 路由序幕和 import download_dir 回填壳已继续收口。若继续，默认不要回头重建 cleanup 薄壳、workflow trace 壳或兼容 tuple；优先挑 `downloader_route_lookup.py` 剩余单消费者 helper 或 route 死壳做一个更小闭环。
+当前唯一主线是文档入口收口 / 当前真相对齐。只改 README、docs/STATUS.md、docs/NEXT_STEP.md、docs/OPERATOR_RUNBOOK.md、docs/HUMAN_START_HERE.md、docs/INDEX.md 和 docs gate 相关测试；不改业务代码、不改协议、不改 SQLite 真相边界。先把“是否先做成人 BT”记录为后续候选，不在本轮开新功能。
 ```

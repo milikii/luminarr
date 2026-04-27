@@ -676,8 +676,9 @@
     1. 仓库级 CI：`.github/workflows/quality.yml` 在 `push` / `pull_request` / `workflow_dispatch` 上运行 `make quality` + `make verify-mainline`，最近一次推送绿灯。
     2. 默认分支全量回归稳绿：`.venv/bin/python -m pytest -q` = `1714 passed, 2 skipped`。
     3. shared runtime / channel 解耦累计完成 `57+` 条最小直连闭环。
-    4. `app/bot/telegram_bot.py` 当前维持在 `220` 行，纯 wrapper 继续保持完成态。
-    5. `app/bot/private_chat_runtime.py` 当前维持在 `476` 行，runtime bootstrap / route block / follow-up / preparation 段继续保持收口态。
+    4. `app/bot/telegram_bot.py` 继续保持纯 Telegram wrapper 边界，不回退为业务编排中心。
+    5. `app/bot/private_chat_runtime.py` 继续保持 shared runtime 边界，runtime bootstrap / route block / follow-up / preparation 段不回退为渠道专属分叉。
+  - 精确行数不是长期决策真相；需要行数时以当前代码为准，不在决策文档里冻结瞬时数字。
 
 ## D-040 BT 支线当前专注成人资源，动漫 BT 不再继续投资
 - **状态**：已决定
