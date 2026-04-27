@@ -1,10 +1,12 @@
-# Next step (v397)
+# Next step (v398)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环：把 `auto_import_batch`、`search_request_context`、`media_name_parser`、`bt_candidate_scorer`、`import_to_library`、`import_transfer_execution`、`post_download_auto_import`、`cleanup_downloaded_source`、`import_job_state`、`import_approval_state` 的剩余手写 ANSI 日志统一到 shared `emit_operational_log` 边界。
-- 本轮还把 Feishu 入站收口到 SDK 长连接 only：`FEISHU_INBOUND_MODE` / `FEISHU_ENCRYPT_KEY` / webhook server 入口已经从当前代码和配置面移除。
+- 本轮已继续收口异常边界与日志边界：
+  - `subtitle_translation_support` 的本地字幕读写、模型响应 JSON 和 metadata JSON 读取只捕获明确 I/O/编码/解析异常。
+  - `metadata_scraper` 的 metadata/NFO/图片本地产物写入只捕获明确 I/O/编码异常。
+  - `wecom_adapter` callback 配置、请求体、验签、解密和运行时失败日志已统一到 shared `emit_operational_log`。
 - focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
@@ -12,7 +14,7 @@
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码、search/web/BT 展示、candidate/clarification、Telegram delivery/update、import pending/approval/event 等异常边界已持续收口。
-  - downloader route lookup、confirm / cleanup / frustration / BT read-only / raw BT / BT TMDB / BT pending、Feishu client、web source、main startup、Telegram update/delivery、channel identity、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation、auto-import/search/naming/scoring/import/cleanup 的日志出口已统一到 shared operational logging。
+  - downloader route lookup、confirm / cleanup / frustration / BT read-only / raw BT / BT TMDB / BT pending、Feishu client、web source、main startup、Telegram update/delivery、channel identity、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation、auto-import/search/naming/scoring/import/cleanup、WeCom callback 的日志出口已统一到 shared operational logging。
   - Feishu 入站已切到 SDK 长连接 only；webhook server / webhook 装配 / webhook 专属测试与配置入口已经移除。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
   - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
@@ -49,5 +51,5 @@
 ## After this step
 
 1. 若继续质量债，优先评估剩余 broad `except Exception` 中的 repo/SQLite 边界，或继续收口剩余日志打印边界 / `main()` DI。
-2. 若候选属于外部网络、LLM、TMDB/search、webhook 或后台 loop 隔离边界，先判断是否应保留宽捕获，不要机械替换。
+2. 若候选属于外部网络、LLM、TMDB/search、webhook、SDK 长连接或后台 loop 隔离边界，先判断是否应保留宽捕获，不要机械替换。
 3. 若用户明确切成人 BT，则先写成人 BT 缺口清单和 focused gate，再动功能代码。

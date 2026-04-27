@@ -270,7 +270,7 @@ def _extract_embedded_subtitle_file_for_video(
 def _read_subtitle_source_text(source_path: Path) -> tuple[str | None, _SubtitleCommandFailure | None]:
     try:
         return source_path.read_text(encoding="utf-8"), None
-    except Exception as exc:
+    except (OSError, UnicodeError) as exc:
         return None, _SubtitleCommandFailure(
             reason="read_source",
             problem=f"读取字幕文件失败：{source_path}，原因：{exc}",
@@ -285,7 +285,7 @@ def _write_translated_subtitle_file(
 ) -> _SubtitleCommandFailure | None:
     try:
         output_path.write_text(rendered_output, encoding="utf-8")
-    except Exception as exc:
+    except (OSError, UnicodeError) as exc:
         return _SubtitleCommandFailure(
             reason="write_output",
             problem=f"写入字幕文件失败：{output_path}，原因：{exc}",
@@ -399,7 +399,7 @@ def _build_subtitle_translation_summary(
 def _extract_chat_completion_response_text(body: dict[str, object]) -> str:
     try:
         content = body["choices"][0]["message"]["content"]
-    except Exception as exc:
+    except (KeyError, IndexError, TypeError) as exc:
         raise RuntimeError(f"响应缺少 content 字段：{exc}") from exc
     text = str(content).strip()
     if not text:
@@ -435,7 +435,7 @@ def _request_subtitle_chat_completion(
         raise RuntimeError(f"HTTP {response.status_code}: {response.text[:300]}")
     try:
         body = response.json()
-    except Exception as exc:
+    except ValueError as exc:
         raise RuntimeError(f"响应不是 JSON：{exc}") from exc
     return _extract_chat_completion_response_text(body)
 
@@ -1045,7 +1045,7 @@ def _read_metadata_title(metadata_path: Path) -> str:
         return ""
     try:
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    except Exception as error:
+    except (OSError, UnicodeError, ValueError) as error:
         _print_colored_error(
             problem=f"读取字幕元数据失败：{metadata_path}，原因={error}",
             fix="检查 metadata JSON 文件是否仍可读、编码是否为 UTF-8，以及 tmdb 字段结构是否完整。",

@@ -141,7 +141,7 @@ class MetadataScraperService:
         ) != WRITE_STRATEGY_SKIP:
             try:
                 metadata_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-            except Exception as exc:
+            except (OSError, UnicodeError) as exc:
                 message = f"写入 metadata 文件失败：{exc}"
                 _print_colored_error(
                     problem=message,
@@ -176,7 +176,7 @@ class MetadataScraperService:
                     )
                 nfo_lines.append("</movie>")
                 nfo_path.write_text("\n".join(nfo_lines) + "\n", encoding="utf-8")
-            except Exception as exc:
+            except (OSError, UnicodeError) as exc:
                 message = f"写入 NFO 文件失败：{exc}"
                 _print_colored_error(
                     problem=message,
@@ -335,7 +335,7 @@ class MetadataScraperService:
                 return [], MetadataScrapeResult(success=False, message=message)
             try:
                 artifact_path.write_bytes(payload)
-            except Exception as exc:
+            except OSError as exc:
                 cleanup_written_artifacts()
                 message = f"写入 {label} 图片失败：{exc}"
                 _print_colored_error(

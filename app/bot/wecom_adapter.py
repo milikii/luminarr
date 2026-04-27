@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
+from app.operational_logging import emit_operational_log
 
 WECOM_CHANNEL = "wecom"
 WECOM_XML_CONTENT_TYPE = "application/xml; charset=utf-8"
@@ -130,9 +131,10 @@ async def handle_wecom_callback_http_request(
 ) -> WeComWebhookHttpResponse:
     crypto_config = _resolve_callback_crypto_config(bot_data)
     if crypto_config is None:
-        print(
-            "\033[31m[WeCom callback 配置缺失]\033[0m 缺少 WECOM_TOKEN、WECOM_ENCODING_AES_KEY 或 WECOM_RECEIVE_ID。\n"
-            "\033[33m[处理建议]\033[0m 同时配置这三项后重启服务，再重新触发 WeCom 回调。"
+        emit_operational_log(
+            title="WeCom callback 配置缺失",
+            detail="缺少 WECOM_TOKEN、WECOM_ENCODING_AES_KEY 或 WECOM_RECEIVE_ID。",
+            fix_hint="同时配置这三项后重启服务，再重新触发 WeCom 回调。",
         )
         return WeComWebhookHttpResponse(status_code=500, body=b"wecom callback not configured")
 
@@ -148,9 +150,10 @@ async def handle_wecom_callback_http_request(
 
     raw_encrypt = _extract_encrypt_from_callback_body(body)
     if not raw_encrypt:
-        print(
-            "\033[31m[WeCom callback 请求体无效]\033[0m 缺少 Encrypt 节点或 XML 结构不合法。\n"
-            "\033[33m[处理建议]\033[0m 检查 WeCom 回调是否开启加密模式，并确认代理层没有改写原始 XML。"
+        emit_operational_log(
+            title="WeCom callback 请求体无效",
+            detail="缺少 Encrypt 节点或 XML 结构不合法。",
+            fix_hint="检查 WeCom 回调是否开启加密模式，并确认代理层没有改写原始 XML。",
         )
         return WeComWebhookHttpResponse(status_code=400, body=b"invalid callback body")
 
@@ -176,9 +179,10 @@ async def handle_wecom_callback_http_request(
             reply_text_func=capture_reply,
         )
     except Exception as error:
-        print(
-            f"\033[31m[WeCom callback 处理失败]\033[0m 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 shared private-chat runtime 依赖、WeCom 明文 XML 和当前请求签名后重试。"
+        emit_operational_log(
+            title="WeCom callback 处理失败",
+            detail=f"原因={error}",
+            fix_hint="检查 shared private-chat runtime 依赖、WeCom 明文 XML 和当前请求签名后重试。",
         )
         return WeComWebhookHttpResponse(status_code=500, body=b"internal error")
 
@@ -263,9 +267,10 @@ def _handle_wecom_callback_url_verification(
 ) -> WeComWebhookHttpResponse:
     echostr = query_params.get(WECOM_REQUEST_ECHOSTR_QUERY_KEY, "")
     if not echostr:
-        print(
-            "\033[31m[WeCom URL 校验参数缺失]\033[0m 缺少 echostr。\n"
-            "\033[33m[处理建议]\033[0m 检查 WeCom callback URL 校验请求是否完整透传到当前服务。"
+        emit_operational_log(
+            title="WeCom URL 校验参数缺失",
+            detail="缺少 echostr。",
+            fix_hint="检查 WeCom callback URL 校验请求是否完整透传到当前服务。",
         )
         return WeComWebhookHttpResponse(status_code=400, body=b"missing echostr")
 
@@ -293,21 +298,24 @@ def _verify_and_decrypt_ciphertext(
     signature = query_params.get(WECOM_REQUEST_SIGNATURE_QUERY_KEY, "").lower()
 
     if not timestamp:
-        print(
-            "\033[31m[WeCom callback 时间戳缺失]\033[0m 缺少 timestamp。\n"
-            "\033[33m[处理建议]\033[0m 检查 WeCom 回调 query string 是否完整透传。"
+        emit_operational_log(
+            title="WeCom callback 时间戳缺失",
+            detail="缺少 timestamp。",
+            fix_hint="检查 WeCom 回调 query string 是否完整透传。",
         )
         return "", WeComWebhookHttpResponse(status_code=400, body=b"missing timestamp")
     if not nonce:
-        print(
-            "\033[31m[WeCom callback nonce 缺失]\033[0m 缺少 nonce。\n"
-            "\033[33m[处理建议]\033[0m 检查 WeCom 回调 query string 是否完整透传。"
+        emit_operational_log(
+            title="WeCom callback nonce 缺失",
+            detail="缺少 nonce。",
+            fix_hint="检查 WeCom 回调 query string 是否完整透传。",
         )
         return "", WeComWebhookHttpResponse(status_code=400, body=b"missing nonce")
     if not signature:
-        print(
-            "\033[31m[WeCom callback 签名缺失]\033[0m 缺少 msg_signature。\n"
-            "\033[33m[处理建议]\033[0m 检查 WeCom 回调 query string 是否完整透传。"
+        emit_operational_log(
+            title="WeCom callback 签名缺失",
+            detail="缺少 msg_signature。",
+            fix_hint="检查 WeCom 回调 query string 是否完整透传。",
         )
         return "", WeComWebhookHttpResponse(status_code=401, body=b"missing msg_signature")
 
@@ -318,9 +326,10 @@ def _verify_and_decrypt_ciphertext(
         encrypted_text=encrypted_text,
     )
     if signature != expected_signature:
-        print(
-            f"\033[31m[WeCom callback 签名校验失败]\033[0m 类型={request_kind}\n"
-            "\033[33m[处理建议]\033[0m 检查 WECOM_TOKEN、query string 和加密体是否与 WeCom 原始请求一致。"
+        emit_operational_log(
+            title="WeCom callback 签名校验失败",
+            detail=f"类型={request_kind}",
+            fix_hint="检查 WECOM_TOKEN、query string 和加密体是否与 WeCom 原始请求一致。",
         )
         return "", WeComWebhookHttpResponse(status_code=401, body=b"invalid msg_signature")
 
@@ -330,9 +339,10 @@ def _verify_and_decrypt_ciphertext(
             crypto_config=crypto_config,
         )
     except ValueError as error:
-        print(
-            f"\033[31m[WeCom callback 解密失败]\033[0m 类型={request_kind} 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 WECOM_ENCODING_AES_KEY、WECOM_RECEIVE_ID 和回调原始密文是否匹配。"
+        emit_operational_log(
+            title="WeCom callback 解密失败",
+            detail=f"类型={request_kind} 原因={error}",
+            fix_hint="检查 WECOM_ENCODING_AES_KEY、WECOM_RECEIVE_ID 和回调原始密文是否匹配。",
         )
         return "", WeComWebhookHttpResponse(status_code=400, body=b"invalid encrypted payload")
 
