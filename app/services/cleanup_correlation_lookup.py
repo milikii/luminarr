@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from app.db.job_event_repo import JobEvent, JobEventRepo
-from app.db.job_repo import JobRepo
+from app.db.job_event_repo import JobEvent, JobEventPersistenceError, JobEventRepo
+from app.db.job_repo import JobPersistenceError, JobRepo
 
 CLEANUP_CORRELATION_LOOKUP_RESULT_MISSING_REASON = "job_event list result missing during correlation lookup"
 
@@ -185,7 +186,7 @@ def fetch_cleanup_correlation_event(
 ) -> object | None:
     try:
         return fetch_event()
-    except Exception as error:
+    except (JobEventPersistenceError, sqlite3.Error) as error:
         reason = str(error)
         if reason == result_missing_reason:
             on_result_missing(reason)
@@ -333,7 +334,7 @@ def resolve_cleanup_task_identity(
     if job_lookup is not None and chat_id is not None and chat_id > 0:
         try:
             job = job_lookup(chat_id, task_ref)
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             on_job_lookup_failed(error)
             job = None
         if job is not None:

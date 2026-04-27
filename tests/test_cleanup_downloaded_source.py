@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -733,7 +734,7 @@ def test_inspect_by_task_ref_logs_job_lookup_failure_and_falls_back_to_task_ref(
 
     class FailingJobRepo:
         def get_job_for_chat_ref(self, *, chat_id: int, task_ref: str) -> None:
-            raise RuntimeError("mock job lookup denied")
+            raise sqlite3.OperationalError("mock job lookup denied")
 
     service = CleanupDownloadedSourceService(event_repo, job_repo=FailingJobRepo())  # type: ignore[arg-type]
 
@@ -1292,7 +1293,7 @@ def test_inspect_by_task_ref_logs_correlation_query_failure_and_returns_missing_
     monkeypatch.setattr(
         event_repo,
         "find_latest_import_correlation",
-        lambda **_: (_ for _ in ()).throw(RuntimeError("mock correlation lookup denied")),
+        lambda **_: (_ for _ in ()).throw(sqlite3.OperationalError("mock correlation lookup denied")),
     )
 
     reply = service.inspect_by_task_ref("87")
@@ -1321,7 +1322,7 @@ def test_cleanup_by_task_ref_logs_correlation_query_failure_and_keeps_follow_up(
     monkeypatch.setattr(
         event_repo,
         "find_latest_import_correlation",
-        lambda **_: (_ for _ in ()).throw(RuntimeError("mock correlation lookup denied")),
+        lambda **_: (_ for _ in ()).throw(sqlite3.OperationalError("mock correlation lookup denied")),
     )
 
     reply = service.cleanup_by_task_ref("87")
@@ -1350,7 +1351,7 @@ def test_inspect_by_task_ref_logs_correlation_lookup_result_missing_and_returns_
     monkeypatch.setattr(
         event_repo,
         "find_latest_import_correlation",
-        lambda **_: (_ for _ in ()).throw(RuntimeError("job_event list result missing during correlation lookup")),
+        lambda **_: (_ for _ in ()).throw(JobEventPersistenceError("job_event list result missing during correlation lookup")),
     )
 
     reply = service.inspect_by_task_ref("87")
@@ -1379,7 +1380,7 @@ def test_cleanup_by_task_ref_logs_correlation_lookup_result_missing_and_keeps_fo
     monkeypatch.setattr(
         event_repo,
         "find_latest_import_correlation",
-        lambda **_: (_ for _ in ()).throw(RuntimeError("job_event list result missing during correlation lookup")),
+        lambda **_: (_ for _ in ()).throw(JobEventPersistenceError("job_event list result missing during correlation lookup")),
     )
 
     reply = service.cleanup_by_task_ref("87")
@@ -1475,7 +1476,7 @@ def test_inspect_by_task_ref_logs_correlation_query_failure_with_chat_scoped_ide
     monkeypatch.setattr(
         event_repo,
         "find_latest_import_correlation",
-        lambda **_: (_ for _ in ()).throw(RuntimeError("mock correlation lookup denied")),
+        lambda **_: (_ for _ in ()).throw(sqlite3.OperationalError("mock correlation lookup denied")),
     )
 
     reply = service.inspect_by_task_ref("cleanup-shortcut", chat_id=1001)
@@ -1513,7 +1514,7 @@ def test_cleanup_by_task_ref_logs_correlation_query_failure_with_chat_scoped_ide
     monkeypatch.setattr(
         event_repo,
         "find_latest_import_correlation",
-        lambda **_: (_ for _ in ()).throw(RuntimeError("mock correlation lookup denied")),
+        lambda **_: (_ for _ in ()).throw(sqlite3.OperationalError("mock correlation lookup denied")),
     )
 
     reply = service.cleanup_by_task_ref("cleanup-shortcut", chat_id=1001)
