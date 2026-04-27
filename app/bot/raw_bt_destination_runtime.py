@@ -25,7 +25,7 @@ from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BtPendingPersistenceError,
 )
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.add_to_downloader import BT_SOURCE_UNSUPPORTED_TEXT, AddToDownloaderService
 from app.services.pure_bt import extract_bt_search_query, pick_single_item_candidate
 from app.services.search_media import SearchMediaService
@@ -75,13 +75,10 @@ class ResolvedDownloaderExecutionLike(Protocol):
 
 
 def log_pure_bt_search_error(*, query: str, error: Exception) -> None:
-    print(
-        format_operational_log_message(
-            title="pure BT 搜索失败",
-            detail=f"查询={query} 原因={error}",
-            fix_hint="检查 Prowlarr 地址、API Key 和网络连通性后重试。",
-        ),
-        flush=True,
+    emit_operational_log(
+        title="pure BT 搜索失败",
+        detail=f"查询={query} 原因={error}",
+        fix_hint="检查 Prowlarr 地址、API Key 和网络连通性后重试。",
     )
 
 
