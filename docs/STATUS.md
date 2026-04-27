@@ -2,14 +2,14 @@
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；当前唯一主线仍是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮按文档连续完成 10 个最小闭环：confirm job lookup、frustration pending-job lookup、BT read-only helper、BT processing-path pending payload/clear/read/corruption/persist/missing-after-upsert 日志统一到共享 operational logging helper，并同步当前文档真相。
+- 本轮按文档连续完成 10 个最小闭环：`search_clarification_state`、`add_pending_presence_state`、`import_pending_write_through_state`、`add_confirm_job_state`、`import_cancel_state`、`import_confirm_expiry_state`、`search_candidate_state`、`add_confirm_context_state`、`import_prepare_state`、`private_chat_cleanup_runtime` 的日志边界统一到共享 operational logging helper；同时把几个测试夹具的通用 `RuntimeError("db down")` 收回到明确的 persistence error 类型。
 - 成人归档上层不再用泛 `Exception` 判断归档/清理失败；文件搬运、下载器删除和本地源清理失败进入明确操作失败文本，持久化失败仍保持状态不可用边界。
 - 默认分支协议、SQLite schema、下载/导入/审批语义未变化；本轮主要是异常类型和日志边界收口。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支质量 gate 通过；本轮 focused tests 已覆盖 confirm、frustration、BT read-only 和 BT processing-path pending 日志路径。
+- 默认分支质量 gate 通过；本轮 focused tests 已覆盖 search clarification、pending add、import pending write-through、downloader confirm/job、import cancel/expiry、candidate、confirm context、import prepare 和 cleanup runtime 日志路径。
 - `make quality` 通过，`make verify-mainline` 通过。
 - 下一轮继续质量债时，优先从剩余 broad `except Exception` 中区分“外部服务隔离”与“repo/SQLite 持久化边界”，或继续收口日志打印边界 / `main()` DI；不要切成人 BT 新功能。
 
@@ -39,6 +39,18 @@
 - `tests/test_manage_bt_subscription.py -k "list"`：`6 passed, 32 deselected`
 - `tests/test_manage_bt_subscription.py tests/test_bt_subscription_scan_support.py -k "scan"`：`10 passed, 32 deselected`
 - `tests/test_manage_bt_subscription.py tests/test_bt_subscription_scheduler_support.py -k "scheduler or chat"`：`12 passed, 29 deselected`
+- `make quality`：通过（`27 passed, 0 skipped`）
+- `make verify-mainline`：通过
+- `tests/test_private_chat_runtime.py tests/test_search_media.py -k "clarification"`：`15 passed`
+- `tests/test_private_chat_runtime.py -k "downloader_pending_lookup_failure or confirm_routes"`：`1 passed`
+- `tests/test_import_pending_write_through_state.py`：`3 passed`
+- `tests/test_add_to_downloader.py -k "claim_pending_job or restore_pending_job or mark_completed_job"`：`9 passed, 103 deselected`
+- `tests/test_import_to_library.py -k "cancel_pending_import or import_cancel"`：`11 passed, 139 deselected`
+- `tests/test_import_to_library.py -k "expired or expiry or approval_expired or confirm_import_by_task_ref_returns_expired"`：`9 passed, 141 deselected`
+- `tests/test_search_media.py tests/test_private_chat_runtime.py -k "candidate or digit_stops_on_clarification_lookup_failure or candidate_clear_failure"`：`39 passed, 203 deselected`
+- `tests/test_add_to_downloader.py -k "context_lookup or context_row_corruption or context_payload_corruption or approval_lookup_fails or approval_row_missing or expiry_lookup_fails or expired"`：`16 passed, 96 deselected`
+- `tests/test_import_to_library.py -k "import_by_task_ref or import_source_missing or import_query_failed or import_target_exists or prepare_target"`：`44 passed, 106 deselected`
+- `tests/test_private_chat_runtime.py tests/test_private_chat_cleanup_runtime.py -k "cleanup_replies_service_not_ready or cleanup_routes_to_cleanup_service or handle_cleanup_query"`：`4 passed, 57 deselected`
 - `make quality`：通过（`27 passed, 0 skipped`）
 - `make verify-mainline`：通过
 
