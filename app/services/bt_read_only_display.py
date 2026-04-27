@@ -57,7 +57,9 @@ class BtReadOnlyDisplayService:
         display_candidates = [_to_candidate_dict(item) for item in candidates]
         if not display_candidates:
             return []
-        helper_match = await self.lookup_helper_match(lookup_query)
+        helper_match = None
+        if any(not str(item.get("adult_content_id", "")).strip() for item in display_candidates):
+            helper_match = await self.lookup_helper_match(lookup_query)
         display_candidates = prepare_bt_read_only_selection_candidates(
             display_candidates,
             helper_match=helper_match,
