@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from app.operational_logging import emit_operational_log
 from app.services.adult_content import extract_exact_adult_content_match
 from app.services.media_identity import normalize_media_identity_payload
 from app.services.bt_sources import resolve_bt_source
@@ -194,11 +195,13 @@ class AddPendingRuntimeState:
                 "检查 SQLite/jobs 表里的待确认下载任务是否仍存在；当前入口会直接返回服务未就绪，"
                 "避免把进程内残留上下文误判成普通仍有待确认下载。"
             )
-        print(
-            f"\033[31m[下载待确认任务结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} "
-            f"task_id={task_id} task_hash={task_hash} 错误=jobs pending row missing while in-memory pending exists\n"
-            f"\033[33m[处理建议]\033[0m {suggestion}",
-            flush=True,
+        emit_operational_log(
+            title="下载待确认任务结果缺失",
+            detail=(
+                f"chat_id={chat_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} "
+                "错误=jobs pending row missing while in-memory pending exists"
+            ),
+            fix_hint=suggestion,
         )
 
 
