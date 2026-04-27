@@ -224,22 +224,6 @@ def _require_lookup_client_for_task(
     return client
 
 
-def _resolve_downloader_name_for_task(
-    *,
-    task_ref: str,
-    chat_id: int | None,
-    job_repo: JobRepo,
-) -> str | None:
-    route = _resolve_downloader_task_route(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        job_repo=job_repo,
-    )
-    if route is None:
-        return None
-    return route.downloader_name
-
-
 def _log_downloader_instance_missing(*, downloader_name: str) -> None:
     _print_downloader_issue_log(
         title="下载器实例不存在",

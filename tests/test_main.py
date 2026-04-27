@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from telegram.error import NetworkError
 
-from app.downloader_route_lookup import DownloaderRouteLookupError, _resolve_downloader_name_for_task
+from app.downloader_route_lookup import DownloaderRouteLookupError, _resolve_downloader_task_route
 from app.downloader_route_lookup import _resolve_downloader_client_for_lookup
 from app.main import (
     _build_refresh_media_server_func,
@@ -36,7 +36,7 @@ def test_resolve_downloader_name_for_task_fails_closed_when_lookup_is_missing(
     job_repo = SimpleNamespace(
         get_downloader_job_for_chat_ref=lambda **_: None,
     )
-    assert _resolve_downloader_name_for_task(task_ref="87", chat_id=1001, job_repo=job_repo) is None
+    assert _resolve_downloader_task_route(task_ref="87", chat_id=1001, job_repo=job_repo) is None
     captured = capsys.readouterr()
     assert "[下载器路由未命中]" in captured.out
     assert "[处理建议]" in captured.out
@@ -49,7 +49,7 @@ def test_resolve_downloader_name_for_task_logs_lookup_error(
         get_downloader_job_for_chat_ref=lambda **_: (_ for _ in ()).throw(RuntimeError("db down")),
     )
 
-    assert _resolve_downloader_name_for_task(task_ref="87", chat_id=1001, job_repo=job_repo) is None
+    assert _resolve_downloader_task_route(task_ref="87", chat_id=1001, job_repo=job_repo) is None
 
     captured = capsys.readouterr()
     assert "[下载器路由查询失败]" in captured.out
@@ -75,7 +75,7 @@ def test_resolve_downloader_name_for_task_logs_payload_corruption(
         get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json=payload_json),
     )
 
-    assert _resolve_downloader_name_for_task(task_ref="87", chat_id=1001, job_repo=job_repo) is None
+    assert _resolve_downloader_task_route(task_ref="87", chat_id=1001, job_repo=job_repo) is None
 
     captured = capsys.readouterr()
     assert "[下载器路由载荷损坏]" in captured.out
