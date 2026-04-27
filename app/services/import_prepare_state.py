@@ -11,11 +11,23 @@ from app.clients.qbittorrent import QbittorrentError
 from app.clients.transmission import TransmissionError, TransmissionImportSource
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.downloader_route_lookup import DownloaderRouteLookupError
+from app.operational_logging import format_operational_log_message
 from app.services.import_transfer_execution import PreparedImport
 from app.services.media_name_parser import parse_media_name
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 RecordImportEventFunc = Callable[..., None]
+
+
+def _log_import_prepare_error(*, title: str, detail: str, fix_hint: str) -> None:
+    print(
+        format_operational_log_message(
+            title=title,
+            detail=detail,
+            fix_hint=fix_hint,
+        ),
+        flush=True,
+    )
 
 
 class ImportPrepareState:
@@ -53,9 +65,10 @@ class ImportPrepareState:
         try:
             import_source = await self._get_import_source(task_ref, chat_id=chat_id)
         except (DownloaderRouteLookupError, QbittorrentError, TransmissionError, httpx.HTTPError) as error:
-            print(
-                f"\033[31m[导入源查询失败]\033[0m task_ref={task_ref} chat_id={chat_id or 0} 错误={error}\n\033[33m[处理建议]\033[0m 检查下载器状态查询、下载器路由和网络连通性；当前请求会返回查询失败文本，并记录 `import.query_failed` 事件。",
-                flush=True,
+            _log_import_prepare_error(
+                title="导入源查询失败",
+                detail=f"task_ref={task_ref} chat_id={chat_id or 0} 错误={error}",
+                fix_hint="检查下载器状态查询、下载器路由和网络连通性；当前请求会返回查询失败文本，并记录 `import.query_failed` 事件。",
             )
             self._record_event(
                 task_ref=task_ref,
@@ -86,9 +99,10 @@ class ImportPrepareState:
 
         source_path = Path(import_source.download_dir) / import_source.name
         if not source_path.exists():
-            print(
-                f"\033[31m[导入源文件缺失]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path}\n\033[33m[处理建议]\033[0m 检查下载目录是否已被清理、移动或手工删除；确认下载源仍在后再重新执行导入。",
-                flush=True,
+            _log_import_prepare_error(
+                title="导入源文件缺失",
+                detail=f"task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path}",
+                fix_hint="检查下载目录是否已被清理、移动或手工删除；确认下载源仍在后再重新执行导入。",
             )
             self._record_event(
                 task_ref=task_ref,
@@ -104,9 +118,10 @@ class ImportPrepareState:
             target_root.mkdir(parents=True, exist_ok=True)
         except OSError as error:
             message = self._import_prepare_target_failed_text_template.format(target_path=str(target_root))
-            print(
-                f"\033[31m[导入目标目录创建失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_root} 错误={error}\n\033[33m[处理建议]\033[0m 检查 LIBRARY_TARGET_DIR 是否存在、是否可写，以及当前进程对目标目录是否有创建权限；当前请求会直接失败返回。",
-                flush=True,
+            _log_import_prepare_error(
+                title="导入目标目录创建失败",
+                detail=f"task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_root} 错误={error}",
+                fix_hint="检查 LIBRARY_TARGET_DIR 是否存在、是否可写，以及当前进程对目标目录是否有创建权限；当前请求会直接失败返回。",
             )
             self._record_event(
                 task_ref=task_ref,
@@ -129,9 +144,10 @@ class ImportPrepareState:
         target_path = target_root / normalized_target_name
         if target_path.exists():
             message = self._import_target_exists_text_template.format(target_path=str(target_path))
-            print(
-                f"\033[31m[导入目标已存在]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_path}\n\033[33m[处理建议]\033[0m 检查库目录里是否已有同名文件或目录；若这是历史残留，请先确认是否可复用或手动清理后再重试导入。",
-                flush=True,
+            _log_import_prepare_error(
+                title="导入目标已存在",
+                detail=f"task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_path}",
+                fix_hint="检查库目录里是否已有同名文件或目录；若这是历史残留，请先确认是否可复用或手动清理后再重试导入。",
             )
             self._record_event(
                 task_ref=task_ref,
