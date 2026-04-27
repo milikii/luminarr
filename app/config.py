@@ -137,26 +137,47 @@ def _read_optional_int_with_validator(
     predicate: Callable[[int], bool],
     error_message: str,
 ) -> int:
+    return _read_optional_parsed_value(
+        env,
+        key,
+        default,
+        parse=int,
+        parse_error_message=f"{key} must be an integer",
+        predicate=predicate,
+        validation_error_message=error_message,
+    )
+
+
+def _read_optional_parsed_value(
+    env: Mapping[str, str],
+    key: str,
+    default: _T,
+    *,
+    parse: Callable[[str], _T],
+    parse_error_message: str,
+    predicate: Callable[[_T], bool] | None = None,
+    validation_error_message: str = "",
+) -> _T:
     raw_value = _read_optional(env, key)
     if not raw_value:
         return default
     try:
-        value = int(raw_value)
+        value = parse(raw_value)
     except ValueError as error:
-        raise ConfigError(f"{key} must be an integer") from error
-    if not predicate(value):
-        raise ConfigError(error_message)
+        raise ConfigError(parse_error_message) from error
+    if predicate is not None and not predicate(value):
+        raise ConfigError(validation_error_message)
     return value
 
 
 def _read_optional_float(env: Mapping[str, str], key: str, default: float) -> float:
-    raw_value = _read_optional(env, key)
-    if not raw_value:
-        return default
-    try:
-        return float(raw_value)
-    except ValueError as error:
-        raise ConfigError(f"{key} must be a number") from error
+    return _read_optional_parsed_value(
+        env,
+        key,
+        default,
+        parse=float,
+        parse_error_message=f"{key} must be a number",
+    )
 
 
 def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
