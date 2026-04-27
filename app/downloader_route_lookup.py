@@ -23,6 +23,14 @@ def _format_task_route_context(*, task_ref: str, chat_id: int | None) -> str:
     return f"task_ref={task_ref} chat_id={chat_id if chat_id is not None else '-'}"
 
 
+def _format_downloader_context(*, downloader_name: str, downloader_type: str = "") -> str:
+    cleaned_name = downloader_name or "-"
+    cleaned_type = downloader_type.strip()
+    if not cleaned_type:
+        return cleaned_name
+    return f"{cleaned_name} downloader_type={cleaned_type}"
+
+
 def _print_downloader_issue_log(
     *,
     title: str,
@@ -173,7 +181,7 @@ def _log_downloader_instance_missing(*, downloader_name: str) -> None:
     _print_downloader_issue_log(
         title="下载器实例不存在",
         context_label="downloader_name",
-        context_value=downloader_name,
+        context_value=_format_downloader_context(downloader_name=downloader_name),
         detail_label="原因",
         detail_value="instance missing",
         fix_hint="检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，并确认角色绑定或历史任务没有引用已删除的实例名。",
@@ -184,7 +192,10 @@ def _log_downloader_client_not_configured(*, downloader_name: str, downloader_ty
     _print_downloader_issue_log(
         title="下载器客户端未配置",
         context_label="downloader_name",
-        context_value=f"{downloader_name} downloader_type={downloader_type}",
+        context_value=_format_downloader_context(
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+        ),
         detail_label="原因",
         detail_value="client missing",
         fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
@@ -200,7 +211,10 @@ def _log_downloader_dispatch_resolution_failed(
     _print_downloader_issue_log(
         title="下载器投递路由失败",
         context_label="downloader_name",
-        context_value=f"{downloader_name} downloader_type={downloader_type}",
+        context_value=_format_downloader_context(
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+        ),
         detail_label="原因",
         detail_value=reason,
         fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
