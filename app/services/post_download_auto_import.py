@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from app.db.adult_content_registry_repo import (
     ADULT_CONTENT_STATUS_ARCHIVED_DELETED,
     ADULT_CONTENT_STATUS_ARCHIVED_PRESENT,
+    AdultContentRegistryPersistenceError,
     AdultContentRegistryRepo,
 )
 from app.db.download_monitor_repo import DownloadMonitorRecord, DownloadMonitorRepo
@@ -122,7 +124,7 @@ class PostDownloadAutoImportService:
                 task_id=candidate.task_id,
                 task_hash=candidate.task_hash,
             )
-        except Exception as error:
+        except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[成人资源历史查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
                 "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表读取是否正常；当前会按状态不可用停路，避免把历史真相缺口误判成普通非成人下载。",

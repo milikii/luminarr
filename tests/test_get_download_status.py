@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTaskStatus
-from app.db.adult_content_registry_repo import AdultContentRegistryRepo
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.sqlite import SqliteDatabase
@@ -1399,6 +1399,50 @@ def test_post_download_auto_import_run_for_record_logs_invalid_chat_identity(cap
     output = capsys.readouterr().out
     assert "[自动导入聊天身份无效]" in output
     assert "chat_id=0" in output
+
+
+def test_post_download_auto_import_run_for_record_stops_when_adult_registry_lookup_fails(capsys) -> None:
+    auto_import = AsyncMock(return_value="不应走到这里")
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=None,
+        job_event_repo=type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: []})(),
+        auto_import_func=auto_import,
+        adult_content_registry_repo=type(
+            "AdultRegistryRepo",
+            (),
+            {
+                "get_by_task_identity": lambda self, **kwargs: (_ for _ in ()).throw(
+                    AdultContentRegistryPersistenceError("registry down")
+                )
+            },
+        )(),
+    )
+    record = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "SSIS-123",
+            "chat_id": 1001,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15T00:00:00+00:00",
+            "last_observed_at": "2026-04-15T00:00:00+00:00",
+            "created_at": "2026-04-15T00:00:00+00:00",
+            "updated_at": "2026-04-15T00:00:00+00:00",
+        },
+    )()
+
+    with pytest.raises(AutoImportStateUnavailableError):
+        asyncio.run(auto_import_service.run_for_record(record))
+
+    auto_import.assert_not_awaited()
+    output = capsys.readouterr().out
+    assert "[成人资源历史查询失败]" in output
+    assert "registry down" in output
 
 
 def test_post_download_auto_import_run_for_record_routes_adult_task_to_archive_service(tmp_path: Path) -> None:
