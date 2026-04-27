@@ -12,7 +12,7 @@ from app.db.job_repo import (
     JobRepo,
     WORKFLOW_ADD_TO_DOWNLOADER,
 )
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.add_confirm_approval_state import AddConfirmApprovalState
 from app.services.add_pending_context import PendingAddContext, pending_add_from_json
 
@@ -23,14 +23,7 @@ IsPendingApprovalExpiredFunc = Callable[..., bool | None]
 
 
 def _log_add_confirm_context_error(*, title: str, detail: str, fix_hint: str) -> None:
-    print(
-        format_operational_log_message(
-            title=title,
-            detail=detail,
-            fix_hint=fix_hint,
-        ),
-        flush=True,
-    )
+    emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
 
 
 @dataclass(frozen=True, slots=True)
