@@ -1,7 +1,8 @@
-# Current status (v504)
+# Current status (v505)
 
 ## Current mainline
-- **质量硬化** 继续保持完成态；**文档入口收口 / 当前真相对齐** 已完成并推送；当前切回 **质量债硬化 / import 持久化异常边界收口 + 小 support 文件收口**。
+- **质量硬化** 继续保持完成态；**文档入口收口 / 当前真相对齐** 已完成并推送；当前切回 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
+- 本轮继续收口 5 处状态/下载 follow-up 边界：`status_follow_up` 的下载观察、完成观察事件，`post_download_auto_import` 的成人资源历史查找，`get_download_status` 的下载器查询，`download_follow_up_runtime` 的待完成轮询列表；这些路径不再吞泛 `Exception`，只兜明确 repo persistence、SQLite、下载器/路由/HTTP 或本地状态异常。
 - 本轮继续收口 12 处小异常边界：`search_request_context` 的搜索源失败日志、`web_source` 的搜索/分页/详情 HTTP 边界、`bt_read_only_display` 的 JavLibrary 只读补全和成人历史查询、`import_confirmed_media_identity` 的 job_event 回读、`add_adult_registry_state` 的成人待确认/下载状态登记、`import_context_lookup` 的 job/approval/raw BT 回读；这些路径不再吞泛 `Exception`，只兜明确 HTTP、JSON、repo persistence 或 SQLite 异常。
 - 本轮继续收口 10 处状态边界：`search_candidate_state` 的持久化/回读/回滚边界、`search_clarification_state` 的持久化/回读/清理边界，统一收窄为 `CandidatePersistenceError` / `ClarificationPersistenceError` 和 `sqlite3.Error`，不再吞泛 `Exception`。
 - 本轮继续收口 Telegram 出站与去重边界：`telegram_update_runtime` 只兜 `TelegramUpdatePersistenceError` / `sqlite3.Error`，去重结果缺失也改为专用异常；`telegram_delivery_runtime` 只兜 `TelegramError`。
@@ -13,10 +14,13 @@
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支最近业务回归保持绿灯；本轮 focused tests 已覆盖 import 持久化边界、import transfer、search media、BT subscription、WeCom 和 docs gate.
-- 下一轮如果继续质量债，优先挑 `status_follow_up`、download follow-up runtime、剩余小 broad `except Exception`、日志打印边界或 `main()` DI；不要为了凑数字强拆剩余大 support 文件。
+- 默认分支最近业务回归保持绿灯；本轮 focused tests 已覆盖下载状态、下载完成 follow-up、自动导入状态边界和 docs gate.
+- 下一轮如果继续质量债，优先挑 `post_download_auto_import` 剩余成人归档/终态/skip event 边界、`add_confirm_*` / cancel 一带剩余 broad `except Exception`、日志打印边界或 `main()` DI；不要为了凑数字强拆剩余大 support 文件。
 
 ## Latest verification
+- `tests/test_get_download_status.py tests/test_download_follow_up_runtime.py`：`58 passed, 4 warnings`
+- `make quality`：通过（`27 passed`）
+- `make verify-mainline`：通过
 - `tests/test_bt_sources.py tests/test_bt_read_only_display.py tests/test_import_confirmed_media_identity.py tests/test_import_context_lookup.py`：`31 passed`
 - `tests/test_search_media.py -k "javlibrary_lookup_fails or search_backend_failure or tmdb_failed or tmdb_failure" tests/test_add_to_downloader.py -k "adult_pending_registry_failure" tests/test_add_execution_follow_up.py -k "adult_content_downloading_failure" tests/test_import_to_library.py -k "correlation_lookup or raw_bt or rebuild_confirm_context"`：`14 passed, 442 deselected`
 - `make quality`：通过（`27 passed`）

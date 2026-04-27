@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call
 
@@ -90,7 +91,7 @@ def test_poll_pending_download_completion_once_reuses_status_service() -> None:
 
 
 def test_poll_pending_download_completion_once_logs_pending_list_failure(capsys: pytest.CaptureFixture[str]) -> None:
-    repo = SimpleNamespace(list_pending_completion=Mock(side_effect=RuntimeError("db down")))
+    repo = SimpleNamespace(list_pending_completion=Mock(side_effect=sqlite3.OperationalError("db down")))
     status_service = SimpleNamespace(get_status_text=AsyncMock())
 
     asyncio.run(

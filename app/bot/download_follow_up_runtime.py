@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from collections.abc import MutableMapping
 from typing import Protocol
 
@@ -13,6 +14,10 @@ class _SchedulerApplication(Protocol):
     bot_data: MutableMapping[str, object]
 
     def create_task(self, coroutine, *, name: str): ...
+
+
+class DownloadCompletionPendingListError(RuntimeError):
+    pass
 
 
 async def post_download_auto_import_scheduler_loop(
@@ -42,8 +47,8 @@ async def poll_pending_download_completion_once(
     try:
         pending_records = download_monitor_repo.list_pending_completion()
         if pending_records is None:
-            raise RuntimeError("download completion pending list result missing")
-    except Exception as error:
+            raise DownloadCompletionPendingListError("download completion pending list result missing")
+    except (DownloadMonitorPersistenceError, sqlite3.Error, DownloadCompletionPendingListError) as error:
         _log_download_completion_pending_list_error(error=error)
         return
     for record in pending_records:
