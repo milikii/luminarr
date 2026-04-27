@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 
-from app.db.job_repo import JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 
 IMPORT_PENDING_JOB_RESULT_MISSING_REASON = "job missing after pending upsert"
 IMPORT_PENDING_JOB_NONE_REASON = "import pending job result missing"
@@ -45,8 +46,8 @@ class ImportJobState:
                 payload_json=payload_json,
             )
             if pending_job is None:
-                raise RuntimeError(IMPORT_PENDING_JOB_NONE_REASON)
-        except Exception as error:
+                raise JobPersistenceError(IMPORT_PENDING_JOB_NONE_REASON)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 IMPORT_PENDING_JOB_RESULT_MISSING_REASON,
                 IMPORT_PENDING_JOB_NONE_REASON,
@@ -78,7 +79,7 @@ class ImportJobState:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) == IMPORT_CLAIM_PENDING_JOB_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[导入确认任务抢占结果缺失]\033[0m job_id={job.job_id} task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} version={job.version} lease_owner={lease_owner} 错误={error}\n"
@@ -116,7 +117,7 @@ class ImportJobState:
                 lease_owner=lease_owner,
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) == IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[导入确认任务回退结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"
@@ -153,8 +154,8 @@ class ImportJobState:
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
             if marked is None:
-                raise RuntimeError(IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
-        except Exception as error:
+                raise JobPersistenceError(IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) == IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[导入确认任务完结结果缺失]\033[0m job_id={job_id} version={expected_version} lease_owner={lease_owner} 错误={error}\n"

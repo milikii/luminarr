@@ -315,7 +315,7 @@ def test_rebuild_confirm_context_logs_approval_lookup_failure(capsys) -> None:
 def test_confirm_import_by_task_ref_returns_state_unavailable_on_context_lookup_failure(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     get_import_source = AsyncMock(return_value=None)
     service = ImportToLibraryService(get_import_source, "/data/library/movies", job_repo=job_repo)
 
@@ -482,7 +482,7 @@ def test_import_by_task_ref_returns_query_failed_when_raw_bt_payload_is_corrupte
 
 
 def test_claim_pending_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     job = JobRecord(
         job_id="job-1",
@@ -514,7 +514,7 @@ def test_claim_pending_job_logs_missing_result(capsys) -> None:
         {
             "claim_lease": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("job missing during lease claim"))
+            ).throw(JobPersistenceError("job missing during lease claim"))
         },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
@@ -592,7 +592,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_claim_lease_f
         (),
         {
             "get_import_job_for_chat_ref": lambda self, **kwargs: job,
-            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     approval_repo = type(
@@ -646,7 +646,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_claim_lease_r
         (),
         {
             "get_import_job_for_chat_ref": lambda self, **kwargs: job,
-            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job missing during lease claim")),
+            "claim_lease": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("job missing during lease claim")),
         },
     )()
     approval_repo = type(
@@ -730,7 +730,7 @@ def test_confirm_import_by_task_ref_returns_not_pending_when_claim_lease_is_reje
 
 
 def test_restore_pending_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     service._restore_pending_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87")
     output = capsys.readouterr().out
@@ -744,7 +744,7 @@ def test_restore_pending_job_logs_missing_result(capsys) -> None:
         (),
         {
             "release_lease_to_pending": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job missing during state transition")
+                JobPersistenceError("job missing during state transition")
             )
         },
     )()
@@ -767,7 +767,7 @@ def test_restore_pending_job_logs_rejected_current_state(capsys) -> None:
 
 
 def test_mark_completed_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"mark_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"mark_completed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     assert service._mark_completed_job(job_id="job-1", expected_version=3, lease_owner="import_confirm:87") is None
     output = capsys.readouterr().out
@@ -1082,7 +1082,7 @@ def test_record_executed_lease_version_logs_row_corruption(capsys) -> None:
 
 
 def test_record_pending_job_logs_persistence_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     assert service._record_pending_job(chat_id=1001, user_id=2001, task_ref="87", task_id="87", task_hash="hash-87", payload_json="{}") is False
     output = capsys.readouterr().out
@@ -1095,7 +1095,7 @@ def test_record_pending_job_logs_missing_pending_job_result(capsys) -> None:
     job_repo = type(
         "JobRepo",
         (),
-        {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job missing after pending upsert"))},
+        {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("job missing after pending upsert"))},
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     assert (
@@ -1409,7 +1409,7 @@ def test_import_by_task_ref_returns_state_unavailable_when_pending_job_persist_f
             "cancel_import": lambda self, **kwargs: True,
         },
     )()
-    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"upsert_import_job_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(
         AsyncMock(return_value=import_source),
         str(tmp_path / "library"),
@@ -2302,7 +2302,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_look
         updated_at="2026-04-15 00:00:00",
     )
     job_repo = type("JobRepo", (), {"get_import_job_for_chat_ref": lambda self, **kwargs: job})()
-    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     get_import_source = AsyncMock(return_value=None)
     service = ImportToLibraryService(
         get_import_source,
@@ -3145,7 +3145,7 @@ def test_confirm_import_by_task_ref_appends_warning_when_job_completion_write_fa
             {
                 "get_import_job_for_chat_ref": lambda self, **kwargs: job,
                 "claim_lease": lambda self, **kwargs: True,
-                "mark_completed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+                "mark_completed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             },
         )(),
         approval_repo=type(
@@ -3897,7 +3897,7 @@ def test_resolve_normalized_naming_truth_logs_query_failure(capsys: pytest.Captu
     event_repo = type(
         "EventRepo",
         (),
-        {"list_events_for_task_identity": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"list_events_for_task_identity": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     service = ImportToLibraryService(
         get_import_source_func=AsyncMock(return_value=None),
