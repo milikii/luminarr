@@ -97,9 +97,10 @@ class PostDownloadAutoImportService:
         if not candidate.is_complete:
             return None
         if candidate.chat_id <= 0:
-            print(
-                f"\033[31m[自动导入聊天身份无效]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} chat_id={candidate.chat_id} user_id={candidate.user_id}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表里的归属聊天身份是否完整；当前不会推进自动导入，避免把坏身份任务继续送入导入审批链。",
-                flush=True,
+            emit_operational_log(
+                title="自动导入聊天身份无效",
+                detail=f"task_id={candidate.task_id} task_hash={candidate.task_hash} chat_id={candidate.chat_id} user_id={candidate.user_id}",
+                fix_hint="检查 SQLite/download_monitor 表里的归属聊天身份是否完整；当前不会推进自动导入，避免把坏身份任务继续送入导入审批链。",
             )
             raise AutoImportStateUnavailableError(
                 f"auto import chat identity invalid for {candidate.task_id}/{candidate.task_hash}"
@@ -130,10 +131,10 @@ class PostDownloadAutoImportService:
                 task_hash=candidate.task_hash,
             )
         except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
-            print(
-                f"\033[31m[成人资源历史查询失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 adult_content_registry 表读取是否正常；当前会按状态不可用停路，避免把历史真相缺口误判成普通非成人下载。",
-                flush=True,
+            emit_operational_log(
+                title="成人资源历史查询失败",
+                detail=f"task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}",
+                fix_hint="检查 adult_content_registry 表读取是否正常；当前会按状态不可用停路，避免把历史真相缺口误判成普通非成人下载。",
             )
             raise AutoImportStateUnavailableError(
                 f"adult registry lookup failed for {candidate.task_id}/{candidate.task_hash}"
@@ -152,20 +153,20 @@ class PostDownloadAutoImportService:
                 registry_record=registry_record,
             )
         except AdultArchiveStateUnavailableError as error:
-            print(
-                f"\033[31m[成人资源归档状态不可用]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 adult_content_registry、下载器导入源查询和归档目录配置；当前这条成人资源不会继续推进归档/清理。",
-                flush=True,
+            emit_operational_log(
+                title="成人资源归档状态不可用",
+                detail=f"task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}",
+                fix_hint="检查 adult_content_registry、下载器导入源查询和归档目录配置；当前这条成人资源不会继续推进归档/清理。",
             )
             raise AutoImportStateUnavailableError(
                 f"adult archive state unavailable for {candidate.task_id}/{candidate.task_hash}"
             ) from error
         except AdultArchiveOperationError as error:
             action = "保留期清理" if registry_record.current_status == ADULT_CONTENT_STATUS_ARCHIVED_PRESENT else "归档"
-            print(
-                f"\033[31m[成人资源{action}失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查下载器删除协议、源路径权限、归档目标目录和 adult_content_registry 状态后重试。",
-                flush=True,
+            emit_operational_log(
+                title=f"成人资源{action}失败",
+                detail=f"task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}",
+                fix_hint="检查下载器删除协议、源路径权限、归档目标目录和 adult_content_registry 状态后重试。",
             )
             return f"注意：成人资源{action}失败，本轮未更新后续状态，请稍后重试。"
 
