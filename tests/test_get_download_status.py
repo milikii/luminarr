@@ -721,7 +721,7 @@ def test_get_status_text_stops_auto_import_when_terminal_lookup_fails(
     event_repo = type(
         "BoomEventRepo",
         (),
-        {"list_events_for_task_identity": lambda self, *, task_id, task_hash: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"list_events_for_task_identity": lambda self, *, task_id, task_hash: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     auto_import = AsyncMock(return_value="不应走到这里")
     auto_import_service = PostDownloadAutoImportService(
@@ -782,7 +782,7 @@ def test_post_download_auto_import_run_once_skips_record_when_terminal_lookup_fa
     event_repo = type(
         "BoomEventRepo",
         (),
-        {"list_events_for_task_identity": lambda self, *, task_id, task_hash: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"list_events_for_task_identity": lambda self, *, task_id, task_hash: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     auto_import = AsyncMock(return_value="不应走到这里")
     auto_import_service = PostDownloadAutoImportService(
@@ -1021,7 +1021,7 @@ def test_get_status_text_returns_state_unavailable_when_skip_event_write_fails(
             (),
             {
                 "list_events_for_task_identity": lambda self, *, task_id, task_hash: [],
-                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             },
         )(),
         auto_import_func=auto_import,
@@ -1255,7 +1255,7 @@ def test_post_download_auto_import_run_once_marks_state_unavailable_when_skip_ev
             (),
             {
                 "list_events_for_task_identity": lambda self, *, task_id, task_hash: [],
-                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             },
         )(),
         auto_import_func=auto_import,
@@ -1568,7 +1568,7 @@ def test_post_download_auto_import_run_for_record_raises_when_skip_event_write_f
             (),
             {
                 "list_events_for_task_identity": lambda self, **kwargs: [],
-                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             },
         )(),
         auto_import_func=auto_import,
@@ -1744,7 +1744,7 @@ def test_post_download_auto_import_run_once_logs_completed_list_failure(capsys) 
     monitor_repo = type(
         "BoomRepo",
         (),
-        {"list_completed_for_auto_import": lambda self, *, limit: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"list_completed_for_auto_import": lambda self, *, limit: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     auto_import_service = PostDownloadAutoImportService(
         download_monitor_repo=monitor_repo,

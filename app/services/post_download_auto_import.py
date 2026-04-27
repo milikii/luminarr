@@ -171,10 +171,10 @@ class PostDownloadAutoImportService:
                 task_hash=candidate.task_hash,
             )
             if events is None:
-                raise AutoImportStateUnavailableError(
+                raise JobEventPersistenceError(
                     f"auto import terminal lookup result missing for {candidate.task_id}/{candidate.task_hash}"
                 )
-        except Exception as error:
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error).startswith("auto import terminal lookup result missing for "):
                 _log_auto_import_terminal_lookup_result_missing(
                     task_id=candidate.task_id,
