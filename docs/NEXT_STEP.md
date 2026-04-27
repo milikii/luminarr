@@ -1,8 +1,9 @@
-# Next step (v386)
+# Next step (v387)
 
 ## Current goal
 
 - 当前唯一主线切到 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
+- 本轮已完成 10 个最小闭环：9 个代码闭环收口 add/import confirm/cancel、private confirm routing、download follow-up、watchlist、BT subscription repo support、import job 和 import naming truth 的 repo/SQLite 异常边界；第 10 个闭环同步 STATUS/NEXT_STEP/codex.md。下一步继续从更小的 broad `except Exception`、日志打印边界或 `main()` DI 里挑一个最小闭环。
 - 本轮已继续收口 `status_follow_up`、`post_download_auto_import`、`get_download_status` 和 `download_follow_up_runtime` 的 5 处状态/下载 follow-up 异常边界；下一步继续从更小的 broad `except Exception`、日志打印边界或 `main()` DI 里挑一个最小闭环。
 - 本轮已继续收口 `search_request_context`、`web_source`、`bt_read_only_display`、`import_confirmed_media_identity`、`add_adult_registry_state` 和 `import_context_lookup` 的 12 处异常边界；下一步继续从更小的 broad `except Exception`、日志打印边界或 `main()` DI 里挑一个最小闭环。
 - 已完成态保持，不回退：
@@ -10,6 +11,7 @@
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码的异常边界已收窄。
+  - add/import confirm/cancel、watchlist、BT subscription repo support 和 shared confirm 路由的 repo/SQLite 异常边界已继续收窄。
   - import 持久化边界继续收口，`ImportApprovalState` / `ImportEventRecorder` / `ImportPendingWriteThroughState`、`ImportConfirmedMediaIdentityResolver` 和 `ImportContextLookup` 的回读和写回边界已改成只兜明确仓库异常。
   - 搜索与 BT 展示边界继续收口，`search_request_context`、`web_source`、`bt_read_only_display` 和 `add_adult_registry_state` 不再吞泛 `Exception`。
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
@@ -43,5 +45,5 @@
 
 ## After this step
 
-1. 若继续质量债，优先评估 `post_download_auto_import` 剩余成人归档/终态/skip event 边界、`add_confirm_*` / cancel 一带剩余 broad `except` 和日志边界。
+1. 若继续质量债，优先评估 `post_download_auto_import` 剩余成人归档/终态/skip event 边界、`status_follow_up` 剩余终态事件边界、日志边界或 `main()` DI。
 2. 若用户明确切成人 BT，则先写成人 BT 缺口清单和 focused gate，再动功能代码。

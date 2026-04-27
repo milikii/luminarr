@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -1191,7 +1192,7 @@ def test_dispatch_private_chat_text_replies_downloader_cancel_state_unavailable_
         job_repo=type(
             "BoomJobRepo",
             (),
-            {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"get_latest_pending_downloader_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
         )(),
     )
 
@@ -1258,7 +1259,7 @@ def test_dispatch_private_chat_text_replies_import_cancel_state_unavailable_with
         job_repo=type(
             "BoomJobRepo",
             (),
-            {"get_latest_pending_import_job": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"get_latest_pending_import_job": lambda self, chat_id: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
         )(),
     )
 
