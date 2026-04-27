@@ -65,6 +65,24 @@ def test_resolve_downloader_dispatch_download_dir_keeps_requested_dir_without_di
     assert resolved == "/data/downloads/tr-bt"
 
 
+def test_resolve_downloader_dispatch_download_dir_strips_explicit_instance_name() -> None:
+    resolved = resolve_downloader_dispatch_download_dir(
+        downloader_name="  tr-bt  ",
+        requested_download_dir="/data/downloads/tr-bt",
+        downloader_instances_by_name={
+            "tr-bt": DownloaderInstanceConfig(
+                name="tr-bt",
+                downloader_type="transmission",
+                base_url="http://127.0.0.1:19092",
+                download_dir="/data/downloads/tr-bt",
+                dispatch_download_dir="/downloads/complete",
+            )
+        },
+    )
+
+    assert resolved == "/downloads/complete"
+
+
 def test_get_torrent_import_source_with_routing_restores_host_download_dir() -> None:
     class FakeJobRepo:
         def get_downloader_job_for_chat_ref(self, *, chat_id: int, task_ref: str):
