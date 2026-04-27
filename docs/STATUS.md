@@ -12,7 +12,7 @@
 - 当前归档迁移、cleanup 收口、trace logger 收口、`config.py` 收口、`app/main.py` 死壳清理和 route helper 错误边界修正都已落地。
 
 ## Latest verification
-- `tests/test_config.py tests/test_downloader_route_lookup.py tests/test_main.py`：`68 passed, 0 skipped`
+- `tests/test_config.py tests/test_downloader_route_lookup.py tests/test_main.py`：`67 passed, 0 skipped`
 - `make quality`：通过
 - `make verify-mainline`：当前完成态保持通过
 

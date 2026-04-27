@@ -375,6 +375,11 @@ def _read_downloader_role_binding(
     )
 
 
+def _require_complete_credential_set(*, has_any: bool, has_all: bool, error_message: str) -> None:
+    if has_any and not has_all:
+        raise ConfigError(error_message)
+
+
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
     emby_base_url = _read_base_url(env, "EMBY_BASE_URL")
@@ -399,17 +404,27 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     has_feishu_app_credentials = bool(feishu_app_id and feishu_app_secret)
     has_all_feishu_credentials = bool(has_feishu_app_credentials and feishu_encrypt_key)
     if feishu_inbound_mode == "webhook":
-        if has_any_feishu_credential and not has_all_feishu_credentials:
-            raise ConfigError("FEISHU_APP_ID, FEISHU_APP_SECRET and FEISHU_ENCRYPT_KEY must be set together")
-    elif has_any_feishu_credential and not has_feishu_app_credentials:
-        raise ConfigError("FEISHU_APP_ID and FEISHU_APP_SECRET must be set together")
+        _require_complete_credential_set(
+            has_any=has_any_feishu_credential,
+            has_all=has_all_feishu_credentials,
+            error_message="FEISHU_APP_ID, FEISHU_APP_SECRET and FEISHU_ENCRYPT_KEY must be set together",
+        )
+    else:
+        _require_complete_credential_set(
+            has_any=has_any_feishu_credential,
+            has_all=has_feishu_app_credentials,
+            error_message="FEISHU_APP_ID and FEISHU_APP_SECRET must be set together",
+        )
     wecom_token = _read_optional(env, "WECOM_TOKEN")
     wecom_encoding_aes_key = _read_optional(env, "WECOM_ENCODING_AES_KEY")
     wecom_receive_id = _read_optional(env, "WECOM_RECEIVE_ID")
     has_any_wecom_credential = bool(wecom_token or wecom_encoding_aes_key or wecom_receive_id)
     has_all_wecom_credentials = bool(wecom_token and wecom_encoding_aes_key and wecom_receive_id)
-    if has_any_wecom_credential and not has_all_wecom_credentials:
-        raise ConfigError("WECOM_TOKEN, WECOM_ENCODING_AES_KEY and WECOM_RECEIVE_ID must be set together")
+    _require_complete_credential_set(
+        has_any=has_any_wecom_credential,
+        has_all=has_all_wecom_credentials,
+        error_message="WECOM_TOKEN, WECOM_ENCODING_AES_KEY and WECOM_RECEIVE_ID must be set together",
+    )
     downloader_instances = _read_downloader_instances(env)
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
