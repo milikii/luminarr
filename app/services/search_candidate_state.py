@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -29,7 +30,7 @@ class CandidateStateStore:
             return True
         try:
             self.repo.save_candidates(chat_id, candidates)
-        except Exception as error:
+        except (CandidatePersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[BT 批量预览候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n"
                 "\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 写入是否正常；"
@@ -41,7 +42,7 @@ class CandidateStateStore:
                 cleared_result = self.repo.clear_candidates(chat_id)
                 if cleared_result is None:
                     raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
-            except Exception as rollback_error:
+            except (CandidatePersistenceError, sqlite3.Error) as rollback_error:
                 print(
                     f"\033[31m[BT 批量预览候选清理失败]\033[0m chat_id={chat_id} 错误={rollback_error}\n"
                     "\033[33m[处理建议]\033[0m 检查 SQLite/candidate_mapping 删除是否正常；"
@@ -80,7 +81,7 @@ class CandidateStateStore:
             self.recent_by_chat.pop(chat_id, None)
             self._rollback_failed_persist(chat_id=chat_id)
             return False
-        except Exception as error:
+        except (CandidatePersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[搜索候选持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/候选表写入是否正常；当前会直接返回候选状态写入失败，避免把持久化真相缺口混成仍可继续按序号选择的候选缓存。",
                 flush=True,
@@ -128,7 +129,7 @@ class CandidateStateStore:
             if cleared_result is None:
                 raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_REASON)
             return cleared_result or cleared
-        except Exception as error:
+        except (CandidatePersistenceError, sqlite3.Error) as error:
             if str(error) == CANDIDATE_CLEAR_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[搜索候选清理结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
@@ -170,7 +171,7 @@ class CandidateStateStore:
             cleared_result = self.repo.clear_candidates(chat_id)
             if cleared_result is None:
                 raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON)
-        except Exception as rollback_error:
+        except (CandidatePersistenceError, sqlite3.Error) as rollback_error:
             if str(rollback_error) == CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON:
                 print(
                     f"\033[31m[搜索候选回滚清理结果缺失]\033[0m chat_id={chat_id} 错误={rollback_error}\n"

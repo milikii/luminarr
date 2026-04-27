@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler
 
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
@@ -7211,7 +7212,7 @@ def test_telegram_media_sender_logs_api_failure_and_reraises(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    send_photo = AsyncMock(side_effect=RuntimeError("telegram api down"))
+    send_photo = AsyncMock(side_effect=TelegramError("telegram api down"))
     sender = build_telegram_send_media_func(
         SimpleNamespace(
             bot=SimpleNamespace(
@@ -7223,7 +7224,7 @@ def test_telegram_media_sender_logs_api_failure_and_reraises(
     file_path = tmp_path / "wechat-login.png"
     file_path.write_bytes(b"fake-png")
 
-    with pytest.raises(RuntimeError, match="telegram api down"):
+    with pytest.raises(TelegramError, match="telegram api down"):
         asyncio.run(sender(1001, file_path, "微信登录二维码"))
 
     captured = capsys.readouterr()

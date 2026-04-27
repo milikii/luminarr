@@ -1,8 +1,9 @@
-# Next step (v383)
+# Next step (v384)
 
 ## Current goal
 
 - 当前唯一主线切到 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
+- 本轮已继续收口 `search_candidate_state`、`search_clarification_state`、`telegram_update_runtime` 和 `telegram_delivery_runtime` 的异常边界；下一步继续从更小的 broad `except Exception`、日志打印边界或 `main()` DI 里挑一个最小闭环。
 - 已完成态保持，不回退：
   - README 不再承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
@@ -40,5 +41,5 @@
 
 ## After this step
 
-1. 若继续质量债，优先评估 broad `except Exception` 热点、`print(` 日志边界或 `app/main.py` DI。
+1. 若继续质量债，优先评估 `search_request_context`、`web_source`、`import_confirmed_media_identity`、`add_confirm_*` 一带剩余 broad `except` 和日志边界。
 2. 若用户明确切成人 BT，则先写成人 BT 缺口清单和 focused gate，再动功能代码。

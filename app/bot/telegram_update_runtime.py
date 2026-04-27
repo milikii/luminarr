@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Awaitable, Callable
 
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.db.telegram_update_repo import TelegramUpdateRepo
 
 
@@ -90,9 +92,9 @@ def record_telegram_message_update(
             user_id=user_id,
         )
         if recorded is None:
-            raise RuntimeError("telegram update record result missing")
+            raise TelegramUpdatePersistenceError("telegram update record result missing")
         return recorded
-    except Exception as error:
+    except (TelegramUpdatePersistenceError, sqlite3.Error) as error:
         _log_telegram_update_record_error(
             source_type="message",
             source_id=str(update_id),
@@ -122,9 +124,9 @@ def record_telegram_callback_update(
             user_id=user_id,
         )
         if recorded is None:
-            raise RuntimeError("telegram update record result missing")
+            raise TelegramUpdatePersistenceError("telegram update record result missing")
         return recorded
-    except Exception as error:
+    except (TelegramUpdatePersistenceError, sqlite3.Error) as error:
         _log_telegram_update_record_error(
             source_type="callback",
             source_id=callback_query_id,

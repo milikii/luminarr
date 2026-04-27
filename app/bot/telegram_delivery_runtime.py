@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from telegram.error import TelegramError
 from telegram.ext import Application
 
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
@@ -56,7 +57,7 @@ async def _send_telegram_media(
             caption=caption,
             filename=file_path.name,
         )
-    except Exception as error:
+    except TelegramError as error:
         print(
             f"\033[31m[Telegram 媒资发送失败]\033[0m chat_id={chat_id} 文件={file_path} 原因={error}\n"
             "\033[33m[处理建议]\033[0m 检查 Telegram chat_id 是否仍有效、Bot 是否具备发送媒资权限，以及本地文件是否可被 Telegram API 正常读取。"

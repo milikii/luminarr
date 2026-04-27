@@ -10,6 +10,7 @@ from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.clients.tmdb import TmdbMovie
 from app.db.candidate_repo import CandidateMappingRepo
+from app.db.candidate_repo import CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
@@ -3012,7 +3013,7 @@ def test_search_success_clears_persisted_clarification_pending(tmp_path: Path) -
 def test_search_success_returns_state_unavailable_when_clarification_clear_fails(tmp_path: Path, capsys) -> None:
     class ClearFailsClarificationRepo(ClarificationRepo):
         def clear_pending(self, *, chat_id: int) -> bool:
-            raise RuntimeError(f"db down for {chat_id}")
+            raise ClarificationPersistenceError(f"db down for {chat_id}")
 
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))
@@ -3158,7 +3159,7 @@ def test_search_candidate_persist_rollback_logs_missing_clear_result(capsys) -> 
     class RollbackMissingRepo:
         def save_candidates(self, chat_id: int, results) -> None:
             _ = (chat_id, results)
-            raise RuntimeError("db down")
+            raise CandidatePersistenceError("db down")
 
         def clear_candidates(self, chat_id: int):
             _ = chat_id
@@ -3182,7 +3183,11 @@ def test_search_candidate_persist_rollback_logs_missing_clear_result(capsys) -> 
 
 
 def test_clear_clarification_pending_logs_persistence_failure(capsys) -> None:
-    repo = type("BoomRepo", (), {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    repo = type(
+        "BoomRepo",
+        (),
+        {"clear_pending": lambda self, chat_id: (_ for _ in ()).throw(ClarificationPersistenceError("db down"))},
+    )()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)
     service._clarification_pending_by_chat[1001] = "Dune"
     assert service.clear_clarification_pending(1001) is False
@@ -3204,7 +3209,11 @@ def test_clear_clarification_pending_logs_missing_clear_result(capsys) -> None:
 
 
 def test_is_clarification_pending_logs_persistence_failure(capsys) -> None:
-    repo = type("BoomRepo", (), {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    repo = type(
+        "BoomRepo",
+        (),
+        {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(ClarificationPersistenceError("db down"))},
+    )()
     service = SearchMediaService(_fake_search_with_results, clarification_repo=repo)
     assert service.is_clarification_pending(1001) is None
     output = capsys.readouterr().out
@@ -3239,7 +3248,11 @@ def test_is_clarification_pending_logs_row_corruption(tmp_path: Path, capsys) ->
 
 def test_load_persisted_clarification_query_distinguishes_repo_failure_from_missing_state() -> None:
     missing_repo = type("MissingRepo", (), {"get_pending_query": lambda self, chat_id: None})()
-    failed_repo = type("BoomRepo", (), {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    failed_repo = type(
+        "BoomRepo",
+        (),
+        {"get_pending_query": lambda self, chat_id: (_ for _ in ()).throw(ClarificationPersistenceError("db down"))},
+    )()
 
     missing_service = SearchMediaService(_fake_search_with_results, clarification_repo=missing_repo)
     failed_service = SearchMediaService(_fake_search_with_results, clarification_repo=failed_repo)
@@ -3254,7 +3267,11 @@ def test_load_persisted_clarification_query_distinguishes_repo_failure_from_miss
 
 
 def test_clear_cached_candidates_logs_candidate_persistence_failure(capsys) -> None:
-    repo = type("BoomRepo", (), {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    repo = type(
+        "BoomRepo",
+        (),
+        {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(CandidatePersistenceError("db down"))},
+    )()
     service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)
     service._recent_candidates_by_chat[1001] = [{"title": "Dune"}]
 
@@ -3305,7 +3322,11 @@ def test_get_cached_candidate_logs_candidate_payload_corruption(tmp_path: Path, 
 
 
 def test_has_cached_candidates_distinguishes_lookup_failure(capsys) -> None:
-    repo = type("BoomRepo", (), {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    repo = type(
+        "BoomRepo",
+        (),
+        {"get_candidate": lambda self, chat_id, index: (_ for _ in ()).throw(CandidatePersistenceError("db down"))},
+    )()
     service = SearchMediaService(_fake_search_with_results, candidate_repo=repo)
 
     assert service.has_cached_candidates(1001) is None

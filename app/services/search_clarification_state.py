@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass, field
 
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
@@ -50,7 +51,7 @@ class ClarificationStateStore:
             if cleared_result is None:
                 raise ClarificationPersistenceError(CLARIFICATION_CLEAR_RESULT_MISSING_REASON)
             return cleared_result or cleared
-        except Exception as error:
+        except (ClarificationPersistenceError, sqlite3.Error) as error:
             if str(error) == CLARIFICATION_CLEAR_RESULT_MISSING_REASON:
                 print(
                     f"\033[31m[搜索澄清态清理结果缺失]\033[0m chat_id={chat_id} 错误={error}\n"
@@ -101,7 +102,7 @@ class ClarificationStateStore:
             else:
                 self.pending_by_chat.pop(chat_id, None)
             return False
-        except Exception as error:
+        except sqlite3.Error as error:
             print(
                 f"\033[31m[搜索澄清态持久化失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/clarification 表写入是否正常；当前进程内仍保留待澄清状态，但重启后可能丢失这次待确认查询。",
                 flush=True,
@@ -120,7 +121,7 @@ class ClarificationStateStore:
             return ClarificationQueryLoadResult(
                 query=self.repo.get_pending_query(chat_id=chat_id),
             )
-        except Exception as error:
+        except (ClarificationPersistenceError, sqlite3.Error) as error:
             if str(error) == CLARIFICATION_QUERY_EMPTY_AFTER_READ_REASON:
                 print(
                     f"\033[31m[搜索澄清态记录损坏]\033[0m chat_id={chat_id} 错误={error}\n"

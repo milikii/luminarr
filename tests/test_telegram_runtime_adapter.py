@@ -4,6 +4,7 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.bot.telegram_bot import TELEGRAM_UPDATE_REPO_KEY
 from app.bot.telegram_runtime_adapter import handle_telegram_callback_query, handle_telegram_message
 from app.db.sqlite import SqliteDatabase
@@ -127,7 +128,7 @@ def test_handle_telegram_message_stops_when_update_dedup_persist_fails(tmp_path,
     update_repo = TelegramUpdateRepo(database)
 
     def _crash_record_message_update(**_: object) -> bool:
-        raise RuntimeError("db down")
+        raise TelegramUpdatePersistenceError("db down")
 
     update_repo.record_message_update = _crash_record_message_update  # type: ignore[method-assign]
     update, _ = _build_update("dune", update_id=9002)
@@ -176,7 +177,7 @@ def test_handle_telegram_callback_query_stops_when_update_dedup_persist_fails(tm
     update_repo = TelegramUpdateRepo(database)
 
     def _crash_record_callback_update(**_: object) -> bool:
-        raise RuntimeError("db down")
+        raise TelegramUpdatePersistenceError("db down")
 
     update_repo.record_callback_update = _crash_record_callback_update  # type: ignore[method-assign]
     update, _, answer = _build_callback_update("dune", callback_query_id="cb-9002")

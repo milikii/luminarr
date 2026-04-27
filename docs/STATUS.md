@@ -1,7 +1,9 @@
-# Current status (v502)
+# Current status (v503)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；**文档入口收口 / 当前真相对齐** 已完成并推送；当前切回 **质量债硬化 / import 持久化异常边界收口 + 小 support 文件收口**。
+- 本轮继续收口 10 处状态边界：`search_candidate_state` 的持久化/回读/回滚边界、`search_clarification_state` 的持久化/回读/清理边界，统一收窄为 `CandidatePersistenceError` / `ClarificationPersistenceError` 和 `sqlite3.Error`，不再吞泛 `Exception`。
+- 本轮继续收口 Telegram 出站与去重边界：`telegram_update_runtime` 只兜 `TelegramUpdatePersistenceError` / `sqlite3.Error`，去重结果缺失也改为专用异常；`telegram_delivery_runtime` 只兜 `TelegramError`。
 - 本轮连续收掉 10 处持久化/回读边界：`ImportEventRecorder`、`ImportApprovalState` 的 pending / approve / restore / executed / pending lease / stale target / expiry / event lookup 分支，以及 `ImportPendingWriteThroughState` 的取消回退分支；都改成只兜 `ApprovalPersistenceError`、`JobEventPersistenceError` 或 `sqlite3.Error`，不再吞泛 `Exception`。
 - 本轮已收掉 5 个小单消费者 support 文件：`bt_subscription_dispatch_support.py`、`bt_subscription_last_seen_support.py`、`bt_subscription_scan_support.py`、`bt_subscription_scheduler_support.py`、`search_media_batch_preview_support.py`。
 - 本轮已收窄 3 处异常边界：import transfer 残留清理只捕获文件 I/O 异常，TMDB fallback 只捕获 HTTP/JSON 响应异常，WeCom base64 解码只捕获 `binascii.Error`。
@@ -14,6 +16,11 @@
 - 下一轮如果继续质量债，优先挑剩余 broad `except Exception`、日志打印边界或 `main()` DI；不要为了凑数字强拆剩余大 support 文件。
 
 ## Latest verification
+- `tests/test_search_media.py -k "candidate or clarification"`：`48 passed, 137 deselected`
+- `tests/test_telegram_runtime_adapter.py tests/test_telegram_delivery_runtime.py`：`13 passed, 4 warnings`
+- `tests/test_telegram_bot.py -k "telegram_media_sender"`：`4 passed, 190 deselected`
+- `make quality`：通过（`27 passed`）
+- `make verify-mainline`：通过
 - `tests/test_import_pending_write_through_state.py`：`3 passed`
 - `tests/test_import_to_library.py tests/test_import_pending_write_through_state.py`：`152 passed`
 - `tests/test_cleanup_docs_consistency.py`：`8 passed`
@@ -25,9 +32,6 @@
 - `tests/test_wecom_adapter.py`：`33 passed, 4 warnings`
 - `tests/test_config.py`：`39 passed, 0 skipped`
 - `tests/test_config.py tests/test_downloader_route_lookup.py tests/test_main.py`：`71 passed, 4 warnings`
-- `make quality`：通过（`27 passed`）
-- `make verify-mainline`：通过
-
 ## Current biggest risk
 - 剩余 broad `except Exception` 里还有一部分是外部服务降级边界和若干运行时 wrapper，不能机械替换；下一步必须逐个按真实异常类型和测试覆盖判断。
 - 当前成人 BT 后续仍可作为候选主线，但默认不切功能；继续质量债时以“最小、可验证、不扩协议”为准。
