@@ -170,10 +170,14 @@ class AdultArchiveService:
         )
 
     async def _get_import_source(self, *, candidate: DownloadMonitorRecord) -> TransmissionImportSource | None:
+        import inspect
         try:
-            return await self._get_import_source_func(candidate.task_hash, candidate.chat_id, None)
-        except TypeError:
+            params = inspect.signature(self._get_import_source_func).parameters
+        except (ValueError, TypeError):
             return await self._get_import_source_func(candidate.task_hash, candidate.chat_id)
+        if len(params) >= 3:
+            return await self._get_import_source_func(candidate.task_hash, candidate.chat_id, None)
+        return await self._get_import_source_func(candidate.task_hash, candidate.chat_id)
 
     def _retention_elapsed(self, candidate: DownloadMonitorRecord) -> bool:
         if self._retention_hours <= 0:

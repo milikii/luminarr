@@ -3,6 +3,7 @@
 ## Current goal
 
 - 当前唯一主线切到 **`downloader_route_lookup.py` 重复日志/路由壳收口 / 质量硬化**。
+- cleanup / adult archive 的最新回归已补齐并通过，但当前主线仍保持在 `downloader_route_lookup.py`，不切换施工边界。
 - 当前这一轮主要服务以下收口：
   - 收掉 `downloader_route_lookup.py` 里重复的日志函数、同构的路由序幕和单用途 helper 壳
   - 顺手收掉 `app/main.py` 里 route helper 残余死导入

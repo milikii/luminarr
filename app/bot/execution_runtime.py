@@ -24,9 +24,9 @@ def resolve_execution_gate(
     gate = bot_data.get(execution_gate_key)
     if isinstance(gate, ExecutionGate):
         return gate
-    resolved_gate = ExecutionGate()
-    bot_data[execution_gate_key] = resolved_gate
-    return resolved_gate
+    gate = ExecutionGate()
+    bot_data[execution_gate_key] = gate
+    return gate
 
 
 async def run_sync_with_policy(

@@ -387,6 +387,10 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
 
         name = parts[0]
         downloader_type = _normalize_downloader_type(parts[1])
+        if not downloader_type:
+            raise ConfigError(
+                f"DOWNLOADER_INSTANCES downloader_type must be transmission (tr) or qbittorrent (qb), got: {parts[1]!r}"
+            )
         base_url = _normalize_base_url(parts[2])
         download_dir = parts[3]
         dispatch_download_dir = ""
