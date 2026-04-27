@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTaskStatus
 from app.config import DownloaderInstanceConfig
-from app.db.job_repo import JobRepo
+from app.db.job_repo import JobPersistenceError, JobRepo
 
 
 class DownloaderRouteLookupError(RuntimeError):
@@ -58,7 +59,7 @@ def _resolve_downloader_task_route(
         return None
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
-    except Exception as error:
+    except (JobPersistenceError, sqlite3.Error) as error:
         _print_downloader_issue_log(
             title="下载器路由查询失败",
             context_label="task_ref",
