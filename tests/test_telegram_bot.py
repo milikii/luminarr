@@ -1038,7 +1038,7 @@ def test_bt_processing_path_pending_logs_missing_source_after_restart(
 def test_bt_processing_path_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1114,7 +1114,7 @@ def test_pop_bt_processing_path_pending_logs_missing_source_after_restart(
 def test_set_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1172,7 +1172,7 @@ def test_set_bt_processing_path_pending_logs_missing_row_after_upsert(
 def test_clear_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1220,7 +1220,7 @@ def test_clear_bt_processing_path_pending_logs_missing_clear_result(capsys: pyte
 def test_pop_bt_processing_path_pending_logs_persistence_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
@@ -1278,7 +1278,7 @@ def test_pop_bt_processing_path_pending_logs_missing_clear_result_after_restart(
 def test_pop_bt_processing_path_pending_logs_read_failure(capsys: pytest.CaptureFixture[str]) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def get_pending(self, *, chat_id: int):
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     context = SimpleNamespace(
         application=SimpleNamespace(
