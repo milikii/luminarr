@@ -47,25 +47,6 @@ def _print_downloader_issue_log(
     )
 
 
-def _log_downloader_task_route_issue(
-    *,
-    title: str,
-    task_ref: str,
-    chat_id: int | None,
-    detail_label: str,
-    detail_value: str,
-    fix_hint: str,
-) -> None:
-    _print_downloader_issue_log(
-        title=title,
-        context_label="task_ref",
-        context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
-        detail_label=detail_label,
-        detail_value=detail_value,
-        fix_hint=fix_hint,
-    )
-
-
 def _resolve_downloader_task_route(
     *,
     task_ref: str,
@@ -225,27 +206,6 @@ def _resolve_downloader_client_candidate(
     return cleaned_name, instance, client
 
 
-def _log_downloader_client_resolution_issue(
-    *,
-    title: str,
-    downloader_name: str,
-    downloader_type: str,
-    reason: str,
-    fix_hint: str,
-) -> None:
-    _print_downloader_issue_log(
-        title=title,
-        context_label="downloader_name",
-        context_value=_format_downloader_context(
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-        ),
-        detail_label="原因",
-        detail_value=reason,
-        fix_hint=fix_hint,
-    )
-
-
 def _resolve_downloader_client_for_dispatch(
     *,
     downloader_name: str,
@@ -264,20 +224,25 @@ def _resolve_downloader_client_for_dispatch(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
-        _log_downloader_client_resolution_issue(
+        _print_downloader_issue_log(
             title="下载器投递路由失败",
-            downloader_name=cleaned_name,
-            downloader_type="-",
-            reason="instance missing",
+            context_label="downloader_name",
+            context_value=_format_downloader_context(downloader_name=cleaned_name, downloader_type="-"),
+            detail_label="原因",
+            detail_value="instance missing",
             fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
         )
         raise ValueError(f"unknown downloader instance: {cleaned_name}")
     if client is None:
-        _log_downloader_client_resolution_issue(
+        _print_downloader_issue_log(
             title="下载器投递路由失败",
-            downloader_name=cleaned_name,
-            downloader_type=instance.downloader_type,
-            reason="client not configured",
+            context_label="downloader_name",
+            context_value=_format_downloader_context(
+                downloader_name=cleaned_name,
+                downloader_type=instance.downloader_type,
+            ),
+            detail_label="原因",
+            detail_value="client not configured",
             fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
         )
         raise ValueError(f"downloader client not configured: {cleaned_name}")
