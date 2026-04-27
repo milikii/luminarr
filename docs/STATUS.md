@@ -1,7 +1,8 @@
-# Current status (v501)
+# Current status (v502)
 
 ## Current mainline
-- **质量硬化** 继续保持完成态；**文档入口收口 / 当前真相对齐** 已完成并推送；当前切回 **质量债硬化 / 小 support 文件收口 + 异常边界收窄**。
+- **质量硬化** 继续保持完成态；**文档入口收口 / 当前真相对齐** 已完成并推送；当前切回 **质量债硬化 / import 持久化异常边界收口 + 小 support 文件收口**。
+- 本轮连续收掉 10 处持久化/回读边界：`ImportEventRecorder`、`ImportApprovalState` 的 pending / approve / restore / executed / pending lease / stale target / expiry / event lookup 分支，以及 `ImportPendingWriteThroughState` 的取消回退分支；都改成只兜 `ApprovalPersistenceError`、`JobEventPersistenceError` 或 `sqlite3.Error`，不再吞泛 `Exception`。
 - 本轮已收掉 5 个小单消费者 support 文件：`bt_subscription_dispatch_support.py`、`bt_subscription_last_seen_support.py`、`bt_subscription_scan_support.py`、`bt_subscription_scheduler_support.py`、`search_media_batch_preview_support.py`。
 - 本轮已收窄 3 处异常边界：import transfer 残留清理只捕获文件 I/O 异常，TMDB fallback 只捕获 HTTP/JSON 响应异常，WeCom base64 解码只捕获 `binascii.Error`。
 - 成人 BT 不是空白：当前已有 PT/BT 分流、BT 成人链问询、成人归档目录配置、`adult_content_registry`、归档保留期清理、只读补全和展示基础；但成人 BT 继续扩功能不是本轮主线。
@@ -9,10 +10,12 @@
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支最近业务回归保持绿灯；本轮 focused tests 已覆盖 import transfer、search media、BT subscription、WeCom 和 docs gate。
+- 默认分支最近业务回归保持绿灯；本轮 focused tests 已覆盖 import 持久化边界、import transfer、search media、BT subscription、WeCom 和 docs gate.
 - 下一轮如果继续质量债，优先挑剩余 broad `except Exception`、日志打印边界或 `main()` DI；不要为了凑数字强拆剩余大 support 文件。
 
 ## Latest verification
+- `tests/test_import_pending_write_through_state.py`：`3 passed`
+- `tests/test_import_to_library.py tests/test_import_pending_write_through_state.py`：`152 passed`
 - `tests/test_cleanup_docs_consistency.py`：`8 passed`
 - `tests/test_import_to_library.py -k "copy_fallback or hardlink or target_exists or import_transfer"`：`12 passed, 137 deselected`
 - `tests/test_persistence_sqlite.py -k "copy_fallback_pending_survives_restart_and_second_confirm_copies or unexpected_hardlink"`：`1 passed, 110 deselected`
@@ -26,7 +29,7 @@
 - `make verify-mainline`：通过
 
 ## Current biggest risk
-- 剩余 broad `except Exception` 里有一部分是外部服务降级边界，不能机械替换；下一步必须逐个按真实异常类型和测试覆盖判断。
+- 剩余 broad `except Exception` 里还有一部分是外部服务降级边界和若干运行时 wrapper，不能机械替换；下一步必须逐个按真实异常类型和测试覆盖判断。
 - 当前成人 BT 后续仍可作为候选主线，但默认不切功能；继续质量债时以“最小、可验证、不扩协议”为准。
 
 ## Recommended Next Operator Command

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import errno
 import json
+import sqlite3
 from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -16,6 +17,7 @@ from app.db.approval_repo import (
     APPROVAL_STATUS_CANCELLED,
     APPROVAL_STATUS_PENDING,
     ApprovalRepo,
+    ApprovalPersistenceError,
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import (
@@ -782,7 +784,11 @@ def test_mark_completed_job_logs_rejected_current_state(capsys) -> None:
 
 
 def test_record_pending_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 0
     output = capsys.readouterr().out
@@ -794,7 +800,11 @@ def test_record_pending_approval_logs_missing_pending_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing after pending request"))},
+        {
+            "request_import_approval": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(ApprovalPersistenceError("approval_record missing after pending request"))
+        },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert service._record_pending_approval(task_ref="87", task_id="87", task_hash="hash-87") == 0
@@ -820,7 +830,7 @@ def test_record_pending_approval_logs_row_corruption(capsys) -> None:
         {
             "request_import_approval": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row lease version corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row lease version corrupted after read"))
         },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -844,7 +854,11 @@ def test_record_pending_approval_clears_in_memory_copy_fallback_pending() -> Non
 
 
 def test_record_import_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"approve_import": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     service._pending_import_identities.add(("87", "hash-87"))
     service._pending_import_lease_versions[("87", "hash-87")] = 2
@@ -856,7 +870,11 @@ def test_record_import_approval_logs_missing_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during approve"))},
+        {
+            "approve_import": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(ApprovalPersistenceError("approval_record missing during approve"))
+        },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     service._pending_import_identities.add(("87", "hash-87"))
@@ -980,7 +998,11 @@ def test_cancel_pending_import_logs_missing_approval_result_when_repo_returns_no
 
 
 def test_record_executed_lease_version_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"mark_import_executed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"mark_import_executed": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert (
         service._record_executed_lease_version(
@@ -1001,7 +1023,7 @@ def test_record_executed_lease_version_logs_missing_result(capsys) -> None:
         (),
         {
             "mark_import_executed": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("approval_record missing during executed version update")
+                ApprovalPersistenceError("approval_record missing during executed version update")
             )
         },
     )()
@@ -1028,7 +1050,7 @@ def test_record_executed_lease_version_logs_row_corruption(capsys) -> None:
         {
             "mark_import_executed": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row executed version corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row executed version corrupted after read"))
         },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -1157,7 +1179,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_approval_upda
         {
             "get_import_approval": lambda self, **kwargs: approval_record,
             "is_import_pending_expired": lambda self, **kwargs: False,
-            "approve_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "approve_import": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     get_import_source = AsyncMock(return_value=import_source)
@@ -1265,7 +1287,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_pending_lease
     approval_records = iter(
         (
             type("ApprovalRecord", (), {"lease_version": 0, "executed_version": 0})(),
-            RuntimeError("db down"),
+            sqlite3.OperationalError("db down"),
         )
     )
 
@@ -1313,7 +1335,11 @@ def test_import_by_task_ref_returns_state_unavailable_when_pending_approval_pers
         is_finished=True,
         percent_done=1.0,
     )
-    approval_repo = type("ApprovalRepo", (), {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"request_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(
         AsyncMock(return_value=import_source),
         str(tmp_path / "library"),
@@ -1419,7 +1445,11 @@ def test_import_by_task_ref_returns_state_unavailable_when_pending_job_result_is
 
 
 def test_record_event_logs_persistence_failure(capsys) -> None:
-    event_repo = type("EventRepo", (), {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    event_repo = type(
+        "EventRepo",
+        (),
+        {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
 
     service._record_event(
@@ -1442,7 +1472,11 @@ def test_record_event_logs_missing_appended_event_result(capsys) -> None:
     event_repo = type(
         "EventRepo",
         (),
-        {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append"))},
+        {
+            "append_event": lambda self, **kwargs: (_ for _ in ()).throw(
+                JobEventPersistenceError("job_event missing after append")
+            )
+        },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
 
@@ -1491,7 +1525,11 @@ def test_record_event_logs_row_corrupted_appended_event(capsys) -> None:
 
 
 def test_restore_pending_approval_logs_persistence_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert (
         service._restore_pending_approval(
@@ -1529,7 +1567,11 @@ def test_restore_pending_approval_logs_missing_row_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"restore_import_pending": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during restore"))},
+        {
+            "restore_import_pending": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(ApprovalPersistenceError("approval_record missing during restore"))
+        },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert (
@@ -1607,7 +1649,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_can
             return True
 
         def restore_import_pending(self, **_: object) -> bool:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
@@ -1701,7 +1743,7 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_res
 
         def restore_import_pending(self, **_: object):
             if restore_mode == "missing_row":
-                raise RuntimeError("approval_record missing during restore")
+                raise ApprovalPersistenceError("approval_record missing during restore")
             return None
 
     download_dir = tmp_path / "downloads"
@@ -1739,7 +1781,11 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_execution_res
 
 
 def test_resolve_pending_lease_version_logs_approval_lookup_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     service._pending_import_identities.add(("87", "hash-87"))
     service._pending_import_lease_versions[("87", "hash-87")] = 3
@@ -1776,7 +1822,11 @@ def test_resolve_pending_lease_version_logs_missing_approval_row_with_in_memory_
 
 
 def test_find_version_stale_rejection_text_logs_approval_lookup_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {"get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert service._find_version_stale_rejection_text(task_id="87", task_hash="hash-87") == IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
     output = capsys.readouterr().out
@@ -1807,7 +1857,7 @@ def test_find_version_stale_rejection_text_logs_row_corruption(capsys) -> None:
         {
             "get_import_approval": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row executed version corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row executed version corrupted after read"))
         },
     )()
     service = ImportToLibraryService(
@@ -1828,7 +1878,11 @@ def test_find_latest_import_target_path_logs_event_lookup_failure(capsys) -> Non
     event_repo = type(
         "EventRepo",
         (),
-        {"find_latest_import_correlation": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {
+            "find_latest_import_correlation": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(sqlite3.OperationalError("db down"))
+        },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
 
@@ -1848,7 +1902,7 @@ def test_find_latest_import_target_path_logs_missing_event_lookup_result(capsys)
         {
             "find_latest_import_correlation": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("job_event list result missing during correlation lookup"))
+            ).throw(JobEventPersistenceError("job_event list result missing during correlation lookup"))
         },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_event_repo=event_repo)
@@ -1919,7 +1973,9 @@ def test_find_version_stale_rejection_text_returns_state_unavailable_when_event_
         "EventRepo",
         (),
         {
-            "find_latest_import_correlation": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "find_latest_import_correlation": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(sqlite3.OperationalError("db down")),
             "append_event": lambda self, **kwargs: None,
         },
     )()
@@ -2021,7 +2077,9 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_stale_target_
         "EventRepo",
         (),
         {
-            "find_latest_import_correlation": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "find_latest_import_correlation": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(sqlite3.OperationalError("db down")),
             "append_event": lambda self, **kwargs: None,
         },
     )()
@@ -2158,7 +2216,15 @@ def test_prepare_import_logs_target_exists(
 
 
 def test_is_pending_approval_expired_logs_approval_lookup_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type(
+        "ApprovalRepo",
+        (),
+        {
+            "is_import_pending_expired": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(sqlite3.OperationalError("db down"))
+        },
+    )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     assert service._is_pending_approval_expired(task_id="87", task_hash="hash-87", expected_lease_version=2) is None
     output = capsys.readouterr().out
@@ -2173,7 +2239,7 @@ def test_is_pending_approval_expired_logs_missing_approval_result(capsys) -> Non
         {
             "is_import_pending_expired": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval_record missing during pending expiry check"))
+            ).throw(ApprovalPersistenceError("approval_record missing during pending expiry check"))
         },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -2193,7 +2259,7 @@ def test_is_pending_approval_expired_logs_row_corruption(capsys) -> None:
         {
             "is_import_pending_expired": lambda self, **kwargs: (
                 _ for _ in ()
-            ).throw(RuntimeError("approval row status corrupted after read"))
+            ).throw(ApprovalPersistenceError("approval row status corrupted after read"))
         },
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
@@ -2302,7 +2368,9 @@ def test_confirm_import_by_task_ref_returns_state_unavailable_when_expiry_lookup
         (),
         {
             "get_import_approval": lambda self, **kwargs: approval_record,
-            "is_import_pending_expired": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "is_import_pending_expired": lambda self, **kwargs: (
+                _ for _ in ()
+            ).throw(sqlite3.OperationalError("db down")),
         },
     )()
     get_import_source = AsyncMock(return_value=None)
@@ -2714,7 +2782,7 @@ def test_cancel_pending_import_returns_state_unavailable_when_pending_lease_look
         "ApprovalRepo",
         (),
         {
-            "get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "get_import_approval": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
             "cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(AssertionError("cancel_import should not be called")),
         },
     )()
@@ -2995,13 +3063,15 @@ def test_confirm_import_by_task_ref_appends_warning_when_executed_version_write_
             "ApprovalRepo",
             (),
             {
-                "get_import_approval": lambda self, **kwargs: approval_record,
-                "is_import_pending_expired": lambda self, **kwargs: False,
-                "approve_import": lambda self, **kwargs: True,
-                "mark_import_executed": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
-            },
-        )(),
-    )
+                    "get_import_approval": lambda self, **kwargs: approval_record,
+                    "is_import_pending_expired": lambda self, **kwargs: False,
+                    "approve_import": lambda self, **kwargs: True,
+                    "mark_import_executed": lambda self, **kwargs: (
+                        _ for _ in ()
+                    ).throw(sqlite3.OperationalError("db down")),
+                },
+            )(),
+        )
 
     async def _fake_execute_import(*_: object, **__: object) -> import_module.ImportExecutionResult:
         return import_module.ImportExecutionResult(reply="导入成功：Dune.2021.mkv", imported=True)

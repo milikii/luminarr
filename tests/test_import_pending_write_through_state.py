@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 from app.clients.transmission import TransmissionImportSource
 from app.services.import_pending_write_through_state import ImportPendingWriteThroughState
 
@@ -96,7 +98,7 @@ def test_persist_pending_import_logs_when_cancel_pending_approval_fails(capsys) 
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     state = ImportPendingWriteThroughState(
         approval_repo=approval_repo,

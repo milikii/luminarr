@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 
 from app.clients.transmission import TransmissionImportSource
-from app.db.approval_repo import ApprovalRepo
+from app.db.approval_repo import ApprovalPersistenceError, ApprovalRepo
 
 LogTraceFunc = Callable[..., None]
 RecordImportEventFunc = Callable[..., None]
@@ -99,7 +100,7 @@ class ImportPendingWriteThroughState:
                 task_ref=task_ref,
                 expected_lease_version=expected_lease_version,
             )
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[导入取消审批更新失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前导入待确认创建会直接失败返回，但审批真相可能仍残留。",
                 flush=True,

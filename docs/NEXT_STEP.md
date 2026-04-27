@@ -1,4 +1,4 @@
-# Next step (v382)
+# Next step (v383)
 
 ## Current goal
 
@@ -8,6 +8,7 @@
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码的异常边界已收窄。
+  - import 持久化边界这轮继续收口，`ImportApprovalState` / `ImportEventRecorder` / `ImportPendingWriteThroughState` 的回读和写回边界已改成只兜明确仓库异常。
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不再作为长期文档真相。
 - 剩余 `*_support.py` 都是较大边界，不再因为文件名机械强拆；下一步优先从更小的 broad `except Exception` 或日志打印点继续收。
