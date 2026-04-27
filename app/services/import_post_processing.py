@@ -92,11 +92,7 @@ class ImportPostProcessingService:
                 event_type="metadata.failed",
                 message=message,
             )
-            print(f"\033[31m[元数据刮削失败]\033[0m {message}", flush=True)
-            print(
-                "\033[33m[处理建议]\033[0m 检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
-                flush=True,
-            )
+            _log_import_metadata_scrape_failed(message=message)
             return None
 
         event_type = "metadata.succeeded" if result.success else "metadata.failed"
@@ -202,3 +198,11 @@ def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
     if target_path.is_dir():
         return target_path / ".luminarr.metadata.json"
     return target_path.with_suffix(".metadata.json")
+
+
+def _log_import_metadata_scrape_failed(*, message: str) -> None:
+    print(f"\033[31m[元数据刮削失败]\033[0m {message}", flush=True)
+    print(
+        "\033[33m[处理建议]\033[0m 检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
+        flush=True,
+    )
