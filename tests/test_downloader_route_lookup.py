@@ -6,6 +6,7 @@ from app.clients.transmission import TransmissionImportSource
 from app.config import DownloaderInstanceConfig
 from app.downloader_route_lookup import (
     _get_torrent_import_source_with_routing,
+    _remove_torrent_with_routing,
     _resolve_downloader_client_candidate,
     resolve_downloader_dispatch_download_dir,
 )
@@ -184,3 +185,39 @@ def test_resolve_downloader_client_candidate_strips_name_and_returns_client() ->
     assert instance is not None
     assert instance.downloader_type == "transmission"
     assert resolved_client is client
+
+
+def test_remove_torrent_with_routing_uses_routed_client() -> None:
+    calls: list[tuple[str, bool]] = []
+
+    class FakeJobRepo:
+        def get_downloader_job_for_chat_ref(self, *, chat_id: int, task_ref: str):
+            assert chat_id == 1001
+            assert task_ref == "hash-42"
+            return type("FakeJob", (), {"payload_json": '{"downloader_name":"tr-bt"}'})()
+
+    class FakeTransmissionClient:
+        async def remove_torrent(self, task_ref: str, *, delete_local_data: bool) -> None:
+            calls.append((task_ref, delete_local_data))
+
+    asyncio.run(
+        _remove_torrent_with_routing(
+            task_ref="hash-42",
+            chat_id=1001,
+            job_repo=FakeJobRepo(),
+            downloader_instances_by_name={
+                "tr-bt": DownloaderInstanceConfig(
+                    name="tr-bt",
+                    downloader_type="transmission",
+                    base_url="http://127.0.0.1:19092",
+                    download_dir="/data/downloads/tr-bt",
+                    dispatch_download_dir="/downloads/complete",
+                )
+            },
+            transmission_clients_by_name={"tr-bt": FakeTransmissionClient()},
+            qbittorrent_clients_by_name={},
+            delete_local_data=False,
+        )
+    )
+
+    assert calls == [("hash-42", False)]
