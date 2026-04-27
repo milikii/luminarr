@@ -405,7 +405,8 @@ def test_cleanup_by_task_ref_logs_missing_structured_target_path(tmp_path: Path,
                         "source_path": str(source_file),
                         "target_path": "",
                     },
-                )()
+                )(),
+                "append_event": lambda self, **kwargs: None,
             },
         )()
     )
