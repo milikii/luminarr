@@ -68,26 +68,6 @@ from app.services.subtitle_translator import SubtitleTranslatorService
 from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, configure_trace_log_file
 
 
-async def _skip_fanart_images(_: str):
-    return None
-
-
-async def _download_remote_image(url: str, *, proxy_url: str) -> bytes:
-    cleaned_url = url.strip()
-    if not cleaned_url:
-        return b""
-    async with httpx.AsyncClient(timeout=20.0, proxy=proxy_url or None) as client:
-        response = await client.get(cleaned_url)
-    response.raise_for_status()
-    return response.content
-
-
-def _build_downloader_instances_by_name(
-    instances: tuple[DownloaderInstanceConfig, ...],
-) -> dict[str, DownloaderInstanceConfig]:
-    return {instance.name: instance for instance in instances}
-
-
 def _run_application_polling(application) -> None:
     try:
         application.run_polling(drop_pending_updates=True)
@@ -156,57 +136,6 @@ def resolve_downloader_dispatch_download_dir(
     if dispatch_download_dir and cleaned_download_dir == instance.download_dir:
         return dispatch_download_dir
     return cleaned_download_dir
-
-
-def _build_transmission_clients_by_name(
-    instances: tuple[DownloaderInstanceConfig, ...],
-) -> dict[str, TransmissionClient]:
-    clients: dict[str, TransmissionClient] = {}
-    for instance in instances:
-        if instance.downloader_type != "transmission":
-            continue
-        clients[instance.name] = TransmissionClient(
-            base_url=instance.base_url,
-            username=instance.username,
-            password=instance.password,
-        )
-    return clients
-
-
-def _build_qbittorrent_clients_by_name(
-    instances: tuple[DownloaderInstanceConfig, ...],
-) -> dict[str, QbittorrentClient]:
-    clients: dict[str, QbittorrentClient] = {}
-    for instance in instances:
-        if instance.downloader_type != "qbittorrent":
-            continue
-        clients[instance.name] = QbittorrentClient(
-            base_url=instance.base_url,
-            username=instance.username,
-            password=instance.password,
-        )
-    return clients
-
-
-def _build_bt_source_providers(
-    *,
-    prowlarr_client: ProwlarrClient,
-    bt_web_sources: tuple[str, ...],
-    outbound_proxy_url: str = "",
-) -> tuple[BtSourceProvider, ...]:
-    providers: list[BtSourceProvider] = []
-    for source_name in bt_web_sources:
-        rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
-        if rule is None:
-            print(
-                f"\033[31m[BT 外部站点源配置无效]\033[0m 来源={source_name}\n"
-                "\033[33m[处理建议]\033[0m 检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。"
-            )
-            continue
-        client = WebSourceClient(rule=rule, proxy_url=outbound_proxy_url)
-        providers.append(BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page))
-    providers.append(BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search))
-    return tuple(providers)
 
 
 def _log_media_server_config_missing(provider: str, missing_keys: tuple[str, ...]) -> None:
@@ -287,16 +216,36 @@ def main() -> None:
         base_url=settings.prowlarr_base_url,
         api_key=settings.prowlarr_api_key,
     )
-    bt_source_adapter = BtSourceAdapter(
-        _build_bt_source_providers(
-            prowlarr_client=prowlarr_client,
-            bt_web_sources=settings.bt_web_sources,
-            outbound_proxy_url=settings.outbound_proxy_url,
+    bt_source_providers: list[BtSourceProvider] = []
+    for source_name in settings.bt_web_sources:
+        rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
+        if rule is None:
+            print(
+                f"\033[31m[BT 外部站点源配置无效]\033[0m 来源={source_name}\n"
+                "\033[33m[处理建议]\033[0m 检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。"
+            )
+            continue
+        client = WebSourceClient(rule=rule, proxy_url=settings.outbound_proxy_url)
+        bt_source_providers.append(
+            BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page)
         )
-    )
+    bt_source_providers.append(BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search))
+    bt_source_adapter = BtSourceAdapter(tuple(bt_source_providers))
     tmdb_lookup_movie_func = None
     scrape_metadata_func = None
     if settings.tmdb_api_key:
+        async def _skip_fanart_images(_: str) -> None:
+            return None
+
+        async def _download_remote_image(url: str) -> bytes:
+            cleaned_url = url.strip()
+            if not cleaned_url:
+                return b""
+            async with httpx.AsyncClient(timeout=20.0, proxy=settings.outbound_proxy_url or None) as client:
+                response = await client.get(cleaned_url)
+            response.raise_for_status()
+            return response.content
+
         tmdb_client = TmdbClient(
             api_key=settings.tmdb_api_key,
             base_url=settings.tmdb_base_url,
@@ -315,7 +264,7 @@ def main() -> None:
             lookup_movie_func=tmdb_client.search_movie,
             get_movie_images_func=get_movie_images_func,
             lookup_movie_by_tmdb_id_func=tmdb_client.get_movie_by_id,
-            download_image_func=lambda url: _download_remote_image(url, proxy_url=settings.outbound_proxy_url),
+            download_image_func=_download_remote_image,
         )
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(
@@ -335,9 +284,25 @@ def main() -> None:
         username=settings.transmission_username,
         password=settings.transmission_password,
     )
-    downloader_instances_by_name = _build_downloader_instances_by_name(settings.downloader_instances)
-    transmission_clients_by_name = _build_transmission_clients_by_name(settings.downloader_instances)
-    qbittorrent_clients_by_name = _build_qbittorrent_clients_by_name(settings.downloader_instances)
+    downloader_instances_by_name = {instance.name: instance for instance in settings.downloader_instances}
+    transmission_clients_by_name: dict[str, TransmissionClient] = {}
+    for instance in settings.downloader_instances:
+        if instance.downloader_type != "transmission":
+            continue
+        transmission_clients_by_name[instance.name] = TransmissionClient(
+            base_url=instance.base_url,
+            username=instance.username,
+            password=instance.password,
+        )
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient] = {}
+    for instance in settings.downloader_instances:
+        if instance.downloader_type != "qbittorrent":
+            continue
+        qbittorrent_clients_by_name[instance.name] = QbittorrentClient(
+            base_url=instance.base_url,
+            username=instance.username,
+            password=instance.password,
+        )
 
     async def add_torrent_with_routing(source: str, downloader_name: str = "", download_dir: str = "") -> TransmissionTask:
         client = _resolve_downloader_client_for_dispatch(
