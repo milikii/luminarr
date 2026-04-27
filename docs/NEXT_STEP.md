@@ -22,7 +22,7 @@
   - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/bot/personal_wechat_login.py` 与 `app/bot/personal_wechat_text.py` 的无消费者 `__all__` 纯导出列表也已删掉；`app/db/__init__.py` 的死 re-export 已清掉，`app/bot/telegram_bot.py` 保留显式公共 `__all__` 边界以维持 quality gate
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
 - `app/downloader_route_lookup.py` 当前 `369` 行；task/downloader 日志上下文、payload JSON 解析收口、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，downloader instance strip + lookup 与 host download_dir fallback 也已收口；当前 `_log_*` 已归零，剩余候选继续限制在单消费者薄壳或 route 死壳
-- `app/config.py` 当前 `481` 行；base URL 现在统一走 shared normalization helper，读 base URL 的 env 路径也抽成 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 也走同一个 helper，继续保留既有的 semicolon / pipe 解析收口，不回头扩张 settings 语义。
+- `app/config.py` 当前 `499` 行；base URL 现在统一走 shared normalization helper，读 base URL 的 env 路径也抽成 `_read_base_url`，`DOWNLOADER_INSTANCES` 里的 base URL 也走同一个 helper，`FEISHU_INBOUND_MODE` / `MEDIA_SERVER_PROVIDER` 也共用 lower-choice helper，继续保留既有的 semicolon / pipe 解析收口，不回头扩张 settings 语义。
 
 ## User value
 

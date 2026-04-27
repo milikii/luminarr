@@ -109,24 +109,6 @@ def _normalize_proxy_url(raw_value: str) -> str:
     raise ConfigError("OUTBOUND_PROXY_URL must start with http://, https:// or socks5://")
 
 
-def _read_feishu_inbound_mode(env: Mapping[str, str]) -> str:
-    raw_value = _read_optional(env, "FEISHU_INBOUND_MODE").strip().lower()
-    if not raw_value:
-        return "webhook"
-    if raw_value not in {"webhook", "long_connection"}:
-        raise ConfigError("FEISHU_INBOUND_MODE must be webhook or long_connection")
-    return raw_value
-
-
-def _read_media_server_provider(env: Mapping[str, str]) -> str:
-    raw_value = _read_optional(env, "MEDIA_SERVER_PROVIDER").strip().lower()
-    if not raw_value:
-        return "emby"
-    if raw_value not in {"emby", "jellyfin", "plex"}:
-        raise ConfigError("MEDIA_SERVER_PROVIDER must be emby, jellyfin or plex")
-    return raw_value
-
-
 def _read_optional(env: Mapping[str, str], key: str) -> str:
     return env.get(key, "").strip()
 
@@ -171,6 +153,42 @@ def _normalize_base_url(raw_value: str) -> str:
 def _read_base_url(env: Mapping[str, str], key: str, *, required: bool = False) -> str:
     raw_value = _read_required(env, key) if required else _read_optional(env, key)
     return _normalize_base_url(raw_value)
+
+
+def _read_optional_lower_choice(
+    env: Mapping[str, str],
+    key: str,
+    *,
+    default: str,
+    allowed_values: tuple[str, ...],
+    error_message: str,
+) -> str:
+    raw_value = _read_optional(env, key).lower()
+    if not raw_value:
+        return default
+    if raw_value not in allowed_values:
+        raise ConfigError(error_message)
+    return raw_value
+
+
+def _read_feishu_inbound_mode(env: Mapping[str, str]) -> str:
+    return _read_optional_lower_choice(
+        env,
+        "FEISHU_INBOUND_MODE",
+        default="webhook",
+        allowed_values=("webhook", "long_connection"),
+        error_message="FEISHU_INBOUND_MODE must be webhook or long_connection",
+    )
+
+
+def _read_media_server_provider(env: Mapping[str, str]) -> str:
+    return _read_optional_lower_choice(
+        env,
+        "MEDIA_SERVER_PROVIDER",
+        default="emby",
+        allowed_values=("emby", "jellyfin", "plex"),
+        error_message="MEDIA_SERVER_PROVIDER must be emby, jellyfin or plex",
+    )
 
 
 def _iter_semicolon_entries(raw_value: str) -> tuple[str, ...]:
