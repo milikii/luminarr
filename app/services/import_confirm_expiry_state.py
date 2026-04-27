@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 
-from app.db.approval_repo import ApprovalRepo
-from app.db.job_repo import JobRepo
+from app.db.approval_repo import ApprovalPersistenceError, ApprovalRepo
+from app.db.job_repo import JobPersistenceError, JobRepo
 from app.services.import_context_lookup import ConfirmExecutionContext
 
 ClearPendingCopyFallbackFunc = Callable[..., None]
@@ -93,7 +94,7 @@ class ImportConfirmExpiryState:
                 task_ref=task_ref,
                 expected_lease_version=lease_version,
             )
-        except Exception as error:
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[导入确认超时审批取消失败]\033[0m task_ref={task_ref} task_id={context.job.task_id} task_hash={context.job.task_hash} lease_version={lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通“导入确认已超时”。",
                 flush=True,
@@ -123,8 +124,8 @@ class ImportConfirmExpiryState:
                 workflow_type=self._workflow_import_to_library,
             )
             if cancelled is None:
-                raise RuntimeError(self._import_cancel_pending_job_result_missing_reason)
-        except Exception as error:
+                raise JobPersistenceError(self._import_cancel_pending_job_result_missing_reason)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 self._import_cancel_pending_job_result_missing_reason,
                 self._import_cancel_pending_job_row_missing_reason,

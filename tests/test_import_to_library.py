@@ -2496,7 +2496,7 @@ def test_cancel_pending_import_logs_missing_job_cancel_result(capsys) -> None:
 
 
 def test_handle_expired_pending_confirm_logs_approval_cancel_failure(capsys) -> None:
-    approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", approval_repo=approval_repo)
     service._is_pending_approval_expired = lambda **kwargs: True
     context = ConfirmExecutionContext(
@@ -2526,7 +2526,7 @@ def test_handle_expired_pending_confirm_logs_approval_cancel_failure(capsys) -> 
 
 
 def test_handle_expired_pending_confirm_logs_job_cancel_failure(capsys) -> None:
-    job_repo = type("JobRepo", (), {"cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))})()
+    job_repo = type("JobRepo", (), {"cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))})()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
     service._is_pending_approval_expired = lambda **kwargs: True
     context = ConfirmExecutionContext(
@@ -2561,7 +2561,7 @@ def test_handle_expired_pending_confirm_logs_missing_job_during_cancel(capsys) -
         (),
         {
             "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job missing during cancel")
+                JobPersistenceError("job missing during cancel")
             )
         },
     )()
