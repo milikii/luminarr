@@ -4,6 +4,7 @@ import sqlite3
 from collections.abc import Callable
 
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.operational_logging import emit_operational_log
 
 IsImportEventRowCorruptedErrorFunc = Callable[[Exception], bool]
 
@@ -33,6 +34,10 @@ class ImportEventRecorder:
     ) -> None:
         if self._job_event_repo is None:
             return
+        details = (
+            f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} "
+            f"event_type={event_type} source={source_path} target={target_path}"
+        )
         try:
             self._job_event_repo.append_event(
                 task_ref=task_ref,
@@ -45,22 +50,26 @@ class ImportEventRecorder:
             )
         except JobEventPersistenceError as error:
             if str(error) == self._import_event_result_missing_reason:
-                print(
-                    f"\033[31m[导入事件结果缺失]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误=import event missing after append\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的导入事件；当前导入流程会继续执行，但这次事件真相还没有确认落稳。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入事件结果缺失",
+                    detail=f"{details} 错误=import event missing after append",
+                    fix_hint="检查 job_event 写入后回读是否仍能拿到刚追加的导入事件；当前导入流程会继续执行，但这次事件真相还没有确认落稳。",
                 )
             elif self._is_import_event_row_corrupted_error(error):
-                print(
-                    f"\033[31m[导入事件记录损坏]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 等真相字段是否仍然完整；当前导入流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入事件记录损坏",
+                    detail=f"{details} 错误={error}",
+                    fix_hint="检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 等真相字段是否仍然完整；当前导入流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
                 )
             else:
-                print(
-                    f"\033[31m[导入事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入事件落盘失败",
+                    detail=f"{details} 错误={error}",
+                    fix_hint="检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
                 )
         except sqlite3.Error as error:
-            print(
-                f"\033[31m[导入事件落盘失败]\033[0m task_ref={task_ref} task_id={task_id} task_hash={task_hash} event_type={event_type} source={source_path} target={target_path} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
-                flush=True,
+            emit_operational_log(
+                title="导入事件落盘失败",
+                detail=f"{details} 错误={error}",
+                fix_hint="检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
             )
