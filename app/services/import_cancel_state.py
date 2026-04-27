@@ -5,10 +5,22 @@ from collections.abc import Callable
 
 from app.db.approval_repo import ApprovalPersistenceError, ApprovalRepo
 from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.operational_logging import format_operational_log_message
 
 ResolvePendingLeaseVersionFunc = Callable[..., int]
 ClearPendingCopyFallbackFunc = Callable[..., None]
 RecordImportEventFunc = Callable[..., None]
+
+
+def _log_import_cancel_state_error(*, title: str, detail: str, fix_hint: str) -> None:
+    print(
+        format_operational_log_message(
+            title=title,
+            detail=detail,
+            fix_hint=fix_hint,
+        ),
+        flush=True,
+    )
 
 
 class ImportCancelState:
@@ -58,15 +70,17 @@ class ImportCancelState:
             allow_in_memory_fallback_on_error=False,
         )
         if expected_lease_version == self._pending_lease_lookup_failed:
-            print(
-                f"\033[31m[导入取消状态读取失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease lookup failed\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前取消会直接返回状态读取失败，避免把审批查询异常误判成“没有待取消导入”。",
-                flush=True,
+            _log_import_cancel_state_error(
+                title="导入取消状态读取失败",
+                detail=f"task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease lookup failed",
+                fix_hint="检查 SQLite/approval_record 表查询是否正常；当前取消会直接返回状态读取失败，避免把审批查询异常误判成“没有待取消导入”。",
             )
             return self._import_cancel_state_unavailable_text
         if expected_lease_version <= 0:
-            print(
-                f"\033[31m[导入取消状态读取失败]\033[0m task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease missing\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
-                flush=True,
+            _log_import_cancel_state_error(
+                title="导入取消状态读取失败",
+                detail=f"task_ref={pending_job.task_ref} task_id={pending_job.task_id} task_hash={pending_job.task_hash} 原因=import approval pending lease missing",
+                fix_hint="检查 SQLite/approval_record 表里的待确认导入审批是否仍存在；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
             )
             return self._import_cancel_state_unavailable_text
 
@@ -100,9 +114,10 @@ class ImportCancelState:
         try:
             pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
         except (JobPersistenceError, sqlite3.Error) as error:
-            print(
-                f"\033[31m[导入取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前取消会直接返回状态读取失败，避免把查询异常误判成“没有待取消导入”。",
-                flush=True,
+            _log_import_cancel_state_error(
+                title="导入取消查询失败",
+                detail=f"chat_id={chat_id} 错误={error}",
+                fix_hint="检查 SQLite/jobs 表读取是否正常；当前取消会直接返回状态读取失败，避免把查询异常误判成“没有待取消导入”。",
             )
             pending_job = None
             pending_lookup_failed = True
@@ -130,22 +145,26 @@ class ImportCancelState:
                 self._import_cancel_approval_result_missing_reason,
                 self._import_cancel_approval_none_reason,
             }:
-                print(
-                    f"\033[31m[导入取消审批结果缺失]\033[0m task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} lease_version={expected_lease_version} 错误={error}\n"
-                    "\033[33m[处理建议]\033[0m 检查 approval_record 表里该待确认导入审批是否仍存在，以及取消更新后是否还能回读到该行；"
-                    "当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消导入”。",
-                    flush=True,
+                _log_import_cancel_state_error(
+                    title="导入取消审批结果缺失",
+                    detail=f"task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint=(
+                        "检查 approval_record 表里该待确认导入审批是否仍存在，以及取消更新后是否还能回读到该行；"
+                        "当前取消会直接返回状态读取失败，避免把缺失真相误判成普通状态冲突或普通“没有待取消导入”。"
+                    ),
                 )
             else:
-                print(
-                    f"\033[31m[导入取消审批更新失败]\033[0m task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} lease_version={expected_lease_version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认导入状态可能仍残留。",
-                    flush=True,
+                _log_import_cancel_state_error(
+                    title="导入取消审批更新失败",
+                    detail=f"task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} lease_version={expected_lease_version} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表更新是否正常；当前取消会直接失败返回，待确认导入状态可能仍残留。",
                 )
             return None
         if not approval_cancelled:
-            print(
-                f"\033[31m[导入取消审批更新失败]\033[0m task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认导入审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
-                flush=True,
+            _log_import_cancel_state_error(
+                title="导入取消审批更新失败",
+                detail=f"task_ref={job.task_ref} task_id={job.task_id} task_hash={job.task_hash} lease_version={expected_lease_version} 错误=approval_record missing or lease_version mismatch",
+                fix_hint="检查 SQLite/approval_record 表里的待确认导入审批是否仍存在，或是否已被其他路径抢先取消/确认；当前取消会直接返回状态读取失败，避免把审批真相缺口误判成“没有待取消导入”。",
             )
             return False
         return True
@@ -167,21 +186,24 @@ class ImportCancelState:
             }:
                 self._log_cancel_pending_job_result_missing(job=job, reason=str(error))
             else:
-                print(
-                    f"\033[31m[导入取消任务更新失败]\033[0m task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
-                    flush=True,
+                _log_import_cancel_state_error(
+                    title="导入取消任务更新失败",
+                    detail=f"task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 错误={error}",
+                    fix_hint="检查 SQLite/jobs 表更新是否正常；当前审批可能已取消，但任务真相可能仍残留在待确认状态。",
                 )
             return None
         if not cancelled:
-            print(
-                f"\033[31m[导入取消任务更新失败]\033[0m task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 错误=jobs.cancel_pending_job rejected current state\n\033[33m[处理建议]\033[0m 检查该任务是否已被其他路径抢先取消、确认或完结；当前审批可能已取消，但待确认任务真相可能已被其他状态迁移抢先改写。",
-                flush=True,
+            _log_import_cancel_state_error(
+                title="导入取消任务更新失败",
+                detail=f"task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 错误=jobs.cancel_pending_job rejected current state",
+                fix_hint="检查该任务是否已被其他路径抢先取消、确认或完结；当前审批可能已取消，但待确认任务真相可能已被其他状态迁移抢先改写。",
             )
             return False
         return True
 
     def _log_cancel_pending_job_result_missing(self, *, job: JobRecord, reason: str) -> None:
-        print(
-            f"\033[31m[导入取消任务结果缺失]\033[0m task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认导入任务是否仍存在，以及取消更新后是否还能回读到最新状态；当前审批可能已取消，但任务真相还没有确认取消成功。",
-            flush=True,
+        _log_import_cancel_state_error(
+            title="导入取消任务结果缺失",
+            detail=f"task_ref={job.task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}",
+            fix_hint="检查 jobs 表里该待确认导入任务是否仍存在，以及取消更新后是否还能回读到最新状态；当前审批可能已取消，但任务真相还没有确认取消成功。",
         )
