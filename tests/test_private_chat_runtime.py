@@ -30,6 +30,7 @@ from app.bot.telegram_bot import (
     TELEGRAM_SEND_TEXT_FUNC_KEY,
 )
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
+from app.db.candidate_repo import CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobPersistenceError, JobRepo
@@ -1325,7 +1326,7 @@ def test_dispatch_private_chat_text_replies_service_not_ready_on_candidate_clear
         candidate_repo=type(
             "BoomRepo",
             (),
-            {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"clear_candidates": lambda self, chat_id: (_ for _ in ()).throw(CandidatePersistenceError("db down"))},
         )(),
     )
     search_service._recent_candidates_by_chat[1001] = [{"title": "title-dune"}]
