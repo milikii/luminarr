@@ -135,10 +135,9 @@ class ImportPostProcessingService:
                 event_type="subtitle.failed",
                 message=message,
             )
-            print(f"\033[31m[字幕翻译失败]\033[0m {message}", flush=True)
-            print(
-                "\033[33m[处理建议]\033[0m 检查字幕文件编码和目录写权限，再重试 confirm 导入。",
-                flush=True,
+            _log_import_subtitle_translate_failed(
+                message=message,
+                fix_hint="检查字幕文件编码和目录写权限，再重试 confirm 导入。",
             )
             return
 
@@ -156,10 +155,9 @@ class ImportPostProcessingService:
             message=result.message,
         )
         if event_type == "subtitle.failed":
-            print(f"\033[31m[字幕翻译失败]\033[0m {result.message}", flush=True)
-            print(
-                "\033[33m[处理建议]\033[0m 检查字幕文件内容、编码和目录写权限，再重试 confirm 导入。",
-                flush=True,
+            _log_import_subtitle_translate_failed(
+                message=result.message,
+                fix_hint="检查字幕文件内容、编码和目录写权限，再重试 confirm 导入。",
             )
 
     async def _try_refresh(self, *, request: ImportPostProcessRequest) -> str:
@@ -206,3 +204,8 @@ def _log_import_metadata_scrape_failed(*, message: str) -> None:
         "\033[33m[处理建议]\033[0m 检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
         flush=True,
     )
+
+
+def _log_import_subtitle_translate_failed(*, message: str, fix_hint: str) -> None:
+    print(f"\033[31m[字幕翻译失败]\033[0m {message}", flush=True)
+    print(f"\033[33m[处理建议]\033[0m {fix_hint}", flush=True)
