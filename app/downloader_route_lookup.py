@@ -73,10 +73,10 @@ def _resolve_downloader_task_route(
     job_repo: JobRepo,
 ) -> ResolvedDownloaderTaskRoute | None:
     if chat_id is None or chat_id <= 0:
-        _log_downloader_task_route_issue(
+        _print_downloader_issue_log(
             title="下载器路由未命中",
-            task_ref=task_ref,
-            chat_id=chat_id,
+            context_label="task_ref",
+            context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
             detail_label="原因",
             detail_value="chat_id missing",
             fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
@@ -85,20 +85,20 @@ def _resolve_downloader_task_route(
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
     except Exception as error:
-        _log_downloader_task_route_issue(
+        _print_downloader_issue_log(
             title="下载器路由查询失败",
-            task_ref=task_ref,
-            chat_id=chat_id,
+            context_label="task_ref",
+            context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
             detail_label="错误",
             detail_value=str(error),
             fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
         )
         return None
     if downloader_job is None:
-        _log_downloader_task_route_issue(
+        _print_downloader_issue_log(
             title="下载器路由未命中",
-            task_ref=task_ref,
-            chat_id=chat_id,
+            context_label="task_ref",
+            context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
             detail_label="原因",
             detail_value="downloader job missing",
             fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
@@ -117,10 +117,10 @@ def _resolve_downloader_task_route(
             if not isinstance(payload, dict):
                 payload_reason = "payload_json not object"
     if payload_reason is not None:
-        _log_downloader_task_route_issue(
+        _print_downloader_issue_log(
             title="下载器路由载荷损坏",
-            task_ref=task_ref,
-            chat_id=chat_id,
+            context_label="task_ref",
+            context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
             detail_label="原因",
             detail_value=payload_reason,
             fix_hint="检查 jobs.payload_json 是否仍保留合法 JSON，且包含 downloader_name。",
@@ -129,10 +129,10 @@ def _resolve_downloader_task_route(
     downloader_name = str(payload.get("downloader_name", "")).strip()
     download_dir = str(payload.get("download_dir", "")).strip()
     if not downloader_name:
-        _log_downloader_task_route_issue(
+        _print_downloader_issue_log(
             title="下载器路由未命中",
-            task_ref=task_ref,
-            chat_id=chat_id,
+            context_label="task_ref",
+            context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
             detail_label="原因",
             detail_value="downloader_name missing",
             fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
@@ -168,45 +168,29 @@ def _resolve_lookup_client_for_task(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
-        _log_downloader_client_resolution_issue(
+        _print_downloader_issue_log(
             title="下载器实例不存在",
-            downloader_name=cleaned_name or "-",
-            downloader_type="",
-            reason="instance missing",
+            context_label="downloader_name",
+            context_value=_format_downloader_context(downloader_name=cleaned_name or "-"),
+            detail_label="原因",
+            detail_value="instance missing",
             fix_hint="检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，并确认角色绑定或历史任务没有引用已删除的实例名。",
         )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     if client is None:
-        _log_downloader_client_resolution_issue(
+        _print_downloader_issue_log(
             title="下载器客户端未配置",
-            downloader_name=cleaned_name or "-",
-            downloader_type=instance.downloader_type,
-            reason="client missing",
+            context_label="downloader_name",
+            context_value=_format_downloader_context(
+                downloader_name=cleaned_name or "-",
+                downloader_type=instance.downloader_type,
+            ),
+            detail_label="原因",
+            detail_value="client missing",
             fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
         )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     return route, client
-
-
-def _log_downloader_client_resolution_issue(
-    *,
-    title: str,
-    downloader_name: str,
-    downloader_type: str,
-    reason: str,
-    fix_hint: str,
-) -> None:
-    _print_downloader_issue_log(
-        title=title,
-        context_label="downloader_name",
-        context_value=_format_downloader_context(
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-        ),
-        detail_label="原因",
-        detail_value=reason,
-        fix_hint=fix_hint,
-    )
 
 
 def _resolve_downloader_instance(
@@ -239,6 +223,27 @@ def _resolve_downloader_client_candidate(
     if client is None:
         return cleaned_name, instance, None
     return cleaned_name, instance, client
+
+
+def _log_downloader_client_resolution_issue(
+    *,
+    title: str,
+    downloader_name: str,
+    downloader_type: str,
+    reason: str,
+    fix_hint: str,
+) -> None:
+    _print_downloader_issue_log(
+        title=title,
+        context_label="downloader_name",
+        context_value=_format_downloader_context(
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+        ),
+        detail_label="原因",
+        detail_value=reason,
+        fix_hint=fix_hint,
+    )
 
 
 def _resolve_downloader_client_for_dispatch(
