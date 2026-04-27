@@ -1,9 +1,9 @@
-# Next step (v388)
+# Next step (v389)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小代码闭环并通过总 gate：auto-import 终态/skip/completed list、候选读取、cleanup correlation、frustration pending job，以及 BT pending 四段状态链路都已从 broad `Exception` 收窄到明确 repo/SQLite 异常边界。
+- 本轮已完成 10 个最小闭环并通过总 gate：下载器路由、导入源查询、cleanup 事件与 PT seed window、命名规则解析、媒体服务器 refresh 配置日志、成人归档/保留期清理持久化状态不可用边界，以及成人归档状态不可用 follow-up 覆盖。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
@@ -11,6 +11,7 @@
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码、search/web/BT 展示、candidate/clarification、Telegram delivery/update、import pending/approval/event 等异常边界已持续收口。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
+  - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - 剩余 `*_support.py` 都是较大边界，不再因为文件名机械强拆。
 
