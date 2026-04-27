@@ -9,6 +9,8 @@ from urllib.parse import parse_qs, parse_qsl, quote_plus, urlencode, urljoin, ur
 
 import httpx
 
+from app.operational_logging import emit_operational_log
+
 _ROW_PATTERN = re.compile(r"<tr\b[^>]*>(?P<html>.*?)</tr>", re.IGNORECASE | re.DOTALL)
 _CELL_PATTERN = re.compile(r"<t[dh]\b[^>]*>(?P<html>.*?)</t[dh]>", re.IGNORECASE | re.DOTALL)
 _TITLE_ATTR_PATTERN = re.compile(
@@ -412,7 +414,8 @@ def _extract_javbus_search_entries(html: str, *, base_url: str) -> list[tuple[st
 
 
 def _log_web_source_error(*, source_name: str, query: str, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 外部站点源失败]\033[0m 来源={source_name} 查询={query} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查站点可达性、HTML 页面结构和网络连通性后重试。"
+    emit_operational_log(
+        title="BT 外部站点源失败",
+        detail=f"来源={source_name} 查询={query} 原因={error}",
+        fix_hint="检查站点可达性、HTML 页面结构和网络连通性后重试。",
     )
