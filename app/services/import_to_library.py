@@ -10,6 +10,7 @@ from app.db.approval_repo import (
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.operational_logging import emit_operational_log
 from app.services.import_pending_write_through_state import ImportPendingWriteThroughState
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
@@ -312,9 +313,10 @@ class ImportToLibraryService:
         )
 
     def _log_expired_cancel_pending_job_result_missing(self, *, job: JobRecord, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[导入确认超时任务结果缺失]\033[0m task_ref={task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}\n\033[33m[处理建议]\033[0m 检查 jobs 表里该待确认导入任务是否仍存在，以及超时取消后是否还能回读到最新状态；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“导入确认已超时”。",
-            flush=True,
+        emit_operational_log(
+            title="导入确认超时任务结果缺失",
+            detail=f"task_ref={task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}",
+            fix_hint="检查 jobs 表里该待确认导入任务是否仍存在，以及超时取消后是否还能回读到最新状态；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“导入确认已超时”。",
         )
 
     async def _prepare_import(
