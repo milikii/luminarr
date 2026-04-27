@@ -366,7 +366,9 @@ def test_resolve_downloader_client_for_dispatch_logs_missing_client(
     assert "[处理建议]" in captured.out
 
 
-def test_build_refresh_media_server_func_returns_none_without_media_server_settings() -> None:
+def test_build_refresh_media_server_func_logs_missing_emby_settings(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     settings = SimpleNamespace(
         media_server_provider="emby",
         emby_base_url="",
@@ -378,6 +380,13 @@ def test_build_refresh_media_server_func_returns_none_without_media_server_setti
     )
 
     assert _build_refresh_media_server_func(settings) is None
+
+    captured = capsys.readouterr()
+    assert "[媒体服务器配置缺失]" in captured.out
+    assert "provider=emby" in captured.out
+    assert "EMBY_BASE_URL" in captured.out
+    assert "EMBY_API_KEY" in captured.out
+    assert "[处理建议]" in captured.out
 
 
 def test_build_refresh_media_server_func_logs_missing_jellyfin_settings(

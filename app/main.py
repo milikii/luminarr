@@ -180,7 +180,18 @@ def _build_refresh_media_server_func(settings):
             token=settings.plex_token,
         ).refresh_library
     else:
-        if not settings.emby_base_url or not settings.emby_api_key:
+        missing_keys = []
+        if not settings.emby_base_url:
+            missing_keys.append("EMBY_BASE_URL")
+        if not settings.emby_api_key:
+            missing_keys.append("EMBY_API_KEY")
+        if missing_keys:
+            joined_keys = ", ".join(missing_keys)
+            print(
+                f"\033[31m[媒体服务器配置缺失]\033[0m provider=emby 缺少={joined_keys}\n"
+                "\033[33m[处理建议]\033[0m 补齐该 provider 对应的地址和凭据；当前会保留导入成功真相，但跳过媒体库刷新。",
+                flush=True,
+            )
             return None
         target_url = settings.emby_base_url
         refresh_func = EmbyClient(
