@@ -156,50 +156,36 @@ def _resolve_lookup_client_for_task(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
-        _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
+        _log_downloader_client_resolution_issue(
+            title="下载器实例不存在",
+            downloader_name=cleaned_name or "-",
+            downloader_type="",
+            reason="instance missing",
+            fix_hint="检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，并确认角色绑定或历史任务没有引用已删除的实例名。",
+        )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     if client is None:
-        _log_downloader_client_not_configured(
+        _log_downloader_client_resolution_issue(
+            title="下载器客户端未配置",
             downloader_name=cleaned_name or "-",
             downloader_type=instance.downloader_type,
+            reason="client missing",
+            fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
         )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     return route, client
 
 
-def _log_downloader_instance_missing(*, downloader_name: str) -> None:
-    _print_downloader_issue_log(
-        title="下载器实例不存在",
-        context_label="downloader_name",
-        context_value=_format_downloader_context(downloader_name=downloader_name),
-        detail_label="原因",
-        detail_value="instance missing",
-        fix_hint="检查当前任务 payload 里的 downloader_name 是否仍存在于 DOWNLOADER_INSTANCES，并确认角色绑定或历史任务没有引用已删除的实例名。",
-    )
-
-
-def _log_downloader_client_not_configured(*, downloader_name: str, downloader_type: str) -> None:
-    _print_downloader_issue_log(
-        title="下载器客户端未配置",
-        context_label="downloader_name",
-        context_value=_format_downloader_context(
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-        ),
-        detail_label="原因",
-        detail_value="client missing",
-        fix_hint="检查应用启动阶段是否已按 DOWNLOADER_INSTANCES 创建对应下载器 client，并确认当前实例的 base_url / 用户名密码没有让这条配置在装配时被跳过。",
-    )
-
-
-def _log_downloader_dispatch_resolution_failed(
+def _log_downloader_client_resolution_issue(
     *,
+    title: str,
     downloader_name: str,
     downloader_type: str,
     reason: str,
+    fix_hint: str,
 ) -> None:
     _print_downloader_issue_log(
-        title="下载器投递路由失败",
+        title=title,
         context_label="downloader_name",
         context_value=_format_downloader_context(
             downloader_name=downloader_name,
@@ -207,7 +193,7 @@ def _log_downloader_dispatch_resolution_failed(
         ),
         detail_label="原因",
         detail_value=reason,
-        fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
+        fix_hint=fix_hint,
     )
 
 
@@ -261,17 +247,21 @@ def _resolve_downloader_client_for_dispatch(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
-        _log_downloader_dispatch_resolution_failed(
+        _log_downloader_client_resolution_issue(
+            title="下载器投递路由失败",
             downloader_name=cleaned_name,
             downloader_type="-",
             reason="instance missing",
+            fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
         )
         raise ValueError(f"unknown downloader instance: {cleaned_name}")
     if client is None:
-        _log_downloader_dispatch_resolution_failed(
+        _log_downloader_client_resolution_issue(
+            title="下载器投递路由失败",
             downloader_name=cleaned_name,
             downloader_type=instance.downloader_type,
             reason="client not configured",
+            fix_hint="检查 DOWNLOADER_INSTANCES、下载器角色绑定和应用启动阶段的 client 装配是否一致，再重试当前下载投递。",
         )
         raise ValueError(f"downloader client not configured: {cleaned_name}")
     return client
