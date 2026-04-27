@@ -1,21 +1,26 @@
-# Current status (v514)
+# Current status (v515)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；当前唯一主线仍是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮连续完成 10 个最小闭环：把 `downloader_route_lookup`、`private_chat_confirm_runtime`、`private_chat_cleanup_runtime`、`private_chat_frustration_runtime`、`private_chat_bt_read_only_runtime`、`raw_bt_destination_runtime`、`bt_tmdb_association_runtime`、`bt_pending_runtime`、`clients/feishu.py`、`clients/web_source.py` 的手写 ANSI 日志收口到共享 `emit_operational_log` 边界。
-- 本轮同时修复下载器投递失败边界：`add_torrent_func` 抛出运行时 / HTTP 错误时，`confirm add` 重新返回明确失败文本并触发既有审批回退，不再把 downloader dispatch 异常泄出到调用方。
+- 本轮连续完成 10 个最小闭环：把 `app/main.py`、`telegram_update_runtime`、`telegram_delivery_runtime`、`channel_identity`、`download_follow_up_runtime`、`metadata_scraper`、`subtitle_translation_support`、`manage_watchlist`、`manage_bt_subscription`、`cleanup_correlation_lookup` 的剩余手写/间接 ANSI 日志继续收口到共享 `emit_operational_log` 边界。
+- 本轮同时修复两个只读/cleanup 失败边界：下载状态路由读取异常会包装成明确 `DownloaderRouteLookupError`；cleanup correlation 的 `job_event` 查询运行时错误会进入既有查询失败边界，不再跨渠道泄出异常。
 - 本轮 focused tests 已通过；`make quality`、`make verify-mainline` 已通过。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支质量 gate 通过；本轮 focused tests 已覆盖 downloader route lookup、确认/cleanup/frustration、BT read-only、raw BT、BT TMDB、BT pending、Feishu client 和 BT source 路径。
-- `tests/test_downloader_route_lookup.py`、`tests/test_private_chat_confirm_runtime.py`、`tests/test_private_chat_cleanup_runtime.py`、`tests/test_private_chat_frustration_runtime.py`、`tests/test_private_chat_bt_read_only_runtime.py`、`tests/test_private_chat_raw_bt_destination_runtime.py`、`tests/test_private_chat_bt_tmdb_runtime.py`、`tests/test_private_chat_bt_processing_runtime.py`、`tests/test_feishu_client.py`、`tests/test_bt_sources.py` 通过。
+- 默认分支质量 gate 通过；本轮 focused tests 已覆盖 main/downloader route、Telegram update/delivery、跨渠道身份、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation/cross-channel 路径。
+- `tests/test_main.py`、`tests/test_downloader_route_lookup.py`、`tests/test_telegram_runtime_adapter.py`、`tests/test_telegram_delivery_runtime.py`、`tests/test_feishu_adapter.py`、`tests/test_wecom_adapter.py`、`tests/test_personal_wechat_text.py`、`tests/test_download_follow_up_runtime.py`、`tests/test_metadata_scraper.py`、`tests/test_subtitle_translator.py`、`tests/test_manage_watchlist.py`、`tests/test_manage_bt_subscription.py`、`tests/test_bt_subscription_last_seen_support.py`、`tests/test_bt_subscription_scan_support.py`、`tests/test_bt_subscription_scheduler_support.py`、`tests/test_cleanup_downloaded_source.py`、`tests/test_cleanup_cross_channel_smoke.py` 通过。
 - `make quality` 通过（`27 passed in 0.13s`），`make verify-mainline` 通过。
 - 下一轮继续质量债时，优先从剩余 broad `except Exception` 中区分“外部服务隔离”与“repo/SQLite 持久化边界”，或继续收口日志打印边界 / `main()` DI；不要切成人 BT 新功能。
 
 ## Latest verification
-- `tests/test_downloader_route_lookup.py`、`tests/test_private_chat_confirm_runtime.py`、`tests/test_private_chat_cleanup_runtime.py`、`tests/test_private_chat_frustration_runtime.py`、`tests/test_private_chat_bt_read_only_runtime.py`、`tests/test_private_chat_raw_bt_destination_runtime.py`、`tests/test_private_chat_bt_tmdb_runtime.py`、`tests/test_private_chat_bt_processing_runtime.py`、`tests/test_feishu_client.py`、`tests/test_bt_sources.py` 通过。
+- `tests/test_main.py tests/test_downloader_route_lookup.py` 通过。
+- `tests/test_telegram_runtime_adapter.py`、`tests/test_telegram_delivery_runtime.py` 通过。
+- `tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_personal_wechat_text.py` 通过。
+- `tests/test_download_follow_up_runtime.py`、`tests/test_metadata_scraper.py`、`tests/test_subtitle_translator.py` 通过。
+- `tests/test_manage_watchlist.py`、`tests/test_manage_bt_subscription.py tests/test_bt_subscription_last_seen_support.py tests/test_bt_subscription_scan_support.py tests/test_bt_subscription_scheduler_support.py` 通过。
+- `tests/test_cleanup_downloaded_source.py tests/test_cleanup_cross_channel_smoke.py` 通过（`428 passed`）。
 - `make quality` 通过（`27 passed, 0 skipped`）。
 - `make verify-mainline` 通过。
 
