@@ -3,8 +3,8 @@
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环：新增共享 `emit_operational_log`，并把 `add_cancel_state`、`add_pending_persistence`、`add_adult_registry_state`、`import_event_recorder`、`import_raw_bt_guard`、`get_download_status`、`status_follow_up`、`add_execution_follow_up`、`post_download_auto_import` 的手写 ANSI 日志统一到 shared operational formatter 边界。
-- `make quality` / `make verify-mainline` 通过，focused tests 已覆盖这批日志路径；协议、SQLite schema、下载/导入/BT 主线语义不变。
+- 本轮已完成 10 个最小闭环：把 `import_confirmed_media_identity`、`import_confirm_context_guard`、`add_confirm_context_state`、`add_confirm_job_state`、`import_cancel_state`、`import_confirm_expiry_state`、`import_job_state`、`add_pending_context`、`add_confirm_approval_state`、`import_approval_state` 的手写 ANSI 日志统一到 shared `emit_operational_log` 边界。
+- focused tests 已覆盖本轮触及的导入/下载审批边界；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/BT 主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
