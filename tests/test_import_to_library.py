@@ -956,7 +956,7 @@ def test_cancel_pending_import_logs_missing_approval_result(capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
-        {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("approval_record missing during cancel"))},
+        {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(ApprovalPersistenceError("approval_record missing during cancel"))},
     )()
     service = ImportToLibraryService(
         AsyncMock(return_value=None),
@@ -2424,7 +2424,7 @@ def test_cancel_pending_import_logs_job_cancel_failure(capsys) -> None:
         (),
         {
             "get_latest_pending_import_job": lambda self, chat_id: pending_job,
-            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+            "cancel_pending_job": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down")),
         },
     )()
     approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: True})()
@@ -2440,7 +2440,7 @@ def test_cancel_pending_import_logs_job_lookup_failure(capsys) -> None:
     job_repo = type(
         "JobRepo",
         (),
-        {"get_latest_pending_import_job": lambda self, chat_id: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"get_latest_pending_import_job": lambda self, chat_id: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies", job_repo=job_repo)
 

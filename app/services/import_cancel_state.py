@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 
-from app.db.approval_repo import ApprovalRepo
-from app.db.job_repo import JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.db.approval_repo import ApprovalPersistenceError, ApprovalRepo
+from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
 
 ResolvePendingLeaseVersionFunc = Callable[..., int]
 ClearPendingCopyFallbackFunc = Callable[..., None]
@@ -98,7 +99,7 @@ class ImportCancelState:
         pending_lookup_failed = False
         try:
             pending_job = self._job_repo.get_latest_pending_import_job(chat_id=chat_id)
-        except Exception as error:
+        except (JobPersistenceError, sqlite3.Error) as error:
             print(
                 f"\033[31m[导入取消查询失败]\033[0m chat_id={chat_id} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前取消会直接返回状态读取失败，避免把查询异常误判成“没有待取消导入”。",
                 flush=True,
@@ -123,8 +124,8 @@ class ImportCancelState:
                 expected_lease_version=expected_lease_version,
             )
             if approval_cancelled is None:
-                raise RuntimeError(self._import_cancel_approval_none_reason)
-        except Exception as error:
+                raise ApprovalPersistenceError(self._import_cancel_approval_none_reason)
+        except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 self._import_cancel_approval_result_missing_reason,
                 self._import_cancel_approval_none_reason,
@@ -158,8 +159,8 @@ class ImportCancelState:
                 workflow_type=WORKFLOW_IMPORT_TO_LIBRARY,
             )
             if cancelled is None:
-                raise RuntimeError(self._import_cancel_pending_job_result_missing_reason)
-        except Exception as error:
+                raise JobPersistenceError(self._import_cancel_pending_job_result_missing_reason)
+        except (JobPersistenceError, sqlite3.Error) as error:
             if str(error) in {
                 self._import_cancel_pending_job_result_missing_reason,
                 self._import_cancel_pending_job_row_missing_reason,
