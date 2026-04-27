@@ -149,6 +149,16 @@ def _read_optional_int_with_validator(
     return value
 
 
+def _read_optional_float(env: Mapping[str, str], key: str, default: float) -> float:
+    raw_value = _read_optional(env, key)
+    if not raw_value:
+        return default
+    try:
+        return float(raw_value)
+    except ValueError as error:
+        raise ConfigError(f"{key} must be a number") from error
+
+
 def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
     return _read_optional_int_with_validator(
         env,
@@ -435,13 +445,11 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     fanart_base_url = _read_base_url(env, "FANART_BASE_URL")
     subtitle_translation_base_url = _read_base_url(env, "SUBTITLE_TRANSLATION_BASE_URL")
     feishu_base_url = _read_base_url(env, "FEISHU_BASE_URL")
-    subtitle_translation_timeout_raw = _read_optional(env, "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS")
-    subtitle_translation_timeout_seconds = 60.0
-    if subtitle_translation_timeout_raw:
-        try:
-            subtitle_translation_timeout_seconds = float(subtitle_translation_timeout_raw)
-        except ValueError:
-            raise ConfigError("SUBTITLE_TRANSLATION_TIMEOUT_SECONDS must be a number")
+    subtitle_translation_timeout_seconds = _read_optional_float(
+        env,
+        "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS",
+        60.0,
+    )
     feishu_app_id = _read_optional(env, "FEISHU_APP_ID")
     feishu_app_secret = _read_optional(env, "FEISHU_APP_SECRET")
     feishu_encrypt_key = _read_optional(env, "FEISHU_ENCRYPT_KEY")

@@ -236,6 +236,20 @@ def test_load_settings_reads_subtitle_translation_settings() -> None:
     assert settings.subtitle_translation_timeout_seconds == 45.0
 
 
+def test_load_settings_strips_whitespace_from_subtitle_timeout() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS": " 45 ",
+        }
+    )
+
+    assert settings.subtitle_translation_timeout_seconds == 45.0
+
+
 def test_load_settings_reads_feishu_settings() -> None:
     settings = load_settings(
         {
@@ -316,6 +330,22 @@ def test_load_settings_rejects_invalid_feishu_inbound_mode() -> None:
                 "FEISHU_INBOUND_MODE": "sdk",
             }
         )
+
+
+def test_load_settings_strips_whitespace_from_lower_choice_fields() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "MEDIA_SERVER_PROVIDER": " Plex ",
+            "FEISHU_INBOUND_MODE": " long_connection ",
+        }
+    )
+
+    assert settings.media_server_provider == "plex"
+    assert settings.feishu_inbound_mode == "long_connection"
 
 
 def test_load_settings_reads_raw_bt_destinations() -> None:
