@@ -1,15 +1,15 @@
-# Current status (v509)
+# Current status (v510)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；当前唯一主线仍是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮按文档连续完成 10 个最小闭环：trace、cleanup smoke、refresh、import post-processing、BT 搜索、状态跟进、download follow-up、BT source、BT subscription logging 统一到共享 operational logging helper，并同步当前文档真相。
+- 本轮按文档连续完成 10 个最小闭环：confirm job lookup、frustration pending-job lookup、BT read-only helper、BT processing-path pending payload/clear/read/corruption/persist/missing-after-upsert 日志统一到共享 operational logging helper，并同步当前文档真相。
 - 成人归档上层不再用泛 `Exception` 判断归档/清理失败；文件搬运、下载器删除和本地源清理失败进入明确操作失败文本，持久化失败仍保持状态不可用边界。
 - 默认分支协议、SQLite schema、下载/导入/审批语义未变化；本轮主要是异常类型和日志边界收口。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支质量 gate 通过；本轮 focused tests 已覆盖 trace、cleanup smoke、refresh、import post-processing、BT 搜索、状态跟进、download follow-up、BT source 和 BT subscription 日志路径。
+- 默认分支质量 gate 通过；本轮 focused tests 已覆盖 confirm、frustration、BT read-only 和 BT processing-path pending 日志路径。
 - `make quality` 通过，`make verify-mainline` 通过。
 - 下一轮继续质量债时，优先从剩余 broad `except Exception` 中区分“外部服务隔离”与“repo/SQLite 持久化边界”，或继续收口日志打印边界 / `main()` DI；不要切成人 BT 新功能。
 
@@ -24,6 +24,9 @@
 - `tests/test_download_follow_up_runtime.py`：`13 passed`
 - `tests/test_bt_sources.py`：`18 passed`
 - `tests/test_manage_bt_subscription.py -k "scan or scheduler or list"`：`18 passed, 20 deselected`
+- `make quality`：通过（`27 passed, 0 skipped`）
+- `make verify-mainline`：通过
+- `tests/test_private_chat_confirm_runtime.py tests/test_private_chat_frustration_runtime.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_runtime.py -k "handle_confirm_query or handle_frustration_query or handle_bt_read_only_query or bt_processing_path"`：`19 passed, 51 deselected`
 - `make quality`：通过（`27 passed, 0 skipped`）
 - `make verify-mainline`：通过
 - `tests/test_adult_archive_service.py tests/test_get_download_status.py -k "adult_archive_service or adult_archive"`：`7 passed, 45 deselected`

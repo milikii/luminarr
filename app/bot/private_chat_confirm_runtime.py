@@ -4,15 +4,21 @@ import sqlite3
 from collections.abc import Awaitable, Callable, MutableMapping
 
 from app.db.job_repo import JobPersistenceError
+from app.operational_logging import format_operational_log_message
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
 
 def log_confirm_job_lookup_failed(*, chat_id: int | None, task_ref: str, reason: str) -> None:
     print(
-        f"\033[31m[确认关联任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} "
-        f"task_ref={task_ref.strip() or '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前确认任务关联记录是否正常。"
+        format_operational_log_message(
+            title="确认关联任务查询失败",
+            detail=(
+                f"chat_id={chat_id if chat_id is not None else '-'} "
+                f"task_ref={task_ref.strip() or '-'} 原因={reason}"
+            ),
+            fix_hint="检查 SQLite 是否可读，以及 jobs 表和当前确认任务关联记录是否正常。",
+        )
     )
 
 

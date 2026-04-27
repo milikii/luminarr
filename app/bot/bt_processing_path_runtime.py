@@ -10,6 +10,7 @@ from app.db.bt_pending_repo import (
     BtPendingPersistenceError,
     BtPendingRepo,
 )
+from app.operational_logging import format_operational_log_message
 
 BT_PROCESSING_PATH_PROMPT_TEXT = (
     "已识别为直接磁力下载需求。\n"
@@ -68,40 +69,55 @@ def _deserialize_bt_pending_payload(payload_json: str) -> tuple[dict[str, object
 
 def _log_bt_pending_payload_corruption(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理载荷损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.payload_json 是否仍是合法 JSON，且包含当前 stage 需要的字段。",
+        format_operational_log_message(
+            title="BT 待处理载荷损坏",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint="检查 bt_pending_state.payload_json 是否仍是合法 JSON，且包含当前 stage 需要的字段。",
+        ),
         flush=True,
     )
 
 
 def _log_bt_pending_clear_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理清理失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表删除是否正常；当前进程内待处理状态已尽量清掉，但重启后旧状态可能仍残留。",
+        format_operational_log_message(
+            title="BT 待处理清理失败",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint="检查 bt_pending_state 表删除是否正常；当前进程内待处理状态已尽量清掉，但重启后旧状态可能仍残留。",
+        ),
         flush=True,
     )
 
 
 def _log_bt_pending_clear_result_missing(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理清理结果缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 删除返回是否仍带有明确结果；当前进程内待处理状态已尽量回滚，避免把缺失真相误判成已清理成功。",
+        format_operational_log_message(
+            title="BT 待处理清理结果缺失",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint="检查 bt_pending_state 删除返回是否仍带有明确结果；当前进程内待处理状态已尽量回滚，避免把缺失真相误判成已清理成功。",
+        ),
         flush=True,
     )
 
 
 def _log_bt_pending_read_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理读取失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表读取是否正常；当前相关入口会按状态不可用处理，避免把 SQLite 读取异常误判成“没有待处理状态”。",
+        format_operational_log_message(
+            title="BT 待处理读取失败",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint="检查 bt_pending_state 表读取是否正常；当前相关入口会按状态不可用处理，避免把 SQLite 读取异常误判成“没有待处理状态”。",
+        ),
         flush=True,
     )
 
 
 def _log_bt_pending_row_corrupted(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理记录损坏]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state.stage 是否仍是完整真相；当前相关入口会按状态不可用处理，避免把坏记录误判成“没有待处理状态”。",
+        format_operational_log_message(
+            title="BT 待处理记录损坏",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint="检查 bt_pending_state.stage 是否仍是完整真相；当前相关入口会按状态不可用处理，避免把坏记录误判成“没有待处理状态”。",
+        ),
         flush=True,
     )
 
@@ -112,17 +128,25 @@ def _is_bt_pending_row_corrupted_reason(reason: str) -> bool:
 
 def _log_bt_pending_persist_failed(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理持久化失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表写入是否正常；当前进程内待处理状态仍保留，但重启后可能丢失这一步的上下文。",
+        format_operational_log_message(
+            title="BT 待处理持久化失败",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint="检查 bt_pending_state 表写入是否正常；当前进程内待处理状态仍保留，但重启后可能丢失这一步的上下文。",
+        ),
         flush=True,
     )
 
 
 def _log_bt_pending_missing_after_upsert(*, chat_id: int | None, stage: str, reason: str) -> None:
     print(
-        f"\033[31m[BT 待处理写入后记录缺失]\033[0m chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_pending_state 表是否被并发删除或触发器回滚；"
-        "如需继续当前 BT follow-up，请先确认 SQLite 写入后能立即回读该记录。",
+        format_operational_log_message(
+            title="BT 待处理写入后记录缺失",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+            fix_hint=(
+                "检查 bt_pending_state 表是否被并发删除或触发器回滚；"
+                "如需继续当前 BT follow-up，请先确认 SQLite 写入后能立即回读该记录。"
+            ),
+        ),
         flush=True,
     )
 

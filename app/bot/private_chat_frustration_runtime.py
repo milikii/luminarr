@@ -16,14 +16,18 @@ from app.bot.query_text_runtime import is_frustration_text
 from app.bot.raw_bt_destination_runtime import clear_raw_bt_destination_pending
 from app.bot.bt_tmdb_association_runtime import clear_bt_tmdb_association_pending
 from app.db.job_repo import JobPersistenceError
+from app.operational_logging import format_operational_log_message
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
 
 def _log_pending_job_lookup_failed(*, chat_id: int | None, reason: str) -> None:
     print(
-        f"\033[31m[待处理任务查询失败]\033[0m chat_id={chat_id if chat_id is not None else '-'} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可读，以及 jobs 表和当前待处理任务记录是否正常。"
+        format_operational_log_message(
+            title="待处理任务查询失败",
+            detail=f"chat_id={chat_id if chat_id is not None else '-'} 原因={reason}",
+            fix_hint="检查 SQLite 是否可读，以及 jobs 表和当前待处理任务记录是否正常。",
+        )
     )
 
 

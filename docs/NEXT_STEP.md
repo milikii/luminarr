@@ -1,9 +1,9 @@
-# Next step (v390)
+# Next step (v391)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环：trace、cleanup smoke、refresh、import post-processing、BT 搜索、状态跟进、download follow-up、BT source、BT subscription logging 都已统一到共享 operational logging helper，并同步 STATUS/NEXT_STEP 当前真相。
+- 本轮已完成 10 个最小闭环：confirm job lookup、frustration pending-job lookup、BT read-only helper、BT processing-path pending payload/clear/read/corruption/persist/missing-after-upsert logging 都已统一到共享 operational logging helper，并同步 STATUS/NEXT_STEP 当前真相。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
@@ -44,6 +44,6 @@
 
 ## After this step
 
-1. 若继续质量债，优先评估剩余 broad `except Exception` 中的 repo/SQLite 边界，或日志打印边界 / `main()` DI。
+1. 若继续质量债，优先评估剩余 broad `except Exception` 中的 repo/SQLite 边界，或继续收口剩余日志打印边界 / `main()` DI。
 2. 若候选属于外部网络、LLM、TMDB/search、webhook 或后台 loop 隔离边界，先判断是否应保留宽捕获，不要机械替换。
 3. 若用户明确切成人 BT，则先写成人 BT 缺口清单和 focused gate，再动功能代码。
