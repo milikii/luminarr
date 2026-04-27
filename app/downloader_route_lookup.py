@@ -148,6 +148,30 @@ def _resolve_lookup_client_for_task(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     operation: str,
 ) -> tuple[ResolvedDownloaderTaskRoute, TransmissionClient | QbittorrentClient]:
+    route = _require_downloader_task_route(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+        operation=operation,
+    )
+    client = _require_lookup_client_for_task(
+        downloader_name=route.downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        operation=operation,
+        task_ref=task_ref,
+    )
+    return route, client
+
+
+def _require_downloader_task_route(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    operation: str,
+) -> ResolvedDownloaderTaskRoute:
     route = _resolve_downloader_task_route(
         task_ref=task_ref,
         chat_id=chat_id,
@@ -155,15 +179,27 @@ def _resolve_lookup_client_for_task(
     )
     if route is None:
         raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
+    return route
+
+
+def _require_lookup_client_for_task(
+    *,
+    downloader_name: str,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+    operation: str,
+    task_ref: str,
+) -> TransmissionClient | QbittorrentClient:
     client = _resolve_downloader_client_for_lookup(
-        downloader_name=route.downloader_name,
+        downloader_name=downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if client is None:
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
-    return route, client
+    return client
 
 
 def _resolve_downloader_name_for_task(
