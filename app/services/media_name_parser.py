@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from app.operational_logging import emit_operational_log
+
 _CJK_RE = re.compile(r"[\u3400-\u9fff]")
 _SEASON_EPISODE_RE = re.compile(
     r"\bS(?P<season>\d{1,2})E(?P<episode>\d{1,3})(?:-(?P<episode_end>\d{1,3}))?\b",
@@ -113,11 +115,10 @@ def _load_naming_rules_cached(config_path: str) -> NamingRules:
     try:
         return _parse_naming_rules_yaml(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError, SyntaxError) as error:
-        print(
-            f"\033[31m[命名规则文件读取失败]\033[0m path={path} 错误={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 app/services/naming_rules.yml 缩进、引号和 aliases 列表格式；"
-            "当前会回退到内置最小规则，避免把解析链直接卡死。",
-            flush=True,
+        emit_operational_log(
+            title="命名规则文件读取失败",
+            detail=f"path={path} 错误={error}",
+            fix_hint="检查 app/services/naming_rules.yml 缩进、引号和 aliases 列表格式；当前会回退到内置最小规则，避免把解析链直接卡死。",
         )
         return _DEFAULT_NAMING_RULES
 
