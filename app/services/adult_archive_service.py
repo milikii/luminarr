@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import sqlite3
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -12,11 +13,12 @@ from app.db.adult_content_registry_repo import (
     ADULT_CONTENT_STATUS_ARCHIVED_DELETED,
     ADULT_CONTENT_STATUS_DOWNLOADING,
     ADULT_CONTENT_STATUS_PENDING,
+    AdultContentRegistryPersistenceError,
     AdultContentRegistryRecord,
     AdultContentRegistryRepo,
 )
 from app.db.download_monitor_repo import DownloadMonitorRecord
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.services.import_transfer_execution import _copy_import, _hardlink_import
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
@@ -107,21 +109,26 @@ class AdultArchiveService:
                     import_source_type_unsupported_text="成人资源源路径不是文件或目录，无法归档。",
                 )
 
-        self._job_event_repo.append_event(
-            task_ref=candidate.task_hash,
-            task_id=candidate.task_id,
-            task_hash=candidate.task_hash,
-            event_type="adult_archive.succeeded",
-            message=str(target_path),
-            source_path=str(source_path),
-            target_path=str(target_path),
-        )
-        self._registry_repo.mark_archived_present(
-            normalized_content_id=registry_record.normalized_content_id,
-            archive_path=str(target_path),
-            task_id=candidate.task_id,
-            task_hash=candidate.task_hash,
-        )
+        try:
+            self._job_event_repo.append_event(
+                task_ref=candidate.task_hash,
+                task_id=candidate.task_id,
+                task_hash=candidate.task_hash,
+                event_type="adult_archive.succeeded",
+                message=str(target_path),
+                source_path=str(source_path),
+                target_path=str(target_path),
+            )
+            self._registry_repo.mark_archived_present(
+                normalized_content_id=registry_record.normalized_content_id,
+                archive_path=str(target_path),
+                task_id=candidate.task_id,
+                task_hash=candidate.task_hash,
+            )
+        except (AdultContentRegistryPersistenceError, JobEventPersistenceError, sqlite3.Error) as error:
+            raise AdultArchiveStateUnavailableError(
+                f"adult archive state persist failed for {candidate.task_id}/{candidate.task_hash}: {error}"
+            ) from error
         return (
             f"成人资源归档成功：{registry_record.display_title or import_source.name}\n"
             f"任务 Hash: {candidate.task_hash}\n"
