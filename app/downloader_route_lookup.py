@@ -300,6 +300,23 @@ def resolve_downloader_dispatch_download_dir(
     return dispatch_download_dir
 
 
+def _resolve_route_host_download_dir(
+    *,
+    route: ResolvedDownloaderTaskRoute,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+) -> str:
+    host_download_dir = route.download_dir.strip()
+    if host_download_dir:
+        return host_download_dir
+    _, instance = _resolve_downloader_instance(
+        downloader_name=route.downloader_name,
+        downloader_instances_by_name=downloader_instances_by_name,
+    )
+    if instance is None:
+        return ""
+    return instance.download_dir.strip()
+
+
 async def _get_torrent_import_source_with_routing(
     *,
     task_ref: str,
@@ -321,14 +338,10 @@ async def _get_torrent_import_source_with_routing(
     import_source = await client.get_torrent_import_source(task_ref)
     if import_source is None:
         return None
-    host_download_dir = route.download_dir.strip()
-    if not host_download_dir:
-        _, instance = _resolve_downloader_instance(
-            downloader_name=route.downloader_name,
-            downloader_instances_by_name=downloader_instances_by_name,
-        )
-        if instance is not None:
-            host_download_dir = instance.download_dir.strip()
+    host_download_dir = _resolve_route_host_download_dir(
+        route=route,
+        downloader_instances_by_name=downloader_instances_by_name,
+    )
     if not host_download_dir or host_download_dir == import_source.download_dir:
         return import_source
     return TransmissionImportSource(
