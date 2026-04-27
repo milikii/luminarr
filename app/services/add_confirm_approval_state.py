@@ -9,6 +9,7 @@ from app.db.approval_repo import (
     ApprovalPersistenceError,
     ApprovalRepo,
 )
+from app.operational_logging import emit_operational_log
 
 PENDING_LEASE_LOOKUP_FAILED = -1
 DOWNLOADER_PENDING_EXPIRY_RESULT_MISSING_REASON = "approval_record missing during pending expiry check"
@@ -58,9 +59,10 @@ class AddConfirmApprovalState:
         try:
             approval_record = self.approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
         except (ApprovalPersistenceError, sqlite3.Error) as error:
-            print(
-                f"\033[31m[下载待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前调用会按状态读取失败处理，避免把持久化真相异常继续混成进程内版号兜底。",
-                flush=True,
+            emit_operational_log(
+                title="下载待确认版号查询失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表查询是否正常；当前调用会按状态读取失败处理，避免把持久化真相异常继续混成进程内版号兜底。",
             )
             if not allow_in_memory_fallback_on_error:
                 return PENDING_LEASE_LOOKUP_FAILED
@@ -69,9 +71,10 @@ class AddConfirmApprovalState:
             return self.pending_add_lease_versions.get(identity, 1)
         if approval_record is None:
             if identity in self.pending_add_identities:
-                print(
-                    f"\033[31m[下载待确认版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误=approval_record missing while in-memory pending exists\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前调用会按状态读取失败处理，避免把审批真相缺口继续混成进程内版号兜底。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载待确认版号查询失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误=approval_record missing while in-memory pending exists",
+                    fix_hint="检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前调用会按状态读取失败处理，避免把审批真相缺口继续混成进程内版号兜底。",
                 )
                 if not allow_in_memory_fallback_on_error:
                     return PENDING_LEASE_LOOKUP_FAILED
@@ -90,20 +93,23 @@ class AddConfirmApprovalState:
             approval_record = self.approval_repo.get_downloader_approval(task_id=task_id, task_hash=task_hash)
         except (ApprovalPersistenceError, sqlite3.Error) as error:
             if str(error) in APPROVAL_ROW_CORRUPTED_REASONS:
-                print(
-                    f"\033[31m[下载确认执行版号记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通没有待确认下载。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载确认执行版号记录损坏",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 approval_record 里的 status / lease_version / executed_version 等字段是否仍是完整真相；当前 confirm 会直接返回状态读取失败，避免把坏审批记录误判成普通没有待确认下载。",
                 )
             else:
-                print(
-                    f"\033[31m[下载确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认下载。",
-                    flush=True,
+                emit_operational_log(
+                    title="下载确认执行版号查询失败",
+                    detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                    fix_hint="检查 SQLite/approval_record 表查询是否正常；当前 confirm 会直接返回状态读取失败，避免把持久化异常误判成普通没有待确认下载。",
                 )
             return self.add_confirm_state_unavailable_text
         if approval_record is None:
-            print(
-                f"\033[31m[下载确认执行版号查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误=approval_record missing during stale check\n\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通没有待确认下载。",
-                flush=True,
+            emit_operational_log(
+                title="下载确认执行版号查询失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误=approval_record missing during stale check",
+                fix_hint="检查 SQLite/approval_record 表里的待确认下载审批是否仍存在；当前 confirm 会直接返回状态读取失败，避免把审批真相缺口误判成普通没有待确认下载。",
             )
             return self.add_confirm_state_unavailable_text
         if approval_record.lease_version <= 0:
