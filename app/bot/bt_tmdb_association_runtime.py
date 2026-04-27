@@ -27,7 +27,7 @@ from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
     BtPendingPersistenceError,
 )
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.add_to_downloader import BT_SOURCE_UNSUPPORTED_TEXT, AddToDownloaderService
 from app.services.search_request_context import parse_movie_query
 
@@ -102,13 +102,10 @@ def resolve_bt_tmdb_candidates_lookup(
 
 
 def log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
-    print(
-        format_operational_log_message(
-            title="BT TMDB 关联失败",
-            detail=f"类型={media_kind} 查询={query} 原因={error}",
-            fix_hint="检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。",
-        ),
-        flush=True,
+    emit_operational_log(
+        title="BT TMDB 关联失败",
+        detail=f"类型={media_kind} 查询={query} 原因={error}",
+        fix_hint="检查 TMDB_API_KEY、TMDB_BASE_URL 和网络连通性后重试。",
     )
 
 
