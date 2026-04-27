@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sqlite3
+
 from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
@@ -14,6 +16,10 @@ DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON = "download monitor observed rec
 DOWNLOAD_MONITOR_STATUS_UPSERT_RESULT_MISSING_REASON = "download monitor state missing after status upsert"
 DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON = "download monitor completion flag missing"
 DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON = "job_event missing after append"
+
+
+class StatusFollowUpStateError(RuntimeError):
+    pass
 
 
 class StatusFollowUpRecorder:
@@ -34,13 +40,13 @@ class StatusFollowUpRecorder:
         try:
             update = self._download_monitor_repo.record_status(task_status)
             if update is None:
-                raise RuntimeError(DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON)
+                raise StatusFollowUpStateError(DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON)
             if getattr(update, "record", None) is None:
-                raise RuntimeError(DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON)
+                raise StatusFollowUpStateError(DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON)
             newly_completed = getattr(update, "newly_completed", None)
             if not isinstance(newly_completed, bool):
-                raise RuntimeError(DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON)
-        except Exception as error:
+                raise StatusFollowUpStateError(DOWNLOAD_MONITOR_COMPLETION_FLAG_MISSING_REASON)
+        except (DownloadMonitorPersistenceError, sqlite3.Error, StatusFollowUpStateError) as error:
             if str(error) in {
                 DOWNLOAD_MONITOR_STATUS_RESULT_MISSING_REASON,
                 DOWNLOAD_MONITOR_OBSERVED_RECORD_MISSING_REASON,
