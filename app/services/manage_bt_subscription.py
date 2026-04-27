@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
@@ -775,12 +775,10 @@ def _log_bt_subscription_scan_error(
     query: str,
     error: Exception,
 ) -> None:
-    print(
-        format_operational_log_message(
-            title="BT 订阅扫描失败",
-            detail=f"条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}",
-            fix_hint="检查 Prowlarr 地址、API Key 和网络连通性后重试。",
-        )
+    _print_bt_subscription_issue(
+        title="BT 订阅扫描失败",
+        context=f"条目ID={item.item_id} 类型={item.media_kind} 查询={query} 原因={error}",
+        fix_hint="检查 Prowlarr 地址、API Key 和网络连通性后重试。",
     )
 
 
@@ -857,48 +855,50 @@ def _log_bt_subscription_list_row_corrupted(*, chat_id: int, reason: str) -> Non
 
 
 def _log_bt_subscription_remove_failed(*, chat_id: int, item_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅删除失败]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。"
+    _print_bt_subscription_issue(
+        title="BT 订阅删除失败",
+        context=f"chat_id={chat_id} item_id={item_id} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。",
     )
 
 
 def _log_bt_subscription_remove_result_missing(*, chat_id: int, item_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅删除结果缺失]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 删除查询返回是否仍带有完整结果；"
-        "当前会按删除失败处理，避免把缺失真相误判成“条目不存在”。"
+    _print_bt_subscription_issue(
+        title="BT 订阅删除结果缺失",
+        context=f"chat_id={chat_id} item_id={item_id} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 删除查询返回是否仍带有完整结果；当前会按删除失败处理，避免把缺失真相误判成“条目不存在”。",
     )
 
 
 def _log_bt_subscription_remove_row_corrupted(*, chat_id: int, item_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅删除命中坏记录]\033[0m chat_id={chat_id} item_id={item_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按删除失败处理，避免把损坏记录误判成可正常删除或“条目不存在”。"
+    _print_bt_subscription_issue(
+        title="BT 订阅删除命中坏记录",
+        context=f"chat_id={chat_id} item_id={item_id} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按删除失败处理，避免把损坏记录误判成可正常删除或“条目不存在”。",
     )
 
 
 def _log_bt_subscription_clear_failed(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅清单清空失败]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表是否正常。"
+    _print_bt_subscription_issue(
+        title="BT 订阅清单清空失败",
+        context=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写，以及 bt_subscription_item 表是否正常。",
     )
 
 
 def _log_bt_subscription_clear_result_missing(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅清单清空结果缺失]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 清空查询返回是否仍带有完整结果；"
-        "当前会按清空失败处理，避免把缺失真相误判成“清单本来就是空的”。"
+    _print_bt_subscription_issue(
+        title="BT 订阅清单清空结果缺失",
+        context=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 清空查询返回是否仍带有完整结果；当前会按清空失败处理，避免把缺失真相误判成“清单本来就是空的”。",
     )
 
 
 def _log_bt_subscription_clear_row_corrupted(*, chat_id: int, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅清单清空命中坏记录]\033[0m chat_id={chat_id} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按清空失败处理，避免把损坏记录误判成可正常清空或“清单本来就是空的”。"
+    _print_bt_subscription_issue(
+        title="BT 订阅清单清空命中坏记录",
+        context=f"chat_id={chat_id} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按清空失败处理，避免把损坏记录误判成可正常清空或“清单本来就是空的”。",
     )
 
 
@@ -910,10 +910,10 @@ def _log_bt_subscription_add_failed(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅写入失败]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。"
+    _print_bt_subscription_issue(
+        title="BT 订阅写入失败",
+        context=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写，以及 bt_subscription_item 表和当前条目是否正常。",
     )
 
 
@@ -925,11 +925,10 @@ def _log_bt_subscription_add_result_missing(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅写入结果缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 插入查询返回是否仍带有完整结果；"
-        "当前会按写入失败处理，避免把缺失真相误判成“已成功添加”。"
+    _print_bt_subscription_issue(
+        title="BT 订阅写入结果缺失",
+        context=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 插入查询返回是否仍带有完整结果；当前会按写入失败处理，避免把缺失真相误判成“已成功添加”。",
     )
 
 
@@ -941,11 +940,10 @@ def _log_bt_subscription_add_item_missing_after_insert(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅写入后条目缺失]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表是否被并发删除或触发器回滚；"
-        "如需继续添加，请先确认 SQLite 写入后能立即回读该条目。"
+    _print_bt_subscription_issue(
+        title="BT 订阅写入后条目缺失",
+        context=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 表是否被并发删除或触发器回滚；如需继续添加，请先确认 SQLite 写入后能立即回读该条目。",
     )
 
 
@@ -957,11 +955,10 @@ def _log_bt_subscription_add_row_corrupted(
     media_kind: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅写入命中坏记录]\033[0m chat_id={chat_id} title={title} year={year or '-'} "
-        f"media_kind={media_kind} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会按写入失败处理，避免把损坏记录误判成可复用旧条目或成功新建条目。"
+    _print_bt_subscription_issue(
+        title="BT 订阅写入命中坏记录",
+        context=f"chat_id={chat_id} title={title} year={year or '-'} media_kind={media_kind} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按写入失败处理，避免把损坏记录误判成可复用旧条目或成功新建条目。",
     )
 
 
@@ -973,10 +970,10 @@ def _log_bt_subscription_last_seen_update_failed(
     title: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅最近资源回写失败]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
-        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。"
+    _print_bt_subscription_issue(
+        title="BT 订阅最近资源回写失败",
+        context=f"chat_id={chat_id} 条目ID={item.item_id} 类型={item.media_kind} source={source} title={title} 原因={reason}",
+        fix_hint="检查 SQLite 是否可写、订阅条目是否仍存在，然后重新执行 btsub run。",
     )
 
 
@@ -988,10 +985,10 @@ def _log_bt_subscription_last_seen_item_missing(
     title: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅最近资源回写条目缺失]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
-        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查该订阅条目是否已被删除；如仍需继续追踪，请重新添加后再执行 btsub run。"
+    _print_bt_subscription_issue(
+        title="BT 订阅最近资源回写条目缺失",
+        context=f"chat_id={chat_id} 条目ID={item.item_id} 类型={item.media_kind} source={source} title={title} 原因={reason}",
+        fix_hint="检查该订阅条目是否已被删除；如仍需继续追踪，请重新添加后再执行 btsub run。",
     )
 
 
@@ -1003,11 +1000,10 @@ def _log_bt_subscription_last_seen_result_missing(
     title: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅最近资源回写结果缺失]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
-        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 更新返回是否仍带有明确结果；"
-        "当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把持久化缺口误判成普通成功。"
+    _print_bt_subscription_issue(
+        title="BT 订阅最近资源回写结果缺失",
+        context=f"chat_id={chat_id} 条目ID={item.item_id} 类型={item.media_kind} source={source} title={title} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 更新返回是否仍带有明确结果；当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把持久化缺口误判成普通成功。",
     )
 
 
@@ -1019,11 +1015,10 @@ def _log_bt_subscription_last_seen_row_corrupted(
     title: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅最近资源回写命中坏记录]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
-        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；"
-        "当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把损坏记录误判成普通回写失败。"
+    _print_bt_subscription_issue(
+        title="BT 订阅最近资源回写命中坏记录",
+        context=f"chat_id={chat_id} 条目ID={item.item_id} 类型={item.media_kind} source={source} title={title} 原因={reason}",
+        fix_hint="检查 bt_subscription_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会保留已创建的下载待确认，并提示最近资源真相未更新，避免把损坏记录误判成普通回写失败。",
     )
 
 
@@ -1035,15 +1030,15 @@ def _log_bt_subscription_pending_creation_failed(
     title: str,
     reason: str,
 ) -> None:
-    print(
-        f"\033[31m[BT 订阅待确认创建失败]\033[0m chat_id={chat_id} 条目ID={item.item_id} "
-        f"类型={item.media_kind} source={source} title={title} 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。"
+    _print_bt_subscription_issue(
+        title="BT 订阅待确认创建失败",
+        context=f"chat_id={chat_id} 条目ID={item.item_id} 类型={item.media_kind} source={source} title={title} 原因={reason}",
+        fix_hint="检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。",
     )
 
 
 def _print_bt_subscription_issue(*, title: str, context: str, fix_hint: str) -> None:
-    print(f"\033[31m[{title}]\033[0m {context}\n\033[33m[处理建议]\033[0m {fix_hint}")
+    emit_operational_log(title=title, detail=context, fix_hint=fix_hint)
 
 
 def _is_bt_subscription_item_row_corrupted_reason(reason: str) -> bool:
