@@ -5,6 +5,8 @@ import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+import httpx
+
 from app.clients.transmission import TransmissionTask
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
@@ -61,7 +63,7 @@ class AddExecutionFollowUpService:
     ) -> AddExecutionOutcome:
         try:
             task = await self._invoke_add_torrent(pending_add)
-        except (JobEventPersistenceError, sqlite3.Error) as error:
+        except (RuntimeError, httpx.HTTPError) as error:
             self._log_dispatch_error(pending_add=pending_add, error=error)
             self.record_event(
                 task_ref=task_ref,

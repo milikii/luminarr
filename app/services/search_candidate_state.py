@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.db.candidate_repo import CandidateMappingRepo, CandidatePayloadCorruptionError, CandidatePersistenceError
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 
 CANDIDATE_COUNT_RESULT_MISSING_AFTER_SAVE_REASON = "candidate_mapping count missing after query"
 CANDIDATE_COUNT_MISMATCH_AFTER_SAVE_REASON = "candidate_mapping count mismatch after save"
@@ -15,14 +15,7 @@ CANDIDATE_CLEAR_RESULT_MISSING_DURING_ROLLBACK_REASON = "candidate clear result 
 
 
 def _log_candidate_state_error(*, title: str, detail: str, fix_hint: str) -> None:
-    print(
-        format_operational_log_message(
-            title=title,
-            detail=detail,
-            fix_hint=fix_hint,
-        ),
-        flush=True,
-    )
+    emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
 
 
 @dataclass(frozen=True, slots=True)

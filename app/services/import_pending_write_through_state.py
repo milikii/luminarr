@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import ApprovalPersistenceError, ApprovalRepo
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 
 LogTraceFunc = Callable[..., None]
 RecordImportEventFunc = Callable[..., None]
@@ -102,11 +102,8 @@ class ImportPendingWriteThroughState:
                 expected_lease_version=expected_lease_version,
             )
         except (ApprovalPersistenceError, sqlite3.Error) as error:
-            print(
-                format_operational_log_message(
-                    title="导入取消审批更新失败",
-                    detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
-                    fix_hint="检查 SQLite/approval_record 表更新是否正常；当前导入待确认创建会直接失败返回，但审批真相可能仍残留。",
-                ),
-                flush=True,
+            emit_operational_log(
+                title="导入取消审批更新失败",
+                detail=f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} lease_version={expected_lease_version} 错误={error}",
+                fix_hint="检查 SQLite/approval_record 表更新是否正常；当前导入待确认创建会直接失败返回，但审批真相可能仍残留。",
             )

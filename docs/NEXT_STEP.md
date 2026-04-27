@@ -1,16 +1,18 @@
-# Next step (v393)
+# Next step (v394)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环：把 `import_confirmed_media_identity`、`import_confirm_context_guard`、`add_confirm_context_state`、`add_confirm_job_state`、`import_cancel_state`、`import_confirm_expiry_state`、`import_job_state`、`add_pending_context`、`add_confirm_approval_state`、`import_approval_state` 的手写 ANSI 日志统一到 shared `emit_operational_log` 边界。
-- focused tests 已覆盖本轮触及的导入/下载审批边界；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/BT 主线语义不变。
+- 本轮已完成 10 个最小闭环：把 `import_pending_write_through_state`、`add_pending_presence_state`、`refresh_media_server`、`import_prepare_state`、`search_candidate_state`、`search_clarification_state`、`bt_sources`、`import_post_processing`、`search_media`、`bt_read_only_display` 的手写 ANSI 日志统一到 shared `emit_operational_log` 边界。
+- 本轮还修复了 `confirm add` 的下载器投递失败边界：`add_torrent_func` 的运行时 / HTTP 错误现在返回既有失败文本，并走既有审批回退，不再泄出异常。
+- focused tests 已覆盖本轮触及的日志路径和 downloader dispatch 失败路径；`tests/test_add_to_downloader.py`、`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/BT 主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码、search/web/BT 展示、candidate/clarification、Telegram delivery/update、import pending/approval/event 等异常边界已持续收口。
+  - import pending write-through、add pending presence、refresh、import prepare/post-processing、BT sources、BT read-only display 的日志出口已统一到 shared operational logging。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
   - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
@@ -37,7 +39,7 @@
 
 ## Done when
 
-1. 这一轮选中的质量债闭环有明确 diff、focused tests 和文档同步。
+1. 下一轮选中的质量债闭环有明确 diff、focused tests 和文档同步。
 2. `make quality` 通过。
 3. `make verify-mainline` 通过。
 4. 已收掉的小 support 文件不回归。

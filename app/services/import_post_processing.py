@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScrapeResult
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslateResult
 
@@ -200,33 +200,24 @@ def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
 
 
 def _log_import_metadata_scrape_failed(*, message: str) -> None:
-    print(
-        format_operational_log_message(
-            title="元数据刮削失败",
-            detail=message,
-            fix_hint="检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
-        ),
-        flush=True,
+    emit_operational_log(
+        title="元数据刮削失败",
+        detail=message,
+        fix_hint="检查 TMDB/Fanart 配置和网络，再重试 confirm 导入。",
     )
 
 
 def _log_import_subtitle_translate_failed(*, message: str, fix_hint: str) -> None:
-    print(
-        format_operational_log_message(
-            title="字幕翻译失败",
-            detail=message,
-            fix_hint=fix_hint,
-        ),
-        flush=True,
+    emit_operational_log(
+        title="字幕翻译失败",
+        detail=message,
+        fix_hint=fix_hint,
     )
 
 
 def _log_import_refresh_failed(*, request: ImportPostProcessRequest, reason: str) -> None:
-    print(
-        format_operational_log_message(
-            title="媒体库刷新失败",
-            detail=f"task_ref={request.task_ref} task_id={request.task_id} task_hash={request.task_hash} 错误={reason}",
-            fix_hint="检查媒体服务器地址、API Key 和网络连通性；当前导入成功不会回滚，但刷新结果会按失败文本返回。",
-        ),
-        flush=True,
+    emit_operational_log(
+        title="媒体库刷新失败",
+        detail=f"task_ref={request.task_ref} task_id={request.task_id} task_hash={request.task_hash} 错误={reason}",
+        fix_hint="检查媒体服务器地址、API Key 和网络连通性；当前导入成功不会回滚，但刷新结果会按失败文本返回。",
     )

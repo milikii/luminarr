@@ -18,7 +18,7 @@ from app.services import search_reply_formatter
 from app.services.search_ambiguity_helper import format_ambiguous_clarification
 from app.services.search_media_bt_ordering import order_media_bt_results
 from app.services.media_identity import build_media_identity_from_tmdb_movie, normalize_media_identity_payload
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.search_reply_formatter import (
     format_bt_batch_preview_reply,
     format_bt_batch_preview_selection_label,
@@ -110,13 +110,10 @@ async def search_raw_page_candidates(
     except UnsupportedBatchPreviewPageUrl:
         raise
     except Exception as error:
-        print(
-            format_operational_log_message(
-                title="BT 页面预览失败",
-                detail=f"页面={cleaned_page_url} 错误={error}",
-                fix_hint="检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
-            ),
-            flush=True,
+        emit_operational_log(
+            title="BT 页面预览失败",
+            detail=f"页面={cleaned_page_url} 错误={error}",
+            fix_hint="检查页面 URL 是否仍在 allowlist 内、站点是否可达，以及 HTML 结构是否变化后重试。",
         )
         raise
     return tuple(prepare_raw_candidates(raw_results, query=cleaned_page_url))
@@ -156,13 +153,10 @@ class SearchMediaService:
         try:
             raw_results = await self._raw_search_func(cleaned_query)
         except Exception as error:
-            print(
-                format_operational_log_message(
-                    title="BT 只读搜索失败",
-                    detail=f"query={cleaned_query} 错误={error}",
-                    fix_hint="检查 BT 搜索源、代理和网络连通性；当前只读探索没有拿到结果，且这不是正常的“无候选”状态。",
-                ),
-                flush=True,
+            emit_operational_log(
+                title="BT 只读搜索失败",
+                detail=f"query={cleaned_query} 错误={error}",
+                fix_hint="检查 BT 搜索源、代理和网络连通性；当前只读探索没有拿到结果，且这不是正常的“无候选”状态。",
             )
             raise
         return tuple(self._bt_read_only_display.prepare_raw_candidates(raw_results, query=cleaned_query))

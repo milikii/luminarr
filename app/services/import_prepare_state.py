@@ -11,7 +11,7 @@ from app.clients.qbittorrent import QbittorrentError
 from app.clients.transmission import TransmissionError, TransmissionImportSource
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.downloader_route_lookup import DownloaderRouteLookupError
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.import_transfer_execution import PreparedImport
 from app.services.media_name_parser import parse_media_name
 
@@ -20,14 +20,7 @@ RecordImportEventFunc = Callable[..., None]
 
 
 def _log_import_prepare_error(*, title: str, detail: str, fix_hint: str) -> None:
-    print(
-        format_operational_log_message(
-            title=title,
-            detail=detail,
-            fix_hint=fix_hint,
-        ),
-        flush=True,
-    )
+    emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
 
 
 class ImportPrepareState:
@@ -374,29 +367,35 @@ def _sanitize_target_component(value: str) -> str:
 
 
 def _log_import_naming_truth_query_failed(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入命名真相查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；"
-        "当前导入会退回下载源名称做命名，文件名可能缺少 downloader 已确认的标题真相。",
-        flush=True,
+    emit_operational_log(
+        title="导入命名真相查询失败",
+        detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+        fix_hint=(
+            "检查 SQLite/job_event 表读取是否正常；"
+            "当前导入会退回下载源名称做命名，文件名可能缺少 downloader 已确认的标题真相。"
+        ),
     )
 
 
 def _log_import_naming_truth_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入命名真相结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
-        "当前导入会退回下载源名称做命名，避免把缺失真相误判成“没有 downloader 标题”。",
-        flush=True,
+    emit_operational_log(
+        title="导入命名真相结果缺失",
+        detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+        fix_hint=(
+            "检查 job_event 查询返回是否仍带有完整结果；"
+            "当前导入会退回下载源名称做命名，避免把缺失真相误判成“没有 downloader 标题”。"
+        ),
     )
 
 
 def _log_import_naming_truth_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[导入命名真相记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 里的 task_ref / event_type / message 等命名真相字段是否仍是完整记录；"
-        "当前导入会退回下载源名称做命名，避免把坏记录混成普通查询失败。",
-        flush=True,
+    emit_operational_log(
+        title="导入命名真相记录损坏",
+        detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+        fix_hint=(
+            "检查 job_event 里的 task_ref / event_type / message 等命名真相字段是否仍是完整记录；"
+            "当前导入会退回下载源名称做命名，避免把坏记录混成普通查询失败。"
+        ),
     )
 
 
