@@ -7,7 +7,7 @@ import pytest
 from telegram.error import NetworkError
 
 from app.downloader_route_lookup import DownloaderRouteLookupError, _resolve_downloader_task_route
-from app.downloader_route_lookup import _resolve_downloader_client_for_lookup
+from app.downloader_route_lookup import _resolve_lookup_client_for_task
 from app.main import (
     _build_refresh_media_server_func,
     _get_torrent_import_source_with_routing,
@@ -83,34 +83,48 @@ def test_resolve_downloader_name_for_task_logs_payload_corruption(
     assert "[处理建议]" in captured.out
 
 
-def test_resolve_downloader_client_for_lookup_returns_none_for_unknown_instance(
+def test_resolve_downloader_client_for_lookup_raises_for_unknown_instance(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    known_client = object()
-    assert _resolve_downloader_client_for_lookup(
-        downloader_name="missing",
-        downloader_instances_by_name={},
-        transmission_clients_by_name={},
-        qbittorrent_clients_by_name={},
-    ) is None
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json='{"downloader_name":"missing"}'),
+    )
+
+    with pytest.raises(DownloaderRouteLookupError, match="downloader client unavailable for import task: 87"):
+        asyncio.run(
+            _resolve_lookup_client_for_task(
+                task_ref="87",
+                chat_id=1001,
+                job_repo=job_repo,
+                downloader_instances_by_name={},
+                transmission_clients_by_name={},
+                qbittorrent_clients_by_name={},
+                operation="import",
+            )
+        )
+
     captured = capsys.readouterr()
     assert "[下载器实例不存在]" in captured.out
     assert "[处理建议]" in captured.out
-    assert _resolve_downloader_client_for_lookup(
-        downloader_name="pt-main",
-        downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
-        transmission_clients_by_name={"pt-main": known_client},
-        qbittorrent_clients_by_name={},
-    ) is known_client
 
 
 def test_resolve_downloader_client_for_lookup_logs_missing_client(capsys: pytest.CaptureFixture[str]) -> None:
-    assert _resolve_downloader_client_for_lookup(
-        downloader_name="pt-main",
-        downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
-        transmission_clients_by_name={},
-        qbittorrent_clients_by_name={},
-    ) is None
+    job_repo = SimpleNamespace(
+        get_downloader_job_for_chat_ref=lambda **_: SimpleNamespace(payload_json='{"downloader_name":"pt-main"}'),
+    )
+
+    with pytest.raises(DownloaderRouteLookupError, match="downloader client unavailable for import task: 87"):
+        asyncio.run(
+            _resolve_lookup_client_for_task(
+                task_ref="87",
+                chat_id=1001,
+                job_repo=job_repo,
+                downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+                transmission_clients_by_name={},
+                qbittorrent_clients_by_name={},
+                operation="import",
+            )
+        )
 
     captured = capsys.readouterr()
     assert "[下载器客户端未配置]" in captured.out

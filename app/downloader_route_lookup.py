@@ -47,23 +47,6 @@ def _print_downloader_issue_log(
     )
 
 
-def _load_downloader_route_payload(payload_json: str) -> tuple[dict[str, object] | None, str | None]:
-    cleaned_payload = payload_json.strip()
-    if not cleaned_payload:
-        return None, "payload_json empty"
-    try:
-        payload = json.loads(cleaned_payload)
-    except json.JSONDecodeError:
-        return None, "payload_json invalid json"
-    if not isinstance(payload, dict):
-        return None, "payload_json not object"
-    return payload, None
-
-
-def _payload_string(payload: dict[str, object], key: str) -> str:
-    return str(payload.get(key, "")).strip()
-
-
 def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
     _print_downloader_issue_log(
         title="下载器路由未命中",
@@ -119,16 +102,32 @@ def _resolve_downloader_task_route(
     if downloader_job is None:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader job missing")
         return None
-    payload, payload_problem = _load_downloader_route_payload(downloader_job.payload_json)
-    if payload is None:
+    cleaned_payload = downloader_job.payload_json.strip()
+    if not cleaned_payload:
         _log_downloader_route_payload_corruption(
             task_ref=task_ref,
             chat_id=chat_id,
-            reason=payload_problem or "payload_json invalid",
+            reason="payload_json empty",
         )
         return None
-    downloader_name = _payload_string(payload, "downloader_name")
-    download_dir = _payload_string(payload, "download_dir")
+    try:
+        payload = json.loads(cleaned_payload)
+    except json.JSONDecodeError:
+        _log_downloader_route_payload_corruption(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            reason="payload_json invalid json",
+        )
+        return None
+    if not isinstance(payload, dict):
+        _log_downloader_route_payload_corruption(
+            task_ref=task_ref,
+            chat_id=chat_id,
+            reason="payload_json not object",
+        )
+        return None
+    downloader_name = str(payload.get("downloader_name", "")).strip()
+    download_dir = str(payload.get("download_dir", "")).strip()
     if not downloader_name:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
         return None
@@ -155,37 +154,22 @@ def _resolve_lookup_client_for_task(
     )
     if route is None:
         raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
-    client = _resolve_downloader_client_for_lookup(
+    cleaned_name, instance, client = _resolve_downloader_client_candidate(
         downloader_name=route.downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
         transmission_clients_by_name=transmission_clients_by_name,
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
+    if instance is None:
+        _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
+        raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     if client is None:
+        _log_downloader_client_not_configured(
+            downloader_name=cleaned_name or "-",
+            downloader_type=instance.downloader_type,
+        )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     return route, client
-
-
-def _resolve_lookup_only_client_for_task(
-    *,
-    task_ref: str,
-    chat_id: int | None,
-    job_repo: JobRepo,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-    transmission_clients_by_name: dict[str, TransmissionClient],
-    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
-    operation: str,
-) -> TransmissionClient | QbittorrentClient:
-    _, client = _resolve_lookup_client_for_task(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        job_repo=job_repo,
-        downloader_instances_by_name=downloader_instances_by_name,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
-        operation=operation,
-    )
-    return client
 
 
 def _log_downloader_instance_missing(*, downloader_name: str) -> None:
@@ -251,31 +235,6 @@ def _resolve_downloader_client_candidate(
     if client is None:
         return cleaned_name, instance, None
     return cleaned_name, instance, client
-
-
-def _resolve_downloader_client_for_lookup(
-    *,
-    downloader_name: str,
-    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
-    transmission_clients_by_name: dict[str, TransmissionClient],
-    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
-) -> TransmissionClient | QbittorrentClient | None:
-    cleaned_name, instance, client = _resolve_downloader_client_candidate(
-        downloader_name=downloader_name,
-        downloader_instances_by_name=downloader_instances_by_name,
-        transmission_clients_by_name=transmission_clients_by_name,
-        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
-    )
-    if instance is None:
-        _log_downloader_instance_missing(downloader_name=cleaned_name or "-")
-        return None
-    if client is None:
-        _log_downloader_client_not_configured(
-            downloader_name=cleaned_name or "-",
-            downloader_type=instance.downloader_type,
-        )
-        return None
-    return client
 
 
 def _resolve_downloader_client_for_dispatch(
@@ -381,7 +340,7 @@ async def _get_torrent_status_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionTaskStatus | None:
-    client = _resolve_lookup_only_client_for_task(
+    _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
@@ -403,7 +362,7 @@ async def _remove_torrent_with_routing(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     delete_local_data: bool,
 ) -> None:
-    client = _resolve_lookup_only_client_for_task(
+    _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,

@@ -19,9 +19,9 @@
   - `app/bot/private_chat_runtime.py` 当前 `476` 行，`app/bot/telegram_bot.py` 当前 `220` 行，不回退
   - cleanup 链当前已不再保留 `cleanup_*_support.py` 文件；相关逻辑已经收回 `cleanup_downloaded_source.py`、`cleanup_correlation_lookup.py` 和 `adult_archive_service.py`
   - `app/services/workflow_trace_logger.py` 已落地；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件
-  - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/main.py`、`app/bot/telegram_bot.py`、`app/bot/personal_wechat_login.py`、`app/bot/personal_wechat_text.py` 和 `app/db/__init__.py` 的无消费者 `__all__` 纯导出列表也已删掉
+  - `app/main.py` 里的残余 downloader client 本地死壳已删掉；`_COMPAT_REEXPORTS` 继续保持删除态，不再回收；`app/bot/personal_wechat_login.py` 与 `app/bot/personal_wechat_text.py` 的无消费者 `__all__` 纯导出列表也已删掉；`app/db/__init__.py` 的死 re-export 已清掉，`app/bot/telegram_bot.py` 保留显式公共 `__all__` 边界以维持 quality gate
   - `app/config.py` 当前 `457` 行，`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory
-- `app/downloader_route_lookup.py` 当前 `415` 行；task/downloader 日志上下文、payload JSON 解析、payload 字段读取、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，剩余候选应继续限制在单消费者薄壳或 route 死壳
+- `app/downloader_route_lookup.py` 当前 `374` 行；task/downloader 日志上下文、payload JSON 解析、lookup route/client 抛错、status/remove client-only 序幕、import host `download_dir` 回填和 import source `download_dir` 重建都已共享化，lookup 侧的二次中转 helper 也已收掉；剩余候选应继续限制在单消费者薄壳或 route 死壳
 
 ## User value
 
@@ -35,7 +35,7 @@
   - `_log_*` 函数继续优先复用共享打印器
   - 实例查找 + client 选择继续优先复用纯解析 helper
   - 3 个路由函数里可提取的公共序幕
-  - import host `download_dir` 回填与 route/client require helper 的剩余单消费者薄壳
+  - import host `download_dir` 回填与 dispatch/download_dir 分流边界上的剩余单消费者薄壳
   - 不改变现有错误文本、路由语义或导入/状态协议
 - 每轮仍只做一个最小闭环；同步补对应 focused tests、`docs/STATUS.md`、`docs/NEXT_STEP.md` 和相关主线文档。
 - 继续保持当前 downloader / 搜索 / 导入 / 成人 BT / 验证入口已收口真相与文档一致。

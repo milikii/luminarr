@@ -11,9 +11,9 @@
 - `search_media.py` 已降到 `288` 行，歧义澄清 / media-BT 排序 / batch preview 页面支持 helper 都已抽出；`import_to_library.py` 当前 `590` 行，经 focused gate + pyflakes 复核后继续保持 proof-like orchestration 冻结态。
 - `cleanup_correlation_lookup.py` 已收回 task identity、correlation lookup、correlation logging 全部薄壳；`cleanup_downloaded_source.py` 已收回 inspect / path guard / query / event / flow / blocked / execution / follow-up / seed-guard / logging / 资产删除 全部薄壳；`adult_archive_service.py` 也不再依赖 cleanup 资产删除 helper。`cleanup_*_support.py` 当前为 `0` 个。
 - `app/services/workflow_trace_logger.py` 已落地为共享 workflow trace logger；`AddToDownloaderService` 与 `ImportToLibraryService` 都已直接改用共享实现，不再保留 workflow 专属 trace logger 文件。
-- `app/main.py` 里的 downloader client 本地死壳已删掉；`app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 也已删除；`app/main.py`、`app/bot/telegram_bot.py`、`app/bot/personal_wechat_login.py`、`app/bot/personal_wechat_text.py` 和 `app/db/__init__.py` 的无消费者 `__all__` 纯导出列表也已清掉，功能测试继续通过，不影响现有直接导入形状。
+- `app/main.py` 里的 downloader client 本地死壳已删掉；`app/main.py` 与 `app/bot/telegram_bot.py` 的 `_COMPAT_REEXPORTS` 也已删除；`app/bot/personal_wechat_login.py` 与 `app/bot/personal_wechat_text.py` 的无消费者 `__all__` 纯导出列表继续保持删除态，`app/db/__init__.py` 的死 re-export 已清掉，`app/bot/telegram_bot.py` 当前改为显式公共 `__all__` 边界以维持 pyflakes 绿灯，功能测试继续通过，不影响现有直接导入形状。
 - `app/config.py` 当前 `457` 行；`RAW_BT_DESTINATIONS`、`ADULT_ARCHIVE_DESTINATIONS`、`DOWNLOADER_INSTANCES` 已共用分条/分段解析 helper，`RAW_BT_DESTINATIONS` / `ADULT_ARCHIVE_DESTINATIONS` 现已共用 labelled destination record factory，当前不再继续在这条边界上做重复壳。
-- `app/downloader_route_lookup.py` 当前 `415` 行；task/downloader 日志上下文、payload JSON 解析、payload 字段读取、lookup route/client 抛错、status/remove 的 client-only 序幕、import host download_dir 回填和 import source `download_dir` 重建都已收成共享 helper，不改错误文本、路由语义或导入/状态协议。
+- `app/downloader_route_lookup.py` 当前 `374` 行；task/downloader 日志上下文、payload JSON 解析、lookup route/client 抛错、status/remove 的 client-only 序幕、import host download_dir 回填和 import source `download_dir` 重建都已收成共享 helper，lookup 侧的二次中转 helper 已继续收掉，不改错误文本、路由语义或导入/状态协议。
 - `docs/TEST_ENV.md` 与 `tmp_tests/` 已按“彻底不用后删”退出活跃仓库真相；当前活跃 `docs/` 根目录 Markdown 为 `15` 个。
 
 ## Current health
@@ -40,6 +40,7 @@
 - `tests/test_cleanup_downloaded_source.py tests/test_cleanup_docs_consistency.py tests/test_adult_archive_service.py`：`57 passed`
 - `tests/test_workflow_trace_logger.py tests/test_trace_logging.py tests/test_add_to_downloader.py -k "trace_log"`：`5 passed, 111 deselected`
 - `tests/test_main.py tests/test_telegram_bot.py tests/test_personal_wechat_login.py tests/test_personal_wechat_text.py`：`255 passed`
+- `tests/test_downloader_route_lookup.py tests/test_main.py tests/test_telegram_bot.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_runtime_adapter.py`：`399 passed`
 - `tests/test_config.py`：`34 passed`
 - `tests/test_downloader_route_lookup.py tests/test_main.py`：`30 passed`
 - `tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py`：`26 passed`
