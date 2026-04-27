@@ -13,6 +13,7 @@ from app.db.adult_content_registry_repo import (
 )
 from app.db.download_monitor_repo import DownloadMonitorRecord, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.operational_logging import emit_operational_log
 from app.services.adult_archive_service import (
     AdultArchiveOperationError,
     AdultArchiveService,
@@ -261,57 +262,74 @@ def _is_auto_import_skip_event_row_corrupted_error(error: Exception) -> bool:
 
 
 def _log_auto_import_terminal_lookup_failed(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[自动导入终态查询失败]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表读取是否正常；"
-        "当前会停止这条任务的自动导入跟进，避免把读取异常误判成“还没有终态事件”。",
-        flush=True,
+    emit_operational_log(
+        title="自动导入终态查询失败",
+        detail=_auto_import_event_detail(task_id=task_id, task_hash=task_hash, reason=reason),
+        fix_hint="检查 SQLite/job_event 表读取是否正常；当前会停止这条任务的自动导入跟进，避免把读取异常误判成“还没有终态事件”。",
     )
 
 
 def _log_auto_import_terminal_lookup_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[自动导入终态结果缺失]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 查询返回是否仍带有完整结果；"
-        "当前会停止这条任务的自动导入跟进，避免把缺失真相误判成“还没有终态事件”。",
-        flush=True,
+    emit_operational_log(
+        title="自动导入终态结果缺失",
+        detail=_auto_import_event_detail(task_id=task_id, task_hash=task_hash, reason=reason),
+        fix_hint="检查 job_event 查询返回是否仍带有完整结果；当前会停止这条任务的自动导入跟进，避免把缺失真相误判成“还没有终态事件”。",
     )
 
 
 def _log_auto_import_terminal_lookup_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[自动导入终态记录损坏]\033[0m task_id={task_id} task_hash={task_hash} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 终态记录里的 task_ref / event_type 等字段是否仍是完整真相；"
-        "当前会停止这条任务的自动导入跟进，避免把坏记录误判成普通查询失败。",
-        flush=True,
+    emit_operational_log(
+        title="自动导入终态记录损坏",
+        detail=_auto_import_event_detail(task_id=task_id, task_hash=task_hash, reason=reason),
+        fix_hint="检查 job_event 终态记录里的 task_ref / event_type 等字段是否仍是完整真相；当前会停止这条任务的自动导入跟进，避免把坏记录误判成普通查询失败。",
     )
 
 
 def _log_auto_import_skip_event_append_failed(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[自动导入跳过事件落盘失败]\033[0m task_id={task_id} task_hash={task_hash} "
-        f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；"
-        "当前会按状态不可用停路，避免把落盘异常误判成普通“已跳过自动导入”。",
-        flush=True,
+    emit_operational_log(
+        title="自动导入跳过事件落盘失败",
+        detail=_auto_import_event_detail(
+            task_id=task_id,
+            task_hash=task_hash,
+            reason=reason,
+            event_type=AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+        ),
+        fix_hint="检查 SQLite/job_event 表写入是否正常；当前会按状态不可用停路，避免把落盘异常误判成普通“已跳过自动导入”。",
     )
 
 
 def _log_auto_import_skip_event_result_missing(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[自动导入跳过事件结果缺失]\033[0m task_id={task_id} task_hash={task_hash} "
-        f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 写入后是否还能立即回读到该条跳过事件；"
-        "当前会按状态不可用停路，避免把缺失真相误判成普通“已跳过自动导入”。",
-        flush=True,
+    emit_operational_log(
+        title="自动导入跳过事件结果缺失",
+        detail=_auto_import_event_detail(
+            task_id=task_id,
+            task_hash=task_hash,
+            reason=reason,
+            event_type=AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+        ),
+        fix_hint="检查 job_event 写入后是否还能立即回读到该条跳过事件；当前会按状态不可用停路，避免把缺失真相误判成普通“已跳过自动导入”。",
     )
 
 
 def _log_auto_import_skip_event_row_corrupted(*, task_id: str, task_hash: str, reason: str) -> None:
-    print(
-        f"\033[31m[自动导入跳过事件记录损坏]\033[0m task_id={task_id} task_hash={task_hash} "
-        f"event_type={AUTO_IMPORT_SKIPPED_BY_RULE_EVENT} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 job_event 新写入的跳过事件里 task_ref / event_type 等字段是否仍是完整真相；"
-        "当前会按状态不可用停路，避免把坏记录误判成普通“已跳过自动导入”。",
-        flush=True,
+    emit_operational_log(
+        title="自动导入跳过事件记录损坏",
+        detail=_auto_import_event_detail(
+            task_id=task_id,
+            task_hash=task_hash,
+            reason=reason,
+            event_type=AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
+        ),
+        fix_hint="检查 job_event 新写入的跳过事件里 task_ref / event_type 等字段是否仍是完整真相；当前会按状态不可用停路，避免把坏记录误判成普通“已跳过自动导入”。",
     )
+
+
+def _auto_import_event_detail(
+    *,
+    task_id: str,
+    task_hash: str,
+    reason: str,
+    event_type: str = "",
+) -> str:
+    event_detail = f" event_type={event_type}" if event_type else ""
+    return f"task_id={task_id} task_hash={task_hash}{event_detail} 错误={reason}"
