@@ -60,6 +60,10 @@ def _load_downloader_route_payload(payload_json: str) -> tuple[dict[str, object]
     return payload, None
 
 
+def _payload_string(payload: dict[str, object], key: str) -> str:
+    return str(payload.get(key, "")).strip()
+
+
 def _log_downloader_route_lookup_failure(*, task_ref: str, chat_id: int | None, reason: str) -> None:
     _print_downloader_issue_log(
         title="下载器路由未命中",
@@ -123,8 +127,8 @@ def _resolve_downloader_task_route(
             reason=payload_problem or "payload_json invalid",
         )
         return None
-    downloader_name = str(payload.get("downloader_name", "")).strip()
-    download_dir = str(payload.get("download_dir", "")).strip()
+    downloader_name = _payload_string(payload, "downloader_name")
+    download_dir = _payload_string(payload, "download_dir")
     if not downloader_name:
         _log_downloader_route_lookup_failure(task_ref=task_ref, chat_id=chat_id, reason="downloader_name missing")
         return None
