@@ -7,6 +7,7 @@ from app.clients.qbittorrent import QbittorrentClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTaskStatus
 from app.config import DownloaderInstanceConfig
 from app.db.job_repo import JobPersistenceError, JobRepo
+from app.operational_logging import emit_operational_log
 
 
 class DownloaderRouteLookupError(RuntimeError):
@@ -34,10 +35,10 @@ def _print_downloader_issue_log(
     detail_value: str,
     fix_hint: str,
 ) -> None:
-    print(
-        f"\033[31m[{title}]\033[0m {context_label}={context_value or '-'} {detail_label}={detail_value}\n"
-        f"\033[33m[处理建议]\033[0m {fix_hint}",
-        flush=True,
+    emit_operational_log(
+        title=title,
+        detail=f"{context_label}={context_value or '-'} {detail_label}={detail_value}",
+        fix_hint=fix_hint,
     )
 
 
