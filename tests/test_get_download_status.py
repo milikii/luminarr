@@ -1076,7 +1076,7 @@ def test_get_status_text_returns_state_unavailable_when_skip_event_result_is_mis
             (),
             {
                 "list_events_for_task_identity": lambda self, *, task_id, task_hash: [],
-                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append")),
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(JobEventPersistenceError("job_event missing after append")),
             },
         )(),
         auto_import_func=auto_import,
@@ -1303,7 +1303,7 @@ def test_post_download_auto_import_run_once_marks_state_unavailable_when_skip_ev
             (),
             {
                 "list_events_for_task_identity": lambda self, *, task_id, task_hash: [],
-                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append")),
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(JobEventPersistenceError("job_event missing after append")),
             },
         )(),
         auto_import_func=auto_import,
@@ -1611,7 +1611,7 @@ def test_post_download_auto_import_run_for_record_raises_when_skip_event_result_
             (),
             {
                 "list_events_for_task_identity": lambda self, **kwargs: [],
-                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("job_event missing after append")),
+                "append_event": lambda self, **kwargs: (_ for _ in ()).throw(JobEventPersistenceError("job_event missing after append")),
             },
         )(),
         auto_import_func=auto_import,

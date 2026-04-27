@@ -210,7 +210,7 @@ class PostDownloadAutoImportService:
                 event_type=AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
                 message=reason,
             )
-        except Exception as error:
+        except (JobEventPersistenceError, sqlite3.Error) as error:
             if str(error) == "job_event missing after append":
                 _log_auto_import_skip_event_result_missing(
                     task_id=candidate.task_id,
