@@ -165,6 +165,28 @@ def _resolve_lookup_client_for_task(
     return route, client
 
 
+def _resolve_lookup_only_client_for_task(
+    *,
+    task_ref: str,
+    chat_id: int | None,
+    job_repo: JobRepo,
+    downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
+    transmission_clients_by_name: dict[str, TransmissionClient],
+    qbittorrent_clients_by_name: dict[str, QbittorrentClient],
+    operation: str,
+) -> TransmissionClient | QbittorrentClient:
+    _, client = _resolve_lookup_client_for_task(
+        task_ref=task_ref,
+        chat_id=chat_id,
+        job_repo=job_repo,
+        downloader_instances_by_name=downloader_instances_by_name,
+        transmission_clients_by_name=transmission_clients_by_name,
+        qbittorrent_clients_by_name=qbittorrent_clients_by_name,
+        operation=operation,
+    )
+    return client
+
+
 def _require_downloader_task_route(
     *,
     task_ref: str,
@@ -411,7 +433,7 @@ async def _get_torrent_status_with_routing(
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionTaskStatus | None:
-    _, client = _resolve_lookup_client_for_task(
+    client = _resolve_lookup_only_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
@@ -433,7 +455,7 @@ async def _remove_torrent_with_routing(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     delete_local_data: bool,
 ) -> None:
-    _, client = _resolve_lookup_client_for_task(
+    client = _resolve_lookup_only_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
