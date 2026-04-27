@@ -168,6 +168,11 @@ def _normalize_base_url(raw_value: str) -> str:
     return raw_value.strip().rstrip("/")
 
 
+def _read_base_url(env: Mapping[str, str], key: str, *, required: bool = False) -> str:
+    raw_value = _read_required(env, key) if required else _read_optional(env, key)
+    return _normalize_base_url(raw_value)
+
+
 def _iter_semicolon_entries(raw_value: str) -> tuple[str, ...]:
     return tuple(cleaned_item for raw_item in raw_value.split(";") if (cleaned_item := raw_item.strip()))
 
@@ -372,13 +377,13 @@ def _read_downloader_role_binding(
 
 def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     env = os.environ if environ is None else environ
-    emby_base_url = _normalize_base_url(_read_optional(env, "EMBY_BASE_URL"))
-    jellyfin_base_url = _normalize_base_url(_read_optional(env, "JELLYFIN_BASE_URL"))
-    plex_base_url = _normalize_base_url(_read_optional(env, "PLEX_BASE_URL"))
-    tmdb_base_url = _normalize_base_url(_read_optional(env, "TMDB_BASE_URL"))
-    fanart_base_url = _normalize_base_url(_read_optional(env, "FANART_BASE_URL"))
-    subtitle_translation_base_url = _normalize_base_url(_read_optional(env, "SUBTITLE_TRANSLATION_BASE_URL"))
-    feishu_base_url = _normalize_base_url(_read_optional(env, "FEISHU_BASE_URL"))
+    emby_base_url = _read_base_url(env, "EMBY_BASE_URL")
+    jellyfin_base_url = _read_base_url(env, "JELLYFIN_BASE_URL")
+    plex_base_url = _read_base_url(env, "PLEX_BASE_URL")
+    tmdb_base_url = _read_base_url(env, "TMDB_BASE_URL")
+    fanart_base_url = _read_base_url(env, "FANART_BASE_URL")
+    subtitle_translation_base_url = _read_base_url(env, "SUBTITLE_TRANSLATION_BASE_URL")
+    feishu_base_url = _read_base_url(env, "FEISHU_BASE_URL")
     subtitle_translation_timeout_raw = _read_optional(env, "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS")
     subtitle_translation_timeout_seconds = 60.0
     if subtitle_translation_timeout_raw:
@@ -409,13 +414,13 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
         outbound_proxy_url=_normalize_proxy_url(_read_optional(env, "OUTBOUND_PROXY_URL")),
-        prowlarr_base_url=_normalize_base_url(_read_required(env, "PROWLARR_BASE_URL")),
+        prowlarr_base_url=_read_base_url(env, "PROWLARR_BASE_URL", required=True),
         prowlarr_api_key=_read_required(env, "PROWLARR_API_KEY"),
         tmdb_base_url=tmdb_base_url or "https://api.themoviedb.org",
         tmdb_api_key=_read_optional(env, "TMDB_API_KEY"),
         fanart_base_url=fanart_base_url or "https://webservice.fanart.tv/v3",
         fanart_api_key=_read_optional(env, "FANART_API_KEY"),
-        transmission_base_url=_normalize_base_url(_read_required(env, "TRANSMISSION_BASE_URL")),
+        transmission_base_url=_read_base_url(env, "TRANSMISSION_BASE_URL", required=True),
         transmission_username=_read_optional(env, "TRANSMISSION_USERNAME"),
         transmission_password=_read_optional(env, "TRANSMISSION_PASSWORD"),
         library_target_dir=_read_optional(env, "LIBRARY_TARGET_DIR") or "/data/library/movies",

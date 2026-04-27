@@ -71,6 +71,21 @@ def test_load_settings_reads_outbound_proxy_url() -> None:
     assert settings.outbound_proxy_url == "http://192.168.2.110:7890"
 
 
+def test_load_settings_strips_whitespace_from_base_urls() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": " http://prowlarr:9696/ ",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": " http://transmission:9091/ ",
+        }
+    )
+
+    assert settings.prowlarr_base_url == "http://prowlarr:9696"
+    assert settings.transmission_base_url == "http://transmission:9091"
+    assert settings.emby_base_url == ""
+
+
 def test_load_settings_rejects_proxy_without_supported_scheme() -> None:
     with pytest.raises(ConfigError, match="OUTBOUND_PROXY_URL"):
         load_settings(
