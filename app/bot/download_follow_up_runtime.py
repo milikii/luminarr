@@ -6,7 +6,7 @@ from collections.abc import MutableMapping
 from typing import Protocol
 
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 
@@ -157,60 +157,48 @@ async def stop_download_follow_up_scheduler(
 
 
 def _log_post_download_auto_import_scheduler_error(*, error: Exception) -> None:
-    print(
-        format_operational_log_message(
-            title="下载完成后台轮询失败",
-            detail=f"原因={error}",
-            fix_hint="检查 download_monitor、SQLite 和导入审批链路后等待下一轮自动轮询。",
-        )
+    emit_operational_log(
+        title="下载完成后台轮询失败",
+        detail=f"原因={error}",
+        fix_hint="检查 download_monitor、SQLite 和导入审批链路后等待下一轮自动轮询。",
     )
 
 
 def _log_post_download_auto_import_scheduler_state_unavailable(*, scanned: int) -> None:
-    print(
-        format_operational_log_message(
-            title="下载完成后台轮询状态读取失败",
-            detail=f"scanned={scanned}",
-            fix_hint="检查 download_monitor、job_event 和导入审批链路的持久化状态；当前这轮自动导入已跳过异常记录，下一轮仍会继续尝试。",
-        ),
+    emit_operational_log(
+        title="下载完成后台轮询状态读取失败",
+        detail=f"scanned={scanned}",
+        fix_hint="检查 download_monitor、job_event 和导入审批链路的持久化状态；当前这轮自动导入已跳过异常记录，下一轮仍会继续尝试。",
     )
 
 
 def _log_download_completion_polling_loop_error(*, error: Exception) -> None:
-    print(
-        format_operational_log_message(
-            title="下载完成状态轮询失败",
-            detail=f"原因={error}",
-            fix_hint="检查下载器状态查询、download_monitor 和 SQLite 后等待下一轮自动轮询。",
-        )
+    emit_operational_log(
+        title="下载完成状态轮询失败",
+        detail=f"原因={error}",
+        fix_hint="检查下载器状态查询、download_monitor 和 SQLite 后等待下一轮自动轮询。",
     )
 
 
 def _log_download_completion_pending_list_error(*, error: Exception) -> None:
     if str(error) == "download completion pending list result missing":
-        print(
-            format_operational_log_message(
-                title="下载完成待轮询列表结果缺失",
-                detail=f"原因={error}",
-                fix_hint="检查 download_monitor 待轮询列表查询返回是否仍带有完整结果；当前这轮不会继续逐条查状态，避免把缺失真相误判成“当前没有待轮询任务”。",
-            )
+        emit_operational_log(
+            title="下载完成待轮询列表结果缺失",
+            detail=f"原因={error}",
+            fix_hint="检查 download_monitor 待轮询列表查询返回是否仍带有完整结果；当前这轮不会继续逐条查状态，避免把缺失真相误判成“当前没有待轮询任务”。",
         )
         return
     if _is_download_completion_pending_list_row_corrupted_error(error):
-        print(
-            format_operational_log_message(
-                title="下载完成待轮询列表记录损坏",
-                detail=f"原因={error}",
-                fix_hint="检查 download_monitor 待轮询记录里的 task_id / task_hash / chat_id 等真相字段；当前这轮不会继续逐条查状态，避免把坏记录混成普通读库失败。",
-            )
+        emit_operational_log(
+            title="下载完成待轮询列表记录损坏",
+            detail=f"原因={error}",
+            fix_hint="检查 download_monitor 待轮询记录里的 task_id / task_hash / chat_id 等真相字段；当前这轮不会继续逐条查状态，避免把坏记录混成普通读库失败。",
         )
         return
-    print(
-        format_operational_log_message(
-            title="下载完成待轮询列表读取失败",
-            detail=f"原因={error}",
-            fix_hint="检查 download_monitor 表读取和 SQLite 连通性；当前这轮不会继续逐条查状态，但下一轮轮询仍会继续尝试。",
-        )
+    emit_operational_log(
+        title="下载完成待轮询列表读取失败",
+        detail=f"原因={error}",
+        fix_hint="检查 download_monitor 表读取和 SQLite 连通性；当前这轮不会继续逐条查状态，但下一轮轮询仍会继续尝试。",
     )
 
 
@@ -219,17 +207,16 @@ def _is_download_completion_pending_list_row_corrupted_error(error: Exception) -
 
 
 def _log_download_completion_polling_config_error(*, reason: str) -> None:
-    print(
-        f"\033[31m[下载完成状态轮询未启动]\033[0m 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查应用启动阶段是否已注入 get_download_status_service，并确认它携带有效的 download_monitor_repo。"
+    emit_operational_log(
+        title="下载完成状态轮询未启动",
+        detail=f"原因={reason}",
+        fix_hint="检查应用启动阶段是否已注入 get_download_status_service，并确认它携带有效的 download_monitor_repo。",
     )
 
 
 def _log_download_completion_polling_stop_error(*, error: Exception) -> None:
-    print(
-        format_operational_log_message(
-            title="下载完成状态轮询停止失败",
-            detail=f"原因={error}",
-            fix_hint="检查下载完成轮询 task 的退出路径、SQLite 连接状态，以及 stop_event 触发后的清理逻辑。",
-        )
+    emit_operational_log(
+        title="下载完成状态轮询停止失败",
+        detail=f"原因={error}",
+        fix_hint="检查下载完成轮询 task 的退出路径、SQLite 连接状态，以及 stop_event 触发后的清理逻辑。",
     )
