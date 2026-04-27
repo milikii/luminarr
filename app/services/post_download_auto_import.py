@@ -13,7 +13,11 @@ from app.db.adult_content_registry_repo import (
 )
 from app.db.download_monitor_repo import DownloadMonitorRecord, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
-from app.services.adult_archive_service import AdultArchiveService, AdultArchiveStateUnavailableError
+from app.services.adult_archive_service import (
+    AdultArchiveOperationError,
+    AdultArchiveService,
+    AdultArchiveStateUnavailableError,
+)
 from app.services.auto_import_batch import (
     AutoImportCompletedListUnavailableError,
     load_completed_auto_import_candidates,
@@ -155,7 +159,7 @@ class PostDownloadAutoImportService:
             raise AutoImportStateUnavailableError(
                 f"adult archive state unavailable for {candidate.task_id}/{candidate.task_hash}"
             ) from error
-        except Exception as error:
+        except AdultArchiveOperationError as error:
             action = "保留期清理" if registry_record.current_status == ADULT_CONTENT_STATUS_ARCHIVED_PRESENT else "归档"
             print(
                 f"\033[31m[成人资源{action}失败]\033[0m task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}\n"

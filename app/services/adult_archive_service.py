@@ -6,6 +6,8 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import httpx
+
 from app.clients.transmission import TransmissionImportSource
 from app.config import AdultArchiveDestination
 from app.db.adult_content_registry_repo import (
@@ -28,6 +30,10 @@ _SQLITE_UTC_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class AdultArchiveStateUnavailableError(RuntimeError):
+    pass
+
+
+class AdultArchiveOperationError(RuntimeError):
     pass
 
 
@@ -103,11 +109,16 @@ class AdultArchiveService:
                     import_source_type_unsupported_text="成人资源源路径不是文件或目录，无法归档。",
                 )
             except OSError:
-                _copy_import(
-                    source_path,
-                    target_path,
-                    import_source_type_unsupported_text="成人资源源路径不是文件或目录，无法归档。",
-                )
+                try:
+                    _copy_import(
+                        source_path,
+                        target_path,
+                        import_source_type_unsupported_text="成人资源源路径不是文件或目录，无法归档。",
+                    )
+                except OSError as error:
+                    raise AdultArchiveOperationError(
+                        f"adult archive transfer failed for {candidate.task_id}/{candidate.task_hash}: {error}"
+                    ) from error
 
         try:
             self._job_event_repo.append_event(
@@ -147,14 +158,24 @@ class AdultArchiveService:
                 f"adult archive cleanup import source missing for {candidate.task_id}/{candidate.task_hash}"
             )
         source_path = Path(import_source.download_dir) / import_source.name
-        await self._remove_torrent_func(candidate.task_hash, candidate.chat_id, True)
-        if source_path.exists():
-            if source_path.is_dir():
-                shutil.rmtree(source_path)
-            elif source_path.is_file():
-                source_path.unlink()
-            else:
-                raise OSError("成人资源源路径不是文件或目录，无法清理。")
+        try:
+            await self._remove_torrent_func(candidate.task_hash, candidate.chat_id, True)
+        except (httpx.HTTPError, OSError, ValueError) as error:
+            raise AdultArchiveOperationError(
+                f"adult archive cleanup downloader removal failed for {candidate.task_id}/{candidate.task_hash}: {error}"
+            ) from error
+        try:
+            if source_path.exists():
+                if source_path.is_dir():
+                    shutil.rmtree(source_path)
+                elif source_path.is_file():
+                    source_path.unlink()
+                else:
+                    raise OSError("成人资源源路径不是文件或目录，无法清理。")
+        except OSError as error:
+            raise AdultArchiveOperationError(
+                f"adult archive cleanup source removal failed for {candidate.task_id}/{candidate.task_hash}: {error}"
+            ) from error
         try:
             self._job_event_repo.append_event(
                 task_ref=candidate.task_hash,

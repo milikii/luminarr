@@ -13,7 +13,7 @@ from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceEr
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.sqlite import SqliteDatabase
-from app.services.adult_archive_service import AdultArchiveStateUnavailableError
+from app.services.adult_archive_service import AdultArchiveOperationError, AdultArchiveStateUnavailableError
 from app.services.get_download_status import (
     STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT,
     STATUS_NOT_FOUND_TEXT,
@@ -1558,6 +1558,66 @@ def test_post_download_auto_import_run_for_record_stops_when_adult_archive_state
     output = capsys.readouterr().out
     assert "[成人资源归档状态不可用]" in output
     assert "persist failed" in output
+
+
+def test_post_download_auto_import_run_for_record_reports_adult_archive_operation_failure(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "adult.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.mark_downloading(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="javbus",
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        downloader_name="bt-main",
+    )
+    auto_import = AsyncMock(return_value="不应走到这里")
+    adult_archive_service = type(
+        "AdultArchiveService",
+        (),
+        {"run_for_record": AsyncMock(side_effect=AdultArchiveOperationError("target readonly"))},
+    )()
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=None,
+        job_event_repo=type("EventRepo", (), {"list_events_for_task_identity": lambda self, **kwargs: []})(),
+        auto_import_func=auto_import,
+        adult_content_registry_repo=registry_repo,
+        adult_archive_service=adult_archive_service,
+    )
+    record = type(
+        "Record",
+        (),
+        {
+            "task_id": "87",
+            "task_hash": "hash-87",
+            "name": "SSIS-123 sample",
+            "chat_id": 1001,
+            "user_id": 2001,
+            "status_code": 6,
+            "percent_done": 1.0,
+            "is_complete": True,
+            "completion_observed_at": "2026-04-15 00:00:00",
+            "last_observed_at": "2026-04-15 00:00:00",
+            "created_at": "2026-04-15 00:00:00",
+            "updated_at": "2026-04-15 00:00:00",
+        },
+    )()
+
+    reply = asyncio.run(auto_import_service.run_for_record(record))
+
+    assert reply == "注意：成人资源归档失败，本轮未更新后续状态，请稍后重试。"
+    auto_import.assert_not_awaited()
+    adult_archive_service.run_for_record.assert_awaited_once()
+    output = capsys.readouterr().out
+    assert "[成人资源归档失败]" in output
+    assert "target readonly" in output
 
 
 def test_post_download_auto_import_run_for_record_skips_archived_deleted_adult_task(tmp_path: Path) -> None:
