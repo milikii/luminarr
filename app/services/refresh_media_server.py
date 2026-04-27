@@ -38,10 +38,18 @@ class RefreshMediaServerService:
             await self._refresh_func()
         except Exception as exc:
             reason = str(exc).strip() or REFRESH_FAILED_UNKNOWN_REASON
-            print(
-                f"\033[31m[媒体库刷新失败]\033[0m provider={self._provider_name} {self._format_failure_details(exc)} 错误={reason}\n"
-                "\033[33m[处理建议]\033[0m 检查媒体服务器地址、API Key 和网络连通性；当前会返回刷新失败文本，但导入成功不会回滚。",
-                flush=True,
+            _log_refresh_media_server_failed(
+                provider_name=self._provider_name,
+                details=self._format_failure_details(exc),
+                reason=reason,
             )
             return REFRESH_FAILED_TEXT_TEMPLATE.format(reason=reason)
         return REFRESH_SUCCESS_TEXT
+
+
+def _log_refresh_media_server_failed(*, provider_name: str, details: str, reason: str) -> None:
+    print(
+        f"\033[31m[媒体库刷新失败]\033[0m provider={provider_name} {details} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查媒体服务器地址、API Key 和网络连通性；当前会返回刷新失败文本，但导入成功不会回滚。",
+        flush=True,
+    )
