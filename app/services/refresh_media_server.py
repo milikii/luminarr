@@ -4,6 +4,8 @@ from collections.abc import Awaitable, Callable
 
 import httpx
 
+from app.operational_logging import format_operational_log_message
+
 RefreshFunc = Callable[[], Awaitable[None]]
 
 REFRESH_SUCCESS_TEXT = "媒体库刷新成功。"
@@ -49,7 +51,10 @@ class RefreshMediaServerService:
 
 def _log_refresh_media_server_failed(*, provider_name: str, details: str, reason: str) -> None:
     print(
-        f"\033[31m[媒体库刷新失败]\033[0m provider={provider_name} {details} 错误={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查媒体服务器地址、API Key 和网络连通性；当前会返回刷新失败文本，但导入成功不会回滚。",
+        format_operational_log_message(
+            title="媒体库刷新失败",
+            detail=f"provider={provider_name} {details} 错误={reason}",
+            fix_hint="检查媒体服务器地址、API Key 和网络连通性；当前会返回刷新失败文本，但导入成功不会回滚。",
+        ),
         flush=True,
     )
