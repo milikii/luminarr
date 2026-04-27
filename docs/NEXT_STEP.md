@@ -3,7 +3,7 @@
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已完成 10 个最小闭环并通过总 gate：成人归档操作失败明确类型化，下载状态 completion/auto-import 日志、refresh 日志、导入后处理 metadata/subtitle/refresh 日志、BT 订阅 list/run/scheduler 日志边界已收口。
+- 本轮已完成 10 个最小闭环：trace、cleanup smoke、refresh、import post-processing、BT 搜索、状态跟进、download follow-up、BT source、BT subscription logging 都已统一到共享 operational logging helper，并同步 STATUS/NEXT_STEP 当前真相。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
