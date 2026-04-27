@@ -148,12 +148,13 @@ def _resolve_lookup_client_for_task(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     operation: str,
 ) -> tuple[ResolvedDownloaderTaskRoute, TransmissionClient | QbittorrentClient]:
-    route = _require_downloader_task_route(
+    route = _resolve_downloader_task_route(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
-        operation=operation,
     )
+    if route is None:
+        raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
     client = _require_lookup_client_for_task(
         downloader_name=route.downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
@@ -185,23 +186,6 @@ def _resolve_lookup_only_client_for_task(
         operation=operation,
     )
     return client
-
-
-def _require_downloader_task_route(
-    *,
-    task_ref: str,
-    chat_id: int | None,
-    job_repo: JobRepo,
-    operation: str,
-) -> ResolvedDownloaderTaskRoute:
-    route = _resolve_downloader_task_route(
-        task_ref=task_ref,
-        chat_id=chat_id,
-        job_repo=job_repo,
-    )
-    if route is None:
-        raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
-    return route
 
 
 def _require_lookup_client_for_task(
