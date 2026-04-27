@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Awaitable, Callable, MutableMapping
+
+from app.db.job_repo import JobPersistenceError
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
@@ -83,7 +86,7 @@ async def handle_confirm_query(
             matched_job_lookup_failed = False
             try:
                 matched_job = job_repo.get_job_for_chat_ref(chat_id=chat_id, task_ref=confirm_ref)
-            except Exception as error:
+            except (JobPersistenceError, sqlite3.Error) as error:
                 log_confirm_job_lookup_failed(
                     chat_id=chat_id,
                     task_ref=confirm_ref,

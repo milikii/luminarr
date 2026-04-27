@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -94,7 +95,7 @@ def test_handle_confirm_query_stops_on_job_lookup_failure(
     execution_gate = _ExecutionGateStub()
     bot_data = _build_bot_data()
     job_repo = JobRepo(_make_database(tmp_path))
-    job_repo.get_job_for_chat_ref = Mock(side_effect=RuntimeError("disk i/o error"))  # type: ignore[method-assign]
+    job_repo.get_job_for_chat_ref = Mock(side_effect=sqlite3.OperationalError("disk i/o error"))  # type: ignore[method-assign]
 
     handled = asyncio.run(
         handle_confirm_query(
