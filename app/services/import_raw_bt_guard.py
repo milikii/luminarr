@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.operational_logging import emit_operational_log
 from app.services.import_context_lookup import ImportContextLookup
 
 
@@ -46,29 +47,29 @@ class ImportRawBtGuard:
         return lookup.is_raw_bt
 
     def _log_lookup_failed(self, *, chat_id: int, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定查询失败]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
-            flush=True,
+        emit_operational_log(
+            title="导入 raw_bt 判定查询失败",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 错误={reason}",
+            fix_hint="检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
         )
 
     def _log_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定载荷损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
-            flush=True,
+        emit_operational_log(
+            title="导入 raw_bt 判定载荷损坏",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}",
+            fix_hint="检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
         )
 
     def _log_lookup_result_missing(self, *, chat_id: int, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定结果缺失]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
-            "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务是否仍存在，并确认这条任务真相没有被提前清理；"
-            "当前请求会直接返回查询失败，避免把 raw_bt 分类真相缺口误判成普通“不是 raw_bt”。",
-            flush=True,
+        emit_operational_log(
+            title="导入 raw_bt 判定结果缺失",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 错误={reason}",
+            fix_hint="检查 SQLite/jobs 表里当前下载任务是否仍存在，并确认这条任务真相没有被提前清理；当前请求会直接返回查询失败，避免把 raw_bt 分类真相缺口误判成普通“不是 raw_bt”。",
         )
 
     def _log_lookup_row_corrupted(self, *, chat_id: int, task_ref: str, reason: str) -> None:
-        print(
-            f"\033[31m[导入 raw_bt 判定记录损坏]\033[0m chat_id={chat_id} task_ref={task_ref} 错误={reason}\n"
-            "\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里当前下载任务的 job_id / chat_id / task_ref / payload_json 等真相字段；"
-            "当前请求会直接返回查询失败，避免把坏任务记录误判成普通查询失败或普通“不是 raw_bt”。",
-            flush=True,
+        emit_operational_log(
+            title="导入 raw_bt 判定记录损坏",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 错误={reason}",
+            fix_hint="检查 SQLite/jobs 表里当前下载任务的 job_id / chat_id / task_ref / payload_json 等真相字段；当前请求会直接返回查询失败，避免把坏任务记录误判成普通查询失败或普通“不是 raw_bt”。",
         )
