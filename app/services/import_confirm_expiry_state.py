@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from app.db.approval_repo import ApprovalPersistenceError, ApprovalRepo
 from app.db.job_repo import JobPersistenceError, JobRepo
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.import_context_lookup import ConfirmExecutionContext
 
 ClearPendingCopyFallbackFunc = Callable[..., None]
@@ -15,14 +15,7 @@ RecordEventFunc = Callable[..., None]
 
 
 def _log_import_confirm_expiry_error(*, title: str, detail: str, fix_hint: str) -> None:
-    print(
-        format_operational_log_message(
-            title=title,
-            detail=detail,
-            fix_hint=fix_hint,
-        ),
-        flush=True,
-    )
+    emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
 
 
 class ImportConfirmExpiryState:
