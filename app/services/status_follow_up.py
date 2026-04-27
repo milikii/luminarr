@@ -109,15 +109,17 @@ class StatusFollowUpRecorder:
         try:
             auto_import_text = await self._post_download_auto_import_service.run_for_record(update.record)
         except AutoImportStateUnavailableError as error:
-            print(
-                f"\033[31m[下载状态自动导入状态读取失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor、job_event 和自动导入审批链路是否正常；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
-                flush=True,
+            _log_status_auto_import_state_unavailable(
+                task_ref=task_ref,
+                task_status=task_status,
+                reason=str(error),
             )
             auto_import_text = STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT
         except Exception as error:
-            print(
-                f"\033[31m[下载状态自动导入跟进失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} 错误={error}\n\033[33m[处理建议]\033[0m 检查自动导入后半段依赖、SQLite 和导入审批链路；当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
-                flush=True,
+            _log_status_auto_import_follow_up_failed(
+                task_ref=task_ref,
+                task_status=task_status,
+                reason=str(error),
             )
             auto_import_text = STATUS_AUTO_IMPORT_WARNING_TEXT
         if auto_import_text:
@@ -228,6 +230,36 @@ def _log_download_completion_event_append_failed(
         f"task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={reason}\n"
         "\033[33m[处理建议]\033[0m 检查 SQLite/job_event 表写入是否正常；"
         "当前请求仍会返回下载状态文本，但这次完成观察事件可能没有落盘。",
+        flush=True,
+    )
+
+
+def _log_status_auto_import_state_unavailable(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载状态自动导入状态读取失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor、job_event 和自动导入审批链路是否正常；"
+        "当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
+        flush=True,
+    )
+
+
+def _log_status_auto_import_follow_up_failed(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    reason: str,
+) -> None:
+    print(
+        f"\033[31m[下载状态自动导入跟进失败]\033[0m task_ref={task_ref} task_id={task_status.task_id} "
+        f"task_hash={task_status.task_hash} 错误={reason}\n"
+        "\033[33m[处理建议]\033[0m 检查自动导入后半段依赖、SQLite 和导入审批链路；"
+        "当前请求仍会返回下载状态文本，但不会附带这次自动导入 follow-up。",
         flush=True,
     )
 
