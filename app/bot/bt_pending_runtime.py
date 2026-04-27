@@ -4,7 +4,7 @@ import json
 from collections.abc import MutableMapping
 
 from app.db.bt_pending_repo import BtPendingRepo
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 
 BT_PENDING_REPO_KEY = "bt_pending_repo"
 BT_PENDING_MISSING_AFTER_UPSERT_REASON = "bt_pending_state missing after upsert"
@@ -126,11 +126,8 @@ def _log_bt_pending_state_error(
     reason: str,
     fix_hint: str,
 ) -> None:
-    print(
-        format_operational_log_message(
-            title=title,
-            detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
-            fix_hint=fix_hint,
-        ),
-        flush=True,
+    emit_operational_log(
+        title=title,
+        detail=f"chat_id={chat_id if chat_id is not None else '-'} stage={stage} 原因={reason}",
+        fix_hint=fix_hint,
     )
