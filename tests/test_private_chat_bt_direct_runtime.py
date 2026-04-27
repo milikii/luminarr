@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -61,7 +62,7 @@ def test_handle_bt_direct_intent_query_replies_service_not_ready_when_persist_fa
 ) -> None:
     class _FailingPendingRepo(BtPendingRepo):
         def upsert_pending(self, *, chat_id: int, stage: str, payload_json: str = "") -> None:
-            raise RuntimeError("db down")
+            raise sqlite3.OperationalError("db down")
 
     reply_func = AsyncMock()
 
@@ -88,7 +89,7 @@ def test_handle_bt_direct_intent_query_replies_service_not_ready_when_clear_fail
     class _FailingPendingRepo(BtPendingRepo):
         def clear_pending(self, *, chat_id: int, expected_stage: str | None = None) -> bool:
             if expected_stage == "processing_path":
-                raise RuntimeError("db down")
+                raise sqlite3.OperationalError("db down")
             return False
 
     reply_func = AsyncMock()

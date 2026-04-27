@@ -507,7 +507,7 @@ def test_dispatch_private_chat_text_logs_pending_job_lookup_failure(
 ) -> None:
     reply_text = AsyncMock()
     job_repo = JobRepo(_make_database(tmp_path))
-    job_repo.get_latest_pending_job = Mock(side_effect=RuntimeError("sqlite busy"))  # type: ignore[method-assign]
+    job_repo.get_latest_pending_job = Mock(side_effect=sqlite3.OperationalError("sqlite busy"))  # type: ignore[method-assign]
 
     asyncio.run(
         dispatch_private_chat_text(
@@ -534,7 +534,7 @@ def test_dispatch_private_chat_text_stops_on_pending_job_lookup_failure_even_wit
     reply_text = AsyncMock()
     bot_data = _build_bot_data()
     job_repo = JobRepo(_make_database(tmp_path))
-    job_repo.get_latest_pending_job = Mock(side_effect=RuntimeError("sqlite busy"))  # type: ignore[method-assign]
+    job_repo.get_latest_pending_job = Mock(side_effect=sqlite3.OperationalError("sqlite busy"))  # type: ignore[method-assign]
     add_service = bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY]
     import_service = bot_data[IMPORT_TO_LIBRARY_SERVICE_KEY]
     assert isinstance(add_service, AddToDownloaderService)
