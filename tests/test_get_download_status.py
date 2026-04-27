@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from collections.abc import Awaitable
 from pathlib import Path
 from unittest.mock import AsyncMock
@@ -444,7 +445,7 @@ def test_get_status_text_warns_when_completion_event_write_fails(capsys) -> None
     event_repo = type(
         "BoomEventRepo",
         (),
-        {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+        {"append_event": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
     service = GetDownloadStatusService(
         AsyncMock(
@@ -502,7 +503,7 @@ def test_get_status_text_warns_when_completion_event_result_is_missing(capsys) -
         (),
         {
             "append_event": lambda self, **kwargs: (_ for _ in ()).throw(
-                RuntimeError("job_event missing after append")
+                JobEventPersistenceError("job_event missing after append")
             )
         },
     )()

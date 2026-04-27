@@ -82,7 +82,7 @@ class StatusFollowUpRecorder:
                     event_type="downloader.completed_observed",
                     message=task_status.name,
                 )
-            except Exception as error:
+            except (JobEventPersistenceError, sqlite3.Error) as error:
                 if str(error) == DOWNLOAD_COMPLETION_EVENT_RESULT_MISSING_REASON:
                     print(
                         f"\033[31m[下载完成观察事件结果缺失]\033[0m task_ref={task_ref} task_id={task_status.task_id} task_hash={task_status.task_hash} event_type=downloader.completed_observed 错误={error}\n\033[33m[处理建议]\033[0m 检查 job_event 写入后回读是否仍能拿到刚追加的完成观察事件；当前请求仍会返回下载状态文本，但这次完成观察事件真相还没有确认落稳。",
