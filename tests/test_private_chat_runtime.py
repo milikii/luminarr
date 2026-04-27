@@ -32,7 +32,7 @@ from app.bot.telegram_bot import (
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.db.clarification_repo import ClarificationPersistenceError
 from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JobRepo
+from app.db.job_repo import JobPersistenceError, JobRepo
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import ADD_CANCEL_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
@@ -1449,7 +1449,7 @@ def test_dispatch_private_chat_text_stops_on_downloader_pending_lookup_failure(
         job_repo=type(
             "BoomJobRepo",
             (),
-            {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(RuntimeError("db down"))},
+            {"get_downloader_job_for_chat_ref": lambda self, **kwargs: (_ for _ in ()).throw(JobPersistenceError("db down"))},
         )(),
     )
     import_service = type("ImportService", (), {"confirm_import_by_task_ref": Mock()})()
