@@ -333,21 +333,6 @@ def resolve_downloader_dispatch_download_dir(
     return dispatch_download_dir
 
 
-def _restore_import_source_download_dir(
-    *,
-    import_source: TransmissionImportSource,
-    host_download_dir: str,
-) -> TransmissionImportSource:
-    return TransmissionImportSource(
-        task_id=import_source.task_id,
-        task_hash=import_source.task_hash,
-        name=import_source.name,
-        download_dir=host_download_dir,
-        is_finished=import_source.is_finished,
-        percent_done=import_source.percent_done,
-    )
-
-
 async def _get_torrent_import_source_with_routing(
     *,
     task_ref: str,
@@ -377,9 +362,13 @@ async def _get_torrent_import_source_with_routing(
     cleaned_host_download_dir = host_download_dir.strip()
     if not cleaned_host_download_dir or cleaned_host_download_dir == import_source.download_dir:
         return import_source
-    return _restore_import_source_download_dir(
-        import_source=import_source,
-        host_download_dir=cleaned_host_download_dir,
+    return TransmissionImportSource(
+        task_id=import_source.task_id,
+        task_hash=import_source.task_hash,
+        name=import_source.name,
+        download_dir=cleaned_host_download_dir,
+        is_finished=import_source.is_finished,
+        percent_done=import_source.percent_done,
     )
 
 
