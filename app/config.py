@@ -310,7 +310,7 @@ def _read_downloader_instances(env: Mapping[str, str]) -> tuple[DownloaderInstan
 
         name = parts[0]
         downloader_type = _normalize_downloader_type(parts[1])
-        base_url = parts[2].rstrip("/")
+        base_url = _normalize_base_url(parts[2])
         download_dir = parts[3]
         dispatch_download_dir = ""
         username = ""
