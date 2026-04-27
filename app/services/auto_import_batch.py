@@ -9,6 +9,7 @@ from app.db.download_monitor_repo import (
     DownloadMonitorRecord,
     DownloadMonitorRepo,
 )
+from app.operational_logging import emit_operational_log
 
 AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON = "auto import completed list result missing"
 
@@ -38,23 +39,22 @@ def load_completed_auto_import_candidates(
             raise DownloadMonitorPersistenceError(AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON)
     except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
         if str(error) == AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON:
-            print(
-                f"\033[31m[自动导入候选结果缺失]\033[0m limit={limit} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 download_monitor 已完成列表查询返回是否仍带有完整结果；"
-                "当前这轮自动导入会直接停路，避免把缺失真相误判成“当前没有可导入候选”。",
-                flush=True,
+            emit_operational_log(
+                title="自动导入候选结果缺失",
+                detail=f"limit={limit} 错误={error}",
+                fix_hint="检查 download_monitor 已完成列表查询返回是否仍带有完整结果；当前这轮自动导入会直接停路，避免把缺失真相误判成“当前没有可导入候选”。",
             )
         elif _is_auto_import_completed_row_corrupted_error(error):
-            print(
-                f"\033[31m[自动导入候选记录损坏]\033[0m limit={limit} 错误={error}\n"
-                "\033[33m[处理建议]\033[0m 检查 download_monitor 已完成记录里的 chat_id / task_id / task_hash 等字段是否仍是完整真相；"
-                "当前这轮自动导入会直接停路，避免把坏记录误判成普通读取失败后继续推进导入审批。",
-                flush=True,
+            emit_operational_log(
+                title="自动导入候选记录损坏",
+                detail=f"limit={limit} 错误={error}",
+                fix_hint="检查 download_monitor 已完成记录里的 chat_id / task_id / task_hash 等字段是否仍是完整真相；当前这轮自动导入会直接停路，避免把坏记录误判成普通读取失败后继续推进导入审批。",
             )
         else:
-            print(
-                f"\033[31m[自动导入候选读取失败]\033[0m limit={limit} 错误={error}\n\033[33m[处理建议]\033[0m 检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
-                flush=True,
+            emit_operational_log(
+                title="自动导入候选读取失败",
+                detail=f"limit={limit} 错误={error}",
+                fix_hint="检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
             )
         raise AutoImportCompletedListUnavailableError(str(error)) from error
     return tuple(candidates)
