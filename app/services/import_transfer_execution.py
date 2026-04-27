@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
+from app.operational_logging import emit_operational_log
 from app.services.import_context_lookup import ConfirmExecutionContext
 from app.services.import_post_processing import ImportPostProcessRequest, ImportPostProcessingService
 
@@ -123,9 +124,10 @@ class ImportTransferExecutionService:
                 )
         except FileExistsError:
             message = self._import_target_exists_text_template.format(target_path=str(target_path))
-            print(
-                f"\033[31m[导入目标已存在]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_path}\n\033[33m[处理建议]\033[0m 检查导入执行期间是否已有并发写入或历史文件落到相同目标；确认目标文件可复用或清理后再重试。",
-                flush=True,
+            emit_operational_log(
+                title="导入目标已存在",
+                detail=f"task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} target_path={target_path}",
+                fix_hint="检查导入执行期间是否已有并发写入或历史文件落到相同目标；确认目标文件可复用或清理后再重试。",
             )
             self._record_event(
                 task_ref=task_ref,
@@ -156,14 +158,16 @@ class ImportTransferExecutionService:
                 else self._import_hardlink_failed_text_template.format(reason=str(exc))
             )
             if execution_mode == IMPORT_EXECUTION_MODE_COPY:
-                print(
-                    f"\033[31m[导入复制失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path} target_path={target_path} 错误={exc}\n\033[33m[处理建议]\033[0m 检查目标目录权限、磁盘空间和目标路径占用情况；如果是复制导入确认后的失败，修复后可重新执行 confirm {task_ref}。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入复制失败",
+                    detail=f"task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path} target_path={target_path} 错误={exc}",
+                    fix_hint=f"检查目标目录权限、磁盘空间和目标路径占用情况；如果是复制导入确认后的失败，修复后可重新执行 confirm {task_ref}。",
                 )
             else:
-                print(
-                    f"\033[31m[导入硬链接失败]\033[0m task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path} target_path={target_path} 错误={exc}\n\033[33m[处理建议]\033[0m 检查下载目录与库目录权限、目标路径占用情况，以及跨文件系统场景是否应改走 copy fallback 后重试。",
-                    flush=True,
+                emit_operational_log(
+                    title="导入硬链接失败",
+                    detail=f"task_ref={task_ref} task_id={import_source.task_id} task_hash={import_source.task_hash} source_path={source_path} target_path={target_path} 错误={exc}",
+                    fix_hint="检查下载目录与库目录权限、目标路径占用情况，以及跨文件系统场景是否应改走 copy fallback 后重试。",
                 )
             self._record_event(
                 task_ref=task_ref,
@@ -206,9 +210,10 @@ class ImportTransferExecutionService:
         return ImportExecutionResult(reply=f"{import_success_text}{post_process_result.reply_suffix}", imported=True)
 
     def _log_copy_fallback_payload_corrupted(self, *, task_id: str, task_hash: str, payload_problem: str) -> None:
-        print(
-            f"\033[31m[导入执行模式载荷损坏]\033[0m task_id={task_id} task_hash={task_hash} 载荷={payload_problem}\n\033[33m[处理建议]\033[0m 检查 SQLite/jobs 表里的 payload_json 是否仍是完整 copy-fallback 待确认上下文；若当前进程里也没有 copy-fallback 待确认兜底，当前 confirm 会直接返回状态读取失败，避免把坏载荷误判成硬链接导入。",
-            flush=True,
+        emit_operational_log(
+            title="导入执行模式载荷损坏",
+            detail=f"task_id={task_id} task_hash={task_hash} 载荷={payload_problem}",
+            fix_hint="检查 SQLite/jobs 表里的 payload_json 是否仍是完整 copy-fallback 待确认上下文；若当前进程里也没有 copy-fallback 待确认兜底，当前 confirm 会直接返回状态读取失败，避免把坏载荷误判成硬链接导入。",
         )
 
 
@@ -350,11 +355,10 @@ def _cleanup_partial_target(target_path: Path) -> None:
         elif target_path.exists() or target_path.is_symlink():
             target_path.unlink()
     except OSError as error:
-        print(
-            f"\033[31m[导入残留清理失败]\033[0m target={target_path} 错误={error}\n"
-            "\033[33m[处理建议]\033[0m 检查目标路径是否被占用、是否仍有写权限，"
-            "并手动清理这次失败导入留下的半成品文件或目录。",
-            flush=True,
+        emit_operational_log(
+            title="导入残留清理失败",
+            detail=f"target={target_path} 错误={error}",
+            fix_hint="检查目标路径是否被占用、是否仍有写权限，并手动清理这次失败导入留下的半成品文件或目录。",
         )
 
 
