@@ -1,10 +1,9 @@
-# Current status (v511)
+# Current status (v512)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；当前唯一主线仍是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮按文档继续完成 10 个最小闭环：新增共享 `bt_pending_runtime`，并把 `bt_processing_path`、`bt_classification`、`bt_tmdb_association`、`raw_bt_destination` 的 BT pending repo 解析、payload 编解码和持久化日志统一到该边界；同时收口 pure BT / BT TMDB / BT read-only / BT source 日志格式和刷新边界。
-- 成人归档上层不再用泛 `Exception` 判断归档/清理失败；文件搬运、下载器删除和本地源清理失败进入明确操作失败文本，持久化失败仍保持状态不可用边界。
-- 默认分支协议、SQLite schema、下载/导入/审批语义未变化；本轮主要是 BT pending runtime 结构减法和日志边界收口。
+- 本轮连续完成 10 个最小闭环：新增共享 `emit_operational_log`，并把 `add_cancel_state`、`add_pending_persistence`、`add_adult_registry_state`、`import_event_recorder`、`import_raw_bt_guard`、`get_download_status`、`status_follow_up`、`add_execution_follow_up`、`post_download_auto_import` 的手写 ANSI 日志收口到共享 operational formatter 边界。
+- 本轮 focused tests、`make quality`、`make verify-mainline` 均已通过；下载/导入/刷新/BT 主线行为、协议和 SQLite 真相边界未变。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
@@ -17,6 +16,7 @@
 - BT pending / direct / classification / TMDB / raw destination focused：`77 passed, 194 deselected`
 - BT read-only / history / JavLibrary / batch preview focused：`93 passed, 102 deselected`
 - BT read-only runtime / BT source focused：`140 passed, 319 deselected`
+- 本轮新增 focused：`tests/test_operational_logging.py`、`tests/test_add_to_downloader.py -k cancel_pending_add`、`tests/test_import_to_library.py -k record_event_logs/raw_bt`、`tests/test_get_download_status.py`、`tests/test_add_execution_follow_up.py`
 - `make quality`：通过（`27 passed, 0 skipped`）
 - `make verify-mainline`：通过
 
