@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 from app.db.job_repo import JobPersistenceError, JobRecord, JobRepo, WORKFLOW_ADD_TO_DOWNLOADER
-from app.operational_logging import format_operational_log_message
+from app.operational_logging import emit_operational_log
 from app.services.add_pending_context import PendingAddContext, pending_add_to_json
 
 DOWNLOADER_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim"
@@ -13,14 +13,7 @@ JOB_LEASE_OWNER = "downloader_confirm"
 
 
 def _log_add_confirm_job_state_error(*, title: str, detail: str, fix_hint: str) -> None:
-    print(
-        format_operational_log_message(
-            title=title,
-            detail=detail,
-            fix_hint=fix_hint,
-        ),
-        flush=True,
-    )
+    emit_operational_log(title=title, detail=detail, fix_hint=fix_hint)
 
 
 class AddConfirmJobState:
