@@ -25,6 +25,7 @@ from app.bot.wecom_webhook_server import (
     start_wecom_webhook_server,
     stop_wecom_webhook_server,
 )
+from app.operational_logging import emit_operational_log
 from app.services.manage_bt_subscription import (
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
@@ -231,9 +232,10 @@ async def _send_bt_subscription_scheduler_message(
 
 
 def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
-    print(
-        f"\033[31m[BT 订阅后台扫描未启动]\033[0m 原因={reason}\n"
-        "\033[33m[处理建议]\033[0m 检查 BT 下载器角色绑定和下载器实例配置后重启应用。"
+    emit_operational_log(
+        title="BT 订阅后台扫描未启动",
+        detail=f"原因={reason}",
+        fix_hint="检查 BT 下载器角色绑定和下载器实例配置后重启应用。",
     )
 
 
