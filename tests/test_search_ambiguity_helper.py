@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.search_ambiguity_helper import format_ambiguous_clarification
+from app.services.search_media import format_ambiguous_clarification
 from app.services.search_query_parser import parse_movie_query
 
 

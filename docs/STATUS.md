@@ -3,6 +3,7 @@
 ## Current mainline
 - **质量硬化** 已收工；当前主线是 `services` 层数据结构降本。
 - 最近已合并：`add_pending_persistence.py`、`add_request_facade.py`、`add_confirm_preparation.py`、`add_confirm_availability_state.py`、`add_confirm_approval_state.py`、`add_confirm_context_state.py`、`add_confirm_finalization_state.py`、`add_confirm_job_state.py`、`add_cancel_state.py`、`search_candidate_state.py`。
+- 本轮继续把 `search_ambiguity_helper.py` 合并回 `app/services/search_media.py`，删掉单消费者薄壳，focused tests `54 passed, 134 deselected`。
 - 当前主线没有改协议、SQLite schema、调度语义、下载/导入/刷新真相边界。
 - `cleanup_*_support.py` 仍为 `0` 个；其余大 support 文件暂不机械强拆。
 - `cleanup_*_support.py` 当前为 `0` 个。
@@ -19,6 +20,7 @@
 - `make quality` 通过（`27 passed, 0 skipped`）。
 - `make verify-mainline` 通过。
 - 已通过的关键 focused tests 见上。
+- 本轮 focused tests：`tests/test_search_media.py tests/test_search_ambiguity_helper.py -k "ambiguous or search_and_format"` 通过（`54 passed, 134 deselected`）。
 
 ## Current biggest risk
 - 当前风险不是业务回归，而是 services 层仍有剩余重复结构；下一轮仍需维持“小 diff + focused tests + 文档同步”的节奏，避免重新把 STATUS/NEXT_STEP 写回历史流水账。
