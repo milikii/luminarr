@@ -28,6 +28,7 @@ from app.services.post_download_auto_import import (
     AutoImportRunResult,
     PostDownloadAutoImportService,
 )
+from app.services.status_follow_up import STATUS_AUTO_IMPORT_WARNING_TEXT
 
 
 def test_parse_status_query_supports_status_prefix() -> None:
@@ -758,6 +759,111 @@ def test_get_status_text_stops_auto_import_when_terminal_lookup_fails(
     assert "[下载状态自动导入状态读取失败]" in output
     assert "task_id=87" in output
     assert "db down" in output
+
+
+def test_get_status_text_returns_warning_when_auto_import_follow_up_runtime_fails(capsys) -> None:
+    monitor_repo = type(
+        "MonitorRepo",
+        (),
+        {
+            "record_status": lambda self, task_status: type(
+                "Update",
+                (),
+                {
+                    "newly_completed": False,
+                    "record": type(
+                        "Record",
+                        (),
+                        {
+                            "task_id": "87",
+                            "task_hash": "hash-87",
+                            "name": "Dune 1984",
+                            "chat_id": 1001,
+                            "user_id": 2001,
+                        },
+                    )(),
+                },
+            )()
+        },
+    )()
+    auto_import_service = type(
+        "AutoImportService",
+        (),
+        {"run_for_record": AsyncMock(side_effect=RuntimeError("auto import runner down"))},
+    )()
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    text = _run(service.get_status_text("87"))
+
+    assert "状态: 做种中" in text
+    assert STATUS_AUTO_IMPORT_WARNING_TEXT in text
+    output = capsys.readouterr().out
+    assert "[下载状态自动导入跟进失败]" in output
+    assert "auto import runner down" in output
+
+
+def test_get_status_text_re_raises_non_runtime_auto_import_follow_up_error() -> None:
+    monitor_repo = type(
+        "MonitorRepo",
+        (),
+        {
+            "record_status": lambda self, task_status: type(
+                "Update",
+                (),
+                {
+                    "newly_completed": False,
+                    "record": type(
+                        "Record",
+                        (),
+                        {
+                            "task_id": "87",
+                            "task_hash": "hash-87",
+                            "name": "Dune 1984",
+                            "chat_id": 1001,
+                            "user_id": 2001,
+                        },
+                    )(),
+                },
+            )()
+        },
+    )()
+    auto_import_service = type(
+        "AutoImportService",
+        (),
+        {"run_for_record": AsyncMock(side_effect=ValueError("bad auto import stub"))},
+    )()
+    service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        post_download_auto_import_service=auto_import_service,
+    )
+
+    with pytest.raises(ValueError, match="bad auto import stub"):
+        _run(service.get_status_text("87"))
 
 
 def test_post_download_auto_import_run_once_skips_record_when_terminal_lookup_fails(capsys) -> None:

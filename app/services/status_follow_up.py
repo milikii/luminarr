@@ -116,7 +116,7 @@ class StatusFollowUpRecorder:
                 reason=str(error),
             )
             auto_import_text = STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT
-        except Exception as error:
+        except RuntimeError as error:
             _log_status_auto_import_follow_up_failed(
                 task_ref=task_ref,
                 task_status=task_status,
