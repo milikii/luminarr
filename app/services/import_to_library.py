@@ -16,7 +16,6 @@ from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, Job
 from app.operational_logging import emit_operational_log
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
-from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
@@ -89,6 +88,23 @@ class ImportConfirmPreparationState:
     lease_owner: str
 
 
+@dataclass(frozen=True, slots=True)
+class ImportConfirmExecutionRequest:
+    task_ref: str
+    task_id: str
+    task_hash: str
+    chat_id: int | None
+    user_id: int | None
+    execution: ImportExecutionResult
+    execution_mode: str
+    expected_lease_version: int
+    claimed_job: bool
+    claimed_job_id: str
+    claimed_job_version: int
+    lease_owner: str
+    confirm_context: ConfirmExecutionContext | None
+
+
 class ImportToLibraryService:
     def __init__(
         self,
@@ -151,11 +167,6 @@ class ImportToLibraryService:
             import_copy_approval_pending_text_template=IMPORT_COPY_APPROVAL_PENDING_TEXT,
             import_copy_failed_text_template=IMPORT_COPY_FAILED_TEXT,
             import_hardlink_failed_text_template=IMPORT_HARDLINK_FAILED_TEXT,
-        )
-        self._confirm_execution_tail = ImportConfirmExecutionTail(
-            import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
-            import_finalization_warning_text=IMPORT_FINALIZATION_WARNING_TEXT,
-            import_execution_mode_copy=IMPORT_EXECUTION_MODE_COPY,
         )
     async def import_by_task_ref(
         self,
@@ -221,7 +232,7 @@ class ImportToLibraryService:
             prepared_import,
             execution_mode=preparation.execution_mode,
         )
-        return self._confirm_execution_tail.finalize(
+        return self._finalize_confirm_execution(
             request=ImportConfirmExecutionRequest(
                 task_ref=cleaned_ref,
                 task_id=import_source.task_id,
@@ -236,16 +247,7 @@ class ImportToLibraryService:
                 claimed_job_version=preparation.claimed_job_version,
                 lease_owner=preparation.lease_owner,
                 confirm_context=preparation.confirm_context,
-            ),
-            log_trace=self._trace_logger.log,
-            restore_pending_approval=self._restore_pending_approval,
-            restore_pending_job=self._restore_pending_job,
-            record_executed_lease_version=self._record_executed_lease_version,
-            mark_completed_job=self._mark_completed_job,
-            record_pending_job=self._record_pending_job,
-            record_copy_fallback_pending=self._record_copy_fallback_pending,
-            clear_pending_copy_fallback=self._clear_pending_copy_fallback,
-            copy_fallback_pending_to_json=self._copy_fallback_pending_to_json,
+            )
         )
 
     def cancel_pending_import(self, chat_id: int) -> str | None:
@@ -512,6 +514,154 @@ class ImportToLibraryService:
             job_id=claimed_job_id,
             expected_version=claimed_job_version,
             lease_owner=lease_owner,
+        )
+
+    def _finalize_confirm_execution(self, *, request: ImportConfirmExecutionRequest) -> str:
+        if request.execution.imported:
+            return self._finalize_imported_execution(request=request)
+        if request.execution.pending_copy_approval:
+            return self._finalize_copy_fallback_pending_execution(request=request)
+        return self._finalize_failed_confirm_execution(request=request)
+
+    def _finalize_imported_execution(self, *, request: ImportConfirmExecutionRequest) -> str:
+        self._trace_logger.log(
+            event="confirm_execute",
+            result="imported",
+            stage="execute",
+            chat_id=request.chat_id,
+            user_id=request.user_id,
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            detail=request.execution.reply,
+        )
+        finalization_warning = ""
+        lease_recorded = self._record_executed_lease_version(
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            executed_lease_version=request.expected_lease_version,
+        )
+        if lease_recorded is not True:
+            finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
+        self._clear_pending_copy_fallback(task_id=request.task_id, task_hash=request.task_hash)
+        if request.claimed_job:
+            job_completed = self._mark_completed_job(
+                job_id=request.claimed_job_id,
+                expected_version=request.claimed_job_version,
+                lease_owner=request.lease_owner,
+            )
+            if job_completed is not True:
+                finalization_warning = IMPORT_FINALIZATION_WARNING_TEXT
+        if finalization_warning:
+            self._trace_logger.log(
+                event="confirm_finalize",
+                result="warning",
+                stage="completed",
+                chat_id=request.chat_id,
+                user_id=request.user_id,
+                task_ref=request.task_ref,
+                task_id=request.task_id,
+                task_hash=request.task_hash,
+                detail=IMPORT_FINALIZATION_WARNING_TEXT,
+            )
+            return f"{request.execution.reply}\n\n{finalization_warning}"
+        self._trace_logger.log(
+            event="confirm_finalize",
+            result="succeeded",
+            stage="completed",
+            chat_id=request.chat_id,
+            user_id=request.user_id,
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            detail=request.execution.reply,
+        )
+        return request.execution.reply
+
+    def _finalize_copy_fallback_pending_execution(self, *, request: ImportConfirmExecutionRequest) -> str:
+        self._trace_logger.log(
+            event="confirm_execute",
+            result="copy_fallback_pending",
+            stage="execute",
+            chat_id=request.chat_id,
+            user_id=request.user_id,
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            detail=request.execution.reply,
+        )
+        approval_restored = self._restore_pending_approval(
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            expected_lease_version=request.expected_lease_version,
+        )
+        if approval_restored is not True:
+            self._restore_claimed_confirm_job_if_needed(request=request)
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        self._record_copy_fallback_pending(task_id=request.task_id, task_hash=request.task_hash)
+        if request.confirm_context is not None:
+            persisted = self._record_pending_job(
+                chat_id=request.confirm_context.job.chat_id,
+                user_id=request.confirm_context.job.user_id,
+                task_ref=request.confirm_context.job.task_ref or request.task_ref,
+                task_id=request.task_id,
+                task_hash=request.task_hash,
+                payload_json=self._copy_fallback_pending_to_json(),
+            )
+            if not persisted:
+                self._restore_claimed_confirm_job_if_needed(request=request)
+        return request.execution.reply
+
+    def _finalize_failed_confirm_execution(self, *, request: ImportConfirmExecutionRequest) -> str:
+        approval_restored = self._restore_pending_approval(
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            expected_lease_version=request.expected_lease_version,
+        )
+        if approval_restored is not True:
+            self._restore_claimed_confirm_job_if_needed(request=request)
+            return IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if request.execution_mode == IMPORT_EXECUTION_MODE_COPY:
+            self._record_copy_fallback_pending(task_id=request.task_id, task_hash=request.task_hash)
+        else:
+            self._clear_pending_copy_fallback(task_id=request.task_id, task_hash=request.task_hash)
+        if request.claimed_job:
+            if request.execution_mode == IMPORT_EXECUTION_MODE_COPY:
+                persisted = self._record_pending_job(
+                    chat_id=request.confirm_context.job.chat_id if request.confirm_context is not None else request.chat_id,
+                    user_id=request.confirm_context.job.user_id if request.confirm_context is not None else request.user_id,
+                    task_ref=request.confirm_context.job.task_ref if request.confirm_context is not None else request.task_ref,
+                    task_id=request.task_id,
+                    task_hash=request.task_hash,
+                    payload_json=self._copy_fallback_pending_to_json(),
+                )
+                if not persisted:
+                    self._restore_claimed_confirm_job_if_needed(request=request)
+            else:
+                self._restore_claimed_confirm_job_if_needed(request=request)
+        self._trace_logger.log(
+            event="confirm_execute",
+            result="failed",
+            stage="execute",
+            chat_id=request.chat_id,
+            user_id=request.user_id,
+            task_ref=request.task_ref,
+            task_id=request.task_id,
+            task_hash=request.task_hash,
+            detail=request.execution.reply,
+        )
+        return request.execution.reply
+
+    def _restore_claimed_confirm_job_if_needed(self, *, request: ImportConfirmExecutionRequest) -> None:
+        if not request.claimed_job:
+            return
+        self._restore_pending_job(
+            job_id=request.claimed_job_id,
+            expected_version=request.claimed_job_version,
+            lease_owner=request.lease_owner,
         )
 
     def _log_expired_cancel_pending_job_result_missing(self, *, job: JobRecord, task_ref: str, reason: str) -> None:

@@ -23,6 +23,7 @@
 - 本轮把导入链单消费者 `ImportCancelState` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_cancel_state.py`。
 - 本轮把导入链单消费者 `ImportConfirmExpiryState` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_confirm_expiry_state.py`。
 - 本轮把导入链单消费者 `ImportConfirmPreparation` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_confirm_preparation.py`。
+- 本轮把导入链单消费者 `ImportConfirmExecutionTail` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_confirm_execution_tail.py`。
 - 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
@@ -40,7 +41,7 @@
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
-- 下一候选优先继续评估 services 层内重复的数据解析 / 展示模型，避免跨模块搬大块责任；当前先看导入链剩余单消费者小文件 `import_confirm_execution_tail.py` 是否适合继续合并回消费方。
+- 下一候选优先继续评估 services 层内重复的数据解析 / 展示模型，避免跨模块搬大块责任；当前先看 add 链剩余单消费者小文件 `add_pending_presence_state.py` 是否适合继续合并回消费方。
 
 ## User value
 

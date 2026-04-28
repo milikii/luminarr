@@ -22,6 +22,7 @@
 - 本轮把导入链单消费者 `ImportCancelState` 合并回 `import_to_library.py`，删除 `import_cancel_state.py` 小文件，导入取消查询、审批取消、任务取消与异常日志保持不变。
 - 本轮把导入链单消费者 `ImportConfirmExpiryState` 合并回 `import_to_library.py`，删除 `import_confirm_expiry_state.py` 小文件，confirm 超时取消与 expired event 写入保持不变。
 - 本轮把导入链单消费者 `ImportConfirmPreparation` 合并回 `import_to_library.py`，删除 `import_confirm_preparation.py` 小文件，confirm 准备阶段的 stale / not-pending / lease 恢复分流保持不变。
+- 本轮把导入链单消费者 `ImportConfirmExecutionTail` 合并回 `import_to_library.py`，删除 `import_confirm_execution_tail.py` 小文件，confirm 执行后的 imported / copy-fallback / failed 收尾保持不变。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -30,7 +31,7 @@
 ## Current health
 - 默认分支质量 gate 仍是可复验的；本轮收尾重新跑过 `make quality`，结果仍为 `27 passed, 0 skipped`。
 - 当前没有新的业务回归信号；这次切线来自文档决策，不是红灯修复。
-- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests；当前优先候选切到导入链单消费者小文件 `import_confirm_execution_tail.py`。
+- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests；当前优先候选切到 add 链单消费者小文件 `add_pending_presence_state.py`。
 
 ## Latest verification
 - `make verify-mainline` 通过。
@@ -42,6 +43,7 @@
 - `tests/test_import_to_library.py tests/test_private_chat_runtime.py -k "cancel_pending_import or import_cancel_state_unavailable"` 通过（`12 passed, 198 deselected`，有 4 条既有三方库弃用 warning）。
 - `tests/test_import_to_library.py -k "is_pending_approval_expired or handle_expired_pending_confirm or 导入确认超时"` 通过（`7 passed, 146 deselected`）。
 - `tests/test_import_to_library.py -k "confirm_import_by_task_ref or confirm_not_pending or stale_rejected or handle_expired_pending_confirm or is_pending_approval_expired"` 通过（`40 passed, 113 deselected`）。
+- `tests/test_import_to_library.py -k "confirm_execute or confirm_finalize or copy_fallback_pending or finalization_warning or pending_copy_approval or import_failed"` 通过（`6 passed, 147 deselected`）。
 - `tests/test_import_to_library.py -k "rebuild_confirm_context or context_lookup_failure or context_row_corruption"` 通过（`4 passed, 149 deselected`）。
 - `tests/test_import_to_library.py -k "raw_bt"` 通过（`8 passed, 145 deselected`）。
 - `tests/test_import_to_library.py -k "resolve_metadata_title_year or extract_title_year_for_scrape"` 通过（`5 passed, 148 deselected`）。
