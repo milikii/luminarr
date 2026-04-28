@@ -10,8 +10,8 @@ from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceEr
 from app.db.job_event_repo import JobEventRepo, JobEventPersistenceError
 from app.db.sqlite import SqliteDatabase
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError
-from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.add_pending_context import PendingAddContext
+from app.services.add_to_downloader import AddExecutionFollowUpService
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE
 
 
