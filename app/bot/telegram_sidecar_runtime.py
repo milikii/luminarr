@@ -240,9 +240,10 @@ def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
 
 
 def _log_bt_subscription_scheduler_loop_error(*, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 订阅后台扫描失败]\033[0m 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite 和 Telegram 发送链路后等待下一轮自动扫描。"
+    emit_operational_log(
+        title="BT 订阅后台扫描失败",
+        detail=f"原因={error}",
+        fix_hint="检查 Prowlarr、SQLite 和 Telegram 发送链路后等待下一轮自动扫描。",
     )
 
 
@@ -255,9 +256,10 @@ def _log_bt_subscription_scheduler_result_unavailable() -> None:
 
 
 def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception) -> None:
-    print(
-        f"\033[31m[BT 订阅后台通知失败]\033[0m chat_id={chat_id} 原因={error}\n"
-        "\033[33m[处理建议]\033[0m 检查 Telegram Bot Token、聊天可达性和网络连通性后等待下一轮自动扫描。"
+    emit_operational_log(
+        title="BT 订阅后台通知失败",
+        detail=f"chat_id={chat_id} 原因={error}",
+        fix_hint="检查 Telegram Bot Token、聊天可达性和网络连通性后等待下一轮自动扫描。",
     )
 
 

@@ -13,6 +13,7 @@ from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler
 
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
+from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_loop_error, _log_bt_subscription_scheduler_send_error
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.bot.telegram_runtime_adapter import (
     build_telegram_application as build_application,
@@ -7002,6 +7003,29 @@ def test_run_bt_subscription_scheduler_tick_once_logs_result_unavailable(capsys:
     assert "[BT 订阅后台扫描结果不可用]" in output
     assert "[处理建议]" in output
     application.bot.send_message.assert_not_awaited()
+
+
+def test_log_bt_subscription_scheduler_loop_error_uses_shared_log(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _log_bt_subscription_scheduler_loop_error(error=RuntimeError("scan failed"))
+
+    output = capsys.readouterr().out
+    assert "[BT 订阅后台扫描失败]" in output
+    assert "scan failed" in output
+    assert "[处理建议]" in output
+
+
+def test_log_bt_subscription_scheduler_send_error_uses_shared_log(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _log_bt_subscription_scheduler_send_error(chat_id=1001, error=RuntimeError("telegram down"))
+
+    output = capsys.readouterr().out
+    assert "[BT 订阅后台通知失败]" in output
+    assert "chat_id=1001" in output
+    assert "telegram down" in output
+    assert "[处理建议]" in output
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
