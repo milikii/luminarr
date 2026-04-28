@@ -142,7 +142,11 @@ async def stop_download_follow_up_scheduler(
     if isinstance(stop_event, asyncio.Event):
         stop_event.set()
     if isinstance(task, asyncio.Task):
-        await task
+        try:
+            await task
+        except Exception as error:
+            _log_post_download_auto_import_scheduler_stop_error(error=error)
+            raise
 
     stop_event = application.bot_data.pop(download_completion_polling_stop_event_key, None)
     task = application.bot_data.pop(download_completion_polling_task_key, None)
@@ -169,6 +173,14 @@ def _log_post_download_auto_import_scheduler_state_unavailable(*, scanned: int) 
         title="下载完成后台轮询状态读取失败",
         detail=f"scanned={scanned}",
         fix_hint="检查 download_monitor、job_event 和导入审批链路的持久化状态；当前这轮自动导入已跳过异常记录，下一轮仍会继续尝试。",
+    )
+
+
+def _log_post_download_auto_import_scheduler_stop_error(*, error: Exception) -> None:
+    emit_operational_log(
+        title="下载完成后台轮询停止失败",
+        detail=f"原因={error}",
+        fix_hint="检查 post-download auto-import 后台 task 的异常日志；当前停机将继续上抛该错误，避免静默吞掉未完成的导入后处理。",
     )
 
 

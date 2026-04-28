@@ -303,6 +303,36 @@ def test_stop_download_follow_up_scheduler_stops_download_completion_polling_tas
     asyncio.run(run())
 
 
+def test_stop_download_follow_up_scheduler_logs_fix_hint_when_auto_import_task_fails(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def boom() -> None:
+        raise RuntimeError("auto import boom")
+
+    async def run() -> None:
+        failing_task = asyncio.create_task(boom())
+        application = SimpleNamespace(
+            bot_data={
+                POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY: asyncio.Event(),
+                POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY: failing_task,
+            }
+        )
+        with pytest.raises(RuntimeError, match="auto import boom"):
+            await stop_download_follow_up_scheduler(
+                application=application,
+                post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
+                post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
+                download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
+                download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
+            )
+
+    asyncio.run(run())
+    captured = capsys.readouterr()
+    assert "[下载完成后台轮询停止失败]" in captured.out
+    assert "auto import boom" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_stop_download_follow_up_scheduler_logs_fix_hint_when_completion_polling_task_fails(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
