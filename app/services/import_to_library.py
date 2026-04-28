@@ -18,13 +18,13 @@ from app.services.import_approval_state import ImportApprovalState, ImportTarget
 from app.services.import_cancel_state import ImportCancelState
 from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
 from app.services.import_confirm_expiry_state import ImportConfirmExpiryState
-from app.services.import_confirmed_media_identity import ImportConfirmedMediaIdentityResolver
 from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_job_state import ImportJobState
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
+from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_from_json
 from app.services.workflow_trace_logger import WorkflowTraceLogger
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
@@ -77,6 +77,7 @@ IMPORT_CLAIM_PENDING_JOB_RESULT_MISSING_REASON = "job missing during lease claim
 IMPORT_RESTORE_PENDING_JOB_RESULT_MISSING_REASON = "job missing during state transition"
 IMPORT_MARK_COMPLETED_JOB_RESULT_MISSING_REASON = "import completed job result missing"
 IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON = "downloader job missing during raw_bt check"
+IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON = "import media identity result missing"
 
 
 class ImportToLibraryService:
@@ -127,13 +128,12 @@ class ImportToLibraryService:
         )
         self._pending_import_identities = self._approval_state.pending_import_identities
         self._pending_import_lease_versions = self._approval_state.pending_import_lease_versions
-        self._confirmed_media_identity_resolver = ImportConfirmedMediaIdentityResolver(job_event_repo=job_event_repo)
         self._post_processing_service = ImportPostProcessingService(
             refresh_media_server_func=refresh_media_server_func,
             scrape_metadata_func=scrape_metadata_func,
             translate_subtitle_func=translate_subtitle_func,
             resolve_metadata_title_year_func=self._resolve_metadata_title_year,
-            resolve_metadata_tmdb_id_func=self._confirmed_media_identity_resolver.resolve_tmdb_id,
+            resolve_metadata_tmdb_id_func=self._resolve_confirmed_media_tmdb_id,
             record_event_func=self._record_event,
         )
         self._prepare_state = ImportPrepareState(
@@ -365,7 +365,7 @@ class ImportToLibraryService:
 
     def _resolve_metadata_title_year(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
         fallback_title, fallback_year = extract_title_year_for_scrape(target_path)
-        confirmed_media_identity = self._confirmed_media_identity_resolver.resolve(task_id=task_id, task_hash=task_hash)
+        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
         if confirmed_media_identity is not None:
             title = (
                 confirmed_media_identity.get("title", "").strip()
@@ -387,6 +387,35 @@ class ImportToLibraryService:
         title = title_from_truth or fallback_title
         year = year_from_truth or fallback_year
         return title, year
+
+    def _resolve_confirmed_media_identity(self, *, task_id: str, task_hash: str) -> dict[str, str] | None:
+        if self._job_event_repo is None:
+            return None
+        try:
+            events = self._job_event_repo.list_events_for_task_identity(task_id=task_id, task_hash=task_hash)
+            if events is None:
+                raise JobEventPersistenceError(IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON)
+        except (JobEventPersistenceError, sqlite3.Error) as error:
+            if str(error) == IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON:
+                self._log_import_media_identity_result_missing(task_id=task_id, task_hash=task_hash, reason=str(error))
+            elif _is_import_media_identity_row_corrupted_error(error):
+                self._log_import_media_identity_row_corrupted(task_id=task_id, task_hash=task_hash, reason=str(error))
+            else:
+                self._log_import_media_identity_query_failed(task_id=task_id, task_hash=task_hash, reason=str(error))
+            return None
+        for event in reversed(events):
+            if event.event_type != MEDIA_IDENTITY_EVENT_TYPE:
+                continue
+            media_identity = media_identity_from_json(event.message)
+            if media_identity is not None:
+                return media_identity
+        return None
+
+    def _resolve_confirmed_media_tmdb_id(self, task_id: str, task_hash: str) -> str:
+        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
+        if confirmed_media_identity is None:
+            return ""
+        return confirmed_media_identity.get("tmdb_id", "").strip()
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         return self._approval_state.record_pending_approval_with_copy_fallback_reset(
@@ -726,6 +755,27 @@ class ImportToLibraryService:
                 fix_hint="检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
             )
 
+    def _log_import_media_identity_query_failed(self, *, task_id: str, task_hash: str, reason: str) -> None:
+        emit_operational_log(
+            title="导入媒体身份查询失败",
+            detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+            fix_hint="检查 SQLite/job_event 表读取是否正常；当前 metadata 入参会退回命名真相或文件名解析，避免把查询失败混成普通“无媒体身份”。",
+        )
+
+    def _log_import_media_identity_result_missing(self, *, task_id: str, task_hash: str, reason: str) -> None:
+        emit_operational_log(
+            title="导入媒体身份结果缺失",
+            detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+            fix_hint="检查 job_event 查询返回是否仍带有完整结果；当前 metadata 入参会退回命名真相或文件名解析，避免把缺失真相误判成“没有已确认媒体身份”。",
+        )
+
+    def _log_import_media_identity_row_corrupted(self, *, task_id: str, task_hash: str, reason: str) -> None:
+        emit_operational_log(
+            title="导入媒体身份记录损坏",
+            detail=f"task_id={task_id} task_hash={task_hash} 错误={reason}",
+            fix_hint="检查 job_event 里的 task_ref / event_type / message 等媒体身份字段是否仍是完整记录；当前 metadata 入参会退回命名真相或文件名解析，避免把坏记录混成普通查询失败。",
+        )
+
     def _log_raw_bt_lookup_failed(self, *, chat_id: int, task_ref: str, reason: str) -> None:
         emit_operational_log(
             title="导入 raw_bt 判定查询失败",
@@ -801,4 +851,8 @@ def _is_import_event_row_corrupted_error(error: Exception) -> bool:
 
 
 def _is_import_target_lookup_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
+
+
+def _is_import_media_identity_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
 from app.db.job_event_repo import JobEventPersistenceError
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
-from app.services.import_confirmed_media_identity import ImportConfirmedMediaIdentityResolver
+from app.services.import_to_library import ImportToLibraryService
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json
+
+
+def _build_service(tmp_path: Path, *, job_event_repo: object | None = None) -> ImportToLibraryService:
+    return ImportToLibraryService(
+        get_import_source_func=AsyncMock(),
+        library_target_dir=str(tmp_path / "library"),
+        job_event_repo=job_event_repo,
+    )
 
 
 def test_import_confirmed_media_identity_resolver_reads_latest_media_identity(tmp_path: Path) -> None:
@@ -30,13 +39,13 @@ def test_import_confirmed_media_identity_resolver_reads_latest_media_identity(tm
         ),
     )
 
-    resolver = ImportConfirmedMediaIdentityResolver(job_event_repo=event_repo)
+    service = _build_service(tmp_path, job_event_repo=event_repo)
 
-    media_identity = resolver.resolve(task_id="task-1", task_hash="hash-1")
+    media_identity = service._resolve_confirmed_media_identity(task_id="task-1", task_hash="hash-1")
 
     assert media_identity is not None
     assert media_identity["tmdb_id"] == "12345"
-    assert resolver.resolve_tmdb_id("task-1", "hash-1") == "12345"
+    assert service._resolve_confirmed_media_tmdb_id("task-1", "hash-1") == "12345"
 
 
 def test_import_confirmed_media_identity_resolver_returns_none_without_events(tmp_path: Path) -> None:
@@ -44,10 +53,10 @@ def test_import_confirmed_media_identity_resolver_returns_none_without_events(tm
     database.initialize()
     event_repo = JobEventRepo(database)
 
-    resolver = ImportConfirmedMediaIdentityResolver(job_event_repo=event_repo)
+    service = _build_service(tmp_path, job_event_repo=event_repo)
 
-    assert resolver.resolve(task_id="task-1", task_hash="hash-1") is None
-    assert resolver.resolve_tmdb_id("task-1", "hash-1") == ""
+    assert service._resolve_confirmed_media_identity(task_id="task-1", task_hash="hash-1") is None
+    assert service._resolve_confirmed_media_tmdb_id("task-1", "hash-1") == ""
 
 
 def test_import_confirmed_media_identity_resolver_logs_persistence_failure(capsys) -> None:
@@ -55,9 +64,13 @@ def test_import_confirmed_media_identity_resolver_logs_persistence_failure(capsy
         def list_events_for_task_identity(self, *, task_id: str, task_hash: str):
             raise JobEventPersistenceError("job_event down")
 
-    resolver = ImportConfirmedMediaIdentityResolver(job_event_repo=FailingJobEventRepo())  # type: ignore[arg-type]
+    service = ImportToLibraryService(  # type: ignore[arg-type]
+        get_import_source_func=AsyncMock(),
+        library_target_dir="library",
+        job_event_repo=FailingJobEventRepo(),
+    )
 
-    assert resolver.resolve(task_id="task-1", task_hash="hash-1") is None
+    assert service._resolve_confirmed_media_identity(task_id="task-1", task_hash="hash-1") is None
     output = capsys.readouterr().out
     assert "[导入媒体身份查询失败]" in output
     assert "job_event down" in output
@@ -68,7 +81,11 @@ def test_import_confirmed_media_identity_resolver_does_not_swallow_programming_e
         def list_events_for_task_identity(self, *, task_id: str, task_hash: str):
             raise ValueError("bad fake")
 
-    resolver = ImportConfirmedMediaIdentityResolver(job_event_repo=BrokenJobEventRepo())  # type: ignore[arg-type]
+    service = ImportToLibraryService(  # type: ignore[arg-type]
+        get_import_source_func=AsyncMock(),
+        library_target_dir="library",
+        job_event_repo=BrokenJobEventRepo(),
+    )
 
     with pytest.raises(ValueError, match="bad fake"):
-        resolver.resolve(task_id="task-1", task_hash="hash-1")
+        service._resolve_confirmed_media_identity(task_id="task-1", task_hash="hash-1")
