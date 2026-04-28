@@ -86,6 +86,15 @@ class Settings:
     wecom_webhook_port: int
     wecom_webhook_path: str
 
+    def has_prowlarr_search(self) -> bool:
+        return bool(self.prowlarr_base_url and self.prowlarr_api_key)
+
+    def has_legacy_transmission_downloader(self) -> bool:
+        return bool(self.transmission_base_url)
+
+    def has_any_downloader_dispatch(self) -> bool:
+        return self.has_legacy_transmission_downloader() or bool(self.downloader_instances)
+
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
     value = env.get(key, "").strip()
@@ -455,6 +464,14 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
     fanart_base_url = _read_base_url(env, "FANART_BASE_URL")
     subtitle_translation_base_url = _read_base_url(env, "SUBTITLE_TRANSLATION_BASE_URL")
     feishu_base_url = _read_base_url(env, "FEISHU_BASE_URL")
+    prowlarr_base_url = _read_base_url(env, "PROWLARR_BASE_URL")
+    prowlarr_api_key = _read_optional(env, "PROWLARR_API_KEY")
+    _require_complete_credential_set(
+        has_any=bool(prowlarr_base_url or prowlarr_api_key),
+        has_all=bool(prowlarr_base_url and prowlarr_api_key),
+        error_message="PROWLARR_BASE_URL and PROWLARR_API_KEY must be set together",
+    )
+    transmission_base_url = _read_base_url(env, "TRANSMISSION_BASE_URL")
     subtitle_translation_timeout_seconds = _read_optional_float(
         env,
         "SUBTITLE_TRANSLATION_TIMEOUT_SECONDS",
@@ -480,16 +497,18 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         error_message="WECOM_TOKEN, WECOM_ENCODING_AES_KEY and WECOM_RECEIVE_ID must be set together",
     )
     downloader_instances = _read_downloader_instances(env)
+    if not transmission_base_url and not downloader_instances:
+        raise ConfigError("TRANSMISSION_BASE_URL or DOWNLOADER_INSTANCES is required")
     return Settings(
         telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
         outbound_proxy_url=_normalize_proxy_url(_read_optional(env, "OUTBOUND_PROXY_URL")),
-        prowlarr_base_url=_read_base_url(env, "PROWLARR_BASE_URL", required=True),
-        prowlarr_api_key=_read_required(env, "PROWLARR_API_KEY"),
+        prowlarr_base_url=prowlarr_base_url,
+        prowlarr_api_key=prowlarr_api_key,
         tmdb_base_url=tmdb_base_url or "https://api.themoviedb.org",
         tmdb_api_key=_read_optional(env, "TMDB_API_KEY"),
         fanart_base_url=fanart_base_url or "https://webservice.fanart.tv/v3",
         fanart_api_key=_read_optional(env, "FANART_API_KEY"),
-        transmission_base_url=_read_base_url(env, "TRANSMISSION_BASE_URL", required=True),
+        transmission_base_url=transmission_base_url,
         transmission_username=_read_optional(env, "TRANSMISSION_USERNAME"),
         transmission_password=_read_optional(env, "TRANSMISSION_PASSWORD"),
         library_target_dir=_read_optional(env, "LIBRARY_TARGET_DIR") or "/data/library/movies",

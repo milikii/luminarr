@@ -7,6 +7,11 @@ from app.bot.execution_runtime import bt_subscription_policy_action, run_sync_wi
 from app.services.manage_bt_subscription import BtSubscriptionDispatchContext
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
+BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY = "bt_subscription_capability_unavailable_text"
+BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT = (
+    "BT 订阅当前不可用：缺少 PROWLARR_BASE_URL / PROWLARR_API_KEY。\n"
+    "请补齐配置后重试。"
+)
 
 
 def _resolve_bt_subscription_dispatch_context(
@@ -55,6 +60,10 @@ async def handle_bt_subscription_query(
         return True
 
     if bt_subscription_command.action == "run":
+        unavailable_text = bot_data.get(BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY)
+        if isinstance(unavailable_text, str) and unavailable_text.strip():
+            await reply_func(unavailable_text.strip())
+            return True
         dispatch_context, reply_text = _resolve_bt_subscription_dispatch_context(
             bot_data=bot_data,
             tg=tg,

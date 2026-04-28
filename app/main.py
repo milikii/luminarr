@@ -10,6 +10,14 @@ from app.bot.feishu_long_connection import (
     FeishuLongConnectionConfig,
     FeishuLongConnectionService,
 )
+from app.bot.private_chat_bt_subscription_runtime import (
+    BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT,
+    BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
+)
+from app.bot.private_chat_search_runtime import (
+    SEARCH_CAPABILITY_UNAVAILABLE_TEXT,
+    SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
+)
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
@@ -82,14 +90,24 @@ def _run_application_polling(application) -> None:
 def _resolve_downloader_client_for_dispatch(
     *,
     downloader_name: str,
-    transmission_client: TransmissionClient,
+    transmission_client: TransmissionClient | None,
     downloader_instances_by_name: dict[str, DownloaderInstanceConfig],
     transmission_clients_by_name: dict[str, TransmissionClient],
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionClient | QbittorrentClient:
     cleaned_name = downloader_name.strip()
     if not cleaned_name:
-        return transmission_client
+        if transmission_client is not None:
+            return transmission_client
+        _emit_downloader_issue_log(
+            title="下载器投递路由失败",
+            context_label="downloader_name",
+            context_value=_format_downloader_context(downloader_name="-", downloader_type="-"),
+            detail_label="原因",
+            detail_value="legacy fallback unavailable",
+            fix_hint="当前未配置 legacy TRANSMISSION_BASE_URL；请确保任务写入显式 downloader_name，或补齐 legacy Transmission 配置后重试。",
+        )
+        raise ValueError("legacy transmission client not configured for implicit fallback")
     cleaned_name, instance, client = _resolve_downloader_instance_and_client(
         downloader_name=cleaned_name,
         downloader_instances_by_name=downloader_instances_by_name,
@@ -221,10 +239,10 @@ def main() -> None:
     watchlist_repo = WatchlistRepo(database)
     clarification_repo = ClarificationRepo(database)
 
-    prowlarr_client = ProwlarrClient(
-        base_url=settings.prowlarr_base_url,
-        api_key=settings.prowlarr_api_key,
-    )
+    async def search_capability_unavailable(_: str) -> list[dict[str, object]]:
+        return []
+
+    prowlarr_client: ProwlarrClient | None = None
     bt_source_providers: list[BtSourceProvider] = []
     for source_name in settings.bt_web_sources:
         rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
@@ -239,7 +257,12 @@ def main() -> None:
         bt_source_providers.append(
             BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page)
         )
-    bt_source_providers.append(BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search))
+    if settings.has_prowlarr_search():
+        prowlarr_client = ProwlarrClient(
+            base_url=settings.prowlarr_base_url,
+            api_key=settings.prowlarr_api_key,
+        )
+        bt_source_providers.append(BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search))
     bt_source_adapter = BtSourceAdapter(tuple(bt_source_providers))
     tmdb_lookup_movie_func = None
     scrape_metadata_func = None
@@ -278,7 +301,7 @@ def main() -> None:
         )
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(
-        search_func=prowlarr_client.search,
+        search_func=prowlarr_client.search if prowlarr_client is not None else search_capability_unavailable,
         raw_search_func=bt_source_adapter.search,
         raw_page_search_func=bt_source_adapter.search_page,
         candidate_repo=candidate_repo,
@@ -289,11 +312,13 @@ def main() -> None:
             proxy_url=settings.outbound_proxy_url,
         ).lookup,
     )
-    transmission_client = TransmissionClient(
-        base_url=settings.transmission_base_url,
-        username=settings.transmission_username,
-        password=settings.transmission_password,
-    )
+    transmission_client: TransmissionClient | None = None
+    if settings.has_legacy_transmission_downloader():
+        transmission_client = TransmissionClient(
+            base_url=settings.transmission_base_url,
+            username=settings.transmission_username,
+            password=settings.transmission_password,
+        )
     downloader_instances_by_name = {instance.name: instance for instance in settings.downloader_instances}
     transmission_clients_by_name: dict[str, TransmissionClient] = {}
     for instance in settings.downloader_instances:
@@ -451,6 +476,11 @@ def main() -> None:
         downloader_role_binding=settings.downloader_role_binding,
         outbound_proxy_url=settings.outbound_proxy_url,
     )
+    if not settings.has_prowlarr_search():
+        application.bot_data[SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY] = SEARCH_CAPABILITY_UNAVAILABLE_TEXT
+        application.bot_data[BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY] = (
+            BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT
+        )
     if trace_log_path is not None:
         application.bot_data[TRACE_LOG_PATH_BOT_DATA_KEY] = trace_log_path
     application.bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()

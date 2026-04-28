@@ -6,6 +6,8 @@ from types import SimpleNamespace
 import pytest
 from telegram.error import NetworkError
 
+from app.bot import telegram_bot as tg
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.db.job_repo import JobPersistenceError
 from app.downloader_route_lookup import (
     DownloaderRouteLookupError,
@@ -18,6 +20,7 @@ from app.main import (
     _build_refresh_media_server_func,
     _resolve_downloader_client_for_dispatch,
     _run_application_polling,
+    main as run_main,
 )
 
 
@@ -327,6 +330,24 @@ def test_resolve_downloader_client_for_dispatch_rejects_unknown_explicit_instanc
         )
 
 
+def test_resolve_downloader_client_for_dispatch_rejects_implicit_fallback_without_legacy_client(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(ValueError, match="legacy transmission client not configured for implicit fallback"):
+        _resolve_downloader_client_for_dispatch(
+            downloader_name="",
+            transmission_client=None,
+            downloader_instances_by_name={},
+            transmission_clients_by_name={},
+            qbittorrent_clients_by_name={},
+        )
+
+    captured = capsys.readouterr()
+    assert "[下载器投递路由失败]" in captured.out
+    assert "原因=legacy fallback unavailable" in captured.out
+    assert "[处理建议]" in captured.out
+
+
 def test_resolve_downloader_client_for_dispatch_logs_unknown_explicit_instance(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -560,6 +581,174 @@ def test_build_refresh_media_server_func_wraps_plex_client(monkeypatch: pytest.M
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakePlexClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None
+
+
+class _MainSettings(SimpleNamespace):
+    def has_prowlarr_search(self) -> bool:
+        return bool(self.prowlarr_base_url and self.prowlarr_api_key)
+
+    def has_legacy_transmission_downloader(self) -> bool:
+        return bool(self.transmission_base_url)
+
+    def has_any_downloader_dispatch(self) -> bool:
+        return self.has_legacy_transmission_downloader() or bool(self.downloader_instances)
+
+
+def _build_main_settings(**overrides: object) -> _MainSettings:
+    defaults: dict[str, object] = {
+        "telegram_bot_token": "telegram-token",
+        "outbound_proxy_url": "",
+        "prowlarr_base_url": "",
+        "prowlarr_api_key": "",
+        "tmdb_base_url": "https://api.themoviedb.org",
+        "tmdb_api_key": "",
+        "fanart_base_url": "https://webservice.fanart.tv/v3",
+        "fanart_api_key": "",
+        "transmission_base_url": "",
+        "transmission_username": "",
+        "transmission_password": "",
+        "library_target_dir": "/data/library/movies",
+        "media_server_provider": "emby",
+        "emby_base_url": "",
+        "emby_api_key": "",
+        "jellyfin_base_url": "",
+        "jellyfin_api_key": "",
+        "plex_base_url": "",
+        "plex_token": "",
+        "subtitle_translation_api_key": "",
+        "subtitle_translation_base_url": "https://api.openai.com/v1",
+        "subtitle_translation_model": "gpt-5.4",
+        "subtitle_translation_timeout_seconds": 60.0,
+        "pt_min_seed_hours": 0,
+        "sqlite_db_path": "/tmp/luminarr.db",
+        "raw_bt_destination_options": (),
+        "adult_archive_destinations": (),
+        "adult_bt_retention_hours": 96,
+        "bt_web_sources": (),
+        "downloader_instances": (),
+        "downloader_role_binding": None,
+        "feishu_app_id": "",
+        "feishu_app_secret": "",
+        "feishu_base_url": "https://open.feishu.cn",
+        "wecom_token": "",
+        "wecom_encoding_aes_key": "",
+        "wecom_receive_id": "",
+        "wecom_webhook_host": "0.0.0.0",
+        "wecom_webhook_port": 18097,
+        "wecom_webhook_path": "/wecom/webhook",
+    }
+    defaults.update(overrides)
+    return _MainSettings(**defaults)
+
+
+class _FakeDatabase:
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        self.initialized = False
+
+    def initialize(self) -> None:
+        self.initialized = True
+
+
+def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        downloader_instances=(
+            DownloaderInstanceConfig(
+                name="qb-main",
+                downloader_type="qbittorrent",
+                base_url="http://qb:8080",
+                download_dir="/data/downloads/qb",
+            ),
+        ),
+        downloader_role_binding=DownloaderRoleBinding(pt_downloader="qb-main", bt_downloader="qb-main"),
+    )
+    created: dict[str, object] = {}
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    def _fake_build_application(
+        token: str,
+        search_service,
+        add_to_downloader_service,
+        get_download_status_service,
+        import_to_library_service,
+        cleanup_downloaded_source_service,
+        manage_watchlist_service,
+        manage_bt_subscription_service,
+        **kwargs: object,
+    ) -> SimpleNamespace:
+        app = SimpleNamespace(
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: search_service,
+                tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: manage_bt_subscription_service,
+                tg.DOWNLOADER_INSTANCES_KEY: kwargs["downloader_instances"],
+                tg.DOWNLOADER_ROLE_BINDING_KEY: kwargs["downloader_role_binding"],
+            }
+        )
+        created["token"] = token
+        created["app"] = app
+        return app
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr(
+        "app.main.JavLibraryReadOnlyHelperClient",
+        lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
+    )
+    monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fake_build_application)
+    monkeypatch.setattr("app.main._run_application_polling", lambda _application: None)
+    monkeypatch.setattr("app.main.ProwlarrClient", lambda **_kwargs: (_ for _ in ()).throw(AssertionError("ProwlarrClient should not be created")))
+    monkeypatch.setattr("app.main.TransmissionClient", lambda **_kwargs: (_ for _ in ()).throw(AssertionError("legacy TransmissionClient should not be created")))
+    monkeypatch.setattr(
+        "app.main.QbittorrentClient",
+        lambda **_kwargs: created.setdefault("qb_client_calls", []).append(_kwargs) or SimpleNamespace(),
+    )
+
+    run_main()
+
+    app = created["app"]
+    assert created["token"] == "telegram-token"
+    assert tg.SEARCH_SERVICE_KEY in app.bot_data
+    assert tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY in app.bot_data
+    assert app.bot_data[tg.DOWNLOADER_ROLE_BINDING_KEY] == settings.downloader_role_binding
+    assert app.bot_data[tg.DOWNLOADER_INSTANCES_KEY] == settings.downloader_instances
+    assert app.bot_data["search_capability_unavailable_text"].startswith("搜索能力当前不可用")
+    assert app.bot_data["bt_subscription_capability_unavailable_text"].startswith("BT 订阅当前不可用")
+    assert len(created["qb_client_calls"]) == 1
 
 
 async def _return_async(value):

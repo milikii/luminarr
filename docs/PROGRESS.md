@@ -92,3 +92,36 @@
 
 ### 下轮目标
 - 开始 `app/config.py` 启动硬依赖解耦
+
+## Round 6 — 2026-04-29 00:44
+
+### 完成
+- 定稿 `docs/plans/2026-04-29-config-startup-dependency-decoupling.md`
+- 锁定 config 主线方案 A：本轮只解耦 `PROWLARR_*` 与 legacy `TRANSMISSION_BASE_URL`；`TELEGRAM_BOT_TOKEN` 继续保持当前宿主必填
+- 同步更新 `docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/TASKS.md`，让当前主线真相与计划一致
+
+### 测试状态
+- 通过: 3 / 总计: 3
+
+### 遗留 / 下轮继续
+- 按定稿计划进入 `app/config.py` capability contract 实施
+
+### 下轮目标
+- 先补 capability matrix 和 focused tests，再收口 config 校验与启动装配
+
+## Round 7 — 2026-04-29 01:38
+
+### 完成
+- 完成 `app/config.py` 启动硬依赖解耦方案 A：`PROWLARR_*` 改为能力必填，legacy `TRANSMISSION_BASE_URL` 改为在已有可用 downloader instances 时可选
+- 同步收口 `app/main.py` 装配、搜索 / `btsub run` unavailable guard、legacy downloader fallback fail-closed 语义
+- 补齐 focused tests、`.env.example` 与 `docs/GETTING_STARTED.md` 能力边界说明
+- 通过 reviewer 反馈闭环，确认 `bt搜` / `bt批量` 不被误伤，`btsub list/add/remove/clear` 在降级标记存在时仍可用
+
+### 测试状态
+- 通过: 3 / 总计: 3
+
+### 遗留 / 下轮继续
+- 进入 `telegram_sidecar_runtime.py` 宿主解耦主线
+
+### 下轮目标
+- 先盘点 Telegram `Application` 生命周期下当前承载的 sidecar 与 scheduler，再拆出非 Telegram 运行所需的宿主边界

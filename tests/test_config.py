@@ -534,26 +534,43 @@ def test_load_settings_requires_prowlarr_fields() -> None:
         load_settings(
             {
                 "TELEGRAM_BOT_TOKEN": "token",
-                "TRANSMISSION_BASE_URL": "http://transmission:9091",
-            }
-        )
-    with pytest.raises(ConfigError):
-        load_settings(
-            {
-                "TELEGRAM_BOT_TOKEN": "token",
                 "PROWLARR_BASE_URL": "http://prowlarr:9696",
                 "TRANSMISSION_BASE_URL": "http://transmission:9091",
             }
         )
 
 
-def test_load_settings_requires_transmission_base_url() -> None:
+def test_load_settings_allows_missing_prowlarr_when_downloader_is_configured() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091",
+        }
+    )
+
+    assert settings.prowlarr_base_url == ""
+    assert settings.prowlarr_api_key == ""
+    assert settings.has_prowlarr_search() is False
+
+
+def test_load_settings_allows_downloader_instances_without_legacy_transmission_base_url() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token",
+            "DOWNLOADER_INSTANCES": "qb-main|qb|http://qb:8080|/data/downloads/qb",
+        }
+    )
+
+    assert settings.transmission_base_url == ""
+    assert len(settings.downloader_instances) == 1
+    assert settings.has_any_downloader_dispatch() is True
+
+
+def test_load_settings_requires_any_downloader_dispatch_path() -> None:
     with pytest.raises(ConfigError):
         load_settings(
             {
                 "TELEGRAM_BOT_TOKEN": "token",
-                "PROWLARR_BASE_URL": "http://prowlarr:9696",
-                "PROWLARR_API_KEY": "api-key",
             }
         )
 

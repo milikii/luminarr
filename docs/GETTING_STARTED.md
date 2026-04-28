@@ -53,11 +53,13 @@ cp .env.example .env
 
 这里只补几个最容易忘的约束：
 
-- 当前启动硬必填仍是 `TELEGRAM_BOT_TOKEN`、`PROWLARR_BASE_URL`、`PROWLARR_API_KEY`、`TRANSMISSION_BASE_URL`
+- 当前启动硬必填仍是 `TELEGRAM_BOT_TOKEN`
+- `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` 现在是能力必填：只有你要用 PT / 自然语言搜索，或依赖 Prowlarr 的 `btsub` 扫描时才需要；要么都空、要么都填
+- `TRANSMISSION_BASE_URL` 现在是 legacy 单实例回退必填：如果你已经配置了可用的 `DOWNLOADER_INSTANCES`，它可以留空；如果两者都没配，启动仍会 fail-closed
 - 如果你还要跑 import / refresh 联调，再补 `LIBRARY_TARGET_DIR`、`EMBY_BASE_URL`、`EMBY_API_KEY`
 - 如果你要跑当前成人 BT 专线，再补 `ADULT_ARCHIVE_DESTINATIONS`；统一保留窗口可选 `ADULT_BT_RETENTION_HOURS`，默认 `96`
 - 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
-- `DOWNLOADER_INSTANCES` 不能替代 `TRANSMISSION_BASE_URL`；如果你填了多实例但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
+- 如果你填了 `DOWNLOADER_INSTANCES` 但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
 - direct magnet 入口当前仍会先问“观影 PT 链 / BT 成人链”；不会因为你配置了成人 BT 站点就自动走成人链
 - Feishu SDK 长连接只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对配置；WeCom 三元组必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
 
@@ -157,8 +159,8 @@ docker compose logs -f luminarr
 
 这个项目是自用部署，主 `docker-compose.yml` 只启 Luminarr 本体；Transmission / qBittorrent、Emby、Prowlarr 这三项**不**内置，请你自己在宿主机或其他机器上先跑起来。以下是部署前必须准备好的外部资源：
 
-- **Transmission 或 qBittorrent**：至少一个能正常接受 RPC 投递的实例。如果用 Transmission，记下它的 RPC 地址（如 `http://宿主机 IP:19091`）和用户名密码（如果开了鉴权）。
-- **Prowlarr**：当前 PT 主来源，需要一个能正常返回搜索结果的实例，以及一把可读取的 API Key。
+- **Transmission 或 qBittorrent**：至少一个能正常接受 RPC 投递的实例。如果你走 legacy 单实例 Transmission 回退，就填 `TRANSMISSION_BASE_URL`；如果你走 `DOWNLOADER_INSTANCES`，至少配 1 个实例并确认角色绑定有效。
+- **Prowlarr**：当前 PT 主来源，也是默认 `btsub` 搜索来源；只有你要跑 PT / 自然语言搜索或依赖 Prowlarr 的订阅扫描时才是条件必填。缺它时应用仍可启动，但搜索类能力会明确回复 unavailable。
 - **Emby**：入库刷新目标，需要 `EMBY_BASE_URL` 和 `EMBY_API_KEY`。
 - **TMDB API Key**：不填会关闭 metadata 增强，但不阻塞启动。
 - **Fanart.tv API Key**：不填会关闭 fanart 抓取，不阻塞启动。
@@ -304,6 +306,11 @@ make run
 
 因为这两个渠道当前是可选入口。
 只要 Feishu 应用凭据或 WeCom 三元组留空，对应渠道就不会启动。
+
+### 为什么现在缺 Prowlarr 也能启动
+
+因为 `Prowlarr` 已经从“全局启动硬依赖”收口成“搜索能力依赖”。
+只要 Telegram 宿主和至少一条下载器投递路径仍然成立，应用就可以启动；但 PT / 自然语言搜索和依赖 Prowlarr 的 `btsub` 扫描会明确回复 unavailable，不会再把缺配置拖成启动崩溃。
 
 ### 为什么 Docker Compose 里还要挂 `/data`
 

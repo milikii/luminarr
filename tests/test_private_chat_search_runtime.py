@@ -3,7 +3,11 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
-from app.bot.private_chat_search_runtime import handle_search_query_fallback
+from app.bot.private_chat_search_runtime import (
+    SEARCH_CAPABILITY_UNAVAILABLE_TEXT,
+    SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
+    handle_search_query_fallback,
+)
 from app.bot import telegram_bot as tg
 from app.services.search_media import SearchMediaService
 
@@ -123,3 +127,29 @@ def test_handle_search_query_fallback_replies_service_not_ready_without_search_s
     assert handled is True
     assert execution_gate.actions == []
     reply_func.assert_awaited_once_with(tg.SERVICE_NOT_READY_TEXT)
+
+
+def test_handle_search_query_fallback_replies_explicit_unavailable_text_when_search_capability_is_disabled() -> None:
+    reply_func = AsyncMock()
+    execution_gate = _ExecutionGate()
+
+    handled = asyncio.run(
+        handle_search_query_fallback(
+            query="dune",
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY: SEARCH_CAPABILITY_UNAVAILABLE_TEXT,
+            },
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            chat_id=1001,
+            channel="telegram",
+            bt_processing_path_pending=False,
+            bt_classification_pending=False,
+            tg=tg,
+        )
+    )
+
+    assert handled is True
+    assert execution_gate.actions == []
+    reply_func.assert_awaited_once_with(SEARCH_CAPABILITY_UNAVAILABLE_TEXT)
