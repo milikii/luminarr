@@ -1,11 +1,11 @@
-# Next step (v408)
+# Next step (v409)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
 - 本轮已继续统一 Telegram sidecar 日志出口：
-  - `telegram_sidecar_runtime` 的 WeCom webhook “启动失败”日志已切到 shared operational logging。
-- 本轮补了 WeCom sidecar focused regression，守住日志标题、detail 和 fix hint。
+  - `telegram_sidecar_runtime` 的 personal WeChat 私聊文本服务“配置无效”日志已切到 shared operational logging。
+- 本轮补了 personal WeChat sidecar focused regression，守住日志标题、detail 和 fix hint。
 - focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。

@@ -13,10 +13,12 @@ from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler
 
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
+from app.bot.personal_wechat_text import PERSONAL_WECHAT_TEXT_SERVICE_KEY
 from app.bot.telegram_sidecar_runtime import (
     TELEGRAM_SIDECAR_RUNTIME_CONFIG,
     _log_bt_subscription_scheduler_loop_error,
     _log_bt_subscription_scheduler_send_error,
+    _start_personal_wechat_text_service_if_available,
     _start_wecom_webhook_server_if_configured,
 )
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
@@ -7081,6 +7083,19 @@ def test_start_wecom_webhook_server_if_configured_logs_bind_failure(
     output = capsys.readouterr().out
     assert "[WeCom webhook 启动失败]" in output
     assert "address already in use" in output
+    assert "[处理建议]" in output
+
+
+def test_start_personal_wechat_text_service_if_available_logs_invalid_service(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    application = SimpleNamespace(bot_data={PERSONAL_WECHAT_TEXT_SERVICE_KEY: object()})
+
+    asyncio.run(_start_personal_wechat_text_service_if_available(application))
+
+    output = capsys.readouterr().out
+    assert "[personal WeChat 私聊文本服务配置无效]" in output
+    assert "不是有效服务实例" in output
     assert "[处理建议]" in output
 
 
