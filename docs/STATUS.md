@@ -25,6 +25,7 @@
 - 本轮把导入链单消费者 `ImportConfirmExecutionTail` 合并回 `import_to_library.py`，删除 `import_confirm_execution_tail.py` 小文件，confirm 执行后的 imported / copy-fallback / failed 收尾保持不变。
 - 本轮把 add 链单消费者 `AddPendingPresenceState` 合并回 `add_to_downloader.py`，删除 `add_pending_presence_state.py` 小文件，待确认下载存在性查询保持不变。
 - 本轮把 add 链单消费者 `AddPendingWriteThroughState` 合并回 `add_to_downloader.py`，删除 `add_pending_write_through_state.py` 小文件，待确认下载写通、失败回滚与审批 pending 回复保持不变。
+- 本轮把 add 链单消费者 `AddConfirmExecutionTail` 合并回 `add_to_downloader.py`，删除 `add_confirm_execution_tail.py` 小文件，下载确认执行失败回退与 finalize 收尾保持不变。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -33,7 +34,7 @@
 ## Current health
 - 默认分支质量 gate 仍是可复验的；本轮收尾重新跑过 `make quality`，结果仍为 `27 passed, 0 skipped`。
 - 当前没有新的业务回归信号；这次切线来自文档决策，不是红灯修复。
-- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests；当前优先候选切到 add 链单消费者小文件 `add_confirm_execution_tail.py`。
+- 本轮已完成本次“连续推进十轮”的最小闭环目标；收尾阶段先重新跑总质量 gate 和主线验证，再决定下一条更保守候选。
 
 ## Latest verification
 - `make verify-mainline` 通过。
@@ -48,6 +49,7 @@
 - `tests/test_import_to_library.py -k "confirm_execute or confirm_finalize or copy_fallback_pending or finalization_warning or pending_copy_approval or import_failed"` 通过（`6 passed, 147 deselected`）。
 - `tests/test_add_to_downloader.py -k "has_pending_add"` 通过（`3 passed, 109 deselected`）。
 - `tests/test_add_to_downloader.py -k "approval_pending or add_pending_state_unavailable or persist_pending_add or pending_add"` 通过（`15 passed, 97 deselected`）。
+- `tests/test_add_to_downloader.py -k "confirm_finalize or approval_confirmed or add_confirm_state_unavailable or mark_completed_job or confirm"` 通过（`41 passed, 71 deselected`）。
 - `tests/test_import_to_library.py -k "rebuild_confirm_context or context_lookup_failure or context_row_corruption"` 通过（`4 passed, 149 deselected`）。
 - `tests/test_import_to_library.py -k "raw_bt"` 通过（`8 passed, 145 deselected`）。
 - `tests/test_import_to_library.py -k "resolve_metadata_title_year or extract_title_year_for_scrape"` 通过（`5 passed, 148 deselected`）。

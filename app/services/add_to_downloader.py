@@ -18,7 +18,6 @@ from app.services.add_confirm_approval_state import (
     AddConfirmApprovalState,
 )
 from app.services.add_confirm_context_state import AddConfirmContextState, ConfirmExecutionContext
-from app.services.add_confirm_execution_tail import AddConfirmExecutionTail
 from app.services.add_confirm_finalization_state import AddConfirmFinalizationState
 from app.services.add_confirm_job_state import AddConfirmJobState
 from app.services.add_confirm_preparation import AddConfirmPreparation
@@ -146,11 +145,6 @@ class AddToDownloaderService:
         self._confirm_finalization_state = AddConfirmFinalizationState(
             add_finalization_warning_text=ADD_FINALIZATION_WARNING_TEXT,
             log_trace_func=self._trace_logger.log,
-        )
-        self._confirm_execution_tail = AddConfirmExecutionTail(
-            execution_follow_up=self._execution_follow_up,
-            confirm_finalization_state=self._confirm_finalization_state,
-            add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
         )
         self._confirm_job_state = AddConfirmJobState(job_repo=job_repo)
         self._cancel_state = AddCancelState(
@@ -299,7 +293,7 @@ class AddToDownloaderService:
             return rejection_text
         pending_add = preparation.pending_add
 
-        return await self._confirm_execution_tail.run(
+        return await self._run_confirm_execution_tail(
             task_ref=cleaned_ref,
             pending_add=pending_add,
             chat_id=chat_id,
@@ -309,13 +303,6 @@ class AddToDownloaderService:
             claimed_job_id=preparation.claimed_job_id,
             claimed_job_version=preparation.claimed_job_version,
             lease_owner=preparation.lease_owner,
-            record_event=self._execution_follow_up.record_event,
-            restore_pending_approval=self._restore_pending_approval,
-            restore_pending_job=self._restore_pending_job,
-            record_executed_lease_version=self._record_executed_lease_version,
-            move_completed_approval_identity=self._move_completed_approval_identity,
-            mark_completed_job=self._mark_completed_job,
-            clear_pending_context=self._clear_pending_context,
         )
 
     def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:
@@ -503,6 +490,70 @@ class AddToDownloaderService:
         if reply != ADD_PENDING_STATE_UNAVAILABLE_TEXT:
             self._adult_registry_state.record_pending(pending_add=pending_add)
         return reply
+
+    async def _run_confirm_execution_tail(
+        self,
+        *,
+        task_ref: str,
+        pending_add: PendingAddContext,
+        chat_id: int | None,
+        user_id: int | None,
+        expected_lease_version: int,
+        claimed_job: bool,
+        claimed_job_id: str,
+        claimed_job_version: int,
+        lease_owner: str,
+    ) -> str:
+        self._execution_follow_up.record_event(
+            task_ref=task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            event_type="downloader.approval_confirmed",
+            message=pending_add.title,
+        )
+
+        execution = await self._execution_follow_up.dispatch(
+            task_ref=task_ref,
+            pending_add=pending_add,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        if execution.result is None:
+            approval_restored = self._restore_pending_approval(
+                task_ref=task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                expected_lease_version=expected_lease_version,
+            )
+            if claimed_job:
+                self._restore_pending_job(
+                    job_id=claimed_job_id,
+                    expected_version=claimed_job_version,
+                    lease_owner=lease_owner,
+                )
+            if approval_restored is not True:
+                return ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+            return execution.reply
+
+        result = execution.result
+        reply = execution.reply
+        return self._confirm_finalization_state.finalize_confirmation(
+            task_ref=task_ref,
+            pending_add=pending_add,
+            result=result,
+            reply=reply,
+            chat_id=chat_id,
+            user_id=user_id,
+            expected_lease_version=expected_lease_version,
+            claimed_job=claimed_job,
+            claimed_job_id=claimed_job_id,
+            claimed_job_version=claimed_job_version,
+            lease_owner=lease_owner,
+            record_executed_lease_version=self._record_executed_lease_version,
+            move_completed_approval_identity=self._move_completed_approval_identity,
+            mark_completed_job=self._mark_completed_job,
+            clear_pending_context=self._clear_pending_context,
+        )
 
     def _record_pending_job(
         self,
