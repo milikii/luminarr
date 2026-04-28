@@ -12,7 +12,6 @@ from app.db.download_monitor_repo import DownloadMonitorPersistenceError, Downlo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.downloader_route_lookup import DownloaderRouteLookupError
 from app.operational_logging import emit_operational_log
-from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.post_download_auto_import import AutoImportStateUnavailableError, PostDownloadAutoImportService
 
