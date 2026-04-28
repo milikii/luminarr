@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
-from app.services.command_parsing import parse_prefixed_command_tail
+from app.services.command_parsing import match_command_action, parse_prefixed_command_tail
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import VALID_MEDIA_KINDS, media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
@@ -22,6 +22,13 @@ BT_SUBSCRIPTION_EMPTY_TEXT = "BT 订阅清单为空。"
 BT_SUBSCRIPTION_ADD_USAGE_TEXT = "添加格式：btsub add <movie|series|anime> <片名 [年份]>"
 BT_SUBSCRIPTION_REMOVE_USAGE_TEXT = "删除格式：btsub remove <条目ID>"
 BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT = "BT 订阅清单本来就是空的。"
+BT_SUBSCRIPTION_ACTION_ALIASES = {
+    "list": ("list",),
+    "clear": ("clear",),
+    "run": ("run",),
+    "add": ("add",),
+    "remove": ("remove", "rm"),
+}
 
 @dataclass(frozen=True, slots=True)
 class BtSubscriptionCommand:
@@ -43,17 +50,9 @@ def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
     if not tail:
         return BtSubscriptionCommand(action="list", arg="")
 
-    lowered_tail = tail.lower()
-    if lowered_tail == "list":
-        return BtSubscriptionCommand(action="list", arg="")
-    if lowered_tail == "clear":
-        return BtSubscriptionCommand(action="clear", arg="")
-    if lowered_tail == "run":
-        return BtSubscriptionCommand(action="run", arg="")
-    if lowered_tail == "add":
-        return BtSubscriptionCommand(action="add", arg="")
-    if lowered_tail in {"remove", "rm"}:
-        return BtSubscriptionCommand(action="remove", arg="")
+    action = match_command_action(tail, BT_SUBSCRIPTION_ACTION_ALIASES)
+    if action is not None:
+        return BtSubscriptionCommand(action=action, arg="")
 
     matched_add = re.match(r"^(?i:add)\s+(.*)$", tail)
     if matched_add:

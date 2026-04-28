@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.operational_logging import emit_operational_log
-from app.services.command_parsing import parse_prefixed_command_tail
+from app.services.command_parsing import match_command_action, parse_prefixed_command_tail
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
@@ -32,6 +32,12 @@ WATCHLIST_CLEAR_EMPTY_TEXT = "想看清单本来就是空的。"
 WATCHLIST_CLEAR_FAILED_TEXT = "想看清单清空失败，请稍后重试。"
 WATCHLIST_ITEM_MISSING_AFTER_ADD_REASON = "watchlist_item missing after insert"
 WATCHLIST_ADD_RESULT_MISSING_REASON = "watchlist add result missing"
+WATCHLIST_ACTION_ALIASES = {
+    "list": ("list", "列表"),
+    "clear": ("clear", "清空"),
+    "add": ("add", "添加", "加"),
+    "remove": ("remove", "rm", "删除", "删"),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,15 +244,9 @@ def parse_watchlist_query(text: str) -> WatchlistCommand | None:
     if not tail:
         return WatchlistCommand(action="list", arg="")
 
-    lowered_tail = tail.lower()
-    if lowered_tail in {"list"} or tail in {"列表"}:
-        return WatchlistCommand(action="list", arg="")
-    if lowered_tail in {"clear"} or tail in {"清空"}:
-        return WatchlistCommand(action="clear", arg="")
-    if lowered_tail in {"add"} or tail in {"添加", "加"}:
-        return WatchlistCommand(action="add", arg="")
-    if lowered_tail in {"remove", "rm"} or tail in {"删除", "删"}:
-        return WatchlistCommand(action="remove", arg="")
+    action = match_command_action(tail, WATCHLIST_ACTION_ALIASES)
+    if action is not None:
+        return WatchlistCommand(action=action, arg="")
 
     matched_add = re.match(r"^(?:(?i:add)|添加|加)\s+(.*)$", tail)
     if matched_add:
