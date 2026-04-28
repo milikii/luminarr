@@ -35,7 +35,6 @@ from app.services.search_request_context import (
     build_search_request_context,
 )
 from app.services.bt_candidate_scorer import load_bt_scoring_rules as _load_bt_scoring_rules
-from app.services.search_query_parser import parse_movie_query as _parse_movie_query
 from app.search_title_normalization import normalize_spaces
 from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
 
@@ -63,7 +62,6 @@ CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失�
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
-parse_movie_query = _parse_movie_query
 load_bt_scoring_rules = _load_bt_scoring_rules
 
 BatchPreviewSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]

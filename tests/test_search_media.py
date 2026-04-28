@@ -28,9 +28,9 @@ from app.services.search_media import (
     EMPTY_QUERY_TEXT,
     NO_RESULT_TEXT_TEMPLATE,
     SearchMediaService,
-    parse_movie_query,
 )
 from app.services.pure_bt import BTBatchPreviewRequest
+from app.services.search_query_parser import parse_movie_query
 
 
 async def _fake_search_with_results(query: str) -> list[dict[str, object]]:
