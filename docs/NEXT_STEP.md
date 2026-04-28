@@ -7,6 +7,7 @@
 - 本轮已把 `search_candidate_state.py` 合并回 `app/services/search_media.py`，总质量 gate 与主线验证已过，下一步确认 Git 状态后 `push`。
 - 本轮已把 watchlist 与 BT 订阅重复的 media kind alias / label / prefix parse 结构收口到 `app/services/media_kind.py`，focused tests 覆盖两条调用路径。
 - 本轮已把 `search_ambiguity_helper.py` 合并回 `app/services/search_media.py`，删除单消费者薄壳。
+- 本轮已把 `search_clarification_state.py` 合并回 `app/services/search_media.py`，删除单消费者状态壳。
 - 本轮继续删除 BT 订阅侧单用途 label 转发薄壳；后续不要再给 shared helper 包一层只改名字的单消费者函数。
 - 本轮把 watchlist / BT 订阅共享的 `title (year-or-dash)` 展示格式收口到 `app/services/media_item_display.py`。
 - 本轮把 watchlist / BT 订阅共享的命令前缀 tail 解析收口到 `app/services/command_parsing.py`，没有合并两条命令各自的 action 语义。
@@ -47,7 +48,7 @@
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
 - 本轮“连续推进十轮”已到退出点；收尾先重新跑 `make quality` 与 `make verify-mainline`，确认默认分支质量仍可复验，再从更小、更保守的结构候选继续选下一轮。
-- 下一轮继续收 `search_clarification_state.py`，再按同样方式做下一轮最小闭环。
+- 下一轮继续收 `search_media_bt_ordering.py`，再按同样方式做下一轮最小闭环。
 
 ## User value
 
