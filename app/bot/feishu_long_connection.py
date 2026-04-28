@@ -110,7 +110,7 @@ class FeishuLongConnectionService:
             return
         try:
             loop.call_soon_threadsafe(loop.stop)
-        except Exception as error:
+        except RuntimeError as error:
             if not self._is_expected_loop_stop_error(error):
                 emit_operational_log(
                     title="Feishu 长连接关闭失败",
@@ -166,7 +166,7 @@ class FeishuLongConnectionService:
         finally:
             try:
                 thread_loop.stop()
-            except Exception as error:
+            except RuntimeError as error:
                 if not self._is_expected_loop_stop_error(error):
                     emit_operational_log(
                         title="Feishu 长连接停止失败",
