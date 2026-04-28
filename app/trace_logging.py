@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from app.operational_logging import format_operational_log_message, strip_ansi_escape, summarize_first_non_empty_line
+from app.operational_logging import emit_operational_log, strip_ansi_escape, summarize_first_non_empty_line
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
 TRACE_LOG_LABEL = "[trace]"
@@ -43,16 +43,13 @@ def configure_trace_log_file(
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as error:
-        print(
-            format_operational_log_message(
-                title="trace 日志目录不可写",
-                detail=f"路径={log_path.parent} 错误={error}",
-                fix_hint=(
-                    "检查 `LUMINARR_LOG_DIR`、当前工作目录和 logs 目录权限；"
-                    "确认 `make run` / `.venv/bin/python -m app.main` 使用的是可写目录。"
-                ),
+        emit_operational_log(
+            title="trace 日志目录不可写",
+            detail=f"路径={log_path.parent} 错误={error}",
+            fix_hint=(
+                "检查 `LUMINARR_LOG_DIR`、当前工作目录和 logs 目录权限；"
+                "确认 `make run` / `.venv/bin/python -m app.main` 使用的是可写目录。"
             ),
-            flush=True,
         )
         return None
     return log_path
@@ -186,14 +183,11 @@ def _append_trace_log_line(log_line: str, *, log_path: Path) -> None:
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(f"{cleaned_line}\n")
     except OSError as error:
-        print(
-            format_operational_log_message(
-                title="trace 日志落盘失败",
-                detail=f"路径={log_path} 错误={error}",
-                fix_hint=(
-                    "检查 `LUMINARR_LOG_DIR` 是否可写，确认没有把同名路径占成文件或只读挂载；"
-                    "修复后重新运行应用。"
-                ),
+        emit_operational_log(
+            title="trace 日志落盘失败",
+            detail=f"路径={log_path} 错误={error}",
+            fix_hint=(
+                "检查 `LUMINARR_LOG_DIR` 是否可写，确认没有把同名路径占成文件或只读挂载；"
+                "修复后重新运行应用。"
             ),
-            flush=True,
         )
