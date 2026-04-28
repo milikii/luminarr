@@ -14,6 +14,7 @@
 - 本轮把 `manage_bt_subscription.py` 的 `parse_bt_subscription_query` 再导出薄壳删掉，调用点直接指向 `bt_subscription_command.py`。
 - 本轮把导入链单消费者 `ImportMetadataTitleYearResolver` 合并回 `import_to_library.py`，删除 `import_metadata_title_year.py` 小文件，metadata title/year 回退顺序保持不变。
 - 本轮把导入链单消费者 `ImportRawBtGuard` 合并回 `import_to_library.py`，删除 `import_raw_bt_guard.py` 小文件，raw_bt 阻断判定与日志文案保持不变。
+- 本轮把导入链单消费者 `ImportConfirmContextGuard` 合并回 `import_to_library.py`，删除 `import_confirm_context_guard.py` 小文件，confirm 上下文查询分流与日志保持不变。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -25,6 +26,7 @@
 - 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests。
 
 ## Latest verification
+- `tests/test_import_to_library.py -k "rebuild_confirm_context or context_lookup_failure or context_row_corruption"` 通过（`4 passed, 149 deselected`）。
 - `tests/test_import_to_library.py -k "raw_bt"` 通过（`8 passed, 145 deselected`）。
 - `tests/test_import_to_library.py -k "resolve_metadata_title_year or extract_title_year_for_scrape"` 通过（`5 passed, 148 deselected`）。
 - `tests/test_manage_bt_subscription.py tests/test_private_chat_bt_subscription_runtime.py tests/test_telegram_bot.py -k "bt_subscription_query"` 通过（`6 passed, 237 deselected`）。
