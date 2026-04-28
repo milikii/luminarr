@@ -1,9 +1,10 @@
-# Next step (v414)
+# Next step (v415)
 
 ## Current goal
 
 - 当前唯一主线切到 **services 层数据结构降本**。
 - 当前优先目标是收 services 层里稳定可复用的数据结构和解析逻辑，先从重复形状最明显、验证成本最低的地方下手。
+- 本轮已把 watchlist 与 BT 订阅重复的 media kind alias / label / prefix parse 结构收口到 `app/services/media_kind.py`，focused tests 覆盖两条调用路径。
 - 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
@@ -21,7 +22,7 @@
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
-- 当前更适合先收的结构点是 services 层里重复的 alias / label / parse helper，而不是继续拆较大的 support 文件。
+- 下一候选优先继续评估 services 层内重复的数据解析 / 展示模型，避免跨模块搬大块责任。
 
 ## User value
 
