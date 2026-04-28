@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
 
-from app.operational_logging import format_operational_log_message, strip_ansi_escape, summarize_first_non_empty_line
+from app.operational_logging import emit_operational_log, strip_ansi_escape, summarize_first_non_empty_line
 from app.services.cleanup_downloaded_source import parse_cleanup_inspect_query, parse_cleanup_query
 
 
@@ -36,16 +36,13 @@ def configure_cleanup_private_chat_smoke_log_file(
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as error:
-        print(
-            format_operational_log_message(
-                title="cleanup 私聊 smoke 日志目录不可写",
-                detail=f"路径={log_path.parent} 错误={error}",
-                fix_hint=(
-                    "检查当前工作目录和 logs 目录权限；确认 `make run` / `.venv/bin/python -m app.main` "
-                    "是从仓库根目录启动，或手动创建可写的 logs 目录。"
-                ),
+        emit_operational_log(
+            title="cleanup 私聊 smoke 日志目录不可写",
+            detail=f"路径={log_path.parent} 错误={error}",
+            fix_hint=(
+                "检查当前工作目录和 logs 目录权限；确认 `make run` / `.venv/bin/python -m app.main` "
+                "是从仓库根目录启动，或手动创建可写的 logs 目录。"
             ),
-            flush=True,
         )
         return None
     return log_path
@@ -150,14 +147,11 @@ def _append_cleanup_private_chat_smoke_log_line(log_line: str, *, log_path: Path
         with resolved_log_path.open("a", encoding="utf-8") as handle:
             handle.write(f"{cleaned_line}\n")
     except OSError as error:
-        print(
-            format_operational_log_message(
-                title="cleanup 私聊 smoke 日志落盘失败",
-                detail=f"路径={resolved_log_path} 错误={error}",
-                fix_hint=(
-                    "检查 logs 目录是否可写，确认没有把同名路径占成文件或只读挂载；"
-                    "修复后重新运行真实私聊 smoke。"
-                ),
+        emit_operational_log(
+            title="cleanup 私聊 smoke 日志落盘失败",
+            detail=f"路径={resolved_log_path} 错误={error}",
+            fix_hint=(
+                "检查 logs 目录是否可写，确认没有把同名路径占成文件或只读挂载；"
+                "修复后重新运行真实私聊 smoke。"
             ),
-            flush=True,
         )
