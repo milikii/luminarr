@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
@@ -16,7 +17,6 @@ from app.operational_logging import emit_operational_log
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
 from app.services.import_confirm_execution_tail import ImportConfirmExecutionRequest, ImportConfirmExecutionTail
-from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
@@ -77,6 +77,18 @@ IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON = "downloader job missing during raw_
 IMPORT_MEDIA_IDENTITY_RESULT_MISSING_REASON = "import media identity result missing"
 
 
+@dataclass(frozen=True, slots=True)
+class ImportConfirmPreparationState:
+    prepared_import: PreparedImport
+    confirm_context: ConfirmExecutionContext | None
+    execution_mode: str
+    expected_lease_version: int
+    claimed_job: bool
+    claimed_job_id: str
+    claimed_job_version: int
+    lease_owner: str
+
+
 class ImportToLibraryService:
     def __init__(
         self,
@@ -130,11 +142,6 @@ class ImportToLibraryService:
             import_source_missing_text=IMPORT_SOURCE_MISSING_TEXT,
             import_prepare_target_failed_text_template=IMPORT_PREPARE_TARGET_FAILED_TEXT,
             import_target_exists_text_template=IMPORT_TARGET_EXISTS_TEXT,
-        )
-        self._confirm_preparation = ImportConfirmPreparation(
-            import_confirm_not_pending_text=IMPORT_CONFIRM_NOT_PENDING_TEXT,
-            import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
-            pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
         )
         self._transfer_execution_service = import_transfer_execution.ImportTransferExecutionService(
             post_processing_service=self._post_processing_service,
@@ -194,21 +201,7 @@ class ImportToLibraryService:
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
-        preparation, rejection_text = await self._confirm_preparation.prepare(
-            task_ref=cleaned_ref,
-            chat_id=chat_id,
-            rebuild_confirm_context=self._rebuild_confirm_context,
-            find_version_stale_rejection_text=self._find_version_stale_rejection_text,
-            handle_expired_pending_confirm=self._handle_expired_pending_confirm,
-            build_job_lease_owner=self._build_job_lease_owner,
-            claim_pending_job=self._claim_pending_job,
-            restore_pending_job=self._restore_pending_job,
-            prepare_import=self._prepare_import,
-            resolve_execution_mode=self._resolve_execution_mode,
-            resolve_pending_lease_version=self._resolve_pending_lease_version,
-            record_import_approval=self._record_import_approval,
-            record_event=self._record_event,
-        )
+        preparation, rejection_text = await self._prepare_confirm_import(task_ref=cleaned_ref, chat_id=chat_id)
         if preparation is None:
             return rejection_text
 
@@ -305,6 +298,221 @@ class ImportToLibraryService:
             message=IMPORT_CANCELLED_TEXT,
         )
         return IMPORT_CANCELLED_TEXT
+
+    async def _prepare_confirm_import(
+        self,
+        *,
+        task_ref: str,
+        chat_id: int | None,
+    ) -> tuple[ImportConfirmPreparationState | None, str]:
+        confirm_context, confirm_context_lookup_failed = self._rebuild_confirm_context(task_ref=task_ref, chat_id=chat_id)
+        if confirm_context_lookup_failed:
+            return None, IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if confirm_context is not None and confirm_context.approval_lookup_failed:
+            return None, IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if confirm_context is not None and confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
+            rejection_text = self._resolve_confirm_not_pending_rejection_text(
+                task_id=confirm_context.job.task_id,
+                task_hash=confirm_context.job.task_hash,
+            )
+            self._record_event(
+                task_ref=task_ref,
+                task_id=confirm_context.job.task_id,
+                task_hash=confirm_context.job.task_hash,
+                event_type="import.confirm_not_pending",
+                message=rejection_text,
+            )
+            return None, rejection_text
+
+        claimed_job = False
+        claimed_job_version = 0
+        claimed_job_id = ""
+        lease_owner = ""
+        prepared_task_ref = task_ref
+        if confirm_context is not None:
+            approval_record = confirm_context.approval_record
+            if approval_record is None or approval_record.status != "pending":
+                rejection_text = self._resolve_confirm_not_pending_rejection_text(
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                )
+                self._record_event(
+                    task_ref=task_ref,
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                    event_type="import.confirm_not_pending",
+                    message=rejection_text,
+                )
+                return None, rejection_text
+            expired_text = self._handle_expired_pending_confirm(task_ref=task_ref, context=confirm_context)
+            if expired_text is not None:
+                return None, expired_text
+            lease_owner = self._build_job_lease_owner(task_ref)
+            claimed_job = self._claim_pending_job(job=confirm_context.job, lease_owner=lease_owner)
+            if claimed_job is None:
+                return None, IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+            if not claimed_job:
+                rejection_text = self._resolve_confirm_not_pending_rejection_text(
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                )
+                self._record_event(
+                    task_ref=task_ref,
+                    task_id=confirm_context.job.task_id,
+                    task_hash=confirm_context.job.task_hash,
+                    event_type="import.confirm_not_pending",
+                    message=rejection_text,
+                )
+                return None, rejection_text
+            claimed_job_id = confirm_context.job.job_id
+            claimed_job_version = confirm_context.job.version
+            prepared_task_ref = confirm_context.lookup_task_ref
+
+        prepared_import, error_text = await self._prepare_import(prepared_task_ref, chat_id=chat_id)
+        if prepared_import is None:
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, error_text
+
+        import_source = prepared_import.import_source
+        stale_text = self._find_version_stale_rejection_text(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+        )
+        if stale_text is not None:
+            self._record_event(
+                task_ref=task_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.stale_rejected",
+                message=stale_text,
+            )
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, stale_text
+
+        execution_mode = self._resolve_execution_mode(
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            confirm_context=confirm_context,
+        )
+        if execution_mode is None:
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+
+        expected_lease_version = 0
+        if confirm_context is not None and confirm_context.approval_record is not None:
+            expected_lease_version = max(0, confirm_context.approval_record.lease_version)
+        if expected_lease_version <= 0:
+            expected_lease_version = self._resolve_pending_lease_version(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                allow_in_memory_fallback_on_error=False,
+            )
+        if expected_lease_version == PENDING_LEASE_LOOKUP_FAILED:
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if expected_lease_version <= 0:
+            self._record_event(
+                task_ref=task_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.confirm_not_pending",
+                message=IMPORT_CONFIRM_NOT_PENDING_TEXT,
+            )
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, IMPORT_CONFIRM_NOT_PENDING_TEXT
+
+        approved = self._record_import_approval(
+            task_ref=task_ref,
+            task_id=import_source.task_id,
+            task_hash=import_source.task_hash,
+            expected_lease_version=expected_lease_version,
+        )
+        if approved is None:
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if not approved:
+            rejection_text = self._resolve_confirm_not_pending_rejection_text(
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+            )
+            self._record_event(
+                task_ref=task_ref,
+                task_id=import_source.task_id,
+                task_hash=import_source.task_hash,
+                event_type="import.stale_rejected",
+                message=rejection_text,
+            )
+            self._restore_claimed_job_if_needed(
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            )
+            return None, rejection_text
+
+        return (
+            ImportConfirmPreparationState(
+                prepared_import=prepared_import,
+                confirm_context=confirm_context,
+                execution_mode=execution_mode,
+                expected_lease_version=expected_lease_version,
+                claimed_job=claimed_job,
+                claimed_job_id=claimed_job_id,
+                claimed_job_version=claimed_job_version,
+                lease_owner=lease_owner,
+            ),
+            "",
+        )
+
+    def _resolve_confirm_not_pending_rejection_text(self, *, task_id: str, task_hash: str) -> str:
+        stale_text = self._find_version_stale_rejection_text(task_id=task_id, task_hash=task_hash)
+        return stale_text or IMPORT_CONFIRM_NOT_PENDING_TEXT
+
+    def _restore_claimed_job_if_needed(
+        self,
+        *,
+        claimed_job: bool,
+        claimed_job_id: str,
+        claimed_job_version: int,
+        lease_owner: str,
+    ) -> None:
+        if not claimed_job:
+            return
+        self._restore_pending_job(
+            job_id=claimed_job_id,
+            expected_version=claimed_job_version,
+            lease_owner=lease_owner,
+        )
 
     def _log_expired_cancel_pending_job_result_missing(self, *, job: JobRecord, task_ref: str, reason: str) -> None:
         emit_operational_log(
