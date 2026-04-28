@@ -1,130 +1,302 @@
-# docs/ARCHITECTURE.md (v2)
+# ARCHITECTURE.md
 
-> 目的：用最直白的方式解释“谁收消息、谁做判断、谁调外部系统、谁写数据库”。
+> 本文基于 2026-04-28 代码结构反推，描述“现在系统怎么工作”。如果文档和代码冲突，以代码为准。
 
-## 1. 系统在做什么
+## 1. 总体结构
 
-用户在 Telegram / personal WeChat / Feishu / WeCom 私聊里发一句话。
+Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装配：
 
-系统做四件事：
+1. 读取环境变量并生成 `Settings`
+2. 初始化 SQLite
+3. 创建 repo、外部 client、业务 service
+4. 创建 Telegram `Application`
+5. 把 Feishu、WeCom、personal WeChat、scheduler 作为 sidecar 挂到 Telegram 生命周期
 
-1. 渠道适配层把外部消息接进来。
-2. shared runtime 把文本解析成明确动作。
-3. service 调数据库和外部系统完成动作。
-4. 渠道适配层把文本、图片或文件回给原用户。
+业务入口不是 Web API，而是多渠道私聊文本。所有渠道最终都进入 shared private-chat runtime：
 
-## 2. 一条消息怎么流动
+`渠道适配层 -> shared private-chat runtime -> execution gate -> services -> repos / external clients -> reply`
 
-以 Telegram 里的“`我想看 Dune 2021`”为例：
+## 2. 技术栈
 
-1. `app/bot/telegram_bot.py` 收到 Telegram update。
-2. 渠道层把 Telegram 的 chat/user 映射成内部统一的 `chat_id / user_id`。
-3. `app/bot/private_chat_runtime.py` 判断这是 `search_media`，再把参数交给 `app/services/search_media.py`。
-4. `search_media.py` 调 TMDB / Prowlarr，拿到候选。
-5. `app/db/candidate_repo.py` 把候选写进 SQLite。
-6. runtime 组装回复文本。
-7. 渠道层把文本发回 Telegram。
+| 维度 | 当前实现 |
+| --- | --- |
+| 语言 | Python 3.12 |
+| 核心依赖 | `python-telegram-bot`、`httpx`、`cryptography`、`wechat-clawbot` |
+| 持久化 | SQLite |
+| 下载器协议 | Transmission RPC、qBittorrent Web API |
+| 媒体系统 | Emby、Jellyfin、Plex |
+| 搜索 / 元数据 | Prowlarr、TMDB、Fanart.tv、BT WebSource |
+| 渠道 | Telegram、personal WeChat、Feishu、WeCom |
+| 本地工具 | Docker Compose、`ffmpeg` / `ffprobe` |
+| CI | GitHub Actions `quality.yml` |
 
-同一套 runtime / service / SQLite 真相也被 personal WeChat、Feishu、WeCom 共用。
+补充说明：
 
-## 3. 目录怎么分工
+- Feishu 长连接在代码里通过可选 `lark_oapi` 启动
+- WeCom 回调用内置 `HTTPServer`，不是引入完整 Web 框架
+- 字幕翻译通过 OpenAI 兼容 chat completions 接口调用
 
-| 目录 | 负责什么 | 典型文件 |
-| --- | --- | --- |
-| `app/main.py` | 启动入口；把 config、repo、client、service、渠道装到一起 | `app/main.py` |
-| `app/config.py` | 把环境变量读成 `Settings` | `app/config.py` |
-| `app/bot/` | 四个渠道入口 + shared private-chat runtime | `telegram_bot.py`、`personal_wechat_text.py`、`feishu_adapter.py`、`wecom_adapter.py`、`private_chat_runtime.py` |
-| `app/services/` | 具体业务动作 | `search_media.py`、`add_to_downloader.py`、`import_to_library.py`、`cleanup_downloaded_source.py` |
-| `app/clients/` | 调外部系统的最小协议封装 | `tmdb.py`、`prowlarr.py`、`transmission.py`、`qbittorrent.py`、`emby.py`、`jellyfin.py`、`plex.py` |
-| `app/db/` | SQLite 真相层 | `sqlite.py`、`job_repo.py`、`job_event_repo.py`、`approval_repo.py` |
-| `app/runtime/` | 运行时规则、执行边界 | `execution_policy.py` |
-| `tests/` | 行为回归和协议保护 | `test_cleanup_cross_channel_smoke.py`、`test_import_to_library.py` 等 |
+## 3. 目录分工
 
-## 4. SQLite 在这里做什么
+| 路径 | 职责 |
+| --- | --- |
+| `app/main.py` | 应用装配根入口 |
+| `app/config.py` | 环境变量校验、解析、标准化 |
+| `app/bot/` | 渠道适配、shared private-chat runtime、BT follow-up 状态机 |
+| `app/services/` | 搜索、下载确认、导入、cleanup、watchlist、btsub、metadata、字幕等业务逻辑 |
+| `app/clients/` | 对外部系统的最小协议封装 |
+| `app/db/` | SQLite schema 和 repo |
+| `app/runtime/` | execution gate、跨渠道文本 delivery |
+| `app/maintenance/` | 文档快照同步等维护脚本 |
+| `tests/` | 行为回归、协议保护、docs gate |
+| `docker-compose.yml` | 部署本体 |
+| `docker-compose.test.yml` | 本地联调测试栈 |
+| `archive/docs/` | 已归档的历史方案和施工记录 |
 
-SQLite 是当前唯一真相源。下面这些状态都落在 SQLite：
+## 4. 启动装配图
 
-- `jobs`：当前任务是谁、归谁执行、lease/version 是什么。
-- `job_event`：这条任务已经发生了什么，比如 `import.succeeded`、`cleanup.failed`。
-- `approval_record`：哪些动作还在等 `confirm`。
-- `candidate_mapping`：搜索候选和序号映射。
-- `watchlist` / `bt_subscription`：用户持久化关注内容。
+### 4.1 配置与真相层
 
-外部系统不是账本：
+- `load_settings()` 读取 `.env`
+- `SqliteDatabase.initialize()` 创建 / 修补表结构
+- 创建以下 repo：
+  - `CandidateMappingRepo`
+  - `ClarificationRepo`
+  - `ApprovalRepo`
+  - `JobRepo`
+  - `JobEventRepo`
+  - `DownloadMonitorRepo`
+  - `BtPendingRepo`
+  - `WatchlistRepo`
+  - `BtSubscriptionRepo`
+  - `AdultContentRegistryRepo`
+  - `TelegramUpdateRepo`
 
-- TMDB / Fanart：提供元数据。
-- Prowlarr / WebSource：提供搜索候选。
-- `adult_content_registry`：记录成人内容 ID、当前下载状态、归档路径和保留期清理状态。
-- Transmission / qBittorrent：提供下载动作和状态。
-- Emby / Jellyfin / Plex：提供媒体库刷新动作。
+### 4.2 外部 client
 
-## 5. 几条主链
+- `ProwlarrClient`
+- `TmdbClient`
+- `FanartClient`
+- `TransmissionClient`
+- `QbittorrentClient`
+- `EmbyClient` / `JellyfinClient` / `PlexClient`
+- `WebSourceClient`
+- `FeishuClient`
+- `JavLibraryReadOnlyHelperClient`
 
-### 搜索到下载
+### 4.3 业务 service
 
-`用户文本 -> private_chat_runtime -> search_media -> candidate_repo -> add_to_downloader -> approval_repo -> confirm -> 下载器 client`
+- `SearchMediaService`
+- `AddToDownloaderService`
+- `GetDownloadStatusService`
+- `ImportToLibraryService`
+- `PostDownloadAutoImportService`
+- `CleanupDownloadedSourceService`
+- `ManageWatchlistService`
+- `ManageBtSubscriptionService`
+- `AdultArchiveService`
+- `MetadataScraperService`
+- `SubtitleTranslatorService`
+- `RefreshMediaServerService`
 
-### 下载完成到入库
+### 4.4 运行时宿主
 
-`下载状态 -> post_download_auto_import -> import_to_library -> job_event(import.succeeded) -> metadata_scraper -> subtitle_translator -> refresh_media_server(Emby/Jellyfin/Plex)`
+- `build_telegram_application()` 创建 Telegram `Application`
+- `telegram_sidecar_runtime.py` 在 `post_init` / `post_shutdown` 中启动和关闭：
+  - Feishu 长连接
+  - personal WeChat 轮询
+  - WeCom webhook server
+  - 下载完成轮询与自动导入 scheduler
+  - BT subscription scheduler
 
-### 成人 BT 下载完成到归档
+## 5. shared private-chat runtime
 
-`下载状态 -> download_monitor(completed) -> post_download_auto_import -> adult_archive_service -> adult_content_registry(archived_present / archived_deleted)`
+`app/bot/private_chat_runtime.py` 是 shared private-chat runtime 边界。四个渠道都只负责把外部消息投影成：
 
-### cleanup
+- `query`
+- `chat_id`
+- `user_id`
+- `channel`
+- `reply_func`
 
-`cleanup 文本 -> cleanup_downloaded_source -> job_event 查 import 关联 -> 只读预检或删除源文件 -> job_event 写 cleanup 结果 -> 文本回用户`
+随后统一进入下面的路由顺序：
 
-### watchlist / btsub
+1. 开场路由：取消、direct BT、personal WeChat 登录、BT 只读、BT 批量确认
+2. BT follow-up：处理链选择、媒体类型选择
+3. execution-gated 路由：状态、watchlist、btsub、import、cleanup
+4. 尾部路由：`confirm`、TMDB 关联、raw BT 目录选择、数字选片、搜索 fallback
 
-`用户文本 -> runtime -> manage_watchlist / manage_bt_subscription -> SQLite 持久化 -> 后台 tick 或手动命令再进入既有 downloader approval 边界`
+`ExecutionGate` 会把只读操作直接放行，把副作用操作串行化。
 
-### BT 只读探索
+## 6. 渠道层
 
-`用户文本(bt搜 / bt批量) -> search_media(raw BT sources) -> javlibrary exact-id read-only helper(只补展示字段与历史提示，不写 candidate_mapping / approval / jobs 真相) -> 文本回复`
+### Telegram
 
-### direct magnet
+- `telegram_runtime_adapter.py` 把 Update / CallbackQuery 接到 runtime
+- `telegram_update_repo` 负责 update 去重
+- Telegram 也是 sidecar 生命周期宿主
 
-`用户直接发送 magnet:? -> shared runtime 先问链路(观影 PT / BT 成人) -> 明确链路后再进入对应后续处理`
+### personal WeChat
 
-## 6. 四个渠道为什么没有分叉成四套业务代码
+- `personal_wechat_text.py` 通过 `wechat-clawbot` 轮询单账号私聊文本
+- 渠道身份会被映射成内部 `chat_id` / `user_id`
+- 当前主动推送 / 登录态依赖本地运行状态
 
-因为渠道层只处理“协议差异”，不处理“业务真相”。
+### Feishu
 
-渠道层负责：
+- `feishu_adapter.py` 解析私聊文本事件
+- `feishu_long_connection.py` 通过官方 SDK 长连接接收事件
 
-- 验签、解密、长轮询或 webhook 收包。
-- 把外部会话标识投影成内部 `chat_id / user_id`。
-- 调 shared runtime。
-- 把文本、图片或文件发回去。
+### WeCom
 
-业务层负责：
+- `wecom_adapter.py` 负责验签、解密、回包加密
+- `wecom_webhook_server.py` 提供轻量 HTTP webhook 入口
 
-- 解析动作。
-- 查 SQLite。
-- 调外部系统。
-- 生成回复内容。
+### 跨渠道统一层
 
-所以同一个 cleanup / import / search 协议，不会在四个渠道里各写一份。
+- `channel_identity.py` 对外部 chat/user id 做哈希投影
+- `runtime/delivery.py` 根据渠道渲染统一的 DeliveryItem 文本
 
-## 7. 现在最容易读懂的入口
+## 7. 关键业务模块
 
-如果你想快速理解这个仓库，建议按下面顺序看代码：
+### 7.1 搜索与候选
 
-1. `app/main.py`
-2. `app/config.py`
-3. `app/bot/private_chat_runtime.py`
-4. `app/services/search_media.py`
-5. `app/services/add_to_downloader.py`
-6. `app/services/import_to_library.py`
-7. `app/services/cleanup_downloaded_source.py`
-8. `app/db/job_repo.py` 和 `app/db/job_event_repo.py`
+`SearchMediaService` 负责：
 
-## 8. 当前不做什么
+- 解析用户查询
+- 调 TMDB 做标题 / 年份增强
+- 调 Prowlarr / WebSource 搜索
+- 排序、去重、歧义识别
+- 保存候选到 `candidate_mapping`
+- 保存澄清态到 `clarification_state`
+- 生成跨渠道回复文本
 
-- 现在不把 `app/` 目录重命名成更花哨的层级。
-- 现在不把四渠道抽成通用平台。
-- 现在不引入 Web UI、Redis、PostgreSQL、多机部署。
+BT 只读和 BT 批量预览共用同一个 service，但不会直接触发副作用。
 
-原因很简单：当前瓶颈是知识入口和施工协作，不是代码目录名。
+### 7.2 下载确认
+
+`AddToDownloaderService` 负责：
+
+- 从候选或直接 source 构造 `PendingAddContext`
+- 写入 downloader approval pending
+- 写入 pending `jobs`
+- 记录 `job_event`
+- `confirm` 后真正调下载器
+- 记录 `download_monitor`
+- 维护成人资源历史状态
+
+下载确认的真正副作用边界是：
+
+`pending_add -> approval_record(pending) -> jobs(pending_approval) -> confirm -> downloader.add_torrent()`
+
+### 7.3 状态与自动导入
+
+`GetDownloadStatusService` 负责：
+
+- 按 task ref 查实际下载器状态
+- 把观察结果写回 `download_monitor`
+- 首次完成时写 `downloader.completed_observed`
+- 触发 `PostDownloadAutoImportService`
+
+`PostDownloadAutoImportService` 会：
+
+- 跳过低质量 CAM / TS 等资源
+- 成人内容走 `AdultArchiveService`
+- 普通内容走 `ImportToLibraryService.import_by_task_ref()`
+
+### 7.4 导入与后处理
+
+`ImportToLibraryService` 负责：
+
+- 校验下载是否完成
+- 识别 raw BT 并阻断
+- 生成导入待确认
+- `confirm` 后执行硬链接导入
+- 跨文件系统时进入 copy-fallback pending
+- 记录 import 事件、媒体身份、目标路径
+
+后处理由 `ImportPostProcessingService` 串起：
+
+- metadata scraping
+- subtitle translation
+- media server refresh
+
+### 7.5 cleanup
+
+`CleanupDownloadedSourceService` 依赖 `job_event` 中最近一次 `import.succeeded`：
+
+- `cleanup inspect` 只读检查 source / target / guardrail
+- `cleanup` 真正删除下载源
+- 可选 PT 最小做种时间窗保护
+
+### 7.6 watchlist 与 BT subscription
+
+`ManageWatchlistService`：
+
+- `list/add/remove/clear`
+- 只做持久化，不自动下载
+
+`ManageBtSubscriptionService`：
+
+- `list/add/remove/clear/run`
+- scheduler tick 通过搜索命中新资源
+- 命中后调用 `AddToDownloaderService.add_candidate_source()`
+- 仍保留人工 `confirm` 边界
+
+## 8. 数据模型
+
+| 表 | 用途 |
+| --- | --- |
+| `candidate_mapping` | 搜索候选序号映射 |
+| `clarification_state` | 搜索歧义待澄清状态 |
+| `approval_record` | 下载 / 导入审批状态、lease version、过期时间 |
+| `jobs` | 待确认任务、执行权、payload、版本号 |
+| `job_event` | 任务事件流水、source / target 路径、媒体身份等 |
+| `telegram_updates` | Telegram update 去重 |
+| `download_monitor` | 下载状态观察、完成观察时间、自动导入候选 |
+| `bt_pending_state` | direct BT follow-up 中间态 |
+| `watchlist_item` | 想看清单 |
+| `bt_subscription_item` | BT 订阅及 last_seen 真相 |
+| `adult_content_registry` | 成人资源生命周期、归档路径、保留期状态 |
+
+## 9. 关键数据流
+
+### 9.1 影视搜索到下载
+
+`用户文本 -> SearchMediaService -> candidate_mapping -> 数字选择 -> AddToDownloaderService -> approval_record/jobs -> confirm -> Transmission/qBittorrent`
+
+### 9.2 下载完成到导入
+
+`status / scheduler -> download_monitor -> PostDownloadAutoImportService -> ImportToLibraryService -> import.succeeded -> metadata / subtitle / refresh`
+
+### 9.3 direct BT 影视链
+
+`magnet -> 处理链选择 -> movie/series/anime -> TMDB 关联 -> AddToDownloaderService -> 下载确认`
+
+### 9.4 direct BT pure 链
+
+`magnet -> 处理链选择 -> raw_bt 目录选择 -> AddToDownloaderService(auto_import_disabled) -> 下载完成后不进入媒体导入`
+
+### 9.5 成人 BT 链
+
+`magnet / adult candidate -> AddToDownloaderService(auto_import_disabled) -> adult_content_registry -> 下载完成 -> AdultArchiveService -> 归档 -> 保留期到期后删除下载源`
+
+### 9.6 cleanup
+
+`cleanup inspect / cleanup -> CleanupCorrelationLookup -> job_event(import.succeeded) -> guardrail -> delete source`
+
+## 10. 安全与一致性机制
+
+- `approval_record` 保存 pending / approved / cancelled、`lease_version`、`executed_version`、`expires_at`
+- `jobs` 保存 `version`、`lease_owner`、`lease_until`
+- `ExecutionGate` 把副作用串行化
+- 取消、过期、stale confirm 都显式拒绝
+- 下载器路由从 `jobs.payload_json` 读取 `downloader_name`
+- 大量 repo / service 在“结果缺失、坏行、并发冲突”场景下选择 fail-closed
+
+## 11. 当前结构性限制
+
+- Telegram `Application` 仍是整个 runtime host；其他渠道和 scheduler 不是独立宿主
+- `shared private-chat runtime` 仍通过 `app.bot.telegram_bot` 读取大量常量和 service key
+- 配置校验仍是 Telegram / Prowlarr / Transmission 优先，不是按功能开关做按需校验
+- 若后续继续扩功能，最大的维护风险不是协议，而是 `services/` 下多个超大文件
