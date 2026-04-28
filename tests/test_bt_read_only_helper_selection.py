@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
-from app.services.bt_read_only_helper_selection import (
+from app.services.bt_read_only_display import (
     prepare_bt_read_only_selection_candidates,
     should_apply_bt_read_only_helper,
 )
