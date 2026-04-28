@@ -5,12 +5,13 @@
 - 当前唯一主线是 **services 层数据结构降本**。
 - 本轮已把 `add_pending_persistence.py` 合并回 `app/services/add_to_downloader.py`，删除只被一处消费的待确认落盘薄壳。
 - 本轮已把 `add_request_facade.py` 合并回 `app/services/add_to_downloader.py`，删除只被一处消费的请求转发薄壳。
+- 本轮已把 `add_confirm_preparation.py` 合并回 `app/services/add_to_downloader.py`，删除只被一处消费的确认准备薄壳。
 - 本次连续推进 10 轮已完成一组最小闭环，范围只限 shared helper 收口和单消费者状态壳回收；**没有**改协议、SQLite schema、调度语义、下载/导入/刷新真相边界。
 - 本轮主题性收口：
   - watchlist / BT 订阅共享的 `media kind`、`title (year-or-dash)` 展示、命令 tail / action parse 已收口到 `app/services/media_kind.py`、`media_item_display.py`、`command_parsing.py`。
   - `search_media.py` 与 `manage_bt_subscription.py` 的纯转发别名已删除，测试直接指向真实实现。
   - 导入链多组单消费者状态壳已合并回 `app/services/import_to_library.py`：metadata title/year、raw_bt guard、confirm context、event recorder、pending write-through、confirmed media identity、job state、cancel state、confirm expiry、confirm preparation、confirm execution tail。
-  - add 链单消费者状态壳已合并回 `app/services/add_to_downloader.py`：pending presence、pending write-through、confirm execution tail、pending persistence、request facade。
+  - add 链单消费者状态壳已合并回 `app/services/add_to_downloader.py`：pending presence、pending write-through、confirm execution tail、pending persistence、request facade、confirm preparation。
 - `cleanup_*_support.py` 当前为 `0` 个。
 - `cleanup_*_support.py` 继续保持 `0` 个；`*_support.py` 只剩 `approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py` 这 4 个较大边界，当前不机械强拆。
 
@@ -21,12 +22,14 @@
 - 当前总 gate 已恢复可复验：`make quality` 通过，`make verify-mainline` 通过。
 - 本轮 focused tests：`tests/test_add_to_downloader.py -k "approval_pending or add_pending_state_unavailable or persist_pending_add or pending_add"`，`15 passed, 97 deselected`。
 - 本轮 focused tests：`tests/test_add_to_downloader.py -k "add_by_selection or add_by_batch_selection or add_candidate_source or add_bt_source"`，`17 passed, 95 deselected`。
+- 本轮 focused tests：`tests/test_add_to_downloader.py -k "confirm_add_by_task_ref or expired_pending or confirm_not_pending or state_unavailable"`，`47 passed, 65 deselected`。
 
 ## Latest verification
 - `make quality` 通过（`27 passed, 0 skipped`）。
 - `make verify-mainline` 通过。
 - `tests/test_add_to_downloader.py -k "approval_pending or add_pending_state_unavailable or persist_pending_add or pending_add"` 通过（`15 passed, 97 deselected`）。
 - `tests/test_add_to_downloader.py -k "add_by_selection or add_by_batch_selection or add_candidate_source or add_bt_source"` 通过（`17 passed, 95 deselected`）。
+- `tests/test_add_to_downloader.py -k "confirm_add_by_task_ref or expired_pending or confirm_not_pending or state_unavailable"` 通过（`47 passed, 65 deselected`）。
 - `tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 通过（`50 passed, 106 deselected`）。
 - `tests/test_import_confirmed_media_identity.py tests/test_import_to_library.py -k "resolve_metadata_title_year or extract_title_year_for_scrape or import_confirmed_media_identity"` 通过（`9 passed, 148 deselected`）。
 - `tests/test_import_to_library.py -k "record_pending_job or claim_pending_job or restore_pending_job or mark_completed_job or confirm_import_by_task_ref_executes_after_pending or finalization_warning"` 通过（`14 passed, 139 deselected`）。
