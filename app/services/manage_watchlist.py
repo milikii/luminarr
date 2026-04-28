@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.operational_logging import emit_operational_log
+from app.services.media_item_display import format_title_year
 from app.services.media_kind import media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
 
@@ -65,9 +66,8 @@ class ManageWatchlistService:
 
         lines = ["想看清单："]
         for index, item in enumerate(items, start=1):
-            year_text = item.year if item.year else "-"
             lines.append(
-                f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {media_kind_label(item.media_kind)}"
+                f"{index}. [{item.item_id}] {format_title_year(item.title, item.year)} | 类型: {media_kind_label(item.media_kind)}"
             )
         return "\n".join(lines)
 
@@ -92,11 +92,11 @@ class ManageWatchlistService:
         if created is None:
             return WATCHLIST_ADD_FAILED_TEXT
         item, is_created = created
-        year_text = item.year if item.year else "-"
+        title_year = format_title_year(item.title, item.year)
         kind_text = media_kind_label(item.media_kind)
         if is_created:
-            return f"已加入想看：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
-        return f"想看已存在：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
+            return f"已加入想看：{title_year}\n类型: {kind_text}\n条目ID: {item.item_id}"
+        return f"想看已存在：{title_year}\n类型: {kind_text}\n条目ID: {item.item_id}"
 
     def _remove_text(self, *, chat_id: int, item_ref: str) -> str:
         cleaned_ref = item_ref.strip()

@@ -1,4 +1,4 @@
-# Next step (v416)
+# Next step (v417)
 
 ## Current goal
 
@@ -6,6 +6,7 @@
 - 当前优先目标是收 services 层里稳定可复用的数据结构和解析逻辑，先从重复形状最明显、验证成本最低的地方下手。
 - 本轮已把 watchlist 与 BT 订阅重复的 media kind alias / label / prefix parse 结构收口到 `app/services/media_kind.py`，focused tests 覆盖两条调用路径。
 - 本轮继续删除 BT 订阅侧单用途 label 转发薄壳；后续不要再给 shared helper 包一层只改名字的单消费者函数。
+- 本轮把 watchlist / BT 订阅共享的 `title (year-or-dash)` 展示格式收口到 `app/services/media_item_display.py`。
 - 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。

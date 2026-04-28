@@ -33,6 +33,7 @@ from app.services.bt_subscription_repo_support import (
     update_subscription_last_seen,
 )
 from app.services.bt_sources import resolve_bt_source
+from app.services.media_item_display import format_title_year
 from app.services.media_kind import media_kind_label
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -267,9 +268,8 @@ async def dispatch_bt_subscription_item(
     if "下载待确认：" not in pending_text:
         return BtSubscriptionItemDispatchResult(reply=None)
 
-    year_text = item.year if item.year else "-"
     reply = (
-        f"BT 订阅命中新资源：{item.title} ({year_text})\n"
+        f"BT 订阅命中新资源：{format_title_year(item.title, item.year)}\n"
         f"类型: {media_kind_label(item.media_kind)}\n"
         f"命中资源: {candidate_title}\n\n"
         f"{pending_text}"
@@ -693,8 +693,7 @@ def _resolve_candidate_title(candidate: Mapping[str, Any], *, item: BtSubscripti
     title = str(candidate.get("title", "")).strip()
     if title:
         return title
-    year_text = item.year if item.year else "-"
-    return f"{item.title} ({year_text})"
+    return format_title_year(item.title, item.year)
 
 
 def _build_subscription_bt_candidate(result: Mapping[str, Any], *, item: BtSubscriptionItem) -> BTCandidate | None:

@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
+from app.services.media_item_display import format_title_year
 from app.services.media_kind import VALID_MEDIA_KINDS, media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
 
@@ -92,20 +93,19 @@ def format_bt_subscription_list(items: Sequence[BtSubscriptionItem]) -> str:
 
     lines = ["BT 订阅清单："]
     for index, item in enumerate(items, start=1):
-        year_text = item.year if item.year else "-"
         last_seen = item.last_seen_title.strip() or "-"
         lines.append(
-            f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
+            f"{index}. [{item.item_id}] {format_title_year(item.title, item.year)} | 类型: {media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
         )
     return "\n".join(lines)
 
 
 def format_bt_subscription_add_result(item: BtSubscriptionItem, *, is_created: bool) -> str:
-    year_text = item.year if item.year else "-"
+    title_year = format_title_year(item.title, item.year)
     kind_text = media_kind_label(item.media_kind)
     if is_created:
-        return f"已加入 BT 订阅：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
-    return f"BT 订阅已存在：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
+        return f"已加入 BT 订阅：{title_year}\n类型: {kind_text}\n条目ID: {item.item_id}"
+    return f"BT 订阅已存在：{title_year}\n类型: {kind_text}\n条目ID: {item.item_id}"
 
 
 def format_bt_subscription_remove_result(item_id: int, *, removed: bool) -> str:
