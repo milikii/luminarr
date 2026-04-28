@@ -8,11 +8,10 @@ from dataclasses import dataclass
 import httpx
 
 from app.clients.transmission import TransmissionTask
-from app.db.adult_content_registry_repo import AdultContentRegistryRepo
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.operational_logging import emit_operational_log
-from app.services.add_adult_registry_state import AddAdultRegistryState
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json
 from app.services.add_pending_context import PendingAddContext
 
@@ -31,6 +30,65 @@ class AddResult:
 class AddExecutionOutcome:
     reply: str
     result: AddResult | None = None
+
+
+class AddAdultRegistryState:
+    def __init__(self, adult_content_registry_repo: AdultContentRegistryRepo | None) -> None:
+        self._adult_content_registry_repo = adult_content_registry_repo
+
+    def record_pending(self, *, pending_add: PendingAddContext) -> None:
+        if self._adult_content_registry_repo is None or not pending_add.adult_content_id:
+            return
+        try:
+            self._adult_content_registry_repo.upsert_pending(
+                normalized_content_id=pending_add.adult_content_id,
+                content_id_kind=pending_add.adult_content_kind or pending_add.adult_archive_category or "adult",
+                archive_category=pending_add.adult_archive_category or "other_adult",
+                display_title=pending_add.adult_display_id or pending_add.title,
+                latest_source_site=pending_add.source_site,
+                task_ref=pending_add.task_ref,
+                task_id=pending_add.task_id,
+                task_hash=pending_add.task_hash,
+                downloader_name=pending_add.downloader_name,
+            )
+        except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
+            emit_operational_log(
+                title="成人资源待确认登记失败",
+                detail=(
+                    f"content_id={pending_add.adult_content_id} task_ref={pending_add.task_ref} "
+                    f"task_id={pending_add.task_id} task_hash={pending_add.task_hash} 错误={error}"
+                ),
+                fix_hint="检查 adult_content_registry 表写入是否正常；当前下载待确认已创建，但历史提醒可能不会及时更新。",
+            )
+
+    def record_downloading(
+        self,
+        *,
+        task_ref: str,
+        task_id: str,
+        task_hash: str,
+        pending_add: PendingAddContext,
+    ) -> None:
+        if self._adult_content_registry_repo is None or not pending_add.adult_content_id:
+            return
+        try:
+            self._adult_content_registry_repo.mark_downloading(
+                normalized_content_id=pending_add.adult_content_id,
+                content_id_kind=pending_add.adult_content_kind or pending_add.adult_archive_category or "adult",
+                archive_category=pending_add.adult_archive_category or "other_adult",
+                display_title=pending_add.adult_display_id or pending_add.title,
+                latest_source_site=pending_add.source_site,
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                downloader_name=pending_add.downloader_name,
+            )
+        except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
+            emit_operational_log(
+                title="成人资源下载状态登记失败",
+                detail=f"content_id={pending_add.adult_content_id} task_ref={task_ref} task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 adult_content_registry 表写入是否正常；当前下载已投递，但成人历史状态可能不会及时更新。",
+            )
 
 
 class AddExecutionFollowUpService:
