@@ -326,9 +326,10 @@ def _start_wecom_webhook_server_if_configured(application: Application, *, confi
             bot_data=application.bot_data,
         )
     except OSError as error:
-        print(
-            f"\033[31m[WeCom webhook 启动失败]\033[0m 原因={error}\n"
-            "\033[33m[处理建议]\033[0m 检查 WECOM_WEBHOOK_HOST/PORT 是否可绑定，或确认端口未被占用。"
+        emit_operational_log(
+            title="WeCom webhook 启动失败",
+            detail=f"原因={error}",
+            fix_hint="检查 WECOM_WEBHOOK_HOST/PORT 是否可绑定，或确认端口未被占用。",
         )
         raise
     application.bot_data[config.wecom_webhook_server_runtime_key] = runtime

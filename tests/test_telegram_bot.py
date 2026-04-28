@@ -19,6 +19,7 @@ from app.bot.telegram_sidecar_runtime import (
     _log_bt_subscription_scheduler_send_error,
     _start_wecom_webhook_server_if_configured,
 )
+from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.bot.telegram_runtime_adapter import (
     build_telegram_application as build_application,
@@ -7048,6 +7049,39 @@ def test_start_wecom_webhook_server_if_configured_logs_invalid_server_config(
     assert "缺少有效的 server config" in output
     assert "[处理建议]" in output
     assert "wecom_webhook_server_runtime" not in application.bot_data
+
+
+def test_start_wecom_webhook_server_if_configured_logs_bind_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime.start_wecom_webhook_server",
+        lambda **_: (_ for _ in ()).throw(OSError("address already in use")),
+    )
+
+    async def run() -> None:
+        application = SimpleNamespace(
+            bot_data={
+                "wecom_webhook_server_config": WeComWebhookServerConfig(
+                    host="127.0.0.1",
+                    port=18889,
+                    path="/wecom/callback",
+                )
+            }
+        )
+        with pytest.raises(OSError, match="address already in use"):
+            _start_wecom_webhook_server_if_configured(
+                application,
+                config=TELEGRAM_SIDECAR_RUNTIME_CONFIG,
+            )
+
+    asyncio.run(run())
+
+    output = capsys.readouterr().out
+    assert "[WeCom webhook 启动失败]" in output
+    assert "address already in use" in output
+    assert "[处理建议]" in output
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
