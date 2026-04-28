@@ -1,15 +1,10 @@
-# Next step (v413)
+# Next step (v414)
 
 ## Current goal
 
-- 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已继续统一日志出口：
-  - `cleanup_smoke_logging`、`trace_logging`、`cleanup_verification_docs` 的失败日志已切到 shared operational logging。
-  - `cleanup_smoke_logging` 里的不可能成立空路径兜底已删除。
-  - `feishu_long_connection` 的停止边界已收窄到 `RuntimeError`。
-- 本轮补了 WeCom webhook HTTP 入口的超时分支拆分，避免把超时和一般失败混成同一种 500 路径。
-- 本轮补了 cleanup smoke / trace / cleanup docs sync focused regressions，以及 shared logging primitives 守卫，守住日志标题、detail、fix hint、ANSI 去色和首个非空行摘要。
-- focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
+- 当前唯一主线切到 **services 层数据结构降本**。
+- 当前优先目标是收 services 层里稳定可复用的数据结构和解析逻辑，先从重复形状最明显、验证成本最低的地方下手。
+- 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
@@ -26,17 +21,17 @@
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
-- 剩余 `*_support.py` 都是较大边界，不再因为文件名机械强拆。
+- 当前更适合先收的结构点是 services 层里重复的 alias / label / parse helper，而不是继续拆较大的 support 文件。
 
 ## User value
 
-- 减少持久化异常、配置回退、导入执行失败和 cleanup 失败只能靠猜的场景，同时保持现有用户行为、协议和持久化真相不变。
-- 默认分支继续可用；focused gate 已覆盖本轮触及路径，质量 gate 和 mainline gate 继续作为退出条件。
-- 成人 BT 后续可以切，但默认先把质量债继续压低，避免在不稳边界上扩功能。
+- 减少 services 层重复结构和解析歧义，同时保持现有用户行为、协议和持久化真相不变。
+- 默认分支继续可用；后续每轮都要可验证、可回滚、文档同步。
+- 成人 BT 后续仍可以切，但这轮先把 services 层结构债压低，不在不稳边界上扩功能。
 
 ## Only do
 
-- 每轮只挑一个最小闭环：明确异常类型、收掉单消费者薄壳、或把重复打印收成现有共享边界。
+- 每轮只挑一个最小闭环：收掉重复 alias / label / parse helper，或把重复数据结构收成现有共享边界。
 - 只改有 focused tests 能覆盖的路径；没有测试先补最小测试。
 - 更新 STATUS/NEXT_STEP/codex.md，保持当前真相和验证结果一致。
 
@@ -48,7 +43,7 @@
 
 ## Done when
 
-1. 下一轮选中的质量债闭环有明确 diff、focused tests 和文档同步。
+1. 下一轮选中的 services 结构闭环有明确 diff、focused tests 和文档同步。
 2. `make quality` 通过。
 3. `make verify-mainline` 通过。
 4. 已收掉的小 support 文件不回归。
@@ -56,6 +51,6 @@
 
 ## After this step
 
-1. 若继续质量债，优先评估剩余 broad `except Exception` 中的 repo/SQLite 边界，或继续收口剩余日志打印边界 / `main()` DI。
-2. 若候选属于外部网络、LLM、TMDB/search、webhook、SDK 长连接或后台 loop 隔离边界，先判断是否应保留宽捕获，不要机械替换。
+1. 若继续 services 结构降本，优先评估重复 alias / label / parse helper、共享展示模型或稳定数据结构收口点。
+2. 若候选会影响协议、SQLite 真相边界或下载 / 导入 / 刷新语义，先停下确认边界。
 3. 若用户明确切成人 BT，则先写成人 BT 缺口清单和 focused gate，再动功能代码。
