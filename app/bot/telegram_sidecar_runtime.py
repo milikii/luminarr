@@ -313,9 +313,10 @@ def _start_wecom_webhook_server_if_configured(application: Application, *, confi
     if server_config is None:
         return
     if not isinstance(server_config, WeComWebhookServerConfig):
-        print(
-            "\033[31m[WeCom webhook 配置不完整]\033[0m 缺少有效的 server config。\n"
-            "\033[33m[处理建议]\033[0m 同时配置 WECOM_TOKEN/WECOM_ENCODING_AES_KEY/WECOM_RECEIVE_ID，并在启动阶段注入 webhook host/port/path。"
+        emit_operational_log(
+            title="WeCom webhook 配置不完整",
+            detail="缺少有效的 server config。",
+            fix_hint="同时配置 WECOM_TOKEN/WECOM_ENCODING_AES_KEY/WECOM_RECEIVE_ID，并在启动阶段注入 webhook host/port/path。",
         )
         return
     try:

@@ -13,7 +13,12 @@ from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler
 
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
-from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_loop_error, _log_bt_subscription_scheduler_send_error
+from app.bot.telegram_sidecar_runtime import (
+    TELEGRAM_SIDECAR_RUNTIME_CONFIG,
+    _log_bt_subscription_scheduler_loop_error,
+    _log_bt_subscription_scheduler_send_error,
+    _start_wecom_webhook_server_if_configured,
+)
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.bot.telegram_runtime_adapter import (
     build_telegram_application as build_application,
@@ -7026,6 +7031,23 @@ def test_log_bt_subscription_scheduler_send_error_uses_shared_log(
     assert "chat_id=1001" in output
     assert "telegram down" in output
     assert "[处理建议]" in output
+
+
+def test_start_wecom_webhook_server_if_configured_logs_invalid_server_config(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    application = SimpleNamespace(bot_data={"wecom_webhook_server_config": "bad-config"})
+
+    _start_wecom_webhook_server_if_configured(
+        application,
+        config=TELEGRAM_SIDECAR_RUNTIME_CONFIG,
+    )
+
+    output = capsys.readouterr().out
+    assert "[WeCom webhook 配置不完整]" in output
+    assert "缺少有效的 server config" in output
+    assert "[处理建议]" in output
+    assert "wecom_webhook_server_runtime" not in application.bot_data
 
 
 def test_build_application_applies_outbound_proxy_to_telegram_requests() -> None:
