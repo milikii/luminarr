@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
+from app.services.command_parsing import parse_prefixed_command_tail
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import VALID_MEDIA_KINDS, media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
@@ -36,14 +37,9 @@ class ParsedBtSubscriptionAddRequest:
 
 
 def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
-    cleaned_text = text.strip()
-    if not cleaned_text:
+    tail = parse_prefixed_command_tail(text, prefix_pattern=r"(?i:btsub)")
+    if tail is None:
         return None
-
-    matched = re.match(r"^(?i:btsub)(?:\s+(.*))?$", cleaned_text)
-    if not matched:
-        return None
-    tail = (matched.group(1) or "").strip()
     if not tail:
         return BtSubscriptionCommand(action="list", arg="")
 

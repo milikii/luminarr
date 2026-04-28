@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.operational_logging import emit_operational_log
+from app.services.command_parsing import parse_prefixed_command_tail
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
@@ -231,14 +232,9 @@ class ManageWatchlistService:
 
 
 def parse_watchlist_query(text: str) -> WatchlistCommand | None:
-    cleaned_text = text.strip()
-    if not cleaned_text:
+    tail = parse_prefixed_command_tail(text, prefix_pattern=r"(?i:watchlist)|想看")
+    if tail is None:
         return None
-
-    matched = re.match(r"^(?:(?i:watchlist)|想看)(?:\s+(.*))?$", cleaned_text)
-    if not matched:
-        return None
-    tail = (matched.group(1) or "").strip()
     if not tail:
         return WatchlistCommand(action="list", arg="")
 
