@@ -5,6 +5,11 @@ from dataclasses import dataclass
 
 from telegram.ext import Application
 
+from app.bot.sidecar_host_runtime import (
+    SIDECAR_HOST_SEND_TEXT_FUNC_KEY,
+    SidecarHost,
+    resolve_sidecar_host_send_text_func,
+)
 from app.bot.downloader_execution_runtime import (
     ResolvedDownloaderExecution,
     resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
@@ -80,90 +85,65 @@ TELEGRAM_SIDECAR_RUNTIME_CONFIG = TelegramSidecarRuntimeConfig(
 )
 
 
+async def start_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
+    """Start all generic sidecars and schedulers for the given host."""
+
+    _start_wecom_webhook_server_if_configured(host, config=config)
+    await _start_feishu_long_connection_if_configured(host)
+    await _start_personal_wechat_text_service_if_available(host)
+    _start_post_download_auto_import_scheduler(host, config=config)
+    _start_bt_subscription_scheduler_if_configured(host)
+
+
+async def stop_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
+    """Stop all generic sidecars and schedulers for the given host."""
+
+    _stop_wecom_webhook_server_if_running(host, config=config)
+    await _shutdown_feishu_long_connection_if_running(host)
+    await _shutdown_personal_wechat_text_service_if_running(host)
+    await _shutdown_personal_wechat_login_service_if_running(host, config=config)
+    await _stop_post_download_auto_import_scheduler(host, config=config)
+    await _stop_bt_subscription_scheduler_if_running(host)
+
+
 async def start_telegram_sidecars(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
-    _start_wecom_webhook_server_if_configured(application, config=config)
-    await _start_feishu_long_connection_if_configured(application)
-    await _start_personal_wechat_text_service_if_available(application)
-    _start_post_download_auto_import_scheduler(application, config=config)
+    """Backward-compatible Telegram wrapper for sidecar startup."""
+
+    await start_sidecar_host_lifecycle(application, config=config)
 
 
 async def stop_telegram_sidecars(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
-    _stop_wecom_webhook_server_if_running(application, config=config)
-    await _shutdown_feishu_long_connection_if_running(application)
-    await _shutdown_personal_wechat_text_service_if_running(application)
-    await _shutdown_personal_wechat_login_service_if_running(application, config=config)
-    await _stop_post_download_auto_import_scheduler(application, config=config)
+    """Backward-compatible Telegram wrapper for sidecar shutdown."""
+
+    await stop_sidecar_host_lifecycle(application, config=config)
 
 
 async def start_telegram_application_lifecycle(application: Application) -> None:
-    await start_telegram_sidecars(application, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG)
+    """Telegram lifecycle wrapper that delegates to the generic host runtime."""
 
-    existing_task = application.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
-    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
-        return
-
-    bt_subscription_service = application.bot_data.get(MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
-    if not isinstance(bt_subscription_service, ManageBtSubscriptionService):
-        return
-
-    downloader_execution, resolution_error = _resolve_bound_downloader_execution_for_application(
-        application=application,
-        role="bt",
-    )
-    if resolution_error is not None:
-        _log_bt_subscription_scheduler_config_error(reason=resolution_error)
-        return
-    if downloader_execution is None:
-        _log_bt_subscription_scheduler_config_error(reason="未配置 BT 下载器角色绑定，后台自动扫描不会启动。")
-        return
-
-    stop_event = asyncio.Event()
-    application.bot_data[BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY] = stop_event
-    application.bot_data[BT_SUBSCRIPTION_SCHEDULER_TASK_KEY] = application.create_task(
-        _bt_subscription_scheduler_loop(
-            application=application,
-            bt_subscription_service=bt_subscription_service,
-            execution_gate=_resolve_execution_gate_for_application(application),
-            stop_event=stop_event,
-            dispatch_context=BtSubscriptionDispatchContext(
-                downloader_name=downloader_execution.name,
-                downloader_type=downloader_execution.downloader_type,
-                download_dir=downloader_execution.download_dir,
-            ),
-        ),
-        name="bt_subscription_scheduler",
-    )
+    await start_sidecar_host_lifecycle(application, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG)
 
 
 async def stop_telegram_application_lifecycle(application: Application) -> None:
-    await stop_telegram_sidecars(application, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG)
+    """Telegram lifecycle wrapper that delegates to the generic host runtime."""
 
-    stop_event = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
-    task = application.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
-    if isinstance(stop_event, asyncio.Event):
-        stop_event.set()
-    if not isinstance(task, asyncio.Task):
-        return
-    try:
-        await task
-    except Exception as error:
-        _log_bt_subscription_scheduler_loop_error(error=error)
+    await stop_sidecar_host_lifecycle(application, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG)
 
 
-def _resolve_execution_gate_for_application(application: Application) -> ExecutionGate:
+def _resolve_execution_gate_for_host(host: SidecarHost) -> ExecutionGate:
     return resolve_execution_gate(
-        bot_data=application.bot_data,
+        bot_data=host.bot_data,
         execution_gate_key=EXECUTION_GATE_KEY,
     )
 
 
-def _resolve_bound_downloader_execution_for_application(
+def _resolve_bound_downloader_execution_for_host(
     *,
-    application: Application,
+    host: SidecarHost,
     role: str,
 ) -> tuple[ResolvedDownloaderExecution | None, str | None]:
     return resolve_shared_bound_downloader_execution(
-        bot_data=application.bot_data,
+        bot_data=host.bot_data,
         role=role,
         downloader_role_binding_key=DOWNLOADER_ROLE_BINDING_KEY,
         downloader_instances_key=DOWNLOADER_INSTANCES_KEY,
@@ -173,7 +153,7 @@ def _resolve_bound_downloader_execution_for_application(
 
 async def _bt_subscription_scheduler_loop(
     *,
-    application: Application,
+    host: SidecarHost,
     bt_subscription_service: ManageBtSubscriptionService,
     execution_gate: ExecutionGate,
     stop_event: asyncio.Event,
@@ -182,7 +162,7 @@ async def _bt_subscription_scheduler_loop(
     while not stop_event.is_set():
         try:
             await _run_bt_subscription_scheduler_tick_once(
-                application=application,
+                application=host,
                 bt_subscription_service=bt_subscription_service,
                 execution_gate=execution_gate,
                 dispatch_context=dispatch_context,
@@ -197,7 +177,7 @@ async def _bt_subscription_scheduler_loop(
 
 async def _run_bt_subscription_scheduler_tick_once(
     *,
-    application: Application,
+    application: SidecarHost,
     bt_subscription_service: ManageBtSubscriptionService,
     execution_gate: ExecutionGate,
     dispatch_context: BtSubscriptionDispatchContext,
@@ -221,12 +201,22 @@ async def _run_bt_subscription_scheduler_tick_once(
 
 async def _send_bt_subscription_scheduler_message(
     *,
-    application: Application,
+    application: SidecarHost,
     chat_id: int,
     text: str,
 ) -> None:
+    send_text = resolve_sidecar_host_send_text_func(
+        bot_data=application.bot_data,
+        send_text_func_key=SIDECAR_HOST_SEND_TEXT_FUNC_KEY,
+    )
+    if send_text is None:
+        _log_bt_subscription_scheduler_send_error(
+            chat_id=chat_id,
+            error=RuntimeError("sidecar host send_text callback unavailable"),
+        )
+        return
     try:
-        await application.bot.send_message(chat_id=chat_id, text=text)
+        await send_text(chat_id=chat_id, text=text)
     except Exception as error:
         _log_bt_subscription_scheduler_send_error(chat_id=chat_id, error=error)
 
@@ -263,9 +253,60 @@ def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception)
     )
 
 
-def _start_post_download_auto_import_scheduler(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
+def _start_bt_subscription_scheduler_if_configured(host: SidecarHost) -> None:
+    existing_task = host.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
+    if isinstance(existing_task, asyncio.Task) and not existing_task.done():
+        return
+
+    bt_subscription_service = host.bot_data.get(MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)
+    if not isinstance(bt_subscription_service, ManageBtSubscriptionService):
+        return
+
+    downloader_execution, resolution_error = _resolve_bound_downloader_execution_for_host(
+        host=host,
+        role="bt",
+    )
+    if resolution_error is not None:
+        _log_bt_subscription_scheduler_config_error(reason=resolution_error)
+        return
+    if downloader_execution is None:
+        _log_bt_subscription_scheduler_config_error(reason="未配置 BT 下载器角色绑定，后台自动扫描不会启动。")
+        return
+
+    stop_event = asyncio.Event()
+    host.bot_data[BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY] = stop_event
+    host.bot_data[BT_SUBSCRIPTION_SCHEDULER_TASK_KEY] = host.create_task(
+        _bt_subscription_scheduler_loop(
+            host=host,
+            bt_subscription_service=bt_subscription_service,
+            execution_gate=_resolve_execution_gate_for_host(host),
+            stop_event=stop_event,
+            dispatch_context=BtSubscriptionDispatchContext(
+                downloader_name=downloader_execution.name,
+                downloader_type=downloader_execution.downloader_type,
+                download_dir=downloader_execution.download_dir,
+            ),
+        ),
+        name="bt_subscription_scheduler",
+    )
+
+
+async def _stop_bt_subscription_scheduler_if_running(host: SidecarHost) -> None:
+    stop_event = host.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_STOP_EVENT_KEY, None)
+    task = host.bot_data.pop(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY, None)
+    if isinstance(stop_event, asyncio.Event):
+        stop_event.set()
+    if not isinstance(task, asyncio.Task):
+        return
+    try:
+        await task
+    except Exception as error:
+        _log_bt_subscription_scheduler_loop_error(error=error)
+
+
+def _start_post_download_auto_import_scheduler(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
     start_download_follow_up_scheduler(
-        application=application,
+        application=host,
         post_download_auto_import_service_key=config.post_download_auto_import_service_key,
         post_download_auto_import_stop_event_key=config.post_download_auto_import_stop_event_key,
         post_download_auto_import_task_key=config.post_download_auto_import_task_key,
@@ -277,7 +318,7 @@ def _start_post_download_auto_import_scheduler(application: Application, *, conf
 
 
 async def _stop_post_download_auto_import_scheduler(
-    application: Application,
+    application: SidecarHost,
     *,
     config: TelegramSidecarRuntimeConfig,
 ) -> None:
@@ -290,21 +331,21 @@ async def _stop_post_download_auto_import_scheduler(
     )
 
 
-async def _start_feishu_long_connection_if_configured(application: Application) -> None:
+async def _start_feishu_long_connection_if_configured(application: SidecarHost) -> None:
     service = application.bot_data.get(FEISHU_LONG_CONNECTION_SERVICE_KEY)
     if not isinstance(service, FeishuLongConnectionService):
         return
     await service.start(bot_data=application.bot_data)
 
 
-async def _shutdown_feishu_long_connection_if_running(application: Application) -> None:
+async def _shutdown_feishu_long_connection_if_running(application: SidecarHost) -> None:
     service = application.bot_data.get(FEISHU_LONG_CONNECTION_SERVICE_KEY)
     if not isinstance(service, FeishuLongConnectionService):
         return
     await service.shutdown()
 
 
-def _start_wecom_webhook_server_if_configured(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
+def _start_wecom_webhook_server_if_configured(application: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
     existing_runtime = application.bot_data.get(config.wecom_webhook_server_runtime_key)
     if isinstance(existing_runtime, WeComWebhookServerRuntime):
         return
@@ -335,14 +376,14 @@ def _start_wecom_webhook_server_if_configured(application: Application, *, confi
     application.bot_data[config.wecom_webhook_server_runtime_key] = runtime
 
 
-def _stop_wecom_webhook_server_if_running(application: Application, *, config: TelegramSidecarRuntimeConfig) -> None:
+def _stop_wecom_webhook_server_if_running(application: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
     runtime = application.bot_data.pop(config.wecom_webhook_server_runtime_key, None)
     if not isinstance(runtime, WeComWebhookServerRuntime):
         return
     stop_wecom_webhook_server(runtime)
 
 
-async def _start_personal_wechat_text_service_if_available(application: Application) -> None:
+async def _start_personal_wechat_text_service_if_available(application: SidecarHost) -> None:
     from app.bot.personal_wechat_text import (
         PERSONAL_WECHAT_TEXT_SERVICE_KEY,
         PersonalWeChatTextService,
@@ -362,7 +403,7 @@ async def _start_personal_wechat_text_service_if_available(application: Applicat
     await service.start(bot_data=application.bot_data)
 
 
-async def _shutdown_personal_wechat_text_service_if_running(application: Application) -> None:
+async def _shutdown_personal_wechat_text_service_if_running(application: SidecarHost) -> None:
     from app.bot.personal_wechat_text import (
         PERSONAL_WECHAT_TEXT_SERVICE_KEY,
         PersonalWeChatTextService,
@@ -375,7 +416,7 @@ async def _shutdown_personal_wechat_text_service_if_running(application: Applica
 
 
 async def _shutdown_personal_wechat_login_service_if_running(
-    application: Application,
+    application: SidecarHost,
     *,
     config: TelegramSidecarRuntimeConfig,
 ) -> None:

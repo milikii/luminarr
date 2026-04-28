@@ -8,6 +8,7 @@ from app.db.bt_pending_repo import BtPendingRepo
 from app.db.job_repo import JobRepo
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import ExecutionGate
+from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
@@ -153,7 +154,9 @@ def build_telegram_application(
     application.bot_data[tg.DOWNLOADER_INSTANCES_KEY] = downloader_instances
     application.bot_data[tg.DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
     application.bot_data[tg.TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
-    application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = build_telegram_send_text_func(application)
+    send_text_func = build_telegram_send_text_func(application)
+    application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = send_text_func
+    application.bot_data[SIDECAR_HOST_SEND_TEXT_FUNC_KEY] = send_text_func
     if bt_tmdb_movie_candidates_lookup_func is not None:
         application.bot_data[tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
     if bt_tmdb_tv_candidates_lookup_func is not None:

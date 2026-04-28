@@ -2,19 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from collections.abc import MutableMapping
-from typing import Protocol
 
+from app.bot.sidecar_host_runtime import SidecarHost
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.operational_logging import emit_operational_log
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
-
-
-class _SchedulerApplication(Protocol):
-    bot_data: MutableMapping[str, object]
-
-    def create_task(self, coroutine, *, name: str): ...
 
 
 class DownloadCompletionPendingListError(RuntimeError):
@@ -79,7 +72,7 @@ async def download_completion_polling_loop(
 
 def start_download_follow_up_scheduler(
     *,
-    application: _SchedulerApplication,
+    application: SidecarHost,
     post_download_auto_import_service_key: str,
     post_download_auto_import_stop_event_key: str,
     post_download_auto_import_task_key: str,
@@ -131,7 +124,7 @@ def start_download_follow_up_scheduler(
 
 async def stop_download_follow_up_scheduler(
     *,
-    application: _SchedulerApplication,
+    application: SidecarHost,
     post_download_auto_import_stop_event_key: str,
     post_download_auto_import_task_key: str,
     download_completion_polling_stop_event_key: str,

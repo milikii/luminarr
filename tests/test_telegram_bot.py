@@ -20,7 +20,12 @@ from app.bot.telegram_sidecar_runtime import (
     _log_bt_subscription_scheduler_send_error,
     _start_personal_wechat_text_service_if_available,
     _start_wecom_webhook_server_if_configured,
+    start_sidecar_host_lifecycle,
+    start_telegram_application_lifecycle,
+    stop_sidecar_host_lifecycle,
+    stop_telegram_application_lifecycle,
 )
+from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.bot.telegram_runtime_adapter import (
@@ -6964,6 +6969,84 @@ def test_build_application_registers_services() -> None:
         for handlers in application.handlers.values()
         for handler in handlers
     )
+    assert application.post_init is start_telegram_application_lifecycle
+    assert application.post_shutdown is stop_telegram_application_lifecycle
+
+
+def test_start_and_stop_sidecar_host_lifecycle_accepts_generic_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+
+    def _record_sync(name: str):
+        def _inner(host, *, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG):
+            assert host.bot_data["host"] == "generic"
+            assert config is TELEGRAM_SIDECAR_RUNTIME_CONFIG
+            events.append(name)
+
+        return _inner
+
+    def _record_async(name: str):
+        async def _inner(host, *, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG):
+            assert host.bot_data["host"] == "generic"
+            assert config is TELEGRAM_SIDECAR_RUNTIME_CONFIG
+            events.append(name)
+
+        return _inner
+
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._start_wecom_webhook_server_if_configured",
+        _record_sync("start_wecom"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._start_feishu_long_connection_if_configured",
+        _record_async("start_feishu"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._start_personal_wechat_text_service_if_available",
+        _record_async("start_personal_wechat"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._start_post_download_auto_import_scheduler",
+        _record_sync("start_follow_up"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._stop_wecom_webhook_server_if_running",
+        _record_sync("stop_wecom"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._shutdown_feishu_long_connection_if_running",
+        _record_async("stop_feishu"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._shutdown_personal_wechat_text_service_if_running",
+        _record_async("stop_personal_wechat"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._shutdown_personal_wechat_login_service_if_running",
+        _record_async("stop_personal_wechat_login"),
+    )
+    monkeypatch.setattr(
+        "app.bot.telegram_sidecar_runtime._stop_post_download_auto_import_scheduler",
+        _record_async("stop_follow_up"),
+    )
+
+    host = SimpleNamespace(bot_data={"host": "generic"}, create_task=Mock())
+
+    asyncio.run(start_sidecar_host_lifecycle(host, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG))
+    asyncio.run(stop_sidecar_host_lifecycle(host, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG))
+
+    assert events == [
+        "start_wecom",
+        "start_feishu",
+        "start_personal_wechat",
+        "start_follow_up",
+        "stop_wecom",
+        "stop_feishu",
+        "stop_personal_wechat",
+        "stop_personal_wechat_login",
+        "stop_follow_up",
+    ]
 
 
 def test_log_bt_subscription_scheduler_config_error_prints_fix_hint(
@@ -6978,7 +7061,11 @@ def test_log_bt_subscription_scheduler_config_error_prints_fix_hint(
 
 def test_run_bt_subscription_scheduler_tick_once_skips_none_notifications() -> None:
     execution_gate = SimpleNamespace(run=AsyncMock(return_value=None))
-    application = SimpleNamespace(bot=SimpleNamespace(send_message=AsyncMock()))
+    send_text = AsyncMock()
+    application = SimpleNamespace(
+        bot_data={SIDECAR_HOST_SEND_TEXT_FUNC_KEY: send_text},
+        bot=SimpleNamespace(send_message=AsyncMock()),
+    )
     service = SimpleNamespace(run_scheduler_tick=AsyncMock(return_value=None))
 
     asyncio.run(
@@ -6990,12 +7077,17 @@ def test_run_bt_subscription_scheduler_tick_once_skips_none_notifications() -> N
         )
     )
 
+    send_text.assert_not_awaited()
     application.bot.send_message.assert_not_awaited()
 
 
 def test_run_bt_subscription_scheduler_tick_once_logs_result_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
     execution_gate = SimpleNamespace(run=AsyncMock(return_value=None))
-    application = SimpleNamespace(bot=SimpleNamespace(send_message=AsyncMock()))
+    send_text = AsyncMock()
+    application = SimpleNamespace(
+        bot_data={SIDECAR_HOST_SEND_TEXT_FUNC_KEY: send_text},
+        bot=SimpleNamespace(send_message=AsyncMock()),
+    )
     service = SimpleNamespace(run_scheduler_tick=AsyncMock(return_value=None))
 
     asyncio.run(
@@ -7010,6 +7102,33 @@ def test_run_bt_subscription_scheduler_tick_once_logs_result_unavailable(capsys:
     output = capsys.readouterr().out
     assert "[BT 订阅后台扫描结果不可用]" in output
     assert "[处理建议]" in output
+    send_text.assert_not_awaited()
+    application.bot.send_message.assert_not_awaited()
+
+
+def test_run_bt_subscription_scheduler_tick_once_uses_injected_send_text_callback() -> None:
+    send_text = AsyncMock(return_value="sent")
+    execution_gate = SimpleNamespace(run=AsyncMock(return_value=((1001, "下载待确认：Frieren S01E01 1080p"),)))
+    application = SimpleNamespace(
+        bot_data={SIDECAR_HOST_SEND_TEXT_FUNC_KEY: send_text},
+        bot=SimpleNamespace(send_message=AsyncMock()),
+    )
+    service = SimpleNamespace(
+        run_scheduler_tick=AsyncMock(
+            return_value=((1001, "下载待确认：Frieren S01E01 1080p"),)
+        )
+    )
+
+    asyncio.run(
+        _run_bt_subscription_scheduler_tick_once(
+            application=application,
+            bt_subscription_service=service,
+            execution_gate=execution_gate,
+            dispatch_context=SimpleNamespace(),
+        )
+    )
+
+    send_text.assert_awaited_once_with(chat_id=1001, text="下载待确认：Frieren S01E01 1080p")
     application.bot.send_message.assert_not_awaited()
 
 

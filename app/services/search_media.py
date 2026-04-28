@@ -134,7 +134,7 @@ class CandidateStateStore:
             return True
         try:
             self.repo.save_candidates(chat_id, candidates)
-        except (CandidatePersistenceError, sqlite3.Error) as error:
+        except (CandidatePersistenceError, sqlite3.Error, RuntimeError) as error:
             _log_candidate_state_error(
                 title="BT 批量预览候选持久化失败",
                 detail=f"chat_id={chat_id} 错误={error}",
@@ -194,7 +194,7 @@ class CandidateStateStore:
             self.recent_by_chat.pop(chat_id, None)
             self._rollback_failed_persist(chat_id=chat_id)
             return False
-        except (CandidatePersistenceError, sqlite3.Error) as error:
+        except (CandidatePersistenceError, sqlite3.Error, RuntimeError) as error:
             _log_candidate_state_error(
                 title="搜索候选持久化失败",
                 detail=f"chat_id={chat_id} 错误={error}",
@@ -243,7 +243,7 @@ class CandidateStateStore:
             if cleared_result is None:
                 raise CandidatePersistenceError(CANDIDATE_CLEAR_RESULT_MISSING_REASON)
             return cleared_result or cleared
-        except (CandidatePersistenceError, sqlite3.Error) as error:
+        except (CandidatePersistenceError, sqlite3.Error, RuntimeError) as error:
             if str(error) == CANDIDATE_CLEAR_RESULT_MISSING_REASON:
                 _log_candidate_state_error(
                     title="搜索候选清理结果缺失",
@@ -343,7 +343,7 @@ class ClarificationStateStore:
             if cleared_result is None:
                 raise ClarificationPersistenceError(CLARIFICATION_CLEAR_RESULT_MISSING_REASON)
             return cleared_result or cleared
-        except (ClarificationPersistenceError, sqlite3.Error) as error:
+        except (ClarificationPersistenceError, sqlite3.Error, RuntimeError) as error:
             if str(error) == CLARIFICATION_CLEAR_RESULT_MISSING_REASON:
                 _log_clarification_state_error(
                     title="搜索澄清态清理结果缺失",

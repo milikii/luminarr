@@ -125,3 +125,20 @@
 
 ### 下轮目标
 - 先盘点 Telegram `Application` 生命周期下当前承载的 sidecar 与 scheduler，再拆出非 Telegram 运行所需的宿主边界
+
+## Round 8 — 2026-04-29 01:56
+
+### 完成
+- 完成 `telegram_sidecar_runtime.py` 宿主解耦：抽出通用 sidecar host 边界，Telegram 生命周期只保留 wrapper/委托
+- 让 Feishu、WeCom、personal WeChat、下载完成轮询、post-download auto-import 与 `btsub` scheduler 通过通用 host 生命周期启动/停止
+- 让 `btsub` scheduler 通知发送改走宿主注入的 `send_text` callback，而不是硬绑 `Application.bot.send_message`
+- 补齐 sidecar focused tests，并通过总回归
+
+### 测试状态
+- 通过: 3 / 总计: 3
+
+### 遗留 / 下轮继续
+- 进入超大业务文件收口主线
+
+### 下轮目标
+- 先盘点 `add_to_downloader.py`、`import_to_library.py`、`manage_bt_subscription.py`、`search_media.py`、`cleanup_downloaded_source.py`、`subtitle_translation_support.py` 的体量与单消费者切口，再决定最小拆分顺序
