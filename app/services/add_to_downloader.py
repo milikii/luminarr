@@ -31,7 +31,6 @@ from app.services.add_pending_context import (
     PendingAddContext,
     pending_add_to_json,
 )
-from app.services.add_request_facade import AddPendingRequestFacade
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.search_media import SearchMediaService
 from app.services.workflow_trace_logger import WorkflowTraceLogger
@@ -99,11 +98,6 @@ class AddToDownloaderService:
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
         self._adult_registry_state = AddAdultRegistryState(adult_content_registry_repo)
-        self._pending_request_facade = AddPendingRequestFacade(
-            pending_context_builder=self._pending_context_builder,
-            persist_pending_add=self._persist_pending_add,
-            bt_source_unsupported_text=BT_SOURCE_UNSUPPORTED_TEXT,
-        )
         self._confirm_preparation = AddConfirmPreparation(
             pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -164,15 +158,21 @@ class AddToDownloaderService:
         download_dir: str = "",
         auto_import_enabled: bool = True,
     ) -> str:
-        return self._pending_request_facade.add_by_selection(
+        build_result = self._pending_context_builder.build_from_selection(
             chat_id=chat_id,
             selection_text=selection_text,
-            user_id=user_id,
-            channel=channel,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
             auto_import_enabled=auto_import_enabled,
+        )
+        if build_result.pending_add is None:
+            return build_result.error_text
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=build_result.pending_add,
+            channel=channel,
         )
 
     async def add_by_batch_selection(
@@ -187,16 +187,31 @@ class AddToDownloaderService:
         download_dir: str = "",
         auto_import_enabled: bool = True,
     ) -> str:
-        return self._pending_request_facade.add_by_batch_selection(
-            chat_id=chat_id,
-            selection_indexes=selection_indexes,
-            user_id=user_id,
-            channel=channel,
-            downloader_name=downloader_name,
-            downloader_type=downloader_type,
-            download_dir=download_dir,
-            auto_import_enabled=auto_import_enabled,
-        )
+        pending_adds = []
+        for index in selection_indexes:
+            build_result = self._pending_context_builder.build_from_selection(
+                chat_id=chat_id,
+                selection_text=str(index),
+                downloader_name=downloader_name,
+                downloader_type=downloader_type,
+                download_dir=download_dir,
+                auto_import_enabled=auto_import_enabled,
+            )
+            if build_result.pending_add is None:
+                return build_result.error_text
+            pending_adds.append(build_result.pending_add)
+
+        replies: list[str] = []
+        for pending_add in pending_adds:
+            replies.append(
+                self._persist_pending_add(
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    pending_add=pending_add,
+                    channel=channel,
+                )
+            )
+        return "\n\n".join(replies)
 
     async def add_bt_source(
         self,
@@ -211,16 +226,21 @@ class AddToDownloaderService:
         download_dir: str = "",
         auto_import_enabled: bool = True,
     ) -> str:
-        return self._pending_request_facade.add_bt_source(
-            chat_id=chat_id,
+        build_result = self._pending_context_builder.build_from_source(
             source=source,
             title=title,
-            user_id=user_id,
-            channel=channel,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
             auto_import_enabled=auto_import_enabled,
+        )
+        if build_result.pending_add is None:
+            return build_result.error_text
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=build_result.pending_add,
+            channel=channel,
         )
 
     async def add_candidate_source(
@@ -236,16 +256,21 @@ class AddToDownloaderService:
         download_dir: str = "",
         auto_import_enabled: bool = True,
     ) -> str:
-        return self._pending_request_facade.add_candidate_source(
-            chat_id=chat_id,
+        build_result = self._pending_context_builder.build_from_source(
             source=source,
             title=title,
-            user_id=user_id,
-            channel=channel,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,
             auto_import_enabled=auto_import_enabled,
+        )
+        if build_result.pending_add is None:
+            return build_result.error_text
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=build_result.pending_add,
+            channel=channel,
         )
 
     async def confirm_add_by_task_ref(
