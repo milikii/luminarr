@@ -2946,11 +2946,11 @@ def test_search_bt_batch_preview_and_format_for_chat_caches_home_base_page_candi
 
 def test_search_bt_read_only_and_format_logs_raw_search_failure(capsys) -> None:
     async def fake_raw_search(_: str) -> list[dict[str, object]]:
-        raise RuntimeError("bt source unavailable")
+        raise httpx.ConnectError("bt source unavailable", request=httpx.Request("GET", "https://example.com"))
 
     service = SearchMediaService(_fake_search_with_results, raw_search_func=fake_raw_search)
 
-    with pytest.raises(RuntimeError, match="bt source unavailable"):
+    with pytest.raises(httpx.ConnectError, match="bt source unavailable"):
         _run(service.search_bt_read_only_and_format("dune bt"))
 
     output = capsys.readouterr().out

@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 from app.operational_logging import emit_operational_log
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
@@ -249,7 +251,7 @@ async def dispatch_bt_subscription_item(
     query = _build_subscription_query(item)
     try:
         results = await search_func(query)
-    except Exception as error:
+    except (httpx.HTTPError, ValueError) as error:
         log_scan_error(query, error)
         return BtSubscriptionItemDispatchResult(reply=None)
 

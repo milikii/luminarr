@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape
-import re
+
+import httpx
 
 from app.clients.fanart import FanartMovieImages
 from app.clients.tmdb import TmdbMovie
@@ -83,7 +85,7 @@ class MetadataScraperService:
 
         try:
             fanart_images = await self._get_movie_images_func(movie_id)
-        except Exception as exc:
+        except (httpx.HTTPError, ValueError) as exc:
             message = f"Fanart 查询失败：{exc}"
             _print_colored_error(
                 problem=message,
@@ -211,7 +213,7 @@ class MetadataScraperService:
         if tmdb_id and self._lookup_movie_by_tmdb_id_func is not None:
             try:
                 tmdb_movie = await self._lookup_movie_by_tmdb_id_func(tmdb_id)
-            except Exception as exc:
+            except (httpx.HTTPError, ValueError) as exc:
                 message = f"TMDB 详情查询失败：{exc}"
                 _print_colored_error(
                     problem=message,
@@ -232,7 +234,7 @@ class MetadataScraperService:
 
         try:
             tmdb_movie = await self._lookup_movie_func(title, year)
-        except Exception as exc:
+        except (httpx.HTTPError, ValueError) as exc:
             message = f"TMDB 查询失败：{exc}"
             _print_colored_error(
                 problem=message,
@@ -249,7 +251,7 @@ class MetadataScraperService:
         if tmdb_movie.tmdb_id and self._lookup_movie_by_tmdb_id_func is not None:
             try:
                 localized_movie = await self._lookup_movie_by_tmdb_id_func(tmdb_movie.tmdb_id)
-            except Exception as exc:
+            except (httpx.HTTPError, ValueError) as exc:
                 message = f"TMDB 详情查询失败：{exc}"
                 _print_colored_error(
                     problem=message,
@@ -317,7 +319,7 @@ class MetadataScraperService:
                 continue
             try:
                 payload = await self._download_image_func(image_url)
-            except Exception as exc:
+            except (httpx.HTTPError, ValueError) as exc:
                 cleanup_written_artifacts()
                 message = f"下载 {label} 图片失败：{exc}"
                 _print_colored_error(

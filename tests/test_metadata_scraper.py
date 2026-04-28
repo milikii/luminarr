@@ -4,6 +4,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import httpx
+
 from app.clients.fanart import FanartMovieImages
 from app.clients.tmdb import TmdbMovie
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScraperService
@@ -417,7 +419,7 @@ def test_scrape_for_import_cleans_up_partial_image_artifacts_on_download_failure
     async def fake_download_image(url: str) -> bytes:
         seen_urls.append(url)
         if url.endswith("bg.jpg"):
-            raise RuntimeError("network down")
+            raise httpx.ConnectError("network down", request=httpx.Request("GET", url))
         return f"image:{url}".encode("utf-8")
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)

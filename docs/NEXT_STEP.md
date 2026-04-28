@@ -1,13 +1,15 @@
-# Next step (v398)
+# Next step (v399)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已继续收口异常边界与日志边界：
-  - `subtitle_translation_support` 的本地字幕读写、模型响应 JSON 和 metadata JSON 读取只捕获明确 I/O/编码/解析异常。
-  - `metadata_scraper` 的 metadata/NFO/图片本地产物写入只捕获明确 I/O/编码异常。
-  - `wecom_adapter` callback 配置、请求体、验签、解密和运行时失败日志已统一到 shared `emit_operational_log`。
-- focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新主线语义不变。
+- 本轮已继续收口外部客户端异常边界：
+  - `metadata_scraper` 的 TMDB/Fanart/图片下载只捕获明确 `httpx.HTTPError` / `ValueError`。
+  - `search_media` 的 BT 只读搜索/页面预览只捕获明确 `httpx.HTTPError` / `ValueError`。
+  - `bt_sources` provider 搜索/页面搜索只捕获明确 `httpx.HTTPError` / `ValueError`。
+  - `manage_bt_subscription` 订阅扫描搜索失败只捕获明确 `httpx.HTTPError` / `ValueError`。
+- 本轮补了 BT 订阅扫描搜索失败 regression，并把相关网络失败测试改成真实 `httpx.ConnectError`。
+- focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。

@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import httpx
+
 from app.clients.web_source import UnsupportedWebSourcePageError
 from app.operational_logging import emit_operational_log
 from app.services.adult_content import extract_exact_adult_content_match
@@ -47,7 +49,7 @@ class BtSourceAdapter:
         for provider in self._providers:
             try:
                 raw_results = await provider.search_func(cleaned_query)
-            except Exception as error:
+            except (httpx.HTTPError, ValueError) as error:
                 last_error = error
                 _log_bt_source_provider_error(provider_name=provider.name, query=cleaned_query, error=error)
                 continue
@@ -84,7 +86,7 @@ class BtSourceAdapter:
                 raw_results = await provider.page_search_func(cleaned_page_url)
             except UnsupportedWebSourcePageError:
                 continue
-            except Exception as error:
+            except (httpx.HTTPError, ValueError) as error:
                 matched_provider = True
                 last_error = error
                 _log_bt_source_provider_page_error(provider_name=provider.name, page_url=cleaned_page_url, error=error)

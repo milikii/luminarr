@@ -4,6 +4,8 @@ import asyncio
 import sqlite3
 from pathlib import Path
 
+import httpx
+
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
@@ -371,6 +373,36 @@ def test_manage_bt_subscription_clear_surfaces_row_corruption(tmp_path: Path, ca
     assert "[BT 订阅清单清空命中坏记录]" in captured.out
     assert "[处理建议]" in captured.out
     assert "bt_subscription_item media kind corrupted after read" in captured.out
+
+
+def test_manage_bt_subscription_run_once_logs_scan_failure_when_search_raises(tmp_path: Path, capsys) -> None:
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    repo.add_item(chat_id=1001, title="葬送的芙莉莲", year="2023", media_kind="anime")
+
+    async def _boom(_: str) -> list[dict[str, object]]:
+        raise httpx.ConnectError("bt source unavailable", request=httpx.Request("GET", "https://example.com"))
+
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _boom, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    reply = asyncio.run(
+        service.run_once(
+            chat_id=1001,
+            user_id=2001,
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert reply == "BT 订阅扫描完成：共扫描 1 条，当前没有新资源。"
+    captured = capsys.readouterr()
+    assert "[BT 订阅扫描失败]" in captured.out
+    assert "bt source unavailable" in captured.out
 
 
 def test_bt_subscription_run_once_enqueues_new_candidate_and_skips_seen_source(tmp_path: Path) -> None:

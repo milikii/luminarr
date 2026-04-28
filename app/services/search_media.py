@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
+import httpx
+
 from app.clients.web_source import (
     looks_like_http_url,
     looks_like_web_source_page_request,
@@ -109,7 +111,7 @@ async def search_raw_page_candidates(
         raw_results = await raw_page_search_func(cleaned_page_url)
     except UnsupportedBatchPreviewPageUrl:
         raise
-    except Exception as error:
+    except (httpx.HTTPError, ValueError) as error:
         emit_operational_log(
             title="BT 页面预览失败",
             detail=f"页面={cleaned_page_url} 错误={error}",
@@ -152,7 +154,7 @@ class SearchMediaService:
             return ()
         try:
             raw_results = await self._raw_search_func(cleaned_query)
-        except Exception as error:
+        except (httpx.HTTPError, ValueError) as error:
             emit_operational_log(
                 title="BT 只读搜索失败",
                 detail=f"query={cleaned_query} 错误={error}",
