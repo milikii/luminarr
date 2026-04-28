@@ -25,7 +25,6 @@ from app.services.import_event_recorder import ImportEventRecorder
 from app.services.import_job_state import ImportJobState
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
-from app.services.import_raw_bt_guard import ImportRawBtGuard
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
 from app.services.workflow_trace_logger import WorkflowTraceLogger
 
@@ -104,10 +103,6 @@ class ImportToLibraryService:
             is_job_row_corrupted_error=_is_job_row_corrupted_error,
         )
         self._confirm_context_guard = ImportConfirmContextGuard(context_lookup=self._context_lookup)
-        self._raw_bt_guard = ImportRawBtGuard(
-            context_lookup=self._context_lookup,
-            raw_bt_lookup_result_missing_reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
-        )
         self._approval_state = ImportApprovalState(
             approval_repo=approval_repo,
             job_event_repo=job_event_repo,
@@ -323,7 +318,36 @@ class ImportToLibraryService:
         return await self._prepare_state.prepare_import(task_ref=task_ref, chat_id=chat_id)
 
     def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool | None:
-        return self._raw_bt_guard.is_raw_bt_task(chat_id=chat_id, task_ref=task_ref)
+        lookup = self._context_lookup.lookup_raw_bt_task(chat_id=chat_id, task_ref=task_ref)
+        if lookup.error_kind == "row_corrupted":
+            self._log_raw_bt_lookup_row_corrupted(
+                chat_id=chat_id or 0,
+                task_ref=task_ref,
+                reason=lookup.detail,
+            )
+            return None
+        if lookup.error_kind == "lookup_failed":
+            self._log_raw_bt_lookup_failed(
+                chat_id=chat_id or 0,
+                task_ref=task_ref,
+                reason=lookup.detail,
+            )
+            return None
+        if lookup.error_kind == "result_missing":
+            self._log_raw_bt_lookup_result_missing(
+                chat_id=chat_id or 0,
+                task_ref=task_ref,
+                reason=IMPORT_RAW_BT_LOOKUP_RESULT_MISSING_REASON,
+            )
+            return None
+        if lookup.error_kind == "payload_corrupted":
+            self._log_raw_bt_payload_corrupted(
+                chat_id=chat_id or 0,
+                task_ref=task_ref,
+                payload_summary=lookup.detail,
+            )
+            return None
+        return lookup.is_raw_bt
 
     def _resolve_normalized_naming_truth(
         self,
@@ -574,6 +598,34 @@ class ImportToLibraryService:
             task_hash=task_hash,
             source_path=source_path,
             target_path=target_path,
+        )
+
+    def _log_raw_bt_lookup_failed(self, *, chat_id: int, task_ref: str, reason: str) -> None:
+        emit_operational_log(
+            title="导入 raw_bt 判定查询失败",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 错误={reason}",
+            fix_hint="检查 SQLite/jobs 表读取是否正常；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
+        )
+
+    def _log_raw_bt_payload_corrupted(self, *, chat_id: int, task_ref: str, payload_summary: str) -> None:
+        emit_operational_log(
+            title="导入 raw_bt 判定载荷损坏",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 载荷={payload_summary}",
+            fix_hint="检查 SQLite/jobs 表里的 payload_json 是否仍是完整下载任务上下文；当前请求会直接返回查询失败，避免把原本应被阻断的 raw_bt 任务继续送进入库链。",
+        )
+
+    def _log_raw_bt_lookup_result_missing(self, *, chat_id: int, task_ref: str, reason: str) -> None:
+        emit_operational_log(
+            title="导入 raw_bt 判定结果缺失",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 错误={reason}",
+            fix_hint="检查 SQLite/jobs 表里当前下载任务是否仍存在，并确认这条任务真相没有被提前清理；当前请求会直接返回查询失败，避免把 raw_bt 分类真相缺口误判成普通“不是 raw_bt”。",
+        )
+
+    def _log_raw_bt_lookup_row_corrupted(self, *, chat_id: int, task_ref: str, reason: str) -> None:
+        emit_operational_log(
+            title="导入 raw_bt 判定记录损坏",
+            detail=f"chat_id={chat_id} task_ref={task_ref} 错误={reason}",
+            fix_hint="检查 SQLite/jobs 表里当前下载任务的 job_id / chat_id / task_ref / payload_json 等真相字段；当前请求会直接返回查询失败，避免把坏任务记录误判成普通查询失败或普通“不是 raw_bt”。",
         )
 
 

@@ -14,6 +14,7 @@
 - 本轮删掉 `search_media.py` 里 `load_bt_scoring_rules` 的纯转发别名，测试改为直接引用模块内真实绑定。
 - 本轮删掉 `manage_bt_subscription.py` 的 `parse_bt_subscription_query` 再导出薄壳，调用点直接指向 `bt_subscription_command.py`。
 - 本轮把导入链单消费者 `ImportMetadataTitleYearResolver` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_metadata_title_year.py`。
+- 本轮把导入链单消费者 `ImportRawBtGuard` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_raw_bt_guard.py`。
 - 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
