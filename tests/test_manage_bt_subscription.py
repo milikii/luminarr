@@ -17,6 +17,7 @@ from app.services.bt_subscription_command import (
     format_bt_subscription_list,
     format_bt_subscription_remove_result,
     parse_bt_subscription_add_request,
+    parse_bt_subscription_query,
 )
 from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_ADD_FAILED_TEXT,
@@ -28,7 +29,6 @@ from app.services.manage_bt_subscription import (
     BT_SUBSCRIPTION_RUN_FAILED_TEXT,
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
-    parse_bt_subscription_query,
 )
 from app.services.search_media import SearchMediaService
 

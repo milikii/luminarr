@@ -1,4 +1,4 @@
-# Next step (v422)
+# Next step (v423)
 
 ## Current goal
 
@@ -12,6 +12,7 @@
 - 本轮把带参数 action 的首词 alias + 参数拆分收口到 `match_command_action_argument()`，两条命令的默认 fallback 仍保持原样。
 - 本轮删掉 `search_media.py` 里 `parse_movie_query` 的纯转发别名，测试改为直接引用真正的 parser。
 - 本轮删掉 `search_media.py` 里 `load_bt_scoring_rules` 的纯转发别名，测试改为直接引用模块内真实绑定。
+- 本轮删掉 `manage_bt_subscription.py` 的 `parse_bt_subscription_query` 再导出薄壳，调用点直接指向 `bt_subscription_command.py`。
 - 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。

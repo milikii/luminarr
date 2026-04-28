@@ -82,8 +82,9 @@ from app.services.cleanup_downloaded_source import (
     parse_cleanup_inspect_query,
     parse_cleanup_query,
 )
+from app.services.bt_subscription_command import parse_bt_subscription_query
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
-from app.services.manage_bt_subscription import ManageBtSubscriptionService, parse_bt_subscription_query
+from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.import_to_library import (
     IMPORT_CANCELLED_TEXT,
     ImportToLibraryService,

@@ -21,7 +21,6 @@ from app.services.bt_subscription_command import (
     format_bt_subscription_list,
     format_bt_subscription_remove_result,
     parse_bt_subscription_add_request,
-    parse_bt_subscription_query as _parse_bt_subscription_query,
 )
 from app.services.bt_subscription_repo_support import (
     BtSubscriptionRepoResult,
@@ -60,8 +59,6 @@ BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT = (
 )
 BT_SUBSCRIPTION_ITEM_MISSING_AFTER_ADD_REASON = "bt_subscription_item missing after insert"
 BT_SUBSCRIPTION_LAST_SEEN_RESULT_MISSING_REASON = "bt subscription last_seen update result missing"
-parse_bt_subscription_query = _parse_bt_subscription_query
-
 
 @dataclass(frozen=True, slots=True)
 class BtSubscriptionRunResult:

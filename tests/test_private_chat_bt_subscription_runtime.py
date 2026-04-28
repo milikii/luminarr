@@ -11,10 +11,10 @@ from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.bt_subscription_command import parse_bt_subscription_query
 from app.services.manage_bt_subscription import (
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
-    parse_bt_subscription_query,
 )
 from app.services.search_media import SearchMediaService
 
