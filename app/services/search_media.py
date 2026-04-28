@@ -256,7 +256,7 @@ class SearchMediaService:
         ordered_raw_results = order_media_bt_results(
             raw_results,
             query=request_context.resolved_query or cleaned_query,
-            load_bt_scoring_rules_func=load_bt_scoring_rules,
+            load_bt_scoring_rules_func=_load_bt_scoring_rules,
         )
         selected_raw_results = [{str(key): value for key, value in item.items()} for item in ordered_raw_results[: self._limit]]
         if media_identity is not None:
