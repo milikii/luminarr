@@ -3023,5 +3023,43 @@ def test_confirm_add_by_task_ref_registers_download_monitor_truth(tmp_path) -> N
     assert pending_records[0].task_hash == "abc123"
 
 
+def test_confirm_add_by_task_ref_keeps_duplicate_bt_confirm_idempotent_without_warning(tmp_path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="2", task_hash="hash-42"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+        download_monitor_repo=DownloadMonitorRepo(database),
+    )
+
+    first_reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+    first_task_ref = first_reply.split("选择序号: ", 1)[1].splitlines()[0].strip()
+    first_confirm = _run(service.confirm_add_by_task_ref(first_task_ref, chat_id=1001))
+    assert "任务 Hash: hash-42" in first_confirm
+    assert ADD_FINALIZATION_WARNING_TEXT not in first_confirm
+
+    second_reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+    second_task_ref = second_reply.split("选择序号: ", 1)[1].splitlines()[0].strip()
+    second_confirm = _run(service.confirm_add_by_task_ref(second_task_ref, chat_id=1001))
+
+    assert "任务 Hash: hash-42" in second_confirm
+    assert ADD_FINALIZATION_WARNING_TEXT not in second_confirm
+
+
 def _run(coroutine: Awaitable[str]) -> str:
     return asyncio.run(coroutine)

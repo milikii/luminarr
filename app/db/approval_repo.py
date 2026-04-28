@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.db.approval_repo_support import (
+    delete_approval_row,
     fetch_approval_lease_version_row,
     fetch_exact_approval_row,
     fetch_latest_approval_row_for_task_id,
@@ -516,14 +518,31 @@ class ApprovalRepo:
             return
 
         with self._database.connect() as connection:
-            rowcount = move_approval_identity_row(
-                connection=connection,
-                action_type=action_type,
-                current_task_id=identity.current_task_id,
-                current_task_hash=identity.current_task_hash,
-                new_task_id=identity.new_task_id,
-                new_task_hash=identity.new_task_hash,
-            )
+            try:
+                rowcount = move_approval_identity_row(
+                    connection=connection,
+                    action_type=action_type,
+                    current_task_id=identity.current_task_id,
+                    current_task_hash=identity.current_task_hash,
+                    new_task_id=identity.new_task_id,
+                    new_task_hash=identity.new_task_hash,
+                )
+            except sqlite3.IntegrityError:
+                target_row = fetch_exact_approval_row(
+                    connection=connection,
+                    action_type=action_type,
+                    task_id=identity.new_task_id,
+                    task_hash=identity.new_task_hash,
+                )
+                if target_row is None:
+                    raise
+                delete_approval_row(
+                    connection=connection,
+                    action_type=action_type,
+                    task_id=identity.current_task_id,
+                    task_hash=identity.current_task_hash,
+                )
+                rowcount = 1
             connection.commit()
         if rowcount == 1:
             return

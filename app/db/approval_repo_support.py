@@ -382,6 +382,27 @@ def move_approval_identity_row(
     return cursor.rowcount
 
 
+def delete_approval_row(
+    *,
+    connection: object,
+    action_type: str,
+    task_id: str,
+    task_hash: str,
+) -> int:
+    cursor = connection.execute(
+        """
+        DELETE FROM approval_record
+        WHERE action_type = ? AND task_id = ? AND task_hash = ?
+        """,
+        (
+            action_type,
+            task_id,
+            task_hash,
+        ),
+    )
+    return cursor.rowcount
+
+
 def resolve_approval_record_from_row(
     *,
     row: Mapping[str, object] | None,
