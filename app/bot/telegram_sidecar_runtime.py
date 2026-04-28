@@ -247,9 +247,10 @@ def _log_bt_subscription_scheduler_loop_error(*, error: Exception) -> None:
 
 
 def _log_bt_subscription_scheduler_result_unavailable() -> None:
-    print(
-        "\033[31m[BT 订阅后台扫描结果不可用]\033[0m 本轮未生成可发送通知。\n"
-        "\033[33m[处理建议]\033[0m 检查 Prowlarr、SQLite、approval_record/jobs 和前面的后台扫描明细日志；当前这轮通知已跳过，下一轮自动扫描仍会继续尝试。"
+    emit_operational_log(
+        title="BT 订阅后台扫描结果不可用",
+        detail="本轮未生成可发送通知。",
+        fix_hint="检查 Prowlarr、SQLite、approval_record/jobs 和前面的后台扫描明细日志；当前这轮通知已跳过，下一轮自动扫描仍会继续尝试。",
     )
 
 

@@ -1,22 +1,22 @@
-# Current status (v523)
+# Current status (v524)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；当前唯一主线仍是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮继续统一 Telegram sidecar 日志出口：`telegram_sidecar_runtime` 的 BT 订阅“后台扫描未启动”配置日志已切到 shared operational logging。
-- 本轮复用既有 regression，守住日志标题和 fix hint 不漂移。
+- 本轮继续统一 Telegram sidecar 日志出口：`telegram_sidecar_runtime` 的 BT 订阅“后台扫描结果不可用”日志已切到 shared operational logging。
+- 本轮复用既有 regression，守住日志标题、detail 和 fix hint 不漂移。
 - 本轮只改日志出口，不改协议、SQLite schema、调度语义或 BT 订阅扫描行为，也没有引入新增用户可感知功能。
 - 本轮 focused tests 已通过；`make quality`、`make verify-mainline` 均重新通过。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支质量 gate 通过；本轮 focused tests 覆盖 BT 订阅 sidecar 配置日志出口。
-- 本轮未触发真实 downloader / refresh 协议行为变化；改动为 Telegram sidecar 配置日志出口统一，并由 focused tests 与 mainline gate 覆盖。
+- 默认分支质量 gate 通过；本轮 focused tests 覆盖 BT 订阅 sidecar 结果不可用日志出口。
+- 本轮未触发真实 downloader / refresh 协议行为变化；改动为 Telegram sidecar 结果不可用日志出口统一，并由 focused tests 与 mainline gate 覆盖。
 - `make quality` 通过（`27 passed, 0 skipped`），`make verify-mainline` 通过。
 - 下一轮继续质量债时，优先从剩余 broad `except Exception` 中区分“外部服务隔离”与“repo/SQLite 持久化边界”，或继续收口剩余日志打印边界 / `main()` DI；不要切成人 BT 新功能。
 
 ## Latest verification
-- `tests/test_telegram_bot.py -k "test_log_bt_subscription_scheduler_config_error_prints_fix_hint"` 通过（`1 passed`，`193 deselected`）。
+- `tests/test_telegram_bot.py -k "test_run_bt_subscription_scheduler_tick_once_logs_result_unavailable"` 通过（`1 passed`，`193 deselected`）。
 - `make quality` 通过（`27 passed, 0 skipped`）。
 - `make verify-mainline` 通过。
 
