@@ -555,6 +555,58 @@ def test_handle_wecom_callback_http_request_routes_post_into_shared_runtime_and_
     assert "Dune (2021)" in content
 
 
+def test_handle_wecom_callback_http_request_returns_500_on_runtime_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml("dune"))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    async def failing_handler(**_: object) -> WeComPrivateTextEvent | None:
+        raise RuntimeError("shared runtime down")
+
+    monkeypatch.setattr("app.bot.wecom_adapter.handle_wecom_private_text_event", failing_handler)
+
+    response = asyncio.run(
+        handle_wecom_callback_http_request(
+            method="POST",
+            query_params=query_params,
+            body=body,
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    assert response.status_code == 500
+    assert response.body == b"internal error"
+    output = capsys.readouterr().out
+    assert "[WeCom callback 处理失败]" in output
+    assert "shared runtime down" in output
+
+
+def test_handle_wecom_callback_http_request_re_raises_non_runtime_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    encrypted_text = _encrypt_wecom_plaintext(_build_wecom_private_text_xml("dune"))
+    body = _build_wecom_encrypted_request_body(encrypted_text)
+    query_params = _build_signed_query_params(encrypted_text=encrypted_text)
+
+    async def failing_handler(**_: object) -> WeComPrivateTextEvent | None:
+        raise ValueError("bad callback stub")
+
+    monkeypatch.setattr("app.bot.wecom_adapter.handle_wecom_private_text_event", failing_handler)
+
+    with pytest.raises(ValueError, match="bad callback stub"):
+        asyncio.run(
+            handle_wecom_callback_http_request(
+                method="POST",
+                query_params=query_params,
+                body=body,
+                bot_data=_build_bot_data(),
+            )
+        )
+
+
 def test_handle_wecom_callback_http_request_routes_cleanup_execution_into_shared_runtime_and_returns_encrypted_reply(
     tmp_path: Path,
 ) -> None:

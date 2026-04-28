@@ -178,7 +178,7 @@ async def handle_wecom_callback_http_request(
             bot_data=bot_data,
             reply_text_func=capture_reply,
         )
-    except Exception as error:
+    except RuntimeError as error:
         emit_operational_log(
             title="WeCom callback 处理失败",
             detail=f"原因={error}",

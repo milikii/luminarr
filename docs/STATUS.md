@@ -1,22 +1,22 @@
-# Current status (v520)
+# Current status (v521)
 
 ## Current mainline
 - **质量硬化** 继续保持完成态；当前唯一主线仍是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮继续收口 10 个异常边界：`import_post_processing` 的 metadata/subtitle/refresh 只吞掉明确 `RuntimeError`，`subtitle_translation_support` 的模型翻译失败只吞掉明确 `RuntimeError`，`refresh_media_server` 只吞掉明确 `httpx.HTTPError`，`search_recovery_runtime` 与 `status_follow_up` 只对明确 `RuntimeError` 进入恢复或降级，`private_chat_bt_read_only_runtime` / `raw_bt_destination_runtime` / `bt_tmdb_association_runtime` 的外部查询失败只吞掉明确 `httpx.HTTPError` / `ValueError`。
-- 本轮同时补了 import post-processing、search recovery、下载状态 auto-import follow-up、BT 只读探索、raw BT 目标目录、BT TMDB 关联的 focused regression，把相关网络失败模拟统一收成真实 `httpx.ConnectError`，并补了“非预期 `ValueError` 继续上抛”的守卫测试。
-- 本轮只改异常捕获类型和测试输入，不改协议、SQLite schema、下载/导入/刷新/BT follow-up 语义，也没有引入新增用户可感知功能。
+- 本轮继续收口 WeCom callback 边界：`wecom_adapter` 的 shared private-chat callback 失败只吞掉明确 `RuntimeError`，非预期 `ValueError` 会继续上抛。
+- 本轮补了 WeCom callback 500 降级 regression，并守住“非运行时错误不应被 callback 适配层静默吞掉”。
+- 本轮只改异常捕获类型和 focused tests，不改协议、SQLite schema、回调加解密或 shared runtime 语义，也没有引入新增用户可感知功能。
 - 本轮 focused tests 已通过；`make quality`、`make verify-mainline` 均重新通过。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支质量 gate 通过；本轮 focused tests 覆盖 import post-processing、refresh media server、subtitle translator、下载状态 auto-import follow-up、BT 只读 / raw BT / BT TMDB follow-up 与 search recovery。
-- 本轮未触发真实 downloader / refresh 协议行为变化；改动为异常边界收窄，并由 focused tests 与 mainline gate 覆盖。
+- 默认分支质量 gate 通过；本轮 focused tests 覆盖 WeCom callback 正常回包、运行时降级和非运行时错误上抛分支。
+- 本轮未触发真实 downloader / refresh 协议行为变化；改动为 WeCom callback 异常边界收窄，并由 focused tests 与 mainline gate 覆盖。
 - `make quality` 通过（`27 passed, 0 skipped`），`make verify-mainline` 通过。
 - 下一轮继续质量债时，优先从剩余 broad `except Exception` 中区分“外部服务隔离”与“repo/SQLite 持久化边界”，或继续收口剩余日志打印边界 / `main()` DI；不要切成人 BT 新功能。
 
 ## Latest verification
-- `tests/test_refresh_media_server.py tests/test_private_chat_bt_read_only_runtime.py tests/test_private_chat_bt_tmdb_runtime.py tests/test_private_chat_raw_bt_destination_runtime.py tests/test_subtitle_translator.py tests/test_import_to_library.py tests/test_search_recovery_runtime.py tests/test_get_download_status.py` 通过（`266 passed`）。
+- `tests/test_wecom_adapter.py -k "routes_post_into_shared_runtime_and_returns_encrypted_reply or returns_500_on_runtime_failure or re_raises_non_runtime_failure"` 通过（`3 passed`，`32 deselected`）。
 - `make quality` 通过（`27 passed, 0 skipped`）。
 - `make verify-mainline` 通过。
 
