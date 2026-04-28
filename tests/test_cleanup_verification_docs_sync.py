@@ -45,6 +45,25 @@ def test_parse_pytest_result_raises_for_unexpected_summary() -> None:
         parse_pytest_result("no useful summary here\n")
 
 
+def test_main_emits_shared_log_on_sync_failure(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.sync_documents",
+        lambda **_: (_ for _ in ()).throw(
+            CleanupVerificationDocsSyncError("sync failed", fix_hint="check docs")
+        ),
+    )
+    monkeypatch.setattr("sys.argv", ["cleanup_verification_docs.py", "local_smoke_evidence"])
+
+    from app.maintenance.cleanup_verification_docs import main
+
+    assert main() == 1
+    output = capsys.readouterr().out
+    assert "[cleanup 文档快照同步失败]" in output
+    assert "sync failed" in output
+    assert "[处理建议]" in output
+    assert "check docs" in output
+
+
 def test_update_status_text_replaces_date_first_and_result_first_entries() -> None:
     original = (
         "## Latest verification\n\n"

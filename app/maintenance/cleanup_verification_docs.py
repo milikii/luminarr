@@ -14,6 +14,7 @@ import urllib.request
 from zoneinfo import ZoneInfo
 
 from app.bot.cleanup_smoke_logging import parse_cleanup_private_chat_smoke_log_line
+from app.operational_logging import emit_operational_log
 
 
 SHANGHAI_TZ = ZoneInfo("Asia/Shanghai")
@@ -693,8 +694,11 @@ def main() -> int:
             cwd=cwd,
         )
     except CleanupVerificationDocsSyncError as error:
-        print(f"\033[31m[cleanup 文档快照同步失败]\033[0m {error}", flush=True)
-        print(f"\033[33m[处理建议]\033[0m {error.fix_hint}", flush=True)
+        emit_operational_log(
+            title="cleanup 文档快照同步失败",
+            detail=str(error),
+            fix_hint=error.fix_hint,
+        )
         return 1
 
     for run in runs:
