@@ -43,3 +43,19 @@
 
 ### 下轮目标
 - 让成人历史信息进入待下载回复
+
+## Round 3 — 2026-04-28 20:08
+
+### 完成
+- 为 `AddPendingContextBuilder` 增加基于 `adult_content_registry` 的成人历史回填
+- 让 direct magnet 待下载回复沿用成人历史文案
+- 对不支持历史查询的轻量假 repo 保持 fail-open，不影响待下载创建
+
+### 测试状态
+- 通过: 10 / 总计: 10
+
+### 遗留 / 下轮继续
+- 继续执行成人 BT minimum wedge Task 4
+
+### 下轮目标
+- 增加成人 BT focused 验证入口并跑总 gate

@@ -1438,7 +1438,10 @@ class AddToDownloaderService:
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
         self._trace_logger = WorkflowTraceLogger("add_to_downloader", trace_log_path)
-        self._pending_context_builder = AddPendingContextBuilder(search_service)
+        self._pending_context_builder = AddPendingContextBuilder(
+            search_service,
+            adult_content_registry_repo=adult_content_registry_repo,
+        )
         self._pending_runtime_state = AddPendingRuntimeState()
         self._adult_registry_state = AddAdultRegistryState(adult_content_registry_repo)
         self._confirm_approval_state = AddConfirmApprovalState(

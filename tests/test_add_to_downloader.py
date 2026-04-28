@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTask
-from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.db.approval_repo import (
     APPROVAL_STATUS_CANCELLED,
     DEFAULT_PENDING_TIMEOUT_SECONDS,
@@ -190,6 +190,44 @@ def test_add_candidate_source_logs_adult_pending_registry_failure_without_failin
     assert "[成人资源待确认登记失败]" in output
     assert f"task_ref={expected_pending.task_ref}" in output
     assert "db down" in output
+
+
+def test_add_candidate_source_includes_adult_history_from_registry(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "adult-history.sqlite3"))
+    database.initialize()
+    registry_repo = AdultContentRegistryRepo(database)
+    registry_repo.upsert_pending(
+        normalized_content_id="censored:ssis-123",
+        content_id_kind="censored",
+        archive_category="censored",
+        display_title="SSIS-123",
+        latest_source_site="tokyotosho",
+        task_ref="old-1",
+        task_id="task-1",
+        task_hash="hash-1",
+        downloader_name="bt",
+    )
+    registry_repo.mark_archived_present(
+        normalized_content_id="censored:ssis-123",
+        archive_path="/archive/adult/SSIS-123",
+        task_id="task-1",
+        task_hash="hash-1",
+    )
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        adult_content_registry_repo=registry_repo,
+    )
+
+    reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+
+    assert "历史: 该番号已归档保留：" in reply
 
 
 def test_confirm_add_by_task_ref_dispatches_download() -> None:

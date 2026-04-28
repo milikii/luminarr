@@ -241,7 +241,7 @@ git commit -m "feat: add explicit adult search alias and richer read-only reply"
 - Test: `tests/test_add_pending_context.py`
 - Test: `tests/test_add_to_downloader.py`
 
-- [ ] **Step 1: Add a failing builder test for adult history lookup**
+- [x] **Step 1: Add a failing builder test for adult history lookup**
 
 Add a new test to [tests/test_add_pending_context.py](/home/alex/projects/luminarr/tests/test_add_pending_context.py) that:
 
@@ -263,7 +263,7 @@ Run:
 
 Expected: FAIL because `build_from_source()` does not currently populate `adult_history_text`.
 
-- [ ] **Step 2: Extend `AddPendingContextBuilder` with optional registry-backed history lookup**
+- [x] **Step 2: Extend `AddPendingContextBuilder` with optional registry-backed history lookup**
 
 Update [app/services/add_pending_context.py](/home/alex/projects/luminarr/app/services/add_pending_context.py):
 
@@ -298,7 +298,7 @@ Use:
 - `build_from_selection()` when `adult_history_text` is empty but `adult_content_id` exists
 - `build_from_source()` when an exact adult ID is found
 
-- [ ] **Step 3: Pass the registry repo into the pending context builder**
+- [x] **Step 3: Pass the registry repo into the pending context builder**
 
 Update [app/services/add_to_downloader.py](/home/alex/projects/luminarr/app/services/add_to_downloader.py):
 
@@ -309,7 +309,7 @@ self._pending_context_builder = AddPendingContextBuilder(
 )
 ```
 
-- [ ] **Step 4: Add a failing reply-level test, then make it pass**
+- [x] **Step 4: Add a failing reply-level test, then make it pass**
 
 Add a new test to [tests/test_add_to_downloader.py](/home/alex/projects/luminarr/tests/test_add_to_downloader.py) that constructs a service with an existing adult registry record and asserts the pending reply now includes:
 
@@ -326,7 +326,7 @@ Run:
 Expected before the implementation is complete: FAIL.  
 Expected after the implementation: PASS.
 
-- [ ] **Step 5: Run the focused pending/download tests**
+- [x] **Step 5: Run the focused pending/download tests**
 
 Run:
 
@@ -336,7 +336,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the adult pending-history carry-through**
+- [x] **Step 6: Commit the adult pending-history carry-through**
 
 ```bash
 git add app/services/add_pending_context.py app/services/add_to_downloader.py tests/test_add_pending_context.py tests/test_add_to_downloader.py

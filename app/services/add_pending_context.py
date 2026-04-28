@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.operational_logging import emit_operational_log
 from app.services.adult_content import extract_exact_adult_content_match
+from app.services.bt_read_only_display import build_adult_history_text
 from app.services.media_identity import normalize_media_identity_payload
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_media import SearchMediaService
@@ -46,8 +49,13 @@ class PendingAddBuildResult:
 
 
 class AddPendingContextBuilder:
-    def __init__(self, search_service: SearchMediaService) -> None:
+    def __init__(
+        self,
+        search_service: SearchMediaService,
+        adult_content_registry_repo: AdultContentRegistryRepo | None = None,
+    ) -> None:
         self._search_service = search_service
+        self._adult_content_registry_repo = adult_content_registry_repo
 
     def build_from_selection(
         self,
@@ -85,21 +93,26 @@ class AddPendingContextBuilder:
             title,
             source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
         )
+        adult_content_id = str(candidate.get("adult_content_id", "")).strip() or (
+            adult_content_match.normalized_content_id if adult_content_match is not None else ""
+        )
+        adult_history_text = str(candidate.get("adult_history_text", "")).strip()
+        if not adult_history_text and adult_content_id:
+            adult_history_text = self._resolve_adult_history_text(content_id=adult_content_id)
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(
                 task_ref=str(index),
                 title=title,
                 source=source,
                 media_identity=media_identity,
-                adult_content_id=str(candidate.get("adult_content_id", "")).strip()
-                or (adult_content_match.normalized_content_id if adult_content_match is not None else ""),
+                adult_content_id=adult_content_id,
                 adult_content_kind=str(candidate.get("adult_content_kind", "")).strip()
                 or (adult_content_match.source_kind if adult_content_match is not None else ""),
                 adult_archive_category=str(candidate.get("adult_archive_category", "")).strip()
                 or (adult_content_match.archive_category if adult_content_match is not None else ""),
                 adult_display_id=str(candidate.get("adult_display_id", "")).strip()
                 or (adult_content_match.display_id if adult_content_match is not None else ""),
-                adult_history_text=str(candidate.get("adult_history_text", "")).strip(),
+                adult_history_text=adult_history_text,
                 source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
                 downloader_name=downloader_name,
                 downloader_type=downloader_type,
@@ -125,21 +138,46 @@ class AddPendingContextBuilder:
         adult_content_match = extract_exact_adult_content_match(cleaned_title) or extract_exact_adult_content_match(
             cleaned_source
         )
+        adult_content_id = adult_content_match.normalized_content_id if adult_content_match is not None else ""
 
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(
                 task_ref=build_bt_task_ref(cleaned_source),
                 title=cleaned_title,
                 source=cleaned_source,
-                adult_content_id=adult_content_match.normalized_content_id if adult_content_match is not None else "",
+                adult_content_id=adult_content_id,
                 adult_content_kind=adult_content_match.source_kind if adult_content_match is not None else "",
                 adult_archive_category=adult_content_match.archive_category if adult_content_match is not None else "",
                 adult_display_id=adult_content_match.display_id if adult_content_match is not None else "",
+                adult_history_text=self._resolve_adult_history_text(content_id=adult_content_id),
                 downloader_name=downloader_name,
                 downloader_type=downloader_type,
                 download_dir=download_dir,
                 auto_import_enabled=auto_import_enabled,
             )
+        )
+
+    def _resolve_adult_history_text(self, *, content_id: str) -> str:
+        cleaned_content_id = content_id.strip().lower()
+        if not cleaned_content_id or self._adult_content_registry_repo is None:
+            return ""
+        get_by_content_id = getattr(self._adult_content_registry_repo, "get_by_content_id", None)
+        if not callable(get_by_content_id):
+            return ""
+        try:
+            record = get_by_content_id(normalized_content_id=cleaned_content_id)
+        except (AdultContentRegistryPersistenceError, sqlite3.Error) as error:
+            emit_operational_log(
+                title="成人历史查询失败",
+                detail=f"content_id={cleaned_content_id} 错误={error}",
+                fix_hint="检查 adult_content_registry 表读取是否正常；当前待下载创建会继续，但历史提示可能缺失。",
+            )
+            return ""
+        if record is None:
+            return ""
+        return build_adult_history_text(
+            status=record.current_status,
+            archive_path=record.archive_path,
         )
 
 
