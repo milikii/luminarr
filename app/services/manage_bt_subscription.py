@@ -16,7 +16,6 @@ from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
     BT_SUBSCRIPTION_USAGE_TEXT,
     BtSubscriptionCommand,
-    bt_subscription_media_kind_label,
     format_bt_subscription_add_result,
     format_bt_subscription_clear_result,
     format_bt_subscription_list,
@@ -34,6 +33,7 @@ from app.services.bt_subscription_repo_support import (
     update_subscription_last_seen,
 )
 from app.services.bt_sources import resolve_bt_source
+from app.services.media_kind import media_kind_label
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 BT_SUBSCRIPTION_LIST_FAILED_TEXT = "BT 订阅清单读取失败，请稍后重试。"
@@ -270,7 +270,7 @@ async def dispatch_bt_subscription_item(
     year_text = item.year if item.year else "-"
     reply = (
         f"BT 订阅命中新资源：{item.title} ({year_text})\n"
-        f"类型: {bt_subscription_media_kind_label(item.media_kind)}\n"
+        f"类型: {media_kind_label(item.media_kind)}\n"
         f"命中资源: {candidate_title}\n\n"
         f"{pending_text}"
     )

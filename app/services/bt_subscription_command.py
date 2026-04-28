@@ -95,14 +95,14 @@ def format_bt_subscription_list(items: Sequence[BtSubscriptionItem]) -> str:
         year_text = item.year if item.year else "-"
         last_seen = item.last_seen_title.strip() or "-"
         lines.append(
-            f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {bt_subscription_media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
+            f"{index}. [{item.item_id}] {item.title} ({year_text}) | 类型: {media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
         )
     return "\n".join(lines)
 
 
 def format_bt_subscription_add_result(item: BtSubscriptionItem, *, is_created: bool) -> str:
     year_text = item.year if item.year else "-"
-    kind_text = bt_subscription_media_kind_label(item.media_kind)
+    kind_text = media_kind_label(item.media_kind)
     if is_created:
         return f"已加入 BT 订阅：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
     return f"BT 订阅已存在：{item.title} ({year_text})\n类型: {kind_text}\n条目ID: {item.item_id}"
@@ -118,7 +118,3 @@ def format_bt_subscription_clear_result(deleted: int) -> str:
     if deleted <= 0:
         return BT_SUBSCRIPTION_CLEAR_EMPTY_TEXT
     return f"已清空 BT 订阅清单，共删除 {deleted} 条。"
-
-
-def bt_subscription_media_kind_label(media_kind: str) -> str:
-    return media_kind_label(media_kind)

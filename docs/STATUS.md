@@ -1,9 +1,10 @@
-# Current status (v534)
+# Current status (v535)
 
 ## Current mainline
 - **质量硬化** 已正式收工；当前唯一主线切到 **services 层数据结构降本**。
 - 文档真相已对齐 D-039：后续优先收 services 层里稳定可复用的数据结构和解析逻辑，先从重复形状最明显、验证成本最低的地方下手。
 - 本轮已把 watchlist 与 BT 订阅重复的 `movie/series/anime` alias、label 和前缀解析收口到 `app/services/media_kind.py`，保持两条路径原有默认行为不变。
+- 本轮继续删除 BT 订阅侧单用途 `bt_subscription_media_kind_label()` 转发薄壳，扫描命中回复和列表格式化都直接复用 shared media kind helper。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -15,6 +16,7 @@
 - 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests。
 
 ## Latest verification
+- `tests/test_media_kind.py tests/test_manage_bt_subscription.py` 通过（`42 passed`）。
 - `tests/test_media_kind.py tests/test_manage_watchlist.py tests/test_manage_bt_subscription.py` 通过（`62 passed`）。
 - 上一轮质量硬化 focused tests 与 `make quality` / `make verify-mainline` 都已通过，当前继续保持该已验证状态。
 
