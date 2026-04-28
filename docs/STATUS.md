@@ -9,6 +9,7 @@
 - 本轮继续把 `bt_read_only_helper_selection.py` 合并回 `app/services/bt_read_only_display.py`，删掉单消费者 helper 选择壳，focused tests `10 passed`。
 - 本轮继续把 `adult_bt_selector.py` 合并回 `app/services/bt_read_only_display.py`，删掉单消费者成人排序壳，focused tests `18 passed`。
 - 本轮继续把 `status_delivery.py` 合并回 `app/services/get_download_status.py`，删掉单消费者状态渲染壳，focused tests `25 passed, 24 deselected`。
+- 本轮继续把 `status_follow_up.py` 合并回 `app/services/get_download_status.py`，删掉单消费者状态 follow-up 壳，focused tests `25 passed, 24 deselected`。
 - 当前主线没有改协议、SQLite schema、调度语义、下载/导入/刷新真相边界。
 - `cleanup_*_support.py` 仍为 `0` 个；其余大 support 文件暂不机械强拆。
 - `cleanup_*_support.py` 当前为 `0` 个。
@@ -30,6 +31,7 @@
 - 本轮 focused tests：`tests/test_search_media.py tests/test_search_media_bt_ordering.py -k "bt_ordering or fallback or search_and_format"` 通过（`55 passed, 134 deselected`）。
 - 本轮 focused tests：`tests/test_bt_read_only_display.py tests/test_bt_read_only_helper_selection.py` 通过（`10 passed`）。
 - 本轮 focused tests：`tests/test_adult_content.py tests/test_bt_read_only_display.py` 通过（`18 passed`）。
+- 本轮 focused tests：`tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event"` 通过（`25 passed, 24 deselected`）。
 - 本轮 focused tests：`tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event"` 通过（`25 passed, 24 deselected`）。
 
 ## Current biggest risk

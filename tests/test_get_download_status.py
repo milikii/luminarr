@@ -15,6 +15,7 @@ from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.adult_archive_service import AdultArchiveOperationError, AdultArchiveStateUnavailableError
 from app.services.get_download_status import (
+    STATUS_AUTO_IMPORT_WARNING_TEXT,
     STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT,
     STATUS_NOT_FOUND_TEXT,
     STATUS_QUERY_FAILED_TEXT,
@@ -28,7 +29,6 @@ from app.services.post_download_auto_import import (
     AutoImportRunResult,
     PostDownloadAutoImportService,
 )
-from app.services.status_follow_up import STATUS_AUTO_IMPORT_WARNING_TEXT
 
 
 def test_parse_status_query_supports_status_prefix() -> None:
