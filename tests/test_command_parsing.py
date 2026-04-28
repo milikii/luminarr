@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from app.services.command_parsing import match_command_action, parse_prefixed_command_tail
+from app.services.command_parsing import (
+    match_command_action,
+    match_command_action_argument,
+    parse_prefixed_command_tail,
+)
 
 
 def test_parse_prefixed_command_tail_returns_stripped_tail() -> None:
@@ -26,3 +30,16 @@ def test_match_command_action_supports_case_insensitive_and_raw_aliases() -> Non
     assert match_command_action("列表", aliases) == "list"
     assert match_command_action("rm", aliases) == "remove"
     assert match_command_action("unknown", aliases) is None
+
+
+def test_match_command_action_argument_returns_action_and_stripped_arg() -> None:
+    aliases = {
+        "add": ("add", "添加"),
+        "remove": ("remove", "rm"),
+    }
+
+    assert match_command_action_argument("ADD   dune 2021", aliases) == ("add", "dune 2021")
+    assert match_command_action_argument("添加 三体 2023", aliases) == ("add", "三体 2023")
+    assert match_command_action_argument("rm 7", aliases) == ("remove", "7")
+    assert match_command_action_argument("add", aliases) is None
+    assert match_command_action_argument("unknown value", aliases) is None

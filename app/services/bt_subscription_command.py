@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
-from app.services.command_parsing import match_command_action, parse_prefixed_command_tail
+from app.services.command_parsing import (
+    match_command_action,
+    match_command_action_argument,
+    parse_prefixed_command_tail,
+)
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import VALID_MEDIA_KINDS, media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
@@ -26,6 +29,10 @@ BT_SUBSCRIPTION_ACTION_ALIASES = {
     "list": ("list",),
     "clear": ("clear",),
     "run": ("run",),
+    "add": ("add",),
+    "remove": ("remove", "rm"),
+}
+BT_SUBSCRIPTION_ARGUMENT_ACTION_ALIASES = {
     "add": ("add",),
     "remove": ("remove", "rm"),
 }
@@ -54,13 +61,10 @@ def parse_bt_subscription_query(text: str) -> BtSubscriptionCommand | None:
     if action is not None:
         return BtSubscriptionCommand(action=action, arg="")
 
-    matched_add = re.match(r"^(?i:add)\s+(.*)$", tail)
-    if matched_add:
-        return BtSubscriptionCommand(action="add", arg=(matched_add.group(1) or "").strip())
-
-    matched_remove = re.match(r"^(?:(?i:remove)|(?i:rm))\s+(.*)$", tail)
-    if matched_remove:
-        return BtSubscriptionCommand(action="remove", arg=(matched_remove.group(1) or "").strip())
+    action_argument = match_command_action_argument(tail, BT_SUBSCRIPTION_ARGUMENT_ACTION_ALIASES)
+    if action_argument is not None:
+        action, arg = action_argument
+        return BtSubscriptionCommand(action=action, arg=arg)
 
     return BtSubscriptionCommand(action="add", arg=tail)
 

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import sqlite3
-import re
 from dataclasses import dataclass
 
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.operational_logging import emit_operational_log
-from app.services.command_parsing import match_command_action, parse_prefixed_command_tail
+from app.services.command_parsing import (
+    match_command_action,
+    match_command_action_argument,
+    parse_prefixed_command_tail,
+)
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import media_kind_label, parse_media_kind_prefix
 from app.services.search_request_context import parse_movie_query
@@ -35,6 +38,10 @@ WATCHLIST_ADD_RESULT_MISSING_REASON = "watchlist add result missing"
 WATCHLIST_ACTION_ALIASES = {
     "list": ("list", "列表"),
     "clear": ("clear", "清空"),
+    "add": ("add", "添加", "加"),
+    "remove": ("remove", "rm", "删除", "删"),
+}
+WATCHLIST_ARGUMENT_ACTION_ALIASES = {
     "add": ("add", "添加", "加"),
     "remove": ("remove", "rm", "删除", "删"),
 }
@@ -248,13 +255,10 @@ def parse_watchlist_query(text: str) -> WatchlistCommand | None:
     if action is not None:
         return WatchlistCommand(action=action, arg="")
 
-    matched_add = re.match(r"^(?:(?i:add)|添加|加)\s+(.*)$", tail)
-    if matched_add:
-        return WatchlistCommand(action="add", arg=(matched_add.group(1) or "").strip())
-
-    matched_remove = re.match(r"^(?:(?i:remove)|(?i:rm)|删除|删)\s+(.*)$", tail)
-    if matched_remove:
-        return WatchlistCommand(action="remove", arg=(matched_remove.group(1) or "").strip())
+    action_argument = match_command_action_argument(tail, WATCHLIST_ARGUMENT_ACTION_ALIASES)
+    if action_argument is not None:
+        action, arg = action_argument
+        return WatchlistCommand(action=action, arg=arg)
 
     return WatchlistCommand(action="add", arg=tail)
 

@@ -1,4 +1,4 @@
-# Current status (v538)
+# Current status (v539)
 
 ## Current mainline
 - **质量硬化** 已正式收工；当前唯一主线切到 **services 层数据结构降本**。
@@ -8,6 +8,7 @@
 - 本轮把 watchlist、BT 订阅列表、BT 订阅扫描回复里的 `title (year-or-dash)` 展示格式收口到 `app/services/media_item_display.py`。
 - 本轮把 watchlist 与 BT 订阅重复的命令前缀 tail 解析收口到 `app/services/command_parsing.py`，后续 action 规则保持各自原样。
 - 本轮继续把 watchlist 与 BT 订阅重复的“完整 tail 命中 action alias”判断收口到 `match_command_action()`，带参数 action 解析仍保留各自语义。
+- 本轮继续把带参数 action 的首词 alias + 参数拆分收口到 `match_command_action_argument()`，删除两处手写 regex。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -19,6 +20,7 @@
 - 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests。
 
 ## Latest verification
+- `tests/test_command_parsing.py tests/test_manage_watchlist.py tests/test_manage_bt_subscription.py` 通过（`64 passed`）。
 - `tests/test_command_parsing.py tests/test_manage_watchlist.py tests/test_manage_bt_subscription.py` 通过（`63 passed`）。
 - `tests/test_command_parsing.py tests/test_manage_watchlist.py tests/test_manage_bt_subscription.py` 通过（`62 passed`）。
 - `tests/test_media_item_display.py tests/test_manage_watchlist.py tests/test_manage_bt_subscription.py` 通过（`61 passed`）。

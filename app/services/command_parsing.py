@@ -22,3 +22,16 @@ def match_command_action(tail: str, aliases_by_action: Mapping[str, Iterable[str
             if lowered_tail == alias.lower() or tail == alias:
                 return action
     return None
+
+
+def match_command_action_argument(
+    tail: str,
+    aliases_by_action: Mapping[str, Iterable[str]],
+) -> tuple[str, str] | None:
+    head, separator, rest = tail.partition(" ")
+    if not separator:
+        return None
+    action = match_command_action(head, aliases_by_action)
+    if action is None:
+        return None
+    return action, rest.strip()
