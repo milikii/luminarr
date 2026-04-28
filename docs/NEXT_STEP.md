@@ -1,12 +1,12 @@
-# Next step (v402)
+# Next step (v403)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已继续收口 WeCom callback 适配层边界：
-  - `wecom_adapter` 的 shared private-chat callback 失败只吞掉明确 `RuntimeError`。
-  - 非预期 `ValueError` 不再被 callback 适配层静默吞掉。
-- 本轮补了 WeCom callback 正常回包、运行时降级 500、非运行时错误上抛 regression。
+- 本轮已继续收口 personal WeChat 私聊适配层边界：
+  - `personal_wechat_text` 的 inbound shared runtime 失败只吞掉明确 `RuntimeError`。
+  - 非预期 `ValueError` 不再被 personal WeChat 渠道适配层静默吞掉。
+- 本轮补了 personal WeChat 单账号轮询、runtime 降级日志、非运行时错误上抛 regression。
 - focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。

@@ -466,7 +466,7 @@ class PersonalWeChatTextService:
                 bot_data=bot_data,
                 reply_text_func=reply_text_func,
             )
-        except Exception as error:
+        except RuntimeError as error:
             emit_operational_log(
                 title="personal WeChat 私聊消息处理失败",
                 detail=f"account_id={account_id} user_id={parsed_event.from_user_id} 原因={error}",

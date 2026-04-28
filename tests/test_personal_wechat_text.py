@@ -795,6 +795,65 @@ def test_personal_wechat_text_service_logs_cleanup_service_not_ready(
     close_client.assert_awaited_once()
 
 
+def test_personal_wechat_text_service_logs_runtime_inbound_handler_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    async def failing_handler(**_: object) -> PersonalWeChatPrivateTextEvent | None:
+        raise RuntimeError("shared runtime down")
+
+    monkeypatch.setattr("app.bot.personal_wechat_text.handle_personal_wechat_private_text_event", failing_handler)
+
+    service = PersonalWeChatTextService(
+        get_context_token_func=Mock(return_value=None),
+        set_context_token_func=Mock(),
+        send_text_func=AsyncMock(),
+        close_client_func=AsyncMock(),
+    )
+
+    asyncio.run(
+        service._handle_inbound_message(
+            account_id="wx-account-1",
+            base_url="https://wx.test",
+            token="bot-token-1",
+            message=_build_text_message("dune"),
+            bot_data=_build_bot_data(),
+        )
+    )
+
+    output = capsys.readouterr().out
+    assert "[personal WeChat 私聊消息处理失败]" in output
+    assert "account_id=wx-account-1" in output
+    assert "shared runtime down" in output
+
+
+def test_personal_wechat_text_service_re_raises_non_runtime_inbound_handler_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def failing_handler(**_: object) -> PersonalWeChatPrivateTextEvent | None:
+        raise ValueError("bad runtime stub")
+
+    monkeypatch.setattr("app.bot.personal_wechat_text.handle_personal_wechat_private_text_event", failing_handler)
+
+    service = PersonalWeChatTextService(
+        get_context_token_func=Mock(return_value=None),
+        set_context_token_func=Mock(),
+        send_text_func=AsyncMock(),
+        close_client_func=AsyncMock(),
+    )
+
+    with pytest.raises(ValueError, match="bad runtime stub"):
+        asyncio.run(
+            service._handle_inbound_message(
+                account_id="wx-account-1",
+                base_url="https://wx.test",
+                token="bot-token-1",
+                message=_build_text_message("dune"),
+                bot_data=_build_bot_data(),
+            )
+        )
+
+
 def test_personal_wechat_text_service_refuses_multiple_saved_accounts(capsys) -> None:
     get_updates_func = AsyncMock()
     close_client = AsyncMock()
