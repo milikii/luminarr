@@ -10,7 +10,6 @@ from app.db.adult_content_registry_repo import (
     AdultContentRegistryRepo,
 )
 from app.db.sqlite import SqliteDatabase
-from app.services.adult_bt_selector import build_adult_history_text, order_adult_bt_candidates
 from app.services.adult_content import (
     build_fallback_content_id,
     extract_adult_content_match,
@@ -18,6 +17,7 @@ from app.services.adult_content import (
     guess_adult_archive_category,
     is_fallback_adult_content_match,
 )
+from app.services.bt_read_only_display import build_adult_history_text, order_adult_bt_candidates
 
 
 def test_extract_adult_content_match_supports_fc2_censored_and_uncensored_patterns() -> None:

@@ -7,6 +7,7 @@
 - 本轮继续把 `search_clarification_state.py` 合并回 `app/services/search_media.py`，删掉单消费者状态壳，focused tests `62 passed, 123 deselected`。
 - 本轮继续把 `search_media_bt_ordering.py` 合并回 `app/services/search_media.py`，删掉单消费者排序壳，focused tests `55 passed, 134 deselected`。
 - 本轮继续把 `bt_read_only_helper_selection.py` 合并回 `app/services/bt_read_only_display.py`，删掉单消费者 helper 选择壳，focused tests `10 passed`。
+- 本轮继续把 `adult_bt_selector.py` 合并回 `app/services/bt_read_only_display.py`，删掉单消费者成人排序壳，focused tests `18 passed`。
 - 当前主线没有改协议、SQLite schema、调度语义、下载/导入/刷新真相边界。
 - `cleanup_*_support.py` 仍为 `0` 个；其余大 support 文件暂不机械强拆。
 - `cleanup_*_support.py` 当前为 `0` 个。
@@ -27,6 +28,7 @@
 - 本轮 focused tests：`tests/test_search_media.py -k "clarification or search_and_format"` 通过（`62 passed, 123 deselected`）。
 - 本轮 focused tests：`tests/test_search_media.py tests/test_search_media_bt_ordering.py -k "bt_ordering or fallback or search_and_format"` 通过（`55 passed, 134 deselected`）。
 - 本轮 focused tests：`tests/test_bt_read_only_display.py tests/test_bt_read_only_helper_selection.py` 通过（`10 passed`）。
+- 本轮 focused tests：`tests/test_adult_content.py tests/test_bt_read_only_display.py` 通过（`18 passed`）。
 
 ## Current biggest risk
 - 当前风险不是业务回归，而是 services 层仍有剩余重复结构；下一轮仍需维持“小 diff + focused tests + 文档同步”的节奏，避免重新把 STATUS/NEXT_STEP 写回历史流水账。
