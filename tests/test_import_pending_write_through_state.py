@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
+from unittest.mock import AsyncMock
 
 from app.clients.transmission import TransmissionImportSource
-from app.services.import_pending_write_through_state import ImportPendingWriteThroughState
+from app.services.import_to_library import ImportToLibraryService
 
 
 def _build_import_source() -> TransmissionImportSource:
@@ -17,16 +19,20 @@ def _build_import_source() -> TransmissionImportSource:
     )
 
 
-def test_persist_pending_import_records_event_and_trace_on_success() -> None:
-    state = ImportPendingWriteThroughState(
-        approval_repo=None,
-        import_pending_state_unavailable_text="pending unavailable",
-        import_approval_pending_text_template="导入待确认：{name}\n请发送 confirm {task_ref}",
+def _build_service(tmp_path: Path, *, approval_repo: object | None = None) -> ImportToLibraryService:
+    return ImportToLibraryService(
+        get_import_source_func=AsyncMock(),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
     )
+
+
+def test_persist_pending_import_records_event_and_trace_on_success(tmp_path: Path) -> None:
+    service = _build_service(tmp_path)
     events: list[dict[str, str]] = []
     traces: list[dict[str, str | int | None]] = []
 
-    text = state.persist_pending_import(
+    text = service._persist_pending_import(
         task_ref="87",
         import_source=_build_import_source(),
         chat_id=1001,
@@ -63,16 +69,12 @@ def test_persist_pending_import_records_event_and_trace_on_success() -> None:
     ]
 
 
-def test_persist_pending_import_cancels_pending_approval_when_job_write_fails() -> None:
+def test_persist_pending_import_cancels_pending_approval_when_job_write_fails(tmp_path: Path) -> None:
     cancelled: list[dict[str, str | int]] = []
     approval_repo = type("ApprovalRepo", (), {"cancel_import": lambda self, **kwargs: cancelled.append(kwargs)})()
-    state = ImportPendingWriteThroughState(
-        approval_repo=approval_repo,
-        import_pending_state_unavailable_text="pending unavailable",
-        import_approval_pending_text_template="unused {task_ref}",
-    )
+    service = _build_service(tmp_path, approval_repo=approval_repo)
 
-    text = state.persist_pending_import(
+    text = service._persist_pending_import(
         task_ref="87",
         import_source=_build_import_source(),
         chat_id=1001,
@@ -83,7 +85,7 @@ def test_persist_pending_import_cancels_pending_approval_when_job_write_fails() 
         log_trace=lambda **kwargs: None,
     )
 
-    assert text == "pending unavailable"
+    assert text == "导入待确认状态写入失败，请稍后重试。"
     assert cancelled == [
         {
             "task_id": "87",
@@ -94,19 +96,15 @@ def test_persist_pending_import_cancels_pending_approval_when_job_write_fails() 
     ]
 
 
-def test_persist_pending_import_logs_when_cancel_pending_approval_fails(capsys) -> None:
+def test_persist_pending_import_logs_when_cancel_pending_approval_fails(tmp_path: Path, capsys) -> None:
     approval_repo = type(
         "ApprovalRepo",
         (),
         {"cancel_import": lambda self, **kwargs: (_ for _ in ()).throw(sqlite3.OperationalError("db down"))},
     )()
-    state = ImportPendingWriteThroughState(
-        approval_repo=approval_repo,
-        import_pending_state_unavailable_text="pending unavailable",
-        import_approval_pending_text_template="unused {task_ref}",
-    )
+    service = _build_service(tmp_path, approval_repo=approval_repo)
 
-    text = state.persist_pending_import(
+    text = service._persist_pending_import(
         task_ref="87",
         import_source=_build_import_source(),
         chat_id=1001,
@@ -117,7 +115,7 @@ def test_persist_pending_import_logs_when_cancel_pending_approval_fails(capsys) 
         log_trace=lambda **kwargs: None,
     )
 
-    assert text == "pending unavailable"
+    assert text == "导入待确认状态写入失败，请稍后重试。"
     output = capsys.readouterr().out
     assert "[导入取消审批更新失败]" in output
     assert "task_ref=87" in output

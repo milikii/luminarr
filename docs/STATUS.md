@@ -16,6 +16,7 @@
 - 本轮把导入链单消费者 `ImportRawBtGuard` 合并回 `import_to_library.py`，删除 `import_raw_bt_guard.py` 小文件，raw_bt 阻断判定与日志文案保持不变。
 - 本轮把导入链单消费者 `ImportConfirmContextGuard` 合并回 `import_to_library.py`，删除 `import_confirm_context_guard.py` 小文件，confirm 上下文查询分流与日志保持不变。
 - 本轮把导入链单消费者 `ImportEventRecorder` 合并回 `import_to_library.py`，删除 `import_event_recorder.py` 小文件，job_event 落盘字段和异常日志保持不变。
+- 本轮把导入链单消费者 `ImportPendingWriteThroughState` 合并回 `import_to_library.py`，删除 `import_pending_write_through_state.py` 小文件，待确认审批/任务写通与回滚日志保持不变。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -24,12 +25,13 @@
 ## Current health
 - 默认分支质量 gate 仍是可复验的；本轮收尾重新跑过 `make quality`，结果仍为 `27 passed, 0 skipped`。
 - 当前没有新的业务回归信号；这次切线来自文档决策，不是红灯修复。
-- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests；当前优先候选是导入链剩余单消费者小文件 `import_pending_write_through_state.py`。
+- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests；当前优先候选切到导入链单消费者小文件 `import_confirmed_media_identity.py`。
 
 ## Latest verification
 - `make verify-mainline` 通过。
 - `make quality` 通过（`27 passed, 0 skipped`）。
 - `tests/test_import_to_library.py -k "record_event"` 通过（`3 passed, 150 deselected`）。
+- `tests/test_import_pending_write_through_state.py tests/test_import_to_library.py -k "import_by_task_ref or record_pending_approval or pending_state_unavailable or copy_fallback_pending"` 通过（`50 passed, 106 deselected`）。
 - `tests/test_import_to_library.py -k "rebuild_confirm_context or context_lookup_failure or context_row_corruption"` 通过（`4 passed, 149 deselected`）。
 - `tests/test_import_to_library.py -k "raw_bt"` 通过（`8 passed, 145 deselected`）。
 - `tests/test_import_to_library.py -k "resolve_metadata_title_year or extract_title_year_for_scrape"` 通过（`5 passed, 148 deselected`）。
