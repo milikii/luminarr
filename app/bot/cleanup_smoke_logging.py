@@ -139,8 +139,6 @@ def _summarize_reply_head(reply_text: str) -> str:
 
 def _append_cleanup_private_chat_smoke_log_line(log_line: str, *, log_path: Path | None = None) -> None:
     resolved_log_path = log_path or Path("logs") / DEFAULT_CLEANUP_PRIVATE_CHAT_SMOKE_LOG_FILE
-    if resolved_log_path is None:
-        return
     cleaned_line = strip_ansi_escape(log_line)
     try:
         resolved_log_path.parent.mkdir(parents=True, exist_ok=True)
