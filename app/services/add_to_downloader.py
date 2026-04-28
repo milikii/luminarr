@@ -7,15 +7,13 @@ from pathlib import Path
 
 from app.clients.transmission import TransmissionTask
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
-from app.db.approval_repo import DEFAULT_PENDING_TIMEOUT_SECONDS
-from app.db.approval_repo import ApprovalRepo
+from app.db.approval_repo import APPROVAL_STATUS_PENDING, DEFAULT_PENDING_TIMEOUT_SECONDS, ApprovalRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo
 from app.operational_logging import emit_operational_log
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.add_adult_registry_state import AddAdultRegistryState
-from app.services.add_confirm_availability_state import AddConfirmAvailabilityState
 from app.services.add_confirm_approval_state import (
     PENDING_LEASE_LOOKUP_FAILED,
     AddConfirmApprovalState,
@@ -86,6 +84,12 @@ class ConfirmPreparationState:
     lease_owner: str
 
 
+@dataclass(frozen=True, slots=True)
+class ConfirmAvailabilityResolution:
+    confirm_context: ConfirmExecutionContext | None
+    in_memory_pending: PendingAddContext | None
+
+
 class AddToDownloaderService:
     def __init__(
         self,
@@ -108,10 +112,6 @@ class AddToDownloaderService:
         self._pending_context_builder = AddPendingContextBuilder(search_service)
         self._pending_runtime_state = AddPendingRuntimeState()
         self._adult_registry_state = AddAdultRegistryState(adult_content_registry_repo)
-        self._confirm_availability_state = AddConfirmAvailabilityState(
-            add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
-            add_confirm_state_unavailable_text=ADD_CONFIRM_STATE_UNAVAILABLE_TEXT,
-        )
         self._confirm_approval_state = AddConfirmApprovalState(
             approval_repo=approval_repo,
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -289,13 +289,10 @@ class AddToDownloaderService:
         if not cleaned_ref:
             return CONFIRM_QUERY_USAGE_TEXT
 
-        availability, rejection_text = self._confirm_availability_state.resolve(
+        availability, rejection_text = self._resolve_confirm_availability(
             task_ref=cleaned_ref,
             chat_id=chat_id,
             job_repo_available=self._job_repo is not None,
-            rebuild_confirm_context=self._rebuild_confirm_context,
-            get_in_memory_pending=self._get_in_memory_pending,
-            log_pending_job_result_missing=self._log_pending_job_result_missing,
             find_version_stale_rejection_text=self._find_version_stale_rejection_text,
             handle_expired_pending_confirm=self._handle_expired_pending_confirm,
         )
@@ -452,6 +449,87 @@ class AddToDownloaderService:
             expected_version=claimed_job_version,
             lease_owner=lease_owner,
         )
+
+    def _resolve_confirm_availability(
+        self,
+        *,
+        task_ref: str,
+        chat_id: int | None,
+        job_repo_available: bool,
+        find_version_stale_rejection_text: Callable[..., str | None],
+        handle_expired_pending_confirm: Callable[..., str | None],
+    ) -> tuple[ConfirmAvailabilityResolution | None, str | None]:
+        confirm_context, confirm_context_unavailable = self._rebuild_confirm_context(
+            task_ref=task_ref,
+            chat_id=chat_id,
+        )
+        if confirm_context is None:
+            return self._resolve_missing_confirm_context(
+                task_ref=task_ref,
+                chat_id=chat_id,
+                confirm_context_unavailable=confirm_context_unavailable,
+                job_repo_available=job_repo_available,
+            )
+
+        if confirm_context.approval_lookup_failed:
+            return None, ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+        if confirm_context.job.state != JOB_STATE_PENDING_APPROVAL:
+            return None, self._resolve_not_pending_rejection_text(
+                task_id=confirm_context.pending_add.task_id,
+                task_hash=confirm_context.pending_add.task_hash,
+                find_version_stale_rejection_text=find_version_stale_rejection_text,
+            )
+        if (
+            confirm_context.approval_record is None
+            or confirm_context.approval_record.status != APPROVAL_STATUS_PENDING
+        ):
+            return None, self._resolve_not_pending_rejection_text(
+                task_id=confirm_context.pending_add.task_id,
+                task_hash=confirm_context.pending_add.task_hash,
+                find_version_stale_rejection_text=find_version_stale_rejection_text,
+            )
+        expired_text = handle_expired_pending_confirm(
+            task_ref=task_ref,
+            context=confirm_context,
+            chat_id=chat_id,
+        )
+        if expired_text is not None:
+            return None, expired_text
+        return ConfirmAvailabilityResolution(confirm_context=confirm_context, in_memory_pending=None), None
+
+    def _resolve_missing_confirm_context(
+        self,
+        *,
+        task_ref: str,
+        chat_id: int | None,
+        confirm_context_unavailable: bool,
+        job_repo_available: bool,
+    ) -> tuple[ConfirmAvailabilityResolution | None, str | None]:
+        if confirm_context_unavailable:
+            return None, ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+        in_memory_pending = self._get_in_memory_pending(chat_id=chat_id, task_ref=task_ref)
+        if in_memory_pending is None:
+            return None, ADD_CONFIRM_NOT_PENDING_TEXT
+        if job_repo_available and chat_id is not None and chat_id > 0:
+            self._log_pending_job_result_missing(
+                chat_id=chat_id,
+                task_ref=task_ref,
+                task_id=in_memory_pending.task_id,
+                task_hash=in_memory_pending.task_hash,
+                stage="confirm",
+            )
+            return None, ADD_CONFIRM_STATE_UNAVAILABLE_TEXT
+        return ConfirmAvailabilityResolution(confirm_context=None, in_memory_pending=in_memory_pending), None
+
+    def _resolve_not_pending_rejection_text(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        find_version_stale_rejection_text: Callable[..., str | None],
+    ) -> str:
+        stale_text = find_version_stale_rejection_text(task_id=task_id, task_hash=task_hash)
+        return stale_text or ADD_CONFIRM_NOT_PENDING_TEXT
 
     def has_pending_add(self, chat_id: int, task_ref: str) -> bool | None:
         cleaned_ref = task_ref.strip()
