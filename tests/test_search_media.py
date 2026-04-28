@@ -3393,7 +3393,7 @@ def test_search_and_format_orders_media_bt_candidates_with_shared_scorer(
         codec_scores=dict(DEFAULT_BT_SCORING_RULES.codec_scores),
         release_group_preferred=DEFAULT_BT_SCORING_RULES.release_group_preferred,
     )
-    monkeypatch.setattr("app.services.search_media.load_bt_scoring_rules", lambda: custom_rules)
+    monkeypatch.setattr("app.services.search_media._load_bt_scoring_rules", lambda: custom_rules)
 
     _ = tmp_path
     service = SearchMediaService(fake_search)
