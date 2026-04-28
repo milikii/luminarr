@@ -1,11 +1,12 @@
-# Next step (v409)
+# Next step (v410)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已继续统一 Telegram sidecar 日志出口：
-  - `telegram_sidecar_runtime` 的 personal WeChat 私聊文本服务“配置无效”日志已切到 shared operational logging。
-- 本轮补了 personal WeChat sidecar focused regression，守住日志标题、detail 和 fix hint。
+- 本轮已继续统一日志出口：
+  - `cleanup_smoke_logging`、`trace_logging`、`cleanup_verification_docs` 的失败日志已切到 shared operational logging。
+  - `downloader_route_lookup` 的 helper 命名已收口为真实 emit 边界。
+- 本轮补了 cleanup smoke / trace / cleanup docs sync focused regressions，以及 shared logging primitives 守卫，守住日志标题、detail、fix hint、ANSI 去色和首个非空行摘要。
 - focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
@@ -13,12 +14,13 @@
   - **shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口**继续保持完成态。
   - 5 个小单消费者 support 文件已合并回消费方，并由测试守卫防止回退。
   - import transfer、TMDB fallback、WeCom base64 解码、search/web/BT 展示、candidate/clarification、Telegram delivery/update、import pending/approval/event 等异常边界已持续收口。
-  - downloader route lookup、confirm / cleanup / frustration / BT read-only / raw BT / BT TMDB / BT pending、Feishu client、web source、main startup、Telegram update/delivery、channel identity、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation、auto-import/search/naming/scoring/import/cleanup、WeCom callback 的日志出口已统一到 shared operational logging。
+  - downloader route lookup、confirm / cleanup / frustration / BT read-only / raw BT / BT TMDB / BT pending、Feishu client、web source、main startup、Telegram update/delivery、channel identity、download follow-up、metadata/subtitle、watchlist/BT subscription、cleanup correlation、auto-import/search/naming/scoring/import/cleanup、WeCom callback、cleanup smoke、trace、cleanup docs sync 的日志出口已统一到 shared operational logging。
   - Feishu 入站已切到 SDK 长连接 only；webhook server / webhook 装配 / webhook 专属测试与配置入口已经移除。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
   - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
+- `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
 - 剩余 `*_support.py` 都是较大边界，不再因为文件名机械强拆。
 
 ## User value

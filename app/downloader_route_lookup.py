@@ -26,7 +26,7 @@ def _format_downloader_context(*, downloader_name: str, downloader_type: str = "
     return f"{cleaned_name} downloader_type={cleaned_type}"
 
 
-def _print_downloader_issue_log(
+def _emit_downloader_issue_log(
     *,
     title: str,
     context_label: str,
@@ -49,7 +49,7 @@ def _resolve_downloader_task_route(
     job_repo: JobRepo,
 ) -> tuple[str, str] | None:
     if chat_id is None or chat_id <= 0:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器路由未命中",
             context_label="task_ref",
             context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
@@ -61,7 +61,7 @@ def _resolve_downloader_task_route(
     try:
         downloader_job = job_repo.get_downloader_job_for_chat_ref(chat_id=chat_id, task_ref=task_ref)
     except (JobPersistenceError, sqlite3.Error) as error:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器路由查询失败",
             context_label="task_ref",
             context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
@@ -71,7 +71,7 @@ def _resolve_downloader_task_route(
         )
         return None
     if downloader_job is None:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器路由未命中",
             context_label="task_ref",
             context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
@@ -93,7 +93,7 @@ def _resolve_downloader_task_route(
             if not isinstance(payload, dict):
                 payload_reason = "payload_json not object"
     if payload_reason is not None:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器路由载荷损坏",
             context_label="task_ref",
             context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
@@ -105,7 +105,7 @@ def _resolve_downloader_task_route(
     downloader_name = str(payload.get("downloader_name", "")).strip()
     download_dir = str(payload.get("download_dir", "")).strip()
     if not downloader_name:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器路由未命中",
             context_label="task_ref",
             context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),
@@ -146,7 +146,7 @@ def _resolve_lookup_client_for_task(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器实例不存在",
             context_label="downloader_name",
             context_value=_format_downloader_context(downloader_name=cleaned_name or "-"),
@@ -156,7 +156,7 @@ def _resolve_lookup_client_for_task(
         )
         raise DownloaderRouteLookupError(f"downloader client unavailable for {operation} task: {task_ref}")
     if client is None:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器客户端未配置",
             context_label="downloader_name",
             context_value=_format_downloader_context(
@@ -248,7 +248,7 @@ async def _get_torrent_status_with_routing(
     except RuntimeError as error:
         if isinstance(error, DownloaderRouteLookupError):
             raise
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器路由查询失败",
             context_label="task_ref",
             context_value=_format_task_route_context(task_ref=task_ref, chat_id=chat_id),

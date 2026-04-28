@@ -47,7 +47,7 @@ from app.downloader_route_lookup import (
     _remove_torrent_with_routing,
     _get_torrent_status_with_routing,
     _format_downloader_context,
-    _print_downloader_issue_log,
+    _emit_downloader_issue_log,
     _resolve_downloader_instance_and_client,
 )
 from app.operational_logging import emit_operational_log
@@ -97,7 +97,7 @@ def _resolve_downloader_client_for_dispatch(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
     )
     if instance is None:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器投递路由失败",
             context_label="downloader_name",
             context_value=_format_downloader_context(downloader_name=cleaned_name, downloader_type="-"),
@@ -107,7 +107,7 @@ def _resolve_downloader_client_for_dispatch(
         )
         raise ValueError(f"unknown downloader instance: {cleaned_name}")
     if client is None:
-        _print_downloader_issue_log(
+        _emit_downloader_issue_log(
             title="下载器投递路由失败",
             context_label="downloader_name",
             context_value=_format_downloader_context(
