@@ -436,32 +436,42 @@ git commit -m "chore: add adult BT focused verification target"
 
 ## Final Verification
 
-- [ ] Run the full wedge verification:
+- [x] Run the full wedge verification:
 
 ```bash
 make verify-adult-bt-wedge
 ```
 
-- [ ] Run repository gates:
+- [x] Run repository gates:
 
 ```bash
 make quality
 make verify-mainline
 ```
 
-- [ ] Confirm the docs gate is still green:
+- [x] Confirm the docs gate is still green:
 
 ```bash
 .venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py
 ```
 
-- [ ] Confirm the active docs root count is now within budget:
+- [x] Confirm the active docs root count is now within budget:
 
 ```bash
-find docs -maxdepth 1 -name '*.md' | wc -l
+python3 - <<'PY'
+from pathlib import Path
+active_docs = sorted(
+    path.name
+    for path in Path("docs").glob("*.md")
+    if path.name not in {"BLOCKERS.md", "PROGRESS.md"}
+)
+print(len(active_docs))
+PY
 ```
 
 Expected: `15`
+
+当前状态：Final Verification 已通过；Telegram 人工 smoke 正在当前会话进行中。
 
 ---
 

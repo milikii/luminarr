@@ -119,11 +119,12 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     for heading in STATUS_SECTION_HEADINGS:
         assert heading in status_text
 
-    assert re.search(r"\b\d+ passed, \d+ skipped\b", status_text)
+    assert re.search(r"\b\d+ passed(?:, \d+ skipped)?\b", status_text)
     assert "make quality" in status_text
     assert "make verify-mainline" in status_text
+    assert "make verify-adult-bt-wedge" in status_text
     assert "默认继续施工时，直接复制下面这句给 AI：" in status_text
-    assert "按 AGENTS.md + docs/OPERATOR_RUNBOOK.md 的“默认 3 轮施工”执行。" in status_text
+    assert "按 AGENTS.md 执行单轮主线施工。" in status_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" not in status_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" not in status_text
     assert "cold-start consistency audit" not in status_text

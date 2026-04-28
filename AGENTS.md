@@ -7,7 +7,7 @@
 
 ## 一、当前阶段 ← 每次推进前手动更新这一行
 
-**当前阶段：决策阶段 / 工具：Gstack /plan-eng-review**
+**当前阶段：执行阶段 / 工具：Superpowers /executing-plans**
 
 ```
 阶段选项（手动切换）：

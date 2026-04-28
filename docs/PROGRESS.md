@@ -76,3 +76,19 @@
 
 ### 下轮目标
 - 等待用户指令
+
+## Round 5 — 2026-04-28 20:49
+
+### 完成
+- 启动本地 `app.main`，开启 Telegram 人工 smoke 前置运行环境
+- 将 `AGENTS.md`、`STATUS.md`、`NEXT_STEP.md`、`TASKS.md` 切到 “adult BT 已完成 / 下一条主线为 config 启动硬依赖解耦” 的当前真相
+- 同步执行计划尾部的最终验证状态与 active docs 预算统计口径
+
+### 测试状态
+- 待本轮文档收口后重跑 docs / quality gate
+
+### 遗留 / 下轮继续
+- 等待 Telegram 人工 smoke 结果
+
+### 下轮目标
+- 开始 `app/config.py` 启动硬依赖解耦

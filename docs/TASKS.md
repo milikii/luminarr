@@ -4,17 +4,15 @@
 
 ## 当前验证快照
 
+- `make verify-adult-bt-wedge`：通过
 - `make verify-mainline`：通过
-- `make quality`：失败
-- `docs` 一致性测试当前有 2 个失败：
-  - `tests/test_cleanup_docs_consistency.py::test_docs_entrypoints_are_split_by_reader_role`
-  - `tests/test_cleanup_docs_consistency.py::test_active_docs_root_stays_small_and_current`
-- 直接原因：
-  - 当前 `AGENTS.md` 缺少测试要求的 `docs/INDEX.md` 引用
-  - `docs/*.md` 活跃文档数被测试限制为 `<= 15`，新增 `PRD.md` / `TASKS.md` 后当前变成 `17`
-- 结论：主业务链回归信号当前是绿的，阻断点集中在文档入口约定和活跃文档预算
+- `make quality`：通过
+- `adult BT minimum wedge`：已完成并已推送到 `main`
+- Telegram 人工 smoke：应用已启动，等待当前会话验证
+- 下一条唯一主线：`app/config.py` 启动硬依赖解耦
+- 结论：当前 P0 阻断已清空；后续按 P1 顺序推进，不回切 `services` 结构降本主线
 
-## P0 当前阻断
+## P0 已完成
 
 - [x] 修复 docs gate：让 `AGENTS.md` 与 `tests/test_cleanup_docs_consistency.py` 的入口文档约定重新一致，至少补齐 `docs/INDEX.md` 等活跃文档引用，恢复 `make quality` 通过。
 
