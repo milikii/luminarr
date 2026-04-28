@@ -1,4 +1,4 @@
-# Next step (v411)
+# Next step (v413)
 
 ## Current goal
 
@@ -7,8 +7,9 @@
   - `cleanup_smoke_logging`、`trace_logging`、`cleanup_verification_docs` 的失败日志已切到 shared operational logging。
   - `cleanup_smoke_logging` 里的不可能成立空路径兜底已删除。
   - `feishu_long_connection` 的停止边界已收窄到 `RuntimeError`。
+- 本轮补了 WeCom webhook HTTP 入口的超时分支拆分，避免把超时和一般失败混成同一种 500 路径。
 - 本轮补了 cleanup smoke / trace / cleanup docs sync focused regressions，以及 shared logging primitives 守卫，守住日志标题、detail、fix hint、ANSI 去色和首个非空行摘要。
-- focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 需要在最终合流后复跑，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
+- focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。
   - docs gate 不再锁死 `telegram_bot.py` 这类易漂移文件行数。
@@ -19,6 +20,7 @@
   - Feishu 入站已切到 SDK 长连接 only；webhook server / webhook 装配 / webhook 专属测试与配置入口已经移除。
   - `cleanup_smoke_logging` 不再保留不可能成立的空路径兜底。
   - `feishu_long_connection` 的停止请求与 stop 失败只收 `RuntimeError`，避免机械吞掉不相关异常。
+  - WeCom webhook HTTP 入口把超时单独判成 504，并取消悬挂 future，不再和一般异常混成一类。
   - BT pending 的 `processing_path`、`classification`、`tmdb_association`、`raw_bt_destination` 持久化边界已收窄。
   - downloader route / import prepare / cleanup seed window / adult archive 持久化失败现在都进入明确状态不可用或明确查询失败边界。
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。

@@ -117,6 +117,17 @@ def _build_handler_class(
             )
             try:
                 response = future.result(timeout=30.0)
+            except TimeoutError:
+                future.cancel()
+                emit_operational_log(
+                    title="WeCom webhook HTTP 入口超时",
+                    detail=f"路径={self.path} 等待=30.0s",
+                    fix_hint="检查当前事件循环是否拥塞，以及 WeCom 回调处理链是否阻塞或失去响应。",
+                )
+                response = _HttpResponse(
+                    status_code=504,
+                    body=json.dumps({"code": 504, "msg": "gateway timeout"}).encode("utf-8"),
+                )
             except Exception as error:
                 emit_operational_log(
                     title="WeCom webhook HTTP 入口失败",

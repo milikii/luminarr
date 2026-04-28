@@ -212,6 +212,53 @@ def test_wecom_webhook_handler_logs_response_write_failure(capsys) -> None:
     assert "[处理建议]" in output
 
 
+def test_wecom_webhook_handler_logs_http_timeout(capsys, monkeypatch) -> None:
+    class FakeFuture:
+        def __init__(self) -> None:
+            self.cancel_called = False
+
+        def result(self, timeout: float) -> object:
+            _ = timeout
+            raise TimeoutError("timed out")
+
+        def cancel(self) -> bool:
+            self.cancel_called = True
+            return True
+
+    fake_future = FakeFuture()
+
+    def fake_run_coroutine_threadsafe(coro, loop):
+        _ = loop
+        coro.close()
+        return fake_future
+
+    monkeypatch.setattr(wecom_webhook_server_module.asyncio, "run_coroutine_threadsafe", fake_run_coroutine_threadsafe)
+
+    handler_class = wecom_webhook_server_module._build_handler_class(
+        loop=asyncio.new_event_loop(),
+        path="/wecom/callback",
+        bot_data={},
+    )
+    handler = object.__new__(handler_class)
+    handler.path = "/wecom/callback"
+    captured_responses = []
+    handler._write_response = lambda response: captured_responses.append(response)
+    handler.rfile = SimpleNamespace(read=lambda size: b"")
+    handler.headers = SimpleNamespace(get=lambda name, default=None: None)
+
+    handler._handle_request(method="GET")
+
+    output = capsys.readouterr().out
+    assert "[WeCom webhook HTTP 入口超时]" in output
+    assert "路径=/wecom/callback" in output
+    assert "30.0s" in output
+    assert "[处理建议]" in output
+    assert fake_future.cancel_called is True
+    assert len(captured_responses) == 1
+    assert captured_responses[0].status_code == 504
+    assert captured_responses[0].body == b'{"code": 504, "msg": "gateway timeout"}'
+
+
 def test_start_wecom_webhook_server_logs_bind_failure(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         wecom_webhook_server_module,
