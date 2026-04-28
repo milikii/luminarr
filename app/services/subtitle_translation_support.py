@@ -845,7 +845,7 @@ def _translate_chunk_lines(
 ) -> tuple[list[str] | None, str | None]:
     try:
         translated_lines = translate_lines(source_lines)
-    except Exception as exc:
+    except RuntimeError as exc:
         message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
         _print_colored_error(
             problem=message,

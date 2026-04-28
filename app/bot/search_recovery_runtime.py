@@ -53,7 +53,7 @@ async def search_with_reactive_recovery(
 ) -> str:
     try:
         return await search_service.search_and_format(query, chat_id=chat_id, channel=channel)
-    except Exception as error:
+    except RuntimeError as error:
         if not is_llm_physical_failure(error):
             raise
 
@@ -61,7 +61,7 @@ async def search_with_reactive_recovery(
     compact_query = recovery_context["current_job_context"]
     try:
         return await search_service.search_and_format(compact_query, chat_id=chat_id, channel=channel)
-    except Exception as error:
+    except RuntimeError as error:
         if is_llm_physical_failure(error):
             return safe_text
         raise

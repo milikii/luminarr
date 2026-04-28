@@ -84,7 +84,7 @@ class ImportPostProcessingService:
         )
         try:
             result = await self._scrape_metadata_func(scrape_input)
-        except Exception as exc:
+        except RuntimeError as exc:
             message = f"metadata 刮削执行异常：{exc}"
             self._record_event(
                 task_ref=request.task_ref,
@@ -127,7 +127,7 @@ class ImportPostProcessingService:
         )
         try:
             result = self._translate_subtitle_func(translate_input)
-        except Exception as exc:
+        except RuntimeError as exc:
             message = f"subtitle 翻译执行异常：{exc}"
             self._record_event(
                 task_ref=request.task_ref,
@@ -167,7 +167,7 @@ class ImportPostProcessingService:
 
         try:
             refresh_text = await self._refresh_media_server_func()
-        except Exception as error:
+        except RuntimeError as error:
             _log_import_refresh_failed(
                 request=request,
                 reason=str(error),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
+import httpx
 import pytest
 
 from app.bot.private_chat_bt_read_only_runtime import handle_bt_read_only_query
@@ -154,7 +155,8 @@ def test_handle_bt_read_only_query_logs_failure_and_replies_safe_text(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     async def failing_raw_search(_: str) -> list[dict[str, object]]:
-        raise RuntimeError("network down")
+        request = httpx.Request("GET", "https://example.com/search?q=Frieren")
+        raise httpx.ConnectError("network down", request=request)
 
     reply_func = AsyncMock()
     execution_gate = _ExecutionGate()

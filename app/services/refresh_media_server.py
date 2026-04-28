@@ -25,7 +25,7 @@ class RefreshMediaServerService:
         self._provider_name = provider_name.strip() or "media-server"
         self._target_url = target_url.strip()
 
-    def _format_failure_details(self, exc: Exception) -> str:
+    def _format_failure_details(self, exc: httpx.HTTPError) -> str:
         request_url = ""
         if isinstance(exc, httpx.RequestError) and exc.request is not None:
             request_url = str(exc.request.url)
@@ -38,7 +38,7 @@ class RefreshMediaServerService:
     async def refresh_text(self) -> str:
         try:
             await self._refresh_func()
-        except Exception as exc:
+        except httpx.HTTPError as exc:
             reason = str(exc).strip() or REFRESH_FAILED_UNKNOWN_REASON
             _log_refresh_media_server_failed(
                 provider_name=self._provider_name,

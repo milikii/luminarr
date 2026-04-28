@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
+import httpx
 import pytest
 from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler
@@ -3044,7 +3045,8 @@ def test_handle_message_bt_read_only_helper_routes_to_raw_search() -> None:
 
 def test_handle_message_bt_read_only_helper_search_failure_returns_safe_text() -> None:
     async def failing_raw_search(_: str) -> list[dict[str, object]]:
-        raise RuntimeError("network down")
+        request = httpx.Request("GET", "https://example.com/search?q=Frieren")
+        raise httpx.ConnectError("network down", request=request)
 
     update, reply_text = _build_update("bt search Frieren S01E01")
     search_service = SearchMediaService(_fake_search, raw_search_func=failing_raw_search)

@@ -5,6 +5,8 @@ from collections.abc import Callable, Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+import httpx
+
 from app.bot.bt_pending_runtime import (
     BT_PENDING_CLEAR_RESULT_MISSING_REASON,
     BT_PENDING_MISSING_AFTER_UPSERT_REASON,
@@ -74,7 +76,7 @@ class ResolvedDownloaderExecutionLike(Protocol):
     downloader_type: str
 
 
-def log_pure_bt_search_error(*, query: str, error: Exception) -> None:
+def log_pure_bt_search_error(*, query: str, error: httpx.HTTPError | ValueError) -> None:
     emit_operational_log(
         title="pure BT 搜索失败",
         detail=f"查询={query} 原因={error}",
@@ -372,7 +374,7 @@ async def handle_raw_bt_destination_query(
     search_service_key: str,
     clear_pending: Callable[[], bool | None],
     resolve_downloader_execution: Callable[[], tuple[ResolvedDownloaderExecutionLike | None, str | None]],
-    log_pure_bt_search_error: Callable[[str, Exception], None],
+    log_pure_bt_search_error: Callable[[str, httpx.HTTPError | ValueError], None],
     service_not_ready_text: str,
     bt_source_required_text: str,
     pure_bt_search_failed_text: str,
@@ -419,7 +421,7 @@ async def handle_raw_bt_destination_query(
         return service_not_ready_text
     try:
         raw_results = await search_service.search_raw_candidates(pure_bt_query)
-    except Exception as error:
+    except (httpx.HTTPError, ValueError) as error:
         log_pure_bt_search_error(pure_bt_query, error)
         return f"{selected_text}\n\n{pure_bt_search_failed_text}"
 

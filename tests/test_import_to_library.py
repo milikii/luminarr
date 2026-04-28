@@ -3353,6 +3353,33 @@ def test_confirm_import_by_task_ref_success_with_refresh_exception(tmp_path: Pat
     refresh.assert_awaited_once()
 
 
+def test_confirm_import_by_task_ref_re_raises_non_runtime_refresh_error(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    refresh = AsyncMock(side_effect=ValueError("bad refresh stub"))
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        refresh_media_server_func=refresh,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    with pytest.raises(ValueError, match="bad refresh stub"):
+        _run(service.confirm_import_by_task_ref("87"))
+
+
 def test_import_by_task_ref_not_found() -> None:
     service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
     text = _run(service.import_by_task_ref("missing"))
@@ -4303,6 +4330,40 @@ def test_confirm_import_metadata_scrape_exception_does_not_break_import(tmp_path
     assert any(event.event_type == "metadata.failed" for event in events)
 
 
+def test_confirm_import_metadata_scrape_re_raises_non_runtime_error(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Interstellar.2014.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+
+    async def failing_scrape(_: MetadataScrapeInput) -> MetadataScrapeResult:
+        raise ValueError("bad scrape stub")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        scrape_metadata_func=failing_scrape,
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    with pytest.raises(ValueError, match="bad scrape stub"):
+        _run(service.confirm_import_by_task_ref("87"))
+
+
 def test_confirm_import_triggers_subtitle_translate_success_event(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
@@ -4381,6 +4442,40 @@ def test_confirm_import_subtitle_translate_exception_does_not_break_import(tmp_p
 
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert any(event.event_type == "subtitle.failed" for event in events)
+
+
+def test_confirm_import_subtitle_translate_re_raises_non_runtime_error(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Interstellar.2014.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+
+    def failing_translate(_: SubtitleTranslateInput) -> SubtitleTranslateResult:
+        raise ValueError("bad translate stub")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        translate_subtitle_func=failing_translate,
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    with pytest.raises(ValueError, match="bad translate stub"):
+        _run(service.confirm_import_by_task_ref("87"))
 
 
 def _run(coroutine: Awaitable[str]) -> str:

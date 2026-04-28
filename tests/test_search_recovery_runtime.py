@@ -86,3 +86,22 @@ def test_search_with_reactive_recovery_re_raises_non_physical_failure() -> None:
                 safe_text="safe",
             )
         )
+
+
+def test_search_with_reactive_recovery_re_raises_non_runtime_failure_without_recovery() -> None:
+    search_service = SimpleNamespace(
+        search_and_format=AsyncMock(side_effect=ValueError("bad search stub"))
+    )
+
+    with pytest.raises(ValueError, match="bad search stub"):
+        asyncio.run(
+            search_with_reactive_recovery(
+                search_service=search_service,
+                query="dune",
+                chat_id=1001,
+                channel="telegram",
+                safe_text="safe",
+            )
+        )
+
+    assert search_service.search_and_format.await_count == 1

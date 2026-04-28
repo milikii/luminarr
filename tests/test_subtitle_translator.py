@@ -1142,6 +1142,70 @@ def test_translate_for_import_fails_when_writing_translated_subtitle(tmp_path: P
     assert "写入字幕文件失败" in result.message
 
 
+def test_translate_for_import_returns_failed_result_when_model_runtime_error(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+
+    def failing_request(_: str, __: dict[str, object]) -> str:
+        raise RuntimeError("llm down")
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=failing_request,
+    )
+
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-runtime-error",
+            task_id="runtime-error",
+            task_hash="hash-runtime-error",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is False
+    assert "模型翻译失败" in result.message
+    assert "llm down" in result.message
+
+
+def test_translate_for_import_re_raises_non_runtime_model_error(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+
+    def failing_request(_: str, __: dict[str, object]) -> str:
+        raise ValueError("bad translator stub")
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=failing_request,
+    )
+
+    with pytest.raises(ValueError, match="bad translator stub"):
+        service.translate_for_import(
+            SubtitleTranslateInput(
+                task_ref="hash-non-runtime-error",
+                task_id="non-runtime-error",
+                task_hash="hash-non-runtime-error",
+                target_path=str(target_file),
+            )
+        )
+
+
 def test_read_metadata_title_logs_metadata_read_failure(
     tmp_path: Path,
     capsys,

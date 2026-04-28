@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, MutableMapping
 
+import httpx
+
 from app.bot.query_text_runtime import (
     extract_bt_batch_preview_request,
     extract_bt_read_only_query,
@@ -11,7 +13,7 @@ from app.operational_logging import emit_operational_log
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]
 
 
-def _log_bt_read_only_helper_error(*, query: str, error: Exception) -> None:
+def _log_bt_read_only_helper_error(*, query: str, error: httpx.HTTPError | ValueError) -> None:
     emit_operational_log(
         title="BT 只读探索失败",
         detail=f"查询={query} 原因={error}",
@@ -37,7 +39,7 @@ async def _run_bt_read_only_request(
             tg.ACTION_BT_READ_ONLY_HELPER,
             lambda: search_runner(search_service),
         )
-    except Exception as error:
+    except (httpx.HTTPError, ValueError) as error:
         _log_bt_read_only_helper_error(query=helper_query, error=error)
         await reply_func(tg.BT_READ_ONLY_HELPER_FAILED_TEXT)
         return True

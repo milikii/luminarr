@@ -5,6 +5,8 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+import httpx
+
 from app.bot.bt_classification_runtime import BT_CLASSIFICATION_PROMPT_TEXT, set_bt_classification_pending
 from app.bot.bt_pending_runtime import (
     BT_PENDING_CLEAR_RESULT_MISSING_REASON,
@@ -101,7 +103,7 @@ def resolve_bt_tmdb_candidates_lookup(
     return None
 
 
-def log_bt_tmdb_association_error(*, media_kind: str, query: str, error: Exception) -> None:
+def log_bt_tmdb_association_error(*, media_kind: str, query: str, error: httpx.HTTPError | ValueError) -> None:
     emit_operational_log(
         title="BT TMDB 关联失败",
         detail=f"类型={media_kind} 查询={query} 原因={error}",
@@ -343,7 +345,7 @@ async def handle_bt_tmdb_association_query(
     clear_pending: Callable[[], bool | None],
     resolve_candidates_lookup: Callable[[str], Callable[[str, str], Awaitable[list[TmdbMovie]]] | None],
     resolve_downloader_execution: Callable[[], tuple[ResolvedDownloaderExecutionLike | None, str | None]],
-    log_bt_tmdb_association_error: Callable[[str, str, Exception], None],
+    log_bt_tmdb_association_error: Callable[[str, str, httpx.HTTPError | ValueError], None],
     service_not_ready_text: str,
     bt_tmdb_association_service_not_ready_text: str,
     bt_source_required_text: str,
@@ -360,7 +362,7 @@ async def handle_bt_tmdb_association_query(
 
     try:
         matches = await lookup_func(parsed_query.title, parsed_query.year)
-    except Exception as error:
+    except (httpx.HTTPError, ValueError) as error:
         log_bt_tmdb_association_error(pending.media_kind, query, error)
         return bt_tmdb_association_service_not_ready_text
 

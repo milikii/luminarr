@@ -1,14 +1,15 @@
-# Next step (v399)
+# Next step (v400)
 
 ## Current goal
 
 - 当前唯一主线继续是 **质量债硬化 / 异常边界、日志边界和 DI 收口**。
-- 本轮已继续收口外部客户端异常边界：
-  - `metadata_scraper` 的 TMDB/Fanart/图片下载只捕获明确 `httpx.HTTPError` / `ValueError`。
-  - `search_media` 的 BT 只读搜索/页面预览只捕获明确 `httpx.HTTPError` / `ValueError`。
-  - `bt_sources` provider 搜索/页面搜索只捕获明确 `httpx.HTTPError` / `ValueError`。
-  - `manage_bt_subscription` 订阅扫描搜索失败只捕获明确 `httpx.HTTPError` / `ValueError`。
-- 本轮补了 BT 订阅扫描搜索失败 regression，并把相关网络失败测试改成真实 `httpx.ConnectError`。
+- 本轮已继续收口导入后处理和 BT follow-up 的异常边界：
+  - `import_post_processing` 的 metadata/subtitle/refresh follow-up 只吞掉明确 `RuntimeError`。
+  - `subtitle_translation_support` 的模型翻译失败只吞掉明确 `RuntimeError`。
+  - `refresh_media_server` 只吞掉明确 `httpx.HTTPError`。
+  - `search_recovery_runtime` 只对明确 `RuntimeError` 进入恢复。
+  - `private_chat_bt_read_only_runtime`、`raw_bt_destination_runtime`、`bt_tmdb_association_runtime` 的外部查询失败只吞掉明确 `httpx.HTTPError` / `ValueError`。
+- 本轮补了 import post-processing、refresh/subtitle、BT 只读 / raw BT / BT TMDB follow-up 与 search recovery regression，并把相关网络失败测试改成真实 `httpx.ConnectError`，同时守住非预期 `ValueError` 继续上抛。
 - focused tests 已覆盖本轮触及路径；`make quality` / `make verify-mainline` 已通过，协议、SQLite schema、下载/导入/刷新/订阅扫描主线语义不变。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。

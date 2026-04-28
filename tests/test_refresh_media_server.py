@@ -4,6 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import httpx
+import pytest
 
 from app.services.refresh_media_server import (
     REFRESH_FAILED_TEXT_TEMPLATE,
@@ -23,7 +24,8 @@ def test_refresh_text_success() -> None:
 
 
 def test_refresh_text_failure_with_reason(capsys) -> None:
-    refresh = AsyncMock(side_effect=RuntimeError("connection timeout"))
+    request = httpx.Request("POST", "http://127.0.0.1:8096/Library/Refresh")
+    refresh = AsyncMock(side_effect=httpx.ConnectError("connection timeout", request=request))
     service = RefreshMediaServerService(
         refresh,
         provider_name="jellyfin",
@@ -41,7 +43,8 @@ def test_refresh_text_failure_with_reason(capsys) -> None:
 
 
 def test_refresh_text_failure_with_unknown_reason(capsys) -> None:
-    refresh = AsyncMock(side_effect=RuntimeError(""))
+    request = httpx.Request("GET", "http://127.0.0.1:32400/library/sections/all/refresh")
+    refresh = AsyncMock(side_effect=httpx.ConnectError("", request=request))
     service = RefreshMediaServerService(
         refresh,
         provider_name="plex",
@@ -73,3 +76,11 @@ def test_refresh_text_logs_request_url_for_httpx_error(capsys) -> None:
     assert "provider=jellyfin" in output
     assert "target=http://127.0.0.1:8096" in output
     assert "request_url=http://127.0.0.1:8096/Library/Refresh" in output
+
+
+def test_refresh_text_re_raises_non_http_error() -> None:
+    refresh = AsyncMock(side_effect=RuntimeError("unexpected callback bug"))
+    service = RefreshMediaServerService(refresh)
+
+    with pytest.raises(RuntimeError, match="unexpected callback bug"):
+        asyncio.run(service.refresh_text())

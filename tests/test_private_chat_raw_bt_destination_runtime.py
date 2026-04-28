@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
+import httpx
 from app.bot import telegram_bot as tg
 from app.bot.private_chat_raw_bt_destination_runtime import handle_raw_bt_destination_follow_up
 from app.bot.raw_bt_destination_runtime import RawBtDestinationPending
@@ -107,3 +108,44 @@ def test_handle_raw_bt_destination_follow_up_replies_service_not_ready_without_a
 
     assert handled is True
     reply_func.assert_awaited_once_with(tg.SERVICE_NOT_READY_TEXT)
+
+
+def test_handle_raw_bt_destination_follow_up_replies_search_failure_text() -> None:
+    reply_func = AsyncMock()
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock())
+
+    async def failing_raw_search(_: str) -> list[dict[str, object]]:
+        request = httpx.Request("GET", "https://example.com/api/search?q=Frieren")
+        raise httpx.ConnectError("search down", request=request)
+
+    handled = asyncio.run(
+        handle_raw_bt_destination_follow_up(
+            bot_data={
+                tg.ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                tg.SEARCH_SERVICE_KEY: SearchMediaService(_fake_search, raw_search_func=failing_raw_search),
+                "raw_bt_destination_pending_by_chat": {
+                    1001: RawBtDestinationPending(
+                        options=(
+                            RawBtDestinationOption(
+                                key="downloads",
+                                label="下载目录",
+                                target_dir="/data/raw/downloads",
+                            ),
+                        ),
+                        source="下载这个 BT Frieren",
+                    )
+                },
+            },
+            reply_func=reply_func,
+            query="1",
+            chat_id=1001,
+            user_id=2001,
+            resolve_downloader_execution=lambda: (None, None),
+            tg=tg,
+        )
+    )
+
+    assert handled is True
+    sent_text = reply_func.await_args.args[0]
+    assert "已记录 raw_bt 目标目录。" in sent_text
+    assert tg.PURE_BT_SEARCH_FAILED_TEXT in sent_text
