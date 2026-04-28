@@ -26,7 +26,6 @@ from app.db.job_repo import (
 from app.operational_logging import emit_operational_log
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.add_adult_registry_state import AddAdultRegistryState
-from app.services.add_confirm_finalization_state import AddConfirmFinalizationState
 from app.services.add_confirm_job_state import AddConfirmJobState
 from app.services.add_cancel_state import AddCancelState
 from app.services import add_pending_context
@@ -36,8 +35,9 @@ from app.services.add_pending_context import (
     PendingAddContext,
     pending_add_from_json,
     pending_add_to_json,
+    to_completed_pending_add_context,
 )
-from app.services.add_execution_follow_up import AddExecutionFollowUpService
+from app.services.add_execution_follow_up import AddExecutionFollowUpService, AddResult
 from app.services.search_media import SearchMediaService
 from app.services.workflow_trace_logger import WorkflowTraceLogger
 
@@ -695,6 +695,94 @@ class AddConfirmContextState:
             detail=f"task_ref={task_ref} job_id={job.job_id} task_id={job.task_id} task_hash={job.task_hash} version={job.version} 原因={reason}",
             fix_hint="检查 jobs 表里该待确认任务是否仍存在，以及超时取消后是否还能回读到最新状态；当前 confirm 会直接返回状态读取失败，避免把缺失真相误判成普通“下载确认已超时”。",
         )
+
+
+class AddConfirmFinalizationState:
+    def __init__(
+        self,
+        *,
+        add_finalization_warning_text: str,
+        log_trace_func: Callable[..., None],
+    ) -> None:
+        self._add_finalization_warning_text = add_finalization_warning_text
+        self._log_trace = log_trace_func
+
+    def finalize_confirmation(
+        self,
+        *,
+        task_ref: str,
+        pending_add: PendingAddContext,
+        result: AddResult,
+        reply: str,
+        chat_id: int | None,
+        user_id: int | None,
+        expected_lease_version: int,
+        claimed_job: bool,
+        claimed_job_id: str,
+        claimed_job_version: int,
+        lease_owner: str,
+        record_executed_lease_version: Callable[..., bool | None],
+        move_completed_approval_identity: Callable[..., bool | None],
+        mark_completed_job: Callable[..., bool | None],
+        clear_pending_context: Callable[..., None],
+    ) -> str:
+        finalization_warning = ""
+        lease_recorded = record_executed_lease_version(
+            task_ref=task_ref,
+            task_id=pending_add.task_id,
+            task_hash=pending_add.task_hash,
+            executed_lease_version=expected_lease_version,
+        )
+        if lease_recorded is not True:
+            finalization_warning = self._add_finalization_warning_text
+        approval_identity_moved = move_completed_approval_identity(
+            current_task_id=pending_add.task_id,
+            current_task_hash=pending_add.task_hash,
+            new_task_id=pending_add.task_id,
+            new_task_hash=result.task_hash,
+        )
+        if approval_identity_moved is not True:
+            finalization_warning = self._add_finalization_warning_text
+        if claimed_job:
+            completed_context = to_completed_pending_add_context(
+                pending_add,
+                actual_task_id=pending_add.task_id,
+                actual_task_hash=result.task_hash,
+            )
+            job_completed = mark_completed_job(
+                job_id=claimed_job_id,
+                expected_version=claimed_job_version,
+                lease_owner=lease_owner,
+                completed_add=completed_context,
+            )
+            if job_completed is not True:
+                finalization_warning = self._add_finalization_warning_text
+        clear_pending_context(chat_id=chat_id, task_ref=task_ref)
+        if finalization_warning:
+            self._log_trace(
+                event="confirm_finalize",
+                result="warning",
+                stage="completed",
+                chat_id=chat_id,
+                user_id=user_id,
+                task_ref=task_ref,
+                task_id=result.task_id,
+                task_hash=result.task_hash,
+                detail=self._add_finalization_warning_text,
+            )
+            return f"{reply}\n\n{finalization_warning}"
+        self._log_trace(
+            event="confirm_finalize",
+            result="succeeded",
+            stage="completed",
+            chat_id=chat_id,
+            user_id=user_id,
+            task_ref=task_ref,
+            task_id=result.task_id,
+            task_hash=result.task_hash,
+            detail=result.title,
+        )
+        return reply
 
 
 class AddToDownloaderService:
