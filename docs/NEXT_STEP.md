@@ -16,6 +16,7 @@
 - 本轮把导入链单消费者 `ImportMetadataTitleYearResolver` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_metadata_title_year.py`。
 - 本轮把导入链单消费者 `ImportRawBtGuard` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_raw_bt_guard.py`。
 - 本轮把导入链单消费者 `ImportConfirmContextGuard` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_confirm_context_guard.py`。
+- 本轮把导入链单消费者 `ImportEventRecorder` 合并回 `import_to_library.py`，删掉只被一处消费的 `import_event_recorder.py`。
 - 这轮开始不再以质量债为施工主线，但仍保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 已完成态保持，不回退：
   - README 不承载当前施工热点，当前真相看 STATUS/NEXT_STEP。

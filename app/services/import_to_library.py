@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -20,7 +21,6 @@ from app.services.import_confirm_expiry_state import ImportConfirmExpiryState
 from app.services.import_confirmed_media_identity import ImportConfirmedMediaIdentityResolver
 from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
-from app.services.import_event_recorder import ImportEventRecorder
 from app.services.import_job_state import ImportJobState
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
@@ -181,12 +181,6 @@ class ImportToLibraryService:
             import_finalization_warning_text=IMPORT_FINALIZATION_WARNING_TEXT,
             import_execution_mode_copy=IMPORT_EXECUTION_MODE_COPY,
         )
-        self._event_recorder = ImportEventRecorder(
-            job_event_repo=job_event_repo,
-            import_event_result_missing_reason=IMPORT_EVENT_RESULT_MISSING_REASON,
-            is_import_event_row_corrupted_error=_is_import_event_row_corrupted_error,
-        )
-
     async def import_by_task_ref(
         self,
         task_ref: str,
@@ -611,15 +605,47 @@ class ImportToLibraryService:
         source_path: str = "",
         target_path: str = "",
     ) -> None:
-        self._event_recorder.record_event(
-            task_ref=task_ref,
-            event_type=event_type,
-            message=message,
-            task_id=task_id,
-            task_hash=task_hash,
-            source_path=source_path,
-            target_path=target_path,
+        if self._job_event_repo is None:
+            return
+        details = (
+            f"task_ref={task_ref} task_id={task_id} task_hash={task_hash} "
+            f"event_type={event_type} source={source_path} target={target_path}"
         )
+        try:
+            self._job_event_repo.append_event(
+                task_ref=task_ref,
+                task_id=task_id,
+                task_hash=task_hash,
+                event_type=event_type,
+                message=message,
+                source_path=source_path,
+                target_path=target_path,
+            )
+        except JobEventPersistenceError as error:
+            if str(error) == IMPORT_EVENT_RESULT_MISSING_REASON:
+                emit_operational_log(
+                    title="导入事件结果缺失",
+                    detail=f"{details} 错误=import event missing after append",
+                    fix_hint="检查 job_event 写入后回读是否仍能拿到刚追加的导入事件；当前导入流程会继续执行，但这次事件真相还没有确认落稳。",
+                )
+            elif _is_import_event_row_corrupted_error(error):
+                emit_operational_log(
+                    title="导入事件记录损坏",
+                    detail=f"{details} 错误={error}",
+                    fix_hint="检查 job_event 读回事件里的 task_ref / event_type / source_path / target_path 等真相字段是否仍然完整；当前导入流程会继续执行，但不会把这条坏事件当成已稳定落盘。",
+                )
+            else:
+                emit_operational_log(
+                    title="导入事件落盘失败",
+                    detail=f"{details} 错误={error}",
+                    fix_hint="检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
+                )
+        except sqlite3.Error as error:
+            emit_operational_log(
+                title="导入事件落盘失败",
+                detail=f"{details} 错误={error}",
+                fix_hint="检查 SQLite/job_event 表写入是否正常；当前导入流程会继续执行，但这次事件可能没有落盘。",
+            )
 
     def _log_raw_bt_lookup_failed(self, *, chat_id: int, task_ref: str, reason: str) -> None:
         emit_operational_log(
