@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from app.services.search_media_bt_ordering import (
+from app.services.search_media import (
     _build_media_bt_candidate,
     _dedupe_media_bt_results_by_title,
     _derive_media_title_fallback_queries,
@@ -41,7 +41,7 @@ def test_build_media_bt_candidate_requires_source_and_title() -> None:
 
 
 def test_order_media_bt_results_uses_scored_candidate_order_and_remainder(monkeypatch) -> None:
-    from app.services import search_media_bt_ordering as module
+    from app.services import search_media as module
 
     calls: list[str] = []
     candidate_one = SimpleNamespace(name="one")
