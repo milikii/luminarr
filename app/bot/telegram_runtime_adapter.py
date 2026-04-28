@@ -42,6 +42,9 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
     message = update.effective_message
     if message is None:
         return
+    query_text = str((message.text or message.caption or "")).strip()
+    if not query_text:
+        return
 
     chat_id = resolve_telegram_chat_id(update)
     user_id = resolve_telegram_user_id(update)
@@ -53,7 +56,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
         return
 
     await dispatch_private_chat_text(
-        query=(message.text or "").strip(),
+        query=query_text,
         reply_func=build_telegram_reply_func(message.reply_text, formatter=format_telegram_reply),
         chat_id=chat_id,
         user_id=user_id,
@@ -162,6 +165,6 @@ def build_telegram_application(
         application.bot_data[tg.TELEGRAM_UPDATE_REPO_KEY] = telegram_update_repo
     if job_repo is not None:
         application.bot_data[tg.JOB_REPO_KEY] = job_repo
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_telegram_message))
+    application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, handle_telegram_message))
     application.add_handler(CallbackQueryHandler(handle_telegram_callback_query))
     return application

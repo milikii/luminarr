@@ -14,12 +14,13 @@ from app.db.telegram_update_repo import TelegramUpdateRepo
 def _build_update(
     text: str,
     *,
+    caption: str | None = None,
     chat_id: int = 1001,
     user_id: int = 2001,
     update_id: int = 9001,
 ) -> tuple[SimpleNamespace, AsyncMock]:
     reply_text = AsyncMock()
-    message = SimpleNamespace(text=text, reply_text=reply_text)
+    message = SimpleNamespace(text=text, caption=caption, reply_text=reply_text)
     update = SimpleNamespace(
         update_id=update_id,
         effective_message=message,
@@ -71,6 +72,30 @@ def test_handle_telegram_message_routes_through_dispatch_private_chat_text(monke
     assert kwargs["user_id"] == 2001
     assert kwargs["bot_data"] is context.application.bot_data
     assert callable(kwargs["reply_func"])
+
+
+def test_handle_telegram_message_uses_caption_when_text_missing(monkeypatch) -> None:
+    update, _ = _build_update("", caption="magnet:?xt=urn:btih:abcdef1234567890")
+    context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
+
+    asyncio.run(handle_telegram_message(update, context))
+
+    dispatch_private_chat_text.assert_awaited_once()
+    kwargs = dispatch_private_chat_text.await_args.kwargs
+    assert kwargs["query"] == "magnet:?xt=urn:btih:abcdef1234567890"
+
+
+def test_handle_telegram_message_skips_when_text_and_caption_missing(monkeypatch) -> None:
+    update, _ = _build_update("", caption="")
+    context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
+
+    asyncio.run(handle_telegram_message(update, context))
+
+    dispatch_private_chat_text.assert_not_awaited()
 
 
 def test_handle_telegram_callback_query_routes_through_dispatch_private_chat_text(monkeypatch) -> None:
