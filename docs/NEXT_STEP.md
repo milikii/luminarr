@@ -34,7 +34,7 @@
   - adult archive 操作失败现在由 `AdultArchiveOperationError` 承接，上层不再用泛 `Exception` 判断归档/清理失败。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
-- 下一候选优先继续评估 services 层内重复的数据解析 / 展示模型，避免跨模块搬大块责任。
+- 下一候选优先继续评估 services 层内重复的数据解析 / 展示模型，避免跨模块搬大块责任；当前先看导入链剩余单消费者小文件 `import_pending_write_through_state.py` 是否适合继续合并回消费方。
 
 ## User value
 

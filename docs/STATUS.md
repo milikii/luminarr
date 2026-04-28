@@ -22,11 +22,13 @@
 - `*_support.py` 当前只剩 4 个较大边界：`approval_repo_support.py`、`job_repo_support.py`、`bt_subscription_repo_support.py`、`subtitle_translation_support.py`；不按文件名机械强拆。
 
 ## Current health
-- 默认分支质量 gate 仍是可复验的；最近一次通过结果保持 `27 passed, 0 skipped`。
+- 默认分支质量 gate 仍是可复验的；本轮收尾重新跑过 `make quality`，结果仍为 `27 passed, 0 skipped`。
 - 当前没有新的业务回归信号；这次切线来自文档决策，不是红灯修复。
-- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests。
+- 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests；当前优先候选是导入链剩余单消费者小文件 `import_pending_write_through_state.py`。
 
 ## Latest verification
+- `make verify-mainline` 通过。
+- `make quality` 通过（`27 passed, 0 skipped`）。
 - `tests/test_import_to_library.py -k "record_event"` 通过（`3 passed, 150 deselected`）。
 - `tests/test_import_to_library.py -k "rebuild_confirm_context or context_lookup_failure or context_row_corruption"` 通过（`4 passed, 149 deselected`）。
 - `tests/test_import_to_library.py -k "raw_bt"` 通过（`8 passed, 145 deselected`）。
