@@ -23,9 +23,8 @@ from app.services.import_confirm_preparation import ImportConfirmPreparation
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_event_recorder import ImportEventRecorder
 from app.services.import_job_state import ImportJobState
-from app.services.import_metadata_title_year import ImportMetadataTitleYearResolver
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
-from app.services.import_prepare_state import ImportPrepareState
+from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
 from app.services.import_raw_bt_guard import ImportRawBtGuard
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
 from app.services.workflow_trace_logger import WorkflowTraceLogger
@@ -188,10 +187,6 @@ class ImportToLibraryService:
             import_confirm_state_unavailable_text=IMPORT_CONFIRM_STATE_UNAVAILABLE_TEXT,
             import_finalization_warning_text=IMPORT_FINALIZATION_WARNING_TEXT,
             import_execution_mode_copy=IMPORT_EXECUTION_MODE_COPY,
-        )
-        self._metadata_title_year_resolver = ImportMetadataTitleYearResolver(
-            resolve_normalized_naming_truth_func=self._resolve_normalized_naming_truth,
-            resolve_confirmed_media_identity_func=self._confirmed_media_identity_resolver.resolve,
         )
         self._event_recorder = ImportEventRecorder(
             job_event_repo=job_event_repo,
@@ -357,11 +352,29 @@ class ImportToLibraryService:
         )
 
     def _resolve_metadata_title_year(self, *, task_id: str, task_hash: str, target_path: Path) -> tuple[str, str]:
-        return self._metadata_title_year_resolver.resolve(
+        fallback_title, fallback_year = extract_title_year_for_scrape(target_path)
+        confirmed_media_identity = self._confirmed_media_identity_resolver.resolve(task_id=task_id, task_hash=task_hash)
+        if confirmed_media_identity is not None:
+            title = (
+                confirmed_media_identity.get("title", "").strip()
+                or confirmed_media_identity.get("original_title", "").strip()
+                or fallback_title
+            )
+            year = confirmed_media_identity.get("year", "").strip() or fallback_year
+            return title, year
+
+        naming_truth = self._resolve_normalized_naming_truth(
             task_id=task_id,
             task_hash=task_hash,
-            target_path=target_path,
+            fallback_name="",
         )
+        if not naming_truth:
+            return fallback_title, fallback_year
+
+        title_from_truth, year_from_truth = extract_title_year_from_text(naming_truth)
+        title = title_from_truth or fallback_title
+        year = year_from_truth or fallback_year
+        return title, year
 
     def _record_pending_approval(self, *, task_ref: str, task_id: str, task_hash: str) -> int:
         return self._approval_state.record_pending_approval_with_copy_fallback_reset(

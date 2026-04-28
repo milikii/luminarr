@@ -12,6 +12,7 @@
 - 本轮把 `search_media.py` 里的 `parse_movie_query` 纯转发别名删掉，测试直接指向真正的 parser。
 - 本轮把 `search_media.py` 里的 `load_bt_scoring_rules` 纯转发别名删掉，测试直接指向模块内真实绑定。
 - 本轮把 `manage_bt_subscription.py` 的 `parse_bt_subscription_query` 再导出薄壳删掉，调用点直接指向 `bt_subscription_command.py`。
+- 本轮把导入链单消费者 `ImportMetadataTitleYearResolver` 合并回 `import_to_library.py`，删除 `import_metadata_title_year.py` 小文件，metadata title/year 回退顺序保持不变。
 - 当前继续保持不改协议、SQLite schema、调度语义或下载 / 导入 / 刷新真相边界。
 - 当前质量 gate 仍保持可复验；后续每轮先做一个最小结构闭环，再补 focused tests 和文档同步。
 - `cleanup_*_support.py` 当前为 `0` 个，继续保持完成态。
@@ -23,6 +24,7 @@
 - 下一轮优先挑 services 层里稳定可复用的数据结构或解析逻辑，做最小抽离并补 focused tests。
 
 ## Latest verification
+- `tests/test_import_to_library.py -k "resolve_metadata_title_year or extract_title_year_for_scrape"` 通过（`5 passed, 148 deselected`）。
 - `tests/test_manage_bt_subscription.py tests/test_private_chat_bt_subscription_runtime.py tests/test_telegram_bot.py -k "bt_subscription_query"` 通过（`6 passed, 237 deselected`）。
 - `tests/test_search_media.py -k "parse_movie_query or load_bt_scoring_rules"` 通过（`32 passed, 153 deselected`）。
 - `tests/test_search_media.py -k "parse_movie_query"` 通过（`32 passed, 153 deselected`）。
