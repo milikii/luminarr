@@ -21,6 +21,7 @@ from app.maintenance.cleanup_verification_docs import (
     _run_local_smoke_evidence_snapshot,
     _run_runtime_process_snapshot,
     _run_telegram_bot_api_snapshot,
+    main,
     parse_pytest_result,
     sync_documents,
     update_status_text,
@@ -43,6 +44,29 @@ def test_parse_pytest_result_strips_duration_suffix_with_clock_format() -> None:
 def test_parse_pytest_result_raises_for_unexpected_summary() -> None:
     with pytest.raises(CleanupVerificationDocsSyncError):
         parse_pytest_result("no useful summary here\n")
+
+
+def test_main_logs_success_with_shared_operational_log(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    spec = SNAPSHOT_SPECS["smoke_gate"]
+    monkeypatch.setattr(
+        "sys.argv",
+        ["cleanup_verification_docs", "smoke_gate"],
+    )
+    monkeypatch.setattr(
+        "app.maintenance.cleanup_verification_docs.sync_documents",
+        lambda **_: [SnapshotRun(spec=spec, date_text="2026-04-11", result_text="376 passed")],
+    )
+
+    assert main() == 0
+
+    output = capsys.readouterr().out
+    assert "[cleanup 文档快照已同步]" in output
+    assert "key=smoke_gate date=2026-04-11 result=376 passed" in output
+    assert "[cleanup 文档同步完成]" in output
+    assert "[处理建议]" in output
 
 
 def test_main_emits_shared_log_on_sync_failure(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:

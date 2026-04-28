@@ -702,14 +702,15 @@ def main() -> int:
         return 1
 
     for run in runs:
-        print(
-            f"\033[32m[cleanup 文档快照已同步]\033[0m key={run.spec.key} "
-            f"date={run.date_text} result={run.result_text}",
-            flush=True,
+        emit_operational_log(
+            title="cleanup 文档快照已同步",
+            detail=f"key={run.spec.key} date={run.date_text} result={run.result_text}",
+            fix_hint="无需处理；如文档 diff 异常，请回看本轮快照命令输出和 docs diff。",
         )
-    print(
-        f"\033[32m[cleanup 文档同步完成]\033[0m status={status_file} window={window_file}",
-        flush=True,
+    emit_operational_log(
+        title="cleanup 文档同步完成",
+        detail=f"status={status_file} window={window_file}",
+        fix_hint="无需处理；提交前请 review docs/STATUS.md 与 cleanup 验证窗口文档 diff。",
     )
     return 0
 
