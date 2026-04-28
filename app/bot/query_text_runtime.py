@@ -11,7 +11,7 @@ from app.services.pure_bt import (
 )
 
 FRUSTRATION_TEXTS = frozenset({"不对", "停", "重来", "换一个", "算了", "取消"})
-BT_READ_ONLY_PREFIXES = ("bt搜 ", "bt search ")
+BT_READ_ONLY_PREFIXES = ("bt搜 ", "bt search ", "成人搜 ")
 BT_PROCESSING_PATH_ALIASES = {
     "观影pt链": "media_import",
     "观影pt": "media_import",

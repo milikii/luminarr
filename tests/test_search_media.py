@@ -253,6 +253,7 @@ def test_search_bt_read_only_and_format_includes_javlibrary_helper_summary() -> 
 
     assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
     assert "只读标题: SSIS-123 Sample Title" in text
+    assert "只读详情: https://www.javlibrary.com/tw/?v=javli0001" in text
 
 
 def test_search_bt_read_only_and_format_uses_javlibrary_helper_for_history_lookup(tmp_path: Path) -> None:
@@ -744,6 +745,7 @@ def test_search_bt_batch_preview_and_format_includes_javlibrary_helper_summary()
 
     assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
     assert "只读标题: SSIS-123 Sample Title" in text
+    assert "只读详情: https://www.javlibrary.com/tw/?v=javli0001" in text
 
 
 def test_search_bt_batch_preview_and_format_promotes_helper_related_candidate_before_default_slice() -> None:

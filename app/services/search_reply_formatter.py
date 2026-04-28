@@ -12,7 +12,10 @@ from app.services.search_query_parser import ParsedMovieQuery
 
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
-BT_READ_ONLY_NOTICE_TEXT = "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。"
+BT_READ_ONLY_NOTICE_TEXT = (
+    "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。\n"
+    "如需走成人下载链，请直接发送磁力并选择 BT 成人链。"
+)
 BT_BATCH_PREVIEW_NO_RESULT_TEXT_TEMPLATE = "BT 批量预览未找到候选：{query}"
 BT_BATCH_PREVIEW_NOTICE_TEMPLATE = (
     "只读说明：当前批量预览只用于确认候选范围，不会创建审批或下载任务。\n"
@@ -95,6 +98,9 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         helper_title = format_read_only_adult_helper_title(item)
         if helper_title:
             lines.append(f"   {helper_title}")
+        detail_url = format_read_only_adult_detail_url(item)
+        if detail_url:
+            lines.append(f"   只读详情: {detail_url}")
         history_text = resolve_read_only_history_text(item, seen_content_ids=seen_history_content_ids)
         if history_text:
             lines.append(f"   {history_text}")
@@ -131,6 +137,9 @@ def format_bt_batch_preview_reply(
         helper_title = format_read_only_adult_helper_title(item)
         if helper_title:
             lines.append(f"   {helper_title}")
+        detail_url = format_read_only_adult_detail_url(item)
+        if detail_url:
+            lines.append(f"   只读详情: {detail_url}")
         history_text = resolve_read_only_history_text(item, seen_content_ids=seen_history_content_ids)
         if history_text:
             lines.append(f"   {history_text}")
@@ -190,6 +199,10 @@ def format_read_only_adult_helper_title(item: Mapping[str, Any]) -> str:
     if helper_title_key and helper_title_key == candidate_title_key:
         return ""
     return f"只读标题: {helper_title}"
+
+
+def format_read_only_adult_detail_url(item: Mapping[str, Any]) -> str:
+    return safe_text(item.get("read_only_adult_detail_url"), default="")
 
 
 def resolve_read_only_history_text(item: Mapping[str, Any], *, seen_content_ids: set[str]) -> str:

@@ -144,7 +144,7 @@ git commit -m "docs: restore active docs gate budget"
 - Test: `tests/test_query_text_runtime.py`
 - Test: `tests/test_search_media.py`
 
-- [ ] **Step 1: Add a failing parser test for the new adult query alias**
+- [x] **Step 1: Add a failing parser test for the new adult query alias**
 
 Add this assertion to [tests/test_query_text_runtime.py](/home/alex/projects/luminarr/tests/test_query_text_runtime.py):
 
@@ -160,7 +160,7 @@ Run:
 
 Expected: FAIL because `成人搜` is not currently recognized.
 
-- [ ] **Step 2: Implement the explicit adult read-only alias**
+- [x] **Step 2: Implement the explicit adult read-only alias**
 
 Update [app/bot/query_text_runtime.py](/home/alex/projects/luminarr/app/bot/query_text_runtime.py):
 
@@ -170,7 +170,7 @@ BT_READ_ONLY_PREFIXES = ("bt搜 ", "bt search ", "成人搜 ")
 
 Do not remove existing `bt搜` behavior.
 
-- [ ] **Step 3: Add a failing formatter test for helper detail URL visibility**
+- [x] **Step 3: Add a failing formatter test for helper detail URL visibility**
 
 In [tests/test_search_media.py](/home/alex/projects/luminarr/tests/test_search_media.py), extend the existing helper-summary scenario so the rendered text must include:
 
@@ -186,7 +186,7 @@ Run:
 
 Expected: FAIL because the detail URL is currently stored but not shown to the user.
 
-- [ ] **Step 4: Surface helper detail URLs and a clearer adult-only notice**
+- [x] **Step 4: Surface helper detail URLs and a clearer adult-only notice**
 
 Update [app/services/search_reply_formatter.py](/home/alex/projects/luminarr/app/services/search_reply_formatter.py):
 
@@ -214,7 +214,7 @@ BT_READ_ONLY_NOTICE_TEXT = (
 )
 ```
 
-- [ ] **Step 5: Run the focused read-only tests**
+- [x] **Step 5: Run the focused read-only tests**
 
 Run:
 
@@ -224,7 +224,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the adult query/reply improvements**
+- [x] **Step 6: Commit the adult query/reply improvements**
 
 ```bash
 git add app/bot/query_text_runtime.py app/services/search_reply_formatter.py tests/test_query_text_runtime.py tests/test_search_media.py

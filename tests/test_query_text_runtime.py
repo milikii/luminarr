@@ -27,6 +27,7 @@ def test_is_bt_direct_intent_accepts_magnet_and_bt_search_text() -> None:
 def test_extract_bt_read_only_query_trims_supported_prefixes() -> None:
     assert extract_bt_read_only_query("bt搜  The.Matrix ") == "The.Matrix"
     assert extract_bt_read_only_query("bt search Dune 2021") == "Dune 2021"
+    assert extract_bt_read_only_query("成人搜 SSIS-123") == "SSIS-123"
     assert extract_bt_read_only_query("status 1") == ""
 
 
