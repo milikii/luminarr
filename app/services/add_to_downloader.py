@@ -28,7 +28,7 @@ from app.services.add_pending_context import (
     AddPendingRuntimeState,
     PendingAddContext,
 )
-from app.services.add_pending_persistence import AddPendingPersistenceState
+from app.services.add_pending_persistence import AddPendingPersistenceState, render_add_pending_reply
 from app.services.add_request_facade import AddPendingRequestFacade
 from app.services.add_execution_follow_up import AddExecutionFollowUpService
 from app.services.search_media import SearchMediaService
