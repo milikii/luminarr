@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-mainline-status-and-channels verify-mainline-bt-paths verify-mainline-execution-paths verify-mainline-user-intents test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
+.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-adult-bt-wedge verify-mainline-status-and-channels verify-mainline-bt-paths verify-mainline-execution-paths verify-mainline-user-intents test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-adult-bt-wedge test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -38,6 +38,11 @@ verify-mainline:
 	$(MAKE) verify-mainline-bt-paths
 	$(MAKE) verify-mainline-execution-paths
 	$(MAKE) verify-mainline-user-intents
+
+verify-adult-bt-wedge:
+	$(PYTHON) -m pytest -q tests/test_query_text_runtime.py tests/test_bt_read_only_display.py tests/test_search_media.py
+	$(PYTHON) -m pytest -q tests/test_add_pending_context.py tests/test_add_to_downloader.py tests/test_private_chat_runtime.py
+	$(PYTHON) -m pytest -q tests/test_adult_archive_service.py tests/test_get_download_status.py
 
 verify-mainline-status-and-channels:
 	$(PYTHON) -m pytest -q tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event"

@@ -106,7 +106,7 @@ def test_makefile_help_lists_quality_targets() -> None:
     assert "verify-mainline" in makefile_text
     assert (
         "targets: install test quality lint test-downloader-focused "
-        "test-import-focused verify-quality-gates verify-mainline "
+        "test-import-focused verify-quality-gates verify-mainline verify-adult-bt-wedge "
         "test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate "
         "test-cleanup-window sync-cleanup-doc-snapshots compile run "
         "docker-build docker-up docker-logs"
@@ -147,6 +147,26 @@ def test_makefile_quality_gate_targets_point_to_current_focused_regressions() ->
         "$(MAKE) test",
         "$(MAKE) test-downloader-focused",
         "$(MAKE) test-import-focused",
+    ]
+
+
+def test_makefile_verify_adult_bt_wedge_target_points_to_current_focused_regressions() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "verify-adult-bt-wedge" in makefile_text
+    assert (
+        "targets: install test quality lint test-downloader-focused "
+        "test-import-focused verify-quality-gates verify-mainline verify-adult-bt-wedge "
+        "test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate "
+        "test-cleanup-window sync-cleanup-doc-snapshots compile run "
+        "docker-build docker-up docker-logs"
+    ) in makefile_text
+
+    commands = _extract_makefile_target_commands(makefile_text, "verify-adult-bt-wedge")
+    assert commands == [
+        "$(PYTHON) -m pytest -q tests/test_query_text_runtime.py tests/test_bt_read_only_display.py tests/test_search_media.py",
+        "$(PYTHON) -m pytest -q tests/test_add_pending_context.py tests/test_add_to_downloader.py tests/test_private_chat_runtime.py",
+        "$(PYTHON) -m pytest -q tests/test_adult_archive_service.py tests/test_get_download_status.py",
     ]
 
 

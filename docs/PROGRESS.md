@@ -59,3 +59,20 @@
 
 ### 下轮目标
 - 增加成人 BT focused 验证入口并跑总 gate
+
+## Round 4 — 2026-04-28 20:14
+
+### 完成
+- 新增 `make verify-adult-bt-wedge` 与对应 Makefile 测试
+- 在 `docs/GETTING_STARTED.md` 增加成人 BT focused 验证入口
+- 修复 `handle_confirm_query()` 对 confirm job lookup `RuntimeError` 未 fail-closed 的回归，确保新 focused target 通过
+- 通过 `make verify-adult-bt-wedge`、`make quality`、`make verify-mainline`
+
+### 测试状态
+- 通过: 3 / 总计: 3
+
+### 遗留 / 下轮继续
+- 无
+
+### 下轮目标
+- 等待用户指令

@@ -352,7 +352,7 @@ git commit -m "feat: surface adult history in pending download replies"
 - Modify: `tests/test_makefile.py`
 - Modify: `docs/GETTING_STARTED.md`
 
-- [ ] **Step 1: Add a dedicated Makefile target for this wedge**
+- [x] **Step 1: Add a dedicated Makefile target for this wedge**
 
 Update [Makefile](/home/alex/projects/luminarr/Makefile) with a new target and help entry:
 
@@ -377,7 +377,7 @@ verify-adult-bt-wedge:
 
 Use full test files instead of fragile `-k` filters for this target.
 
-- [ ] **Step 2: Update the Makefile tests**
+- [x] **Step 2: Update the Makefile tests**
 
 Add assertions to [tests/test_makefile.py](/home/alex/projects/luminarr/tests/test_makefile.py) for:
 
@@ -392,7 +392,7 @@ Run:
 
 Expected: FAIL before the target/test exists, then PASS after implementation.
 
-- [ ] **Step 3: Add one operator-facing adult BT verification section**
+- [x] **Step 3: Add one operator-facing adult BT verification section**
 
 Append a short section to [docs/GETTING_STARTED.md](/home/alex/projects/luminarr/docs/GETTING_STARTED.md):
 
@@ -413,7 +413,7 @@ Append a short section to [docs/GETTING_STARTED.md](/home/alex/projects/luminarr
 
 Do not add a long tutorial here. Keep it short and operator-oriented.
 
-- [ ] **Step 4: Run the focused verification target and full quality gate**
+- [x] **Step 4: Run the focused verification target and full quality gate**
 
 Run:
 
@@ -425,7 +425,7 @@ make verify-mainline
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit the adult-BT verification entry point**
+- [x] **Step 5: Commit the adult-BT verification entry point**
 
 ```bash
 git add Makefile tests/test_makefile.py docs/GETTING_STARTED.md
