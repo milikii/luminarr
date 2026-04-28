@@ -353,9 +353,10 @@ async def _start_personal_wechat_text_service_if_available(application: Applicat
         service = PersonalWeChatTextService()
         application.bot_data[PERSONAL_WECHAT_TEXT_SERVICE_KEY] = service
     if not isinstance(service, PersonalWeChatTextService):
-        print(
-            "\033[31m[personal WeChat 私聊文本服务配置无效]\033[0m bot_data 中的 personal_wechat_text_service 不是有效服务实例。\n"
-            "\033[33m[处理建议]\033[0m 删除错误注入值，或改为 PersonalWeChatTextService 实例后重启服务。"
+        emit_operational_log(
+            title="personal WeChat 私聊文本服务配置无效",
+            detail="bot_data 中的 personal_wechat_text_service 不是有效服务实例。",
+            fix_hint="删除错误注入值，或改为 PersonalWeChatTextService 实例后重启服务。",
         )
         return
     await service.start(bot_data=application.bot_data)
