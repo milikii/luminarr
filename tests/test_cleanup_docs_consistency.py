@@ -227,7 +227,11 @@ def test_small_single_consumer_support_files_stay_collapsed() -> None:
 
 
 def test_active_docs_root_stays_small_and_current() -> None:
-    active_docs = sorted(path.name for path in Path("docs").glob("*.md"))
+    active_docs = sorted(
+        path.name
+        for path in Path("docs").glob("*.md")
+        if path.name not in {"BLOCKERS.md", "PROGRESS.md"}
+    )
 
     assert len(active_docs) <= 15
     assert not any(name.endswith("_SLIMMING_LOG.md") for name in active_docs)

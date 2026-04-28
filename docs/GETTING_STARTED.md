@@ -49,7 +49,7 @@ cp .env.example .env
 
 然后手动编辑 `.env`。
 
-如果你只想走最短路径，不要在这里重复抄配置清单，直接看 `docs/DEPLOY_CHECKLIST.md` 的 `Phase 0-3`，再按 `.env.example` 分组填值。
+如果你只想走最短路径，不要在这里重复抄配置清单，直接按 `.env.example` 的分组填写最小必填项；旧的部署速查表已经归档到 `archive/docs/DEPLOY_CHECKLIST.md`。
 
 这里只补几个最容易忘的约束：
 
