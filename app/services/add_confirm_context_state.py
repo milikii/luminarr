@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 from app.db.approval_repo import ApprovalPersistenceError, ApprovalRecord
 from app.db.job_repo import (
@@ -13,7 +14,6 @@ from app.db.job_repo import (
     WORKFLOW_ADD_TO_DOWNLOADER,
 )
 from app.operational_logging import emit_operational_log
-from app.services.add_confirm_approval_state import AddConfirmApprovalState
 from app.services.add_pending_context import PendingAddContext, pending_add_from_json
 
 CancelPendingApprovalFunc = Callable[..., bool]
@@ -34,12 +34,16 @@ class ConfirmExecutionContext:
     approval_lookup_failed: bool = False
 
 
+class ConfirmApprovalStateProtocol(Protocol):
+    approval_repo: object | None
+
+
 class AddConfirmContextState:
     def __init__(
         self,
         *,
         job_repo: JobRepo | None,
-        confirm_approval_state: AddConfirmApprovalState,
+        confirm_approval_state: ConfirmApprovalStateProtocol,
         add_confirm_expired_text: str,
         add_confirm_state_unavailable_text: str,
         job_row_corrupted_reasons: frozenset[str],
