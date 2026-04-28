@@ -13,6 +13,7 @@
 - 本轮已把 `adult_bt_selector.py` 合并回 `app/services/bt_read_only_display.py`，删除单消费者成人排序壳。
 - 本轮已把 `status_delivery.py` 合并回 `app/services/get_download_status.py`，删除单消费者状态渲染壳。
 - 本轮已把 `status_follow_up.py` 合并回 `app/services/get_download_status.py`，删除单消费者状态 follow-up 壳。
+- 本轮已把 `auto_import_batch.py` 合并回 `app/services/post_download_auto_import.py`，删除单消费者自动导入批处理壳。
 - 本轮继续删除 BT 订阅侧单用途 label 转发薄壳；后续不要再给 shared helper 包一层只改名字的单消费者函数。
 - 本轮把 watchlist / BT 订阅共享的 `title (year-or-dash)` 展示格式收口到 `app/services/media_item_display.py`。
 - 本轮把 watchlist / BT 订阅共享的命令前缀 tail 解析收口到 `app/services/command_parsing.py`，没有合并两条命令各自的 action 语义。
@@ -53,7 +54,7 @@
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 - `app/downloader_route_lookup.py` 的共享路由日志 helper 已收口为 `_emit_downloader_issue_log`，不再用 “print” 命名误导维护者。
 - 本轮“连续推进十轮”已到退出点；收尾先重新跑 `make quality` 与 `make verify-mainline`，确认默认分支质量仍可复验，再从更小、更保守的结构候选继续选下一轮。
-- 下一轮继续收 `auto_import_batch.py`，再按同样方式做下一轮最小闭环。
+- 下一轮继续收 `add_adult_registry_state.py`，再按同样方式做下一轮最小闭环。
 
 ## User value
 

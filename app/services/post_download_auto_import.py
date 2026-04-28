@@ -11,7 +11,7 @@ from app.db.adult_content_registry_repo import (
     AdultContentRegistryPersistenceError,
     AdultContentRegistryRepo,
 )
-from app.db.download_monitor_repo import DownloadMonitorRecord, DownloadMonitorRepo
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRecord, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.operational_logging import emit_operational_log
 from app.services.adult_archive_service import (
@@ -19,15 +19,13 @@ from app.services.adult_archive_service import (
     AdultArchiveService,
     AdultArchiveStateUnavailableError,
 )
-from app.services.auto_import_batch import (
-    AutoImportCompletedListUnavailableError,
-    load_completed_auto_import_candidates,
-    run_auto_import_candidates,
-)
 
 AutoImportFunc = Callable[[str, int | None, int | None], Awaitable[str]]
+AutoImportRecordRunner = Callable[[DownloadMonitorRecord], Awaitable[str | None]]
+AutoImportProgressPredicate = Callable[[DownloadMonitorRecord, str], bool]
 AUTO_IMPORT_SKIPPED_BY_RULE_EVENT = "auto_import.skipped_by_rule"
 AUTO_IMPORT_SKIP_EVENT_RESULT_MISSING_REASON = "auto import skip event missing after append"
+AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON = "auto import completed list result missing"
 AUTO_IMPORT_SKIPPED_TEXT = (
     "资源自动规则已跳过自动导入：{name}\n"
     "原因：命中低质量来源标记 {reason}。\n"
@@ -52,7 +50,18 @@ class AutoImportRunResult:
     state_unavailable: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class AutoImportBatchProgress:
+    progressed: int
+    replies: tuple[str, ...]
+    state_unavailable: bool = False
+
+
 class AutoImportStateUnavailableError(RuntimeError):
+    pass
+
+
+class AutoImportCompletedListUnavailableError(RuntimeError):
     pass
 
 
@@ -256,6 +265,72 @@ def _count_auto_import_progress(candidate: DownloadMonitorRecord, _reply: str) -
 
 def _is_auto_import_terminal_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
+
+
+def load_completed_auto_import_candidates(
+    *,
+    download_monitor_repo: DownloadMonitorRepo,
+    limit: int,
+) -> tuple[DownloadMonitorRecord, ...]:
+    try:
+        candidates = download_monitor_repo.list_completed_for_auto_import(limit=limit)
+        if candidates is None:
+            raise DownloadMonitorPersistenceError(AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON)
+    except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
+        if str(error) == AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON:
+            emit_operational_log(
+                title="自动导入候选结果缺失",
+                detail=f"limit={limit} 错误={error}",
+                fix_hint="检查 download_monitor 已完成列表查询返回是否仍带有完整结果；当前这轮自动导入会直接停路，避免把缺失真相误判成“当前没有可导入候选”。",
+            )
+        elif _is_auto_import_completed_row_corrupted_error(error):
+            emit_operational_log(
+                title="自动导入候选记录损坏",
+                detail=f"limit={limit} 错误={error}",
+                fix_hint="检查 download_monitor 已完成记录里的 chat_id / task_id / task_hash 等字段是否仍是完整真相；当前这轮自动导入会直接停路，避免把坏记录误判成普通读取失败后继续推进导入审批。",
+            )
+        else:
+            emit_operational_log(
+                title="自动导入候选读取失败",
+                detail=f"limit={limit} 错误={error}",
+                fix_hint="检查 SQLite/download_monitor 表读取是否正常；当前这轮自动导入会直接跳过，但已完成下载可能暂时不会进入导入审批。",
+            )
+        raise AutoImportCompletedListUnavailableError(str(error)) from error
+    return tuple(candidates)
+
+
+async def run_auto_import_candidates(
+    *,
+    candidates: Sequence[DownloadMonitorRecord],
+    run_for_record: AutoImportRecordRunner,
+    count_as_progress: AutoImportProgressPredicate,
+    state_unavailable_error: type[BaseException],
+) -> AutoImportBatchProgress:
+    replies: list[str] = []
+    progressed = 0
+    state_unavailable = False
+
+    for candidate in candidates:
+        try:
+            reply = await run_for_record(candidate)
+        except state_unavailable_error:
+            state_unavailable = True
+            continue
+        if reply is None:
+            continue
+        replies.append(reply)
+        if count_as_progress(candidate, reply):
+            progressed += 1
+
+    return AutoImportBatchProgress(
+        progressed=progressed,
+        replies=tuple(replies),
+        state_unavailable=state_unavailable,
+    )
+
+
+def _is_auto_import_completed_row_corrupted_error(error: Exception) -> bool:
+    return isinstance(error, DownloadMonitorPersistenceError) and str(error).endswith("corrupted after read")
 
 
 def _is_auto_import_skip_event_row_corrupted_error(error: Exception) -> bool:

@@ -10,6 +10,7 @@
 - 本轮继续把 `adult_bt_selector.py` 合并回 `app/services/bt_read_only_display.py`，删掉单消费者成人排序壳，focused tests `18 passed`。
 - 本轮继续把 `status_delivery.py` 合并回 `app/services/get_download_status.py`，删掉单消费者状态渲染壳，focused tests `25 passed, 24 deselected`。
 - 本轮继续把 `status_follow_up.py` 合并回 `app/services/get_download_status.py`，删掉单消费者状态 follow-up 壳，focused tests `25 passed, 24 deselected`。
+- 本轮继续把 `auto_import_batch.py` 合并回 `app/services/post_download_auto_import.py`，删掉单消费者自动导入批处理壳，focused tests `28 passed, 21 deselected`。
 - 当前主线没有改协议、SQLite schema、调度语义、下载/导入/刷新真相边界。
 - `cleanup_*_support.py` 仍为 `0` 个；其余大 support 文件暂不机械强拆。
 - `cleanup_*_support.py` 当前为 `0` 个。
@@ -33,6 +34,7 @@
 - 本轮 focused tests：`tests/test_adult_content.py tests/test_bt_read_only_display.py` 通过（`18 passed`）。
 - 本轮 focused tests：`tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event"` 通过（`25 passed, 24 deselected`）。
 - 本轮 focused tests：`tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event"` 通过（`25 passed, 24 deselected`）。
+- 本轮 focused tests：`tests/test_get_download_status.py -k "download_monitor or completion_event or auto_import_terminal or skip_event or run_once"` 通过（`28 passed, 21 deselected`）。
 
 ## Current biggest risk
 - 当前风险不是业务回归，而是 services 层仍有剩余重复结构；下一轮仍需维持“小 diff + focused tests + 文档同步”的节奏，避免重新把 STATUS/NEXT_STEP 写回历史流水账。
