@@ -62,6 +62,7 @@ def test_run_sync_with_policy_runs_sync_operation() -> None:
 def test_policy_action_helpers_map_expected_actions() -> None:
     assert watchlist_policy_action("list") == ACTION_WATCHLIST_LIST
     assert watchlist_policy_action("add") == ACTION_WATCHLIST_MUTATION
+    assert watchlist_policy_action("sync") == ACTION_WATCHLIST_MUTATION
     assert bt_subscription_policy_action(SimpleNamespace(action="list")) == ACTION_BT_SUBSCRIPTION_LIST
     assert bt_subscription_policy_action(SimpleNamespace(action="run")) == ACTION_BT_SUBSCRIPTION_RUN
     assert bt_subscription_policy_action(SimpleNamespace(action="add")) == ACTION_BT_SUBSCRIPTION_MUTATION

@@ -9,7 +9,7 @@
 - `make quality`：通过
 - `adult BT minimum wedge`：已完成并已推送到 `main`
 - Telegram 人工 smoke：应用已启动，等待当前会话验证
-- 下一条唯一主线：non-Telegram 后台主动通知所需的可逆会话真相
+- 下一条唯一主线：扩展 BT subscription 边界（优先锁定 raw BT subscription 的最小 contract，继续保持 confirm 边界）
 - 结论：当前 P0 阻断已清空；后续按 P1 / P2 顺序推进，不回切 `services` 结构降本主线
 
 ## P0 已完成
@@ -38,7 +38,7 @@
 
 - [x] 继续补齐 non-Telegram 后台主动通知所需的可逆会话真相：当前已落地运行态联系人注册表，但 `btsub` / 下载完成等后台通知仍未具备对 non-Telegram 会话的独立可发回路。
 
-- [ ] 强化 watchlist 到自动化链的衔接：`watchlist` 目前只有持久化清单，没有自动扫描、自动建议或和 `btsub` 的桥接逻辑。
+- [x] 强化 watchlist 到自动化链的衔接：当前已新增显式 `watchlist sync` / `想看 同步`，会把想看条目按相同 `chat_id` / `title` / `year` / `media_kind` 原子同步进 `btsub`，不触发自动下载，也不会在失败时残留部分成功。
 
 - [ ] 扩展 BT subscription 边界：当前 `btsub` 已有手动命令和后台 tick，但仍是最小实现，不支持 raw BT 订阅、不支持自动确认、通知渠道也主要围绕当前宿主链路。
 

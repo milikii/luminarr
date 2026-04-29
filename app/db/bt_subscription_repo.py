@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from app.db.sqlite import SqliteDatabase
@@ -37,58 +37,43 @@ class BtSubscriptionRepo:
         year: str,
         media_kind: str,
     ) -> tuple[BtSubscriptionItem, bool]:
-        cleaned_title = title.strip()
-        cleaned_year = year.strip()
-        cleaned_kind = media_kind.strip().lower()
+        with self._database.connect() as connection:
+            created = self._add_item_with_connection(
+                connection,
+                chat_id=chat_id,
+                title=title,
+                year=year,
+                media_kind=media_kind,
+            )
+            connection.commit()
+        return created
+
+    def add_items(
+        self,
+        *,
+        chat_id: int,
+        items: Sequence[tuple[str, str, str]],
+    ) -> tuple[int, int]:
+        created_count = 0
+        existing_count = 0
         if chat_id <= 0:
             raise BtSubscriptionPersistenceError("bt_subscription_item chat identity missing")
-        if not cleaned_title:
-            raise BtSubscriptionPersistenceError("bt_subscription_item title missing")
-        if not cleaned_kind:
-            raise BtSubscriptionPersistenceError("bt_subscription_item media kind missing")
-        if cleaned_kind not in VALID_BT_SUBSCRIPTION_MEDIA_KINDS:
-            raise BtSubscriptionPersistenceError("bt_subscription_item media kind invalid")
 
         with self._database.connect() as connection:
-            cursor = connection.execute(
-                """
-                INSERT INTO bt_subscription_item (
-                    chat_id,
-                    title,
-                    year,
-                    media_kind,
-                    last_seen_source,
-                    last_seen_title,
-                    created_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT(chat_id, title, year, media_kind)
-                DO NOTHING
-                """,
-                (chat_id, cleaned_title, cleaned_year, cleaned_kind),
-            )
-            row = connection.execute(
-                """
-                SELECT
-                    id,
-                    chat_id,
-                    title,
-                    year,
-                    media_kind,
-                    last_seen_source,
-                    last_seen_title,
-                    created_at,
-                    updated_at
-                FROM bt_subscription_item
-                WHERE chat_id = ? AND title = ? AND year = ? AND media_kind = ?
-                LIMIT 1
-                """,
-                (chat_id, cleaned_title, cleaned_year, cleaned_kind),
-            ).fetchone()
+            for title, year, media_kind in items:
+                _, is_created = self._add_item_with_connection(
+                    connection,
+                    chat_id=chat_id,
+                    title=title,
+                    year=year,
+                    media_kind=media_kind,
+                )
+                if is_created:
+                    created_count += 1
+                    continue
+                existing_count += 1
             connection.commit()
-        if row is None:
-            raise BtSubscriptionPersistenceError("bt_subscription_item missing after insert")
-        return _to_bt_subscription_item(row), cursor.rowcount == 1
+        return created_count, existing_count
 
     def list_items(self, *, chat_id: int) -> list[BtSubscriptionItem]:
         if chat_id <= 0:
@@ -177,6 +162,66 @@ class BtSubscriptionRepo:
         if cursor.rowcount == 1:
             return True
         raise BtSubscriptionPersistenceError("bt_subscription_item missing during last_seen update")
+
+    def _add_item_with_connection(
+        self,
+        connection,
+        *,
+        chat_id: int,
+        title: str,
+        year: str,
+        media_kind: str,
+    ) -> tuple[BtSubscriptionItem, bool]:
+        cleaned_title = title.strip()
+        cleaned_year = year.strip()
+        cleaned_kind = media_kind.strip().lower()
+        if chat_id <= 0:
+            raise BtSubscriptionPersistenceError("bt_subscription_item chat identity missing")
+        if not cleaned_title:
+            raise BtSubscriptionPersistenceError("bt_subscription_item title missing")
+        if not cleaned_kind:
+            raise BtSubscriptionPersistenceError("bt_subscription_item media kind missing")
+        if cleaned_kind not in VALID_BT_SUBSCRIPTION_MEDIA_KINDS:
+            raise BtSubscriptionPersistenceError("bt_subscription_item media kind invalid")
+
+        cursor = connection.execute(
+            """
+            INSERT INTO bt_subscription_item (
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            ) VALUES (?, ?, ?, ?, '', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(chat_id, title, year, media_kind)
+            DO NOTHING
+            """,
+            (chat_id, cleaned_title, cleaned_year, cleaned_kind),
+        )
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                chat_id,
+                title,
+                year,
+                media_kind,
+                last_seen_source,
+                last_seen_title,
+                created_at,
+                updated_at
+            FROM bt_subscription_item
+            WHERE chat_id = ? AND title = ? AND year = ? AND media_kind = ?
+            LIMIT 1
+            """,
+            (chat_id, cleaned_title, cleaned_year, cleaned_kind),
+        ).fetchone()
+        if row is None:
+            raise BtSubscriptionPersistenceError("bt_subscription_item missing after insert")
+        return _to_bt_subscription_item(row), cursor.rowcount == 1
 
 
 def _to_bt_subscription_item(row: Mapping[str, object]) -> BtSubscriptionItem:

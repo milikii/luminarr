@@ -696,6 +696,11 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
     def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
         return SimpleNamespace()
 
+    def _build_manage_watchlist_service(*args: object, **kwargs: object) -> SimpleNamespace:
+        created["manage_watchlist_service_args"] = args
+        created["manage_watchlist_service_kwargs"] = kwargs
+        return SimpleNamespace()
+
     def _fake_build_application(
         token: str,
         search_service,
@@ -751,7 +756,7 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
     monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
     monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
     monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
-    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _build_manage_watchlist_service)
     monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
     monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
     monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
@@ -778,6 +783,8 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
     assert app.bot_data[tg.DOWNLOADER_INSTANCES_KEY] == settings.downloader_instances
     assert app.bot_data["search_capability_unavailable_text"].startswith("搜索能力当前不可用")
     assert app.bot_data["bt_subscription_capability_unavailable_text"].startswith("BT 订阅当前不可用")
+    assert len(created["manage_watchlist_service_args"]) == 1
+    assert "bt_subscription_repo" in created["manage_watchlist_service_kwargs"]
     assert len(created["qb_client_calls"]) == 1
 
 

@@ -525,7 +525,10 @@ def main() -> None:
         download_monitor_repo=download_monitor_repo,
         pt_min_seed_hours=settings.pt_min_seed_hours,
     )
-    manage_watchlist_service = ManageWatchlistService(watchlist_repo)
+    manage_watchlist_service = ManageWatchlistService(
+        watchlist_repo,
+        bt_subscription_repo=bt_subscription_repo,
+    )
     manage_bt_subscription_service = ManageBtSubscriptionService(
         bt_subscription_repo=bt_subscription_repo,
         search_func=bt_source_adapter.search,

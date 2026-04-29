@@ -267,3 +267,19 @@
 
 ### 下轮目标
 - 把运行态联系人注册表接到后台回发链路，定义 Feishu / WeCom 的最小发送协议与失败语义
+
+## Round 16 — 2026-04-29 13:22
+
+### 完成
+- 新增显式 `watchlist sync` / `想看 同步`，把想看清单按相同 `chat_id` / `title` / `year` / `media_kind` 桥接到 `btsub`
+- 给 `BtSubscriptionRepo` 补单事务批量写入，确保 bridge 失败时不会残留部分成功
+- 补齐 watchlist bridge、main wiring、BT subscription repo 原子写入的 focused tests
+
+### 测试状态
+- 通过: 7 / 总计: 7
+
+### 遗留 / 下轮继续
+- `BT subscription` 扩边主线仍未开始；本轮只完成了 `watchlist -> btsub` 桥接
+
+### 下轮目标
+- 锁定 `BT subscription` 下一条最小扩边切口，优先 raw BT subscription contract，同时继续保持人工 `confirm` 边界

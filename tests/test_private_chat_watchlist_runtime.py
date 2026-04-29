@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 from app.bot.execution_runtime import watchlist_policy_action
 from app.bot.private_chat_watchlist_runtime import handle_watchlist_query
 from app.bot import telegram_bot as tg
+from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.watchlist_repo import WatchlistRepo
 from app.services.manage_watchlist import ManageWatchlistService
@@ -90,6 +91,33 @@ def test_handle_watchlist_query_routes_list_to_read_only_policy(tmp_path: Path) 
     assert handled is True
     assert execution_gate.actions == [watchlist_policy_action("list")]
     reply_func.assert_awaited_once()
+
+
+def test_handle_watchlist_query_routes_sync_to_mutation_policy(tmp_path: Path) -> None:
+    reply_func = AsyncMock()
+    execution_gate = _ExecutionGate()
+    database = _make_database(tmp_path)
+    watchlist_service = ManageWatchlistService(
+        WatchlistRepo(database),
+        bt_subscription_repo=BtSubscriptionRepo(database),
+    )
+    watchlist_service.handle(tg.parse_watchlist_query("watchlist add dune 2021"), chat_id=1001)
+
+    handled = asyncio.run(
+        handle_watchlist_query(
+            query="watchlist sync",
+            bot_data={tg.MANAGE_WATCHLIST_SERVICE_KEY: watchlist_service},
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            chat_id=1001,
+            tg=tg,
+        )
+    )
+
+    assert handled is True
+    assert execution_gate.actions == [watchlist_policy_action("sync")]
+    reply_func.assert_awaited_once()
+    assert "已同步想看清单到 BT 订阅" in reply_func.await_args.args[0]
 
 
 def test_handle_watchlist_query_replies_service_not_ready_when_missing_service() -> None:
