@@ -9,7 +9,7 @@
 - `make quality`：通过
 - `adult BT minimum wedge`：已完成并已推送到 `main`
 - Telegram 人工 smoke：应用已启动，等待当前会话验证
-- 下一条唯一主线：扩展 BT subscription 边界（优先锁定 raw BT subscription 的最小 contract，继续保持 confirm 边界）
+- 下一条唯一主线：继续锁定成人 BT 专线；若扩 `BT subscription`，也只允许面向成人 BT 连续追踪，继续保持 `confirm` 边界
 - 结论：当前 P0 阻断已清空；后续按 P1 / P2 顺序推进，不回切 `services` 结构降本主线
 
 ## P0 已完成
@@ -40,7 +40,7 @@
 
 - [x] 强化 watchlist 到自动化链的衔接：当前已新增显式 `watchlist sync` / `想看 同步`，会把想看条目按相同 `chat_id` / `title` / `year` / `media_kind` 原子同步进 `btsub`，不触发自动下载，也不会在失败时残留部分成功。
 
-- [ ] 扩展 BT subscription 边界：当前 `btsub` 已有手动命令和后台 tick，但仍是最小实现，不支持 raw BT 订阅、不支持自动确认、通知渠道也主要围绕当前宿主链路。
+- [ ] 扩展成人 BT 专线的连续追踪边界：当前 `btsub` 已有手动命令和后台 tick，但后续扩边也只允许服务成人 BT 资源，不引入 raw BT / 影视资源订阅（包括动漫），不放宽自动确认，通知渠道也继续保持当前宿主链路边界。
 
 - [ ] 丰富多渠道交互形态：当前四个渠道统一落在文本私聊基线，尚未把卡片、按钮回调、富媒体消息当作主产品面能力。
 

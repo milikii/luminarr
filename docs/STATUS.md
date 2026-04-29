@@ -1,4 +1,4 @@
-# Current status (v548)
+# Current status (v549)
 
 ## Current mainline
 - `质量硬化` 已完成，`adult BT minimum wedge` 已完成并已推送到 `main`。
@@ -13,7 +13,9 @@
 - 当前主线已落地 non-Telegram 入站宿主收口：`Feishu-only` / `WeCom-only` 在无 `TELEGRAM_BOT_TOKEN` 时都可以按各自凭据独立启动并收消息、回消息；无主动 `send_text` 能力的宿主会显式跳过 `btsub` 后台扫描。
 - 当前主线继续补齐了 non-Telegram 后台通知的运行态联系人注册表：Feishu / WeCom / personal WeChat inbound 会在 `bot_data` 中记录外部会话地址，给后续后台回发解析留出可逆真相。
 - 当前主线已补齐 `watchlist -> btsub` 桥接：`watchlist sync` / `想看 同步` 会把想看清单原子同步进 BT 订阅，保持手动想看语义和 `confirm` 边界不变。
-- 下一条唯一主线切到扩展 BT subscription 边界；优先锁定 raw BT subscription 的最小 contract，不回切 non-Telegram 通知或 richer reply 主线。
+- 当前真相重新锁定到 2026-04-26 / 2026-04-29 已定边界：BT 支线只承接成人资源，不从 BT 线索取任何影视资源，包括动漫。
+- direct `BT` / `magnet:?` 投递入口继续保留 `观影 PT 链 / BT 成人链` 问询，不允许绕过问询把 BT 投递默认解释成成人 BT。
+- 下一条唯一主线保持在成人 BT 专线内；后续若扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不回切 raw BT / 影视资源订阅主线。
 
 ## Current health
 - `make verify-adult-bt-wedge` 通过（总计 `423 passed`）。
@@ -36,7 +38,7 @@
 - 当前主线额外信号：watchlist bridge 现在不会在同步失败时留下部分成功；重复 `watchlist sync` 会稳定计入“已存在”，不重写 `btsub` 语义。
 
 ## Current biggest risk
-- 当前最大风险已经切到 `BT subscription` 扩边本身：下一轮若同时混入 raw BT 订阅、auto-confirm、多渠道通知或 richer reply，会重新把主线做胖。
+- 当前最大风险已经切到“边界漂移”：下一轮若再把 raw BT、影视资源订阅、动漫 BT 或 auto-confirm 混回 BT 主线，会直接违反 2026-04-26 与 2026-04-29 已锁定的使用边界。
 
 ## Recommended Next Operator Command
 
@@ -45,5 +47,5 @@
 ```text
 按 AGENTS.md 执行单轮主线施工。
 
-当前唯一主线切到扩展 BT subscription 边界。`watchlist sync` / `想看 同步` 已完成；下一轮优先锁定 raw BT subscription 的最小 contract，继续保持 `confirm` 边界，不改 SQLite schema，也不要顺手做 auto-confirm、通知渠道扩边或 richer reply。
+当前唯一主线继续锁在成人 BT 专线。`watchlist sync` / `想看 同步` 已完成；下一轮如果还要扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不引入任何影视资源订阅（包括动漫），并继续保持 direct BT / magnet 先问询 `观影 PT 链 / BT 成人链`。
 ```

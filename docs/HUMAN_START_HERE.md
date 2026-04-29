@@ -8,6 +8,7 @@
 - 你发一句自然语言，它去做搜索、审批、下载、入库、刷新和状态查询
 - 代码里现在有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口
 - 但当前保守首版发布承诺只先冻结为：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
+- 当前 BT 支线只承接成人资源，不从 BT 线索取任何影视资源，包括动漫；如果你直接发磁力 / BT，系统仍会先问你走 `观影 PT 链` 还是 `BT 成人链`
 - 当前最稳的是 movie-first 场景；更细的工程边界看 `docs/DECISIONS.md`
 
 ## 2. 你最常用的文档

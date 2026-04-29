@@ -9,12 +9,15 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - 面向单机、单进程、单实例的自托管影视自动化
 - 用一套 shared runtime、approval、`jobs` 和 SQLite 真相承接四个私聊入口
 - 主链聚焦 movie-first：搜索、下载审批、确认投递、状态查询、导入审批、硬链接导入、metadata、字幕翻译、媒体库刷新
-- BT 支线继续保留：PT / BT 分流、processing-path inquiry、TMDB 关联、`raw_bt` 目录选择、BT 搜索与最小订阅基线
+- BT 支线当前继续保留：PT / BT 分流、processing-path inquiry、成人 BT 搜索与成人 BT 下载 / 归档链
+- direct `BT` / `magnet:?` 入口不会直接默认走 BT；当前仍先问 `观影 PT 链` 或 `BT 成人链`
+- BT 主线当前只承接成人资源，不从 BT 线索取任何影视资源，包括动漫；影视资源继续走 PT 主链
 - 下载器支持 Transmission + qBittorrent；刷新支持 Emby / Jellyfin / Plex（按配置选择 provider）
 
 ## 2. 当前稳定范围
 
 - 当前首版承诺矩阵：Telegram 私聊 + PT Transmission + Emby + movie-first 主链
+- 当前 BT 专线是受限边界，不是新的通用影视下载主线：成人 BT 可以继续演进，但不把影视资源、动漫资源或通用 `raw_bt subscription` 重新引回 BT 主线
 - 当前施工主线不要从 README 推断；继续推进前以 `docs/STATUS.md` 和 `docs/NEXT_STEP.md` 为准，README 只保留项目定位、入口分流和稳定范围
 - 当前仓库质量入口保持可复验：`make quality`、`make verify-mainline`、`make verify-quality-gates`
 - 已实现但当前不纳入首版发布保证的路径，继续保留在代码和测试里，不因为发布口径收紧而回退
