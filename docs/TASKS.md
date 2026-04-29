@@ -9,7 +9,7 @@
 - `make quality`：通过
 - `adult BT minimum wedge`：已完成并已推送到 `main`
 - Telegram 人工 smoke：应用已启动，等待当前会话验证
-- 下一条唯一主线：清理当前依赖告警
+- 下一条唯一主线：把 non-Telegram 运行模式做成一等公民
 - 结论：当前 P0 阻断已清空；后续按 P1 顺序推进，不回切 `services` 结构降本主线
 
 ## P0 已完成
@@ -28,7 +28,7 @@
 
 - [x] 明确 Feishu 可选依赖策略：代码里通过 `lark_oapi` 启动 Feishu 长连接，但 `requirements.txt` 没有显式声明这项依赖；需要决定是补到安装依赖、拆成 extras，还是在文档里把“额外安装步骤”写死。
 
-- [ ] 清理当前依赖告警：`make verify-mainline` 虽然通过，但会持续打印 `lark_oapi` / `websockets` 相关 deprecation warnings；需要决定是升级、锁版本，还是局部隔离这条可选链路。
+- [x] 清理当前依赖告警：`make verify-mainline` 虽然通过，但会持续打印 `lark_oapi` / `websockets` 相关 deprecation warnings；需要决定是升级、锁版本，还是局部隔离这条可选链路。
 
 ## P2 已实现但还不完整的能力
 

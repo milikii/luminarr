@@ -174,3 +174,19 @@
 
 ### 下轮目标
 - 收口 `lark_oapi` / `websockets` deprecation warnings，优先找出可通过升级或局部隔离解决的最小切口
+
+## Round 11 — 2026-04-29 09:04
+
+### 完成
+- 在 `feishu_long_connection.py` 局部隔离 `lark_oapi` / `websockets` 已知 deprecation warnings
+- 新增 `tests/test_feishu_dependency_contract.py` 与 `tests/test_feishu_long_connection.py` 的 focused contract/导入期保护
+- 通过 fresh `make quality`、`make verify-mainline`，并确认主线输出里已不再出现那 4 条已知 deprecation warnings
+
+### 测试状态
+- 通过: 2 / 总计: 2
+
+### 遗留 / 下轮继续
+- 进入 non-Telegram 一等公民主线
+
+### 下轮目标
+- 评估非 Telegram 运行模式要成为一等公民时，还缺哪些入口/部署/通知/宿主真相

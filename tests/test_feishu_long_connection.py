@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
+import subprocess
+import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-import app.bot.feishu_long_connection as feishu_long_connection_module
 from app.bot.feishu_adapter import FeishuPrivateTextEvent, parse_feishu_sdk_private_text_event
-from app.bot.feishu_long_connection import FeishuLongConnectionConfig, FeishuLongConnectionService
+
+
+def _load_feishu_long_connection_module():
+    return importlib.import_module("app.bot.feishu_long_connection")
+
+
+def _build_service() -> object:
+    module = _load_feishu_long_connection_module()
+    return module.FeishuLongConnectionService(
+        config=module.FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
+        feishu_client=SimpleNamespace(),
+    )
 
 
 def _build_sdk_message_event(text: str) -> object:
@@ -40,14 +53,28 @@ def test_parse_feishu_sdk_private_text_event_reads_private_text() -> None:
     )
 
 
+def test_import_feishu_long_connection_survives_deprecation_warnings_as_errors() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-W",
+            "error::DeprecationWarning",
+            "-c",
+            "import app.bot.feishu_long_connection",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_feishu_long_connection_service_routes_sdk_event_into_shared_runtime(monkeypatch) -> None:
     route_event = AsyncMock()
     monkeypatch.setattr("app.bot.feishu_adapter.route_feishu_private_text_event", route_event)
 
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
     loop = asyncio.new_event_loop()
     try:
         service._main_loop = loop
@@ -67,10 +94,7 @@ def test_feishu_long_connection_service_routes_sdk_event_into_shared_runtime(mon
 
 
 def test_feishu_long_connection_service_suppresses_expected_shutdown_error() -> None:
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
 
     assert service._is_expected_shutdown_error(RuntimeError("Event loop stopped before Future completed."), None) is True
     assert service._is_expected_shutdown_error(RuntimeError("network down"), None) is False
@@ -81,6 +105,8 @@ def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_
     monkeypatch,
     capsys,
 ) -> None:
+    feishu_long_connection_module = _load_feishu_long_connection_module()
+
     class FakeDispatcherBuilder:
         def register_p2_im_message_receive_v1(self, handler):
             _ = handler
@@ -115,10 +141,7 @@ def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_
         lambda module: SimpleNamespace(Client=FakeWsClient),
     )
 
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
 
     service._run_client_thread()
 
@@ -127,10 +150,7 @@ def test_feishu_long_connection_service_does_not_log_start_failure_for_expected_
 
 
 def test_feishu_long_connection_shutdown_logs_unexpected_loop_stop_request_failure(capsys) -> None:
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
     service._thread_loop = SimpleNamespace(
         is_closed=lambda: False,
         stop=lambda: None,
@@ -148,10 +168,7 @@ def test_feishu_long_connection_shutdown_logs_unexpected_loop_stop_request_failu
 
 
 def test_feishu_long_connection_shutdown_suppresses_expected_loop_stop_request_error(capsys) -> None:
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
     service._thread_loop = SimpleNamespace(
         is_closed=lambda: False,
         stop=lambda: None,
@@ -170,6 +187,8 @@ def test_feishu_long_connection_logs_unexpected_loop_stop_failure(
     monkeypatch,
     capsys,
 ) -> None:
+    feishu_long_connection_module = _load_feishu_long_connection_module()
+
     class FakeDispatcherBuilder:
         def register_p2_im_message_receive_v1(self, handler):
             _ = handler
@@ -212,10 +231,7 @@ def test_feishu_long_connection_logs_unexpected_loop_stop_failure(
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "new_event_loop", lambda: fake_loop)
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "set_event_loop", lambda loop: None)
 
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
 
     service._run_client_thread()
 
@@ -229,6 +245,8 @@ def test_feishu_long_connection_suppresses_expected_loop_stop_error(
     monkeypatch,
     capsys,
 ) -> None:
+    feishu_long_connection_module = _load_feishu_long_connection_module()
+
     class FakeDispatcherBuilder:
         def register_p2_im_message_receive_v1(self, handler):
             _ = handler
@@ -271,10 +289,7 @@ def test_feishu_long_connection_suppresses_expected_loop_stop_error(
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "new_event_loop", lambda: fake_loop)
     monkeypatch.setattr(feishu_long_connection_module.asyncio, "set_event_loop", lambda loop: None)
 
-    service = FeishuLongConnectionService(
-        config=FeishuLongConnectionConfig(app_id="cli_a", app_secret="sec_b"),
-        feishu_client=SimpleNamespace(),
-    )
+    service = _build_service()
 
     service._run_client_thread()
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import threading
+import warnings
 from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -15,15 +16,42 @@ if TYPE_CHECKING:
 
 FEISHU_LONG_CONNECTION_SERVICE_KEY = "feishu_long_connection_service"
 
-try:
-    import lark_oapi
-    import lark_oapi.ws.client as lark_ws_client_module
-except ImportError as import_error:  # pragma: no cover - exercised via availability checks
-    lark_oapi = None
-    lark_ws_client_module = None
-    _FEISHU_LONG_CONNECTION_IMPORT_ERROR = import_error
-else:
-    _FEISHU_LONG_CONNECTION_IMPORT_ERROR = None
+
+def _import_feishu_long_connection_sdk() -> tuple[Any | None, Any | None, Exception | None]:
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"datetime\.datetime\.utcfromtimestamp\(\) is deprecated.*",
+            category=DeprecationWarning,
+            module=r"lark_oapi\.ws\.pb\.google\.protobuf\.internal\.well_known_types",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message=r"There is no current event loop",
+            category=DeprecationWarning,
+            module=r"lark_oapi\.ws\.client",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message=r"websockets\.InvalidStatusCode is deprecated",
+            category=DeprecationWarning,
+            module=r"lark_oapi\.ws\.client",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            message=r"websockets\.legacy is deprecated.*",
+            category=DeprecationWarning,
+            module=r"websockets\.legacy",
+        )
+        try:
+            import lark_oapi
+            import lark_oapi.ws.client as lark_ws_client_module
+        except ImportError as import_error:  # pragma: no cover - exercised via availability checks
+            return None, None, import_error
+    return lark_oapi, lark_ws_client_module, None
+
+
+lark_oapi, lark_ws_client_module, _FEISHU_LONG_CONNECTION_IMPORT_ERROR = _import_feishu_long_connection_sdk()
 
 
 @dataclass(frozen=True, slots=True)

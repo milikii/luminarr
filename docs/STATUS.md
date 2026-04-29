@@ -8,7 +8,8 @@
 - `telegram_sidecar_runtime.py` 宿主解耦已完成：sidecar/scheduler 生命周期已抽成通用 host 边界，Telegram 只保留 wrapper。
 - `manage_bt_subscription.py` 首个超大业务文件收口切口已完成：候选选择 / 打分解析 helper 已下沉，`pure_bt` 与订阅路径已复用同一套 BT candidate metadata 解析实现。
 - Feishu 可选依赖策略已完成：标准 `requirements.txt` 已显式包含 `lark-oapi==1.5.3`，operator docs 与运行时启用条件已对齐。
-- 下一条唯一主线切到清理当前依赖告警；不回切 `services` 结构降本主线。
+- 当前主线已额外完成：`lark_oapi` / `websockets` 已知 deprecation warnings 已在 Feishu 可选链路入口局部隔离，主线验证输出已恢复干净。
+- 下一条唯一主线切到把 non-Telegram 运行模式做成一等公民；不回切 `services` 结构降本主线。
 
 ## Current health
 - `make verify-adult-bt-wedge` 通过（总计 `422 passed`）。
@@ -23,10 +24,10 @@
 - `make verify-mainline` 通过。
 - `.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py` 通过。
 - active docs root 预算验证：排除 `PROGRESS.md` / `BLOCKERS.md` 后为 `15`。
-- 当前主线额外信号：仍保留 `lark_oapi` / `websockets` deprecation warnings，暂无新失败。
+- 当前主线额外信号：已不再看到已知 `lark_oapi` / `websockets` deprecation warnings，暂无新失败。
 
 ## Current biggest risk
-- 当前风险不是前四条主线回归，而是 `lark_oapi` / `websockets` deprecation warnings 仍持续出现在主线验证输出里；如果继续放着不收口，会降低后续 smoke 和真实失败信号的可读性。
+- 当前风险不是前五条主线回归，而是“non-Telegram 运行模式做成一等公民”会同时触碰入口、部署、通知回路和宿主真相边界；如果不先锁定最小交付画像，很容易从宿主解耦滑成整条多渠道产品面重做。
 
 ## Recommended Next Operator Command
 
@@ -35,5 +36,5 @@
 ```text
 按 AGENTS.md 执行单轮主线施工。
 
-当前唯一主线切到清理当前依赖告警。先盘点 `lark_oapi` / `websockets` warnings 的来源，优先找“升级版本 / 局部隔离 warnings / 最小兼容修补”三种路径里差异最小的一条；不要回切宿主/配置/超大文件主线，不改 SQLite schema 或 BT/PT 主链语义。
+当前唯一主线切到把 non-Telegram 运行模式做成一等公民。先盘点当前还依赖 Telegram 宿主的入口、通知与部署真相，锁定“最小可单独运行画像”后再推进；不要回切宿主/配置/超大文件/依赖告警主线，不改 SQLite schema 或 BT/PT 主链语义。
 ```
