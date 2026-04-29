@@ -22,12 +22,17 @@ def pick_subscription_candidate(
     *,
     item: BtSubscriptionItem,
     last_seen_source: str,
+    last_seen_title: str,
 ) -> Mapping[str, Any] | None:
     candidate_pairs: list[tuple[BTCandidate, Mapping[str, Any]]] = []
     normalized_last_seen_source = last_seen_source.strip()
+    normalized_last_seen_title = _normalize_subscription_seen_title(last_seen_title)
     for result in results:
         source = resolve_candidate_source(result)
         if not source or source == normalized_last_seen_source:
+            continue
+        title = resolve_candidate_title(result, item=item)
+        if normalized_last_seen_title and _normalize_subscription_seen_title(title) == normalized_last_seen_title:
             continue
         candidate = build_subscription_bt_candidate(result, item=item)
         if candidate is not None:
@@ -88,3 +93,7 @@ def build_subscription_bt_candidate(result: Mapping[str, Any], *, item: BtSubscr
         age_days=None,
         media_kind=item.media_kind,
     )
+
+
+def _normalize_subscription_seen_title(title: str) -> str:
+    return " ".join(title.strip().casefold().split())

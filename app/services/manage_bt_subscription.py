@@ -674,6 +674,7 @@ class ManageBtSubscriptionService:
             results,
             item=item,
             last_seen_source=item.last_seen_source,
+            last_seen_title=item.last_seen_title,
         )
         if selected_result is None:
             return None

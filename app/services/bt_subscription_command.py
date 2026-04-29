@@ -100,7 +100,7 @@ def format_bt_subscription_list(items: Sequence[BtSubscriptionItem]) -> str:
     for index, item in enumerate(items, start=1):
         last_seen = item.last_seen_title.strip() or "-"
         lines.append(
-            f"{index}. [{item.item_id}] {format_title_year(item.title, item.year)} | 类型: {bt_subscription_media_kind_label(item.media_kind)} | 最近资源: {last_seen}"
+            f"{index}. [{item.item_id}] {format_title_year(item.title, item.year)} | 类型: {bt_subscription_media_kind_label(item.media_kind)} | 上次命中资源: {last_seen}"
         )
     return "\n".join(lines)
 

@@ -103,7 +103,7 @@ def test_bt_subscription_command_helper_formats_list_and_mutation_replies() -> N
     )
 
     assert "BT 订阅清单：" in format_bt_subscription_list([item])
-    assert "最近资源: SSIS-123 1080p" in format_bt_subscription_list([item])
+    assert "上次命中资源: SSIS-123 1080p" in format_bt_subscription_list([item])
     assert "已加入 BT 订阅" in format_bt_subscription_add_result(item, is_created=True)
     assert format_bt_subscription_remove_result(7, removed=False) == "未找到对应 BT 订阅条目。"
     assert format_bt_subscription_clear_result(2) == "已清空 BT 订阅清单，共删除 2 条。"
@@ -510,10 +510,10 @@ def test_bt_subscription_run_once_prefers_new_ranked_candidate(tmp_path: Path) -
         )
     )
 
-    assert "命中资源: SSIS-123 1080p" in reply
+    assert "命中资源: SSIS-123 720p" in reply
     item = repo.list_items(chat_id=1001)[0]
-    assert item.last_seen_source == "https://example.com/1080p.torrent"
-    assert item.last_seen_title == "SSIS-123 1080p"
+    assert item.last_seen_source == "https://example.com/720p.torrent"
+    assert item.last_seen_title == "SSIS-123 720p"
 
 
 def test_bt_subscription_run_once_uses_shared_bt_scoring_rules(tmp_path: Path, monkeypatch) -> None:
@@ -967,6 +967,45 @@ def test_bt_subscription_scheduler_tick_reuses_ranked_candidate_selection(tmp_pa
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)
     repo.add_item(chat_id=1001, title=_ADULT_QUERY, year="", media_kind="adult")
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
+    service = ManageBtSubscriptionService(repo, _scheduler_search, add_service)
+    dispatch_context = BtSubscriptionDispatchContext(
+        downloader_name="tr-main",
+        downloader_type="transmission",
+        download_dir="/data/downloads/tr",
+    )
+
+    notifications = asyncio.run(
+        service.run_scheduler_tick(
+            dispatch_context=dispatch_context,
+        )
+    )
+
+    assert notifications
+    chat_id, reply = notifications[0]
+    assert chat_id == 1001
+    assert "命中资源: SSIS-123 720p" in reply
+
+
+def test_bt_subscription_scheduler_tick_skips_duplicate_last_seen_title_from_new_source(tmp_path: Path) -> None:
+    async def _scheduler_search(_: str) -> list[dict[str, object]]:
+        return [
+            _adult_candidate("SSIS-123 1080p", "https://example.com/mirror-1080p.torrent", seeders=60, size=2_100_000_000),
+            _adult_candidate("SSIS-123 720p", "https://example.com/720p.torrent", seeders=30, size=1_500_000_000),
+        ]
+
+    database = _make_database(tmp_path)
+    repo = BtSubscriptionRepo(database)
+    created = repo.add_item(chat_id=1001, title=_ADULT_QUERY, year="", media_kind="adult")
+    assert created is not None
+    item, _ = created
+    assert repo.update_last_seen(
+        chat_id=1001,
+        item_id=item.item_id,
+        source="https://example.com/old-1080p.torrent",
+        title="SSIS-123 1080p",
+    )
+
     add_service = AddToDownloaderService(SearchMediaService(_fake_search), _fake_add_torrent)
     service = ManageBtSubscriptionService(repo, _scheduler_search, add_service)
     dispatch_context = BtSubscriptionDispatchContext(

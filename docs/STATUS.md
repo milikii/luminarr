@@ -1,4 +1,4 @@
-# Current status (v550)
+# Current status (v551)
 
 ## Current mainline
 - `质量硬化` 已完成，`adult BT minimum wedge` 已完成并已推送到 `main`。
@@ -16,25 +16,26 @@
 - 当前真相重新锁定到 2026-04-26 / 2026-04-29 已定边界：BT 支线只承接成人资源，不从 BT 线索取任何影视资源，包括动漫。
 - direct `BT` / `magnet:?` 投递入口继续保留 `观影 PT 链 / BT 成人链` 问询，不允许绕过问询把 BT 投递默认解释成成人 BT。
 - 当前主线已把 `btsub add` 收口成成人 BT 精确番号追踪；旧的非成人订阅条目会显式告警并跳过扫描。
-- 下一条唯一主线保持在成人 BT 专线内；后续若扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不回切 raw BT / 影视资源订阅主线。
+- 当前主线已补齐成人 BT 连续追踪最小 contract：同标题但不同 URL 的镜像命中不再重复创建下载待确认，`btsub list` 现在会明确展示“上次命中资源”。
+- 后续若还要继续扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不回切 raw BT / 影视资源订阅主线。
 
 ## Current health
 - `make verify-adult-bt-wedge` 通过（总计 `423 passed`）。
 - `make quality` 通过（`28 passed`）。
 - `make verify-mainline` 通过。
 - `make lint` 通过。
-- focused tests：`tests/test_bt_subscription_candidate_helpers.py` / `tests/test_manage_bt_subscription.py` / `tests/test_private_chat_bt_subscription_runtime.py` / `tests/test_manage_watchlist.py` / `tests/test_private_chat_watchlist_runtime.py` / `tests/test_telegram_bot.py` 当前新增的 adult-only `btsub`、旧订阅告警与 watchlist fail-closed 回归已通过。
+- focused tests：`tests/test_bt_subscription_candidate_helpers.py` / `tests/test_manage_bt_subscription.py` 当前新增的 same-title 去重与“上次命中资源”文案回归已通过。
 - Telegram 人工 smoke：应用已启动，当前会话待验证。
 - 当前 active docs root：`15`；docs gate 绿灯。
 
 ## Latest verification
-- `.venv/bin/python -m pytest -q tests/test_bt_subscription_candidate_helpers.py tests/test_manage_bt_subscription.py tests/test_private_chat_bt_subscription_runtime.py tests/test_manage_watchlist.py tests/test_private_chat_watchlist_runtime.py tests/test_telegram_bot.py` 通过。
+- `.venv/bin/python -m pytest -q tests/test_bt_subscription_candidate_helpers.py tests/test_manage_bt_subscription.py` 通过（`50 passed`）。
 - `make quality` 通过。
 - `make verify-mainline` 通过。
 - `make lint` 通过。
 - `make verify-adult-bt-wedge` 通过（195 + 174 + 54 三组均通过）。
 - active docs root 预算验证：排除 `PROGRESS.md` / `BLOCKERS.md` 后为 `15`。
-- 当前主线额外信号：`watchlist sync` 现在只回 PT 主线边界提示；`btsub add` 不再接受影视订阅输入，旧的非成人订阅条目也不会再被静默扫描。
+- 当前主线额外信号：`watchlist sync` 现在只回 PT 主线边界提示；`btsub add` 不再接受影视订阅输入，旧的非成人订阅条目也不会再被静默扫描；同标题镜像资源不会重复报成“新资源”。
 
 ## Current biggest risk
 - 当前最大风险已经切到“边界漂移”：下一轮若再把 raw BT、影视资源订阅、动漫 BT 或 auto-confirm 混回 BT 主线，会直接违反 2026-04-26 与 2026-04-29 已锁定的使用边界。
@@ -46,5 +47,5 @@
 ```text
 按 AGENTS.md 执行单轮主线施工。
 
-当前唯一主线继续锁在成人 BT 专线。`watchlist sync` / `想看 同步` 已改为 fail-closed，`btsub add` 已收口到成人 BT 精确番号追踪；下一轮如果还要扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不引入任何影视资源订阅（包括动漫），并继续保持 direct BT / magnet 先问询 `观影 PT 链 / BT 成人链`。
+当前唯一主线继续锁在成人 BT 专线。`watchlist sync` / `想看 同步` 已改为 fail-closed，`btsub add` 已收口到成人 BT 精确番号追踪，同标题镜像命中不会再重复创建下载待确认；下一轮如果还要扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不引入任何影视资源订阅（包括动漫），并继续保持 direct BT / magnet 先问询 `观影 PT 链 / BT 成人链`。
 ```

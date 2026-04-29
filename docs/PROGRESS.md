@@ -329,3 +329,19 @@
 
 ### 下轮目标
 - 决定成人 BT 专线是否需要更进一步的连续追踪体验，但不回切影视 BT 或 raw BT 订阅
+
+## Round 20 — 2026-04-29 16:56
+
+### 完成
+- 为 `btsub` 连续追踪补齐最小去重 contract：同标题但不同 URL 的镜像命中不再重复创建下载待确认
+- 让 `btsub run` 与 scheduler 复用同一套 same-title 去重判定，避免两个入口行为漂移
+- 将 `btsub list` 文案明确为“上次命中资源”，让当前追踪状态对操作者更直观
+
+### 测试状态
+- 通过: 5 / 总计: 5
+
+### 遗留 / 下轮继续
+- 若还要继续扩成人 BT 连续追踪，只能在当前 adult-only / manual-confirm 边界内先定义新的最小 contract
+
+### 下轮目标
+- 如继续推进 BT subscription，只讨论更进一步的成人 BT 连续追踪 contract，不回切影视 BT、raw BT 或 auto-confirm

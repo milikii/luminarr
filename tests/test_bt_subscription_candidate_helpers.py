@@ -19,7 +19,29 @@ def test_pick_subscription_candidate_skips_last_seen_source() -> None:
         _adult_candidate("SSIS-123 1080p WEB-DL x265-BBB", "https://example.com/new.torrent", seeders=20, size=2_000_000_000),
     ]
 
-    selected = pick_subscription_candidate(results, item=item, last_seen_source="https://example.com/seen.torrent")
+    selected = pick_subscription_candidate(
+        results,
+        item=item,
+        last_seen_source="https://example.com/seen.torrent",
+        last_seen_title="",
+    )
+
+    assert selected == results[1]
+
+
+def test_pick_subscription_candidate_skips_last_seen_title_from_new_source() -> None:
+    item = _make_bt_subscription_item()
+    results = [
+        _adult_candidate("SSIS-123 1080p WEB-DL x265-AAA", "https://example.com/mirror-1.torrent", seeders=500, size=4_000_000_000),
+        _adult_candidate("SSIS-123 720p WEB-DL x265-BBB", "https://example.com/new.torrent", seeders=20, size=2_000_000_000),
+    ]
+
+    selected = pick_subscription_candidate(
+        results,
+        item=item,
+        last_seen_source="https://example.com/seen.torrent",
+        last_seen_title="SSIS-123 1080p WEB-DL x265-AAA",
+    )
 
     assert selected == results[1]
 
@@ -31,7 +53,7 @@ def test_pick_subscription_candidate_prefers_higher_scored_candidate() -> None:
         _adult_candidate("SSIS-123 1080p WEB-DL x265-GRP", "https://example.com/1080p.torrent", seeders=20, size=2_200_000_000),
     ]
 
-    selected = pick_subscription_candidate(results, item=item, last_seen_source="")
+    selected = pick_subscription_candidate(results, item=item, last_seen_source="", last_seen_title="")
 
     assert selected == results[1]
 
@@ -42,7 +64,7 @@ def test_pick_subscription_candidate_rejects_mismatched_adult_identifier() -> No
         _adult_candidate("IPX-001 1080p", "https://example.com/ipx-001.torrent", content_id="censored:ipx-001", display_id="IPX-001"),
     ]
 
-    selected = pick_subscription_candidate(results, item=item, last_seen_source="")
+    selected = pick_subscription_candidate(results, item=item, last_seen_source="", last_seen_title="")
 
     assert selected is None
 
