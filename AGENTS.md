@@ -7,13 +7,13 @@
 
 ## 一、当前阶段 ← 每次推进前手动更新这一行
 
-**当前阶段：执行阶段 / 工具：Superpowers /executing-plans**
+**当前阶段：执行阶段 / 工具：Superpowers /subagent-driven-development**
 
 ```
 阶段选项（手动切换）：
 - 决策阶段   → Gstack /plan-ceo-review /plan-eng-review
 - 拆解阶段   → Superpowers /writing-plans
-- 执行阶段   → Superpowers /executing-plans   ← 编码时锁在这里
+- 执行阶段   → Superpowers /subagent-driven-development   ← 编码时锁在这里
 - 排查阶段   → Superpowers /investigate
 - 收尾阶段   → Gstack /qa → Superpowers /ship
 ```

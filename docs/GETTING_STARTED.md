@@ -15,8 +15,6 @@
 - `make`（可选；没有也能直接跑下面的一行命令）
 - `docker` / `docker compose`（可选；想走容器启动时需要）
 - 一份可用的 `.env`
-- 如果要在**没有外挂字幕**时自动检查/提取视频内嵌字幕：
-  `ffmpeg` 需要在当前 shell 的 `PATH` 里可执行；`ffprobe` 若存在会优先用于探测
 - 当前最少要能访问：
   - Telegram Bot，或成对配置的 Feishu 应用凭据，或完整的 WeCom 三元组
   - Prowlarr
@@ -28,7 +26,7 @@
 如果你要补**当前 cleanup 验证窗口**里的“四渠道真实私聊 smoke”退出条件，还要额外满足：
 
 - `.env` 里至少有可用的 `TELEGRAM_BOT_TOKEN`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`、`WECOM_TOKEN`、`WECOM_ENCODING_AES_KEY`、`WECOM_RECEIVE_ID`
-- personal WeChat 需要本地已有可用登录态；它不靠 `.env` 三元组启动
+- personal WeChat 需要本地已有可用登录态；它不靠 `.env` 三元组启动，具体要求统一看下文“运行时外部依赖真相”
 - 只跑 `pytest` 只能证明 shared runtime 协议没回退，不能替代四渠道真实私聊 smoke 证据
 
 ## 2. 第一次安装依赖
@@ -39,7 +37,20 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 标准 `requirements.txt` 已包含 Feishu SDK，不需要再额外执行一条 Feishu 专用安装命令。是否真的启用 Feishu 长连接，仍取决于你是否同时填写 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
 
-## 3. 生成本地配置
+## 3. 运行时外部依赖真相
+
+这一节是当前唯一主真相入口。`README.md`、`docs/OPERATOR_RUNBOOK.md`、`docs/STATUS.md` 只做引用，不再重复写细节。
+
+- `ffmpeg` / `ffprobe`
+  只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要。`ffmpeg` 必须在当前 shell 的 `PATH` 里可执行；`ffprobe` 可选，存在时会优先用于探测，缺失时会自动回退到 `ffmpeg -i`。
+- personal WeChat 登录态
+  personal WeChat 不是靠一组 `.env` 凭据启动，而是依赖本机已存在的 `wechat-clawbot` 登录态。首次使用先在本地 Python 运行里完成扫码登录，让登录态目录先落盘；如果改用容器，再把同一个登录态目录挂进容器。容器重启后若 `context_token` 失效，需要重新登录。
+- Feishu SDK
+  标准 `requirements.txt` 已包含 Feishu SDK；不要再单独安装 Feishu 专用依赖。是否启用 Feishu，只看 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 是否成对配置。当前只保留 SDK 长连接入口，不需要公网 HTTPS webhook、`FEISHU_INBOUND_MODE` 或 `FEISHU_ENCRYPT_KEY`。
+- WeCom 回调端口与反代
+  WeCom 需要完整的 `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID`。本地探针地址始终以你当前 `.env` 里的 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH` 为准；默认 compose 会映射 `18097`，但你改了 `.env` 就跟着改。想让企微真正从外部回调进来，还要让当前回调端口和路径能被公网入口或反代转发到这台机器；只看到本地 `400 missing echostr` 只说明入口已监听，不代表外部回调已经打通。
+
+## 4. 生成本地配置
 
 `.env.example` 是模板，不是自动加载文件。
 
@@ -63,13 +74,9 @@ cp .env.example .env
 - 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
 - 如果你填了 `DOWNLOADER_INSTANCES` 但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
 - direct magnet 入口当前仍会先问“观影 PT 链 / BT 成人链”；不会因为你配置了成人 BT 站点就自动走成人链
-- 标准 `requirements.txt` 已经包含 Feishu SDK；Feishu 长连接是否启用，只看 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 是否成对配置；WeCom 三元组必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
+- 运行时外部依赖的细节只看上一节；这里不再重复抄 `ffmpeg`、personal WeChat 登录态、Feishu SDK、WeCom 回调要求
 
-补 WeCom 真实私聊 smoke 前，可以先在 `app.main` 已运行的前提下，用 `curl -si http://127.0.0.1:18889/wecom/callback` 确认本地 callback 已经监听；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 里的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于入口已就绪，不等于真实私聊 smoke 已完成；如果直接拿到 `connection refused`，先回头确认应用是否真的已启动。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改，不要死抄这里的样例。
-
-Feishu 当前只保留 SDK 长连接入口；不再需要配置公网 HTTPS webhook、`FEISHU_INBOUND_MODE` 或 `FEISHU_ENCRYPT_KEY`。如果 Telegram 为空，当前代码会优先走 WeCom 宿主，再回落到 Feishu 宿主。
-
-## 4. 启动本地测试栈（需要真实 import / refresh 时）
+## 5. 启动本地测试栈（需要真实 import / refresh 时）
 
 ```bash
 docker compose -f /home/alex/projects/luminarr/docker-compose.test.yml up -d
@@ -98,7 +105,7 @@ curl -si http://127.0.0.1:19091/transmission/rpc | grep -q "X-Transmission-Sessi
 - qBittorrent 的固定测试配置落在仓库内 `docker/test/qbittorrent`；当前必须保持 `WEBUI_PORT=18098` 与 `18098:18098` 同步，不要回退成 `18098:8080`
 - 如果这里只想跑纯单元测试，不做真实导入和刷新，可以先跳过这一步
 
-## 5. 运行应用
+## 6. 运行应用
 
 ### 方案 A：直接用本地 Python 运行
 
@@ -168,8 +175,7 @@ docker compose logs -f luminarr
 - **Fanart.tv API Key**：不填会关闭 fanart 抓取，不阻塞启动。
 - **Telegram Bot Token**：当前改为 Telegram 宿主条件必填；如果你只跑 `Feishu-only` / `WeCom-only` 文本私聊最小基线，可以留空，但 Telegram 私聊入口和 personal WeChat 登录辅助都会不可用。
 - **可选：OpenAI / 字幕翻译 Key**：仅影响 `.srt` 字幕自动翻译。
-- **可选：`ffmpeg`（`ffprobe` 可选）**：只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要；当前代码默认直接从 `PATH` 调用，若缺少 `ffprobe` 会自动回退到 `ffmpeg -i` 做探测。
-- **可选：Feishu / WeCom 渠道启用凭据**：标准 `requirements.txt` 已自带 Feishu SDK；Feishu 只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对填写即可启用，WeCom 需要 `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID` 三元组“要么都空、要么都填”。
+- 渠道和字幕相关的运行时外部依赖，统一回看第 `3` 节，不在这里重复抄一遍。
 
 如果这台机器不能直连公网（Telegram / TMDB / Fanart / BT 外站），再加一条 `OUTBOUND_PROXY_URL=http://192.168.2.110:7890` 走宿主机或旁路由代理；Transmission / Emby / Prowlarr 这类本地地址仍然直连，不吃代理。
 
@@ -182,7 +188,7 @@ docker compose logs -f luminarr
 
 如果你把依赖服务和 Luminarr 放进**同一个 compose** 里（本项目当前不推荐，见 `docs/DECISIONS.md` D-019），那就用 service 名而不是 IP：例如 `http://transmission:9091`。
 
-WeCom webhook 的入站端口（默认 `18097`）已经在 compose 里映射出来；想让外部能回调，还要自己在路由器 / 反代上开好这个端口的公网入口。Feishu 当前走 SDK 长连接，不需要本地 webhook 入站端口。
+WeCom webhook 的入站端口与反代要求，统一回看第 `3` 节；Feishu 当前走 SDK 长连接，不需要本地 webhook 入站端口。
 
 **硬链接 / `SHARED_MEDIA_ROOT` 具体是什么意思**
 
@@ -204,11 +210,11 @@ WeCom webhook 的入站端口（默认 `18097`）已经在 compose 里映射出�
 
 **personal WeChat 在容器里的限制**
 
-- personal WeChat 依赖 `wechat-clawbot`，首次启动需要扫码登录。当前 `docker-compose.yml` 没有为 personal WeChat 单独处理 QR 交互。
-- 如果你要在容器部署 personal WeChat，建议先在**本地 Python**（`make run` / `set -a && . ./.env && set +a && .venv/bin/python -m app.main`）里完成一次扫码登录，让 `wechat-clawbot` 的登录态文件落到磁盘；然后在 `docker-compose.yml` 里**把登录态目录也挂进容器**（当前默认没有这条挂载，需要你自己补）。
-- 容器重启时 `context_token` 可能已失效，personal WeChat 主动推送会降级到 Telegram（这个降级路径由代码自己处理）。
+- 先按第 `3` 节准备好本机 `wechat-clawbot` 登录态，再考虑容器部署。
+- 当前 `docker-compose.yml` 没有为 personal WeChat 单独处理 QR 交互，所以首次扫码登录建议仍在**本地 Python**运行里完成。
+- 改成容器运行时，把同一个登录态目录挂进容器；容器重启后若 `context_token` 失效，需要重新登录。
 
-## 6. 第一条人工验证怎么做
+## 7. 第一条人工验证怎么做
 
 ### Telegram 最小 smoke
 
@@ -235,7 +241,7 @@ make test-cleanup-smoke
 .venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py
 ```
 
-## 7. 常用命令
+## 8. 常用命令
 
 仓库根目录已经提供 `Makefile`：
 
@@ -272,7 +278,7 @@ make help
 
 跑完最小验证后，回到 `docs/STATUS.md` 看当前健康度，再决定要不要继续施工。
 
-## 8. 成人 BT focused 验证
+## 9. 成人 BT focused 验证
 
 先跑：
 
@@ -285,7 +291,7 @@ make help
 3. 发送磁力并选择 `BT 成人链`
 4. 确认待下载回复里能看到番号、分类、历史状态
 
-## 9. 常见问题
+## 10. 常见问题
 
 ### `.env` 写了，但程序还是说缺配置
 

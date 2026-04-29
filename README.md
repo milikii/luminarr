@@ -49,6 +49,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 ## 4. 快速开始
 
 - 想直接把项目跑起来：看 `docs/GETTING_STARTED.md`
+  运行时外部依赖也只认这一页：`ffmpeg` / `ffprobe`、personal WeChat 登录态、Feishu SDK、WeCom 回调端口与反代要求都收口在这里
 - 不会代码，只想知道先做什么：看 `docs/HUMAN_START_HERE.md`
 - 想让 AI 按仓库约定接手：看 `docs/OPERATOR_RUNBOOK.md`
 - 想理解“谁收消息、谁写库、谁调外部系统”：看 `docs/ARCHITECTURE.md`
@@ -83,7 +84,7 @@ Luminarr 是一个面向 **2–4 人自托管影视场景** 的垂直自动化 H
 - `docs/HUMAN_START_HERE.md`：非技术操作者总入口
 - `docs/OPERATOR_RUNBOOK.md`：可直接复制给 AI 的短模板
 - `docs/INDEX.md`：按身份分流的文档地图
-- `docs/GETTING_STARTED.md`：安装、启动、最小 smoke
+- `docs/GETTING_STARTED.md`：安装、启动、最小 smoke，以及运行时外部依赖唯一真相页
 - `docs/ARCHITECTURE.md`：系统结构说明
 - `docs/STATUS.md`：当前短快照
 - `docs/NEXT_STEP.md`：当前主线状态与下一步边界

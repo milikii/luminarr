@@ -345,3 +345,20 @@
 
 ### 下轮目标
 - 如继续推进 BT subscription，只讨论更进一步的成人 BT 连续追踪 contract，不回切影视 BT、raw BT 或 auto-confirm
+
+## Round 21 — 2026-04-30 00:35
+
+### 完成
+- 补齐 Telegram 成人 BT 真机 smoke 证据，并把 `docs/STATUS.md` / `docs/NEXT_STEP.md` 从“待验证”切到完成态
+- 把运行时外部依赖真相页统一收口到 `docs/GETTING_STARTED.md`，让 `README.md`、`docs/OPERATOR_RUNBOOK.md`、`docs/STATUS.md` 改成引用式入口
+- 将 `search_media.py` 的候选/澄清状态持久化 helper 抽到 `app/services/search_media_state.py`，并补齐 focused tests 保护重启恢复与 fail-closed 语义
+- 将 `docs/TASKS.md` 的 `T13`、`T14`、`T15` 全部打勾，当前任务清单清空
+
+### 测试状态
+- 通过: 6 / 总计: 6
+
+### 遗留 / 下轮继续
+- 无；当前执行清单已完成，默认进入冻结态
+
+### 下轮目标
+- 若用户继续推进，先做冷启动一致性检查，再决定是否开启新主线

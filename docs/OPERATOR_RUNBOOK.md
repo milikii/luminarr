@@ -11,6 +11,7 @@
 - 这轮只想修文档入口和 docs gate：用“只做文档收口，不改业务代码”
 
 如果你只记得一步：先看 `docs/STATUS.md`，再回这里复制一条模板。
+运行时外部依赖统一只看 `docs/GETTING_STARTED.md`，不要在这里或 `README.md` 里重复抄 `ffmpeg` / personal WeChat / Feishu / WeCom 细节。
 
 ## 1. 默认 3 轮施工
 
@@ -67,6 +68,6 @@
 
 - 想知道 AI 做完没有：看 `docs/STATUS.md`
 - 想知道当前唯一主线是什么：看 `docs/NEXT_STEP.md`
-- 想知道最常用的验证 / 启动入口：看 `docs/GETTING_STARTED.md`
+- 想知道最常用的验证 / 启动入口，或确认运行时外部依赖：看 `docs/GETTING_STARTED.md`
 - 想知道它到底改了什么：看最新 commit 和相关台账
 - 想判断下一轮该复制哪句：回到本页第 `0` 节

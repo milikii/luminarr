@@ -14,6 +14,7 @@ from app.db.candidate_repo import CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
+from app.services.search_media_state import CandidateStateStore, ClarificationStateStore
 from app.services.search_media import (
     BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT,
     BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE,
@@ -2968,6 +2969,38 @@ def test_search_and_format_returns_clarification_for_ambiguous_query() -> None:
     assert "- Dune (1984) 1080p BluRay (1984)" in text
     assert service.is_clarification_pending(1001)
     assert service.get_cached_candidate(1001, 1) is None
+
+
+def test_candidate_state_store_persists_candidates_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_store = CandidateStateStore(repo=CandidateMappingRepo(database))
+    assert before_restart_store.persist_search_candidates(
+        chat_id=1001,
+        candidates=[{"title": "Dune", "year": 2021}],
+    )
+
+    after_restart_store = CandidateStateStore(repo=CandidateMappingRepo(SqliteDatabase(str(db_path))))
+    load_result = after_restart_store.get_cached_candidate_load_result(1001, 1)
+
+    assert load_result.load_failed is False
+    assert load_result.candidate == {"title": "Dune", "year": 2021}
+
+
+def test_clarification_state_store_persists_query_for_restart(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+
+    before_restart_store = ClarificationStateStore(repo=ClarificationRepo(database))
+    assert before_restart_store.set_pending(chat_id=1001, query="Dune")
+
+    after_restart_store = ClarificationStateStore(repo=ClarificationRepo(SqliteDatabase(str(db_path))))
+
+    assert after_restart_store.is_pending(1001) is True
+    assert after_restart_store.pending_by_chat[1001] == "Dune"
 
 
 def test_clarification_pending_persists_for_restart(tmp_path: Path) -> None:
