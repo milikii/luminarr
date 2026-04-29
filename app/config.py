@@ -95,6 +95,15 @@ class Settings:
     def has_any_downloader_dispatch(self) -> bool:
         return self.has_legacy_transmission_downloader() or bool(self.downloader_instances)
 
+    def has_telegram_host(self) -> bool:
+        return bool(self.telegram_bot_token)
+
+    def has_feishu_host(self) -> bool:
+        return bool(self.feishu_app_id and self.feishu_app_secret)
+
+    def has_wecom_host(self) -> bool:
+        return bool(self.wecom_token and self.wecom_encoding_aes_key and self.wecom_receive_id)
+
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
     value = env.get(key, "").strip()
@@ -496,11 +505,16 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         has_all=has_all_wecom_credentials,
         error_message="WECOM_TOKEN, WECOM_ENCODING_AES_KEY and WECOM_RECEIVE_ID must be set together",
     )
+    if not _read_optional(env, "TELEGRAM_BOT_TOKEN") and not (has_feishu_app_credentials or has_all_wecom_credentials):
+        raise ConfigError(
+            "TELEGRAM_BOT_TOKEN is required unless FEISHU_APP_ID/FEISHU_APP_SECRET or "
+            "WECOM_TOKEN/WECOM_ENCODING_AES_KEY/WECOM_RECEIVE_ID are set"
+        )
     downloader_instances = _read_downloader_instances(env)
     if not transmission_base_url and not downloader_instances:
         raise ConfigError("TRANSMISSION_BASE_URL or DOWNLOADER_INSTANCES is required")
     return Settings(
-        telegram_bot_token=_read_required(env, "TELEGRAM_BOT_TOKEN"),
+        telegram_bot_token=_read_optional(env, "TELEGRAM_BOT_TOKEN"),
         outbound_proxy_url=_normalize_proxy_url(_read_optional(env, "OUTBOUND_PROXY_URL")),
         prowlarr_base_url=prowlarr_base_url,
         prowlarr_api_key=prowlarr_api_key,

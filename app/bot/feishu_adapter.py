@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
+from app.bot.channel_contact_runtime import record_channel_contact
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.clients.feishu import FeishuClient
@@ -110,6 +111,13 @@ async def route_feishu_private_text_event(
 ) -> None:
     chat_id = project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id=event.chat_id)
     user_id = project_channel_user_id(channel=FEISHU_CHANNEL, external_user_id=event.user_open_id)
+    record_channel_contact(
+        bot_data,
+        channel=FEISHU_CHANNEL,
+        internal_chat_id=chat_id,
+        external_chat_id=event.chat_id,
+        external_user_id=event.user_open_id,
+    )
 
     async def reply_with_event(reply_text: str) -> object:
         result = await reply_text_func(event, reply_text)
@@ -176,4 +184,3 @@ def _extract_text_from_content(raw_content: object) -> str:
     if not isinstance(content, dict):
         return ""
     return str(content.get("text", "")).strip()
-

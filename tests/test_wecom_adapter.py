@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock
 import pytest
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+import app.bot.channel_contact_runtime as channel_contact_runtime
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -80,11 +81,13 @@ def _build_bot_data(
     cleanup_service: CleanupDownloadedSourceService | None = None,
 ) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
+    channel_contact_registry = channel_contact_runtime.ChannelContactRegistry()
     bot_data = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+        channel_contact_runtime.CHANNEL_CONTACT_REGISTRY_KEY: channel_contact_registry,
         WECOM_TOKEN_BOT_DATA_KEY: _TEST_TOKEN,
         WECOM_ENCODING_AES_KEY_BOT_DATA_KEY: _TEST_ENCODING_AES_KEY,
         WECOM_RECEIVE_ID_BOT_DATA_KEY: _TEST_RECEIVE_ID,
@@ -293,12 +296,13 @@ def test_handle_wecom_private_text_event_projects_ids_and_routes_into_shared_run
 ) -> None:
     dispatch_private_chat_text = AsyncMock()
     reply_text_func = AsyncMock()
+    bot_data = _build_bot_data()
     monkeypatch.setattr("app.bot.wecom_adapter.dispatch_private_chat_text", dispatch_private_chat_text)
 
     event = asyncio.run(
         handle_wecom_private_text_event(
             payload_xml=_build_wecom_private_text_xml("dune"),
-            bot_data=_build_bot_data(),
+            bot_data=bot_data,
             reply_text_func=reply_text_func,
         )
     )
@@ -320,6 +324,12 @@ def test_handle_wecom_private_text_event_projects_ids_and_routes_into_shared_run
         channel=WECOM_CHANNEL,
         external_user_id="zhangsan",
     )
+    contact = channel_contact_runtime.resolve_channel_contact(
+        bot_data,
+        internal_chat_id=project_channel_chat_id(channel=WECOM_CHANNEL, external_chat_id="zhangsan"),
+    )
+    assert contact is not None
+    assert contact.external_chat_id == "zhangsan"
 
 
 def test_handle_wecom_private_text_event_routes_into_shared_runtime() -> None:
@@ -341,6 +351,26 @@ def test_handle_wecom_private_text_event_routes_into_shared_runtime() -> None:
     assert "- 电影信息" in reply_text
     assert "- 开始下载：发送 select 1" in reply_text
     assert "Dune (2021)" in reply_text
+
+
+def test_handle_wecom_private_text_event_records_external_chat_contact() -> None:
+    bot_data = _build_bot_data()
+
+    asyncio.run(
+        handle_wecom_private_text_event(
+            payload_xml=_build_wecom_private_text_xml("dune"),
+            bot_data=bot_data,
+            reply_text_func=AsyncMock(),
+        )
+    )
+
+    internal_chat_id = project_channel_chat_id(channel=WECOM_CHANNEL, external_chat_id="zhangsan")
+    assert channel_contact_runtime.resolve_channel_contact(bot_data, internal_chat_id=internal_chat_id) == channel_contact_runtime.ChannelContact(
+        channel=WECOM_CHANNEL,
+        internal_chat_id=internal_chat_id,
+        external_chat_id="zhangsan",
+        external_user_id="zhangsan",
+    )
 
 
 def test_handle_wecom_private_text_event_routes_cleanup_inspect_into_shared_runtime(

@@ -742,3 +742,50 @@
   - 当前仓库若要继续“回归简洁”，优先应该收公开入口数量、职责边界和热点文件胶水，而不是先拿安全协议开刀。
 - **原因**：
   当前真正过重的是入口碎片和文档噪声；而 approval / lease / confirm 这些边界虽然保守，但仍在服务下载、导入、恢复和过期拒绝的真实风险。把两者混成一件事，只会把“减噪”做成“减安全”。
+
+## D-046 首个 non-Telegram 一等公民画像固定为“Feishu-only 独立启动 + 当前入站即时回复”
+- **状态**：已决定
+- **日期**：2026-04-29
+- **结论**：
+  - 当前首个 non-Telegram 一等公民最小画像固定为：
+    - `Feishu-only text private chat can boot independently`
+    - 当前入站文本消息可以即时进入 shared runtime 并回消息
+  - `TELEGRAM_BOT_TOKEN` 不再是全局启动硬必填；它改为 Telegram 宿主条件必填。
+  - `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对存在时，可以作为当前唯一宿主启动。
+  - 当前不把 non-Telegram 后台主动通知并入同一轮；没有主动 `send_text` 能力的宿主，`btsub` 后台扫描必须显式不启动，而不是等到运行时再报发送失败。
+  - 当前不把 `WeCom-only` 独立宿主、personal WeChat 去 Telegram 登录依赖、`app/bot/private_chat_runtime.py` 对 `app/bot/telegram_bot.py` 的残余 helper 收口绑进同一轮。
+- **原因**：
+  - Feishu 已经具备现成的入站解析、shared runtime 路由和文本回消息链，最接近“最小独立宿主”。
+  - WeCom 若只看同步回包并不大，但 operator 侧还带着 webhook / 验签 / AES / 公网回调口径；personal WeChat 则继续带着登录态与 Telegram 辅助路径。
+  - non-Telegram 后台主动通知目前共同缺少“内部 `chat_id:int` 到可发会话地址”的可逆真相；把这层真相和独立宿主同时推进，范围会失控。
+
+## D-047 non-Telegram 第二阶段收口为 WeCom-only 独立宿主，Telegram 为空时优先走 WeCom，再回落 Feishu
+- **状态**：已决定
+- **日期**：2026-04-29
+- **结论**：
+  - 当 `TELEGRAM_BOT_TOKEN` 为空时，当前 non-Telegram 启动顺序固定为：
+    - 先看 WeCom 三元组是否完整；完整则走 `WeCom-only` webhook + shared runtime 独立宿主
+    - 否则看 Feishu 应用凭据是否完整；完整则走 `Feishu-only` 文本私聊独立宿主
+    - 两者都不完整则 fail-closed
+  - `WeCom-only` 这一阶段只要求入站 webhook + shared runtime + 同步回包，不要求后台主动通知。
+  - `BT subscription scheduler` 如果宿主没有主动 `send_text` 能力，必须显式不启动。
+- **原因**：
+  - WeCom 已经具备 webhook / 验签 / 解密 / 同步回包的一整条入站闭环，适合作为第二阶段最小独立宿主。
+  - 把 WeCom-only 和后台主动通知分成两层，可以先锁定“能独立启动、能收回消息”的事实，再单独补“后台可逆发回”的真相，不把范围一次做胖。
+
+## D-048 non-Telegram 后台主动通知先补运行态联系人注册表，不改 SQLite schema
+- **状态**：已决定
+- **日期**：2026-04-29
+- **结论**：
+  - 当前后台主动通知的第一层真相固定为运行态 `channel contact registry`，按内部 `chat_id:int` 记录最近一次可逆的外部会话地址。
+  - Feishu / WeCom / personal WeChat inbound 路由在进入 shared runtime 前，都会把：
+    - `channel`
+    - 内部 `chat_id`
+    - 外部 `external_chat_id`
+    - 可得时的 `external_user_id`
+    写入同一份运行态注册表。
+  - 当前不为这层真相新增 SQLite 表；数据库 schema 继续保持不变。
+  - 这层 truth 只负责“可逆解析目标”，不等于后台主动通知已经打通。
+- **原因**：
+  - 当前主线明确不改 SQLite schema；因此最小可交付只能先补运行态可逆真相，而不是直接引入新的持久化边界。
+  - 把联系人真相和后台发送拆成两层，可以先锁定 outbound target resolution，再单独决定 Feishu / WeCom / personal WeChat 的后台发送协议和失败语义。

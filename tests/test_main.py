@@ -2,11 +2,27 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from telegram.error import NetworkError
 
 from app.bot import telegram_bot as tg
+from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
+from app.bot.feishu_long_connection import FEISHU_LONG_CONNECTION_SERVICE_KEY
+from app.bot.telegram_sidecar_runtime import (
+    BT_SUBSCRIPTION_SCHEDULER_TASK_KEY,
+    DOWNLOADER_INSTANCES_KEY,
+    DOWNLOADER_ROLE_BINDING_KEY,
+    MANAGE_BT_SUBSCRIPTION_SERVICE_KEY,
+    _start_bt_subscription_scheduler_if_configured,
+)
+from app.bot.wecom_adapter import (
+    WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
+    WECOM_RECEIVE_ID_BOT_DATA_KEY,
+    WECOM_TOKEN_BOT_DATA_KEY,
+)
+from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.db.job_repo import JobPersistenceError
 from app.downloader_route_lookup import (
@@ -593,6 +609,15 @@ class _MainSettings(SimpleNamespace):
     def has_any_downloader_dispatch(self) -> bool:
         return self.has_legacy_transmission_downloader() or bool(self.downloader_instances)
 
+    def has_telegram_host(self) -> bool:
+        return bool(self.telegram_bot_token)
+
+    def has_feishu_host(self) -> bool:
+        return bool(self.feishu_app_id and self.feishu_app_secret)
+
+    def has_wecom_host(self) -> bool:
+        return bool(self.wecom_token and self.wecom_encoding_aes_key and self.wecom_receive_id)
+
 
 def _build_main_settings(**overrides: object) -> _MainSettings:
     defaults: dict[str, object] = {
@@ -682,16 +707,19 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
         manage_bt_subscription_service,
         **kwargs: object,
     ) -> SimpleNamespace:
+        channel_contact_registry = kwargs["channel_contact_registry"]
         app = SimpleNamespace(
             bot_data={
                 tg.SEARCH_SERVICE_KEY: search_service,
                 tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: manage_bt_subscription_service,
                 tg.DOWNLOADER_INSTANCES_KEY: kwargs["downloader_instances"],
                 tg.DOWNLOADER_ROLE_BINDING_KEY: kwargs["downloader_role_binding"],
+                CHANNEL_CONTACT_REGISTRY_KEY: channel_contact_registry,
             }
         )
         created["token"] = token
         created["app"] = app
+        created["channel_contact_registry"] = channel_contact_registry
         return app
 
     monkeypatch.setattr("app.main.load_settings", lambda: settings)
@@ -742,13 +770,227 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
 
     app = created["app"]
     assert created["token"] == "telegram-token"
+    assert created["channel_contact_registry"] is app.bot_data[CHANNEL_CONTACT_REGISTRY_KEY]
     assert tg.SEARCH_SERVICE_KEY in app.bot_data
     assert tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY in app.bot_data
+    assert isinstance(app.bot_data[CHANNEL_CONTACT_REGISTRY_KEY], ChannelContactRegistry)
     assert app.bot_data[tg.DOWNLOADER_ROLE_BINDING_KEY] == settings.downloader_role_binding
     assert app.bot_data[tg.DOWNLOADER_INSTANCES_KEY] == settings.downloader_instances
     assert app.bot_data["search_capability_unavailable_text"].startswith("搜索能力当前不可用")
     assert app.bot_data["bt_subscription_capability_unavailable_text"].startswith("BT 订阅当前不可用")
     assert len(created["qb_client_calls"]) == 1
+
+
+def test_main_uses_non_telegram_host_when_feishu_is_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        telegram_bot_token="",
+        feishu_app_id="feishu-app-id",
+        feishu_app_secret="feishu-app-secret",
+    )
+    created: dict[str, object] = {}
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    async def _fake_run_non_telegram_host(host, *, config) -> None:
+        created["host"] = host
+        created["config"] = config
+
+    def _fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("Telegram application path should not be used for Feishu-only startup")
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr(
+        "app.main.JavLibraryReadOnlyHelperClient",
+        lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
+    )
+    monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fail_if_called)
+    monkeypatch.setattr("app.main._run_application_polling", _fail_if_called)
+    monkeypatch.setattr("app.main._run_non_telegram_host", _fake_run_non_telegram_host)
+    monkeypatch.setattr(
+        "app.main.ProwlarrClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("ProwlarrClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.TransmissionClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("legacy TransmissionClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.QbittorrentClient",
+        lambda **_kwargs: created.setdefault("qb_client_calls", []).append(_kwargs) or SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "app.main.FeishuClient",
+        lambda **_kwargs: created.setdefault("feishu_client_calls", []).append(_kwargs) or SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "app.main.FeishuLongConnectionService",
+        lambda **kwargs: created.setdefault("feishu_service_calls", []).append(kwargs) or SimpleNamespace(),
+    )
+
+    run_main()
+
+    host = created["host"]
+    assert created["config"].post_download_auto_import_service_key == "post_download_auto_import_service"
+    assert FEISHU_LONG_CONNECTION_SERVICE_KEY in host.bot_data
+    assert isinstance(host.bot_data[CHANNEL_CONTACT_REGISTRY_KEY], ChannelContactRegistry)
+    assert created["feishu_client_calls"][0]["app_id"] == "feishu-app-id"
+    assert created["feishu_service_calls"][0]["config"].app_id == "feishu-app-id"
+    assert created["feishu_service_calls"][0]["config"].app_secret == "feishu-app-secret"
+    assert created.get("qb_client_calls", []) == []
+
+
+def test_main_uses_non_telegram_host_when_wecom_is_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        telegram_bot_token="",
+        wecom_token="wecom-token",
+        wecom_encoding_aes_key="wecom-aes",
+        wecom_receive_id="wecom-receive-id",
+    )
+    created: dict[str, object] = {}
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    async def _fake_run_non_telegram_host(host, *, config) -> None:
+        created["host"] = host
+        created["config"] = config
+
+    def _fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("Telegram application path should not be used for WeCom-only startup")
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr(
+        "app.main.JavLibraryReadOnlyHelperClient",
+        lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
+    )
+    monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fail_if_called)
+    monkeypatch.setattr("app.main._run_application_polling", _fail_if_called)
+    monkeypatch.setattr("app.main._run_non_telegram_host", _fake_run_non_telegram_host)
+    monkeypatch.setattr(
+        "app.main.ProwlarrClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("ProwlarrClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.TransmissionClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("legacy TransmissionClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.QbittorrentClient",
+        lambda **_kwargs: created.setdefault("qb_client_calls", []).append(_kwargs) or SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "app.main.FeishuClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("FeishuClient should not be created in WeCom-only mode")),
+    )
+    monkeypatch.setattr(
+        "app.main.FeishuLongConnectionService",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("FeishuLongConnectionService should not be created in WeCom-only mode")),
+    )
+
+    run_main()
+
+    host = created["host"]
+    assert created["config"].post_download_auto_import_service_key == "post_download_auto_import_service"
+    assert WECOM_TOKEN_BOT_DATA_KEY in host.bot_data
+    assert WECOM_ENCODING_AES_KEY_BOT_DATA_KEY in host.bot_data
+    assert WECOM_RECEIVE_ID_BOT_DATA_KEY in host.bot_data
+    assert isinstance(host.bot_data[CHANNEL_CONTACT_REGISTRY_KEY], ChannelContactRegistry)
+    assert isinstance(host.bot_data["wecom_webhook_server_config"], WeComWebhookServerConfig)
+    assert FEISHU_LONG_CONNECTION_SERVICE_KEY not in host.bot_data
+
+
+def test_start_bt_subscription_scheduler_skips_without_send_text_callback(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    host = SimpleNamespace(
+        bot_data={
+            MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: SimpleNamespace(run_scheduler_tick=AsyncMock(return_value=())),
+            DOWNLOADER_INSTANCES_KEY: {
+                "bt-main": SimpleNamespace(name="bt-main", downloader_type="transmission", download_dir="/data"),
+            },
+            DOWNLOADER_ROLE_BINDING_KEY: DownloaderRoleBinding(pt_downloader="bt-main", bt_downloader="bt-main"),
+        },
+        create_task=Mock(),
+    )
+
+    _start_bt_subscription_scheduler_if_configured(host)
+
+    output = capsys.readouterr().out
+    assert "[BT 订阅后台扫描未启动]" in output
+    assert "主动 send_text 能力" in output
+    assert host.create_task.call_count == 0
+    assert BT_SUBSCRIPTION_SCHEDULER_TASK_KEY not in host.bot_data
 
 
 async def _return_async(value):

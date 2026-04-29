@@ -205,3 +205,65 @@
 
 ### 下轮目标
 - 锁定首个 non-Telegram 一等公民画像与 focused tests 边界
+
+## Round 13 — 2026-04-29 09:40
+
+### 完成
+- 锁定首个 non-Telegram 一等公民最小画像为 `Feishu-only` 文本私聊独立启动 + 当前入站即时回复
+- 让 `TELEGRAM_BOT_TOKEN` 改为 Telegram 宿主条件必填，并新增非 Telegram host 启动路径
+- 让无主动 `send_text` 能力的宿主显式跳过 `btsub` 后台扫描，避免把 non-Telegram 后台通知伪装成可用
+
+### 测试状态
+- 通过: 6 / 总计: 6
+
+### 遗留 / 下轮继续
+- `WeCom-only` 独立宿主与 non-Telegram 后台主动通知可逆会话真相仍未完成
+
+## Round 14 — 2026-04-29 11:03
+
+### 完成
+- 新增 `app/bot/channel_contact_runtime.py`，实现 in-memory channel contact registry 与可逆查询 API
+- 在 Feishu / WeCom / personal WeChat 入站路径里记录外部会话地址到 `bot_data`
+- 给 `main` 与 Telegram build path 注入同一个联系人注册表实例，保持 Feishu-only / WeCom-only 独立宿主不回退
+- 补齐 focused tests，覆盖 registry fail-closed、入站记录回查和 main 注入
+
+### 测试状态
+- 通过: 8 / 总计: 8
+
+### 遗留 / 下轮继续
+- non-Telegram 后台主动通知仍只完成了可逆真相层，尚未接入真正回发实现
+
+### 下轮目标
+- 把联系人注册表接到后台通知发送链路，再单独处理 personal WeChat 登录重做或 richer reply
+
+## Round 14 — 2026-04-29 10:35
+
+### 完成
+- 落地 `WeCom-only` 独立宿主：Telegram token 为空时，若 WeCom 三元组完整，则会走 webhook + shared runtime 的 non-Telegram 启动路径
+- 保持 `Feishu-only` 最小画像不回退，并让 non-Telegram 启动选择在 WeCom 与 Feishu 之间有明确优先级
+- 保持无主动 `send_text` 能力的宿主显式不启动 `btsub` 后台扫描，避免伪装成可用
+
+### 测试状态
+- 通过: 12 / 总计: 12
+
+### 遗留 / 下轮继续
+- non-Telegram 后台主动通知所需的可逆会话真相仍未完成
+
+### 下轮目标
+- 把后台通知的“内部 `chat_id` 到可发回路”单独收口成下一层真相
+
+## Round 15 — 2026-04-29 11:05
+
+### 完成
+- 新增 non-Telegram 运行态联系人注册表，按内部 `chat_id` 记录 Feishu / WeCom / personal WeChat 的外部会话地址
+- 让 Feishu / WeCom / personal WeChat inbound 在进入 shared runtime 前写入可逆会话真相
+- 保持当前不改 SQLite schema，只补 truth layer，不把后台主动发送实现偷带进来
+
+### 测试状态
+- 通过: 16 / 总计: 16
+
+### 遗留 / 下轮继续
+- non-Telegram 后台主动通知仍未真正接上可发回路
+
+### 下轮目标
+- 把运行态联系人注册表接到后台回发链路，定义 Feishu / WeCom 的最小发送协议与失败语义

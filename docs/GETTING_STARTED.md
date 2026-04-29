@@ -18,7 +18,7 @@
 - 如果要在**没有外挂字幕**时自动检查/提取视频内嵌字幕：
   `ffmpeg` 需要在当前 shell 的 `PATH` 里可执行；`ffprobe` 若存在会优先用于探测
 - 当前最少要能访问：
-  - Telegram Bot
+  - Telegram Bot，或成对配置的 Feishu 应用凭据，或完整的 WeCom 三元组
   - Prowlarr
   - Transmission 或 qBittorrent
 - 如果要跑真实 import / refresh：
@@ -55,7 +55,7 @@ cp .env.example .env
 
 这里只补几个最容易忘的约束：
 
-- 当前启动硬必填仍是 `TELEGRAM_BOT_TOKEN`
+- 当前启动至少要满足一条宿主链：`TELEGRAM_BOT_TOKEN`，或成对填写 `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID`，或成对填写 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`
 - `PROWLARR_BASE_URL` / `PROWLARR_API_KEY` 现在是能力必填：只有你要用 PT / 自然语言搜索，或依赖 Prowlarr 的 `btsub` 扫描时才需要；要么都空、要么都填
 - `TRANSMISSION_BASE_URL` 现在是 legacy 单实例回退必填：如果你已经配置了可用的 `DOWNLOADER_INSTANCES`，它可以留空；如果两者都没配，启动仍会 fail-closed
 - 如果你还要跑 import / refresh 联调，再补 `LIBRARY_TARGET_DIR`、`EMBY_BASE_URL`、`EMBY_API_KEY`
@@ -67,7 +67,7 @@ cp .env.example .env
 
 补 WeCom 真实私聊 smoke 前，可以先在 `app.main` 已运行的前提下，用 `curl -si http://127.0.0.1:18889/wecom/callback` 确认本地 callback 已经监听；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 里的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于入口已就绪，不等于真实私聊 smoke 已完成；如果直接拿到 `connection refused`，先回头确认应用是否真的已启动。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改，不要死抄这里的样例。
 
-Feishu 当前只保留 SDK 长连接入口；不再需要配置公网 HTTPS webhook、`FEISHU_INBOUND_MODE` 或 `FEISHU_ENCRYPT_KEY`。
+Feishu 当前只保留 SDK 长连接入口；不再需要配置公网 HTTPS webhook、`FEISHU_INBOUND_MODE` 或 `FEISHU_ENCRYPT_KEY`。如果 Telegram 为空，当前代码会优先走 WeCom 宿主，再回落到 Feishu 宿主。
 
 ## 4. 启动本地测试栈（需要真实 import / refresh 时）
 
@@ -166,10 +166,10 @@ docker compose logs -f luminarr
 - **Emby**：入库刷新目标，需要 `EMBY_BASE_URL` 和 `EMBY_API_KEY`。
 - **TMDB API Key**：不填会关闭 metadata 增强，但不阻塞启动。
 - **Fanart.tv API Key**：不填会关闭 fanart 抓取，不阻塞启动。
-- **Telegram Bot Token**：当前是启动硬必填。Telegram 私聊入口无论你用不用都必须先有 token。
+- **Telegram Bot Token**：当前改为 Telegram 宿主条件必填；如果你只跑 `Feishu-only` / `WeCom-only` 文本私聊最小基线，可以留空，但 Telegram 私聊入口和 personal WeChat 登录辅助都会不可用。
 - **可选：OpenAI / 字幕翻译 Key**：仅影响 `.srt` 字幕自动翻译。
 - **可选：`ffmpeg`（`ffprobe` 可选）**：只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要；当前代码默认直接从 `PATH` 调用，若缺少 `ffprobe` 会自动回退到 `ffmpeg -i` 做探测。
-- **可选：Feishu / WeCom 渠道启用凭据**：标准 `requirements.txt` 已自带 Feishu SDK；Feishu 只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对填写即可启用，WeCom 仍需三元组“要么都空、要么都填”。
+- **可选：Feishu / WeCom 渠道启用凭据**：标准 `requirements.txt` 已自带 Feishu SDK；Feishu 只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对填写即可启用，WeCom 需要 `WECOM_TOKEN` / `WECOM_ENCODING_AES_KEY` / `WECOM_RECEIVE_ID` 三元组“要么都空、要么都填”。
 
 如果这台机器不能直连公网（Telegram / TMDB / Fanart / BT 外站），再加一条 `OUTBOUND_PROXY_URL=http://192.168.2.110:7890` 走宿主机或旁路由代理；Transmission / Emby / Prowlarr 这类本地地址仍然直连，不吃代理。
 

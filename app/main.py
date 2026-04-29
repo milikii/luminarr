@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 import httpx
 from telegram.error import NetworkError
 
+from app.bot import telegram_bot as tg
+from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
 from app.bot.feishu_long_connection import (
     FEISHU_LONG_CONNECTION_SERVICE_KEY,
     FeishuLongConnectionConfig,
     FeishuLongConnectionService,
 )
+from app.bot.non_telegram_runtime_host import NonTelegramRuntimeHost
 from app.bot.private_chat_bt_subscription_runtime import (
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT,
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
@@ -19,6 +23,11 @@ from app.bot.private_chat_search_runtime import (
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
 )
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
+from app.bot.telegram_sidecar_runtime import (
+    TELEGRAM_SIDECAR_RUNTIME_CONFIG,
+    start_non_telegram_sidecar_host_lifecycle,
+    stop_non_telegram_sidecar_host_lifecycle,
+)
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
     WECOM_RECEIVE_ID_BOT_DATA_KEY,
@@ -37,7 +46,7 @@ from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
 from app.clients.web_source import SUPPORTED_WEB_SOURCE_RULES, WebSourceClient
-from app.config import DownloaderInstanceConfig, load_settings
+from app.config import ConfigError, DownloaderInstanceConfig, load_settings
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
@@ -59,6 +68,7 @@ from app.downloader_route_lookup import (
     _resolve_downloader_instance_and_client,
 )
 from app.operational_logging import emit_operational_log
+from app.runtime.execution_policy import ExecutionGate
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.adult_archive_service import AdultArchiveService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
@@ -85,6 +95,27 @@ def _run_application_polling(application) -> None:
             fix_hint="检查当前网络、DNS 和 `TELEGRAM_BOT_TOKEN` 是否可访问 Telegram Bot API 后重试。",
         )
         raise
+
+
+async def _run_non_telegram_host(host: NonTelegramRuntimeHost, *, config) -> None:
+    try:
+        await start_non_telegram_sidecar_host_lifecycle(host, config=config)
+        await host.wait_until_stopped()
+    finally:
+        await stop_non_telegram_sidecar_host_lifecycle(host, config=config)
+
+
+def _resolve_runtime_host_mode(settings) -> str:
+    if settings.has_telegram_host():
+        return "telegram"
+    if settings.has_wecom_host():
+        return "wecom"
+    if settings.has_feishu_host():
+        return "feishu"
+    raise ConfigError(
+        "TELEGRAM_BOT_TOKEN is required unless FEISHU_APP_ID/FEISHU_APP_SECRET or "
+        "WECOM_TOKEN/WECOM_ENCODING_AES_KEY/WECOM_RECEIVE_ID are set"
+    )
 
 
 def _resolve_downloader_client_for_dispatch(
@@ -221,8 +252,51 @@ def _build_refresh_media_server_func(settings):
     return refresh_service.refresh_text
 
 
+def _populate_non_telegram_runtime_bot_data(
+    *,
+    bot_data: dict[str, object],
+    channel_contact_registry: ChannelContactRegistry,
+    search_service: SearchMediaService,
+    add_to_downloader_service: AddToDownloaderService,
+    get_download_status_service: GetDownloadStatusService,
+    import_to_library_service: ImportToLibraryService,
+    cleanup_downloaded_source_service: CleanupDownloadedSourceService,
+    manage_watchlist_service: ManageWatchlistService,
+    manage_bt_subscription_service: ManageBtSubscriptionService,
+    post_download_auto_import_service: PostDownloadAutoImportService,
+    job_repo: JobRepo,
+    bt_pending_repo: BtPendingRepo,
+    raw_bt_destination_options: tuple,
+    downloader_instances: tuple[DownloaderInstanceConfig, ...],
+    downloader_role_binding,
+    bt_tmdb_movie_candidates_lookup_func,
+    bt_tmdb_tv_candidates_lookup_func,
+) -> None:
+    bot_data[CHANNEL_CONTACT_REGISTRY_KEY] = channel_contact_registry
+    bot_data[tg.SEARCH_SERVICE_KEY] = search_service
+    bot_data[tg.ADD_TO_DOWNLOADER_SERVICE_KEY] = add_to_downloader_service
+    bot_data[tg.GET_DOWNLOAD_STATUS_SERVICE_KEY] = get_download_status_service
+    bot_data[tg.IMPORT_TO_LIBRARY_SERVICE_KEY] = import_to_library_service
+    bot_data[tg.POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY] = post_download_auto_import_service
+    bot_data[tg.CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_downloaded_source_service
+    bot_data[tg.MANAGE_WATCHLIST_SERVICE_KEY] = manage_watchlist_service
+    bot_data[tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY] = manage_bt_subscription_service
+    bot_data[tg.EXECUTION_GATE_KEY] = ExecutionGate()
+    bot_data[tg.DOWNLOADER_INSTANCES_KEY] = downloader_instances
+    bot_data[tg.DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
+    bot_data[tg.RAW_BT_DESTINATION_OPTIONS_KEY] = raw_bt_destination_options
+    bot_data[tg.BT_PENDING_REPO_KEY] = bt_pending_repo
+    bot_data[tg.JOB_REPO_KEY] = job_repo
+    if bt_tmdb_movie_candidates_lookup_func is not None:
+        bot_data[tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func
+    if bt_tmdb_tv_candidates_lookup_func is not None:
+        bot_data[tg.BT_TMDB_TV_CANDIDATES_LOOKUP_KEY] = bt_tmdb_tv_candidates_lookup_func
+
+
 def main() -> None:
     settings = load_settings()
+    host_mode = _resolve_runtime_host_mode(settings)
+    has_telegram_host = host_mode == "telegram"
     trace_log_dir = Path((os.getenv("LUMINARR_LOG_DIR", "./logs") or "./logs").strip()).expanduser()
     trace_log_path = configure_trace_log_file(log_dir=trace_log_dir)
     database = SqliteDatabase(settings.sqlite_db_path)
@@ -238,6 +312,7 @@ def main() -> None:
     telegram_update_repo = TelegramUpdateRepo(database)
     watchlist_repo = WatchlistRepo(database)
     clarification_repo = ClarificationRepo(database)
+    channel_contact_registry = ChannelContactRegistry()
 
     async def search_capability_unavailable(_: str) -> list[dict[str, object]]:
         return []
@@ -456,57 +531,87 @@ def main() -> None:
         search_func=bt_source_adapter.search,
         add_to_downloader_service=add_to_downloader_service,
     )
-    application = build_application(
-        settings.telegram_bot_token,
-        search_service,
-        add_to_downloader_service,
-        get_download_status_service,
-        import_to_library_service,
-        cleanup_downloaded_source_service,
-        manage_watchlist_service,
-        manage_bt_subscription_service,
-        post_download_auto_import_service=post_download_auto_import_service,
-        telegram_update_repo=telegram_update_repo,
-        job_repo=job_repo,
-        bt_pending_repo=bt_pending_repo,
-        bt_tmdb_movie_candidates_lookup_func=tmdb_client.search_movie_candidates if settings.tmdb_api_key else None,
-        bt_tmdb_tv_candidates_lookup_func=tmdb_client.search_tv_candidates if settings.tmdb_api_key else None,
-        raw_bt_destination_options=settings.raw_bt_destination_options,
-        downloader_instances=settings.downloader_instances,
-        downloader_role_binding=settings.downloader_role_binding,
-        outbound_proxy_url=settings.outbound_proxy_url,
-    )
+    bt_tmdb_movie_candidates_lookup_func = tmdb_client.search_movie_candidates if settings.tmdb_api_key else None
+    bt_tmdb_tv_candidates_lookup_func = tmdb_client.search_tv_candidates if settings.tmdb_api_key else None
+    runtime_host: object
+    if has_telegram_host:
+        runtime_host = build_application(
+            settings.telegram_bot_token,
+            search_service,
+            add_to_downloader_service,
+            get_download_status_service,
+            import_to_library_service,
+            cleanup_downloaded_source_service,
+            manage_watchlist_service,
+            manage_bt_subscription_service,
+            post_download_auto_import_service=post_download_auto_import_service,
+            telegram_update_repo=telegram_update_repo,
+            job_repo=job_repo,
+            bt_pending_repo=bt_pending_repo,
+            bt_tmdb_movie_candidates_lookup_func=bt_tmdb_movie_candidates_lookup_func,
+            bt_tmdb_tv_candidates_lookup_func=bt_tmdb_tv_candidates_lookup_func,
+            raw_bt_destination_options=settings.raw_bt_destination_options,
+            downloader_instances=settings.downloader_instances,
+            downloader_role_binding=settings.downloader_role_binding,
+            outbound_proxy_url=settings.outbound_proxy_url,
+            channel_contact_registry=channel_contact_registry,
+        )
+    else:
+        runtime_host = NonTelegramRuntimeHost()
+        _populate_non_telegram_runtime_bot_data(
+            bot_data=runtime_host.bot_data,
+            channel_contact_registry=channel_contact_registry,
+            search_service=search_service,
+            add_to_downloader_service=add_to_downloader_service,
+            get_download_status_service=get_download_status_service,
+            import_to_library_service=import_to_library_service,
+            cleanup_downloaded_source_service=cleanup_downloaded_source_service,
+            manage_watchlist_service=manage_watchlist_service,
+            manage_bt_subscription_service=manage_bt_subscription_service,
+            post_download_auto_import_service=post_download_auto_import_service,
+            job_repo=job_repo,
+            bt_pending_repo=bt_pending_repo,
+            raw_bt_destination_options=settings.raw_bt_destination_options,
+            downloader_instances=settings.downloader_instances,
+            downloader_role_binding=settings.downloader_role_binding,
+            bt_tmdb_movie_candidates_lookup_func=bt_tmdb_movie_candidates_lookup_func,
+            bt_tmdb_tv_candidates_lookup_func=bt_tmdb_tv_candidates_lookup_func,
+        )
+    bot_data = runtime_host.bot_data
     if not settings.has_prowlarr_search():
-        application.bot_data[SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY] = SEARCH_CAPABILITY_UNAVAILABLE_TEXT
-        application.bot_data[BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY] = (
+        bot_data[SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY] = SEARCH_CAPABILITY_UNAVAILABLE_TEXT
+        bot_data[BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY] = (
             BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT
         )
     if trace_log_path is not None:
-        application.bot_data[TRACE_LOG_PATH_BOT_DATA_KEY] = trace_log_path
-    application.bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()
-    if settings.feishu_app_id and settings.feishu_app_secret:
+        bot_data[TRACE_LOG_PATH_BOT_DATA_KEY] = trace_log_path
+    bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()
+    if host_mode in {"telegram", "feishu"} and settings.has_feishu_host():
         feishu_client = FeishuClient(
             app_id=settings.feishu_app_id,
             app_secret=settings.feishu_app_secret,
             base_url=settings.feishu_base_url,
         )
-        application.bot_data[FEISHU_LONG_CONNECTION_SERVICE_KEY] = FeishuLongConnectionService(
+        bot_data[FEISHU_LONG_CONNECTION_SERVICE_KEY] = FeishuLongConnectionService(
             config=FeishuLongConnectionConfig(
                 app_id=settings.feishu_app_id,
                 app_secret=settings.feishu_app_secret,
             ),
             feishu_client=feishu_client,
         )
-    if settings.wecom_token and settings.wecom_encoding_aes_key and settings.wecom_receive_id:
-        application.bot_data[WECOM_TOKEN_BOT_DATA_KEY] = settings.wecom_token
-        application.bot_data[WECOM_ENCODING_AES_KEY_BOT_DATA_KEY] = settings.wecom_encoding_aes_key
-        application.bot_data[WECOM_RECEIVE_ID_BOT_DATA_KEY] = settings.wecom_receive_id
-        application.bot_data["wecom_webhook_server_config"] = WeComWebhookServerConfig(
+    if host_mode in {"telegram", "wecom"} and settings.has_wecom_host():
+        bot_data[WECOM_TOKEN_BOT_DATA_KEY] = settings.wecom_token
+        bot_data[WECOM_ENCODING_AES_KEY_BOT_DATA_KEY] = settings.wecom_encoding_aes_key
+        bot_data[WECOM_RECEIVE_ID_BOT_DATA_KEY] = settings.wecom_receive_id
+        bot_data["wecom_webhook_server_config"] = WeComWebhookServerConfig(
             host=settings.wecom_webhook_host,
             port=settings.wecom_webhook_port,
             path=settings.wecom_webhook_path,
         )
-    _run_application_polling(application)
+    if has_telegram_host:
+        _run_application_polling(runtime_host)
+        return
+    asyncio.run(_run_non_telegram_host(runtime_host, config=TELEGRAM_SIDECAR_RUNTIME_CONFIG))
 
 
 if __name__ == "__main__":

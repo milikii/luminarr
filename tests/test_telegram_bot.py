@@ -26,6 +26,7 @@ from app.bot.telegram_sidecar_runtime import (
     stop_telegram_application_lifecycle,
 )
 from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
+from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
 from app.bot.telegram_runtime_adapter import (
@@ -6933,6 +6934,7 @@ def test_build_application_registers_services() -> None:
         pt_downloader="tr-main",
         bt_downloader="tr-main",
     )
+    channel_contact_registry = ChannelContactRegistry()
     application = build_application(
         "token",
         search_service,
@@ -6949,6 +6951,7 @@ def test_build_application_registers_services() -> None:
         ),
         downloader_instances=downloader_instances,
         downloader_role_binding=downloader_role_binding,
+        channel_contact_registry=channel_contact_registry,
     )
     assert application.bot_data[SEARCH_SERVICE_KEY] is search_service
     assert application.bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] is add_service
@@ -6962,6 +6965,7 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[RAW_BT_DESTINATION_OPTIONS_KEY][0].key == "downloads"
     assert application.bot_data[DOWNLOADER_INSTANCES_KEY] == downloader_instances
     assert application.bot_data[DOWNLOADER_ROLE_BINDING_KEY] is downloader_role_binding
+    assert application.bot_data[CHANNEL_CONTACT_REGISTRY_KEY] is channel_contact_registry
     assert callable(application.bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY])
     assert callable(application.bot_data[TELEGRAM_SEND_TEXT_FUNC_KEY])
     assert any(

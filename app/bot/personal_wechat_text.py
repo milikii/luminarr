@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
+from app.bot.channel_contact_runtime import record_channel_contact
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.operational_logging import emit_operational_log
@@ -162,17 +163,27 @@ async def handle_personal_wechat_private_text_event(
         )
         return result
 
+    chat_id = project_channel_chat_id(
+        channel=PERSONAL_WECHAT_CHANNEL,
+        external_chat_id=event.from_user_id,
+    )
+    user_id = project_channel_user_id(
+        channel=PERSONAL_WECHAT_CHANNEL,
+        external_user_id=event.from_user_id,
+    )
+    record_channel_contact(
+        bot_data,
+        channel=PERSONAL_WECHAT_CHANNEL,
+        internal_chat_id=chat_id,
+        external_chat_id=event.from_user_id,
+        external_user_id=event.from_user_id,
+    )
+
     await dispatch_private_chat_text(
         query=event.text,
         reply_func=reply_with_event,
-        chat_id=project_channel_chat_id(
-            channel=PERSONAL_WECHAT_CHANNEL,
-            external_chat_id=event.from_user_id,
-        ),
-        user_id=project_channel_user_id(
-            channel=PERSONAL_WECHAT_CHANNEL,
-            external_user_id=event.from_user_id,
-        ),
+        chat_id=chat_id,
+        user_id=user_id,
         channel=PERSONAL_WECHAT_CHANNEL,
         bot_data=bot_data,
     )

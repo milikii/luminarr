@@ -53,6 +53,63 @@ def test_load_settings_reads_token() -> None:
     assert settings.adult_bt_retention_hours == 96
 
 
+def test_load_settings_allows_missing_telegram_token_when_feishu_host_is_configured() -> None:
+    settings = load_settings(
+        {
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "FEISHU_APP_ID": "feishu-app-id",
+            "FEISHU_APP_SECRET": "feishu-app-secret",
+        }
+    )
+
+    assert settings.telegram_bot_token == ""
+    assert settings.feishu_app_id == "feishu-app-id"
+    assert settings.feishu_app_secret == "feishu-app-secret"
+
+
+def test_load_settings_allows_missing_telegram_token_when_wecom_host_is_configured() -> None:
+    settings = load_settings(
+        {
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "WECOM_TOKEN": "wecom-token",
+            "WECOM_ENCODING_AES_KEY": "wecom-aes",
+            "WECOM_RECEIVE_ID": "wecom-receive-id",
+        }
+    )
+
+    assert settings.telegram_bot_token == ""
+    assert settings.wecom_token == "wecom-token"
+    assert settings.wecom_encoding_aes_key == "wecom-aes"
+    assert settings.wecom_receive_id == "wecom-receive-id"
+
+
+def test_load_settings_rejects_missing_telegram_token_without_feishu_host() -> None:
+    with pytest.raises(ConfigError, match="TELEGRAM_BOT_TOKEN"):
+        load_settings(
+            {
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            }
+        )
+
+
+def test_load_settings_rejects_partial_feishu_credentials_without_telegram_token() -> None:
+    with pytest.raises(ConfigError, match="FEISHU_APP_ID and FEISHU_APP_SECRET"):
+        load_settings(
+            {
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "FEISHU_APP_ID": "feishu-app-id",
+            }
+        )
+
+
 def test_load_settings_reads_outbound_proxy_url() -> None:
     settings = load_settings(
         {

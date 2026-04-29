@@ -95,6 +95,15 @@ async def start_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSid
     _start_bt_subscription_scheduler_if_configured(host)
 
 
+async def start_non_telegram_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
+    """Start the minimal sidecars for a non-Telegram host."""
+
+    _start_wecom_webhook_server_if_configured(host, config=config)
+    await _start_feishu_long_connection_if_configured(host)
+    _start_post_download_auto_import_scheduler(host, config=config)
+    _start_bt_subscription_scheduler_if_configured(host)
+
+
 async def stop_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
     """Stop all generic sidecars and schedulers for the given host."""
 
@@ -102,6 +111,15 @@ async def stop_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSide
     await _shutdown_feishu_long_connection_if_running(host)
     await _shutdown_personal_wechat_text_service_if_running(host)
     await _shutdown_personal_wechat_login_service_if_running(host, config=config)
+    await _stop_post_download_auto_import_scheduler(host, config=config)
+    await _stop_bt_subscription_scheduler_if_running(host)
+
+
+async def stop_non_telegram_sidecar_host_lifecycle(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
+    """Stop the minimal sidecars for a non-Telegram host."""
+
+    _stop_wecom_webhook_server_if_running(host, config=config)
+    await _shutdown_feishu_long_connection_if_running(host)
     await _stop_post_download_auto_import_scheduler(host, config=config)
     await _stop_bt_subscription_scheduler_if_running(host)
 
@@ -225,7 +243,7 @@ def _log_bt_subscription_scheduler_config_error(*, reason: str) -> None:
     emit_operational_log(
         title="BT 订阅后台扫描未启动",
         detail=f"原因={reason}",
-        fix_hint="检查 BT 下载器角色绑定和下载器实例配置后重启应用。",
+        fix_hint="检查当前宿主是否支持后台主动通知，以及 BT 下载器角色绑定和下载器实例配置后重启应用。",
     )
 
 
@@ -256,6 +274,12 @@ def _log_bt_subscription_scheduler_send_error(*, chat_id: int, error: Exception)
 def _start_bt_subscription_scheduler_if_configured(host: SidecarHost) -> None:
     existing_task = host.bot_data.get(BT_SUBSCRIPTION_SCHEDULER_TASK_KEY)
     if isinstance(existing_task, asyncio.Task) and not existing_task.done():
+        return
+
+    if resolve_sidecar_host_send_text_func(bot_data=host.bot_data, send_text_func_key=SIDECAR_HOST_SEND_TEXT_FUNC_KEY) is None:
+        _log_bt_subscription_scheduler_config_error(
+            reason="宿主未注入主动 send_text 能力，后台自动扫描不会启动。",
+        )
         return
 
     bt_subscription_service = host.bot_data.get(MANAGE_BT_SUBSCRIPTION_SERVICE_KEY)

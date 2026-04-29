@@ -7,6 +7,12 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.bot.channel_contact_runtime import (
+    CHANNEL_CONTACT_REGISTRY_KEY,
+    ChannelContact,
+    ChannelContactRegistry,
+    resolve_channel_contact,
+)
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.personal_wechat_text import (
     PERSONAL_WECHAT_CHANNEL,
@@ -57,11 +63,13 @@ def _build_bot_data(
     cleanup_service: CleanupDownloadedSourceService | None = None,
 ) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
+    channel_contact_registry = ChannelContactRegistry()
     bot_data = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+        CHANNEL_CONTACT_REGISTRY_KEY: channel_contact_registry,
     }
     if cleanup_service is not None:
         bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
@@ -270,6 +278,27 @@ def test_handle_personal_wechat_private_text_event_projects_ids_and_routes_into_
     )
     assert dispatch_private_chat_text.await_args.kwargs["user_id"] == project_channel_user_id(
         channel=PERSONAL_WECHAT_CHANNEL,
+        external_user_id="wx-user-1",
+    )
+
+
+def test_handle_personal_wechat_private_text_event_records_external_chat_contact() -> None:
+    bot_data = _build_bot_data()
+
+    asyncio.run(
+        handle_personal_wechat_private_text_event(
+            account_id="wx-account-1",
+            message=_build_text_message("dune"),
+            bot_data=bot_data,
+            reply_text_func=AsyncMock(),
+        )
+    )
+
+    internal_chat_id = project_channel_chat_id(channel=PERSONAL_WECHAT_CHANNEL, external_chat_id="wx-user-1")
+    assert resolve_channel_contact(bot_data, internal_chat_id=internal_chat_id) == ChannelContact(
+        channel=PERSONAL_WECHAT_CHANNEL,
+        internal_chat_id=internal_chat_id,
+        external_chat_id="wx-user-1",
         external_user_id="wx-user-1",
     )
 

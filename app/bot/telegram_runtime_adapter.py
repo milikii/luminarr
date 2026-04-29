@@ -3,6 +3,7 @@ from __future__ import annotations
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
+from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.job_repo import JobRepo
@@ -128,6 +129,7 @@ def build_telegram_application(
     downloader_instances: tuple[DownloaderInstanceConfig, ...] = (),
     downloader_role_binding: DownloaderRoleBinding | None = None,
     outbound_proxy_url: str = "",
+    channel_contact_registry: ChannelContactRegistry | None = None,
 ) -> Application:
     from app.bot import telegram_bot as tg
 
@@ -153,6 +155,8 @@ def build_telegram_application(
     application.bot_data[tg.EXECUTION_GATE_KEY] = execution_gate or ExecutionGate()
     application.bot_data[tg.DOWNLOADER_INSTANCES_KEY] = downloader_instances
     application.bot_data[tg.DOWNLOADER_ROLE_BINDING_KEY] = downloader_role_binding
+    if channel_contact_registry is not None:
+        application.bot_data[CHANNEL_CONTACT_REGISTRY_KEY] = channel_contact_registry
     application.bot_data[tg.TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
     send_text_func = build_telegram_send_text_func(application)
     application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = send_text_func

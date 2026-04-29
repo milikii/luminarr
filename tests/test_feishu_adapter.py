@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+import app.bot.channel_contact_runtime as channel_contact_runtime
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.feishu_adapter import (
     FEISHU_CHANNEL,
@@ -56,11 +57,13 @@ def _build_bot_data(
     cleanup_service: CleanupDownloadedSourceService | None = None,
 ) -> dict[str, object]:
     search_service = SearchMediaService(_fake_search)
+    channel_contact_registry = channel_contact_runtime.ChannelContactRegistry()
     bot_data = {
         SEARCH_SERVICE_KEY: search_service,
         ADD_TO_DOWNLOADER_SERVICE_KEY: AddToDownloaderService(search_service, AsyncMock()),
         GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
         IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+        channel_contact_runtime.CHANNEL_CONTACT_REGISTRY_KEY: channel_contact_registry,
     }
     if cleanup_service is not None:
         bot_data[CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY] = cleanup_service
@@ -198,12 +201,13 @@ def test_parse_feishu_private_text_event_ignores_non_private_or_non_text_message
 
 
 def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
+    bot_data = _build_bot_data()
     reply_text_func = AsyncMock()
 
     asyncio.run(
         handle_feishu_private_text_event(
             payload=_build_feishu_private_text_payload("dune"),
-            bot_data=_build_bot_data(),
+            bot_data=bot_data,
             reply_text_func=reply_text_func,
         )
     )
@@ -216,6 +220,35 @@ def test_handle_feishu_private_text_event_routes_into_shared_runtime() -> None:
     assert "候选结果（1 条）" in reply_text
     assert "开始下载：发送 select 1" in reply_text
     assert "Dune (2021)" in reply_text
+    contact = channel_contact_runtime.resolve_channel_contact(
+        bot_data,
+        internal_chat_id=project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="oc_feishu_chat_1"),
+    )
+    assert contact is not None
+    assert contact.external_chat_id == "oc_feishu_chat_1"
+    assert contact.external_user_id == "ou_feishu_user_1"
+
+
+def test_handle_feishu_private_text_event_records_external_chat_contact() -> None:
+    bot_data = _build_bot_data()
+
+    asyncio.run(
+        handle_feishu_private_text_event(
+            payload=_build_feishu_private_text_payload("dune"),
+            bot_data=bot_data,
+            reply_text_func=AsyncMock(),
+        )
+    )
+
+    assert channel_contact_runtime.resolve_channel_contact(
+        bot_data,
+        internal_chat_id=project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="oc_feishu_chat_1"),
+    ) == channel_contact_runtime.ChannelContact(
+        channel=FEISHU_CHANNEL,
+        internal_chat_id=project_channel_chat_id(channel=FEISHU_CHANNEL, external_chat_id="oc_feishu_chat_1"),
+        external_chat_id="oc_feishu_chat_1",
+        external_user_id="ou_feishu_user_1",
+    )
 
 
 def test_handle_feishu_private_text_event_routes_cleanup_inspect_into_shared_runtime(

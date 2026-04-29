@@ -9,8 +9,8 @@
 - `make quality`：通过
 - `adult BT minimum wedge`：已完成并已推送到 `main`
 - Telegram 人工 smoke：应用已启动，等待当前会话验证
-- 下一条唯一主线：把 non-Telegram 运行模式做成一等公民
-- 结论：当前 P0 阻断已清空；后续按 P1 顺序推进，不回切 `services` 结构降本主线
+- 下一条唯一主线：non-Telegram 后台主动通知所需的可逆会话真相
+- 结论：当前 P0 阻断已清空；后续按 P1 / P2 顺序推进，不回切 `services` 结构降本主线
 
 ## P0 已完成
 
@@ -32,7 +32,11 @@
 
 ## P2 已实现但还不完整的能力
 
-- [ ] 把 non-Telegram 运行模式做成一等公民：现在代码里确实实现了 personal WeChat、Feishu、WeCom 私聊入口，但部署和生命周期仍明显是“Telegram-first”。
+- [x] 锁定并落地首个 non-Telegram 一等公民最小画像：`Feishu-only` 文本私聊现在可在无 `TELEGRAM_BOT_TOKEN` 时独立启动，并对当前入站消息即时回复；后台主动通知仍明确不在本轮范围。
+
+- [x] 落地 non-Telegram 第二阶段 `WeCom-only` 独立宿主：当前在无 `TELEGRAM_BOT_TOKEN`、但具备 WeCom 三元组时可以独立启动并通过 webhook 收到消息、同步回包。
+
+- [x] 继续补齐 non-Telegram 后台主动通知所需的可逆会话真相：当前已落地运行态联系人注册表，但 `btsub` / 下载完成等后台通知仍未具备对 non-Telegram 会话的独立可发回路。
 
 - [ ] 强化 watchlist 到自动化链的衔接：`watchlist` 目前只有持久化清单，没有自动扫描、自动建议或和 `btsub` 的桥接逻辑。
 
