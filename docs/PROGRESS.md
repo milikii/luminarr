@@ -158,3 +158,19 @@
 
 ### 下轮目标
 - 盘点 `lark_oapi` 的真实运行边界和安装入口，收口 requirements / extras / operator docs 其中一个最小方案
+
+## Round 10 — 2026-04-29 08:53
+
+### 完成
+- 在 `requirements.txt` 明确补入 `lark-oapi==1.5.3`
+- 收口 `docs/GETTING_STARTED.md` 的 Feishu 安装真相：标准 requirements 已包含 SDK，运行时是否启用仍由 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 决定
+- 新增 `tests/test_feishu_dependency_contract.py`，保护 requirements 与 operator docs 口径一致
+
+### 测试状态
+- 通过: 2 / 总计: 2
+
+### 遗留 / 下轮继续
+- 进入依赖告警清理主线
+
+### 下轮目标
+- 收口 `lark_oapi` / `websockets` deprecation warnings，优先找出可通过升级或局部隔离解决的最小切口

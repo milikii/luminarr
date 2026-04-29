@@ -37,6 +37,8 @@
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
 
+标准 `requirements.txt` 已包含 Feishu SDK，不需要再额外执行一条 Feishu 专用安装命令。是否真的启用 Feishu 长连接，仍取决于你是否同时填写 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
+
 ## 3. 生成本地配置
 
 `.env.example` 是模板，不是自动加载文件。
@@ -61,7 +63,7 @@ cp .env.example .env
 - 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
 - 如果你填了 `DOWNLOADER_INSTANCES` 但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
 - direct magnet 入口当前仍会先问“观影 PT 链 / BT 成人链”；不会因为你配置了成人 BT 站点就自动走成人链
-- Feishu SDK 长连接只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对配置；WeCom 三元组必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
+- 标准 `requirements.txt` 已经包含 Feishu SDK；Feishu 长连接是否启用，只看 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 是否成对配置；WeCom 三元组必须“要么都空、要么都填”；personal WeChat 继续依赖本地登录态，不靠 `.env` 专用键启动
 
 补 WeCom 真实私聊 smoke 前，可以先在 `app.main` 已运行的前提下，用 `curl -si http://127.0.0.1:18889/wecom/callback` 确认本地 callback 已经监听；这条地址来自当前本地已验证 `.env`，不是 `.env.example` 里的默认端口/路径。当前无校验参数时返回 `400 missing echostr` 属于入口已就绪，不等于真实私聊 smoke 已完成；如果直接拿到 `connection refused`，先回头确认应用是否真的已启动。若你本地改过 `WECOM_WEBHOOK_HOST` / `WECOM_WEBHOOK_PORT` / `WECOM_WEBHOOK_PATH`，探针地址也要跟着当前 `.env` 改，不要死抄这里的样例。
 
@@ -167,7 +169,7 @@ docker compose logs -f luminarr
 - **Telegram Bot Token**：当前是启动硬必填。Telegram 私聊入口无论你用不用都必须先有 token。
 - **可选：OpenAI / 字幕翻译 Key**：仅影响 `.srt` 字幕自动翻译。
 - **可选：`ffmpeg`（`ffprobe` 可选）**：只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要；当前代码默认直接从 `PATH` 调用，若缺少 `ffprobe` 会自动回退到 `ffmpeg -i` 做探测。
-- **可选：Feishu SDK / WeCom webhook 凭据**：Feishu 只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对填写；WeCom 仍需三元组“要么都空、要么都填”。
+- **可选：Feishu / WeCom 渠道启用凭据**：标准 `requirements.txt` 已自带 Feishu SDK；Feishu 只需要 `FEISHU_APP_ID` / `FEISHU_APP_SECRET` 成对填写即可启用，WeCom 仍需三元组“要么都空、要么都填”。
 
 如果这台机器不能直连公网（Telegram / TMDB / Fanart / BT 外站），再加一条 `OUTBOUND_PROXY_URL=http://192.168.2.110:7890` 走宿主机或旁路由代理；Transmission / Emby / Prowlarr 这类本地地址仍然直连，不吃代理。
 
