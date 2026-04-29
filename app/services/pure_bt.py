@@ -5,6 +5,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from app.services.bt_candidate_metadata import (
+    extract_codec,
+    extract_release_group,
+    extract_resolution,
+    extract_source_type,
+    safe_optional_int,
+)
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
 from app.services.bt_sources import resolve_bt_source
 
@@ -239,66 +246,14 @@ def _build_bt_candidate(result: Mapping[str, Any]) -> BTCandidate | None:
         source_site=str(result.get("indexerName", "")).strip() or str(result.get("sourceProvider", "")).strip() or "unknown",
         title=title,
         magnet_or_torrent_url=source,
-        size_bytes=_safe_optional_int(result.get("size")),
-        seeders=_safe_optional_int(result.get("seeders")),
-        leechers=_safe_optional_int(result.get("peers")),
-        resolution=_extract_resolution(title),
-        codec=_extract_codec(title),
-        source_type=_extract_source_type(title),
+        size_bytes=safe_optional_int(result.get("size")),
+        seeders=safe_optional_int(result.get("seeders")),
+        leechers=safe_optional_int(result.get("peers")),
+        resolution=extract_resolution(title),
+        codec=extract_codec(title),
+        source_type=extract_source_type(title),
         audio=(),
-        release_group=_extract_release_group(title),
+        release_group=extract_release_group(title),
         age_days=None,
         media_kind="raw_bt",
     )
-
-
-def _extract_resolution(title: str) -> str | None:
-    lowered_title = title.lower()
-    if re.search(r"\b(2160p|4k)\b", lowered_title):
-        return "2160p"
-    if re.search(r"\b1080p\b", lowered_title):
-        return "1080p"
-    if re.search(r"\b720p\b", lowered_title):
-        return "720p"
-    return None
-
-
-def _extract_codec(title: str) -> str | None:
-    lowered_title = title.lower()
-    if re.search(r"\b(x265|hevc)\b", lowered_title):
-        return "x265" if "x265" in lowered_title else "HEVC"
-    if re.search(r"\b(x264|avc)\b", lowered_title):
-        return "x264"
-    return None
-
-
-def _extract_source_type(title: str) -> str | None:
-    lowered_title = title.lower()
-    if "remux" in lowered_title:
-        return "Remux"
-    if "bluray" in lowered_title or "blu-ray" in lowered_title:
-        return "BluRay"
-    if "bdrip" in lowered_title:
-        return "BDRip"
-    if "web-dl" in lowered_title or "webdl" in lowered_title:
-        return "WEB-DL"
-    if "webrip" in lowered_title or "web-rip" in lowered_title:
-        return "WEBRip"
-    return None
-
-
-def _extract_release_group(title: str) -> str | None:
-    matched = re.search(r"-([A-Za-z0-9][A-Za-z0-9-]+)$", title.strip())
-    if matched is None:
-        return None
-    return str(matched.group(1) or "").strip() or None
-
-
-def _safe_optional_int(value: Any) -> int | None:
-    try:
-        resolved = int(value)
-    except (TypeError, ValueError):
-        return None
-    if resolved > 0:
-        return resolved
-    return None

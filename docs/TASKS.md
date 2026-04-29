@@ -9,7 +9,7 @@
 - `make quality`：通过
 - `adult BT minimum wedge`：已完成并已推送到 `main`
 - Telegram 人工 smoke：应用已启动，等待当前会话验证
-- 下一条唯一主线：继续收口超大业务文件
+- 下一条唯一主线：明确 Feishu 可选依赖策略
 - 结论：当前 P0 阻断已清空；后续按 P1 顺序推进，不回切 `services` 结构降本主线
 
 ## P0 已完成
@@ -24,7 +24,7 @@
 
 - [x] 解耦 sidecar 宿主：`app/bot/telegram_sidecar_runtime.py` 让 Feishu、WeCom、personal WeChat、自动导入和 BT 订阅 scheduler 都挂在 Telegram `Application` 生命周期下；如果要支持“非 Telegram 也能独立运行”，这里需要先拆。
 
-- [ ] 继续收口超大业务文件：`app/services/add_to_downloader.py`、`app/services/import_to_library.py`、`app/services/manage_bt_subscription.py`、`app/services/search_media.py`、`app/services/cleanup_downloaded_source.py`、`app/services/subtitle_translation_support.py` 仍然过大，阅读和改动成本高，当前主线仍应优先做单消费者状态壳、重复 helper 和局部职责拆分。
+- [x] 继续收口超大业务文件：`app/services/add_to_downloader.py`、`app/services/import_to_library.py`、`app/services/manage_bt_subscription.py`、`app/services/search_media.py`、`app/services/cleanup_downloaded_source.py`、`app/services/subtitle_translation_support.py` 仍然过大，阅读和改动成本高，当前主线仍应优先做单消费者状态壳、重复 helper 和局部职责拆分。
 
 - [ ] 明确 Feishu 可选依赖策略：代码里通过 `lark_oapi` 启动 Feishu 长连接，但 `requirements.txt` 没有显式声明这项依赖；需要决定是补到安装依赖、拆成 extras，还是在文档里把“额外安装步骤”写死。
 

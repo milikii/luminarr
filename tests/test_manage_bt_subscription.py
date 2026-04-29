@@ -534,7 +534,7 @@ def test_bt_subscription_run_once_uses_shared_bt_scoring_rules(tmp_path: Path, m
         codec_scores=dict(DEFAULT_BT_SCORING_RULES.codec_scores),
         release_group_preferred=DEFAULT_BT_SCORING_RULES.release_group_preferred,
     )
-    monkeypatch.setattr("app.services.manage_bt_subscription.load_bt_scoring_rules", lambda: custom_rules)
+    monkeypatch.setattr("app.services.bt_subscription_candidate_helpers.load_bt_scoring_rules", lambda: custom_rules)
 
     database = _make_database(tmp_path)
     repo = BtSubscriptionRepo(database)

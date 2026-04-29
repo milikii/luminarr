@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -10,7 +9,11 @@ import httpx
 from app.operational_logging import emit_operational_log
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
-from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, load_bt_scoring_rules, pick_best
+from app.services.bt_subscription_candidate_helpers import (
+    pick_subscription_candidate,
+    resolve_candidate_source,
+    resolve_candidate_title,
+)
 from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_ADD_USAGE_TEXT,
     BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
@@ -31,7 +34,6 @@ from app.services.bt_subscription_repo_support import (
     remove_subscription_item,
     update_subscription_last_seen,
 )
-from app.services.bt_sources import resolve_bt_source
 from app.services.media_item_display import format_title_year
 from app.services.media_kind import media_kind_label
 
@@ -608,17 +610,17 @@ class ManageBtSubscriptionService:
         results: Sequence[Mapping[str, Any]],
         item: BtSubscriptionItem,
     ) -> tuple[str, str] | None:
-        selected_result = _pick_subscription_candidate(
+        selected_result = pick_subscription_candidate(
             results,
             item=item,
             last_seen_source=item.last_seen_source,
         )
         if selected_result is None:
             return None
-        selected_source = _resolve_candidate_source(selected_result)
+        selected_source = resolve_candidate_source(selected_result)
         if not selected_source:
             return None
-        candidate_title = _resolve_candidate_title(selected_result, item=item)
+        candidate_title = resolve_candidate_title(selected_result, item=item)
         return selected_source, candidate_title
 
     async def _scan_chat_once(
@@ -651,120 +653,6 @@ class ManageBtSubscriptionService:
                 reason=reason,
             ),
         )
-
-def _pick_subscription_candidate(
-    results: Sequence[Mapping[str, Any]],
-    *,
-    item: BtSubscriptionItem,
-    last_seen_source: str,
-) -> Mapping[str, Any] | None:
-    candidate_pairs: list[tuple[BTCandidate, Mapping[str, Any]]] = []
-    normalized_last_seen_source = last_seen_source.strip()
-    for result in results:
-        source = _resolve_candidate_source(result)
-        if not source or source == normalized_last_seen_source:
-            continue
-        candidate = _build_subscription_bt_candidate(result, item=item)
-        if candidate is not None:
-            candidate_pairs.append((candidate, result))
-    if not candidate_pairs:
-        return None
-    best = pick_best(
-        [candidate for candidate, _ in candidate_pairs],
-        BTScoringContext(query="", media_kind=item.media_kind),
-        rules=load_bt_scoring_rules(),
-    )
-    if best is None:
-        return None
-    for candidate, result in candidate_pairs:
-        if candidate is best.candidate:
-            return result
-    return None
-
-
-def _resolve_candidate_source(candidate: Mapping[str, Any]) -> str:
-    return resolve_bt_source(candidate)
-
-
-def _resolve_candidate_title(candidate: Mapping[str, Any], *, item: BtSubscriptionItem) -> str:
-    title = str(candidate.get("title", "")).strip()
-    if title:
-        return title
-    return format_title_year(item.title, item.year)
-
-
-def _build_subscription_bt_candidate(result: Mapping[str, Any], *, item: BtSubscriptionItem) -> BTCandidate | None:
-    source = _resolve_candidate_source(result)
-    title = _resolve_candidate_title(result, item=item)
-    if not source or not title:
-        return None
-    return BTCandidate(
-        source_site=str(result.get("indexerName", "")).strip() or str(result.get("sourceProvider", "")).strip() or "unknown",
-        title=title,
-        magnet_or_torrent_url=source,
-        size_bytes=_safe_optional_int(result.get("size")),
-        seeders=_safe_optional_int(result.get("seeders")),
-        leechers=_safe_optional_int(result.get("peers")),
-        resolution=_extract_resolution(title),
-        codec=_extract_codec(title),
-        source_type=_extract_source_type(title),
-        audio=(),
-        release_group=_extract_release_group(title),
-        age_days=None,
-        media_kind=item.media_kind,
-    )
-
-
-def _extract_resolution(title: str) -> str | None:
-    lowered_title = title.strip().lower()
-    if re.search(r"\b(2160p|4k)\b", lowered_title):
-        return "2160p"
-    if re.search(r"\b1080p\b", lowered_title):
-        return "1080p"
-    if re.search(r"\b720p\b", lowered_title):
-        return "720p"
-    return None
-
-
-def _extract_codec(title: str) -> str | None:
-    lowered_title = title.strip().lower()
-    if re.search(r"\b(x265|hevc)\b", lowered_title):
-        return "x265" if "x265" in lowered_title else "HEVC"
-    if re.search(r"\b(x264|avc)\b", lowered_title):
-        return "x264"
-    return None
-
-
-def _extract_source_type(title: str) -> str | None:
-    lowered_title = title.strip().lower()
-    if "remux" in lowered_title:
-        return "Remux"
-    if "bluray" in lowered_title or "blu-ray" in lowered_title:
-        return "BluRay"
-    if "bdrip" in lowered_title:
-        return "BDRip"
-    if "web-dl" in lowered_title or "webdl" in lowered_title:
-        return "WEB-DL"
-    if "webrip" in lowered_title or "web-rip" in lowered_title:
-        return "WEBRip"
-    return None
-
-
-def _extract_release_group(title: str) -> str | None:
-    matched = re.search(r"-([A-Za-z0-9][A-Za-z0-9-]+)$", title.strip())
-    if matched is None:
-        return None
-    return str(matched.group(1) or "").strip() or None
-
-
-def _safe_optional_int(value: Any) -> int | None:
-    try:
-        resolved = int(value)
-    except (TypeError, ValueError):
-        return None
-    if resolved > 0:
-        return resolved
-    return None
 
 
 def _log_bt_subscription_scan_error(

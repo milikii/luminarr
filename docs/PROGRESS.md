@@ -142,3 +142,19 @@
 
 ### 下轮目标
 - 先盘点 `add_to_downloader.py`、`import_to_library.py`、`manage_bt_subscription.py`、`search_media.py`、`cleanup_downloaded_source.py`、`subtitle_translation_support.py` 的体量与单消费者切口，再决定最小拆分顺序
+
+## Round 9 — 2026-04-29 08:35
+
+### 完成
+- 将 `manage_bt_subscription.py` 的候选选择 / 打分解析 helper 下沉到 `bt_subscription_candidate_helpers.py`
+- 新增 `bt_candidate_metadata.py` 作为公开 BT candidate metadata 解析边界，并让 `pure_bt` 与 `manage_bt_subscription` 复用同一套实现
+- 为首个超大业务文件收口切口补齐 focused tests，并通过 spec/quality 两层复审
+
+### 测试状态
+- 通过: 3 / 总计: 3
+
+### 遗留 / 下轮继续
+- 进入 Feishu 可选依赖策略主线
+
+### 下轮目标
+- 盘点 `lark_oapi` 的真实运行边界和安装入口，收口 requirements / extras / operator docs 其中一个最小方案
