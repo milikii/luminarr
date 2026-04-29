@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import sqlite3
 
-from app.db.bt_subscription_repo import BtSubscriptionPersistenceError, BtSubscriptionRepo
+from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.operational_logging import emit_operational_log
 from app.services.command_parsing import (
@@ -36,8 +36,7 @@ WATCHLIST_REMOVE_USAGE_TEXT = "删除格式：watchlist remove <条目ID>"
 WATCHLIST_REMOVE_FAILED_TEXT = "想看删除失败，请稍后重试。"
 WATCHLIST_CLEAR_EMPTY_TEXT = "想看清单本来就是空的。"
 WATCHLIST_CLEAR_FAILED_TEXT = "想看清单清空失败，请稍后重试。"
-WATCHLIST_SYNC_EMPTY_TEXT = "想看清单为空，未同步到 BT 订阅。"
-WATCHLIST_SYNC_FAILED_TEXT = "想看同步到 BT 订阅失败，请稍后重试。"
+WATCHLIST_SYNC_UNAVAILABLE_TEXT = "想看清单当前只服务 PT 主线，不再同步到 BT 订阅。"
 WATCHLIST_ITEM_MISSING_AFTER_ADD_REASON = "watchlist_item missing after insert"
 WATCHLIST_ADD_RESULT_MISSING_REASON = "watchlist add result missing"
 WATCHLIST_ACTION_ALIASES = {
@@ -149,28 +148,7 @@ class ManageWatchlistService:
         return f"已清空想看清单，共删除 {deleted} 条。"
 
     def _sync_text(self, *, chat_id: int) -> str:
-        items = self._list_items(chat_id=chat_id)
-        if items is None:
-            return WATCHLIST_SYNC_FAILED_TEXT
-        if not items:
-            return WATCHLIST_SYNC_EMPTY_TEXT
-
-        if self._bt_subscription_repo is None:
-            _log_watchlist_sync_failed(chat_id=chat_id, item_count=len(items), reason="bt_subscription_repo missing")
-            return WATCHLIST_SYNC_FAILED_TEXT
-
-        try:
-            created_count, existing_count = self._bt_subscription_repo.add_items(
-                chat_id=chat_id,
-                items=tuple((item.title, item.year, item.media_kind) for item in items),
-            )
-        except (BtSubscriptionPersistenceError, sqlite3.Error) as error:
-            _log_watchlist_sync_failed(chat_id=chat_id, item_count=len(items), reason=str(error))
-            return WATCHLIST_SYNC_FAILED_TEXT
-
-        return (
-            f"已同步想看清单到 BT 订阅：共 {len(items)} 条，新增 {created_count} 条，已存在 {existing_count} 条。"
-        )
+        return WATCHLIST_SYNC_UNAVAILABLE_TEXT
 
     def _add_item(
         self,
@@ -429,19 +407,6 @@ def _log_watchlist_clear_row_corrupted(*, chat_id: int, reason: str) -> None:
         title="想看清单清空命中坏记录",
         detail=f"chat_id={chat_id} 原因={reason}",
         fix_hint="检查 watchlist_item 表里该 chat 的 id、title、media_kind 等真相字段；当前会按清空失败处理，避免把损坏记录误判成可正常清空或“清单本来就是空的”。",
-    )
-
-
-def _log_watchlist_sync_failed(
-    *,
-    chat_id: int,
-    item_count: int,
-    reason: str,
-) -> None:
-    _print_watchlist_issue(
-        title="想看同步到 BT 订阅失败",
-        detail=f"chat_id={chat_id} item_count={item_count} 原因={reason}",
-        fix_hint="检查 bt_subscription_item 表和 SQLite 写入是否正常；当前失败时不会残留部分同步结果，也不会把失败批次误判成已进入 BT 自动扫描链。",
     )
 
 

@@ -15,10 +15,18 @@ def test_scan_bt_subscription_items_aggregates_reply_and_pending_creation_state(
     item_one = _make_bt_subscription_item(item_id=1, title="葬送的芙莉莲")
     item_two = _make_bt_subscription_item(item_id=2, title="沙丘", media_kind="movie")
 
-    async def _run_for_item(item: BtSubscriptionItem) -> tuple[str | None, bool]:
+    async def _run_for_item(item: BtSubscriptionItem):
         if item.item_id == 1:
-            return ("命中资源: Frieren S01E01 1080p", False)
-        return (None, True)
+            return type(
+                "Result",
+                (),
+                {"reply": "命中资源: SSIS-123 1080p", "pending_creation_failed": False, "out_of_scope": False},
+            )()
+        return type(
+            "Result",
+            (),
+            {"reply": None, "pending_creation_failed": True, "out_of_scope": False},
+        )()
 
     result = asyncio.run(
         scan_bt_subscription_items(
@@ -33,7 +41,7 @@ def test_scan_bt_subscription_items_aggregates_reply_and_pending_creation_state(
     assert result == BtSubscriptionRunResult(
         scanned=2,
         matched=1,
-        replies=("命中资源: Frieren S01E01 1080p",),
+        replies=("命中资源: SSIS-123 1080p",),
         pending_creation_failed=True,
     )
 
@@ -77,17 +85,18 @@ def test_format_bt_subscription_run_result_includes_reply_body_and_warning() -> 
         result=BtSubscriptionRunResult(
             scanned=2,
             matched=1,
-            replies=("下载待确认：Frieren S01E01 1080p",),
+            replies=("下载待确认：SSIS-123 1080p",),
             pending_creation_failed=True,
         ),
         run_done_template="BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。",
         run_no_new_template="BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。",
         pending_creation_warning_text="注意：本轮有命中的 BT 订阅未能创建下载待确认。",
+        out_of_scope_warning_template="注意：当前有 {count} 条旧 BT 订阅已超出成人 BT 边界，已跳过扫描。",
     )
 
     assert formatted == (
         "BT 订阅扫描完成：共扫描 2 条，命中新资源 1 条。\n\n"
-        "下载待确认：Frieren S01E01 1080p\n\n"
+        "下载待确认：SSIS-123 1080p\n\n"
         "注意：本轮有命中的 BT 订阅未能创建下载待确认。"
     )
 
@@ -100,7 +109,7 @@ def _make_bt_subscription_item(
     *,
     item_id: int,
     title: str,
-    media_kind: str = "anime",
+    media_kind: str = "adult",
 ) -> BtSubscriptionItem:
     return BtSubscriptionItem(
         item_id=item_id,

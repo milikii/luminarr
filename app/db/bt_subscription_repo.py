@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 from app.db.sqlite import SqliteDatabase
 
-VALID_BT_SUBSCRIPTION_MEDIA_KINDS = frozenset({"movie", "series", "anime"})
+VALID_BT_SUBSCRIPTION_MEDIA_KINDS = frozenset({"adult"})
+LEGACY_BT_SUBSCRIPTION_MEDIA_KINDS = frozenset({"movie", "series", "anime", "adult"})
 
 
 class BtSubscriptionPersistenceError(RuntimeError):
@@ -232,7 +233,7 @@ def _to_bt_subscription_item(row: Mapping[str, object]) -> BtSubscriptionItem:
 
     if item_id <= 0 or chat_id <= 0 or not title:
         raise BtSubscriptionPersistenceError("bt_subscription_item row identity corrupted after read")
-    if media_kind not in VALID_BT_SUBSCRIPTION_MEDIA_KINDS:
+    if media_kind not in LEGACY_BT_SUBSCRIPTION_MEDIA_KINDS:
         raise BtSubscriptionPersistenceError("bt_subscription_item media kind corrupted after read")
 
     return BtSubscriptionItem(

@@ -1,11 +1,12 @@
-# Next step (v429)
+# Next step (v430)
 
 ## Current goal
 
 - 当前唯一主线切回成人 BT 专线边界；后续若继续扩 `BT subscription`，也只允许面向成人 BT 连续追踪，不引入任何影视资源订阅（包括动漫）。
-- `watchlist sync` / `想看 同步` 已完成：当前会把想看清单按相同 `chat_id` / `title` / `year` / `media_kind` 原子同步进 `btsub`，不触发自动下载，也不会在失败时留下部分成功。
+- `watchlist sync` / `想看 同步` 已改为 fail-closed：想看清单继续只服务 PT 主线，不再桥接进 `btsub`。
 - `adult BT minimum wedge` 已完成并已推送到 `main`；当前只保留 Telegram 人工 smoke 收尾，不再扩 scope。
 - direct `BT` / `magnet:?` 投递入口继续保留链路问询：先选 `观影 PT 链` 或 `BT 成人链`，不允许绕过问询直接把 BT 入口默认为成人链。
+- `btsub add` 当前已收口成成人 BT 精确番号追踪，不再接受 `movie / series / anime` 型影视订阅输入。
 - `shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口` 继续保持完成态。
 - `app/bot/private_chat_runtime.py` 继续作为 shared private-chat runtime 边界；`app/bot/telegram_bot.py` 继续作为 Telegram wrapper 边界。精确行数以代码为准，不作为长期文档真相。
 
@@ -21,7 +22,7 @@
 - 当前只做一件事：把 BT 支线的后续扩边继续锁在成人 BT 专线内。
 - 若要继续扩 `BT subscription`，下一轮也只允许锁定成人 BT 连续追踪的最小 contract；继续保持人工 `confirm`，不把 auto-confirm 偷带进来。
 - 优先补 focused tests 和最小 contract，不在同一轮同时把通知渠道扩边、richer reply、多渠道交互形态或 personal WeChat 登录重做绑进来。
-- 继续保持 config capability contract、shared private-chat runtime 边界、`shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口` 完成态，以及 `watchlist sync` 的原子桥接语义不回退。
+- 继续保持 config capability contract、shared private-chat runtime 边界、`shared runtime 对 `telegram_bot.py` 内部 helper 的直接依赖收口` 完成态，以及 `watchlist sync` 的 fail-closed 边界不回退。
 - 继续保持 `make quality`、`make verify-mainline` 和 `make verify-adult-bt-wedge` 可复验。
 
 ## Do not do
@@ -38,10 +39,12 @@
 
 1. BT 支线继续只承接成人资源，文档与实现都不再把影视资源或动漫资源写回 BT 主线。
 2. direct `BT` / `magnet:?` 投递继续通过 `观影 PT 链 / BT 成人链` 问询显式分流。
-3. 该主线对应的 focused tests 与 operator 文档真相一致。
-4. `make quality` 通过。
-5. `make verify-mainline` 通过。
-6. `make verify-adult-bt-wedge` 通过。
+3. `btsub add` 只接受成人 BT 精确番号追踪；旧的非成人订阅条目会显式告警并跳过扫描。
+4. `watchlist sync` 继续 fail-closed，不再把影视想看清单桥接到 BT 订阅。
+5. 该主线对应的 focused tests 与 operator 文档真相一致。
+6. `make quality` 通过。
+7. `make verify-mainline` 通过。
+8. `make verify-adult-bt-wedge` 通过。
 
 ## After this step
 

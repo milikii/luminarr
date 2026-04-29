@@ -117,7 +117,7 @@ def test_handle_watchlist_query_routes_sync_to_mutation_policy(tmp_path: Path) -
     assert handled is True
     assert execution_gate.actions == [watchlist_policy_action("sync")]
     reply_func.assert_awaited_once()
-    assert "已同步想看清单到 BT 订阅" in reply_func.await_args.args[0]
+    assert "想看清单当前只服务 PT 主线" in reply_func.await_args.args[0]
 
 
 def test_handle_watchlist_query_replies_service_not_ready_when_missing_service() -> None:

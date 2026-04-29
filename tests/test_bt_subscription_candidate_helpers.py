@@ -15,18 +15,8 @@ from app.services.bt_subscription_candidate_helpers import (
 def test_pick_subscription_candidate_skips_last_seen_source() -> None:
     item = _make_bt_subscription_item()
     results = [
-        {
-            "title": "Frieren S01E01 2160p WEB-DL x265-AAA",
-            "downloadUrl": "https://example.com/seen.torrent",
-            "seeders": 500,
-            "size": 4_000_000_000,
-        },
-        {
-            "title": "Frieren S01E01 1080p WEB-DL x265-BBB",
-            "downloadUrl": "https://example.com/new.torrent",
-            "seeders": 20,
-            "size": 2_000_000_000,
-        },
+        _adult_candidate("SSIS-123 2160p WEB-DL x265-AAA", "https://example.com/seen.torrent", seeders=500, size=4_000_000_000),
+        _adult_candidate("SSIS-123 1080p WEB-DL x265-BBB", "https://example.com/new.torrent", seeders=20, size=2_000_000_000),
     ]
 
     selected = pick_subscription_candidate(results, item=item, last_seen_source="https://example.com/seen.torrent")
@@ -37,18 +27,8 @@ def test_pick_subscription_candidate_skips_last_seen_source() -> None:
 def test_pick_subscription_candidate_prefers_higher_scored_candidate() -> None:
     item = _make_bt_subscription_item()
     results = [
-        {
-            "title": "Frieren S01E01 CAM",
-            "downloadUrl": "https://example.com/cam.torrent",
-            "seeders": 500,
-            "size": 3_000_000_000,
-        },
-        {
-            "title": "Frieren S01E01 1080p WEB-DL x265-GRP",
-            "downloadUrl": "https://example.com/1080p.torrent",
-            "seeders": 20,
-            "size": 2_200_000_000,
-        },
+        _adult_candidate("SSIS-123 CAM", "https://example.com/cam.torrent", seeders=500, size=3_000_000_000),
+        _adult_candidate("SSIS-123 1080p WEB-DL x265-GRP", "https://example.com/1080p.torrent", seeders=20, size=2_200_000_000),
     ]
 
     selected = pick_subscription_candidate(results, item=item, last_seen_source="")
@@ -56,22 +36,33 @@ def test_pick_subscription_candidate_prefers_higher_scored_candidate() -> None:
     assert selected == results[1]
 
 
-def test_resolve_candidate_title_falls_back_to_subscription_title_year() -> None:
-    item = _make_bt_subscription_item(title="葬送的芙莉莲", year="2023")
+def test_pick_subscription_candidate_rejects_mismatched_adult_identifier() -> None:
+    item = _make_bt_subscription_item()
+    results = [
+        _adult_candidate("IPX-001 1080p", "https://example.com/ipx-001.torrent", content_id="censored:ipx-001", display_id="IPX-001"),
+    ]
 
-    assert resolve_candidate_title({}, item=item) == "葬送的芙莉莲 (2023)"
+    selected = pick_subscription_candidate(results, item=item, last_seen_source="")
+
+    assert selected is None
+
+
+def test_resolve_candidate_title_falls_back_to_subscription_title_year() -> None:
+    item = _make_bt_subscription_item(title="SSIS-123", year="")
+
+    assert resolve_candidate_title({}, item=item) == "SSIS-123"
 
 
 def test_subscription_candidate_helpers_extract_minimal_metadata() -> None:
     item = _make_bt_subscription_item()
-    result = {
-        "title": "Frieren S01E01 2160p WEB-DL x265-VCB-Studio",
-        "downloadUrl": "https://example.com/frieren.torrent",
-        "indexerName": "PTP",
-        "size": "2147483648",
-        "seeders": "12",
-        "peers": "7",
-    }
+    result = _adult_candidate(
+        "SSIS-123 2160p WEB-DL x265-VCB-Studio",
+        "https://example.com/ssis-123.torrent",
+        seeders=12,
+        size=2147483648,
+    )
+    result["indexerName"] = "adult-provider"
+    result["peers"] = "7"
 
     candidate = build_subscription_bt_candidate(result, item=item)
 
@@ -89,11 +80,20 @@ def test_subscription_candidate_helpers_extract_minimal_metadata() -> None:
     assert extract_release_group("Movie-CHD") == "CHD"
 
 
+def test_subscription_candidate_helpers_return_none_for_non_adult_subscription_item() -> None:
+    item = _make_bt_subscription_item(media_kind="anime", title="葬送的芙莉莲", year="2023")
+    result = _adult_candidate("SSIS-123 2160p WEB-DL x265-VCB-Studio", "https://example.com/ssis-123.torrent")
+
+    candidate = build_subscription_bt_candidate(result, item=item)
+
+    assert candidate is None
+
+
 def _make_bt_subscription_item(
     *,
-    title: str = "Frieren",
-    year: str = "2023",
-    media_kind: str = "anime",
+    title: str = "SSIS-123",
+    year: str = "",
+    media_kind: str = "adult",
 ) -> BtSubscriptionItem:
     return BtSubscriptionItem(
         item_id=1,
@@ -106,3 +106,26 @@ def _make_bt_subscription_item(
         created_at="2026-04-19 00:00:00",
         updated_at="2026-04-19 00:00:00",
     )
+
+
+def _adult_candidate(
+    title: str,
+    download_url: str,
+    *,
+    seeders: int | None = None,
+    size: int | None = None,
+    content_id: str = "censored:ssis-123",
+    display_id: str = "SSIS-123",
+) -> dict[str, object]:
+    candidate: dict[str, object] = {
+        "title": title,
+        "downloadUrl": download_url,
+        "adult_content_id": content_id,
+        "adult_archive_category": "censored",
+        "adult_display_id": display_id,
+    }
+    if seeders is not None:
+        candidate["seeders"] = str(seeders)
+    if size is not None:
+        candidate["size"] = str(size)
+    return candidate

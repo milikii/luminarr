@@ -80,7 +80,7 @@ def test_handle_bt_subscription_query_routes_to_service(tmp_path: Path) -> None:
 
     handled = asyncio.run(
         handle_bt_subscription_query(
-            query="btsub add anime 葬送的芙莉莲 2023",
+            query="btsub add SSIS-123",
             bot_data={tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: bt_subscription_service},
             execution_gate=execution_gate,
             reply_func=reply_func,
@@ -91,13 +91,13 @@ def test_handle_bt_subscription_query_routes_to_service(tmp_path: Path) -> None:
     )
 
     assert handled is True
-    command = parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023")
+    command = parse_bt_subscription_query("btsub add SSIS-123")
     assert command is not None
     assert execution_gate.actions == [bt_subscription_policy_action(command)]
     reply_func.assert_awaited_once()
     sent_text = reply_func.await_args.args[0]
     assert "已加入 BT 订阅" in sent_text
-    assert "葬送的芙莉莲" in sent_text
+    assert "SSIS-123" in sent_text
 
 
 def test_handle_bt_subscription_query_run_uses_bound_downloader_context(tmp_path: Path) -> None:
@@ -235,7 +235,7 @@ def test_handle_bt_subscription_query_add_still_routes_when_subscription_scan_is
 
     handled = asyncio.run(
         handle_bt_subscription_query(
-            query="btsub add anime 葬送的芙莉莲 2023",
+            query="btsub add SSIS-123",
             bot_data={
                 tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: bt_subscription_service,
                 BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY: (
@@ -251,7 +251,7 @@ def test_handle_bt_subscription_query_add_still_routes_when_subscription_scan_is
     )
 
     assert handled is True
-    command = parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023")
+    command = parse_bt_subscription_query("btsub add SSIS-123")
     assert command is not None
     assert execution_gate.actions == [bt_subscription_policy_action(command)]
     reply_func.assert_awaited_once()
@@ -263,7 +263,7 @@ def test_handle_bt_subscription_query_remove_still_routes_when_subscription_scan
 ) -> None:
     bt_subscription_service = _build_bt_subscription_service(tmp_path)
     bt_subscription_service.handle(
-        parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023"),
+        parse_bt_subscription_query("btsub add SSIS-123"),
         chat_id=1001,
     )
     reply_func = AsyncMock()
@@ -298,7 +298,7 @@ def test_handle_bt_subscription_query_clear_still_routes_when_subscription_scan_
 ) -> None:
     bt_subscription_service = _build_bt_subscription_service(tmp_path)
     bt_subscription_service.handle(
-        parse_bt_subscription_query("btsub add anime 葬送的芙莉莲 2023"),
+        parse_bt_subscription_query("btsub add SSIS-123"),
         chat_id=1001,
     )
     reply_func = AsyncMock()

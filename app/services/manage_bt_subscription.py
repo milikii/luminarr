@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import httpx
@@ -16,9 +16,11 @@ from app.services.bt_subscription_candidate_helpers import (
 )
 from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_ADD_USAGE_TEXT,
+    BT_SUBSCRIPTION_ADULT_ONLY_TEXT,
     BT_SUBSCRIPTION_REMOVE_USAGE_TEXT,
     BT_SUBSCRIPTION_USAGE_TEXT,
     BtSubscriptionCommand,
+    bt_subscription_media_kind_label,
     format_bt_subscription_add_result,
     format_bt_subscription_clear_result,
     format_bt_subscription_list,
@@ -35,7 +37,6 @@ from app.services.bt_subscription_repo_support import (
     update_subscription_last_seen,
 )
 from app.services.media_item_display import format_title_year
-from app.services.media_kind import media_kind_label
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 BT_SUBSCRIPTION_LIST_FAILED_TEXT = "BT 订阅清单读取失败，请稍后重试。"
@@ -47,6 +48,10 @@ BT_SUBSCRIPTION_RUN_FAILED_TEXT = "BT 订阅扫描失败，请稍后重试。"
 BT_SUBSCRIPTION_PENDING_CREATION_FAILED_TEXT = "BT 订阅待确认状态写入失败，请稍后重试。"
 BT_SUBSCRIPTION_RUN_DONE_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，命中新资源 {matched} 条。"
 BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE = "BT 订阅扫描完成：共扫描 {scanned} 条，当前没有新资源。"
+BT_SUBSCRIPTION_OUT_OF_SCOPE_WARNING_TEMPLATE = (
+    "注意：当前有 {count} 条旧 BT 订阅已超出成人 BT 边界，已跳过扫描。\n"
+    "影视资源包括动漫请继续走 PT 主链，不再通过 btsub 扫描。"
+)
 BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT = (
     "注意：本轮有命中的 BT 订阅未能创建下载待确认。\n"
     "请检查 SQLite/approval_record 和 jobs 表写入是否正常，然后重新执行 btsub run。"
@@ -68,11 +73,12 @@ class BtSubscriptionRunResult:
     matched: int
     replies: tuple[str, ...]
     pending_creation_failed: bool = False
+    out_of_scope_count: int = 0
 
 
 LogSubscriptionLastSeenReasonFunc = Callable[[str], None]
 ListSubscriptionItemsFunc = Callable[[], BtSubscriptionRepoResult[Sequence[BtSubscriptionItem]]]
-RunSubscriptionItemFunc = Callable[[BtSubscriptionItem], Awaitable[tuple[str | None, bool]]]
+RunSubscriptionItemFunc = Callable[[BtSubscriptionItem], Awaitable["BtSubscriptionItemDispatchResult"]]
 LogSubscriptionScanItemsReasonFunc = Callable[[str], None]
 SearchSubscriptionResultsFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 ResolveSubscriptionCandidateFunc = Callable[[Sequence[Mapping[str, Any]], BtSubscriptionItem], tuple[str, str] | None]
@@ -97,6 +103,7 @@ class BtSubscriptionDispatchContext:
 class BtSubscriptionItemDispatchResult:
     reply: str | None
     pending_creation_failed: bool = False
+    out_of_scope: bool = False
 
 
 def update_bt_subscription_last_seen(
@@ -201,18 +208,21 @@ async def scan_bt_subscription_items(
     replies: list[str] = []
     matched = 0
     pending_creation_failed = False
+    out_of_scope_count = 0
     for item in items:
-        reply, item_pending_creation_failed = await run_for_item(item)
-        pending_creation_failed = pending_creation_failed or item_pending_creation_failed
-        if reply is None:
+        dispatch_result = await run_for_item(item)
+        pending_creation_failed = pending_creation_failed or dispatch_result.pending_creation_failed
+        out_of_scope_count += int(dispatch_result.out_of_scope)
+        if dispatch_result.reply is None:
             continue
         matched += 1
-        replies.append(reply)
+        replies.append(dispatch_result.reply)
     return BtSubscriptionRunResult(
         scanned=len(items),
         matched=matched,
         replies=tuple(replies),
         pending_creation_failed=pending_creation_failed,
+        out_of_scope_count=out_of_scope_count,
     )
 
 
@@ -222,17 +232,27 @@ def format_bt_subscription_run_result(
     run_done_template: str,
     run_no_new_template: str,
     pending_creation_warning_text: str,
+    out_of_scope_warning_template: str,
 ) -> str:
     header = (
         run_done_template.format(scanned=result.scanned, matched=result.matched)
         if result.matched > 0
         else run_no_new_template.format(scanned=result.scanned)
     )
-    if not result.replies:
-        return header
-    body = "\n\n".join(result.replies)
+    warnings: list[str] = []
     if result.pending_creation_failed:
-        body = f"{body}\n\n{pending_creation_warning_text}"
+        warnings.append(pending_creation_warning_text)
+    if result.out_of_scope_count > 0:
+        warnings.append(out_of_scope_warning_template.format(count=result.out_of_scope_count))
+
+    if not result.replies:
+        if not warnings:
+            return header
+        return f"{header}\n\n" + "\n\n".join(warnings)
+
+    body = "\n\n".join(result.replies)
+    if warnings:
+        body = f"{body}\n\n" + "\n\n".join(warnings)
     return f"{header}\n\n{body}"
 
 
@@ -269,7 +289,7 @@ async def dispatch_bt_subscription_item(
 
     reply = (
         f"BT 订阅命中新资源：{format_title_year(item.title, item.year)}\n"
-        f"类型: {media_kind_label(item.media_kind)}\n"
+        f"类型: {bt_subscription_media_kind_label(item.media_kind)}\n"
         f"命中资源: {candidate_title}\n\n"
         f"{pending_text}"
     )
@@ -303,6 +323,8 @@ class ManageBtSubscriptionService:
         self._bt_subscription_repo = bt_subscription_repo
         self._search_func = search_func
         self._add_to_downloader_service = add_to_downloader_service
+        self._out_of_scope_logged_item_ids: set[int] = set()
+        self._scheduler_out_of_scope_warned_chat_ids: set[int] = set()
 
     def handle(self, command: BtSubscriptionCommand, *, chat_id: int | None) -> str:
         if chat_id is None or chat_id <= 0:
@@ -344,6 +366,7 @@ class ManageBtSubscriptionService:
             run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
             run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
             pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
+            out_of_scope_warning_template=BT_SUBSCRIPTION_OUT_OF_SCOPE_WARNING_TEMPLATE,
         )
 
     async def run_scheduler_tick(
@@ -351,30 +374,60 @@ class ManageBtSubscriptionService:
         *,
         dispatch_context: BtSubscriptionDispatchContext,
     ) -> tuple[tuple[int, str], ...] | None:
-        return await collect_bt_subscription_scheduler_notifications(
-            list_chat_ids=lambda: list_subscription_chat_ids(
-                repo=self._bt_subscription_repo,
-                is_chat_list_row_corrupted_reason=_is_bt_subscription_chat_list_row_corrupted_reason,
-            ),
-            scan_chat=lambda chat_id: self._scan_chat_once(
+        chat_ids_result = list_subscription_chat_ids(
+            repo=self._bt_subscription_repo,
+            is_chat_list_row_corrupted_reason=_is_bt_subscription_chat_list_row_corrupted_reason,
+        )
+        if not chat_ids_result.ok:
+            if chat_ids_result.status == "result_missing":
+                _log_bt_subscription_scan_chat_ids_result_missing(reason=chat_ids_result.reason)
+            elif chat_ids_result.status == "row_corrupted":
+                _log_bt_subscription_scan_chat_ids_row_corrupted(reason=chat_ids_result.reason)
+            else:
+                _log_bt_subscription_scan_chat_ids_failed(reason=chat_ids_result.reason)
+            return None
+
+        notifications: list[tuple[int, str]] = []
+        scan_failed = False
+        for chat_id in chat_ids_result.value or ():
+            result = await self._scan_chat_once(
                 chat_id=chat_id,
                 user_id=None,
                 dispatch_context=dispatch_context,
-            ),
-            format_notification=lambda result: format_bt_subscription_run_result(
-                result=result,
-                run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
-                run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
-                pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
-            ),
-            log_chat_ids_failed=lambda reason: _log_bt_subscription_scan_chat_ids_failed(reason=reason),
-            log_chat_ids_result_missing=lambda reason: _log_bt_subscription_scan_chat_ids_result_missing(
-                reason=reason
-            ),
-            log_chat_ids_row_corrupted=lambda reason: _log_bt_subscription_scan_chat_ids_row_corrupted(
-                reason=reason
-            ),
-        )
+            )
+            if result is None:
+                scan_failed = True
+                continue
+            if result.pending_creation_failed and result.matched <= 0:
+                scan_failed = True
+                continue
+            if result.matched <= 0:
+                if result.out_of_scope_count <= 0:
+                    continue
+                if chat_id in self._scheduler_out_of_scope_warned_chat_ids:
+                    continue
+                self._scheduler_out_of_scope_warned_chat_ids.add(chat_id)
+            elif result.out_of_scope_count > 0:
+                if chat_id in self._scheduler_out_of_scope_warned_chat_ids:
+                    result = replace(result, out_of_scope_count=0)
+                else:
+                    self._scheduler_out_of_scope_warned_chat_ids.add(chat_id)
+
+            notifications.append(
+                (
+                    chat_id,
+                    format_bt_subscription_run_result(
+                        result=result,
+                        run_done_template=BT_SUBSCRIPTION_RUN_DONE_TEMPLATE,
+                        run_no_new_template=BT_SUBSCRIPTION_RUN_NO_NEW_TEMPLATE,
+                        pending_creation_warning_text=BT_SUBSCRIPTION_PENDING_CREATION_WARNING_TEXT,
+                        out_of_scope_warning_template=BT_SUBSCRIPTION_OUT_OF_SCOPE_WARNING_TEMPLATE,
+                    ),
+                )
+            )
+        if scan_failed and not notifications:
+            return None
+        return tuple(notifications)
 
     def _list_text(self, *, chat_id: int) -> str:
         items = self._list_items(chat_id=chat_id)
@@ -383,9 +436,11 @@ class ManageBtSubscriptionService:
         return format_bt_subscription_list(items)
 
     def _add_text(self, *, chat_id: int, raw_title: str) -> str:
+        if not raw_title.strip():
+            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
         parsed_request = parse_bt_subscription_add_request(raw_title)
         if parsed_request is None:
-            return BT_SUBSCRIPTION_ADD_USAGE_TEXT
+            return BT_SUBSCRIPTION_ADULT_ONLY_TEXT
 
         created = self._add_item(
             chat_id=chat_id,
@@ -531,7 +586,12 @@ class ManageBtSubscriptionService:
         chat_id: int,
         user_id: int | None,
         dispatch_context: BtSubscriptionDispatchContext,
-    ) -> tuple[str | None, bool]:
+    ) -> BtSubscriptionItemDispatchResult:
+        if item.media_kind != "adult":
+            if item.item_id not in self._out_of_scope_logged_item_ids:
+                _log_bt_subscription_item_out_of_scope(item=item, chat_id=chat_id)
+                self._out_of_scope_logged_item_ids.add(item.item_id)
+            return BtSubscriptionItemDispatchResult(reply=None, out_of_scope=True)
         result = await dispatch_bt_subscription_item(
             item=item,
             search_func=self._search_func,
@@ -602,7 +662,7 @@ class ManageBtSubscriptionService:
             last_seen_update_warning_text=BT_SUBSCRIPTION_LAST_SEEN_UPDATE_WARNING_TEXT,
             last_seen_item_missing_warning_text=BT_SUBSCRIPTION_LAST_SEEN_ITEM_MISSING_WARNING_TEXT,
         )
-        return result.reply, result.pending_creation_failed
+        return result
 
     def _resolve_item_dispatch_candidate(
         self,
@@ -653,6 +713,14 @@ class ManageBtSubscriptionService:
                 reason=reason,
             ),
         )
+
+
+def _log_bt_subscription_item_out_of_scope(*, item: BtSubscriptionItem, chat_id: int) -> None:
+    _print_bt_subscription_issue(
+        title="BT 订阅条目已超出当前边界",
+        context=f"chat_id={chat_id} 条目ID={item.item_id} 类型={item.media_kind} title={item.title}",
+        fix_hint="当前 BT 支线只承接成人资源；影视资源包括动漫应继续走 PT 主链，不再通过 btsub 扫描。",
+    )
 
 
 def _log_bt_subscription_scan_error(

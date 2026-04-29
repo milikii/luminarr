@@ -2945,7 +2945,7 @@ def test_handle_message_watchlist_replies_service_not_ready() -> None:
 
 
 def test_handle_message_bt_subscription_routes_to_service(tmp_path: Path) -> None:
-    update, reply_text = _build_update("btsub add anime 葬送的芙莉莲 2023")
+    update, reply_text = _build_update("btsub add SSIS-123")
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())
     status_service = GetDownloadStatusService(AsyncMock())
@@ -2971,7 +2971,7 @@ def test_handle_message_bt_subscription_routes_to_service(tmp_path: Path) -> Non
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
     assert "已加入 BT 订阅" in sent_text
-    assert "葬送的芙莉莲" in sent_text
+    assert "SSIS-123" in sent_text
 
 
 def test_handle_message_bt_subscription_run_uses_bound_downloader_context(tmp_path: Path) -> None:

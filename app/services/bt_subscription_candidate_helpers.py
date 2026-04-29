@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.db.bt_subscription_repo import BtSubscriptionItem
+from app.services.adult_content import extract_adult_content_match
 from app.services.bt_candidate_metadata import (
     extract_codec,
     extract_release_group,
@@ -62,6 +63,16 @@ def build_subscription_bt_candidate(result: Mapping[str, Any], *, item: BtSubscr
     title = resolve_candidate_title(result, item=item)
     if not source or not title:
         return None
+    if item.media_kind != "adult":
+        return None
+
+    subscription_match = extract_adult_content_match(item.title)
+    candidate_content_id = str(result.get("adult_content_id", "")).strip().lower()
+    if subscription_match is None or not candidate_content_id:
+        return None
+    if candidate_content_id != subscription_match.normalized_content_id:
+        return None
+
     return BTCandidate(
         source_site=str(result.get("indexerName", "")).strip() or str(result.get("sourceProvider", "")).strip() or "unknown",
         title=title,

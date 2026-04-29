@@ -14,8 +14,7 @@ from app.services.manage_watchlist import (
     WATCHLIST_LIST_FAILED_TEXT,
     WATCHLIST_REMOVE_FAILED_TEXT,
     WATCHLIST_REMOVE_USAGE_TEXT,
-    WATCHLIST_SYNC_EMPTY_TEXT,
-    WATCHLIST_SYNC_FAILED_TEXT,
+    WATCHLIST_SYNC_UNAVAILABLE_TEXT,
     ManageWatchlistService,
     parse_watchlist_query,
 )
@@ -103,7 +102,7 @@ def test_manage_watchlist_validation_errors(tmp_path: Path) -> None:
     assert service.handle(parse_watchlist_query("watchlist remove x"), chat_id=1001) == WATCHLIST_REMOVE_USAGE_TEXT
 
 
-def test_manage_watchlist_sync_bridges_items_into_bt_subscription(tmp_path: Path) -> None:
+def test_manage_watchlist_sync_replies_unavailable_and_does_not_bridge_items(tmp_path: Path) -> None:
     database = _make_database(tmp_path)
     watchlist_repo = WatchlistRepo(database)
     bt_subscription_repo = BtSubscriptionRepo(database)
@@ -117,83 +116,7 @@ def test_manage_watchlist_sync_bridges_items_into_bt_subscription(tmp_path: Path
 
     sync_reply = service.handle(parse_watchlist_query("watchlist sync"), chat_id=1001)
 
-    assert sync_reply == "已同步想看清单到 BT 订阅：共 2 条，新增 2 条，已存在 0 条。"
-    synced_items = bt_subscription_repo.list_items(chat_id=1001)
-    assert len(synced_items) == 2
-    assert {(item.title, item.media_kind) for item in synced_items} == {
-        ("dune", "movie"),
-        ("三体", "series"),
-    }
-
-    repeat_reply = service.handle(parse_watchlist_query("想看 同步"), chat_id=1001)
-    assert repeat_reply == "已同步想看清单到 BT 订阅：共 2 条，新增 0 条，已存在 2 条。"
-
-
-def test_manage_watchlist_sync_returns_empty_text_when_watchlist_is_empty(tmp_path: Path) -> None:
-    database = _make_database(tmp_path)
-    service = ManageWatchlistService(
-        WatchlistRepo(database),
-        bt_subscription_repo=BtSubscriptionRepo(database),
-    )
-
-    reply = service.handle(parse_watchlist_query("watchlist sync"), chat_id=1001)
-
-    assert reply == WATCHLIST_SYNC_EMPTY_TEXT
-
-
-def test_manage_watchlist_sync_returns_failure_text_when_bt_repo_raises(
-    tmp_path: Path,
-    capsys,
-) -> None:
-    database = _make_database(tmp_path)
-    watchlist_repo = WatchlistRepo(database)
-    bt_subscription_repo = BtSubscriptionRepo(database)
-
-    service = ManageWatchlistService(
-        watchlist_repo,
-        bt_subscription_repo=bt_subscription_repo,
-    )
-    service.handle(parse_watchlist_query("watchlist add dune 2021"), chat_id=1001)
-
-    def _crash_add_items(**_: object) -> None:
-        raise sqlite3.OperationalError("db down")
-
-    bt_subscription_repo.add_items = _crash_add_items  # type: ignore[method-assign]
-
-    reply = service.handle(parse_watchlist_query("watchlist sync"), chat_id=1001)
-
-    assert reply == WATCHLIST_SYNC_FAILED_TEXT
-    assert bt_subscription_repo.list_items(chat_id=1001) == []
-    captured = capsys.readouterr()
-    assert "[想看同步到 BT 订阅失败]" in captured.out
-    assert "db down" in captured.out
-
-
-def test_manage_watchlist_sync_fails_closed_on_partial_bt_write_failure(tmp_path: Path) -> None:
-    database = _make_database(tmp_path)
-    watchlist_repo = WatchlistRepo(database)
-    bt_subscription_repo = BtSubscriptionRepo(database)
-    service = ManageWatchlistService(
-        watchlist_repo,
-        bt_subscription_repo=bt_subscription_repo,
-    )
-    service.handle(parse_watchlist_query("watchlist add dune 2021"), chat_id=1001)
-    service.handle(parse_watchlist_query("watchlist add series 三体 2023"), chat_id=1001)
-
-    real_add_item_with_connection = bt_subscription_repo._add_item_with_connection
-    call_count = {"value": 0}
-
-    def _fail_on_second_add(connection, **kwargs: object):
-        call_count["value"] += 1
-        if call_count["value"] == 1:
-            return real_add_item_with_connection(connection, **kwargs)
-        raise sqlite3.OperationalError("db down")
-
-    bt_subscription_repo._add_item_with_connection = _fail_on_second_add  # type: ignore[method-assign]
-
-    reply = service.handle(parse_watchlist_query("watchlist sync"), chat_id=1001)
-
-    assert reply == WATCHLIST_SYNC_FAILED_TEXT
+    assert sync_reply == WATCHLIST_SYNC_UNAVAILABLE_TEXT
     assert bt_subscription_repo.list_items(chat_id=1001) == []
 
 

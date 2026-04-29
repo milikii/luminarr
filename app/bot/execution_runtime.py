@@ -41,7 +41,7 @@ async def run_sync_with_policy(
 
 
 def watchlist_policy_action(action: str) -> str:
-    if action == "list":
+    if action in {"list", "sync"}:
         return ACTION_WATCHLIST_LIST
     return ACTION_WATCHLIST_MUTATION
 
