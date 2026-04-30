@@ -476,3 +476,21 @@
 
 ### 下轮目标
 - 提交 `adult-search-fallback` 变更并继续 Telegram 路径 QA
+
+## Round 29 — 2026-05-01 07:35
+
+### 完成
+- 完成 `Telegram 结果交互与成人 metadata 主辅源重排` 第一阶段：成人搜索结果改为 Telegram 分层布局，保留裸 `magnet:?` 便于点击 / 复制，并补上海报、标准信息、制作信息、详情链接和 Metadata 来源角色展示
+- 固定成人 metadata source policy：`avmoo / avbase / jav321 / avsox / caribbeancom / missav` 作为默认主候选，`javlibrary` 降为 `backup_cross_check`，`javbus` 降为 supporting / 非默认主源，`fanza` 作为条件增强源
+- 扩展 JavLibrary backup helper 的只读解析字段，并把新契约写入 `.trellis/spec/backend/bt-source-contracts.md`
+- 归档 Trellis task `05-01-telegram-adult-result-ux-and-metadata`，session journal 已写入本地 `.trellis/workspace/alex/journal-1.md`
+
+### 测试状态
+- 通过: 5 / 总计: 5
+
+### 遗留 / 下轮继续
+- 这一轮只完成交互壳、source policy 和 JavLibrary backup metadata 解析；尚未接入 `avmoo / avbase / jav321 / avsox / caribbeancom / missav` 的真实 helper client
+- Telegram 客户端对裸 `magnet:?` 的点击行为取决于客户端实现；当前输出已保留完整裸链接，至少可复制
+
+### 下轮目标
+- 若继续优化成人 metadata，优先选 1 个主 metadata helper 做真实接入和 Telegram 实机 smoke；若准备发布，先进入 QA / ship
