@@ -114,6 +114,7 @@ def _format_telegram_import_approval_reply(text: str) -> str:
             f"任务 Hash: {task_hash}",
             f"确认命令: {confirm_command}",
             "",
-            f"直接回复 {confirm_command} 执行导入",
+            "下一步",
+            f"确认导入：发送 {confirm_command}",
         ]
     )

@@ -59,7 +59,8 @@ def test_format_telegram_reply_formats_import_approval() -> None:
         "任务 ID: 87\n"
         "任务 Hash: hash-87\n"
         "确认命令: confirm hash-87\n\n"
-        "直接回复 confirm hash-87 执行导入"
+        "下一步\n"
+        "确认导入：发送 confirm hash-87"
     )
 
 

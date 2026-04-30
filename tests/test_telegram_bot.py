@@ -2527,7 +2527,8 @@ def test_handle_message_import_formats_import_approval_for_telegram() -> None:
     assert "任务 ID: 87" in sent_text
     assert "任务 Hash: hash-87" in sent_text
     assert "确认命令: confirm hash-87" in sent_text
-    assert "直接回复 confirm hash-87 执行导入" in sent_text
+    assert "下一步" in sent_text
+    assert "确认导入：发送 confirm hash-87" in sent_text
     assert "导入待确认：" not in sent_text
     import_service.import_by_task_ref.assert_awaited_once_with("hash-87", chat_id=1001, user_id=2001)
 
