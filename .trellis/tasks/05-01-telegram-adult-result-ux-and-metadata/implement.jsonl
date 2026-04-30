@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load backend spec index before implementing Telegram adult result UX and metadata changes."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep the UX/metadata change bounded and test-driven."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Preserve safe fallback behavior if metadata or poster helpers fail."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Adult metadata changes must stay consistent with current adult-only BT source boundaries."}

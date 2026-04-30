@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Review Telegram adult result UX and metadata changes against backend guidelines."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify the change remains bounded and quality-protected."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Check helper failure behavior stays fail-closed where appropriate."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Verify metadata source changes do not widen the adult-only BT boundary by accident."}
