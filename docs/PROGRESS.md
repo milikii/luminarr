@@ -410,3 +410,36 @@
 
 ### 下轮目标
 - 进入 `T17 Telegram-first 高频主链交付层`，优先搜索结果、下载确认、状态反馈和关键 BT follow-up 的 Telegram-first 交付
+
+## Round 25 — 2026-04-30 13:28
+
+### 完成
+- 完成 `T17 Telegram-first 高频主链交付层`：补齐 Telegram inline actions 基础设施，收口 duplicate warning 主体验、关键 BT follow-up 提示交付和导入审批 Telegram-first 文本结构
+- 保持 shared runtime 业务语义不变，所有按钮继续回译到既有文本 query，不新增业务协议
+- 通过 focused verification 与仓库级 gate，确认 `T17` 没有带偏 adult-only BT 边界或 docs gate
+
+### 测试状态
+- 通过: 4 / 总计: 4
+
+### 遗留 / 下轮继续
+- `T18 成人 BT 来源角色底座` 尚未开始；需要固定主力 BT / 辅助 PT / helper-only 角色，避免后续扩站继续漂移
+
+### 下轮目标
+- 进入 `T18 成人 BT 来源角色底座`，先锁定来源角色真相与 helper-only 边界
+
+## Round 26 — 2026-04-30 14:56
+
+### 完成
+- 完成 `T18 成人 BT 来源角色底座`：在 `app/services/bt_sources.py` 收口来源角色真相与别名归一化，引入 `primary / supporting / helper_only` 角色，并为 BT candidate 增加 `btSourceName` / `btSourceRole`
+- 让 `app/main.py` 通过 `get_configured_web_source_rule()` 只装配允许主动搜索的来源，保持 `javlibrary` helper-only，不再进入主动下载来源
+- 让 `app/services/bt_read_only_display.py` 复用 `bt_sources` 的角色/优先级真相，移除散落的来源优先级与别名表
+- 补齐 focused tests，并新增 `.trellis/spec/backend/bt-source-contracts.md` 记录来源角色、环境装配和 candidate payload 契约
+
+### 测试状态
+- 通过: 4 / 总计: 4
+
+### 遗留 / 下轮继续
+- `T19 Stage 1 聚合验证与运维真相同步` 尚未开始；仍需补新的 focused verification 入口、实机 smoke/等价证据和 operator-facing 文档同步
+
+### 下轮目标
+- 进入 `T19 Stage 1 聚合验证与运维真相同步`，补验证矩阵并同步当前实现真相
