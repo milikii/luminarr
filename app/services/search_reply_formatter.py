@@ -8,6 +8,11 @@ from typing import Any
 from app.clients.tmdb import TmdbMovie
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
+from app.services.adult_metadata_sources import (
+    canonicalize_adult_metadata_source_name,
+    get_adult_metadata_source_profile,
+)
+from app.services.bt_sources import resolve_bt_source
 from app.services.search_query_parser import ParsedMovieQuery
 
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
@@ -95,12 +100,18 @@ def format_adult_bt_resource_fallback_reply(query: str, candidates: Sequence[Map
         return ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE.format(query=query)
 
     lines = [f"成人资源候选：{query}"]
-    _append_bt_candidate_lines(lines, candidates)
+    _append_bt_candidate_lines(lines, candidates, include_adult_metadata=True, include_source_link=True)
     lines.append(ADULT_BT_RESOURCE_FALLBACK_NOTICE_TEXT)
     return "\n".join(lines)
 
 
-def _append_bt_candidate_lines(lines: list[str], candidates: Sequence[Mapping[str, Any]]) -> None:
+def _append_bt_candidate_lines(
+    lines: list[str],
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    include_adult_metadata: bool = False,
+    include_source_link: bool = False,
+) -> None:
     seen_history_content_ids: set[str] = set()
     for index, item in enumerate(candidates, start=1):
         title = safe_text(item.get("title"), default="(no title)")
@@ -122,6 +133,13 @@ def _append_bt_candidate_lines(lines: list[str], candidates: Sequence[Mapping[st
         detail_url = format_read_only_adult_detail_url(item)
         if detail_url:
             lines.append(f"   只读详情: {detail_url}")
+        if include_adult_metadata:
+            for metadata_line in format_adult_metadata_lines(item):
+                lines.append(f"   {metadata_line}")
+        if include_source_link:
+            source_link = format_bt_direct_source_link(item)
+            if source_link:
+                lines.append(f"   {source_link}")
         history_text = resolve_read_only_history_text(item, seen_content_ids=seen_history_content_ids)
         if history_text:
             lines.append(f"   {history_text}")
@@ -200,6 +218,117 @@ def format_read_only_adult_detail_url(item: Mapping[str, Any]) -> str:
     return safe_text(item.get("read_only_adult_detail_url"), default="")
 
 
+def format_adult_metadata_lines(item: Mapping[str, Any]) -> tuple[str, ...]:
+    lines: list[str] = []
+    poster_url = _first_text(
+        item,
+        (
+            "adult_poster_url",
+            "posterUrl",
+            "poster_url",
+            "coverUrl",
+            "cover_url",
+            "thumbnail",
+            "image",
+            "read_only_adult_poster_url",
+        ),
+    )
+    if poster_url:
+        lines.append(f"海报: {poster_url}")
+
+    standard_summary = format_adult_standard_metadata_summary(item)
+    if standard_summary:
+        lines.append(f"标准信息: {standard_summary}")
+
+    production_summary = format_adult_production_metadata_summary(item)
+    if production_summary:
+        lines.append(f"制作信息: {production_summary}")
+
+    metadata_source_summary = format_adult_metadata_source_summary(item)
+    if metadata_source_summary:
+        lines.append(metadata_source_summary)
+    return tuple(lines)
+
+
+def format_adult_standard_metadata_summary(item: Mapping[str, Any]) -> str:
+    title = _first_text(item, ("adult_title", "metadataTitle", "metadata_title", "read_only_adult_title", "title"))
+    release_date = _first_text(
+        item,
+        ("adult_release_date", "releaseDate", "release_date", "date", "read_only_adult_release_date"),
+    )
+    runtime = _first_text(
+        item,
+        ("adult_runtime", "runtime", "duration", "length", "read_only_adult_runtime"),
+    )
+    fields = []
+    if title:
+        fields.append(f"标题: {title}")
+    if release_date:
+        fields.append(f"发行日: {release_date}")
+    if runtime:
+        fields.append(f"时长: {runtime}")
+    return " | ".join(fields)
+
+
+def format_adult_production_metadata_summary(item: Mapping[str, Any]) -> str:
+    maker = _first_text(
+        item,
+        ("adult_maker", "adult_studio", "maker", "studio", "publisher", "read_only_adult_maker", "read_only_adult_studio"),
+    )
+    label = _first_text(item, ("adult_label", "label", "read_only_adult_label"))
+    series = _first_text(item, ("adult_series", "series", "read_only_adult_series"))
+    director = _first_text(item, ("adult_director", "director", "read_only_adult_director"))
+    actors = _first_sequence_text(item, ("adult_actors", "actors", "actresses", "cast", "read_only_adult_actors"))
+    fields = []
+    if maker:
+        fields.append(f"制作商: {maker}")
+    if label:
+        fields.append(f"厂牌: {label}")
+    if series:
+        fields.append(f"系列: {series}")
+    if director:
+        fields.append(f"导演: {director}")
+    if actors:
+        fields.append(f"演员: {actors}")
+    return " | ".join(fields)
+
+
+def format_adult_metadata_source_summary(item: Mapping[str, Any]) -> str:
+    direct_source = _first_text(
+        item,
+        (
+            "adult_metadata_source",
+            "metadataSource",
+            "metadata_source",
+            "sourceSite",
+            "source_site",
+        ),
+    )
+    read_only_source = _first_text(item, ("read_only_adult_source_site",))
+    raw_source = direct_source or read_only_source
+    if not raw_source:
+        return ""
+    source_name = canonicalize_adult_metadata_source_name(raw_source)
+    source_profile = get_adult_metadata_source_profile(source_name)
+    role = _first_text(item, ("adult_metadata_source_role",))
+    if not role and not direct_source:
+        role = _first_text(item, ("read_only_adult_metadata_source_role",))
+    if not role and source_profile is not None:
+        role = source_profile.role
+    if role:
+        return f"Metadata源: {source_name} | 角色: {role}"
+    return f"Metadata源: {source_name}"
+
+
+def format_bt_direct_source_link(item: Mapping[str, Any]) -> str:
+    source = resolve_bt_source(item)
+    if not source:
+        return ""
+    if source.lower().startswith("magnet:?"):
+        return f"磁力链接: {source}"
+    return f"资源链接: {source}"
+
+
 def resolve_read_only_history_text(item: Mapping[str, Any], *, seen_content_ids: set[str]) -> str:
     history_text = safe_text(item.get("adult_history_text"), default="")
     if not history_text:
@@ -223,6 +352,34 @@ def safe_text(value: Any, default: str) -> str:
     if not text:
         return default
     return text
+
+
+def _first_text(item: Mapping[str, Any], keys: Sequence[str]) -> str:
+    for key in keys:
+        text = safe_text(item.get(key), default="")
+        if text:
+            return text
+    return ""
+
+
+def _first_sequence_text(item: Mapping[str, Any], keys: Sequence[str]) -> str:
+    for key in keys:
+        value = item.get(key)
+        if isinstance(value, str):
+            text = safe_text(value, default="")
+            if text:
+                return text
+            continue
+        if isinstance(value, Sequence):
+            parts = [safe_text(part, default="") for part in value]
+            text = " / ".join(part for part in parts if part)
+            if text:
+                return text
+            continue
+        text = safe_text(value, default="")
+        if text:
+            return text
+    return ""
 
 
 def safe_year(value: Any) -> str:

@@ -224,6 +224,169 @@ def test_search_bt_read_only_and_format_uses_adult_only_resource_fallback_when_e
     assert BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="SSIS-123") not in text
 
 
+def test_search_bt_read_only_and_format_adult_only_direct_hit_uses_rich_resource_layout() -> None:
+    magnet = "magnet:?xt=urn:btih:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&dn=ssis-123"
+    helper_queries: list[str] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only results")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "SSIS-123 Sample Title",
+                "source": magnet,
+                "infoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "seeders": 12,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+                "posterUrl": "https://img.example/ssis-123.jpg",
+                "releaseDate": "2026-01-02",
+                "runtime": "120 分钟",
+                "maker": "Prestige",
+                "actors": ["Actor A", "Actor B"],
+                "metadataSource": "avmoo.shop",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        helper_queries.append(lookup_query)
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Sample Title",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+            poster_url="https://pics.example/backup-ssis-123.jpg",
+            release_date="2020-01-01",
+            runtime="98 分钟",
+            maker="Backup Studio",
+            actors=("Backup Actor",),
+        )
+
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert helper_queries == ["SSIS-123"]
+    assert text.startswith("成人资源候选：SSIS-123")
+    assert "BT 只读探索结果：" not in text
+    assert "海报: https://img.example/ssis-123.jpg" in text
+    assert "标准信息: 标题: SSIS-123 Sample Title | 发行日: 2026-01-02 | 时长: 120 分钟" in text
+    assert "制作信息: 制作商: Prestige | 演员: Actor A / Actor B" in text
+    assert "Metadata源: avmoo | 角色: primary" in text
+    assert "https://pics.example/backup-ssis-123.jpg" not in text
+    assert "Backup Studio" not in text
+    assert f"磁力链接: {magnet}" in text
+
+
+def test_search_bt_read_only_and_format_adult_only_renders_backup_helper_metadata() -> None:
+    magnet = "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&dn=ssis-123"
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only helper metadata")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "Secret Mission Nurse leaked cut",
+                "source": magnet,
+                "infoHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "seeders": 8,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> object:
+        assert lookup_query == "SSIS-123"
+
+        class HelperMatch:
+            normalized_content_id = "censored:ssis-123"
+            display_id = "SSIS-123"
+            archive_category = "censored"
+            title = "SSIS-123 Secret Mission Nurse"
+            detail_url = "https://www.javlibrary.com/tw/?v=javli0001"
+            source_site = "javlibrary"
+            poster_url = "https://pics.example/javlibrary-ssis-123.jpg"
+            release_date = "2025-12-31"
+            runtime = "118 分钟"
+            maker = "Backup Studio"
+            actors = ("Actor C",)
+
+        return HelperMatch()
+
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert "只读补全: javlibrary | 番号: SSIS-123 | 分类: censored" in text
+    assert "海报: https://pics.example/javlibrary-ssis-123.jpg" in text
+    assert "标准信息: 标题: SSIS-123 Secret Mission Nurse | 发行日: 2025-12-31 | 时长: 118 分钟" in text
+    assert "制作信息: 制作商: Backup Studio | 演员: Actor C" in text
+    assert "Metadata源: javlibrary | 角色: backup_cross_check" in text
+    assert f"磁力链接: {magnet}" in text
+
+
+def test_search_bt_read_only_and_format_adult_only_enriches_explicit_id_with_helper_metadata() -> None:
+    magnet = "magnet:?xt=urn:btih:cccccccccccccccccccccccccccccccccccccccc&dn=ssis-123"
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only explicit metadata")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-123"
+        return [
+            {
+                "title": "SSIS-123 Sample Title",
+                "source": magnet,
+                "infoHash": "cccccccccccccccccccccccccccccccccccccccc",
+                "seeders": 8,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-123"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-123",
+            display_id="SSIS-123",
+            archive_category="censored",
+            title="SSIS-123 Sample Title",
+            detail_url="https://www.javlibrary.com/tw/?v=javli0001",
+            poster_url="https://pics.example/explicit-ssis-123.jpg",
+            release_date="2026-02-03",
+            runtime="121 分钟",
+            maker="Backup Studio",
+            actors=("Actor D",),
+        )
+
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert "海报: https://pics.example/explicit-ssis-123.jpg" in text
+    assert "标准信息: 标题: SSIS-123 Sample Title | 发行日: 2026-02-03 | 时长: 121 分钟" in text
+    assert "制作信息: 制作商: Backup Studio | 演员: Actor D" in text
+    assert "Metadata源: javlibrary | 角色: backup_cross_check" in text
+    assert f"磁力链接: {magnet}" in text
+
+
 def test_search_bt_read_only_and_format_returns_explicit_adult_source_empty_text_when_fallback_stays_empty() -> None:
     fallback_queries: list[str] = []
 

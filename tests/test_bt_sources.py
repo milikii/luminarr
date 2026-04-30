@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import httpx
 
 from app.clients.web_source import (
@@ -16,6 +17,7 @@ from app.clients.web_source import (
     parse_web_source_html,
     resolve_supported_web_source_page_request,
 )
+from app.services import bt_sources
 from app.services.bt_sources import (
     BT_SOURCE_ROLE_HELPER_ONLY,
     BT_SOURCE_ROLE_PRIMARY,
@@ -145,6 +147,20 @@ def test_bt_source_registry_tracks_roles_and_helper_only_gate() -> None:
     assert is_active_bt_source("javlibrary") is False
 
 
+def test_adult_metadata_source_ranking_keeps_javlibrary_backup_and_javbus_non_default() -> None:
+    assert hasattr(bt_sources, "get_adult_metadata_source_rank")
+    ranking = bt_sources.get_adult_metadata_source_rank()
+    source_names = [item.name for item in ranking]
+
+    assert source_names[:4] == ["avmoo", "avbase", "jav321", "avsox"]
+    assert "javlibrary" in source_names
+    assert "javbus" in source_names
+    assert ranking[source_names.index("javlibrary")].role == "backup_cross_check"
+    assert ranking[source_names.index("javbus")].role == "supporting"
+    assert source_names.index("javbus") > source_names.index("javlibrary")
+    assert source_names.index("fanza") > source_names.index("javbus")
+
+
 def test_get_configured_web_source_rule_skips_helper_only_source() -> None:
     assert get_configured_web_source_rule("nyaa") is NYAA_RULE
     assert get_configured_web_source_rule("tokyotosho") is TOKYOTOSHO_RULE
@@ -165,6 +181,25 @@ def test_get_configured_web_source_rule_skips_supported_but_unmodeled_source(mon
     monkeypatch.setattr(web_source_module, "SUPPORTED_WEB_SOURCE_RULES", patched_rules)
 
     assert get_configured_web_source_rule("unmodeled-source") is None
+
+
+def test_adult_metadata_source_policy_prefers_reference_sources_before_javbus_and_javlibrary() -> None:
+    try:
+        metadata_sources = importlib.import_module("app.services.adult_metadata_sources")
+    except ModuleNotFoundError:
+        metadata_sources = None
+    assert metadata_sources is not None
+
+    ranked = metadata_sources.rank_adult_metadata_sources(
+        ("javlibrary", "javbus.com", "avmoo.shop", "jav321.com")
+    )
+
+    assert ranked == ("avmoo", "jav321", "javlibrary", "javbus")
+    assert metadata_sources.get_adult_metadata_source_profile("avmoo.shop").role == "primary"
+    assert metadata_sources.get_adult_metadata_source_profile("javbus").default_main is False
+    assert metadata_sources.get_adult_metadata_source_profile("javlibrary").role == "backup_cross_check"
+    assert "javbus" not in metadata_sources.get_default_adult_metadata_source_names()
+    assert "javlibrary" not in metadata_sources.get_default_adult_metadata_source_names()
 
 
 def test_parse_web_source_html_extracts_size_and_seeders_for_nyaa() -> None:

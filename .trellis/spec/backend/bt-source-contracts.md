@@ -109,3 +109,93 @@
 
 - Resolve configured provider eligibility through `get_configured_web_source_rule()`.
 - Reuse `canonicalize_bt_source_name()` and role/priority helpers from `app.services.bt_sources`.
+
+## Scenario: Adult Metadata Source Ranking and Telegram Result Display
+
+### 1. Scope / Trigger
+
+- Trigger: `成人搜` now renders adult-only BT candidates with Telegram-specific layout and structured adult metadata fields.
+- Why code-spec depth is required: the contract spans helper parsing (`JavLibraryReadOnlyHelperClient`), candidate decoration (`BtReadOnlyDisplayService`), adult display formatting, Telegram reply formatting, and source ranking policy.
+
+### 2. Signatures
+
+- `app.services.adult_metadata_sources.canonicalize_adult_metadata_source_name(value: str) -> str`
+- `app.services.adult_metadata_sources.get_adult_metadata_source_profile(name: str) -> AdultMetadataSourceProfile | None`
+- `app.services.adult_metadata_sources.rank_adult_metadata_sources(source_names: tuple[str, ...] | list[str]) -> tuple[str, ...]`
+- `app.services.adult_metadata_sources.get_default_adult_metadata_source_names() -> tuple[str, ...]`
+- `app.services.bt_sources.get_adult_metadata_source_rank() -> tuple[AdultMetadataSourceProfile, ...]`
+- `app.bot.telegram_reply_formatter.format_telegram_reply(text: str) -> str`
+
+### 3. Contracts
+
+#### Metadata source policy
+
+- Default main metadata sources are, in order: `avmoo`, `avbase`, `jav321`, `avsox`, `caribbeancom`, `missav`.
+- `javlibrary` is `backup_cross_check`; it may enrich read-only display but must not be treated as the default main metadata source.
+- `javbus` is `supporting`; it must not be a default main metadata source.
+- `fanza` is `conditional`; it must rank after default and supporting sources unless a future explicit Japan-IP capability changes the policy.
+- Aliases such as `avmoo.shop`, `avbase.net`, `jav321.com`, `avsox.click`, `missav123.com`, `javbus.com`, and `javlibrary.com` must canonicalize before ranking or display.
+
+#### Candidate metadata fields
+
+- Adult display candidates may carry:
+  - `read_only_adult_poster_url` / `posterUrl` / `poster_url`
+  - `read_only_adult_release_date` / `releaseDate`
+  - `read_only_adult_runtime` / `runtime` / `duration`
+  - `read_only_adult_maker` / `read_only_adult_studio` / `maker` / `studio`
+  - `read_only_adult_series`, `read_only_adult_director`, `read_only_adult_actors`
+  - `metadataSource` / `read_only_adult_source_site`
+  - `read_only_adult_metadata_source_role`
+- JavLibrary helper fields are backup/cross-check fields and must be copied into `read_only_adult_*` payload keys only after helper relevance checks pass.
+
+#### Telegram adult result contract
+
+- Adult-only direct hits and adult-only fallback hits must both use `format_adult_bt_resource_fallback_reply()` so the first line is `成人资源候选：<query>`.
+- Telegram formatting must transform adult candidates into:
+  - `【成人资源候选】 <query>`
+  - `候选结果（N 条）`
+  - `【1】 <title>` style candidate blocks
+  - visible poster and standard metadata lines when present
+  - bare `magnet:?` text as `磁力: <magnet>` for Telegram copy/click behavior
+- Telegram adult formatting must omit the older `链接参考: magnet | infoHash=...` summary from the primary adult result view.
+
+### 4. Validation & Error Matrix
+
+- Helper lookup/parsing failure -> log existing helper failure path and keep BT candidates visible without metadata enrichment.
+- Missing optional metadata fields -> omit only those fields; keep title/source/seeders/size and magnet visible.
+- Unknown metadata source -> keep the canonicalized source text if available; do not promote it into default main policy.
+- Adult-only candidates from non-adult PT/Prowlarr proof -> continue rejecting them per adult-only fallback display contract.
+
+### 5. Good / Base / Bad Cases
+
+- Good: `metadataSource=avmoo.shop` displays as `Metadata: avmoo (primary)` in Telegram.
+- Base: only JavLibrary helper data is available; display it as `Metadata: javlibrary (backup/cross-check)` and keep the resource candidate usable.
+- Bad: `javbus` poster data outranks configured primary metadata sources or appears in `get_default_adult_metadata_source_names()`.
+
+### 6. Tests Required
+
+- `tests/test_bt_sources.py`
+  - metadata source rank keeps default sources first
+  - `javlibrary` role is `backup_cross_check`
+  - `javbus` is not default main
+- `tests/test_javlibrary_helper.py`
+  - JavLibrary helper extracts poster, release date, duration, studio, series, genres, and actors from detail HTML
+- `tests/test_search_media.py`
+  - adult-only direct hits use `成人资源候选` rich layout
+  - helper metadata propagates to adult-only display without PT fallback
+- `tests/test_telegram_reply_formatter.py`
+  - Telegram adult candidate text is reformatted with candidate blocks and copyable magnet text
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+- Add another adult metadata site by hard-coding its priority inside Telegram formatter.
+- Treat `javbus` or `javlibrary` as default main metadata because they already exist in BT source registries.
+- Hide the full magnet behind `infoHash`-only text in Telegram adult results.
+
+#### Correct
+
+- Add metadata source policy in `app.services.adult_metadata_sources`, then consume canonical names in display code.
+- Keep `javlibrary` backup/cross-check and `javbus` supporting/non-default unless the task explicitly changes source strategy.
+- Preserve a bare `magnet:?` line in Telegram adult results while keeping adult-only source proof and PT rejection unchanged.

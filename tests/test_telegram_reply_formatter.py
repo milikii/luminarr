@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 from app.bot.telegram_update_runtime import build_telegram_reply_func
 from app.bot.telegram_reply_formatter import format_telegram_reply
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
+from app.services.search_reply_formatter import format_adult_bt_resource_fallback_reply
 
 
 def test_format_telegram_reply_formats_search_result() -> None:
@@ -27,6 +28,34 @@ def test_format_telegram_reply_formats_search_result() -> None:
         "2. Dune: Part Two (2024)\n\n"
         "直接回复 1-2 中的序号继续，例如：1"
     )
+
+
+def test_format_telegram_reply_formats_adult_bt_resource_result() -> None:
+    text = (
+        "成人资源候选：SSIS-123\n"
+        "1. SSIS-123 Sample Title\n"
+        "   站点: tokyotosho | 来源入口: tokyotosho | 做种: 12 | 大小: 2.0 GB\n"
+        "   番号: SSIS-123 | 分类: censored\n"
+        "   海报: https://img.example/ssis-123.jpg\n"
+        "   标准信息: 标题: SSIS-123 Sample Title | 发行日: 2026-01-02 | 时长: 120 分钟\n"
+        "   制作信息: 制作商: Prestige | 演员: Actor A, Actor B\n"
+        "   Metadata源: avmoo | 角色: primary\n"
+        "   磁力链接: magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12&dn=ssis-123\n"
+        "   链接参考: magnet | infoHash=abcdef1234567890abcdef1234567890abcdef12\n"
+        "只读说明：以上为当前已配置成人源返回的资源候选，不会创建审批或下载任务。\n"
+        "如需走成人下载链，请直接发送磁力并选择 BT 成人链。"
+    )
+
+    formatted = format_telegram_reply(text)
+
+    assert formatted.startswith("【成人资源候选】 SSIS-123\n候选结果（1 条）")
+    assert "【1】 SSIS-123 Sample Title" in formatted
+    assert "海报: https://img.example/ssis-123.jpg" in formatted
+    assert "标题: SSIS-123 Sample Title | 发行日: 2026-01-02 | 时长: 120 分钟" in formatted
+    assert "Metadata: avmoo (primary)" in formatted
+    assert "磁力: magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12&dn=ssis-123" in formatted
+    assert "链接参考:" not in formatted
+    assert "复制上面的磁力链接后发送，选择 BT 成人链。" in formatted
 
 
 def test_format_telegram_reply_formats_add_approval() -> None:
@@ -62,6 +91,50 @@ def test_format_telegram_reply_formats_import_approval() -> None:
         "下一步\n"
         "确认导入：发送 confirm hash-87"
     )
+
+
+def test_format_telegram_reply_formats_adult_resource_candidates_with_copyable_links() -> None:
+    magnet = "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12&dn=SSIS-123"
+    text = format_adult_bt_resource_fallback_reply(
+        "SSIS-123",
+        (
+            {
+                "title": "SSIS-123 Secret Mission Nurse",
+                "source": magnet,
+                "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+                "adult_display_id": "SSIS-123",
+                "adult_archive_category": "censored",
+                "read_only_adult_source_site": "javlibrary",
+                "read_only_adult_title": "SSIS-123 Secret Mission Nurse",
+                "read_only_adult_detail_url": "https://www.javlibrary.com/tw/?v=javli0001",
+                "read_only_adult_poster_url": "https://img.example/ssis-123.jpg",
+                "read_only_adult_release_date": "2026-04-01",
+                "read_only_adult_actors": ("Aki", "Mei"),
+                "read_only_adult_studio": "S1",
+                "read_only_adult_series": "Secret Mission",
+            },
+        ),
+    )
+
+    formatted = format_telegram_reply(text)
+
+    assert formatted.startswith("【成人资源候选】 SSIS-123")
+    assert "候选结果（1 条）" in formatted
+    assert "【1】 SSIS-123 Secret Mission Nurse" in formatted
+    assert "番号: SSIS-123 | 分类: censored" in formatted
+    assert "海报: https://img.example/ssis-123.jpg" in formatted
+    assert "发行日: 2026-04-01" in formatted
+    assert "演员: Aki / Mei" in formatted
+    assert "制作商: S1" in formatted
+    assert "系列: Secret Mission" in formatted
+    assert "Metadata: javlibrary (backup/cross-check)" in formatted
+    assert f"磁力: {magnet}" in formatted
+    assert "详情: https://www.javlibrary.com/tw/?v=javli0001" in formatted
+    assert "链接参考: magnet | infoHash" not in formatted
 
 
 def test_format_telegram_reply_keeps_unrelated_text() -> None:

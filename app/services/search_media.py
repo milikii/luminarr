@@ -203,11 +203,12 @@ class SearchMediaService:
             raw_results,
             lookup_query=cleaned_query,
             limit=self._limit,
+            include_explicit_adult_metadata=adult_only,
         )
         if adult_only:
             adult_display_results = _filter_adult_only_display_candidates(display_results)
             if adult_display_results:
-                return format_bt_read_only_reply(cleaned_query, adult_display_results)
+                return format_adult_bt_resource_fallback_reply(cleaned_query, adult_display_results)
             fallback_results = await self._search_adult_only_fallback_candidates(cleaned_query)
             return format_adult_bt_resource_fallback_reply(cleaned_query, fallback_results)
         return format_bt_read_only_reply(cleaned_query, display_results)
@@ -221,6 +222,7 @@ class SearchMediaService:
                 raw_results,
                 lookup_query=query,
                 limit=self._limit,
+                include_explicit_adult_metadata=True,
             )
             adult_display_results = _filter_adult_only_display_candidates(display_results)
             if adult_display_results:

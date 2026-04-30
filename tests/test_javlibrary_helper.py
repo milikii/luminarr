@@ -40,6 +40,14 @@ def test_javlibrary_read_only_helper_follows_search_result_to_detail(monkeypatch
                     text=(
                         '<div id="video_title"><a rel="bookmark">SSIS-123 Sample Title</a></div>'
                         '<div id="video_id"><table><tr><td class="text">SSIS-123</td></tr></table></div>'
+                        '<img id="video_jacket_img" src="//img.example/ssis-123.jpg">'
+                        '<span class="header">发行日期:</span><span class="text">2026-04-01</span>'
+                        '<span class="header">长度:</span><span class="text">120分钟</span>'
+                        '<span class="header">导演:</span><span class="text">Director A</span>'
+                        '<span class="header">制作商:</span><span class="text">S1</span>'
+                        '<span class="header">系列:</span><span class="text">Secret Mission</span>'
+                        '<span class="header">类别:</span><span class="text">Drama Nurse</span>'
+                        '<span class="star"><a>Aki</a></span><span class="star"><a>Mei</a></span>'
                     ),
                     request=httpx.Request("GET", url),
                 )
@@ -60,6 +68,14 @@ def test_javlibrary_read_only_helper_follows_search_result_to_detail(monkeypatch
     assert match.archive_category == "censored"
     assert match.title == "SSIS-123 Sample Title"
     assert match.detail_url == "https://www.javlibrary.com/tw/?v=javli0001"
+    assert match.poster_url == "https://img.example/ssis-123.jpg"
+    assert match.release_date == "2026-04-01"
+    assert match.duration == "120分钟"
+    assert match.director == "Director A"
+    assert match.studio == "S1"
+    assert match.series == "Secret Mission"
+    assert match.genres == ("Drama", "Nurse")
+    assert match.actors == ("Aki", "Mei")
 
 
 def test_javlibrary_read_only_helper_accepts_direct_detail_response(monkeypatch) -> None:

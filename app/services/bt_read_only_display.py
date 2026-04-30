@@ -13,6 +13,7 @@ from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceEr
 from app.operational_logging import emit_operational_log
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key
 from app.services.adult_content import AdultContentMatch, extract_exact_adult_content_match
+from app.services.adult_metadata_sources import get_adult_metadata_source_profile
 from app.services.bt_sources import attach_bt_source_profile, canonicalize_bt_source_name, get_bt_source_priority
 
 AdultReadOnlyLookupFunc = Callable[[str], Awaitable[JavLibraryReadOnlyMatch | None]]
@@ -83,13 +84,18 @@ class BtReadOnlyDisplayService:
         *,
         lookup_query: str,
         limit: int,
+        include_explicit_adult_metadata: bool = False,
     ) -> list[dict[str, Any]]:
         selected_limit = max(1, limit)
         display_candidates = [_to_candidate_dict(item) for item in candidates]
         if not display_candidates:
             return []
         helper_match = None
-        if any(not str(item.get("adult_content_id", "")).strip() for item in display_candidates):
+        if _should_lookup_helper_metadata(
+            display_candidates,
+            lookup_query=lookup_query,
+            include_explicit_adult_metadata=include_explicit_adult_metadata,
+        ):
             helper_match = await self.lookup_helper_match(lookup_query)
         display_candidates = prepare_bt_read_only_selection_candidates(
             display_candidates,
@@ -100,6 +106,7 @@ class BtReadOnlyDisplayService:
             limited_candidates,
             lookup_query=lookup_query,
             helper_match=helper_match,
+            include_explicit_adult_metadata=include_explicit_adult_metadata,
         )
 
     async def decorate_display_candidates(
@@ -108,11 +115,16 @@ class BtReadOnlyDisplayService:
         *,
         lookup_query: str,
         helper_match: JavLibraryReadOnlyMatch | None = None,
+        include_explicit_adult_metadata: bool = False,
     ) -> list[dict[str, Any]]:
         display_candidates = [_to_candidate_dict(item) for item in candidates]
-        if not display_candidates or not any(not str(item.get("adult_content_id", "")).strip() for item in display_candidates):
+        if not display_candidates:
             return [self._annotate_adult_history(item) for item in display_candidates]
-        if helper_match is None:
+        if helper_match is None and _should_lookup_helper_metadata(
+            display_candidates,
+            lookup_query=lookup_query,
+            include_explicit_adult_metadata=include_explicit_adult_metadata,
+        ):
             helper_match = await self.lookup_helper_match(lookup_query)
         if helper_match is None:
             return [self._annotate_adult_history(item) for item in display_candidates]
@@ -196,8 +208,6 @@ class BtReadOnlyDisplayService:
         helper_match: JavLibraryReadOnlyMatch,
     ) -> dict[str, Any]:
         candidate = _to_candidate_dict(item)
-        if candidate.get("adult_content_id"):
-            return candidate
         if not should_apply_bt_read_only_helper(
             candidate,
             helper_match=helper_match,
@@ -209,7 +219,48 @@ class BtReadOnlyDisplayService:
         candidate["read_only_adult_title"] = helper_match.title
         candidate["read_only_adult_source_site"] = helper_match.source_site
         candidate["read_only_adult_detail_url"] = helper_match.detail_url
+        _copy_optional_helper_metadata(candidate, helper_match=helper_match)
         return candidate
+
+
+def _should_lookup_helper_metadata(
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    lookup_query: str,
+    include_explicit_adult_metadata: bool,
+) -> bool:
+    if any(not str(item.get("adult_content_id", "")).strip() for item in candidates):
+        return True
+    if not include_explicit_adult_metadata:
+        return False
+    content_match = extract_exact_adult_content_match(lookup_query, source_site="javlibrary")
+    return content_match is not None and content_match.archive_category == "censored"
+
+
+def _copy_optional_helper_metadata(candidate: dict[str, Any], *, helper_match: JavLibraryReadOnlyMatch) -> None:
+    optional_fields = {
+        "poster_url": "read_only_adult_poster_url",
+        "release_date": "read_only_adult_release_date",
+        "runtime": "read_only_adult_runtime",
+        "duration": "read_only_adult_runtime",
+        "maker": "read_only_adult_maker",
+        "studio": "read_only_adult_maker",
+        "label": "read_only_adult_label",
+        "series": "read_only_adult_series",
+        "director": "read_only_adult_director",
+        "genres": "read_only_adult_genres",
+        "actors": "read_only_adult_actors",
+    }
+    for helper_field, candidate_field in optional_fields.items():
+        value = getattr(helper_match, helper_field, "")
+        if value:
+            candidate[candidate_field] = value
+
+    source_profile = get_adult_metadata_source_profile(str(helper_match.source_site))
+    if source_profile is None:
+        return
+    candidate["read_only_adult_metadata_source_role"] = source_profile.role
+    candidate["read_only_adult_metadata_source_priority"] = source_profile.priority
 
 
 def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:

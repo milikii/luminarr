@@ -10,6 +10,10 @@ import httpx
 from app.clients.web_source import UnsupportedWebSourcePageError
 from app.operational_logging import emit_operational_log
 from app.services.adult_content import extract_exact_adult_content_match
+from app.services.adult_metadata_sources import (
+    AdultMetadataSourceProfile,
+    get_adult_metadata_source_rank as get_ranked_adult_metadata_source_profiles,
+)
 from app.services.media_name_parser import parse_media_name
 
 BtSourceSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
@@ -102,6 +106,10 @@ def get_bt_source_priority(name: str) -> float:
     if profile is None:
         return 0.0
     return profile.adult_sort_priority
+
+
+def get_adult_metadata_source_rank() -> tuple[AdultMetadataSourceProfile, ...]:
+    return get_ranked_adult_metadata_source_profiles()
 
 
 def attach_bt_source_profile(candidate: Mapping[str, Any]) -> dict[str, Any]:

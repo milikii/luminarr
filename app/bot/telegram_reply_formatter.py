@@ -4,6 +4,7 @@ import re
 
 TELEGRAM_MOVIE_CARD_HEADER_TEXT = "电影海报卡片"
 TELEGRAM_SEARCH_RESULT_PREFIX = "搜索结果："
+TELEGRAM_ADULT_BT_RESULT_PREFIX = "成人资源候选："
 TELEGRAM_ADD_APPROVAL_PREFIX = "下载待确认："
 TELEGRAM_ADD_APPROVAL_TASK_REF_PREFIX = "选择序号:"
 TELEGRAM_IMPORT_APPROVAL_PREFIX = "导入待确认："
@@ -13,7 +14,7 @@ TELEGRAM_IMPORT_APPROVAL_TASK_HASH_PREFIX = "任务 Hash:"
 
 def format_telegram_reply(text: str) -> str:
     return _format_telegram_import_approval_reply(
-        _format_telegram_add_approval_reply(_format_telegram_search_reply(text))
+        _format_telegram_add_approval_reply(_format_telegram_adult_bt_reply(_format_telegram_search_reply(text)))
     )
 
 
@@ -52,6 +53,66 @@ def _format_telegram_search_reply(text: str) -> str:
     formatted_lines.extend(result_lines[1:])
     formatted_lines.extend(("", _format_telegram_selection_hint(candidate_count)))
     return "\n".join(formatted_lines)
+
+
+def _format_telegram_adult_bt_reply(text: str) -> str:
+    stripped_text = text.strip()
+    if not stripped_text.startswith(TELEGRAM_ADULT_BT_RESULT_PREFIX):
+        return text
+
+    lines = [line.rstrip() for line in stripped_text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return text
+
+    query = lines[0].removeprefix(TELEGRAM_ADULT_BT_RESULT_PREFIX).strip()
+    candidate_count = sum(1 for line in lines[1:] if re.match(r"^\d+\.\s", line.strip()))
+    if not query or candidate_count <= 0:
+        return text
+
+    formatted_lines = [f"【成人资源候选】 {query}".rstrip(), f"候选结果（{candidate_count} 条）"]
+    current_candidate = 0
+    for line in lines[1:]:
+        cleaned_line = line.strip()
+        if not cleaned_line:
+            continue
+        if cleaned_line.startswith("链接参考:"):
+            continue
+        if cleaned_line.startswith("只读说明：") or cleaned_line.startswith("如需走成人下载链"):
+            continue
+        candidate_match = re.match(r"^(?P<index>\d+)\.\s+(?P<title>.+)$", cleaned_line)
+        if candidate_match is not None:
+            if current_candidate > 0:
+                formatted_lines.append("")
+            current_candidate = int(str(candidate_match.group("index") or "0"))
+            formatted_lines.append(f"【{current_candidate}】 {str(candidate_match.group('title') or '').strip()}")
+            continue
+        formatted_lines.append(_format_telegram_adult_bt_line(cleaned_line))
+
+    formatted_lines.extend(("", "下一步", "复制上面的磁力链接后发送，选择 BT 成人链。"))
+    return "\n".join(formatted_lines)
+
+
+def _format_telegram_adult_bt_line(line: str) -> str:
+    if line.startswith("磁力链接:"):
+        return line.replace("磁力链接:", "磁力:", 1).strip()
+    if line.startswith("资源链接:"):
+        return line.replace("资源链接:", "链接:", 1).strip()
+    if line.startswith("只读详情:"):
+        return line.replace("只读详情:", "详情:", 1).strip()
+    metadata_match = re.match(r"^Metadata源:\s*(?P<source>[^|]+?)(?:\s*\|\s*角色:\s*(?P<role>.+))?$", line)
+    if metadata_match is not None:
+        source = str(metadata_match.group("source") or "").strip()
+        role = str(metadata_match.group("role") or "").strip()
+        if role == "backup_cross_check":
+            role = "backup/cross-check"
+        if role:
+            return f"Metadata: {source} ({role})"
+        return f"Metadata: {source}"
+    if line.startswith("标准信息:"):
+        return line.removeprefix("标准信息:").strip()
+    if line.startswith("制作信息:"):
+        return line.removeprefix("制作信息:").strip().replace(", ", " / ")
+    return line
 
 
 def _format_telegram_selection_hint(candidate_count: int) -> str:
