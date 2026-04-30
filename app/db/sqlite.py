@@ -161,6 +161,19 @@ SCHEMA_STATEMENTS = (
     """,
     "CREATE INDEX IF NOT EXISTS idx_adult_content_registry_task_identity ON adult_content_registry(current_task_id, current_task_hash)",
     "CREATE INDEX IF NOT EXISTS idx_adult_content_registry_status ON adult_content_registry(current_status, updated_at)",
+    """
+    CREATE TABLE IF NOT EXISTS adult_duplicate_memory_snapshot (
+        normalized_content_id TEXT PRIMARY KEY,
+        display_title TEXT NOT NULL DEFAULT '',
+        snapshot_status TEXT NOT NULL DEFAULT '',
+        evidence_summary_json TEXT NOT NULL DEFAULT '',
+        last_verified_at TEXT NOT NULL DEFAULT '',
+        last_scan_failed_at TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_adult_duplicate_memory_snapshot_status ON adult_duplicate_memory_snapshot(snapshot_status, updated_at)",
 )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable
 import errno
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -18,6 +19,10 @@ from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
     ApprovalPersistenceError,
     ApprovalRepo,
+)
+from app.db.adult_duplicate_memory_snapshot_repo import (
+    AdultDuplicateMemorySnapshotPersistenceError,
+    AdultDuplicateMemorySnapshotRepo,
 )
 from app.db.bt_subscription_repo import BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.bt_pending_repo import (
@@ -747,6 +752,119 @@ def test_clarification_repo_rejects_missing_chat_identity_for_clear(tmp_path: Pa
 
     with pytest.raises(ClarificationPersistenceError, match="clarification_state chat identity missing for clear"):
         repo.clear_pending(chat_id=0)
+
+
+def test_adult_duplicate_memory_snapshot_repo_round_trip(tmp_path: Path) -> None:
+    db_path = tmp_path / "state.sqlite3"
+    database = SqliteDatabase(str(db_path))
+    database.initialize()
+    repo = AdultDuplicateMemorySnapshotRepo(database)
+
+    repo.upsert_snapshot(
+        normalized_content_id="censored:ssis-123",
+        display_title="SSIS-123",
+        snapshot_status="fresh",
+        evidence_summary_json=json.dumps(
+            {
+                "local_matches": [{"path": "/library/adult/SSIS-123.mp4"}],
+                "registry_status": "archived_present",
+            },
+            ensure_ascii=False,
+        ),
+        last_verified_at="2026-04-30T10:00:00+08:00",
+        last_scan_failed_at="",
+    )
+
+    restarted_repo = AdultDuplicateMemorySnapshotRepo(SqliteDatabase(str(db_path)))
+    row = restarted_repo.get_snapshot(normalized_content_id="censored:ssis-123")
+
+    assert row is not None
+    assert row.normalized_content_id == "censored:ssis-123"
+    assert row.display_title == "SSIS-123"
+    assert row.snapshot_status == "fresh"
+    assert "SSIS-123.mp4" in row.evidence_summary_json
+    assert row.last_verified_at == "2026-04-30T10:00:00+08:00"
+    assert row.last_scan_failed_at == ""
+
+    restarted_repo.upsert_snapshot(
+        normalized_content_id="censored:ssis-123",
+        display_title="SSIS-123 duplicate warning",
+        snapshot_status="scan_failed",
+        evidence_summary_json=json.dumps(
+            {
+                "local_matches": [],
+                "registry_status": "archived_deleted",
+                "event_hits": [{"task_ref": "bt-1", "event_type": "downloader.succeeded"}],
+            },
+            ensure_ascii=False,
+        ),
+        last_verified_at="2026-04-30T10:10:00+08:00",
+        last_scan_failed_at="2026-04-30T10:09:00+08:00",
+    )
+
+    updated_row = restarted_repo.get_snapshot(normalized_content_id="censored:ssis-123")
+
+    assert updated_row is not None
+    assert updated_row.display_title == "SSIS-123 duplicate warning"
+    assert updated_row.snapshot_status == "scan_failed"
+    assert "archived_deleted" in updated_row.evidence_summary_json
+    assert updated_row.last_verified_at == "2026-04-30T10:10:00+08:00"
+    assert updated_row.last_scan_failed_at == "2026-04-30T10:09:00+08:00"
+
+
+def test_adult_duplicate_memory_snapshot_repo_rejects_missing_content_id_for_query(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = AdultDuplicateMemorySnapshotRepo(database)
+
+    with pytest.raises(
+        AdultDuplicateMemorySnapshotPersistenceError,
+        match="adult_duplicate_memory_snapshot content id missing for query",
+    ):
+        repo.get_snapshot(normalized_content_id="   ")
+
+
+def test_adult_duplicate_memory_snapshot_repo_rejects_missing_content_id_for_upsert(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = AdultDuplicateMemorySnapshotRepo(database)
+
+    with pytest.raises(
+        AdultDuplicateMemorySnapshotPersistenceError,
+        match="adult_duplicate_memory_snapshot content id missing",
+    ):
+        repo.upsert_snapshot(
+            normalized_content_id="   ",
+            display_title="SSIS-123",
+            snapshot_status="fresh",
+            evidence_summary_json="{}",
+            last_verified_at="2026-04-30T10:00:00+08:00",
+            last_scan_failed_at="",
+        )
+
+
+def test_adult_duplicate_memory_snapshot_repo_raises_when_row_missing_after_upsert(tmp_path: Path) -> None:
+    class MissingRowAdultDuplicateMemorySnapshotRepo(AdultDuplicateMemorySnapshotRepo):
+        def get_snapshot(self, normalized_content_id: str):
+            _ = normalized_content_id
+            return None
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = MissingRowAdultDuplicateMemorySnapshotRepo(database)
+
+    with pytest.raises(
+        AdultDuplicateMemorySnapshotPersistenceError,
+        match="adult_duplicate_memory_snapshot missing after upsert",
+    ):
+        repo.upsert_snapshot(
+            normalized_content_id="censored:ssis-123",
+            display_title="SSIS-123",
+            snapshot_status="fresh",
+            evidence_summary_json="{}",
+            last_verified_at="2026-04-30T10:00:00+08:00",
+            last_scan_failed_at="",
+        )
 
 
 def test_bt_pending_repo_persists_for_restart(tmp_path: Path) -> None:
