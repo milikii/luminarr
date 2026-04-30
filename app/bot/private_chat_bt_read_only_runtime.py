@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable, MutableMapping
 
 import httpx
@@ -19,6 +20,11 @@ def _log_bt_read_only_helper_error(*, query: str, error: httpx.HTTPError | Value
         detail=f"查询={query} 原因={error}",
         fix_hint="检查 BT 来源配置、站点可达性和网络连通性后重试。",
     )
+
+
+def _is_adult_bt_read_only_query(text: str) -> bool:
+    cleaned_text = re.sub(r"\s+", " ", text.strip())
+    return cleaned_text.startswith("成人搜 ")
 
 
 async def _run_bt_read_only_request(
@@ -58,11 +64,15 @@ async def handle_bt_read_only_query(
 ) -> bool:
     bt_read_only_query = extract_bt_read_only_query(query)
     if bt_read_only_query:
+        adult_only = _is_adult_bt_read_only_query(query)
         return await _run_bt_read_only_request(
             bot_data=bot_data,
             execution_gate=execution_gate,
             reply_func=reply_func,
-            search_runner=lambda search_service: search_service.search_bt_read_only_and_format(bt_read_only_query),
+            search_runner=lambda search_service: search_service.search_bt_read_only_and_format(
+                bt_read_only_query,
+                adult_only=adult_only,
+            ),
             helper_query=bt_read_only_query,
             tg=tg,
         )

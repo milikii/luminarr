@@ -16,6 +16,7 @@ from app.db.sqlite import SqliteDatabase
 from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
 from app.services.search_media_state import CandidateStateStore, ClarificationStateStore
 from app.services.search_media import (
+    ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE,
     BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT,
     BT_BATCH_PREVIEW_INVALID_SELECTION_TEMPLATE,
     BT_BATCH_PREVIEW_NOTICE_TEMPLATE,
@@ -177,6 +178,70 @@ def test_search_bt_read_only_and_format_no_result() -> None:
     text = _run(service.search_bt_read_only_and_format("unknown"))
 
     assert text == BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="unknown")
+
+
+def test_search_bt_read_only_and_format_uses_adult_only_resource_fallback_when_enabled() -> None:
+    fallback_queries: list[str] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only fallback")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        fallback_queries.append(query)
+        if query == "SSIS-123":
+            return []
+        if query == "SSIS 123":
+            return [
+                {
+                    "title": "SSIS 123 resource release",
+                    "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                    "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                    "seeders": 9,
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "indexerName": "tokyotosho",
+                    "sourceProvider": "tokyotosho",
+                }
+            ]
+        return []
+
+    service = SearchMediaService(unexpected_pt_search, raw_search_func=fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert fallback_queries == ["SSIS-123", "SSIS 123"]
+    assert "成人资源候选：SSIS-123" in text
+    assert "1. SSIS 123 resource release" in text
+    assert BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="SSIS-123") not in text
+
+
+def test_search_bt_read_only_and_format_returns_explicit_adult_source_empty_text_when_fallback_stays_empty() -> None:
+    fallback_queries: list[str] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only fallback")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        fallback_queries.append(query)
+        return []
+
+    service = SearchMediaService(unexpected_pt_search, raw_search_func=fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert fallback_queries == ["SSIS-123", "SSIS 123", "SSIS123"]
+    assert text == ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE.format(query="SSIS-123")
+
+
+def test_search_bt_read_only_and_format_keeps_generic_no_result_when_adult_fallback_not_enabled() -> None:
+    raw_queries: list[str] = []
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        raw_queries.append(query)
+        return []
+
+    service = SearchMediaService(_fake_search_with_results, raw_search_func=fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("SSIS-123"))
+
+    assert raw_queries == ["SSIS-123"]
+    assert text == BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="SSIS-123")
 
 
 def test_search_bt_read_only_and_format_includes_adult_history_hint(tmp_path: Path) -> None:

@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index before implementing adult search fallback."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep the fallback change constrained and protected by tests."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Preserve fail-closed behavior when configured adult-only sources are truly empty."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Adult search fallback must stay within configured adult-only BT source contracts."}
+{"file": "docs/superpowers/specs/2026-04-30-adult-search-fallback-design.md", "reason": "Approved design for read-only miss fallback behavior."}

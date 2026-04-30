@@ -16,6 +16,7 @@ from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key, normalize_spaces
+from app.services.adult_content import extract_exact_adult_content_match
 from app.services.bt_read_only_display import AdultReadOnlyLookupFunc, BtReadOnlyDisplayService
 from app.services import search_reply_formatter
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates
@@ -29,6 +30,7 @@ from app.services.search_media_state import (
     ClarificationStateStore,
 )
 from app.services.search_reply_formatter import (
+    format_adult_bt_resource_fallback_reply,
     format_bt_batch_preview_reply,
     format_bt_batch_preview_selection_label,
     format_bt_read_only_reply,
@@ -52,6 +54,7 @@ EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = search_reply_formatter.NO_RESULT_TEXT_TEMPLATE
 BT_READ_ONLY_EMPTY_QUERY_TEXT = "BT 只读探索格式：bt搜 <关键词>"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = search_reply_formatter.BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE
+ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE = search_reply_formatter.ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE
 BT_READ_ONLY_NOTICE_TEXT = search_reply_formatter.BT_READ_ONLY_NOTICE_TEXT
 BT_BATCH_PREVIEW_EMPTY_QUERY_TEXT = "BT 批量预览格式：bt批量 <关键词或 allowlist 页面 URL> [1-3,5]"
 BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE = (
@@ -188,7 +191,7 @@ class SearchMediaService:
             raise
         return tuple(self._bt_read_only_display.prepare_raw_candidates(raw_results, query=cleaned_query))
 
-    async def search_bt_read_only_and_format(self, query: str) -> str:
+    async def search_bt_read_only_and_format(self, query: str, *, adult_only: bool = False) -> str:
         cleaned_query = normalize_spaces(query)
         if not cleaned_query:
             return BT_READ_ONLY_EMPTY_QUERY_TEXT
@@ -199,7 +202,22 @@ class SearchMediaService:
             lookup_query=cleaned_query,
             limit=self._limit,
         )
+        if adult_only and not display_results:
+            fallback_results = await self._search_adult_only_fallback_candidates(cleaned_query)
+            return format_adult_bt_resource_fallback_reply(cleaned_query, fallback_results)
         return format_bt_read_only_reply(cleaned_query, display_results)
+
+    async def _search_adult_only_fallback_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
+        for fallback_query in _iter_adult_only_fallback_queries(query):
+            raw_results = await self.search_raw_candidates(fallback_query)
+            if not raw_results:
+                continue
+            return await self._bt_read_only_display.build_display_candidates(
+                raw_results,
+                lookup_query=query,
+                limit=self._limit,
+            )
+        return ()
 
     async def search_bt_batch_preview_and_format(self, request: BTBatchPreviewRequest) -> str:
         return await self.search_bt_batch_preview_and_format_for_chat(request, chat_id=None)
@@ -379,6 +397,30 @@ def format_ambiguous_clarification(
         query=query,
         options="\n".join(option_lines),
     )
+
+
+def _iter_adult_only_fallback_queries(query: str) -> tuple[str, ...]:
+    content_match = extract_exact_adult_content_match(query)
+    if content_match is None:
+        return ()
+
+    display_id = normalize_spaces(content_match.display_id)
+    if not display_id:
+        return ()
+
+    variants = (
+        re.sub(r"[-_]+", " ", display_id).strip(),
+        re.sub(r"[-_\s]+", "", display_id).strip(),
+    )
+    deduped_variants: list[str] = []
+    seen: set[str] = {normalize_spaces(query)}
+    for variant in variants:
+        cleaned_variant = normalize_spaces(variant)
+        if not cleaned_variant or cleaned_variant in seen:
+            continue
+        seen.add(cleaned_variant)
+        deduped_variants.append(cleaned_variant)
+    return tuple(deduped_variants)
 
 
 def _collect_ambiguous_options(raw_results: Sequence[Mapping[str, Any]]) -> list[AmbiguousOption]:

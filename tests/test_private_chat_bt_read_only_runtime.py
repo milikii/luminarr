@@ -92,6 +92,48 @@ def test_handle_bt_read_only_query_routes_to_raw_search() -> None:
     assert "title-Frieren S01E01" in sent_text
 
 
+def test_handle_bt_read_only_query_uses_adult_only_fallback_for_adult_prefix() -> None:
+    raw_queries: list[str] = []
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        raw_queries.append(query)
+        if query == "SSIS-123":
+            return []
+        if query == "SSIS 123":
+            return [
+                {
+                    "title": "title-SSIS 123",
+                    "source": "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+                    "infoHash": "abcdef1234567890abcdef1234567890abcdef12",
+                    "indexerName": "tokyotosho",
+                    "sourceProvider": "tokyotosho",
+                }
+            ]
+        return []
+
+    reply_func = AsyncMock()
+    execution_gate = _ExecutionGate()
+
+    handled = asyncio.run(
+        handle_bt_read_only_query(
+            query="成人搜 SSIS-123",
+            bot_data={tg.SEARCH_SERVICE_KEY: SearchMediaService(_fake_search, raw_search_func=fake_raw_search)},
+            execution_gate=execution_gate,
+            reply_func=reply_func,
+            chat_id=1001,
+            tg=tg,
+        )
+    )
+
+    assert handled is True
+    assert execution_gate.actions == [tg.ACTION_BT_READ_ONLY_HELPER]
+    assert raw_queries == ["SSIS-123", "SSIS 123"]
+    reply_func.assert_awaited_once()
+    sent_text = reply_func.await_args.args[0]
+    assert "成人资源候选：SSIS-123" in sent_text
+    assert "title-SSIS 123" in sent_text
+
+
 def test_handle_bt_read_only_query_routes_batch_preview_to_search_service() -> None:
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         assert query == "Frieren S01E01"

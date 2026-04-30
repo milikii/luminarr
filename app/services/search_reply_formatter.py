@@ -12,8 +12,13 @@ from app.services.search_query_parser import ParsedMovieQuery
 
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
+ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE = "当前已配置成人源无结果：{query}"
 BT_READ_ONLY_NOTICE_TEXT = (
     "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。\n"
+    "如需走成人下载链，请直接发送磁力并选择 BT 成人链。"
+)
+ADULT_BT_RESOURCE_FALLBACK_NOTICE_TEXT = (
+    "只读说明：以上为当前已配置成人源返回的资源候选，不会创建审批或下载任务。\n"
     "如需走成人下载链，请直接发送磁力并选择 BT 成人链。"
 )
 BT_BATCH_PREVIEW_NO_RESULT_TEXT_TEMPLATE = "BT 批量预览未找到候选：{query}"
@@ -80,6 +85,22 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         return BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query=query)
 
     lines = [f"BT 只读探索结果：{query}"]
+    _append_bt_candidate_lines(lines, candidates)
+    lines.append(BT_READ_ONLY_NOTICE_TEXT)
+    return "\n".join(lines)
+
+
+def format_adult_bt_resource_fallback_reply(query: str, candidates: Sequence[Mapping[str, Any]]) -> str:
+    if not candidates:
+        return ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE.format(query=query)
+
+    lines = [f"成人资源候选：{query}"]
+    _append_bt_candidate_lines(lines, candidates)
+    lines.append(ADULT_BT_RESOURCE_FALLBACK_NOTICE_TEXT)
+    return "\n".join(lines)
+
+
+def _append_bt_candidate_lines(lines: list[str], candidates: Sequence[Mapping[str, Any]]) -> None:
     seen_history_content_ids: set[str] = set()
     for index, item in enumerate(candidates, start=1):
         title = safe_text(item.get("title"), default="(no title)")
@@ -105,8 +126,6 @@ def format_bt_read_only_reply(query: str, candidates: Sequence[Mapping[str, Any]
         if history_text:
             lines.append(f"   {history_text}")
         lines.append(f"   链接参考: {format_bt_source_reference(item)}")
-    lines.append(BT_READ_ONLY_NOTICE_TEXT)
-    return "\n".join(lines)
 
 
 def format_bt_batch_preview_reply(
@@ -119,31 +138,7 @@ def format_bt_batch_preview_reply(
         return BT_BATCH_PREVIEW_NO_RESULT_TEXT_TEMPLATE.format(query=query)
 
     lines = [f"BT 批量预览结果：{query}"]
-    seen_history_content_ids: set[str] = set()
-    for index, item in enumerate(candidates, start=1):
-        title = safe_text(item.get("title"), default="(no title)")
-        indexer = safe_indexer(item.get("indexer"), item.get("indexerName"))
-        provider = safe_text(item.get("sourceProvider"), default=indexer)
-        seeders = format_seeder_count(item.get("seeders"))
-        size = format_size(item.get("size"))
-        lines.append(f"{index}. {title}")
-        lines.append(f"   站点: {indexer} | 来源入口: {provider} | 做种: {seeders} | 大小: {size}")
-        adult_summary = format_adult_candidate_summary(item)
-        if adult_summary:
-            lines.append(f"   {adult_summary}")
-        helper_summary = format_read_only_adult_helper_summary(item)
-        if helper_summary:
-            lines.append(f"   {helper_summary}")
-        helper_title = format_read_only_adult_helper_title(item)
-        if helper_title:
-            lines.append(f"   {helper_title}")
-        detail_url = format_read_only_adult_detail_url(item)
-        if detail_url:
-            lines.append(f"   只读详情: {detail_url}")
-        history_text = resolve_read_only_history_text(item, seen_content_ids=seen_history_content_ids)
-        if history_text:
-            lines.append(f"   {history_text}")
-        lines.append(f"   链接参考: {format_bt_source_reference(item)}")
+    _append_bt_candidate_lines(lines, candidates)
     lines.append(BT_BATCH_PREVIEW_NOTICE_TEMPLATE.format(selection=selection_label))
     return "\n".join(lines)
 

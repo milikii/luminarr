@@ -460,3 +460,19 @@
 
 ### 下轮目标
 - 按收尾阶段执行 commit / archive / journal 收口，或进入 QA / ship
+
+## Round 28 — 2026-04-30 22:58
+
+### 完成
+- 完成 `成人搜` adult-only fallback：`成人搜` 继续走当前 BT 只读入口，但当只读候选为空时，会仅基于当前已配置的 adult-only 来源做同源 fallback，不再直接停在通用只读空结果
+- 保持边界不回退：fallback 不进入 PT 主链搜索、不扩到未配置成人源；当当前 adult-only 来源确实为空时，明确回复“当前已配置成人源无结果”
+- 同步补齐 `tests/test_search_media.py` 和 `tests/test_private_chat_bt_read_only_runtime.py` focused coverage，保护 adult-only fallback、有结果/无结果和运行时 `成人搜` 路由透传
+
+### 测试状态
+- 通过: 2 / 总计: 2
+
+### 遗留 / 下轮继续
+- 若要继续收尾，需要对本轮 adult-search-fallback 变更做 commit，并在之后继续 QA / ship
+
+### 下轮目标
+- 提交 `adult-search-fallback` 变更并继续 Telegram 路径 QA

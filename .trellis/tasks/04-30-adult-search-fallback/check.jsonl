@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Review adult search fallback against backend guidelines."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify the fallback remains minimal and fully tested."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Check that empty configured adult sources produce explicit but safe responses."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Verify the fallback stays inside configured adult-only BT source boundaries."}
+{"file": "docs/superpowers/specs/2026-04-30-adult-search-fallback-design.md", "reason": "Review implementation against the approved design."}
