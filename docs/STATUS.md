@@ -10,7 +10,7 @@
 ## Current health
 - `make quality` 通过。
 - `make verify-mainline` 通过。
-- `make verify-stage1` 通过（`8` 个子组、`43 passed`）。
+- `make verify-stage1` 通过（`8` 个子组、`44 passed`）。
 - `make verify-adult-bt-wedge` 通过（总计 `429 passed`）。
 - `make lint` 通过。
 - Telegram-first 等价证据已补充：`make verify-stage1-telegram-delivery` 通过（`16 passed`）；当前环境快照同时显示 `telegram bot api unreachable`、`no luminarr process running`，因此本轮未能补到新的真实 Telegram 入站 smoke。
@@ -20,7 +20,7 @@
 ## Latest verification
 - `2026-04-30` `make verify-stage1-duplicate-memory` 通过：snapshot persistence（`4 passed`）、duplicate service/tooling（`6 passed`）、duplicate gate/runtime（`6 passed`）。
 - `2026-04-30` `make verify-stage1-telegram-delivery` 通过：delivery renderer/runtime（`10 passed`）、Telegram-first 高频主链 focused path（`6 passed`）。
-- `2026-04-30` `make verify-stage1-bt-source-roles` 通过：source role registry（`3 passed`）、helper-only/read-only contract（`7 passed`）、main wiring（`1 passed`）。
+- `2026-04-30` `make verify-stage1-bt-source-roles` 通过：source role registry（`3 passed`）、helper-only/read-only contract（`7 passed`）、main wiring（`2 passed`）。
 - `2026-04-30` 仓库级 gate 继续全绿：`make quality`、`make verify-mainline`、`make verify-adult-bt-wedge`、`make lint` 通过。
 - `2026-04-30` Telegram 环境等价证据：`.venv/bin/python -c "from pathlib import Path; from app.maintenance.cleanup_verification_docs import _run_telegram_bot_api_snapshot; print(_run_telegram_bot_api_snapshot(Path('.')))"` 返回 `telegram bot api unreachable`；`.venv/bin/python -c "from pathlib import Path; from app.maintenance.cleanup_verification_docs import _run_runtime_process_snapshot; print(_run_runtime_process_snapshot(Path('.')))"` 返回 `no luminarr process running`。
 

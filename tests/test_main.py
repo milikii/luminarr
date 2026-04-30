@@ -622,6 +622,39 @@ def test_build_bt_source_providers_skips_helper_only_web_sources(
     assert created_rules == ["nyaa", "tokyotosho", "javbus"]
 
 
+def test_build_bt_source_providers_skips_supported_but_unmodeled_web_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.clients import web_source as web_source_module
+
+    created_rules: list[str] = []
+
+    class FakeWebSourceClient:
+        def __init__(self, *, rule, proxy_url: str) -> None:
+            created_rules.append(rule.name)
+            self.search = AsyncMock(return_value=[])
+            self.search_page = AsyncMock(return_value=[])
+
+    unmodeled_rule = web_source_module.WebSourceRule(
+        name="unmodeled-source",
+        base_url="https://example.com",
+        search_path_template="/search?q={query}",
+    )
+    patched_rules = dict(web_source_module.SUPPORTED_WEB_SOURCE_RULES)
+    patched_rules["unmodeled-source"] = unmodeled_rule
+
+    monkeypatch.setattr(web_source_module, "SUPPORTED_WEB_SOURCE_RULES", patched_rules)
+    monkeypatch.setattr("app.main.WebSourceClient", FakeWebSourceClient)
+
+    providers = _build_bt_source_providers(
+        configured_web_source_names=("tokyotosho", "unmodeled-source", "javbus"),
+        proxy_url="http://proxy.local:7890",
+    )
+
+    assert [provider.name for provider in providers] == ["tokyotosho", "javbus"]
+    assert created_rules == ["tokyotosho", "javbus"]
+
+
 class _MainSettings(SimpleNamespace):
     def has_prowlarr_search(self) -> bool:
         return bool(self.prowlarr_base_url and self.prowlarr_api_key)

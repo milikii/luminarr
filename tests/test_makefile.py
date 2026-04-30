@@ -222,7 +222,7 @@ def test_makefile_verify_stage1_bt_source_roles_group_keeps_current_regressions(
     assert commands == [
         "$(PYTHON) -m pytest -q tests/test_bt_sources.py -k \"registry_tracks_roles_and_helper_only_gate or get_configured_web_source_rule_skips_helper_only_source or get_configured_web_source_rule_skips_supported_but_unmodeled_source\"",
         "$(PYTHON) -m pytest -q tests/test_bt_read_only_display.py tests/test_search_media.py -k \"javlibrary or helper_only\"",
-        "$(PYTHON) -m pytest -q tests/test_main.py -k build_bt_source_providers_skips_helper_only_web_sources",
+        "$(PYTHON) -m pytest -q tests/test_main.py -k \"build_bt_source_providers_skips_helper_only_web_sources or build_bt_source_providers_skips_supported_but_unmodeled_web_sources\"",
     ]
 
 
