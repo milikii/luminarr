@@ -2052,8 +2052,16 @@ class AddToDownloaderService:
                     )
                 except BtPendingPersistenceError:
                     return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+                evidence_lines = tuple(item.summary for item in decision.evidence)
+                if channel in SUPPORTED_DELIVERY_CHANNELS:
+                    return render_duplicate_warning_reply(
+                        pending_add=pending_add,
+                        warning_text=decision.warning_text,
+                        evidence_lines=evidence_lines,
+                        channel=channel,
+                    )
                 reply_lines = [decision.warning_text]
-                reply_lines.extend(item.summary for item in decision.evidence)
+                reply_lines.extend(evidence_lines)
                 reply_lines.append(f"继续下载：发送 继续下载 {pending_add.adult_display_id or pending_add.title}")
                 return "\n".join(line for line in reply_lines if line)
 
@@ -2337,6 +2345,23 @@ def render_add_pending_reply(*, pending_add: PendingAddContext, channel: str) ->
     return render_delivery_item(build_add_pending_delivery_item(pending_add), channel=channel)
 
 
+def render_duplicate_warning_reply(
+    *,
+    pending_add: PendingAddContext,
+    warning_text: str,
+    evidence_lines: tuple[str, ...],
+    channel: str,
+) -> str:
+    return render_delivery_item(
+        build_duplicate_warning_delivery_item(
+            pending_add=pending_add,
+            warning_text=warning_text,
+            evidence_lines=evidence_lines,
+        ),
+        channel=channel,
+    )
+
+
 def build_add_pending_delivery_item(pending_add: PendingAddContext) -> DeliveryItem:
     expire_minutes = max(1, DEFAULT_PENDING_TIMEOUT_SECONDS // 60)
     task_lines = [
@@ -2363,6 +2388,37 @@ def build_add_pending_delivery_item(pending_add: PendingAddContext) -> DeliveryI
         ),
         footer=f"过期时间：{expire_minutes} 分钟后",
         status="pending",
+    )
+
+
+def build_duplicate_warning_delivery_item(
+    *,
+    pending_add: PendingAddContext,
+    warning_text: str,
+    evidence_lines: tuple[str, ...],
+) -> DeliveryItem:
+    summary_lines = [f"片名：{pending_add.title}"]
+    if pending_add.adult_display_id:
+        summary_lines.append(f"番号：{pending_add.adult_display_id}")
+    if pending_add.adult_archive_category:
+        summary_lines.append(f"分类：{pending_add.adult_archive_category}")
+
+    sections = [
+        DeliverySection(label="提醒", lines=(warning_text,)),
+        DeliverySection(label="任务信息", lines=tuple(summary_lines)),
+    ]
+    if evidence_lines:
+        sections.append(DeliverySection(label="命中证据", lines=evidence_lines))
+
+    continue_query = f"继续下载 {pending_add.adult_display_id or pending_add.title}".strip()
+    return DeliveryItem(
+        header=DeliveryHeader(kind="warning", title="重复命中：下载前确认"),
+        sections=tuple(sections),
+        actions=(
+            DeliveryAction(label="继续下载", hint=f"发送 {continue_query}", kind="primary"),
+            DeliveryAction(label="取消", hint="发送 cancel", kind="secondary"),
+        ),
+        status="warning",
     )
 
 

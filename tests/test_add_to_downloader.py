@@ -266,6 +266,41 @@ def test_add_candidate_source_returns_duplicate_warning_before_pending_add(tmp_p
     assert "待确认：下载" not in reply
 
 
+def test_add_candidate_source_formats_duplicate_warning_for_telegram_channel(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    adult_dir = tmp_path / "adult"
+    adult_dir.mkdir()
+    (adult_dir / "SSIS-123 archived.mp4").write_text("video", encoding="utf-8")
+
+    duplicate_service = AdultDuplicateMemoryService(
+        snapshot_repo=AdultDuplicateMemorySnapshotRepo(database),
+        adult_content_registry_repo=AdultContentRegistryRepo(database),
+        job_event_repo=None,
+        adult_scan_dirs=(adult_dir,),
+    )
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        adult_duplicate_memory_service=duplicate_service,
+        bt_pending_repo=BtPendingRepo(database),
+    )
+
+    reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+            channel="telegram",
+        )
+    )
+
+    assert reply.startswith("重复命中：下载前确认 ⚠️")
+    assert "提醒" in reply
+    assert "继续下载：发送 继续下载 SSIS-123" in reply
+    assert "取消：发送 cancel" in reply
+
+
 def test_continue_duplicate_add_creates_pending_approval(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
