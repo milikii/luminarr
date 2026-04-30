@@ -3,10 +3,12 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 from telegram.ext import Application
 
 from app.operational_logging import emit_operational_log
+from app.runtime.delivery import extract_telegram_actions
 
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
@@ -27,7 +29,10 @@ def build_telegram_send_media_func(application: Application):
 
 def build_telegram_send_text_func(application: Application):
     async def send_text(*, chat_id: int, text: str) -> object:
-        return await application.bot.send_message(chat_id=chat_id, text=text)
+        reply_markup = _build_inline_keyboard_markup(text)
+        if reply_markup is None:
+            return await application.bot.send_message(chat_id=chat_id, text=text)
+        return await application.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
 
     return send_text
 
@@ -71,3 +76,26 @@ async def _send_telegram_media(
 
 def _is_telegram_photo_path(file_path: Path) -> bool:
     return file_path.suffix.lower() in TELEGRAM_PHOTO_SUFFIXES
+
+
+def _build_inline_keyboard_markup(text: str) -> InlineKeyboardMarkup | None:
+    actions = extract_telegram_actions(text)
+    if not actions:
+        return None
+
+    keyboard_rows: list[list[InlineKeyboardButton]] = []
+    current_row: list[InlineKeyboardButton] = []
+    for action in actions:
+        callback_query = (action.callback_query or "").strip()
+        label = action.label.strip()
+        if not callback_query or not label:
+            continue
+        current_row.append(InlineKeyboardButton(text=label, callback_data=callback_query))
+        if len(current_row) >= 2:
+            keyboard_rows.append(current_row)
+            current_row = []
+    if current_row:
+        keyboard_rows.append(current_row)
+    if not keyboard_rows:
+        return None
+    return InlineKeyboardMarkup(keyboard_rows)

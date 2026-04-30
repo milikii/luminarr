@@ -6,8 +6,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from telegram import InlineKeyboardMarkup
 
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func, build_telegram_send_text_func
+from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
 
 
 def test_build_telegram_send_text_func_sends_message() -> None:
@@ -18,6 +20,59 @@ def test_build_telegram_send_text_func_sends_message() -> None:
 
     assert result == "text-message"
     send_message.assert_awaited_once_with(chat_id=1001, text="扫码成功")
+
+
+def test_build_telegram_send_text_func_sends_plain_text_without_reply_markup() -> None:
+    send_message = AsyncMock(return_value="text-message")
+    sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    text = render_telegram_text(
+        DeliveryItem(
+            header=DeliveryHeader(kind="status", title="下载状态"),
+            sections=(DeliverySection(label="当前进度", lines=("任务：hash-87", "进度：100%")),),
+            actions=(),
+            status="success",
+        )
+    )
+
+    result = asyncio.run(sender(chat_id=1001, text=text))
+
+    assert result == "text-message"
+    send_message.assert_awaited_once_with(chat_id=1001, text="下载状态 ✓\n\n当前进度\n任务：hash-87\n进度：100%")
+
+
+def test_build_telegram_send_text_func_sends_inline_keyboard_when_actions_exist() -> None:
+    send_message = AsyncMock(return_value="text-message")
+    sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    text = render_telegram_text(
+        DeliveryItem(
+            header=DeliveryHeader(kind="approval", title="待确认：下载"),
+            sections=(DeliverySection(label="任务信息", lines=("片名：Dune 2021", "选择序号：hash-87")),),
+            actions=(
+                DeliveryAction(label="确认下载", hint="发送 confirm hash-87", kind="primary"),
+                DeliveryAction(label="取消下载", hint="发送 cancel hash-87", kind="secondary"),
+                DeliveryAction(label="查看状态", hint="发送 status hash-87", kind="secondary"),
+            ),
+            status="pending",
+        )
+    )
+
+    result = asyncio.run(sender(chat_id=1001, text=text))
+
+    assert result == "text-message"
+    send_message.assert_awaited_once()
+    kwargs = send_message.await_args.kwargs
+    assert kwargs["chat_id"] == 1001
+    assert kwargs["text"] == text
+    reply_markup = kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (
+        ("确认下载", "取消下载"),
+        ("查看状态",),
+    )
+    assert tuple(tuple(button.callback_data for button in row) for row in reply_markup.inline_keyboard) == (
+        ("confirm hash-87", "cancel hash-87"),
+        ("status hash-87",),
+    )
 
 
 def test_build_telegram_send_media_func_uses_document_for_non_image_path(

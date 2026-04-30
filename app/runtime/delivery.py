@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 
 _STATUS_EMOJI = {
@@ -29,6 +30,7 @@ class DeliveryAction:
     label: str
     hint: str
     kind: str
+    callback_query: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,8 +51,20 @@ class _RenderStyle:
     blank_line_between_sections: bool = True
 
 
+class TelegramDeliveryText(str):
+    """Telegram text payload that preserves inline action metadata."""
+
+    __slots__ = ("actions",)
+
+    def __new__(cls, value: str, actions: tuple[DeliveryAction, ...]):
+        instance = super().__new__(cls, value)
+        instance.actions = actions
+        return instance
+
+
 def render_telegram_text(item: DeliveryItem) -> str:
-    return _render_text_item(item, _RenderStyle())
+    text = _render_text_item(item, _RenderStyle())
+    return TelegramDeliveryText(text, tuple(_materialize_telegram_action(action) for action in item.actions))
 
 
 def render_feishu_text(item: DeliveryItem) -> str:
@@ -87,6 +101,18 @@ def render_delivery_item(item: DeliveryItem, *, channel: str) -> str:
     if channel_name == "feishu":
         return render_feishu_text(item)
     return render_telegram_text(item)
+
+
+def extract_telegram_actions(text: str) -> tuple[DeliveryAction, ...]:
+    actions = getattr(text, "actions", ())
+    if not isinstance(actions, tuple):
+        return ()
+    normalized: list[DeliveryAction] = []
+    for action in actions:
+        if not isinstance(action, DeliveryAction):
+            return ()
+        normalized.append(action)
+    return tuple(normalized)
 
 
 def _render_text_item(item: DeliveryItem, style: _RenderStyle) -> str:
@@ -154,6 +180,30 @@ def _format_actions(actions: tuple[DeliveryAction, ...], *, style: _RenderStyle)
         body = f"{label}{style.action_separator}{hint}" if hint else label
         lines.append(f"{style.action_prefix}{body}".rstrip())
     return lines
+
+
+def _materialize_telegram_action(action: DeliveryAction) -> DeliveryAction:
+    callback_query = _resolve_callback_query(action)
+    return DeliveryAction(
+        label=action.label,
+        hint=action.hint,
+        kind=action.kind,
+        callback_query=callback_query,
+    )
+
+
+def _resolve_callback_query(action: DeliveryAction) -> str | None:
+    explicit = (action.callback_query or "").strip()
+    if explicit:
+        return explicit
+    hint = action.hint.strip()
+    if not hint:
+        return None
+    match = re.match(r"^发送\s+(.+?)\s*$", hint)
+    if match is not None:
+        callback_query = match.group(1).strip()
+        return callback_query or None
+    return None
 
 
 def _join_blocks(blocks: list[list[str]], *, insert_blank_line: bool) -> list[str]:

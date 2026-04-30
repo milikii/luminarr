@@ -1,4 +1,9 @@
+import asyncio
+from unittest.mock import AsyncMock
+
+from app.bot.telegram_update_runtime import build_telegram_reply_func
 from app.bot.telegram_reply_formatter import format_telegram_reply
+from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, extract_telegram_actions, render_telegram_text
 
 
 def test_format_telegram_reply_formats_search_result() -> None:
@@ -62,3 +67,31 @@ def test_format_telegram_reply_keeps_unrelated_text() -> None:
     text = "普通回复，不需要 Telegram 特殊格式化。"
 
     assert format_telegram_reply(text) == text
+
+
+def test_build_telegram_reply_func_preserves_inline_action_metadata_after_formatting() -> None:
+    reply_text = AsyncMock(return_value="sent")
+    reply_func = build_telegram_reply_func(reply_text, formatter=format_telegram_reply)
+    text = render_telegram_text(
+        DeliveryItem(
+            header=DeliveryHeader(kind="approval", title="待确认：下载"),
+            sections=(DeliverySection(label="任务信息", lines=("片名：Frieren S01E01 1080p", "选择序号：hash-1")),),
+            actions=(DeliveryAction(label="确认下载", hint="发送 confirm hash-1", kind="primary"),),
+            status="pending",
+        )
+    )
+
+    result = asyncio.run(reply_func(text))
+
+    assert result == "sent"
+    reply_text.assert_awaited_once()
+    formatted_text = reply_text.await_args.args[0]
+    assert formatted_text == text
+    assert extract_telegram_actions(formatted_text) == (
+        DeliveryAction(
+            label="确认下载",
+            hint="发送 confirm hash-1",
+            kind="primary",
+            callback_query="confirm hash-1",
+        ),
+    )

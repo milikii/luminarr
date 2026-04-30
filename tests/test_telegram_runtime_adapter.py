@@ -116,6 +116,19 @@ def test_handle_telegram_callback_query_routes_through_dispatch_private_chat_tex
     assert callable(kwargs["reply_func"])
 
 
+def test_handle_telegram_callback_query_forwards_callback_data_unchanged(monkeypatch) -> None:
+    update, _, answer = _build_callback_update("status hash-87")
+    context = SimpleNamespace(application=SimpleNamespace(bot_data={"key": "value"}))
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
+
+    asyncio.run(handle_telegram_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    dispatch_private_chat_text.assert_awaited_once()
+    assert dispatch_private_chat_text.await_args.kwargs["query"] == "status hash-87"
+
+
 def test_handle_telegram_message_deduplicates_update(tmp_path, monkeypatch) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
