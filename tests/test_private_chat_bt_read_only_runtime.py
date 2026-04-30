@@ -98,7 +98,15 @@ def test_handle_bt_read_only_query_uses_adult_only_fallback_for_adult_prefix() -
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         raw_queries.append(query)
         if query == "SSIS-123":
-            return []
+            return [
+                {
+                    "title": "Dune 2021 1080p",
+                    "source": "magnet:?xt=urn:btih:1111111111111111111111111111111111111111",
+                    "infoHash": "1111111111111111111111111111111111111111",
+                    "indexerName": "Nyaa",
+                    "sourceProvider": "nyaa",
+                }
+            ]
         if query == "SSIS 123":
             return [
                 {
@@ -132,6 +140,7 @@ def test_handle_bt_read_only_query_uses_adult_only_fallback_for_adult_prefix() -
     sent_text = reply_func.await_args.args[0]
     assert "成人资源候选：SSIS-123" in sent_text
     assert "title-SSIS 123" in sent_text
+    assert "Dune 2021 1080p" not in sent_text
 
 
 def test_handle_bt_read_only_query_routes_batch_preview_to_search_service() -> None:

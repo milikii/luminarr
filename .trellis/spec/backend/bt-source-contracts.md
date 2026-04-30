@@ -58,6 +58,13 @@
   - `btSourceRole`: `primary` / `supporting` / `helper_only`
 - `attach_bt_source_profile()` is the reuse point for adding these fields when only `sourceProvider` / `indexerName` are present.
 
+#### Adult-only fallback display contract
+
+- `成人搜` adult-only fallback must require both exact adult identity metadata (`adult_content_id` or `read_only_adult_content_id`) and configured adult source proof.
+- Adult web-source proof may come from `btSourceName`, `sourceProvider`, or `indexerName` canonicalizing to a known adult web source such as `tokyotosho`, `sukebei`, or `javbus`.
+- `prowlarr` is an aggregator, not source proof by itself. A Prowlarr candidate is adult-only only when its underlying `indexerName` canonicalizes to a known adult web source.
+- Generic Prowlarr / PT indexer results must be treated as empty for `成人搜` adult-only replies even if their title contains an adult-looking identifier.
+
 ### 4. Validation & Error Matrix
 
 - Unknown `BT_WEB_SOURCES` name -> operational log + skip provider.
@@ -66,6 +73,7 @@
 - Provider HTTP / parsing failure -> operational log + continue with remaining providers.
 - Missing source profile for a candidate -> keep candidate usable; do not invent a role.
 - Read-only display ranking lookup -> canonicalize aliases before reading priority.
+- Adult-only fallback sees `sourceProvider=prowlarr` with `indexerName=IndexerPT` -> do not show it in `成人搜`; continue fallback variants and eventually return the explicit adult-source-empty text if no adult source proof exists.
 
 ### 5. Good / Base / Bad Cases
 
@@ -86,6 +94,9 @@
 - Search/display tests:
   - read-only display keeps using role-based priority lookup
   - helper-only metadata does not leak into cached candidate payloads unless explicitly persisted by design
+  - adult-only fallback rejects generic Prowlarr / PT indexers
+  - adult-only fallback allows Prowlarr results whose `indexerName` canonicalizes to a known adult web source
+  - adult-only fallback returns explicit configured-adult-source-empty text when only non-adult source candidates exist
 
 ### 7. Wrong vs Correct
 

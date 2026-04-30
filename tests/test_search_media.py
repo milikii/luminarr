@@ -189,7 +189,17 @@ def test_search_bt_read_only_and_format_uses_adult_only_resource_fallback_when_e
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         fallback_queries.append(query)
         if query == "SSIS-123":
-            return []
+            return [
+                {
+                    "title": "Dune 2021 1080p",
+                    "source": "magnet:?xt=urn:btih:1111111111111111111111111111111111111111",
+                    "infoHash": "1111111111111111111111111111111111111111",
+                    "seeders": 4,
+                    "size": 1 * 1024 * 1024 * 1024,
+                    "indexerName": "Nyaa",
+                    "sourceProvider": "nyaa",
+                }
+            ]
         if query == "SSIS 123":
             return [
                 {
@@ -210,6 +220,7 @@ def test_search_bt_read_only_and_format_uses_adult_only_resource_fallback_when_e
     assert fallback_queries == ["SSIS-123", "SSIS 123"]
     assert "成人资源候选：SSIS-123" in text
     assert "1. SSIS 123 resource release" in text
+    assert "Dune 2021 1080p" not in text
     assert BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE.format(query="SSIS-123") not in text
 
 
@@ -221,6 +232,16 @@ def test_search_bt_read_only_and_format_returns_explicit_adult_source_empty_text
 
     async def fake_raw_search(query: str) -> list[dict[str, object]]:
         fallback_queries.append(query)
+        if query == "SSIS-123":
+            return [
+                {
+                    "title": "Dune 2021 1080p",
+                    "source": "magnet:?xt=urn:btih:2222222222222222222222222222222222222222",
+                    "infoHash": "2222222222222222222222222222222222222222",
+                    "indexerName": "Nyaa",
+                    "sourceProvider": "nyaa",
+                }
+            ]
         return []
 
     service = SearchMediaService(unexpected_pt_search, raw_search_func=fake_raw_search)
@@ -228,6 +249,60 @@ def test_search_bt_read_only_and_format_returns_explicit_adult_source_empty_text
 
     assert fallback_queries == ["SSIS-123", "SSIS 123", "SSIS123"]
     assert text == ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE.format(query="SSIS-123")
+
+
+def test_search_bt_read_only_and_format_rejects_generic_prowlarr_indexer_for_adult_fallback() -> None:
+    fallback_queries: list[str] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only fallback")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        fallback_queries.append(query)
+        return [
+            {
+                "title": f"{query} generic PT release",
+                "source": "magnet:?xt=urn:btih:3333333333333333333333333333333333333333",
+                "infoHash": "3333333333333333333333333333333333333333",
+                "indexerName": "IndexerPT",
+                "sourceProvider": "prowlarr",
+            }
+        ]
+
+    service = SearchMediaService(unexpected_pt_search, raw_search_func=fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert fallback_queries == ["SSIS-123", "SSIS 123", "SSIS123"]
+    assert text == ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE.format(query="SSIS-123")
+    assert "generic PT release" not in text
+
+
+def test_search_bt_read_only_and_format_allows_adult_prowlarr_indexer_for_adult_fallback() -> None:
+    fallback_queries: list[str] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only fallback")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        fallback_queries.append(query)
+        if query != "SSIS 123":
+            return []
+        return [
+            {
+                "title": "SSIS 123 adult prowlarr release",
+                "source": "magnet:?xt=urn:btih:4444444444444444444444444444444444444444",
+                "infoHash": "4444444444444444444444444444444444444444",
+                "indexerName": "sukebei.nyaa.si",
+                "sourceProvider": "prowlarr",
+            }
+        ]
+
+    service = SearchMediaService(unexpected_pt_search, raw_search_func=fake_raw_search)
+    text = _run(service.search_bt_read_only_and_format("SSIS-123", adult_only=True))
+
+    assert fallback_queries == ["SSIS-123", "SSIS 123"]
+    assert "成人资源候选：SSIS-123" in text
+    assert "SSIS 123 adult prowlarr release" in text
 
 
 def test_search_bt_read_only_and_format_keeps_generic_no_result_when_adult_fallback_not_enabled() -> None:

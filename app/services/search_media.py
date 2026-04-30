@@ -20,7 +20,7 @@ from app.services.adult_content import extract_exact_adult_content_match
 from app.services.bt_read_only_display import AdultReadOnlyLookupFunc, BtReadOnlyDisplayService
 from app.services import search_reply_formatter
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates
-from app.services.bt_sources import resolve_bt_source
+from app.services.bt_sources import canonicalize_bt_source_name, resolve_bt_source
 from app.services.media_identity import build_media_identity_from_tmdb_movie, normalize_media_identity_payload
 from app.operational_logging import emit_operational_log
 from app.services.search_media_state import (
@@ -75,6 +75,8 @@ CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态写入失�
 CANDIDATE_STATE_UNAVAILABLE_TEXT = "搜索候选状态写入失败，请稍后重试。"
 CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT = "搜索待澄清状态清理失败，请稍后重试。"
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
+ADULT_BT_WEB_SOURCE_NAMES = frozenset({"tokyotosho", "sukebei", "javbus"})
+ADULT_BT_AGGREGATOR_SOURCE_NAMES = frozenset({"prowlarr"})
 
 BatchPreviewSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 PrepareRawCandidatesFunc = Callable[[Sequence[Mapping[str, Any]], str], Sequence[Mapping[str, Any]]]
@@ -202,7 +204,10 @@ class SearchMediaService:
             lookup_query=cleaned_query,
             limit=self._limit,
         )
-        if adult_only and not display_results:
+        if adult_only:
+            adult_display_results = _filter_adult_only_display_candidates(display_results)
+            if adult_display_results:
+                return format_bt_read_only_reply(cleaned_query, adult_display_results)
             fallback_results = await self._search_adult_only_fallback_candidates(cleaned_query)
             return format_adult_bt_resource_fallback_reply(cleaned_query, fallback_results)
         return format_bt_read_only_reply(cleaned_query, display_results)
@@ -212,11 +217,14 @@ class SearchMediaService:
             raw_results = await self.search_raw_candidates(fallback_query)
             if not raw_results:
                 continue
-            return await self._bt_read_only_display.build_display_candidates(
+            display_results = await self._bt_read_only_display.build_display_candidates(
                 raw_results,
                 lookup_query=query,
                 limit=self._limit,
             )
+            adult_display_results = _filter_adult_only_display_candidates(display_results)
+            if adult_display_results:
+                return adult_display_results
         return ()
 
     async def search_bt_batch_preview_and_format(self, request: BTBatchPreviewRequest) -> str:
@@ -421,6 +429,35 @@ def _iter_adult_only_fallback_queries(query: str) -> tuple[str, ...]:
         seen.add(cleaned_variant)
         deduped_variants.append(cleaned_variant)
     return tuple(deduped_variants)
+
+
+def _filter_adult_only_display_candidates(
+    candidates: Sequence[Mapping[str, Any]],
+) -> tuple[Mapping[str, Any], ...]:
+    return tuple(candidate for candidate in candidates if _is_adult_only_display_candidate(candidate))
+
+
+def _is_adult_only_display_candidate(candidate: Mapping[str, Any]) -> bool:
+    if not _has_configured_adult_only_source(candidate):
+        return False
+    return bool(
+        safe_text(candidate.get("adult_content_id"), default="")
+        or safe_text(candidate.get("read_only_adult_content_id"), default="")
+    )
+
+
+def _has_configured_adult_only_source(candidate: Mapping[str, Any]) -> bool:
+    bt_source_name = canonicalize_bt_source_name(safe_text(candidate.get("btSourceName"), default=""))
+    source_provider_name = canonicalize_bt_source_name(safe_text(candidate.get("sourceProvider"), default=""))
+    indexer_name = canonicalize_bt_source_name(safe_text(candidate.get("indexerName"), default=""))
+
+    if bt_source_name in ADULT_BT_WEB_SOURCE_NAMES or source_provider_name in ADULT_BT_WEB_SOURCE_NAMES:
+        return True
+    if indexer_name in ADULT_BT_WEB_SOURCE_NAMES:
+        return True
+    if bt_source_name in ADULT_BT_AGGREGATOR_SOURCE_NAMES or source_provider_name in ADULT_BT_AGGREGATOR_SOURCE_NAMES:
+        return False
+    return False
 
 
 def _collect_ambiguous_options(raw_results: Sequence[Mapping[str, Any]]) -> list[AmbiguousOption]:
