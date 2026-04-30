@@ -11,7 +11,7 @@
 ## Current health
 - `make quality` 通过（`28 passed`）。
 - `make verify-mainline` 通过。
-- `make verify-adult-bt-wedge` 通过（总计 `423 passed`）。
+- `make verify-adult-bt-wedge` 通过（总计 `428 passed`）。
 - `make lint` 通过。
 - `T16` focused verification 通过：snapshot persistence `4 passed`、duplicate service/tooling `6 passed`、duplicate gate/runtime `5 passed`、main wiring `3 passed`。
 - Telegram 成人 BT 真机 smoke 已完成（`2026-04-28`）。
