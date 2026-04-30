@@ -211,7 +211,7 @@
 - 依赖的前置任务：
   T03、T08、T10、T11、T12
 
-### T16 `[ ]` 成人 BT 下载前防重记忆层
+### T16 `[x]` 成人 BT 下载前防重记忆层
 
 - 任务描述：
   在 `AddToDownloaderService` shared path 前增加 adult-only duplicate memory gate，把本地成人目录、`adult_content_registry` 和旧任务事件聚合成统一记忆层；命中旧番号时先强提醒，再让操作者显式继续。
@@ -270,4 +270,4 @@
 
 ## 当前第一个未完成任务
 
-- `T16 成人 BT 下载前防重记忆层`
+- `T17 Telegram-first 高频主链交付层`

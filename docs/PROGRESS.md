@@ -393,3 +393,20 @@
 
 ### 下轮目标
 - 按 `docs/plans/2026-04-30-adult-duplicate-memory-execution.md` 进入 `T16` 实施，并在实现完成后重跑全部 gate
+
+## Round 24 — 2026-04-30 12:20
+
+### 完成
+- 完成 `T16 成人 BT 下载前防重记忆层`：新增 `adult_duplicate_memory_snapshot` sibling 真相、`AdultDuplicateMemoryService`、`AddToDownloaderService` duplicate gate、`duplicate_override` follow-up 和 operator tooling
+- 在 `main.py` 完成 duplicate memory wiring，让运行时真实装配 `AdultDuplicateMemoryService` 和 `BtPendingRepo`
+- focused verification 全绿：snapshot persistence、duplicate service/tooling、duplicate gate/runtime、main wiring 均已通过
+- 将 `docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/TASKS.md` 切到 `T17 Telegram-first 高频主链交付层`
+
+### 测试状态
+- 通过: 4 / 总计: 4
+
+### 遗留 / 下轮继续
+- `T17 Telegram-first 高频主链交付层` 尚未开始；需要在不回退 duplicate 语义的前提下收口 Telegram 高频主链交付体验
+
+### 下轮目标
+- 进入 `T17 Telegram-first 高频主链交付层`，优先搜索结果、下载确认、状态反馈和关键 BT follow-up 的 Telegram-first 交付
