@@ -37,11 +37,17 @@ RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE = (
     "请选择预设目标目录：\n"
     "{options}\n"
     "请回复目录编号或目录键，例如：1 或 downloads\n"
-    "当前这一步只记录目录 follow-up，不会执行下载投递。"
+    "当前这一步只记录目录 follow-up，不会执行下载投递。\n"
+    "\n"
+    "下一步\n"
+    "{actions}"
 )
 RAW_BT_DESTINATION_PENDING_REMINDER_TEMPLATE = (
     "当前正在等待 raw_bt 目标目录。\n"
-    "请回复目录编号或目录键，例如：{example}"
+    "请回复目录编号或目录键，例如：{example}\n"
+    "\n"
+    "下一步\n"
+    "{actions}"
 )
 RAW_BT_DESTINATION_SELECTED_TEMPLATE = (
     "已记录 raw_bt 目标目录。\n"
@@ -54,7 +60,10 @@ RAW_BT_DESTINATION_INVALID_TEMPLATE = (
     "未识别到有效的 raw_bt 目录选项：{query}\n"
     "请回复目录编号或目录键，例如：{example}\n"
     "可选目录：\n"
-    "{options}"
+    "{options}\n"
+    "\n"
+    "下一步\n"
+    "{actions}"
 )
 RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT = "raw_bt 目录选择未就绪，请先配置预设目标目录后重试。"
 PURE_BT_CANDIDATE_SELECTED_TEMPLATE = (
@@ -306,6 +315,7 @@ def format_raw_bt_destination_options(options: tuple[RawBtDestinationOption, ...
 def format_raw_bt_destination_prompt(options: tuple[RawBtDestinationOption, ...]) -> str:
     return RAW_BT_DESTINATION_PROMPT_TEXT_TEMPLATE.format(
         options=format_raw_bt_destination_options(options),
+        actions=format_raw_bt_destination_actions(options),
     )
 
 
@@ -349,7 +359,15 @@ def format_raw_bt_destination_invalid(
         query=query.strip(),
         example=resolve_raw_bt_destination_example(options),
         options=format_raw_bt_destination_options(options),
+        actions=format_raw_bt_destination_actions(options),
     )
+
+
+def format_raw_bt_destination_actions(options: tuple[RawBtDestinationOption, ...]) -> str:
+    lines: list[str] = []
+    for option in options:
+        lines.append(f"{option.label}：发送 {option.key}")
+    return "\n".join(lines) if lines else "暂无可用目录。"
 
 
 def _resolve_search_candidate_source(candidate: Mapping[str, object]) -> str:

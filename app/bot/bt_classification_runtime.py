@@ -27,13 +27,27 @@ from app.db.bt_pending_repo import (
 
 BT_CLASSIFICATION_PROMPT_TEXT = (
     "已记录后续处理链：影视入库链。\n"
-    "请回复以下媒体类型之一：movie / series / anime\n"
-    "对应含义：电影 / 剧集 / 动漫"
+    "请从以下媒体类型中选择。\n"
+    "\n"
+    "媒体类型\n"
+    "movie：电影\n"
+    "series：剧集\n"
+    "anime：动漫\n"
+    "\n"
+    "下一步\n"
+    "电影：发送 movie\n"
+    "剧集：发送 series\n"
+    "动漫：发送 anime"
 )
 BT_CLASSIFICATION_CANCELLED_TEXT = "已取消当前 BT 媒体类型选择，请重新发送磁力或 BT 指令。"
 BT_CLASSIFICATION_PENDING_REMINDER_TEXT = (
     "当前正在等待 BT 媒体类型选择。\n"
-    "请回复：movie / series / anime"
+    "请从以下媒体类型中选择。\n"
+    "\n"
+    "下一步\n"
+    "电影：发送 movie\n"
+    "剧集：发送 series\n"
+    "动漫：发送 anime"
 )
 BT_CLASSIFICATION_PENDING_BY_CHAT_KEY = "bt_classification_pending_by_chat"
 

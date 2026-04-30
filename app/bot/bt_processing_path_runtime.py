@@ -27,13 +27,24 @@ from app.db.bt_pending_repo import (
 
 BT_PROCESSING_PATH_PROMPT_TEXT = (
     "已识别为直接磁力下载需求。\n"
-    "请回复以下链路之一：观影 PT 链 / BT 成人链\n"
-    "对应含义：按观影资源流程处理 / 按成人 BT 归档流程处理"
+    "请从以下链路中选择。\n"
+    "\n"
+    "处理链\n"
+    "观影 PT 链：按观影资源流程处理\n"
+    "BT 成人链：按成人 BT 归档流程处理\n"
+    "\n"
+    "下一步\n"
+    "观影 PT 链：发送 观影 PT 链\n"
+    "BT 成人链：发送 BT 成人链"
 )
 BT_PROCESSING_PATH_CANCELLED_TEXT = "已取消当前 BT 处理链选择，请重新发送磁力或 BT 指令。"
 BT_PROCESSING_PATH_PENDING_REMINDER_TEXT = (
     "当前正在等待 BT 处理链选择。\n"
-    "请回复：观影 PT 链 / BT 成人链"
+    "请从以下链路中选择。\n"
+    "\n"
+    "下一步\n"
+    "观影 PT 链：发送 观影 PT 链\n"
+    "BT 成人链：发送 BT 成人链"
 )
 BT_PROCESSING_PATH_PENDING_BY_CHAT_KEY = "bt_processing_path_pending_by_chat"
 
