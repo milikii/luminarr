@@ -1,7 +1,7 @@
 # Luminarr 任务清单
 
-> 我正在使用 `superpowers:writing-plans` 基于 `docs/PRD.md` 与 `docs/ARCHITECTURE.md` 拆解任务。  
-> 本清单按 2026-04-29 当前仓库真相标注状态；执行阶段始终从第一个 `状态：未完成` 的任务开始。
+> 我正在使用 `superpowers:writing-plans` 基于 `docs/PRD.md`、`docs/ARCHITECTURE.md` 和当前已批准的 Stage 1 设计拆解任务。  
+> 本清单按 2026-04-30 当前仓库真相标注状态；执行阶段始终从第一个 `状态：未完成` 的任务开始。
 
 ## 使用说明
 
@@ -211,6 +211,63 @@
 - 依赖的前置任务：
   T03、T08、T10、T11、T12
 
+### T16 `[ ]` 成人 BT 下载前防重记忆层
+
+- 任务描述：
+  在 `AddToDownloaderService` shared path 前增加 adult-only duplicate memory gate，把本地成人目录、`adult_content_registry` 和旧任务事件聚合成统一记忆层；命中旧番号时先强提醒，再让操作者显式继续。
+- 关键触点：
+  `app/db/sqlite.py`、`app/db/adult_duplicate_memory_snapshot_repo.py`、`app/services/adult_duplicate_memory.py`、`app/services/add_to_downloader.py`、`app/bot/private_chat_runtime.py`
+- 完成标准：
+  - 新增 sibling snapshot 真相 `adult_duplicate_memory_snapshot`，且 repo 能 round-trip。
+  - duplicate memory 只对带 `adult_content_id` / `normalized_content_id` 的成人 BT 路径生效，且 exact 命中强制复用 `extract_exact_adult_content_match`。
+  - direct BT、批量选择、`btsub` 命中创建待确认前都会先过同一层 duplicate gate。
+  - duplicate 命中时不会直接创建下载待确认，而是进入显式 `duplicate_override` follow-up；异常时显式降级，不静默跳过。
+  - focused tests、`make quality`、`make verify-mainline`、`make verify-adult-bt-wedge`、`make lint` 继续通过。
+- 依赖的前置任务：
+  T05、T08、T10、T12
+
+### T17 `[ ]` Telegram-first 高频主链交付层
+
+- 任务描述：
+  只针对 Telegram 高频主链，把搜索结果、下载确认、导入确认、状态反馈和关键 BT follow-up 收口成更直接的 Telegram-first 交付层；其他渠道继续保留文本 fallback，不追求一轮内同时追平。
+- 关键触点：
+  `app/runtime/delivery.py`、`app/bot/telegram_delivery_runtime.py`、`app/bot/telegram_runtime_adapter.py`、`app/services/search_reply_formatter.py`、`app/services/add_to_downloader.py`、`app/services/get_download_status.py`
+- 完成标准：
+  - Telegram 能为高频主链消息提供更直接的动作区，不再只依赖长文本手输命令。
+  - shared delivery intent 继续可被 Feishu / WeCom / personal WeChat 渲染成稳定文本 fallback，不分叉业务真相。
+  - duplicate memory 的提醒与显式继续语义要并入 Telegram 主体验，不允许形成平行支线。
+  - focused tests 与主线回归继续通过。
+- 依赖的前置任务：
+  T03、T04、T05、T06、T07、T12、T16
+
+### T18 `[ ]` 成人 BT 来源角色底座
+
+- 任务描述：
+  把成人 BT 来源固定成可持续扩站的底座，显式区分主力 BT、辅助 PT 成人站点和 helper-only，只让 helper 做只读补全，不再混进主下载语义。
+- 关键触点：
+  `app/services/bt_sources.py`、`app/clients/web_source.py`、`app/services/search_media.py`、`app/services/bt_read_only_display.py`、`app/main.py`
+- 完成标准：
+  - 来源角色真相稳定存在，后续扩站不需要重写搜索、排序和交付语义。
+  - `javlibrary` 继续锁定为 helper-only，只做只读补全，不进入主动下载来源。
+  - 成人 BT 结果排序、说明文案和 helper-only 行为一致，不回切到“几个零散站点脚本”的状态。
+  - focused tests 与主线回归继续通过。
+- 依赖的前置任务：
+  T04、T08、T12、T16、T17
+
+### T19 `[ ]` Stage 1 聚合验证与运维真相同步
+
+- 任务描述：
+  在 `T16`、`T17`、`T18` 分别完成后，补一轮 Stage 1 focused 验证矩阵与 operator 文档真相同步，确保新主线不是只在开发者上下文里成立。
+- 关键触点：
+  `Makefile`、`tests/`、`docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/GETTING_STARTED.md`、`docs/OPERATOR_RUNBOOK.md`
+- 完成标准：
+  - Stage 1 focused verification 入口可重复运行，并覆盖 duplicate memory、Telegram-first 高频链和来源角色底座。
+  - `docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/GETTING_STARTED.md` 与实现状态一致，不再保留“冻结态”口径。
+  - 真实 Telegram 操作路径至少补一轮新的实机 smoke 或等价证据。
+  - `make quality`、`make verify-mainline`、`make verify-adult-bt-wedge`、`make lint` 继续通过。
+- 依赖的前置任务：
+  T16、T17、T18
+
 ## 当前第一个未完成任务
 
-- 无，当前任务清单已全部完成。
+- `T16 成人 BT 下载前防重记忆层`
