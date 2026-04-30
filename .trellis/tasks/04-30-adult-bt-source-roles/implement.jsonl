@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index before implementing T18."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check project quality constraints while changing BT source plumbing."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Preserve fail-closed behavior when BT sources or helper-only lookups fail."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Use the BT source role contract as the single source of truth for active-provider wiring and candidate metadata."}

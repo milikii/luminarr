@@ -45,7 +45,7 @@ from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
 from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
-from app.clients.web_source import SUPPORTED_WEB_SOURCE_RULES, WebSourceClient
+from app.clients.web_source import WebSourceClient, get_configured_web_source_rule
 from app.config import ConfigError, DownloaderInstanceConfig, load_settings
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.adult_duplicate_memory_snapshot_repo import AdultDuplicateMemorySnapshotRepo
@@ -118,6 +118,28 @@ def _resolve_runtime_host_mode(settings) -> str:
         "TELEGRAM_BOT_TOKEN is required unless FEISHU_APP_ID/FEISHU_APP_SECRET or "
         "WECOM_TOKEN/WECOM_ENCODING_AES_KEY/WECOM_RECEIVE_ID are set"
     )
+
+
+def _build_bt_source_providers(
+    *,
+    configured_web_source_names: tuple[str, ...],
+    proxy_url: str,
+) -> list[BtSourceProvider]:
+    bt_source_providers: list[BtSourceProvider] = []
+    for source_name in configured_web_source_names:
+        rule = get_configured_web_source_rule(source_name)
+        if rule is None:
+            emit_operational_log(
+                title="BT 外部站点源配置无效",
+                detail=f"来源={source_name}",
+                fix_hint="检查 BT_WEB_SOURCES，只填写当前代码内已支持且允许主动搜索的站点名。",
+            )
+            continue
+        client = WebSourceClient(rule=rule, proxy_url=proxy_url)
+        bt_source_providers.append(
+            BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page)
+        )
+    return bt_source_providers
 
 
 def _resolve_downloader_client_for_dispatch(
@@ -321,20 +343,10 @@ def main() -> None:
         return []
 
     prowlarr_client: ProwlarrClient | None = None
-    bt_source_providers: list[BtSourceProvider] = []
-    for source_name in settings.bt_web_sources:
-        rule = SUPPORTED_WEB_SOURCE_RULES.get(source_name)
-        if rule is None:
-            emit_operational_log(
-                title="BT 外部站点源配置无效",
-                detail=f"来源={source_name}",
-                fix_hint="检查 BT_WEB_SOURCES，只填写当前代码内已支持的站点名。",
-            )
-            continue
-        client = WebSourceClient(rule=rule, proxy_url=settings.outbound_proxy_url)
-        bt_source_providers.append(
-            BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page)
-        )
+    bt_source_providers = _build_bt_source_providers(
+        configured_web_source_names=settings.bt_web_sources,
+        proxy_url=settings.outbound_proxy_url,
+    )
     if settings.has_prowlarr_search():
         prowlarr_client = ProwlarrClient(
             base_url=settings.prowlarr_base_url,

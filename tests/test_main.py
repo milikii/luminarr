@@ -33,6 +33,7 @@ from app.downloader_route_lookup import (
     _resolve_lookup_client_for_task,
 )
 from app.main import (
+    _build_bt_source_providers,
     _build_refresh_media_server_func,
     _resolve_downloader_client_for_dispatch,
     _run_application_polling,
@@ -597,6 +598,28 @@ def test_build_refresh_media_server_func_wraps_plex_client(monkeypatch: pytest.M
     assert getattr(calls["refresh_func"], "__self__", None).__class__ is FakePlexClient
     assert getattr(calls["refresh_func"], "__name__", "") == "refresh_library"
     assert refresh_func is not None
+
+
+def test_build_bt_source_providers_skips_helper_only_web_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created_rules: list[str] = []
+
+    class FakeWebSourceClient:
+        def __init__(self, *, rule, proxy_url: str) -> None:
+            created_rules.append(rule.name)
+            self.search = AsyncMock(return_value=[])
+            self.search_page = AsyncMock(return_value=[])
+
+    monkeypatch.setattr("app.main.WebSourceClient", FakeWebSourceClient)
+
+    providers = _build_bt_source_providers(
+        configured_web_source_names=("nyaa", "tokyotosho", "javlibrary", "javbus"),
+        proxy_url="http://proxy.local:7890",
+    )
+
+    assert [provider.name for provider in providers] == ["nyaa", "tokyotosho", "javbus"]
+    assert created_rules == ["nyaa", "tokyotosho", "javbus"]
 
 
 class _MainSettings(SimpleNamespace):

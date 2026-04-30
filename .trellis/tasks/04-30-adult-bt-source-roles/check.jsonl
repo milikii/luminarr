@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Review T18 against the backend spec index."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify code quality expectations after the source-role refactor."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Verify fail-closed behavior for BT source and helper-only paths."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Review the BT source role contract, especially that unmodeled sources must not become active providers by default."}

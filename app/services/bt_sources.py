@@ -14,9 +14,62 @@ from app.services.media_name_parser import parse_media_name
 
 BtSourceSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 
+BT_SOURCE_ROLE_PRIMARY = "primary"
+BT_SOURCE_ROLE_SUPPORTING = "supporting"
+BT_SOURCE_ROLE_HELPER_ONLY = "helper_only"
+
 _SOURCE_KEYS = ("source", "downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid", "link", "url")
 _INFO_HASH_KEYS = ("infoHash", "infohash", "torrentHash", "torrenthash", "hash")
 _MAGNET_INFO_HASH_PATTERN = re.compile(r"xt=urn:btih:([0-9a-z]{32,40})", re.IGNORECASE)
+
+
+@dataclass(frozen=True, slots=True)
+class BtSourceProfile:
+    name: str
+    role: str
+    adult_sort_priority: float = 0.0
+    aliases: tuple[str, ...] = ()
+
+
+_BT_SOURCE_PROFILES: dict[str, BtSourceProfile] = {
+    "nyaa": BtSourceProfile(
+        name="nyaa",
+        role=BT_SOURCE_ROLE_SUPPORTING,
+        adult_sort_priority=0.0,
+    ),
+    "tokyotosho": BtSourceProfile(
+        name="tokyotosho",
+        role=BT_SOURCE_ROLE_PRIMARY,
+        adult_sort_priority=4.0,
+        aliases=("tokyotosho.info", "www.tokyotosho.info"),
+    ),
+    "sukebei": BtSourceProfile(
+        name="sukebei",
+        role=BT_SOURCE_ROLE_PRIMARY,
+        adult_sort_priority=3.5,
+        aliases=("offkab", "sukebei.nyaa.si", "nyaa.si"),
+    ),
+    "javbus": BtSourceProfile(
+        name="javbus",
+        role=BT_SOURCE_ROLE_SUPPORTING,
+        adult_sort_priority=3.0,
+        aliases=("javbus.com", "www.javbus.com"),
+    ),
+    "prowlarr": BtSourceProfile(
+        name="prowlarr",
+        role=BT_SOURCE_ROLE_SUPPORTING,
+        adult_sort_priority=1.0,
+    ),
+    "javlibrary": BtSourceProfile(
+        name="javlibrary",
+        role=BT_SOURCE_ROLE_HELPER_ONLY,
+        adult_sort_priority=0.0,
+        aliases=("javlibrary.com", "www.javlibrary.com"),
+    ),
+}
+_BT_SOURCE_ALIASES: dict[str, str] = {
+    alias: profile.name for profile in _BT_SOURCE_PROFILES.values() for alias in (profile.name, *profile.aliases)
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +77,44 @@ class BtSourceProvider:
     name: str
     search_func: BtSourceSearchFunc
     page_search_func: BtSourceSearchFunc | None = None
+
+
+def canonicalize_bt_source_name(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned:
+        return ""
+    return _BT_SOURCE_ALIASES.get(cleaned, cleaned)
+
+
+def get_bt_source_profile(name: str) -> BtSourceProfile | None:
+    return _BT_SOURCE_PROFILES.get(canonicalize_bt_source_name(name))
+
+
+def is_active_bt_source(name: str) -> bool:
+    profile = get_bt_source_profile(name)
+    if profile is None:
+        return False
+    return profile.role != BT_SOURCE_ROLE_HELPER_ONLY
+
+
+def get_bt_source_priority(name: str) -> float:
+    profile = get_bt_source_profile(name)
+    if profile is None:
+        return 0.0
+    return profile.adult_sort_priority
+
+
+def attach_bt_source_profile(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    annotated_candidate = dict(candidate.items())
+    source_name = str(annotated_candidate.get("sourceProvider", "")).strip() or str(
+        annotated_candidate.get("indexerName", "")
+    ).strip()
+    profile = get_bt_source_profile(source_name)
+    if profile is None:
+        return annotated_candidate
+    annotated_candidate.setdefault("btSourceName", profile.name)
+    annotated_candidate.setdefault("btSourceRole", profile.role)
+    return annotated_candidate
 
 
 class BtSourceAdapter:
@@ -124,6 +215,7 @@ def normalize_bt_candidate(
         return None
 
     normalized_candidate = dict(candidate.items())
+    source_profile = get_bt_source_profile(provider_name)
     normalized_candidate["title"] = title
     normalized_candidate["source"] = source
     normalized_candidate["seeders"] = _safe_int(candidate.get("seeders"))
@@ -145,6 +237,10 @@ def normalize_bt_candidate(
     info_hash = resolve_bt_info_hash(candidate, source=source)
     if info_hash:
         normalized_candidate["infoHash"] = info_hash
+
+    if source_profile is not None:
+        normalized_candidate["btSourceName"] = source_profile.name
+        normalized_candidate["btSourceRole"] = source_profile.role
 
     if source.lower().startswith("magnet:?"):
         normalized_candidate.setdefault("magnetUrl", source)

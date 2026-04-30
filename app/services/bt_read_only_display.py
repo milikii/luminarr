@@ -13,6 +13,7 @@ from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceEr
 from app.operational_logging import emit_operational_log
 from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key
 from app.services.adult_content import AdultContentMatch, extract_exact_adult_content_match
+from app.services.bt_sources import attach_bt_source_profile, canonicalize_bt_source_name, get_bt_source_priority
 
 AdultReadOnlyLookupFunc = Callable[[str], Awaitable[JavLibraryReadOnlyMatch | None]]
 BT_READ_ONLY_HELPER_TITLE_NOISE_TOKENS = frozenset(
@@ -23,23 +24,6 @@ BT_READ_ONLY_HELPER_TITLE_NOISE_TOKENS = frozenset(
         "complete",
     }
 )
-_SOURCE_PRIORITY = {
-    "tokyotosho": 4.0,
-    "sukebei": 3.5,
-    "javbus": 3.0,
-    "prowlarr": 1.0,
-}
-_SOURCE_PRIORITY_ALIASES = {
-    "offkab": "sukebei",
-    "sukebei.nyaa.si": "sukebei",
-    "nyaa.si": "sukebei",
-    "tokyotosho.info": "tokyotosho",
-    "www.tokyotosho.info": "tokyotosho",
-    "javbus.com": "javbus",
-    "www.javbus.com": "javbus",
-    "javlibrary.com": "javlibrary",
-    "www.javlibrary.com": "javlibrary",
-}
 _TITLE_RELEVANCE_NOISE_TOKENS = frozenset(
     {
         "jav",
@@ -229,7 +213,7 @@ class BtReadOnlyDisplayService:
 
 
 def _to_candidate_dict(item: Mapping[str, Any]) -> dict[str, Any]:
-    return {str(key): value for key, value in item.items()}
+    return attach_bt_source_profile({str(key): value for key, value in item.items()})
 
 
 def prepare_bt_read_only_selection_candidates(
@@ -386,13 +370,9 @@ def _content_id_matches(candidate_match: AdultContentMatch | None, *, query_matc
 
 
 def _resolve_source_priority(item: Mapping[str, Any]) -> float:
-    source_provider = _canonicalize_source_name(str(item.get("sourceProvider", "")).strip())
-    indexer_name = _canonicalize_source_name(str(item.get("indexerName", "")).strip())
-    if source_provider in _SOURCE_PRIORITY:
-        return _SOURCE_PRIORITY[source_provider]
-    if indexer_name in _SOURCE_PRIORITY:
-        return _SOURCE_PRIORITY[indexer_name]
-    return 0.0
+    source_provider = canonicalize_bt_source_name(str(item.get("sourceProvider", "")).strip())
+    indexer_name = canonicalize_bt_source_name(str(item.get("indexerName", "")).strip())
+    return max(get_bt_source_priority(source_provider), get_bt_source_priority(indexer_name))
 
 
 def _safe_int(value: Any) -> int:
@@ -403,14 +383,6 @@ def _safe_int(value: Any) -> int:
     if resolved > 0:
         return resolved
     return 0
-
-
-def _canonicalize_source_name(value: str) -> str:
-    cleaned = value.strip().lower()
-    if not cleaned:
-        return ""
-    return _SOURCE_PRIORITY_ALIASES.get(cleaned, cleaned)
-
 
 def _resolve_explicit_id_title_score(item: Mapping[str, Any], *, query_match: AdultContentMatch | None) -> float:
     if query_match is None:

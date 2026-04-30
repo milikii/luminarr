@@ -10,12 +10,23 @@ from app.clients.web_source import (
     SUKEBEI_RULE,
     UnsupportedWebSourcePageError,
     WebSourceClient,
+    get_configured_web_source_rule,
     is_supported_web_source_page_url,
     looks_like_web_source_page_request,
     parse_web_source_html,
     resolve_supported_web_source_page_request,
 )
-from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, build_bt_candidate_dedupe_key
+from app.services.bt_sources import (
+    BT_SOURCE_ROLE_HELPER_ONLY,
+    BT_SOURCE_ROLE_PRIMARY,
+    BT_SOURCE_ROLE_SUPPORTING,
+    BtSourceAdapter,
+    BtSourceProvider,
+    build_bt_candidate_dedupe_key,
+    canonicalize_bt_source_name,
+    get_bt_source_profile,
+    is_active_bt_source,
+)
 
 
 def test_bt_source_adapter_normalizes_candidates_and_deduplicates_by_info_hash() -> None:
@@ -116,6 +127,44 @@ def test_bt_source_adapter_only_persists_exact_adult_id_and_skips_keyword_only_g
     assert "adult_content_id" not in results[1]
     assert "adult_archive_category" not in results[1]
     assert "adult_display_id" not in results[1]
+
+
+def test_bt_source_registry_tracks_roles_and_helper_only_gate() -> None:
+    assert canonicalize_bt_source_name("www.tokyotosho.info") == "tokyotosho"
+    assert canonicalize_bt_source_name("offkab") == "sukebei"
+    assert canonicalize_bt_source_name("www.javlibrary.com") == "javlibrary"
+
+    assert get_bt_source_profile("nyaa").role == BT_SOURCE_ROLE_SUPPORTING
+    assert get_bt_source_profile("tokyotosho").role == BT_SOURCE_ROLE_PRIMARY
+    assert get_bt_source_profile("javbus").role == BT_SOURCE_ROLE_SUPPORTING
+    assert get_bt_source_profile("javlibrary").role == BT_SOURCE_ROLE_HELPER_ONLY
+
+    assert is_active_bt_source("nyaa") is True
+    assert is_active_bt_source("tokyotosho") is True
+    assert is_active_bt_source("javbus") is True
+    assert is_active_bt_source("javlibrary") is False
+
+
+def test_get_configured_web_source_rule_skips_helper_only_source() -> None:
+    assert get_configured_web_source_rule("nyaa") is NYAA_RULE
+    assert get_configured_web_source_rule("tokyotosho") is TOKYOTOSHO_RULE
+    assert get_configured_web_source_rule("javbus") is JAVBUS_RULE
+    assert get_configured_web_source_rule("javlibrary") is None
+
+
+def test_get_configured_web_source_rule_skips_supported_but_unmodeled_source(monkeypatch) -> None:
+    from app.clients import web_source as web_source_module
+
+    unmodeled_rule = web_source_module.WebSourceRule(
+        name="unmodeled-source",
+        base_url="https://example.com",
+        search_path_template="/search?q={query}",
+    )
+    patched_rules = dict(web_source_module.SUPPORTED_WEB_SOURCE_RULES)
+    patched_rules["unmodeled-source"] = unmodeled_rule
+    monkeypatch.setattr(web_source_module, "SUPPORTED_WEB_SOURCE_RULES", patched_rules)
+
+    assert get_configured_web_source_rule("unmodeled-source") is None
 
 
 def test_parse_web_source_html_extracts_size_and_seeders_for_nyaa() -> None:
