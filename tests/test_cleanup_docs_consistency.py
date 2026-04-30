@@ -54,6 +54,8 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "默认 3 轮施工" in runbook_text
     assert "只做冷启动一致性检查" in runbook_text
     assert "只做文档收口，不改业务代码" in runbook_text
+    assert "只做 Stage 1 验证 / 文档同步" in runbook_text
+    assert "make verify-stage1" in runbook_text
 
     assert "## 1. 如果你是操作者" in index_text
     assert "## 2. 如果你是 AI / 施工代理" in index_text
@@ -122,9 +124,10 @@ def test_status_stays_short_snapshot_and_points_to_operator_flow() -> None:
     assert re.search(r"\b\d+ passed(?:, \d+ skipped)?\b", status_text)
     assert "make quality" in status_text
     assert "make verify-mainline" in status_text
+    assert "make verify-stage1" in status_text
     assert "make verify-adult-bt-wedge" in status_text
     assert "默认继续施工时，直接复制下面这句给 AI：" in status_text
-    assert "按 AGENTS.md 执行单轮主线施工。" in status_text
+    assert "按 AGENTS.md 进入收尾阶段。" in status_text
     assert "docs/CLEANUP_SLIMMING_LOG.md" not in status_text
     assert "docs/BT_REAL_DISPATCH_SMOKE_PLAN.md" not in status_text
     assert "cold-start consistency audit" not in status_text
@@ -146,6 +149,33 @@ def test_current_doc_truth_keeps_runtime_lines_and_channel_scope_aligned() -> No
     assert "当前维持在 `220` 行" not in decisions_text
     assert "代码里已经有 Telegram / personal WeChat / Feishu / WeCom 四个私聊入口" in history_text
     assert "当前仍然只有 Telegram。" not in history_text
+
+
+def test_stage1_truth_docs_point_to_single_verification_entrypoint_and_finish_phase() -> None:
+    status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
+    next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
+    getting_started_text = Path("docs/GETTING_STARTED.md").read_text(encoding="utf-8")
+    runbook_text = Path("docs/OPERATOR_RUNBOOK.md").read_text(encoding="utf-8")
+
+    assert "make verify-stage1" in status_text
+    assert "make verify-stage1" in next_step_text
+    assert "make verify-stage1" in getting_started_text
+    assert "make verify-stage1" in runbook_text
+    assert "T19 Stage 1 聚合验证与运维真相同步" in status_text
+    assert "收尾阶段" in status_text
+    assert "收尾阶段" in next_step_text
+    assert "当前主线已切到 `T17 Telegram-first 高频主链交付层`" not in status_text
+    assert "当前唯一下一条执行入口切到 `T19 Stage 1 聚合验证与运维真相同步`" not in next_step_text
+
+
+def test_stage1_task_board_matches_finish_phase_truth() -> None:
+    next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
+    tasks_text = Path("docs/TASKS.md").read_text(encoding="utf-8")
+
+    assert "`T19 Stage 1 聚合验证与运维真相同步` 已完成" in next_step_text
+    assert "### T19 `[x]` Stage 1 聚合验证与运维真相同步" in tasks_text
+    assert "### T19 `[ ]` Stage 1 聚合验证与运维真相同步" not in tasks_text
+    assert "- 当前没有未完成执行任务；进入收尾阶段。" in tasks_text
 
 
 def test_persistence_closure_log_keeps_current_line_detail() -> None:

@@ -1,4 +1,4 @@
-# docs/OPERATOR_RUNBOOK.md (v5)
+# docs/OPERATOR_RUNBOOK.md (v6)
 
 > 目的：给非技术操作者几条可直接复制给 AI 的短模板，不再长期维护一大段自由发挥提示词。
 
@@ -9,6 +9,7 @@
 - 想在同一会话里连续长跑，但不超过仓库约定上限：用“连续 10 轮施工（封顶版）”
 - 不确定最近提交和文档有没有漂移：用“只做冷启动一致性检查”
 - 这轮只想修文档入口和 docs gate：用“只做文档收口，不改业务代码”
+- 这轮只做 Stage 1 验证 / 文档同步：先看 `docs/STATUS.md`，再按 `make verify-stage1` 复验
 
 如果你只记得一步：先看 `docs/STATUS.md`，再回这里复制一条模板。
 运行时外部依赖统一只看 `docs/GETTING_STARTED.md`，不要在这里或 `README.md` 里重复抄 `ffmpeg` / personal WeChat / Feishu / WeCom 细节。
@@ -64,10 +65,22 @@
 改完后自行运行针对性验证、review diff、commit 并 push。
 ```
 
-## 5. 用完后看哪里
+## 5. 只做 Stage 1 验证 / 文档同步
+
+适用：你只想确认 `T16` duplicate memory、`T17` Telegram-first 高频链、`T18` 来源角色底座和相关 operator 文档没有回退，这一轮不要求继续改业务代码。
+
+```text
+按 AGENTS.md 执行。
+这一轮只做 Stage 1 验证 / 文档同步：先跑 `make verify-stage1`，再核对 `docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/GETTING_STARTED.md`、`docs/OPERATOR_RUNBOOK.md` 是否与当前实现一致。
+如果当前环境没有可用的真实 Telegram 私聊入口，允许用 focused tests + `telegram bot api` / `app.main` 运行态快照作为等价证据，但必须把限制写回文档。
+除非 focused gate 暴露真实缺陷，否则不要改业务代码；改完后补针对性验证并简短汇报。
+```
+
+## 6. 用完后看哪里
 
 - 想知道 AI 做完没有：看 `docs/STATUS.md`
 - 想知道当前唯一主线是什么：看 `docs/NEXT_STEP.md`
 - 想知道最常用的验证 / 启动入口，或确认运行时外部依赖：看 `docs/GETTING_STARTED.md`
+- 想先确认 Stage 1 (`T16`~`T19`) 没有回退：直接跑 `make verify-stage1`
 - 想知道它到底改了什么：看最新 commit 和相关台账
 - 想判断下一轮该复制哪句：回到本页第 `0` 节

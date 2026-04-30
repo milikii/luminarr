@@ -443,3 +443,20 @@
 
 ### 下轮目标
 - 进入 `T19 Stage 1 聚合验证与运维真相同步`，补验证矩阵并同步当前实现真相
+
+## Round 27 — 2026-04-30 20:32
+
+### 完成
+- 完成 `T19 Stage 1 聚合验证与运维真相同步`：新增 `make verify-stage1` 及其 `duplicate-memory` / `telegram-delivery` / `bt-source-roles` 三个子入口，固定为 Stage 1 单一 focused verification 真相
+- 同步 `docs/GETTING_STARTED.md`、`docs/STATUS.md`、`docs/NEXT_STEP.md`、`docs/OPERATOR_RUNBOOK.md` 和 docs gate 测试，让 operator-facing 文档与当前实现、收尾阶段口径和 `verify-stage1` 保持一致
+- 在无法新增真实 Telegram 入站 smoke 的环境下，明确记录 `telegram bot api unreachable`、`no luminarr process running` 快照，并保留 `logs/trace.log` 中既有真实 Telegram 链路作为等价证据
+- 将 `T19` 标记完成，并把 `.trellis/spec/backend/quality-guidelines.md` 补齐为 Stage 1 verification entrypoint 契约
+
+### 测试状态
+- 通过: 5 / 总计: 5
+
+### 遗留 / 下轮继续
+- 进入收尾阶段；若要补新的真实 Telegram smoke，需先恢复 `api.telegram.org` 可达性并启动本地 `app.main`
+
+### 下轮目标
+- 按收尾阶段执行 commit / archive / journal 收口，或进入 QA / ship

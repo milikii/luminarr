@@ -254,6 +254,7 @@ make help
 - `make test`：跑全量 pytest
 - `make quality`：跑当前仓库级快速质量入口（compile + pyflakes + Makefile/docs gate）
 - `make lint`：跑最小静态检查（当前为 `pyflakes app tests`）
+- `make verify-stage1`：跑当前 Stage 1 focused verification（`T16` duplicate memory + `T17` Telegram-first 高频链 + `T18` 来源角色底座）
 - `make verify-mainline`：跑当前主线 focused 验证入口
 - `make test-cleanup-smoke`：跑四渠道 cleanup smoke gate
 - `make test-cleanup`：跑 cleanup 聚合回归
@@ -263,6 +264,7 @@ make help
 - `make sync-cleanup-doc-snapshots`：顺序执行固定的 cleanup 验证命令，并把 `docs/STATUS.md` / `docs/CLEANUP_VERIFICATION_WINDOW.md` 里的固定快照行同步到最新结果；现在也会一起刷新环境就绪、Telegram Bot API 就绪、当前运行进程和仓库内真实 smoke 证据快照
 - 应用通过 `make run` 或 `.venv/bin/python -m app.main` 启动后，会把最小可追溯 trace 追加到 `logs/trace.log`；当前 trace 会覆盖 shared private-chat 入站/回包，以及下载/导入待确认与 confirm 执行关键节点
 - 真实私聊里的 `cleanup` / `cleanup inspect` 回复也会继续把 `[cleanup 私聊 smoke]` 追加到 `logs/cleanup-private-chat-smoke.log`，`make sync-cleanup-doc-snapshots` 就靠这份日志识别窗口内真实 smoke 证据
+- 没有 `make` 时，`make verify-stage1` 不再维护成一条超长等价一行命令；直接按 `verify-stage1-duplicate-memory`、`verify-stage1-telegram-delivery`、`verify-stage1-bt-source-roles` 三组顺序执行即可，具体命令以 `Makefile` 为准
 - 没有 `make` 时，`make test-cleanup` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup`
 - 没有 `make` 时，`make test-cleanup-docs-gate` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
 - 没有 `make` 时，`make test-cleanup-window` 的等价一行命令是：`.venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py && .venv/bin/python -m pytest -q tests/test_cleanup_cross_channel_smoke.py tests/test_cleanup_downloaded_source.py tests/test_private_chat_runtime.py tests/test_personal_wechat_text.py tests/test_feishu_adapter.py tests/test_wecom_adapter.py tests/test_telegram_bot.py -k cleanup && .venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py tests/test_cleanup_cross_channel_smoke.py`
@@ -278,7 +280,28 @@ make help
 
 跑完最小验证后，回到 `docs/STATUS.md` 看当前健康度，再决定要不要继续施工。
 
-## 9. 成人 BT focused 验证
+## 9. Stage 1 focused 验证
+
+先跑：
+
+`make verify-stage1`
+
+覆盖范围：
+
+1. `verify-stage1-duplicate-memory`：`T16` 的 duplicate memory snapshot、service/tooling 和 duplicate gate/runtime。
+2. `verify-stage1-telegram-delivery`：`T17` 的 Telegram-first delivery renderer、inline action 映射、status / import / duplicate follow-up 高频路径。
+3. `verify-stage1-bt-source-roles`：`T18` 的 `primary / supporting / helper_only` 角色真相、helper-only 只读补全和 main wiring。
+
+如果这轮只想补 Telegram 等价证据，但当前环境没有可用的真实私聊入口，至少再单独跑：
+
+`make verify-stage1-telegram-delivery`
+
+若要补新的真实 Telegram smoke，先确认两件事：
+
+1. 当前机器能访问 `api.telegram.org`
+2. 本地 `app.main` 正在运行，且 `logs/trace.log` 会继续追加新记录
+
+## 10. 成人 BT focused 补充验证
 
 先跑：
 
@@ -291,7 +314,7 @@ make help
 3. 发送磁力并选择 `BT 成人链`
 4. 确认待下载回复里能看到番号、分类、历史状态
 
-## 10. 常见问题
+## 11. 常见问题
 
 ### `.env` 写了，但程序还是说缺配置
 

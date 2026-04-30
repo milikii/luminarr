@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index before implementing T19 verification/docs sync."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep verification entrypoints and docs changes aligned with project quality expectations."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Preserve fail-closed operator and verification behavior if T19 reveals gaps."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Stage 1 verification must cover the newly landed BT source role contract."}
