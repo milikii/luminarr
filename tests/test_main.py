@@ -54,6 +54,15 @@ def test_run_application_polling_prints_colored_fix_hint_on_network_error(
     assert "[处理建议]" in captured.out
 
 
+def test_run_application_polling_uses_bootstrap_retries_for_transient_proxy_network() -> None:
+    run_polling = Mock()
+    app = SimpleNamespace(run_polling=run_polling)
+
+    _run_application_polling(app)
+
+    run_polling.assert_called_once_with(drop_pending_updates=True, timeout=20, bootstrap_retries=3)
+
+
 def test_resolve_downloader_name_for_task_fails_closed_when_lookup_is_missing(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

@@ -89,12 +89,12 @@ from app.trace_logging import TRACE_LOG_PATH_BOT_DATA_KEY, configure_trace_log_f
 
 def _run_application_polling(application) -> None:
     try:
-        application.run_polling(drop_pending_updates=True)
+        application.run_polling(drop_pending_updates=True, timeout=20, bootstrap_retries=3)
     except NetworkError as error:
         emit_operational_log(
             title="Telegram 启动失败",
             detail=f"错误={error}",
-            fix_hint="检查当前网络、DNS 和 `TELEGRAM_BOT_TOKEN` 是否可访问 Telegram Bot API 后重试。",
+            fix_hint="检查当前网络、DNS、代理和 `TELEGRAM_BOT_TOKEN` 是否可访问 Telegram Bot API 后重试。",
         )
         raise
 
