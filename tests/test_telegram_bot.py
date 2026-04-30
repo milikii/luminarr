@@ -6900,6 +6900,27 @@ def test_handle_message_frustration_cancels_pending_downloader(tmp_path: Path) -
     reply_text.assert_awaited_once_with(ADD_CANCELLED_TEXT)
 
 
+def test_handle_message_routes_duplicate_override_follow_up() -> None:
+    update, reply_text = _build_update("继续下载 SSIS-123", update_id=79)
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock())
+    add_service.continue_duplicate_add = AsyncMock(return_value="下载待确认：1001")  # type: ignore[method-assign]
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                SEARCH_SERVICE_KEY: SearchMediaService(_fake_search),
+                ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+                IMPORT_TO_LIBRARY_SERVICE_KEY: ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies"),
+            }
+        )
+    )
+
+    asyncio.run(handle_message(update, context))
+
+    reply_text.assert_awaited_once_with("下载待确认：1001")
+    add_service.continue_duplicate_add.assert_awaited_once_with(chat_id=1001)  # type: ignore[attr-defined]
+
+
 def test_build_application_registers_services() -> None:
     search_service = SearchMediaService(_fake_search)
     add_service = AddToDownloaderService(search_service, AsyncMock())

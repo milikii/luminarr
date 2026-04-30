@@ -54,6 +54,7 @@ from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_conf
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
 from app.db.bt_pending_repo import (
+    BT_PENDING_STAGE_DUPLICATE_OVERRIDE,
     BtPendingRepo,
 )
 from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
@@ -101,6 +102,7 @@ __all__ = (
     "BT_PROCESSING_PATH_CANCELLED_TEXT",
     "BT_PROCESSING_PATH_PENDING_REMINDER_TEXT",
     "BT_PROCESSING_PATH_PROMPT_TEXT",
+    "BT_PENDING_STAGE_DUPLICATE_OVERRIDE",
     "BT_TMDB_ASSOCIATION_CANCELLED_TEXT",
     "BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT",
     "_format_bt_tmdb_association_pending_reminder",

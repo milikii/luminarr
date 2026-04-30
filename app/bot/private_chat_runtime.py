@@ -34,6 +34,9 @@ from app.bot.private_chat_bt_direct_runtime import (
 from app.bot.private_chat_bt_batch_confirm_runtime import (
     handle_bt_batch_confirm_query as handle_shared_bt_batch_confirm_query,
 )
+from app.bot.private_chat_bt_duplicate_runtime import (
+    handle_bt_duplicate_override_follow_up,
+)
 from app.bot.private_chat_bt_read_only_runtime import (
     handle_bt_read_only_query as handle_shared_bt_read_only_query,
 )
@@ -254,7 +257,7 @@ async def _handle_opening_routes(
     ):
         return True
 
-    return await handle_shared_bt_batch_confirm_query(
+    if await handle_shared_bt_batch_confirm_query(
         query=query,
         bot_data=bot_data,
         execution_gate=execution_gate,
@@ -263,6 +266,16 @@ async def _handle_opening_routes(
         user_id=user_id,
         channel=channel,
         resolve_downloader_execution=resolve_bt_downloader_execution,
+        tg=tg,
+    ):
+        return True
+
+    return await handle_bt_duplicate_override_follow_up(
+        query=query,
+        bot_data=bot_data,
+        execution_gate=execution_gate,
+        reply_func=reply_func,
+        chat_id=chat_id,
         tg=tg,
     )
 

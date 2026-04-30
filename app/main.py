@@ -48,6 +48,7 @@ from app.clients.transmission import TransmissionClient, TransmissionImportSourc
 from app.clients.web_source import SUPPORTED_WEB_SOURCE_RULES, WebSourceClient
 from app.config import ConfigError, DownloaderInstanceConfig, load_settings
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
+from app.db.adult_duplicate_memory_snapshot_repo import AdultDuplicateMemorySnapshotRepo
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.bt_subscription_repo import BtSubscriptionRepo
@@ -70,6 +71,7 @@ from app.downloader_route_lookup import (
 from app.operational_logging import emit_operational_log
 from app.runtime.execution_policy import ExecutionGate
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
 from app.services.adult_archive_service import AdultArchiveService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
@@ -306,6 +308,7 @@ def main() -> None:
     job_repo = JobRepo(database)
     approval_repo = ApprovalRepo(database)
     adult_content_registry_repo = AdultContentRegistryRepo(database)
+    adult_duplicate_memory_snapshot_repo = AdultDuplicateMemorySnapshotRepo(database)
     bt_pending_repo = BtPendingRepo(database)
     bt_subscription_repo = BtSubscriptionRepo(database)
     download_monitor_repo = DownloadMonitorRepo(database)
@@ -467,6 +470,14 @@ def main() -> None:
             delete_local_data=delete_local_data,
         )
 
+    adult_scan_dirs = [Path(destination.target_dir).expanduser() for destination in settings.adult_archive_destinations]
+    adult_duplicate_memory_service = AdultDuplicateMemoryService(
+        snapshot_repo=adult_duplicate_memory_snapshot_repo,
+        adult_content_registry_repo=adult_content_registry_repo,
+        job_event_repo=job_event_repo,
+        adult_scan_dirs=adult_scan_dirs,
+    )
+
     add_to_downloader_service = AddToDownloaderService(
         search_service=search_service,
         add_torrent_func=add_torrent_with_routing,
@@ -475,6 +486,8 @@ def main() -> None:
         job_event_repo=job_event_repo,
         download_monitor_repo=download_monitor_repo,
         adult_content_registry_repo=adult_content_registry_repo,
+        adult_duplicate_memory_service=adult_duplicate_memory_service,
+        bt_pending_repo=bt_pending_repo,
         trace_log_path=trace_log_path,
     )
     refresh_media_server_func = _build_refresh_media_server_func(settings)

@@ -10,6 +10,7 @@ import httpx
 
 from app.clients.transmission import TransmissionTask
 from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
+from app.db.bt_pending_repo import BT_PENDING_STAGE_DUPLICATE_OVERRIDE, BtPendingPersistenceError, BtPendingRepo
 from app.db.approval_repo import (
     APPROVAL_STATUS_PENDING,
     DEFAULT_PENDING_TIMEOUT_SECONDS,
@@ -28,6 +29,7 @@ from app.db.job_repo import (
 )
 from app.operational_logging import emit_operational_log
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
+from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
 from app.services import add_pending_context
 from app.services.add_pending_context import (
     AddPendingContextBuilder,
@@ -1429,6 +1431,8 @@ class AddToDownloaderService:
         job_event_repo: JobEventRepo | None = None,
         download_monitor_repo: DownloadMonitorRepo | None = None,
         adult_content_registry_repo: AdultContentRegistryRepo | None = None,
+        adult_duplicate_memory_service: AdultDuplicateMemoryService | None = None,
+        bt_pending_repo: BtPendingRepo | None = None,
         trace_log_path: Path | None = None,
     ) -> None:
         self._search_service = search_service
@@ -1437,6 +1441,7 @@ class AddToDownloaderService:
         self._job_repo = job_repo
         self._job_event_repo = job_event_repo
         self._download_monitor_repo = download_monitor_repo
+        self._bt_pending_repo = bt_pending_repo
         self._trace_logger = WorkflowTraceLogger("add_to_downloader", trace_log_path)
         self._pending_context_builder = AddPendingContextBuilder(
             search_service,
@@ -1444,6 +1449,7 @@ class AddToDownloaderService:
         )
         self._pending_runtime_state = AddPendingRuntimeState()
         self._adult_registry_state = AddAdultRegistryState(adult_content_registry_repo)
+        self._adult_duplicate_memory_service = adult_duplicate_memory_service
         self._confirm_approval_state = AddConfirmApprovalState(
             approval_repo=approval_repo,
             add_confirm_not_pending_text=ADD_CONFIRM_NOT_PENDING_TEXT,
@@ -1481,6 +1487,35 @@ class AddToDownloaderService:
             pending_lease_lookup_failed=PENDING_LEASE_LOOKUP_FAILED,
             downloader_cancel_pending_job_result_missing_reason=DOWNLOADER_CANCEL_PENDING_JOB_RESULT_MISSING_REASON,
             downloader_cancel_pending_job_row_missing_reason=DOWNLOADER_CANCEL_PENDING_JOB_ROW_MISSING_REASON,
+        )
+
+    async def continue_duplicate_add(self, *, chat_id: int | None) -> str:
+        if chat_id is None or chat_id <= 0 or self._bt_pending_repo is None:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        try:
+            pending_state = self._bt_pending_repo.get_pending(chat_id=chat_id)
+        except BtPendingPersistenceError:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        if pending_state is None or pending_state.stage != BT_PENDING_STAGE_DUPLICATE_OVERRIDE:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        pending_add, payload_problem = pending_add_from_json(pending_state.payload_json)
+        if pending_add is None or payload_problem:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        try:
+            cleared = self._bt_pending_repo.clear_pending(
+                chat_id=chat_id,
+                expected_stage=BT_PENDING_STAGE_DUPLICATE_OVERRIDE,
+            )
+        except BtPendingPersistenceError:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        if not cleared:
+            return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=None,
+            pending_add=pending_add,
+            channel=None,
+            skip_duplicate_check=True,
         )
 
     async def add_by_selection(
@@ -1996,7 +2031,32 @@ class AddToDownloaderService:
         user_id: int | None,
         pending_add: PendingAddContext,
         channel: str | None = None,
+        skip_duplicate_check: bool = False,
     ) -> str:
+        if (
+            not skip_duplicate_check
+            and self._adult_duplicate_memory_service is not None
+            and self._bt_pending_repo is not None
+            and pending_add.adult_content_id
+        ):
+            decision = self._adult_duplicate_memory_service.inspect(
+                normalized_content_id=pending_add.adult_content_id,
+                display_title=pending_add.adult_display_id or pending_add.title,
+            )
+            if decision.should_warn:
+                try:
+                    self._bt_pending_repo.upsert_pending(
+                        chat_id=chat_id,
+                        stage=BT_PENDING_STAGE_DUPLICATE_OVERRIDE,
+                        payload_json=pending_add_to_json(pending_add),
+                    )
+                except BtPendingPersistenceError:
+                    return ADD_PENDING_STATE_UNAVAILABLE_TEXT
+                reply_lines = [decision.warning_text]
+                reply_lines.extend(item.summary for item in decision.evidence)
+                reply_lines.append(f"继续下载：发送 继续下载 {pending_add.adult_display_id or pending_add.title}")
+                return "\n".join(line for line in reply_lines if line)
+
         expected_lease_version = self._record_pending_approval(
             task_ref=pending_add.task_ref,
             task_id=pending_add.task_id,

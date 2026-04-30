@@ -260,6 +260,27 @@ def test_dispatch_private_chat_text_routes_add_pending_with_channel_delivery_ren
     assert "确认下载：发送 confirm 1" in sent_text
 
 
+def test_dispatch_private_chat_text_routes_duplicate_override_follow_up() -> None:
+    reply_text = AsyncMock()
+    add_service = AddToDownloaderService(SearchMediaService(_fake_search), AsyncMock())
+    add_service.continue_duplicate_add = AsyncMock(return_value="下载待确认：1001")  # type: ignore[method-assign]
+    bot_data = _build_bot_data()
+    bot_data[ADD_TO_DOWNLOADER_SERVICE_KEY] = add_service
+
+    asyncio.run(
+        dispatch_private_chat_text(
+            query="继续下载 SSIS-123",
+            reply_func=reply_text,
+            chat_id=1001,
+            user_id=2001,
+            bot_data=bot_data,
+        )
+    )
+
+    reply_text.assert_awaited_once_with("下载待确认：1001")
+    add_service.continue_duplicate_add.assert_awaited_once_with(chat_id=1001)  # type: ignore[attr-defined]
+
+
 def test_dispatch_private_chat_text_routes_status_with_channel_delivery_renderer() -> None:
     reply_text = AsyncMock()
     bot_data = _build_bot_data()

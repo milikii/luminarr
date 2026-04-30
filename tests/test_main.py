@@ -701,6 +701,11 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
         created["manage_watchlist_service_kwargs"] = kwargs
         return SimpleNamespace()
 
+    def _build_add_to_downloader_service(*args: object, **kwargs: object) -> SimpleNamespace:
+        created["add_to_downloader_service_args"] = args
+        created["add_to_downloader_service_kwargs"] = kwargs
+        return SimpleNamespace()
+
     def _fake_build_application(
         token: str,
         search_service,
@@ -735,6 +740,7 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
     monkeypatch.setattr("app.main.JobRepo", _simple_component)
     monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
     monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
     monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
     monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
     monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
@@ -751,7 +757,8 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
         lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
     )
     monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
-    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _build_add_to_downloader_service)
     monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
     monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
     monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
@@ -785,6 +792,8 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
     assert app.bot_data["bt_subscription_capability_unavailable_text"].startswith("BT 订阅当前不可用")
     assert len(created["manage_watchlist_service_args"]) == 1
     assert "bt_subscription_repo" in created["manage_watchlist_service_kwargs"]
+    assert "adult_duplicate_memory_service" in created["add_to_downloader_service_kwargs"]
+    assert "bt_pending_repo" in created["add_to_downloader_service_kwargs"]
     assert len(created["qb_client_calls"]) == 1
 
 
@@ -819,6 +828,7 @@ def test_main_uses_non_telegram_host_when_feishu_is_available(
     monkeypatch.setattr("app.main.JobRepo", _simple_component)
     monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
     monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
     monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
     monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
     monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
@@ -835,6 +845,7 @@ def test_main_uses_non_telegram_host_when_feishu_is_available(
         lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
     )
     monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
     monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
     monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
     monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
@@ -914,6 +925,7 @@ def test_main_uses_non_telegram_host_when_wecom_is_available(
     monkeypatch.setattr("app.main.JobRepo", _simple_component)
     monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
     monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
     monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
     monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
     monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
@@ -930,6 +942,7 @@ def test_main_uses_non_telegram_host_when_wecom_is_available(
         lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
     )
     monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
     monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
     monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
     monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)

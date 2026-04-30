@@ -9,6 +9,7 @@ BT_PENDING_STAGE_PROCESSING_PATH = "processing_path"
 BT_PENDING_STAGE_CLASSIFICATION = "classification"
 BT_PENDING_STAGE_TMDB_ASSOCIATION = "tmdb_association"
 BT_PENDING_STAGE_RAW_BT_DESTINATION = "raw_bt_destination"
+BT_PENDING_STAGE_DUPLICATE_OVERRIDE = "duplicate_override"
 
 
 @dataclass(frozen=True, slots=True)

@@ -52,6 +52,7 @@ BT_CLASSIFICATION_ALIASES = {
     "动画": "anime",
 }
 RAW_BT_LEGACY_SHORTCUTS = frozenset({"raw_bt", "rawbt", "raw", "其他bt资源", "其他bt"})
+_DUPLICATE_OVERRIDE_PATTERN = re.compile(r"^\s*继续下载(?:\s+.+)?\s*$", re.IGNORECASE)
 
 
 def _normalize_compact_text(text: str) -> str:
@@ -126,3 +127,7 @@ def parse_bt_processing_path_legacy_shortcut(text: str) -> tuple[str, str | None
     if normalized_text in RAW_BT_LEGACY_SHORTCUTS:
         return ("pure_bt", None)
     return None
+
+
+def is_duplicate_override_text(text: str) -> bool:
+    return _DUPLICATE_OVERRIDE_PATTERN.match(text) is not None

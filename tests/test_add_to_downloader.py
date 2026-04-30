@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTask
+from app.db.adult_duplicate_memory_snapshot_repo import AdultDuplicateMemorySnapshotRepo
 from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
 from app.db.approval_repo import (
     APPROVAL_STATUS_CANCELLED,
@@ -16,6 +17,7 @@ from app.db.approval_repo import (
     ApprovalPersistenceError,
     ApprovalRepo,
 )
+from app.db.bt_pending_repo import BtPendingRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JobPersistenceError, JobRecord, JobRepo
@@ -38,6 +40,7 @@ from app.services.add_to_downloader import (
     AddToDownloaderService,
     PendingAddContext,
 )
+from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
 from app.services.add_pending_context import build_bt_task_ref, build_pending_add_context
 from app.services.search_media import SearchMediaService
 from app.trace_logging import parse_trace_log_line
@@ -228,6 +231,76 @@ def test_add_candidate_source_includes_adult_history_from_registry(tmp_path: Pat
     )
 
     assert "历史: 该番号已归档保留：" in reply
+
+
+def test_add_candidate_source_returns_duplicate_warning_before_pending_add(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    adult_dir = tmp_path / "adult"
+    adult_dir.mkdir()
+    (adult_dir / "SSIS-123 archived.mp4").write_text("video", encoding="utf-8")
+
+    duplicate_service = AdultDuplicateMemoryService(
+        snapshot_repo=AdultDuplicateMemorySnapshotRepo(database),
+        adult_content_registry_repo=AdultContentRegistryRepo(database),
+        job_event_repo=None,
+        adult_scan_dirs=(adult_dir,),
+    )
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        adult_duplicate_memory_service=duplicate_service,
+        bt_pending_repo=BtPendingRepo(database),
+    )
+
+    reply = _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+
+    assert "检测到该番号已有本地或历史命中" in reply
+    assert "继续下载：发送 继续下载 SSIS-123" in reply
+    assert "待确认：下载" not in reply
+
+
+def test_continue_duplicate_add_creates_pending_approval(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    adult_dir = tmp_path / "adult"
+    adult_dir.mkdir()
+    (adult_dir / "SSIS-123 archived.mp4").write_text("video", encoding="utf-8")
+    bt_pending_repo = BtPendingRepo(database)
+
+    duplicate_service = AdultDuplicateMemoryService(
+        snapshot_repo=AdultDuplicateMemorySnapshotRepo(database),
+        adult_content_registry_repo=AdultContentRegistryRepo(database),
+        job_event_repo=None,
+        adult_scan_dirs=(adult_dir,),
+    )
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=AsyncMock(),
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+        adult_duplicate_memory_service=duplicate_service,
+        bt_pending_repo=bt_pending_repo,
+    )
+
+    _run(
+        service.add_candidate_source(
+            chat_id=1001,
+            source="magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+            title="SSIS-123",
+        )
+    )
+
+    reply = _run(service.continue_duplicate_add(chat_id=1001))
+
+    assert "下载待确认" in reply
+    assert "SSIS-123" in reply
 
 
 def test_confirm_add_by_task_ref_dispatches_download() -> None:
