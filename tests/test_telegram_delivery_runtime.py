@@ -75,6 +75,34 @@ def test_build_telegram_send_text_func_sends_inline_keyboard_when_actions_exist(
     )
 
 
+def test_build_telegram_send_text_func_skips_oversized_callback_queries() -> None:
+    send_message = AsyncMock(return_value="text-message")
+    sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    long_query = "search " + ("很长的查询" * 20)
+    text = render_telegram_text(
+        DeliveryItem(
+            header=DeliveryHeader(kind="search_results", title="搜索：长查询"),
+            sections=(DeliverySection(label="候选结果", lines=("1. Dune (2021)",)),),
+            actions=(
+                DeliveryAction(label="开始下载", hint="发送 select 1", kind="primary"),
+                DeliveryAction(label="换关键词", hint=f"发送 {long_query}", kind="secondary"),
+            ),
+            status="success",
+        )
+    )
+
+    result = asyncio.run(sender(chat_id=1001, text=text))
+
+    assert result == "text-message"
+    send_message.assert_awaited_once()
+    reply_markup = send_message.await_args.kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("开始下载",),)
+    assert tuple(tuple(button.callback_data for button in row) for row in reply_markup.inline_keyboard) == (
+        ("select 1",),
+    )
+
+
 def test_build_telegram_send_media_func_uses_document_for_non_image_path(
     tmp_path: Path,
 ) -> None:

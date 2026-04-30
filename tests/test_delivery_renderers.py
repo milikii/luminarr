@@ -5,7 +5,6 @@ from app.runtime.delivery import (
     DeliveryHeader,
     DeliveryItem,
     DeliverySection,
-    extract_telegram_actions,
     render_feishu_text,
     render_personal_wechat_text,
     render_telegram_text,
@@ -34,34 +33,6 @@ def test_render_telegram_text_formats_search_results_fallback() -> None:
     assert "下一步" in text
     assert "选择 1：发送 select 1" in text
     assert text.endswith("如需重搜，请发送 search 沙丘 2021")
-
-
-def test_render_telegram_text_preserves_action_queries_for_inline_buttons() -> None:
-    item = DeliveryItem(
-        header=DeliveryHeader(kind="approval", title="待确认：下载"),
-        sections=(
-            DeliverySection(label="任务信息", lines=("片名：Dune 2021", "选择序号：hash-87")),
-        ),
-        actions=(
-            DeliveryAction(label="确认下载", hint="发送 confirm hash-87", kind="primary"),
-            DeliveryAction(label="取消下载", hint="发送 cancel hash-87", kind="secondary"),
-            DeliveryAction(label="刷新状态", hint="发送 status hash-87", kind="secondary"),
-        ),
-        status="pending",
-    )
-
-    text = render_telegram_text(item)
-    actions = extract_telegram_actions(text)
-
-    assert text.startswith("待确认：下载 ⏳")
-    assert tuple((action.label, action.hint, action.kind) for action in actions) == tuple(
-        (action.label, action.hint, action.kind) for action in item.actions
-    )
-    assert tuple(action.callback_query for action in actions) == (
-        "confirm hash-87",
-        "cancel hash-87",
-        "status hash-87",
-    )
 
 
 def test_render_feishu_text_formats_error_fallback() -> None:

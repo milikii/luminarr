@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+import re
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 from telegram.ext import Application
 
 from app.operational_logging import emit_operational_log
-from app.runtime.delivery import extract_telegram_actions
 
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
+TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64
+_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 
@@ -79,16 +81,14 @@ def _is_telegram_photo_path(file_path: Path) -> bool:
 
 
 def _build_inline_keyboard_markup(text: str) -> InlineKeyboardMarkup | None:
-    actions = extract_telegram_actions(text)
-    if not actions:
+    action_rows = _extract_inline_action_rows(text)
+    if not action_rows:
         return None
 
     keyboard_rows: list[list[InlineKeyboardButton]] = []
     current_row: list[InlineKeyboardButton] = []
-    for action in actions:
-        callback_query = (action.callback_query or "").strip()
-        label = action.label.strip()
-        if not callback_query or not label:
+    for label, callback_query in action_rows:
+        if len(callback_query.encode("utf-8")) > TELEGRAM_CALLBACK_DATA_MAX_BYTES:
             continue
         current_row.append(InlineKeyboardButton(text=label, callback_data=callback_query))
         if len(current_row) >= 2:
@@ -99,3 +99,26 @@ def _build_inline_keyboard_markup(text: str) -> InlineKeyboardMarkup | None:
     if not keyboard_rows:
         return None
     return InlineKeyboardMarkup(keyboard_rows)
+
+
+def _extract_inline_action_rows(text: str) -> tuple[tuple[str, str], ...]:
+    in_actions = False
+    action_rows: list[tuple[str, str]] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == "下一步":
+            in_actions = True
+            continue
+        if not in_actions:
+            continue
+        matched = _ACTION_LINE_PATTERN.match(line)
+        if matched is None:
+            continue
+        label = str(matched.group("label") or "").strip()
+        query = str(matched.group("query") or "").strip()
+        if not label or not query:
+            continue
+        action_rows.append((label, query))
+    return tuple(action_rows)

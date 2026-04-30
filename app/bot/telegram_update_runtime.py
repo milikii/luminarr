@@ -9,7 +9,6 @@ from telegram.ext import ContextTypes
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.operational_logging import emit_operational_log
-from app.runtime.delivery import extract_telegram_actions, TelegramDeliveryText
 
 
 def build_telegram_reply_func(
@@ -18,11 +17,7 @@ def build_telegram_reply_func(
     formatter: Callable[[str], str],
 ) -> Callable[[str], Awaitable[object]]:
     async def wrapped(text: str) -> object:
-        formatted = formatter(text)
-        actions = extract_telegram_actions(text)
-        if actions:
-            formatted = TelegramDeliveryText(formatted, actions)
-        return await reply_func(formatted)
+        return await reply_func(formatter(text))
 
     return wrapped
 

@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 
 from app.bot.telegram_update_runtime import build_telegram_reply_func
 from app.bot.telegram_reply_formatter import format_telegram_reply
-from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, extract_telegram_actions, render_telegram_text
+from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
 
 
 def test_format_telegram_reply_formats_search_result() -> None:
@@ -69,7 +69,7 @@ def test_format_telegram_reply_keeps_unrelated_text() -> None:
     assert format_telegram_reply(text) == text
 
 
-def test_build_telegram_reply_func_preserves_inline_action_metadata_after_formatting() -> None:
+def test_build_telegram_reply_func_formats_text_before_replying() -> None:
     reply_text = AsyncMock(return_value="sent")
     reply_func = build_telegram_reply_func(reply_text, formatter=format_telegram_reply)
     text = render_telegram_text(
@@ -87,11 +87,3 @@ def test_build_telegram_reply_func_preserves_inline_action_metadata_after_format
     reply_text.assert_awaited_once()
     formatted_text = reply_text.await_args.args[0]
     assert formatted_text == text
-    assert extract_telegram_actions(formatted_text) == (
-        DeliveryAction(
-            label="确认下载",
-            hint="发送 confirm hash-1",
-            kind="primary",
-            callback_query="confirm hash-1",
-        ),
-    )
