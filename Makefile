@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-adult-bt-wedge verify-mainline-status-and-channels verify-mainline-bt-paths verify-mainline-execution-paths verify-mainline-user-intents test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
+.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-stage1-duplicate-memory verify-stage1-telegram-delivery verify-stage1-bt-source-roles verify-adult-bt-wedge verify-mainline-status-and-channels verify-mainline-bt-paths verify-mainline-execution-paths verify-mainline-user-intents test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-adult-bt-wedge test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-adult-bt-wedge test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -38,6 +38,25 @@ verify-mainline:
 	$(MAKE) verify-mainline-bt-paths
 	$(MAKE) verify-mainline-execution-paths
 	$(MAKE) verify-mainline-user-intents
+
+verify-stage1:
+	$(MAKE) verify-stage1-duplicate-memory
+	$(MAKE) verify-stage1-telegram-delivery
+	$(MAKE) verify-stage1-bt-source-roles
+
+verify-stage1-duplicate-memory:
+	$(PYTHON) -m pytest -q tests/test_persistence_sqlite.py -k adult_duplicate_memory_snapshot
+	$(PYTHON) -m pytest -q tests/test_adult_duplicate_memory.py tests/test_adult_duplicate_memory_tools.py
+	$(PYTHON) -m pytest -q tests/test_add_to_downloader.py tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k duplicate
+
+verify-stage1-telegram-delivery:
+	$(PYTHON) -m pytest -q tests/test_delivery_renderers.py tests/test_telegram_delivery_runtime.py
+	$(PYTHON) -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "routes_search_with_channel_delivery_renderer or routes_add_pending_with_channel_delivery_renderer or routes_status_with_channel_delivery_renderer or import_formats_import_approval_for_telegram or routes_duplicate_override_follow_up"
+
+verify-stage1-bt-source-roles:
+	$(PYTHON) -m pytest -q tests/test_bt_sources.py -k "registry_tracks_roles_and_helper_only_gate or get_configured_web_source_rule_skips_helper_only_source or get_configured_web_source_rule_skips_supported_but_unmodeled_source"
+	$(PYTHON) -m pytest -q tests/test_bt_read_only_display.py tests/test_search_media.py -k "javlibrary or helper_only"
+	$(PYTHON) -m pytest -q tests/test_main.py -k build_bt_source_providers_skips_helper_only_web_sources
 
 verify-adult-bt-wedge:
 	$(PYTHON) -m pytest -q tests/test_query_text_runtime.py tests/test_bt_read_only_display.py tests/test_search_media.py
