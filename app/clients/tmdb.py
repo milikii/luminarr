@@ -7,6 +7,11 @@ from typing import Any
 
 import httpx
 
+from app.search_franchise_intent import (
+    PRIMARY_FRANCHISE_INTENT_BOOST,
+    has_explicit_franchise_intent,
+    resolve_franchise_intent_boost,
+)
 from app.search_title_normalization import normalize_match_key, score_title_match
 
 
@@ -270,6 +275,8 @@ def _rank_tmdb_candidates(
         for candidate in candidates
     ]
     scored_candidates.sort(key=lambda item: item[0], reverse=True)
+    if has_explicit_franchise_intent(title):
+        scored_candidates = _prefer_primary_franchise_cluster(scored_candidates, title=title)
     if scored_candidates:
         best_score = scored_candidates[0][0]
         if best_score[0] >= 3 and best_score[1] > 0:
@@ -297,12 +304,28 @@ def _rank_tmdb_candidates(
     return ranked_candidates
 
 
+def _prefer_primary_franchise_cluster(
+    scored_candidates: list[tuple[tuple[int, int, int], TmdbMovie]],
+    *,
+    title: str,
+) -> list[tuple[tuple[int, int, int], TmdbMovie]]:
+    primary_candidates = [
+        item
+        for item in scored_candidates
+        if resolve_franchise_intent_boost(title, item[1].title, item[1].original_title) >= PRIMARY_FRANCHISE_INTENT_BOOST
+    ]
+    if primary_candidates:
+        return primary_candidates
+    return scored_candidates
+
+
 def _score_tmdb_match(candidate: TmdbMovie, *, title: str, year: str) -> tuple[int, int, int]:
     normalized_title = normalize_match_key(candidate.title)
     normalized_original_title = normalize_match_key(candidate.original_title)
     compact_query = _compact_tmdb_match_key(title)
     compact_title = _compact_tmdb_match_key(normalized_title)
     compact_original_title = _compact_tmdb_match_key(normalized_original_title)
+    franchise_intent_boost = resolve_franchise_intent_boost(title, candidate.title, candidate.original_title)
     title_score = max(
         score_title_match(title, normalized_title),
         score_title_match(title, normalized_original_title),
@@ -314,7 +337,7 @@ def _score_tmdb_match(candidate: TmdbMovie, *, title: str, year: str) -> tuple[i
         exact_bias = 1
     year_score = 1 if year and candidate.year == year else 0
     exact_year_penalty = 0 if year_score or not year else -1
-    return title_score, exact_bias, year_score + exact_year_penalty
+    return title_score + franchise_intent_boost * 10, exact_bias, year_score + exact_year_penalty
 
 
 def _compact_tmdb_match_key(value: str) -> str:

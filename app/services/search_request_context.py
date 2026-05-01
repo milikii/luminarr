@@ -10,6 +10,11 @@ import httpx
 
 from app.clients.tmdb import TmdbMovie
 from app.operational_logging import emit_operational_log
+from app.search_franchise_intent import (
+    PRIMARY_FRANCHISE_INTENT_BOOST,
+    has_explicit_franchise_intent,
+    resolve_franchise_intent_boost,
+)
 from app.search_title_normalization import (
     compact_match_key,
     is_confident_title_match,
@@ -37,11 +42,13 @@ STRONG_TITLE_MIN_MATCH_SCORE = 3
 STRONG_TITLE_LARGE_GAP = 60
 STRONG_TITLE_EXACT_GAP = 25
 STRONG_TITLE_YEAR_GAP = 20
+FRANCHISE_INTENT_RELEVANCE_WEIGHT = 500
 
 
 @dataclass(frozen=True, slots=True)
 class _MediaIdentityCandidateSignal:
     candidate: TmdbMovie
+    franchise_intent_boost: int
     title_match_score: int
     exact_title_bias: int
     confident_title_match: bool
@@ -167,9 +174,13 @@ def _assess_media_identity(
             identity_movie=None,
         )
 
-    signals = tuple(
-        _build_media_identity_candidate_signal(parsed_query=parsed_query, candidate=candidate)
-        for candidate in tmdb_candidates
+    signals = _ordered_media_identity_candidate_signals(
+        parsed_query=parsed_query,
+        tmdb_candidates=tmdb_candidates,
+    )
+    signals = _prefer_primary_franchise_confirmation_signals(
+        parsed_query=parsed_query,
+        signals=signals,
     )
     top_signal = signals[0]
 
@@ -219,12 +230,18 @@ def _build_media_identity_candidate_signal(
         original_title=candidate.original_title,
     )
     year_match = _candidate_year_matches_query(parsed_query=parsed_query, candidate=candidate)
+    franchise_intent_boost = resolve_franchise_intent_boost(
+        parsed_query.title,
+        candidate.title,
+        candidate.original_title,
+    )
     title_match_score = max(
         score_title_match(parsed_query.title, candidate.title),
         score_title_match(parsed_query.title, candidate.original_title),
     )
     return _MediaIdentityCandidateSignal(
         candidate=candidate,
+        franchise_intent_boost=franchise_intent_boost,
         title_match_score=title_match_score,
         exact_title_bias=exact_title_bias,
         confident_title_match=(
@@ -232,6 +249,7 @@ def _build_media_identity_candidate_signal(
         ),
         year_match=year_match,
         relevance_score=_score_confirmation_candidate(
+            franchise_intent_boost=franchise_intent_boost,
             title_match_score=title_match_score,
             exact_title_bias=exact_title_bias,
             year_match=year_match,
@@ -275,12 +293,52 @@ def _select_confirmation_tmdb_candidates(
     if not tmdb_candidates:
         return ()
 
-    signals = tuple(
-        _build_media_identity_candidate_signal(parsed_query=parsed_query, candidate=candidate)
-        for candidate in tmdb_candidates
+    signals = _ordered_media_identity_candidate_signals(
+        parsed_query=parsed_query,
+        tmdb_candidates=tmdb_candidates,
+    )
+    signals = _prefer_primary_franchise_confirmation_signals(
+        parsed_query=parsed_query,
+        signals=signals,
     )
     limit = _resolve_confirmation_candidate_limit(parsed_query=parsed_query, signals=signals)
     return tuple(signal.candidate for signal in signals[:limit])
+
+
+def _ordered_media_identity_candidate_signals(
+    *,
+    parsed_query: ParsedMovieQuery,
+    tmdb_candidates: Sequence[TmdbMovie],
+) -> tuple[_MediaIdentityCandidateSignal, ...]:
+    signals = [
+        _build_media_identity_candidate_signal(parsed_query=parsed_query, candidate=candidate)
+        for candidate in tmdb_candidates
+    ]
+    signals.sort(
+        key=lambda signal: (
+            signal.relevance_score,
+            signal.title_match_score,
+            signal.exact_title_bias,
+        ),
+        reverse=True,
+    )
+    return tuple(signals)
+
+
+def _prefer_primary_franchise_confirmation_signals(
+    *,
+    parsed_query: ParsedMovieQuery,
+    signals: Sequence[_MediaIdentityCandidateSignal],
+) -> tuple[_MediaIdentityCandidateSignal, ...]:
+    if not signals or not has_explicit_franchise_intent(parsed_query.title):
+        return tuple(signals)
+
+    primary_signals = tuple(
+        signal for signal in signals if signal.franchise_intent_boost >= PRIMARY_FRANCHISE_INTENT_BOOST
+    )
+    if primary_signals:
+        return primary_signals
+    return tuple(signals)
 
 
 def _resolve_confirmation_candidate_limit(
@@ -345,6 +403,7 @@ def _resolve_exact_title_bias(
 
 def _score_confirmation_candidate(
     *,
+    franchise_intent_boost: int,
     title_match_score: int,
     exact_title_bias: int,
     year_match: bool,
@@ -354,7 +413,8 @@ def _score_confirmation_candidate(
     if query_year.strip():
         year_score = YEAR_MATCH_WEIGHT if year_match else YEAR_MISMATCH_PENALTY
     return (
-        title_match_score * TITLE_MATCH_WEIGHT
+        franchise_intent_boost * FRANCHISE_INTENT_RELEVANCE_WEIGHT
+        + title_match_score * TITLE_MATCH_WEIGHT
         + exact_title_bias * EXACT_TITLE_BIAS_WEIGHT
         + year_score
     )

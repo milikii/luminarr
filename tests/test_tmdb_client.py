@@ -5,6 +5,7 @@ from collections.abc import Awaitable
 from typing import Any
 
 import httpx
+import pytest
 
 from app.clients.tmdb import TmdbClient
 
@@ -311,6 +312,70 @@ def test_search_media_candidates_prefers_exact_tmdb_identity_for_strong_japanese
     assert results[0].title == "你的名字。"
     assert results[0].poster_path == "/your-name.jpg"
     assert results[0].overview == "Two teenagers share a supernatural connection."
+
+
+@pytest.mark.parametrize("query", ["魔戒", "指环王", "Lord of the Rings"])
+def test_search_media_candidates_prefers_lord_of_the_rings_franchise_for_explicit_alias_query(query: str) -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == query
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 91,
+                            "title": "魔戒迷踪",
+                            "original_title": "Ringers: Lord of the Fans",
+                            "release_date": "2005-01-21",
+                        },
+                        {
+                            "id": 92,
+                            "title": "指环王：护戒使者",
+                            "original_title": "The Lord of the Rings: The Fellowship of the Ring",
+                            "release_date": "2001-12-19",
+                            "poster_path": "/lotr-fellowship.jpg",
+                            "overview": "Frodo begins the journey to destroy the One Ring.",
+                        },
+                        {
+                            "id": 93,
+                            "title": "指环王：双塔奇兵",
+                            "original_title": "The Lord of the Rings: The Two Towers",
+                            "release_date": "2002-12-18",
+                        },
+                        {
+                            "id": 95,
+                            "title": "指环王：王者无敌",
+                            "original_title": "The Lord of the Rings: The Return of the King",
+                            "release_date": "2003-12-17",
+                        },
+                    ]
+                }
+            )
+        assert path == "/3/search/tv"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 94,
+                        "name": "牙狼：魔戒之花",
+                        "original_name": "GARO: Makai no Hana",
+                        "first_air_date": "2014-04-04",
+                    }
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+
+    results = _run(client.search_media_candidates(query, limit=5))
+
+    assert [item.tmdb_id for item in results] == ["92", "93", "95"]
+    assert results[0].title == "指环王：护戒使者"
+    assert results[0].poster_path == "/lotr-fellowship.jpg"
+    assert results[0].overview == "Frodo begins the journey to destroy the One Ring."
+    assert all(item.tmdb_id not in {"91", "94"} for item in results)
 
 
 def test_search_movie_prefers_base_title_when_query_has_final_cut_noise() -> None:

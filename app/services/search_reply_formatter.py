@@ -81,16 +81,18 @@ def format_media_candidate_confirmation_reply(
 ) -> str:
     if not tmdb_candidates:
         return NO_RESULT_TEXT_TEMPLATE.format(query=query)
-    lines = [f"候选作品：{query}"]
+    candidate_count = len(tmdb_candidates[:5])
+    lines = [f"候选作品：{query}", "先确认最可能的作品："]
     for index, candidate in enumerate(tmdb_candidates[:5], start=1):
         section_label, candidate_lines = build_media_candidate_confirmation_entry(
             parsed_query=parsed_query,
             candidate=candidate,
             index=index,
+            expanded=index == 1,
         )
         lines.append(section_label)
         lines.extend(candidate_lines)
-    lines.append("直接回复对应序号确认作品，例如：1")
+    lines.append(format_media_candidate_confirmation_hint(candidate_count))
     return "\n".join(lines)
 
 
@@ -740,6 +742,7 @@ def build_media_candidate_confirmation_delivery_item(
 ) -> DeliveryItem:
     if not tmdb_candidates:
         raise ValueError("media candidate confirmation requires at least one candidate")
+    candidate_count = len(tmdb_candidates[:5])
     sections: list[DeliverySection] = []
     for index, candidate in enumerate(tmdb_candidates[:5], start=1):
         section_label, candidate_lines = build_media_candidate_confirmation_entry(
@@ -747,6 +750,7 @@ def build_media_candidate_confirmation_delivery_item(
             candidate=candidate,
             index=index,
             field_delimiter="：",
+            expanded=index == 1,
         )
         sections.append(
             DeliverySection(
@@ -755,7 +759,11 @@ def build_media_candidate_confirmation_delivery_item(
             )
         )
     return DeliveryItem(
-        header=DeliveryHeader(kind="media_candidate_confirmation", title=f"候选作品：{query}", subtitle=f"候选作品（{len(tmdb_candidates[:5])} 条）"),
+        header=DeliveryHeader(
+            kind="media_candidate_confirmation",
+            title=f"候选作品：{query}",
+            subtitle=f"候选作品（{candidate_count} 条）\n先确认最可能的作品：",
+        ),
         sections=tuple(sections),
         actions=(
             DeliveryAction(label="确认作品", hint="发送 1", kind="primary"),
@@ -771,6 +779,7 @@ def build_media_candidate_confirmation_entry(
     candidate: TmdbMovie,
     index: int,
     field_delimiter: str = ": ",
+    expanded: bool = True,
 ) -> tuple[str, list[str]]:
     card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
         parsed_query,
@@ -778,17 +787,27 @@ def build_media_candidate_confirmation_entry(
         prefer_localized_title=True,
     )
     section_label = f"{index}. {card_title} ({card_year}) | {card_media_type}"
-    candidate_lines = [
-        f"年份{field_delimiter}{card_year}",
-        f"类型{field_delimiter}{card_media_type}",
-    ]
-    if card_poster != "暂未接入图片":
-        candidate_lines.insert(0, f"海报{field_delimiter}{card_poster}")
+    candidate_lines: list[str] = []
+    if expanded and card_poster != "暂未接入图片":
+        candidate_lines.append(f"海报{field_delimiter}{card_poster}")
     if card_alias != "-":
         candidate_lines.append(f"原名{field_delimiter}{card_alias}")
-    if card_overview:
-        candidate_lines.append(f"简介{field_delimiter}{truncate_text(card_overview, limit=120)}")
+    if expanded:
+        candidate_lines.extend(
+            (
+                f"年份{field_delimiter}{card_year}",
+                f"类型{field_delimiter}{card_media_type}",
+            )
+        )
+        if card_overview:
+            candidate_lines.append(f"简介{field_delimiter}{truncate_text(card_overview, limit=120)}")
     return section_label, candidate_lines
+
+
+def format_media_candidate_confirmation_hint(candidate_count: int) -> str:
+    if candidate_count <= 1:
+        return "直接回复 1 确认作品，例如：1"
+    return f"直接回复 1-{candidate_count} 中的序号确认作品，例如：1"
 
 
 def guess_quality_from_title(title: str) -> str:

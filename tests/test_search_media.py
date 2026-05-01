@@ -3653,16 +3653,22 @@ def test_search_and_format_renders_tmdb_enriched_mixed_media_card() -> None:
 
     assert seen_queries == []
     assert text.startswith("候选作品：丧尸")
+    assert "先确认最可能的作品：" in text
     assert "1. Zombie Detective (2020) | tv" in text
     assert "海报: https://image.tmdb.org/t/p/w500/zombie-detective.jpg" in text
     assert "原名: 좀비탐정" in text
+    assert "年份: 2020" in text
+    assert "类型: tv" in text
     assert "简介: A detective story with a zombie lead." in text
     assert "2. Zombie for Sale (2019) | movie" in text
     assert "原名: 기묘한 가족" in text
+    assert "简介: A family comedy about zombies." not in text
     assert "3. All of Us Are Dead (2022) | tv" in text
     assert "4. Train to Busan (2016) | movie" in text
     assert "5. Kingdom (2019) | tv" in text
     assert "6. Zom 100: Bucket List of the Dead (2023) | tv" not in text
+    assert text.count("海报: https://image.tmdb.org/t/p/w500") == 1
+    assert text.count("简介:") == 1
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
@@ -3745,18 +3751,116 @@ def test_search_and_format_prefers_media_confirmation_for_strong_cjk_title_befor
 
     assert seen_queries == []
     assert "候选作品：你的名字" in text
+    assert "先确认最可能的作品：" in text
     assert "1. 你的名字。 (2016) | movie" in text
+    assert "年份: 2016" in text
+    assert "类型: movie" in text
     assert "2. 你的名字 特别收藏版 (2017) | movie" in text
     assert "3. 你的名字 剧场纪念版 (2018) | movie" in text
     assert "4. 你的名字 官方原声带 (2016) | movie" not in text
     assert "4. 你的名字 4K 修复合集 (2020) | movie" not in text
     assert "海报: https://image.tmdb.org/t/p/w500/your-name.jpg" in text
+    assert text.count("海报: https://image.tmdb.org/t/p/w500") == 1
+    assert text.count("简介:") == 1
+    assert "简介: A longer noisy collection title that should stay behind the exact film." not in text
     assert "站点:" not in text
     assert "链接参考:" not in text
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
     assert cached_candidate["media_identity"]["tmdb_id"] == "101"
+
+
+@pytest.mark.parametrize("query", ["魔戒", "指环王", "Lord of the Rings"])
+def test_search_and_format_prefers_lord_of_the_rings_franchise_for_explicit_alias_query(query: str) -> None:
+    seen_queries: list[str] = []
+
+    async def unexpected_resource_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return [
+            {
+                "title": "The Lord of the Rings Trilogy 1080p BluRay",
+                "year": 2001,
+                "size": 18 * 1024 * 1024 * 1024,
+                "indexerName": "IndexerMovie",
+                "downloadUrl": "https://example.com/lotr-trilogy.torrent",
+            }
+        ]
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == query
+        assert year == ""
+        return [
+            TmdbMovie(
+                title="魔戒迷踪",
+                original_title="Ringers: Lord of the Fans",
+                year="2005",
+                tmdb_id="201",
+                media_type="movie",
+                poster_path="/ringers.jpg",
+                overview="A documentary about Tolkien fandom.",
+            ),
+            TmdbMovie(
+                title="牙狼：魔戒之花",
+                original_title="GARO: Makai no Hana",
+                year="2014",
+                tmdb_id="202",
+                media_type="tv",
+                poster_path="/garo-makai.jpg",
+                overview="A GARO side story that should not outrank Lord of the Rings.",
+            ),
+            TmdbMovie(
+                title="指环王：护戒使者",
+                original_title="The Lord of the Rings: The Fellowship of the Ring",
+                year="2001",
+                tmdb_id="203",
+                media_type="movie",
+                poster_path="/lotr-fellowship.jpg",
+                overview="Frodo begins the journey to destroy the One Ring.",
+            ),
+            TmdbMovie(
+                title="指环王：双塔奇兵",
+                original_title="The Lord of the Rings: The Two Towers",
+                year="2002",
+                tmdb_id="204",
+                media_type="movie",
+                poster_path="/lotr-two-towers.jpg",
+                overview="The fellowship fights on across Middle-earth.",
+            ),
+            TmdbMovie(
+                title="指环王：王者无敌",
+                original_title="The Lord of the Rings: The Return of the King",
+                year="2003",
+                tmdb_id="205",
+                media_type="movie",
+                poster_path="/lotr-return-king.jpg",
+                overview="Aragorn claims the throne as the final battle begins.",
+            ),
+        ]
+
+    service = SearchMediaService(
+        unexpected_resource_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    text = _run(service.search_and_format(query, chat_id=1001))
+
+    assert seen_queries == []
+    assert text.startswith(f"候选作品：{query}")
+    assert "1. 指环王:护戒使者 (2001) | movie" in text
+    assert "2. 指环王:双塔奇兵 (2002) | movie" in text
+    assert "3. 指环王:王者无敌 (2003) | movie" in text
+    assert "魔戒迷踪" not in text
+    assert "牙狼：魔戒之花" not in text
+    assert "海报: https://image.tmdb.org/t/p/w500/lotr-fellowship.jpg" in text
+    assert "站点:" not in text
+    assert "链接参考:" not in text
+    cached_candidate = service.get_cached_candidate(1001, 1)
+    assert cached_candidate is not None
+    assert cached_candidate["candidate_stage"] == "media_candidate"
+    assert cached_candidate["media_identity"]["tmdb_id"] == "203"
+    assert service.get_cached_candidate(1001, 4) is None
+    assert service.get_cached_candidate(1001, 5) is None
 
 
 def test_search_and_format_with_explicit_year_prefers_media_confirmation_before_resource_search() -> None:

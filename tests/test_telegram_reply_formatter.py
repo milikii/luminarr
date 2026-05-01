@@ -70,6 +70,41 @@ def test_format_telegram_reply_formats_adult_bt_resource_result() -> None:
     assert "➡️ 下一步：发送 magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12" in formatted
 
 
+def test_format_telegram_reply_formats_media_candidate_confirmation_with_primary_hero_block() -> None:
+    text = (
+        "候选作品：你的名字\n"
+        "先确认最可能的作品：\n"
+        "1. 你的名字。 (2016) | movie\n"
+        "海报: https://image.tmdb.org/t/p/w500/your-name.jpg\n"
+        "原名: 君の名は。\n"
+        "年份: 2016\n"
+        "类型: movie\n"
+        "简介: Two teenagers share a supernatural connection.\n"
+        "2. 你的名字 特别收藏版 (2017) | movie\n"
+        "原名: 君の名は。4K Collection\n"
+        "3. 你的名字 剧场纪念版 (2018) | movie\n"
+        "原名: 君の名は。 Memorial Edition\n"
+        "直接回复对应序号确认作品，例如：1"
+    )
+
+    formatted = format_telegram_reply(text)
+
+    assert formatted.startswith("【候选作品】 你的名字\n候选作品（3 条）\n先确认最可能的作品：")
+    assert "【1】 你的名字。 (2016) | movie" in formatted
+    assert "海报: https://image.tmdb.org/t/p/w500/your-name.jpg" in formatted
+    assert "原名: 君の名は。" in formatted
+    assert "年份: 2016" in formatted
+    assert "类型: movie" in formatted
+    assert "简介: Two teenagers share a supernatural connection." in formatted
+    assert "【2】 你的名字 特别收藏版 (2017) | movie" in formatted
+    assert "原名: 君の名は。4K Collection" in formatted
+    assert "【3】 你的名字 剧场纪念版 (2018) | movie" in formatted
+    assert "原名: 君の名は。 Memorial Edition" in formatted
+    assert formatted.count("海报: https://image.tmdb.org/t/p/w500") == 1
+    assert formatted.count("简介:") == 1
+    assert formatted.endswith("下一步\n直接回复 1-3 中的序号确认作品，例如：1")
+
+
 def test_format_telegram_reply_formats_add_approval() -> None:
     text = "下载待确认：Frieren S01E01 1080p\n选择序号: hash-1\n请发送 confirm hash-1 执行下载。"
 
@@ -404,40 +439,25 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
     result = asyncio.run(reply_func(text))
 
     assert result == "text-ok"
-    assert len(sent_media) == 3
+    assert len(sent_media) == 1
     assert sent_media[0][0] == 1001
     assert "https://image.tmdb.org/t/p/w500/your-name.jpg" in sent_media[0][1]
     assert sent_media[0][2] == (
         "【1】 你的名字。 (2016) | movie\n"
+        "原名：君の名は。\n"
         "年份：2016\n"
         "类型：movie\n"
-        "原名：君の名は。\n"
         "简介：Two teenagers share a supernatural connection."
-    )
-    assert "https://image.tmdb.org/t/p/w500/your-name-collection.jpg" in sent_media[1][1]
-    assert sent_media[1][2] == (
-        "【2】 你的名字 特别收藏版 (2017) | movie\n"
-        "年份：2017\n"
-        "类型：movie\n"
-        "原名：君の名は。4K Collection\n"
-        "简介：A longer noisy collection title that should stay behind the exact film."
-    )
-    assert "https://image.tmdb.org/t/p/w500/your-name-memorial.jpg" in sent_media[2][1]
-    assert sent_media[2][2] == (
-        "【3】 你的名字 剧场纪念版 (2018) | movie\n"
-        "年份：2018\n"
-        "类型：movie\n"
-        "原名：君の名は。 Memorial Edition\n"
-        "简介：A weaker commemorative release candidate."
     )
     reply_text.assert_not_called()
     send_text.assert_awaited_once()
     sent_text = send_text.await_args.kwargs["text"]
     assert "海报：" not in sent_text
-    assert "【候选作品】 你的名字" in sent_text
+    assert sent_text.startswith("【候选作品】 你的名字\n候选作品（3 条）\n先确认最可能的作品：")
     assert "【1】 你的名字。" in sent_text
     assert "【2】 你的名字 特别收藏版" in sent_text
     assert "【3】 你的名字 剧场纪念版" in sent_text
+    assert sent_text.count("简介：") == 1
     assert "站点：" not in sent_text
     assert "直接回复 1-3 中的序号确认作品，例如：1" in sent_text
 
@@ -462,9 +482,12 @@ def test_render_telegram_text_prefers_localized_title_for_non_chinese_tmdb_candi
     )
 
     assert "候选作品：丧尸" in text
+    assert "先确认最可能的作品：" in text
     assert "1. Zombie Detective (2020) | tv" in text
     assert "海报：https://image.tmdb.org/t/p/w500/zombie-detective.jpg" in text
     assert "原名：좀비탐정" in text
+    assert "年份：2020" in text
+    assert "类型：tv" in text
     assert "原名：Zombie Detective" not in text
 
 
