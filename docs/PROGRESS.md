@@ -494,3 +494,22 @@
 
 ### 下轮目标
 - 若继续优化成人 metadata，优先选 1 个主 metadata helper 做真实接入和 Telegram 实机 smoke；若准备发布，先进入 QA / ship
+
+## Round 30 — 2026-05-01 09:07
+
+### 完成
+- 完成 `Avmoo adult metadata helper` 第一阶段：新增 Avmoo 静态 HTML 只读 helper，并在运行时先查 Avmoo、失败或空结果后回退 JavLibrary
+- 保持边界不变：未引入无头浏览器、新依赖、PT fallback、下载器来源或自动副作用
+- 用真实 Avmoo HTML fixture 验证 `SSIS-483` 的海报、发行日、时长、导演、制作商、发行商、系列、类别和演员字段均可解析
+- 更新 `.trellis/spec/backend/bt-source-contracts.md`，记录 Avmoo primary + JavLibrary backup 的 helper chain 契约
+- 归档 Trellis task `05-01-avmoo-adult-metadata-helper`，session journal 已写入本地 `.trellis/workspace/alex/journal-1.md`
+
+### 测试状态
+- 通过: 4 / 总计: 4
+
+### 遗留 / 下轮继续
+- live Avmoo Python helper smoke 在当前沙箱网络路径下没有稳定返回；当前以 curl 抓取页和保存的真实 HTML fixture 解析作为等价证据
+- Avmoo HTML 不是正式 API，后续若页面结构漂移会 fail-closed 并回退 JavLibrary
+
+### 下轮目标
+- 若继续增强成人 metadata，优先做真实 Telegram smoke 或接第二个主 helper；若准备发布，进入 QA / ship
