@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index and pre-development guidance for this task."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Adult metadata source policy, helper enrichment, and Telegram adult result contracts."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verification entrypoints and quality gate expectations."}

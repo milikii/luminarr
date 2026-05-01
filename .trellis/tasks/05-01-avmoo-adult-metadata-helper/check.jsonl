@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index and check guidance."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Validate Avmoo helper behavior against adult metadata source and Telegram display contracts."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Validate required quality gates and focused verification."}
