@@ -423,6 +423,32 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
     assert "直接回复 1-2 中的序号确认作品，例如：1" in sent_text
 
 
+def test_render_telegram_text_prefers_localized_title_for_non_chinese_tmdb_candidate() -> None:
+    text = render_telegram_text(
+        build_media_candidate_confirmation_delivery_item(
+            query="丧尸",
+            parsed_query=ParsedMovieQuery(title="丧尸", year=""),
+            tmdb_candidates=(
+                TmdbMovie(
+                    title="Zombie Detective",
+                    original_title="좀비탐정",
+                    year="2020",
+                    tmdb_id="111",
+                    media_type="tv",
+                    poster_path="/zombie-detective.jpg",
+                    overview="A detective story with a zombie lead.",
+                ),
+            ),
+        )
+    )
+
+    assert "候选作品：丧尸" in text
+    assert "1. Zombie Detective (2020) | tv" in text
+    assert "海报：https://image.tmdb.org/t/p/w500/zombie-detective.jpg" in text
+    assert "原名：좀비탐정" in text
+    assert "原名：Zombie Detective" not in text
+
+
 def test_format_telegram_reply_keeps_unrelated_text() -> None:
     text = "普通回复，不需要 Telegram 特殊格式化。"
 

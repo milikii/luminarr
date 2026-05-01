@@ -3,18 +3,45 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 
 from app.clients.tmdb import TmdbMovie
 from app.operational_logging import emit_operational_log
-from app.search_title_normalization import compact_match_key, is_confident_title_match, normalize_match_key, normalize_spaces
+from app.search_title_normalization import (
+    compact_match_key,
+    is_confident_title_match,
+    normalize_match_key,
+    normalize_spaces,
+    score_title_match,
+)
 from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
 LookupMediaCandidatesFunc = Callable[[str, str], Awaitable[Sequence[TmdbMovie]]]
+MediaIdentityState = Literal["high_confidence_identity", "needs_confirmation", "empty"]
+
+HIGH_CONFIDENCE_IDENTITY: MediaIdentityState = "high_confidence_identity"
+NEEDS_CONFIRMATION: MediaIdentityState = "needs_confirmation"
+EMPTY_MEDIA_IDENTITY: MediaIdentityState = "empty"
+
+
+@dataclass(frozen=True, slots=True)
+class _MediaIdentityCandidateSignal:
+    candidate: TmdbMovie
+    title_match_score: int
+    confident_title_match: bool
+    year_match: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _MediaIdentityAssessment:
+    state: MediaIdentityState
+    reason: str
+    identity_movie: TmdbMovie | None
+
 
 @dataclass(frozen=True, slots=True)
 class SearchRequestContext:
@@ -22,8 +49,11 @@ class SearchRequestContext:
     tmdb_movie: TmdbMovie | None
     tmdb_identity_movie: TmdbMovie | None
     tmdb_candidates: tuple[TmdbMovie, ...]
+    media_identity_state: MediaIdentityState
+    media_identity_reason: str
     resolved_query: str
     raw_results: Sequence[Mapping[str, Any]]
+
 
 async def build_search_request_context(
     *,
@@ -35,6 +65,11 @@ async def build_search_request_context(
     parsed_query = parse_movie_query(user_query)
     tmdb_movie: TmdbMovie | None = None
     tmdb_candidates: tuple[TmdbMovie, ...] = ()
+    media_identity_assessment = _MediaIdentityAssessment(
+        state=EMPTY_MEDIA_IDENTITY,
+        reason="tmdb_lookup_unavailable",
+        identity_movie=None,
+    )
 
     if lookup_media_candidates_func is not None:
         try:
@@ -47,15 +82,21 @@ async def build_search_request_context(
             )
         if tmdb_candidates:
             tmdb_movie = tmdb_candidates[0]
-            if not parsed_query.year.strip():
-                return SearchRequestContext(
-                    parsed_query=parsed_query,
-                    tmdb_movie=tmdb_movie,
-                    tmdb_identity_movie=tmdb_movie if _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=tmdb_movie) else None,
-                    tmdb_candidates=tmdb_candidates,
-                    resolved_query="",
-                    raw_results=(),
-                )
+        media_identity_assessment = _assess_media_identity(
+            parsed_query=parsed_query,
+            tmdb_candidates=tmdb_candidates,
+        )
+        if media_identity_assessment.state == NEEDS_CONFIRMATION:
+            return SearchRequestContext(
+                parsed_query=parsed_query,
+                tmdb_movie=tmdb_movie,
+                tmdb_identity_movie=media_identity_assessment.identity_movie,
+                tmdb_candidates=tmdb_candidates,
+                media_identity_state=media_identity_assessment.state,
+                media_identity_reason=media_identity_assessment.reason,
+                resolved_query="",
+                raw_results=(),
+            )
 
     if lookup_media_candidates_func is None and lookup_movie_func is not None:
         try:
@@ -70,6 +111,12 @@ async def build_search_request_context(
             tmdb_candidates = (tmdb_movie,)
 
     tmdb_confident = _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=tmdb_movie)
+    if lookup_media_candidates_func is None:
+        media_identity_assessment = _MediaIdentityAssessment(
+            state=HIGH_CONFIDENCE_IDENTITY if tmdb_confident else EMPTY_MEDIA_IDENTITY,
+            reason="lookup_movie_exact_match" if tmdb_confident else "lookup_movie_unconfirmed",
+            identity_movie=tmdb_movie if tmdb_confident else None,
+        )
     ordered_queries = _resolve_ordered_queries(
         parsed_query=parsed_query,
         tmdb_movie=tmdb_movie,
@@ -82,11 +129,112 @@ async def build_search_request_context(
     return SearchRequestContext(
         parsed_query=parsed_query,
         tmdb_movie=tmdb_movie if lookup_media_candidates_func is not None or tmdb_confident else None,
-        tmdb_identity_movie=tmdb_movie if tmdb_confident else None,
+        tmdb_identity_movie=media_identity_assessment.identity_movie,
         tmdb_candidates=tmdb_candidates,
+        media_identity_state=media_identity_assessment.state,
+        media_identity_reason=media_identity_assessment.reason,
         resolved_query=resolved_query,
         raw_results=raw_results,
     )
+
+
+def _assess_media_identity(
+    *,
+    parsed_query: ParsedMovieQuery,
+    tmdb_candidates: Sequence[TmdbMovie],
+) -> _MediaIdentityAssessment:
+    if not tmdb_candidates:
+        return _MediaIdentityAssessment(
+            state=EMPTY_MEDIA_IDENTITY,
+            reason="no_tmdb_candidates",
+            identity_movie=None,
+        )
+
+    signals = tuple(
+        _build_media_identity_candidate_signal(parsed_query=parsed_query, candidate=candidate)
+        for candidate in tmdb_candidates
+    )
+    top_signal = signals[0]
+
+    if not parsed_query.year.strip():
+        return _MediaIdentityAssessment(
+            state=NEEDS_CONFIRMATION,
+            reason="title_only_query",
+            identity_movie=None,
+        )
+
+    if not top_signal.year_match:
+        return _MediaIdentityAssessment(
+            state=NEEDS_CONFIRMATION,
+            reason="top_candidate_year_mismatch",
+            identity_movie=None,
+        )
+
+    if not top_signal.confident_title_match:
+        return _MediaIdentityAssessment(
+            state=NEEDS_CONFIRMATION,
+            reason="low_confidence_title_match",
+            identity_movie=None,
+        )
+
+    if _has_competing_identity_candidate(top_signal=top_signal, other_signals=signals[1:]):
+        return _MediaIdentityAssessment(
+            state=NEEDS_CONFIRMATION,
+            reason="ambiguous_tmdb_candidates",
+            identity_movie=None,
+        )
+
+    return _MediaIdentityAssessment(
+        state=HIGH_CONFIDENCE_IDENTITY,
+        reason="explicit_year_exact_match",
+        identity_movie=top_signal.candidate,
+    )
+
+
+def _build_media_identity_candidate_signal(
+    *,
+    parsed_query: ParsedMovieQuery,
+    candidate: TmdbMovie,
+) -> _MediaIdentityCandidateSignal:
+    title_match_score = max(
+        score_title_match(parsed_query.title, candidate.title),
+        score_title_match(parsed_query.title, candidate.original_title),
+    )
+    return _MediaIdentityCandidateSignal(
+        candidate=candidate,
+        title_match_score=title_match_score,
+        confident_title_match=(
+            _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=candidate) or title_match_score >= 3
+        ),
+        year_match=_candidate_year_matches_query(parsed_query=parsed_query, candidate=candidate),
+    )
+
+
+def _candidate_year_matches_query(
+    *,
+    parsed_query: ParsedMovieQuery,
+    candidate: TmdbMovie,
+) -> bool:
+    resolved_year = parsed_query.year.strip()
+    if not resolved_year:
+        return False
+    return candidate.year.strip() == resolved_year
+
+
+def _has_competing_identity_candidate(
+    *,
+    top_signal: _MediaIdentityCandidateSignal,
+    other_signals: Sequence[_MediaIdentityCandidateSignal],
+) -> bool:
+    minimum_competing_score = max(3, top_signal.title_match_score - 1)
+    for signal in other_signals:
+        if not signal.year_match:
+            continue
+        if signal.confident_title_match:
+            return True
+        if signal.title_match_score >= minimum_competing_score:
+            return True
+    return False
 
 
 def _resolve_ordered_queries(

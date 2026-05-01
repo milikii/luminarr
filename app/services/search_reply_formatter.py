@@ -86,6 +86,7 @@ def format_media_candidate_confirmation_reply(
         card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
             parsed_query,
             candidate,
+            prefer_localized_title=True,
         )
         lines.append(f"{index}. {card_title} ({card_year}) | {card_media_type}")
         if card_poster != "暂未接入图片":
@@ -564,6 +565,8 @@ def format_movie_poster_card(
 def resolve_movie_card_fields(
     parsed_query: ParsedMovieQuery,
     tmdb_movie: TmdbMovie | None,
+    *,
+    prefer_localized_title: bool = False,
 ) -> tuple[str, str, str, str, str, str]:
     card_title = parsed_query.title or "-"
     card_year = parsed_query.year.strip() or "-"
@@ -575,26 +578,64 @@ def resolve_movie_card_fields(
     if tmdb_movie is not None:
         original_title = normalize_spaces(tmdb_movie.original_title)
         localized_title = normalize_spaces(tmdb_movie.title)
-        if _contains_cjk(localized_title):
-            card_title = localized_title
-        elif original_title:
-            card_title = original_title
-        elif localized_title:
-            card_title = localized_title
+        if prefer_localized_title:
+            card_title, card_alias = _resolve_tmdb_display_titles(
+                localized_title=localized_title,
+                original_title=original_title,
+                fallback_title=parsed_query.title,
+            )
+        else:
+            if _contains_cjk(localized_title):
+                card_title = localized_title
+            elif original_title:
+                card_title = original_title
+            elif localized_title:
+                card_title = localized_title
+
+            if card_title == original_title and localized_title and localized_title != card_title:
+                card_alias = localized_title
+            elif original_title and original_title != card_title:
+                card_alias = original_title
 
         resolved_year = tmdb_movie.year.strip()
         if resolved_year:
             card_year = resolved_year
 
-        if card_title == original_title and localized_title and localized_title != card_title:
-            card_alias = localized_title
-        elif original_title and original_title != card_title:
-            card_alias = original_title
         if tmdb_movie.media_type.strip():
             card_media_type = tmdb_movie.media_type.strip()
         card_poster = resolve_tmdb_poster_url(tmdb_movie) or card_poster
         card_overview = normalize_spaces(tmdb_movie.overview)
     return card_title, card_year, card_media_type, card_alias, card_poster, card_overview
+
+
+def _resolve_tmdb_display_titles(
+    *,
+    localized_title: str,
+    original_title: str,
+    fallback_title: str,
+) -> tuple[str, str]:
+    resolved_localized_title = normalize_spaces(localized_title)
+    resolved_original_title = normalize_spaces(original_title)
+    resolved_fallback_title = normalize_spaces(fallback_title)
+
+    if _contains_han_characters(resolved_localized_title):
+        primary_title = resolved_localized_title
+    elif resolved_localized_title:
+        primary_title = resolved_localized_title
+    elif resolved_original_title:
+        primary_title = resolved_original_title
+    elif resolved_fallback_title:
+        primary_title = resolved_fallback_title
+    else:
+        primary_title = "-"
+
+    if resolved_original_title and resolved_original_title != primary_title:
+        return primary_title, resolved_original_title
+    return primary_title, "-"
+
+
+def _contains_han_characters(value: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", value))
 
 
 def _contains_cjk(value: str) -> bool:
@@ -637,6 +678,7 @@ def format_ranked_tmdb_candidate_lines(tmdb_candidates: Sequence[TmdbMovie]) -> 
         card_title, card_year, card_media_type, card_alias, _, card_overview = resolve_movie_card_fields(
             ParsedMovieQuery(title=candidate.title, year=candidate.year),
             candidate,
+            prefer_localized_title=True,
         )
         title_line = f"{index}. {card_title} ({card_year}) | {card_media_type}"
         lines.append(title_line)
@@ -708,6 +750,7 @@ def build_media_candidate_confirmation_delivery_item(
         card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
             ParsedMovieQuery(title=candidate.title, year=candidate.year),
             candidate,
+            prefer_localized_title=True,
         )
         candidate_lines = [
             f"海报：{card_poster}",
