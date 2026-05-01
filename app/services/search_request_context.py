@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -26,14 +27,26 @@ MediaIdentityState = Literal["high_confidence_identity", "needs_confirmation", "
 HIGH_CONFIDENCE_IDENTITY: MediaIdentityState = "high_confidence_identity"
 NEEDS_CONFIRMATION: MediaIdentityState = "needs_confirmation"
 EMPTY_MEDIA_IDENTITY: MediaIdentityState = "empty"
+STRONG_TITLE_CONFIRMATION_LIMIT = 3
+AMBIGUOUS_TITLE_CONFIRMATION_LIMIT = 5
+TITLE_MATCH_WEIGHT = 100
+EXACT_TITLE_BIAS_WEIGHT = 25
+YEAR_MATCH_WEIGHT = 15
+YEAR_MISMATCH_PENALTY = -10
+STRONG_TITLE_MIN_MATCH_SCORE = 3
+STRONG_TITLE_LARGE_GAP = 60
+STRONG_TITLE_EXACT_GAP = 25
+STRONG_TITLE_YEAR_GAP = 20
 
 
 @dataclass(frozen=True, slots=True)
 class _MediaIdentityCandidateSignal:
     candidate: TmdbMovie
     title_match_score: int
+    exact_title_bias: int
     confident_title_match: bool
     year_match: bool
+    relevance_score: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,12 +94,16 @@ async def build_search_request_context(
                 fix_hint="检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但候选卡片信息可能缺失。",
             )
         if tmdb_candidates:
+            tmdb_candidates = _select_confirmation_tmdb_candidates(
+                parsed_query=parsed_query,
+                tmdb_candidates=tmdb_candidates,
+            )
             tmdb_movie = tmdb_candidates[0]
         media_identity_assessment = _assess_media_identity(
             parsed_query=parsed_query,
             tmdb_candidates=tmdb_candidates,
         )
-        if media_identity_assessment.state == NEEDS_CONFIRMATION:
+        if tmdb_candidates:
             return SearchRequestContext(
                 parsed_query=parsed_query,
                 tmdb_movie=tmdb_movie,
@@ -196,6 +213,12 @@ def _build_media_identity_candidate_signal(
     parsed_query: ParsedMovieQuery,
     candidate: TmdbMovie,
 ) -> _MediaIdentityCandidateSignal:
+    exact_title_bias = _resolve_exact_title_bias(
+        query_title=parsed_query.title,
+        localized_title=candidate.title,
+        original_title=candidate.original_title,
+    )
+    year_match = _candidate_year_matches_query(parsed_query=parsed_query, candidate=candidate)
     title_match_score = max(
         score_title_match(parsed_query.title, candidate.title),
         score_title_match(parsed_query.title, candidate.original_title),
@@ -203,10 +226,17 @@ def _build_media_identity_candidate_signal(
     return _MediaIdentityCandidateSignal(
         candidate=candidate,
         title_match_score=title_match_score,
+        exact_title_bias=exact_title_bias,
         confident_title_match=(
             _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=candidate) or title_match_score >= 3
         ),
-        year_match=_candidate_year_matches_query(parsed_query=parsed_query, candidate=candidate),
+        year_match=year_match,
+        relevance_score=_score_confirmation_candidate(
+            title_match_score=title_match_score,
+            exact_title_bias=exact_title_bias,
+            year_match=year_match,
+            query_year=parsed_query.year,
+        ),
     )
 
 
@@ -235,6 +265,103 @@ def _has_competing_identity_candidate(
         if signal.title_match_score >= minimum_competing_score:
             return True
     return False
+
+
+def _select_confirmation_tmdb_candidates(
+    *,
+    parsed_query: ParsedMovieQuery,
+    tmdb_candidates: Sequence[TmdbMovie],
+) -> tuple[TmdbMovie, ...]:
+    if not tmdb_candidates:
+        return ()
+
+    signals = tuple(
+        _build_media_identity_candidate_signal(parsed_query=parsed_query, candidate=candidate)
+        for candidate in tmdb_candidates
+    )
+    limit = _resolve_confirmation_candidate_limit(parsed_query=parsed_query, signals=signals)
+    return tuple(signal.candidate for signal in signals[:limit])
+
+
+def _resolve_confirmation_candidate_limit(
+    *,
+    parsed_query: ParsedMovieQuery,
+    signals: Sequence[_MediaIdentityCandidateSignal],
+) -> int:
+    if not signals:
+        return 0
+    if _should_compact_confirmation_candidates(parsed_query=parsed_query, signals=signals):
+        return min(len(signals), STRONG_TITLE_CONFIRMATION_LIMIT)
+    return min(len(signals), AMBIGUOUS_TITLE_CONFIRMATION_LIMIT)
+
+
+def _should_compact_confirmation_candidates(
+    *,
+    parsed_query: ParsedMovieQuery,
+    signals: Sequence[_MediaIdentityCandidateSignal],
+) -> bool:
+    top_signal = signals[0]
+    if top_signal.title_match_score < STRONG_TITLE_MIN_MATCH_SCORE:
+        return False
+    if top_signal.exact_title_bias <= 0 and not top_signal.confident_title_match:
+        return False
+    if len(signals) == 1:
+        return True
+
+    second_signal = signals[1]
+    relevance_gap = top_signal.relevance_score - second_signal.relevance_score
+    if relevance_gap >= STRONG_TITLE_LARGE_GAP:
+        return True
+    if top_signal.exact_title_bias > second_signal.exact_title_bias and relevance_gap >= STRONG_TITLE_EXACT_GAP:
+        return True
+    if (
+        parsed_query.year.strip()
+        and top_signal.year_match
+        and not second_signal.year_match
+        and relevance_gap >= STRONG_TITLE_YEAR_GAP
+    ):
+        return True
+    return False
+
+
+def _resolve_exact_title_bias(
+    *,
+    query_title: str,
+    localized_title: str,
+    original_title: str,
+) -> int:
+    compact_query = _compact_title_match_key(query_title)
+    compact_localized_title = _compact_title_match_key(localized_title)
+    compact_original_title = _compact_title_match_key(original_title)
+    normalized_query = normalize_match_key(query_title)
+    normalized_localized_title = normalize_match_key(localized_title)
+    normalized_original_title = normalize_match_key(original_title)
+    if compact_query and (compact_localized_title == compact_query or compact_original_title == compact_query):
+        return 2
+    if normalized_query and (normalized_localized_title == normalized_query or normalized_original_title == normalized_query):
+        return 1
+    return 0
+
+
+def _score_confirmation_candidate(
+    *,
+    title_match_score: int,
+    exact_title_bias: int,
+    year_match: bool,
+    query_year: str,
+) -> int:
+    year_score = 0
+    if query_year.strip():
+        year_score = YEAR_MATCH_WEIGHT if year_match else YEAR_MISMATCH_PENALTY
+    return (
+        title_match_score * TITLE_MATCH_WEIGHT
+        + exact_title_bias * EXACT_TITLE_BIAS_WEIGHT
+        + year_score
+    )
+
+
+def _compact_title_match_key(value: str) -> str:
+    return re.sub(r"[\W_]+", "", normalize_match_key(value), flags=re.UNICODE).lower()
 
 
 def _resolve_ordered_queries(

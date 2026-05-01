@@ -45,7 +45,6 @@ from app.services.search_query_parser import parse_movie_query
 from app.services.search_request_context import (
     LookupMovieFunc,
     LookupMediaCandidatesFunc,
-    NEEDS_CONFIRMATION,
     SearchFunc,
     build_search_request_context,
 )
@@ -302,7 +301,6 @@ class SearchMediaService:
         media_identity = build_media_identity_from_tmdb_movie(request_context.tmdb_identity_movie)
 
         if self._should_confirm_media_candidates(
-            media_identity_state=request_context.media_identity_state,
             tmdb_candidates=tmdb_candidates,
         ):
             media_candidates = _build_media_selection_candidates(tmdb_candidates)
@@ -506,14 +504,13 @@ class SearchMediaService:
     def _should_confirm_media_candidates(
         self,
         *,
-        media_identity_state: str,
         tmdb_candidates: Sequence[Any],
     ) -> bool:
         if self._lookup_media_candidates_func is None:
             return False
         if not tmdb_candidates:
             return False
-        return media_identity_state == NEEDS_CONFIRMATION
+        return True
 
     async def _translate_adult_display_candidates(
         self,

@@ -3606,6 +3606,42 @@ def test_search_and_format_renders_tmdb_enriched_mixed_media_card() -> None:
                 poster_path="/zombie-for-sale.jpg",
                 overview="A family comedy about zombies.",
             ),
+            TmdbMovie(
+                title="All of Us Are Dead",
+                original_title="지금 우리 학교는",
+                year="2022",
+                tmdb_id="333",
+                media_type="tv",
+                poster_path="/all-of-us-are-dead.jpg",
+                overview="A school zombie outbreak thriller.",
+            ),
+            TmdbMovie(
+                title="Train to Busan",
+                original_title="부산행",
+                year="2016",
+                tmdb_id="444",
+                media_type="movie",
+                poster_path="/train-to-busan.jpg",
+                overview="Passengers fight for survival on a fast train.",
+            ),
+            TmdbMovie(
+                title="Kingdom",
+                original_title="킹덤",
+                year="2019",
+                tmdb_id="555",
+                media_type="tv",
+                poster_path="/kingdom.jpg",
+                overview="A Joseon political thriller with zombies.",
+            ),
+            TmdbMovie(
+                title="Zom 100: Bucket List of the Dead",
+                original_title="ゾン100〜ゾンビになるまでにしたい100のこと〜",
+                year="2023",
+                tmdb_id="666",
+                media_type="tv",
+                poster_path="/zom-100.jpg",
+                overview="A zombie comedy about reclaiming life.",
+            ),
         ]
 
     service = SearchMediaService(
@@ -3623,6 +3659,10 @@ def test_search_and_format_renders_tmdb_enriched_mixed_media_card() -> None:
     assert "简介: A detective story with a zombie lead." in text
     assert "2. Zombie for Sale (2019) | movie" in text
     assert "原名: 기묘한 가족" in text
+    assert "3. All of Us Are Dead (2022) | tv" in text
+    assert "4. Train to Busan (2016) | movie" in text
+    assert "5. Kingdom (2019) | tv" in text
+    assert "6. Zom 100: Bucket List of the Dead (2023) | tv" not in text
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
@@ -3667,6 +3707,33 @@ def test_search_and_format_prefers_media_confirmation_for_strong_cjk_title_befor
                 poster_path="/your-name-collection.jpg",
                 overview="A longer noisy collection title that should stay behind the exact film.",
             ),
+            TmdbMovie(
+                title="你的名字 剧场纪念版",
+                original_title="君の名は。 Memorial Edition",
+                year="2018",
+                tmdb_id="103",
+                media_type="movie",
+                poster_path="/your-name-memorial.jpg",
+                overview="A weaker commemorative release candidate.",
+            ),
+            TmdbMovie(
+                title="你的名字 官方原声带",
+                original_title="君の名は。 Original Soundtrack",
+                year="2016",
+                tmdb_id="104",
+                media_type="movie",
+                poster_path="/your-name-soundtrack.jpg",
+                overview="A soundtrack result that should not stay in the first compact set.",
+            ),
+            TmdbMovie(
+                title="你的名字 4K 修复合集",
+                original_title="君の名は。 4K Restoration Collection",
+                year="2020",
+                tmdb_id="105",
+                media_type="movie",
+                poster_path="/your-name-4k-collection.jpg",
+                overview="Another noisy collection candidate that should be trimmed.",
+            ),
         ]
 
     service = SearchMediaService(
@@ -3679,29 +3746,33 @@ def test_search_and_format_prefers_media_confirmation_for_strong_cjk_title_befor
     assert seen_queries == []
     assert "候选作品：你的名字" in text
     assert "1. 你的名字。 (2016) | movie" in text
+    assert "2. 你的名字 特别收藏版 (2017) | movie" in text
+    assert "3. 你的名字 剧场纪念版 (2018) | movie" in text
+    assert "4. 你的名字 官方原声带 (2016) | movie" not in text
+    assert "4. 你的名字 4K 修复合集 (2020) | movie" not in text
     assert "海报: https://image.tmdb.org/t/p/w500/your-name.jpg" in text
+    assert "站点:" not in text
+    assert "链接参考:" not in text
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
     assert cached_candidate["media_identity"]["tmdb_id"] == "101"
 
 
-def test_search_and_format_with_explicit_year_still_searches_resources_after_tmdb_candidate_lookup() -> None:
+def test_search_and_format_with_explicit_year_prefers_media_confirmation_before_resource_search() -> None:
     seen_queries: list[str] = []
 
-    async def fake_search(query: str) -> list[dict[str, object]]:
+    async def unexpected_resource_search(query: str) -> list[dict[str, object]]:
         seen_queries.append(query)
-        if query == "Dune 2021":
-            return [
-                {
-                    "title": "Dune 2021 2160p WEB-DL",
-                    "year": 2021,
-                    "size": 8 * 1024 * 1024 * 1024,
-                    "indexerName": "IndexerMovie",
-                    "downloadUrl": "https://example.com/dune-2021.torrent",
-                }
-            ]
-        return []
+        return [
+            {
+                "title": "Dune 2021 2160p WEB-DL",
+                "year": 2021,
+                "size": 8 * 1024 * 1024 * 1024,
+                "indexerName": "IndexerMovie",
+                "downloadUrl": "https://example.com/dune-2021.torrent",
+            }
+        ]
 
     async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
         assert title == "Dune"
@@ -3728,17 +3799,20 @@ def test_search_and_format_with_explicit_year_still_searches_resources_after_tmd
         ]
 
     service = SearchMediaService(
-        fake_search,
+        unexpected_resource_search,
         lookup_media_candidates_func=fake_tmdb_candidates,
     )
 
     text = _run(service.search_and_format("Dune 2021", chat_id=1001))
 
-    assert seen_queries == ["Dune 2021"]
-    assert text.startswith("电影海报卡片")
-    assert "搜索结果：Dune 2021" in text
-    assert "Dune 2021 2160p WEB-DL (2021)" in text
-    assert "候选作品：Dune 2021" not in text
+    assert seen_queries == []
+    assert text.startswith("候选作品：Dune 2021")
+    assert "1. Dune (2021) | movie" in text
+    assert "海报: https://image.tmdb.org/t/p/w500/dune.jpg" in text
+    cached_candidate = service.get_cached_candidate(1001, 1)
+    assert cached_candidate is not None
+    assert cached_candidate["candidate_stage"] == "media_candidate"
+    assert cached_candidate["media_identity"]["tmdb_id"] == "438631"
 
 
 def test_build_search_request_context_marks_low_confidence_year_query_as_needs_confirmation() -> None:
@@ -3840,7 +3914,7 @@ def test_search_and_format_with_explicit_year_but_low_confidence_tmdb_hit_prefer
     assert "2. Children of Dune (2003) | tv" in text
 
 
-def test_search_and_format_regular_result_card_keeps_existing_related_title_order() -> None:
+def test_search_resources_for_selected_media_keeps_existing_related_title_order_after_confirmation() -> None:
     seen_queries: list[str] = []
 
     async def fake_search(query: str) -> list[dict[str, object]]:
@@ -3877,15 +3951,53 @@ def test_search_and_format_regular_result_card_keeps_existing_related_title_orde
         lookup_media_candidates_func=fake_tmdb_candidates,
     )
 
-    text = _run(service.search_and_format("Zombie Detective 2020"))
+    confirmation_text = _run(service.search_and_format("Zombie Detective 2020", chat_id=1001))
+    text = _run(service.search_resources_for_selected_media(1001, "1"))
 
-    assert seen_queries == ["Zombie Detective 2020"]
+    assert seen_queries == ["좀비탐정 2020", "좀비탐정", "Zombie Detective 2020"]
+    assert confirmation_text.startswith("候选作品：Zombie Detective 2020")
     assert text.startswith("电影海报卡片")
     assert "候选作品：" not in text
     assert "片名: 좀비탐정" in text
     assert "别名: Zombie Detective" in text
     assert "- tv | 좀비탐정 / Zombie Detective | 2020" in text
     assert "- tv | Zombie Detective / 좀비탐정 | 2020" not in text
+
+
+def test_search_and_format_falls_back_to_resource_search_when_tmdb_candidates_are_empty() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune 2021":
+            return [
+                {
+                    "title": "Dune 2021 2160p WEB-DL",
+                    "year": 2021,
+                    "size": 8 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerMovie",
+                    "downloadUrl": "https://example.com/dune-2021.torrent",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == "2021"
+        return []
+
+    service = SearchMediaService(
+        fake_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    text = _run(service.search_and_format("Dune 2021", chat_id=1001))
+
+    assert seen_queries == ["Dune 2021"]
+    assert text.startswith("电影海报卡片")
+    assert "搜索结果：Dune 2021" in text
+    assert "Dune 2021 2160p WEB-DL (2021)" in text
+    assert "候选作品：Dune 2021" not in text
 
 
 def test_search_resources_for_selected_media_returns_resource_results_after_confirmation() -> None:

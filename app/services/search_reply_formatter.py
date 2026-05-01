@@ -83,18 +83,13 @@ def format_media_candidate_confirmation_reply(
         return NO_RESULT_TEXT_TEMPLATE.format(query=query)
     lines = [f"候选作品：{query}"]
     for index, candidate in enumerate(tmdb_candidates[:5], start=1):
-        card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
-            parsed_query,
-            candidate,
-            prefer_localized_title=True,
+        section_label, candidate_lines = build_media_candidate_confirmation_entry(
+            parsed_query=parsed_query,
+            candidate=candidate,
+            index=index,
         )
-        lines.append(f"{index}. {card_title} ({card_year}) | {card_media_type}")
-        if card_poster != "暂未接入图片":
-            lines.append(f"   海报: {card_poster}")
-        if card_alias != "-":
-            lines.append(f"   原名: {card_alias}")
-        if card_overview:
-            lines.append(f"   简介: {truncate_text(card_overview, limit=80)}")
+        lines.append(section_label)
+        lines.extend(candidate_lines)
     lines.append("直接回复对应序号确认作品，例如：1")
     return "\n".join(lines)
 
@@ -747,23 +742,15 @@ def build_media_candidate_confirmation_delivery_item(
         raise ValueError("media candidate confirmation requires at least one candidate")
     sections: list[DeliverySection] = []
     for index, candidate in enumerate(tmdb_candidates[:5], start=1):
-        card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
-            ParsedMovieQuery(title=candidate.title, year=candidate.year),
-            candidate,
-            prefer_localized_title=True,
+        section_label, candidate_lines = build_media_candidate_confirmation_entry(
+            parsed_query=ParsedMovieQuery(title=candidate.title, year=candidate.year),
+            candidate=candidate,
+            index=index,
+            field_delimiter="：",
         )
-        candidate_lines = [
-            f"海报：{card_poster}",
-            f"年份：{card_year}",
-            f"类型：{card_media_type}",
-        ]
-        if card_alias != "-":
-            candidate_lines.append(f"原名：{card_alias}")
-        if card_overview:
-            candidate_lines.append(f"简介：{truncate_text(card_overview, limit=120)}")
         sections.append(
             DeliverySection(
-                label=f"{index}. {card_title} ({card_year}) | {card_media_type}",
+                label=section_label,
                 lines=tuple(candidate_lines),
             )
         )
@@ -776,6 +763,32 @@ def build_media_candidate_confirmation_delivery_item(
         ),
         status="success",
     )
+
+
+def build_media_candidate_confirmation_entry(
+    *,
+    parsed_query: ParsedMovieQuery,
+    candidate: TmdbMovie,
+    index: int,
+    field_delimiter: str = ": ",
+) -> tuple[str, list[str]]:
+    card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
+        parsed_query,
+        candidate,
+        prefer_localized_title=True,
+    )
+    section_label = f"{index}. {card_title} ({card_year}) | {card_media_type}"
+    candidate_lines = [
+        f"年份{field_delimiter}{card_year}",
+        f"类型{field_delimiter}{card_media_type}",
+    ]
+    if card_poster != "暂未接入图片":
+        candidate_lines.insert(0, f"海报{field_delimiter}{card_poster}")
+    if card_alias != "-":
+        candidate_lines.append(f"原名{field_delimiter}{card_alias}")
+    if card_overview:
+        candidate_lines.append(f"简介{field_delimiter}{truncate_text(card_overview, limit=120)}")
+    return section_label, candidate_lines
 
 
 def guess_quality_from_title(title: str) -> str:

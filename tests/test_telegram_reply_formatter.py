@@ -388,14 +388,23 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
                     poster_path="/your-name-collection.jpg",
                     overview="A longer noisy collection title that should stay behind the exact film.",
                 ),
+                TmdbMovie(
+                    title="你的名字 剧场纪念版",
+                    original_title="君の名は。 Memorial Edition",
+                    year="2018",
+                    tmdb_id="103",
+                    media_type="movie",
+                    poster_path="/your-name-memorial.jpg",
+                    overview="A weaker commemorative release candidate.",
+                ),
             ),
+            )
         )
-    )
 
     result = asyncio.run(reply_func(text))
 
     assert result == "text-ok"
-    assert len(sent_media) == 2
+    assert len(sent_media) == 3
     assert sent_media[0][0] == 1001
     assert "https://image.tmdb.org/t/p/w500/your-name.jpg" in sent_media[0][1]
     assert sent_media[0][2] == (
@@ -413,6 +422,14 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
         "原名：君の名は。4K Collection\n"
         "简介：A longer noisy collection title that should stay behind the exact film."
     )
+    assert "https://image.tmdb.org/t/p/w500/your-name-memorial.jpg" in sent_media[2][1]
+    assert sent_media[2][2] == (
+        "【3】 你的名字 剧场纪念版 (2018) | movie\n"
+        "年份：2018\n"
+        "类型：movie\n"
+        "原名：君の名は。 Memorial Edition\n"
+        "简介：A weaker commemorative release candidate."
+    )
     reply_text.assert_not_called()
     send_text.assert_awaited_once()
     sent_text = send_text.await_args.kwargs["text"]
@@ -420,7 +437,9 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
     assert "【候选作品】 你的名字" in sent_text
     assert "【1】 你的名字。" in sent_text
     assert "【2】 你的名字 特别收藏版" in sent_text
-    assert "直接回复 1-2 中的序号确认作品，例如：1" in sent_text
+    assert "【3】 你的名字 剧场纪念版" in sent_text
+    assert "站点：" not in sent_text
+    assert "直接回复 1-3 中的序号确认作品，例如：1" in sent_text
 
 
 def test_render_telegram_text_prefers_localized_title_for_non_chinese_tmdb_candidate() -> None:
