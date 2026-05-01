@@ -54,9 +54,10 @@ verify-stage1-telegram-delivery:
 	$(PYTHON) -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "routes_search_with_channel_delivery_renderer or routes_add_pending_with_channel_delivery_renderer or routes_status_with_channel_delivery_renderer or import_formats_import_approval_for_telegram or routes_duplicate_override_follow_up"
 
 verify-stage1-bt-source-roles:
-	$(PYTHON) -m pytest -q tests/test_bt_sources.py -k "registry_tracks_roles_and_helper_only_gate or get_configured_web_source_rule_skips_helper_only_source or get_configured_web_source_rule_skips_supported_but_unmodeled_source"
-	$(PYTHON) -m pytest -q tests/test_bt_read_only_display.py tests/test_search_media.py -k "javlibrary or helper_only"
-	$(PYTHON) -m pytest -q tests/test_main.py -k "build_bt_source_providers_skips_helper_only_web_sources or build_bt_source_providers_skips_supported_but_unmodeled_web_sources"
+	$(PYTHON) -m pytest -q tests/test_bt_sources.py -k "registry_tracks_roles_and_helper_only_gate or default_adult_bt_sources_are_active_resource_providers_only or get_configured_web_source_rule_skips_helper_only_source or get_configured_web_source_rule_skips_supported_but_unmodeled_source"
+	$(PYTHON) -m pytest -q tests/test_bt_read_only_display.py tests/test_search_media.py -k "javlibrary or helper_only or uncensored_helper"
+	$(PYTHON) -m pytest -q tests/test_adult_read_only_helper_chain.py tests/test_avmoo_helper.py tests/test_avsox_helper.py tests/test_javbus_helper.py tests/test_caribbeancom_helper.py tests/test_javlibrary_helper.py
+	$(PYTHON) -m pytest -q tests/test_main.py -k "build_bt_source_providers_skips_helper_only_web_sources or build_bt_source_providers_uses_curated_adult_defaults_when_config_empty or build_bt_source_providers_skips_supported_but_unmodeled_web_sources or build_adult_read_only_lookup_func_wires_avmoo_before_javlibrary"
 
 verify-adult-bt-wedge:
 	$(PYTHON) -m pytest -q tests/test_query_text_runtime.py tests/test_bt_read_only_display.py tests/test_search_media.py

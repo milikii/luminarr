@@ -14,11 +14,14 @@ from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
 SearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
+LookupMediaCandidatesFunc = Callable[[str, str], Awaitable[Sequence[TmdbMovie]]]
 
 @dataclass(frozen=True, slots=True)
 class SearchRequestContext:
     parsed_query: ParsedMovieQuery
     tmdb_movie: TmdbMovie | None
+    tmdb_identity_movie: TmdbMovie | None
+    tmdb_candidates: tuple[TmdbMovie, ...]
     resolved_query: str
     raw_results: Sequence[Mapping[str, Any]]
 
@@ -27,11 +30,34 @@ async def build_search_request_context(
     user_query: str,
     search_func: SearchFunc,
     lookup_movie_func: LookupMovieFunc | None,
+    lookup_media_candidates_func: LookupMediaCandidatesFunc | None = None,
 ) -> SearchRequestContext:
     parsed_query = parse_movie_query(user_query)
     tmdb_movie: TmdbMovie | None = None
+    tmdb_candidates: tuple[TmdbMovie, ...] = ()
 
-    if lookup_movie_func is not None:
+    if lookup_media_candidates_func is not None:
+        try:
+            tmdb_candidates = tuple(await lookup_media_candidates_func(parsed_query.title, parsed_query.year))
+        except (httpx.HTTPError, json.JSONDecodeError) as error:
+            emit_operational_log(
+                title="TMDB 候选查询失败",
+                detail=f"query={user_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}",
+                fix_hint="检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但候选卡片信息可能缺失。",
+            )
+        if tmdb_candidates:
+            tmdb_movie = tmdb_candidates[0]
+            if not parsed_query.year.strip():
+                return SearchRequestContext(
+                    parsed_query=parsed_query,
+                    tmdb_movie=tmdb_movie,
+                    tmdb_identity_movie=tmdb_movie if _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=tmdb_movie) else None,
+                    tmdb_candidates=tmdb_candidates,
+                    resolved_query="",
+                    raw_results=(),
+                )
+
+    if lookup_media_candidates_func is None and lookup_movie_func is not None:
         try:
             tmdb_movie = await lookup_movie_func(parsed_query.title, parsed_query.year)
         except (httpx.HTTPError, json.JSONDecodeError) as error:
@@ -40,6 +66,8 @@ async def build_search_request_context(
                 detail=f"query={user_query} title={parsed_query.title} year={parsed_query.year or '-'} 错误={error}",
                 fix_hint="检查 TMDB API、代理和网络连通性；当前会退回普通搜索，但海报卡片和标题归一化结果可能缺失。",
             )
+        if tmdb_movie is not None:
+            tmdb_candidates = (tmdb_movie,)
 
     tmdb_confident = _is_tmdb_confident_match(parsed_query=parsed_query, tmdb_movie=tmdb_movie)
     ordered_queries = _resolve_ordered_queries(
@@ -53,7 +81,9 @@ async def build_search_request_context(
     )
     return SearchRequestContext(
         parsed_query=parsed_query,
-        tmdb_movie=tmdb_movie if tmdb_confident else None,
+        tmdb_movie=tmdb_movie if lookup_media_candidates_func is not None or tmdb_confident else None,
+        tmdb_identity_movie=tmdb_movie if tmdb_confident else None,
+        tmdb_candidates=tmdb_candidates,
         resolved_query=resolved_query,
         raw_results=raw_results,
     )

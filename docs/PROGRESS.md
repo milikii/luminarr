@@ -530,3 +530,26 @@
 
 ### 下轮目标
 - 确认并提交 `adult-search-fallback` 文案与测试补强，然后进入 `/finish-work` 收尾
+
+## Round 32 — 2026-05-01 17:24
+
+### 完成
+- 将 Telegram 成人 BT 搜索结果改为海报优先卡片：海报通过 Telegram photo 发送，作品信息和资源列表进入 HTML caption。
+- 将成人 BT 磁力链接压缩为 `magnet:?xt=urn:btih:<hash>` 并用 `<code>` 包裹，去掉 `&dn=` / `&tr=` 等冗长参数。
+- 为成人详情链接和首个资源下一步动作生成 inline keyboard：详情走 URL 按钮，下一步走短磁力 callback。
+- 更新 `.trellis/spec/backend/bt-source-contracts.md` 的 Telegram adult result contract，避免后续按旧文本分层格式回退。
+
+### 测试状态
+- 通过: 6 / 总计: 6
+- `focused adult/Telegram tests`
+- `make lint`
+- `make verify-stage1`
+- `make quality`
+- `make verify-mainline`
+- `make verify-adult-bt-wedge`
+
+### 遗留 / 下轮继续
+- 当前仓库仍有大量本轮之前已存在的未提交改动；本轮未自动提交，避免混入无关变更。
+
+### 下轮目标
+- 若继续收口当前 Trellis task，先确认提交分组，再进入 `/finish-work` 或后续 QA / ship。

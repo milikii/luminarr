@@ -8,22 +8,30 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 from telegram.ext import Application
 
+from app.bot.telegram_reply_formatter import _has_telegram_html
 from app.operational_logging import emit_operational_log
 
 TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64
-_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
-TelegramSendMediaFunc = Callable[[int, str | Path, str | None], Awaitable[object]]
+_SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
+_URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
+TelegramSendMediaFunc = Callable[[int, str | Path, str | None, str | None], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 
 
 def build_telegram_send_media_func(application: Application):
-    async def send_media(chat_id: int, file_path: str | Path, caption: str | None = None) -> object:
+    async def send_media(
+        chat_id: int,
+        file_path: str | Path,
+        caption: str | None = None,
+        parse_mode: str | None = None,
+    ) -> object:
         return await _send_telegram_media(
             application=application,
             chat_id=chat_id,
             file_path=Path(file_path).expanduser(),
             caption=caption,
+            parse_mode=parse_mode,
         )
 
     return send_media
@@ -32,9 +40,12 @@ def build_telegram_send_media_func(application: Application):
 def build_telegram_send_text_func(application: Application):
     async def send_text(*, chat_id: int, text: str) -> object:
         reply_markup = _build_inline_keyboard_markup(text)
-        if reply_markup is None:
-            return await application.bot.send_message(chat_id=chat_id, text=text)
-        return await application.bot.send_message(chat_id=chat_id, text=text, reply_markup=reply_markup)
+        kwargs: dict = {"chat_id": chat_id, "text": text}
+        if _has_telegram_html(text):
+            kwargs["parse_mode"] = "HTML"
+        if reply_markup is not None:
+            kwargs["reply_markup"] = reply_markup
+        return await application.bot.send_message(**kwargs)
 
     return send_text
 
@@ -45,6 +56,7 @@ async def _send_telegram_media(
     chat_id: int,
     file_path: Path,
     caption: str | None,
+    parse_mode: str | None = None,
 ) -> object:
     if not file_path.is_file():
         emit_operational_log(
@@ -56,17 +68,14 @@ async def _send_telegram_media(
 
     try:
         if _is_telegram_photo_path(file_path):
-            return await application.bot.send_photo(
-                chat_id=chat_id,
-                photo=file_path,
-                caption=caption,
-            )
-        return await application.bot.send_document(
-            chat_id=chat_id,
-            document=file_path,
-            caption=caption,
-            filename=file_path.name,
-        )
+            kwargs = {"chat_id": chat_id, "photo": file_path, "caption": caption}
+            if parse_mode:
+                kwargs["parse_mode"] = parse_mode
+            return await application.bot.send_photo(**kwargs)
+        kwargs = {"chat_id": chat_id, "document": file_path, "caption": caption, "filename": file_path.name}
+        if parse_mode:
+            kwargs["parse_mode"] = parse_mode
+        return await application.bot.send_document(**kwargs)
     except TelegramError as error:
         emit_operational_log(
             title="Telegram 媒资发送失败",
@@ -87,10 +96,11 @@ def _build_inline_keyboard_markup(text: str) -> InlineKeyboardMarkup | None:
 
     keyboard_rows: list[list[InlineKeyboardButton]] = []
     current_row: list[InlineKeyboardButton] = []
-    for label, callback_query in action_rows:
-        if len(callback_query.encode("utf-8")) > TELEGRAM_CALLBACK_DATA_MAX_BYTES:
+    for button in action_rows:
+        callback_query = str(getattr(button, "callback_data", "") or "")
+        if callback_query and len(callback_query.encode("utf-8")) > TELEGRAM_CALLBACK_DATA_MAX_BYTES:
             continue
-        current_row.append(InlineKeyboardButton(text=label, callback_data=callback_query))
+        current_row.append(button)
         if len(current_row) >= 2:
             keyboard_rows.append(current_row)
             current_row = []
@@ -101,9 +111,9 @@ def _build_inline_keyboard_markup(text: str) -> InlineKeyboardMarkup | None:
     return InlineKeyboardMarkup(keyboard_rows)
 
 
-def _extract_inline_action_rows(text: str) -> tuple[tuple[str, str], ...]:
+def _extract_inline_action_rows(text: str) -> tuple[InlineKeyboardButton, ...]:
     in_actions = False
-    action_rows: list[tuple[str, str]] = []
+    action_rows: list[InlineKeyboardButton] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
@@ -113,12 +123,19 @@ def _extract_inline_action_rows(text: str) -> tuple[tuple[str, str], ...]:
             continue
         if not in_actions:
             continue
-        matched = _ACTION_LINE_PATTERN.match(line)
-        if matched is None:
+        url_match = _URL_ACTION_LINE_PATTERN.match(line)
+        if url_match is not None:
+            label = str(url_match.group("label") or "").strip()
+            url = str(url_match.group("url") or "").strip()
+            if label and url:
+                action_rows.append(InlineKeyboardButton(text=label, url=url))
             continue
-        label = str(matched.group("label") or "").strip()
-        query = str(matched.group("query") or "").strip()
+        send_match = _SEND_ACTION_LINE_PATTERN.match(line)
+        if send_match is None:
+            continue
+        label = str(send_match.group("label") or "").strip()
+        query = str(send_match.group("query") or "").strip()
         if not label or not query:
             continue
-        action_rows.append((label, query))
+        action_rows.append(InlineKeyboardButton(text=label, callback_data=query))
     return tuple(action_rows)

@@ -632,6 +632,28 @@ def test_build_bt_source_providers_skips_helper_only_web_sources(
     assert created_rules == ["nyaa", "tokyotosho", "javbus"]
 
 
+def test_build_bt_source_providers_uses_curated_adult_defaults_when_config_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    created_rules: list[str] = []
+
+    class FakeWebSourceClient:
+        def __init__(self, *, rule, proxy_url: str) -> None:
+            created_rules.append(rule.name)
+            self.search = AsyncMock(return_value=[])
+            self.search_page = AsyncMock(return_value=[])
+
+    monkeypatch.setattr("app.main.WebSourceClient", FakeWebSourceClient)
+
+    providers = _build_bt_source_providers(
+        configured_web_source_names=(),
+        proxy_url="http://proxy.local:7890",
+    )
+
+    assert [provider.name for provider in providers] == ["tokyotosho", "sukebei", "javbus"]
+    assert created_rules == ["tokyotosho", "sukebei", "javbus"]
+
+
 def test_build_bt_source_providers_skips_supported_but_unmodeled_web_sources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -676,7 +698,31 @@ def test_build_adult_read_only_lookup_func_wires_avmoo_before_javlibrary(
 
         async def lookup(self, lookup_text: str):
             calls.append(f"avmoo:lookup:{lookup_text}")
-            return SimpleNamespace(source_site="avmoo")
+            return None
+
+    class FakeAvsoxReadOnlyHelperClient:
+        def __init__(self, *, proxy_url: str) -> None:
+            calls.append(f"avsox:init:{proxy_url}")
+
+        async def lookup(self, lookup_text: str):
+            calls.append(f"avsox:lookup:{lookup_text}")
+            return None
+
+    class FakeJavBusReadOnlyHelperClient:
+        def __init__(self, *, proxy_url: str) -> None:
+            calls.append(f"javbus:init:{proxy_url}")
+
+        async def lookup(self, lookup_text: str):
+            calls.append(f"javbus:lookup:{lookup_text}")
+            return SimpleNamespace(source_site="javbus")
+
+    class FakeCaribbeancomReadOnlyHelperClient:
+        def __init__(self, *, proxy_url: str) -> None:
+            calls.append(f"caribbeancom:init:{proxy_url}")
+
+        async def lookup(self, lookup_text: str):
+            calls.append(f"caribbeancom:lookup:{lookup_text}")
+            return None
 
     class FakeJavLibraryReadOnlyHelperClient:
         def __init__(self, *, proxy_url: str) -> None:
@@ -687,16 +733,25 @@ def test_build_adult_read_only_lookup_func_wires_avmoo_before_javlibrary(
             return SimpleNamespace(source_site="javlibrary")
 
     monkeypatch.setattr("app.main.AvmooReadOnlyHelperClient", FakeAvmooReadOnlyHelperClient)
+    monkeypatch.setattr("app.main.AvsoxReadOnlyHelperClient", FakeAvsoxReadOnlyHelperClient)
+    monkeypatch.setattr("app.main.JavBusReadOnlyHelperClient", FakeJavBusReadOnlyHelperClient)
+    monkeypatch.setattr("app.main.CaribbeancomReadOnlyHelperClient", FakeCaribbeancomReadOnlyHelperClient)
     monkeypatch.setattr("app.main.JavLibraryReadOnlyHelperClient", FakeJavLibraryReadOnlyHelperClient)
 
     lookup = _build_adult_read_only_lookup_func(proxy_url="http://proxy.local:7890")
     match = asyncio.run(lookup("SSIS-123"))
 
-    assert match.source_site == "avmoo"
+    assert match.source_site == "javbus"
     assert calls == [
         "avmoo:init:http://proxy.local:7890",
+        "avsox:init:http://proxy.local:7890",
+        "javbus:init:http://proxy.local:7890",
+        "caribbeancom:init:http://proxy.local:7890",
         "javlibrary:init:http://proxy.local:7890",
+        "caribbeancom:lookup:SSIS-123",
         "avmoo:lookup:SSIS-123",
+        "avsox:lookup:SSIS-123",
+        "javbus:lookup:SSIS-123",
     ]
 
 

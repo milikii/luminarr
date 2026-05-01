@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -30,20 +29,22 @@ from app.services.search_media_state import (
     ClarificationStateStore,
 )
 from app.services.search_reply_formatter import (
+    format_media_candidate_confirmation_reply,
     format_adult_bt_resource_fallback_reply,
     format_bt_batch_preview_reply,
     format_bt_batch_preview_selection_label,
     format_bt_read_only_reply,
     format_movie_query_reply,
     normalize_candidate,
+    render_media_candidate_confirmation_reply,
     render_search_results_reply,
     safe_indexer,
     safe_text,
-    safe_year,
 )
 from app.services.search_query_parser import parse_movie_query
 from app.services.search_request_context import (
     LookupMovieFunc,
+    LookupMediaCandidatesFunc,
     SearchFunc,
     build_search_request_context,
 )
@@ -52,6 +53,8 @@ from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_can
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = search_reply_formatter.NO_RESULT_TEXT_TEMPLATE
+MEDIA_SELECTION_NOT_FOUND_TEXT = "没有可用的作品候选，请先发一条搜索请求。"
+MEDIA_SELECTION_OUT_OF_RANGE_TEXT = "作品序号超出范围，请按候选结果里的序号重试。"
 BT_READ_ONLY_EMPTY_QUERY_TEXT = "BT 只读探索格式：bt搜 <关键词>"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = search_reply_formatter.BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE
 ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE = search_reply_formatter.ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE
@@ -80,28 +83,11 @@ ADULT_BT_AGGREGATOR_SOURCE_NAMES = frozenset({"prowlarr"})
 
 BatchPreviewSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 PrepareRawCandidatesFunc = Callable[[Sequence[Mapping[str, Any]], str], Sequence[Mapping[str, Any]]]
-AMBIGUOUS_QUERY_TEXT_TEMPLATE = (
-    "片名可能有多个版本：{query}\n"
-    "请补充更具体信息后再搜索，例如：\n"
-    "- 片名 + 年份（例如：Dune 2021）\n"
-    "- 更完整片名（例如：Dune Part Two）\n"
-    "只读探索参考：\n"
-    "{options}"
-)
-AMBIGUOUS_OPTION_FALLBACK_TEXT = "- 暂无可区分候选，请直接补充年份。"
-AMBIGUOUS_MIN_RESULT_COUNT = 3
-AMBIGUOUS_MAX_OPTION_COUNT = 3
 load_bt_scoring_rules = _load_bt_scoring_rules
 
 
 class UnsupportedBatchPreviewPageUrl(ValueError):
     pass
-
-
-@dataclass(frozen=True, slots=True)
-class AmbiguousOption:
-    title: str
-    year: str
 
 
 async def search_bt_batch_preview_candidates(
@@ -161,6 +147,7 @@ class SearchMediaService:
         candidate_repo: CandidateMappingRepo | None = None,
         clarification_repo: ClarificationRepo | None = None,
         lookup_movie_func: LookupMovieFunc | None = None,
+        lookup_media_candidates_func: LookupMediaCandidatesFunc | None = None,
         adult_content_registry_repo: AdultContentRegistryRepo | None = None,
         adult_read_only_lookup_func: AdultReadOnlyLookupFunc | None = None,
     ) -> None:
@@ -171,6 +158,7 @@ class SearchMediaService:
         self._candidate_state = CandidateStateStore(repo=candidate_repo)
         self._clarification_state = ClarificationStateStore(repo=clarification_repo)
         self._lookup_movie_func = lookup_movie_func
+        self._lookup_media_candidates_func = lookup_media_candidates_func
         self._bt_read_only_display = BtReadOnlyDisplayService(
             adult_content_registry_repo=adult_content_registry_repo,
             adult_read_only_lookup_func=adult_read_only_lookup_func,
@@ -293,25 +281,50 @@ class SearchMediaService:
             user_query=cleaned_query,
             search_func=self._search_func,
             lookup_movie_func=self._lookup_movie_func,
+            lookup_media_candidates_func=self._lookup_media_candidates_func,
         )
         parsed_query = request_context.parsed_query
         tmdb_movie = request_context.tmdb_movie
+        tmdb_candidates = request_context.tmdb_candidates
         raw_results = request_context.raw_results
-        media_identity = build_media_identity_from_tmdb_movie(tmdb_movie)
+        media_identity = build_media_identity_from_tmdb_movie(request_context.tmdb_identity_movie)
 
-        ambiguous_text = format_ambiguous_clarification(
-            query=cleaned_query,
-            parsed_query=parsed_query,
-            raw_results=raw_results,
-        )
-        if ambiguous_text is not None:
-            if chat_id is not None and not self._set_clarification_pending(chat_id=chat_id, query=cleaned_query):
-                return CLARIFICATION_PENDING_STATE_UNAVAILABLE_TEXT
-            return ambiguous_text
+        if self._should_confirm_media_candidates(parsed_query=parsed_query, tmdb_candidates=tmdb_candidates):
+            media_candidates = _build_media_selection_candidates(tmdb_candidates)
+            if chat_id is not None:
+                self._recent_candidates_by_chat[chat_id] = media_candidates
+                clarification_pending = self.is_clarification_pending(chat_id)
+                if clarification_pending is None:
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    return CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
+                if clarification_pending and not self._clear_clarification_pending(chat_id=chat_id):
+                    self._recent_candidates_by_chat.pop(chat_id, None)
+                    return CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
+                if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=media_candidates):
+                    return CANDIDATE_STATE_UNAVAILABLE_TEXT
+            if (channel or "").strip().lower() == "telegram":
+                return format_media_candidate_confirmation_reply(
+                    cleaned_query,
+                    parsed_query,
+                    tmdb_candidates,
+                )
+            if channel in SUPPORTED_DELIVERY_CHANNELS:
+                return render_media_candidate_confirmation_reply(
+                    query=cleaned_query,
+                    parsed_query=parsed_query,
+                    tmdb_candidates=tmdb_candidates,
+                    channel=channel or "telegram",
+                )
+            return format_media_candidate_confirmation_reply(
+                cleaned_query,
+                parsed_query,
+                tmdb_candidates,
+            )
 
         ordered_raw_results = order_media_bt_results(
             raw_results,
             query=request_context.resolved_query or cleaned_query,
+            media_kind=_resolve_bt_scoring_media_kind(tmdb_movie),
             load_bt_scoring_rules_func=_load_bt_scoring_rules,
         )
         selected_raw_results = [{str(key): value for key, value in item.items()} for item in ordered_raw_results[: self._limit]]
@@ -350,8 +363,100 @@ class SearchMediaService:
                 tmdb_movie=tmdb_movie,
                 candidates=candidates,
                 channel=channel,
+                tmdb_candidates=tmdb_candidates,
             )
-        return format_movie_query_reply(cleaned_query, parsed_query, tmdb_movie, candidates)
+        return format_movie_query_reply(
+            cleaned_query,
+            parsed_query,
+            tmdb_movie,
+            candidates,
+            tmdb_candidates=tmdb_candidates,
+        )
+
+    def is_media_candidate_selection(self, chat_id: int, index: int) -> bool | None:
+        load_result = self.get_cached_candidate_load_result(chat_id, index)
+        if load_result.load_failed:
+            return None
+        return _is_media_candidate_payload(load_result.candidate)
+
+    async def search_resources_for_selected_media(
+        self,
+        chat_id: int,
+        selection_text: str,
+        *,
+        channel: str | None = None,
+    ) -> str:
+        try:
+            index = int(selection_text)
+        except ValueError:
+            return MEDIA_SELECTION_OUT_OF_RANGE_TEXT
+        load_result = self.get_cached_candidate_load_result(chat_id, index)
+        if load_result.load_failed:
+            return CANDIDATE_STATE_UNAVAILABLE_TEXT
+        candidate = load_result.candidate
+        if candidate is None:
+            first_candidate = self.get_cached_candidate_load_result(chat_id, 1)
+            if first_candidate.load_failed:
+                return CANDIDATE_STATE_UNAVAILABLE_TEXT
+            if first_candidate.candidate is None:
+                return MEDIA_SELECTION_NOT_FOUND_TEXT
+            return MEDIA_SELECTION_OUT_OF_RANGE_TEXT
+        media_identity = normalize_media_identity_payload(candidate.get("media_identity"))
+        if media_identity is None:
+            return MEDIA_SELECTION_NOT_FOUND_TEXT
+
+        ordered_queries = _build_media_identity_resource_queries(media_identity)
+        resolved_query = ""
+        raw_results: Sequence[Mapping[str, Any]] = ()
+        for query in ordered_queries:
+            raw_results = await self._search_func(query)
+            if raw_results:
+                resolved_query = query
+                break
+
+        tmdb_movie = _tmdb_movie_from_media_candidate(candidate)
+        ordered_raw_results = order_media_bt_results(
+            raw_results,
+            query=resolved_query or media_identity.get("title", "") or media_identity.get("original_title", ""),
+            media_kind=_resolve_bt_scoring_media_kind(tmdb_movie),
+            load_bt_scoring_rules_func=_load_bt_scoring_rules,
+        )
+        selected_raw_results = [{str(key): value for key, value in item.items()} for item in ordered_raw_results[: self._limit]]
+        if media_identity is not None:
+            selected_raw_results = [
+                {
+                    **item,
+                    "media_identity": media_identity,
+                }
+                for item in selected_raw_results
+            ]
+        self._recent_candidates_by_chat[chat_id] = selected_raw_results
+        if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=selected_raw_results):
+            return CANDIDATE_STATE_UNAVAILABLE_TEXT
+
+        query_label = (
+            media_identity.get("title", "").strip()
+            or media_identity.get("original_title", "").strip()
+            or safe_text(candidate.get("title"), default="")
+        )
+        parsed_query = parse_movie_query(query_label)
+        normalized_candidates = [normalize_candidate(item) for item in selected_raw_results]
+        if channel in SUPPORTED_DELIVERY_CHANNELS and normalized_candidates:
+            return render_search_results_reply(
+                query=query_label,
+                parsed_query=parsed_query,
+                tmdb_movie=tmdb_movie,
+                candidates=normalized_candidates,
+                channel=channel or "telegram",
+                tmdb_candidates=(tmdb_movie,) if tmdb_movie is not None else (),
+            )
+        return format_movie_query_reply(
+            query_label,
+            parsed_query,
+            tmdb_movie,
+            normalized_candidates,
+            tmdb_candidates=(tmdb_movie,) if tmdb_movie is not None else (),
+        )
 
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
         return self.get_cached_candidate_load_result(chat_id, index).candidate
@@ -383,30 +488,17 @@ class SearchMediaService:
     def _load_persisted_clarification_query(self, *, chat_id: int) -> ClarificationQueryLoadResult:
         return self._clarification_state.load_persisted_query(chat_id=chat_id)
 
-
-def format_ambiguous_clarification(
-    *,
-    query: str,
-    parsed_query: Any,
-    raw_results: Sequence[Mapping[str, Any]],
-) -> str | None:
-    if str(parsed_query.year).strip():
-        return None
-    if len(raw_results) < AMBIGUOUS_MIN_RESULT_COUNT:
-        return None
-
-    options = _collect_ambiguous_options(raw_results)
-    if not _is_highly_ambiguous(options):
-        return None
-
-    option_lines = [f"- {option.title} ({option.year})" for option in options[:AMBIGUOUS_MAX_OPTION_COUNT]]
-    if not option_lines:
-        option_lines.append(AMBIGUOUS_OPTION_FALLBACK_TEXT)
-
-    return AMBIGUOUS_QUERY_TEXT_TEMPLATE.format(
-        query=query,
-        options="\n".join(option_lines),
-    )
+    def _should_confirm_media_candidates(
+        self,
+        *,
+        parsed_query: Any,
+        tmdb_candidates: Sequence[Any],
+    ) -> bool:
+        if self._lookup_media_candidates_func is None:
+            return False
+        if not tmdb_candidates:
+            return False
+        return not str(parsed_query.year).strip()
 
 
 def _iter_adult_only_fallback_queries(query: str) -> tuple[str, ...]:
@@ -431,6 +523,79 @@ def _iter_adult_only_fallback_queries(query: str) -> tuple[str, ...]:
         seen.add(cleaned_variant)
         deduped_variants.append(cleaned_variant)
     return tuple(deduped_variants)
+
+
+def _is_media_candidate_payload(candidate: Mapping[str, Any] | None) -> bool:
+    if candidate is None:
+        return False
+    if safe_text(candidate.get("source"), default=""):
+        return False
+    if safe_text(candidate.get("downloadUrl"), default=""):
+        return False
+    return safe_text(candidate.get("candidate_stage"), default="") == "media_candidate" and bool(
+        normalize_media_identity_payload(candidate.get("media_identity"))
+    )
+
+
+def _build_media_selection_candidates(tmdb_candidates: Sequence[Any]) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for candidate in tmdb_candidates[:5]:
+        media_identity = build_media_identity_from_tmdb_movie(candidate, source="search_candidate")
+        if media_identity is None:
+            continue
+        candidates.append(
+            {
+                "candidate_stage": "media_candidate",
+                "title": safe_text(getattr(candidate, "title", ""), default="-"),
+                "original_title": safe_text(getattr(candidate, "original_title", ""), default=""),
+                "year": safe_text(getattr(candidate, "year", ""), default="-"),
+                "media_type": safe_text(getattr(candidate, "media_type", ""), default="movie"),
+                "poster_path": safe_text(getattr(candidate, "poster_path", ""), default=""),
+                "overview": safe_text(getattr(candidate, "overview", ""), default=""),
+                "tmdb_id": safe_text(getattr(candidate, "tmdb_id", ""), default=""),
+                "media_identity": media_identity,
+            }
+        )
+    return candidates
+
+
+def _build_media_identity_resource_queries(media_identity: Mapping[str, Any]) -> tuple[str, ...]:
+    title = normalize_spaces(str(media_identity.get("title", "")).strip())
+    original_title = normalize_spaces(str(media_identity.get("original_title", "")).strip())
+    year = str(media_identity.get("year", "")).strip()
+    queries: list[str] = []
+    for query_title in (original_title, title):
+        if not query_title:
+            continue
+        if year:
+            queries.append(f"{query_title} {year}".strip())
+        queries.append(query_title)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for query in queries:
+        cleaned_query = normalize_spaces(query)
+        if not cleaned_query or cleaned_query in seen:
+            continue
+        seen.add(cleaned_query)
+        deduped.append(cleaned_query)
+    return tuple(deduped)
+
+
+def _tmdb_movie_from_media_candidate(candidate: Mapping[str, Any]) -> Any:
+    media_identity = normalize_media_identity_payload(candidate.get("media_identity"))
+    if media_identity is None:
+        return None
+    from app.clients.tmdb import TmdbMovie
+
+    return TmdbMovie(
+        title=safe_text(candidate.get("title"), default=media_identity.get("title", "")),
+        original_title=safe_text(candidate.get("original_title"), default=media_identity.get("original_title", "")),
+        year=safe_text(candidate.get("year"), default=media_identity.get("year", "")),
+        tmdb_id=safe_text(candidate.get("tmdb_id"), default=media_identity.get("tmdb_id", "")),
+        media_type=safe_text(candidate.get("media_type"), default=media_identity.get("media_type", "movie")),
+        poster_path=safe_text(candidate.get("poster_path"), default=""),
+        overview=safe_text(candidate.get("overview"), default=""),
+    )
 
 
 def _filter_adult_only_display_candidates(
@@ -462,44 +627,11 @@ def _has_configured_adult_only_source(candidate: Mapping[str, Any]) -> bool:
     return False
 
 
-def _collect_ambiguous_options(raw_results: Sequence[Mapping[str, Any]]) -> list[AmbiguousOption]:
-    options: list[AmbiguousOption] = []
-    seen_keys: set[tuple[str, str]] = set()
-    for item in raw_results:
-        title = safe_text(item.get("title"), default="")
-        if not title:
-            continue
-        year = safe_year(item.get("year"))
-        key = (_normalize_title_key(title), year)
-        if not key[0] or key in seen_keys:
-            continue
-        seen_keys.add(key)
-        options.append(AmbiguousOption(title=title, year=year))
-    return options
-
-
-def _is_highly_ambiguous(options: Sequence[AmbiguousOption]) -> bool:
-    if len(options) < 2:
-        return False
-
-    distinct_titles = {_normalize_title_key(option.title) for option in options if option.title}
-    distinct_years = {option.year for option in options if option.year != "-"}
-    if len(distinct_years) >= 2 and len(distinct_titles) >= 2:
-        return True
-    return len(options) >= 3 and len(distinct_titles) >= 3
-
-
-def _normalize_title_key(title: str) -> str:
-    lowered = title.lower()
-    lowered = re.sub(r"\b(?:19|20)\d{2}\b", " ", lowered)
-    lowered = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", " ", lowered)
-    return re.sub(r"\s+", " ", lowered).strip()
-
-
 def order_media_bt_results(
     raw_results: Sequence[Mapping[str, Any]],
     *,
     query: str,
+    media_kind: str = "movie",
     load_bt_scoring_rules_func: Callable[[], Any] | None = None,
 ) -> Sequence[Mapping[str, Any]]:
     if load_bt_scoring_rules_func is None:
@@ -517,7 +649,7 @@ def order_media_bt_results(
 
     scored_candidates = filter_candidates(
         [candidate for candidate, _ in candidate_pairs],
-        BTScoringContext(query=query, media_kind="movie"),
+        BTScoringContext(query=query, media_kind=media_kind),
         rules=load_bt_scoring_rules_func(),
     )
     if all(scored_candidate.drop_reason == "title_mismatch" for scored_candidate in scored_candidates):
@@ -527,7 +659,7 @@ def order_media_bt_results(
         for fallback_query in fallback_queries:
             rescored_candidates = filter_candidates(
                 [candidate for candidate, _ in candidate_pairs],
-                BTScoringContext(query=fallback_query, media_kind="movie"),
+                BTScoringContext(query=fallback_query, media_kind=media_kind),
                 rules=load_bt_scoring_rules_func(),
             )
             fallback_metrics = _score_fallback_candidates(rescored_candidates)
@@ -625,8 +757,19 @@ def _derive_media_title_fallback_queries(
         query_text = " ".join(common_tokens).strip()
         if not query_text:
             continue
-        fallback_queries.append(f"{query_text} {parsed_query.year}".strip() if parsed_query.year else query_text)
+        if parsed_query.year:
+            fallback_queries.append(f"{query_text} {parsed_query.year}".strip())
+        fallback_queries.append(query_text)
     return tuple(dict.fromkeys(fallback_queries))
+
+
+def _resolve_bt_scoring_media_kind(tmdb_movie: Any) -> str:
+    media_type = safe_text(getattr(tmdb_movie, "media_type", ""), default="").lower()
+    if media_type == "tv":
+        return "series"
+    if media_type == "anime":
+        return "anime"
+    return "movie"
 
 
 def _normalize_title_tokens_for_fallback(title: str) -> list[str]:

@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Review changes against backend conventions and actual repository guardrails."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Verify PT/adult source roles, provider/helper separation, and adult-only boundaries stay intact."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify focused tests and repo-level gates remain green after implementation."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/prd.md", "reason": "Check implementation against accepted product requirements."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/info.md", "reason": "Check implementation against the reviewed plan, surfaced findings, and taste decision."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/test-plan.md", "reason": "Validate that required coverage and real smoke targets are actually addressed."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/research/adult-metadata-source-probe-2026-05-01.md", "reason": "Review any adult metadata helper expansion against the actual environment probe and approved role split."}

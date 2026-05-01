@@ -28,6 +28,7 @@ from app.bot.telegram_delivery_runtime import (
 )
 from app.bot.telegram_reply_formatter import format_telegram_reply
 from app.bot.telegram_update_runtime import (
+    build_telegram_download_image_func,
     build_telegram_reply_func,
     record_telegram_callback_update,
     record_telegram_message_update,
@@ -59,7 +60,15 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
 
     await dispatch_private_chat_text(
         query=query_text,
-        reply_func=build_telegram_reply_func(message.reply_text, formatter=format_telegram_reply),
+        reply_func=build_telegram_reply_func(
+            message.reply_text,
+            formatter=format_telegram_reply,
+            reply_photo_func=getattr(message, "reply_photo", None),
+            chat_id=chat_id,
+            send_text_func=context.application.bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY),
+            send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
+            download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
+        ),
         chat_id=chat_id,
         user_id=user_id,
         channel="telegram",
@@ -101,7 +110,15 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
 
     await dispatch_private_chat_text(
         query=query,
-        reply_func=build_telegram_reply_func(message.reply_text, formatter=format_telegram_reply),
+        reply_func=build_telegram_reply_func(
+            message.reply_text,
+            formatter=format_telegram_reply,
+            reply_photo_func=getattr(message, "reply_photo", None),
+            chat_id=chat_id,
+            send_text_func=context.application.bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY),
+            send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
+            download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
+        ),
         chat_id=chat_id,
         user_id=user_id,
         channel="telegram",
@@ -168,6 +185,9 @@ def build_telegram_application(
     application.bot_data[tg.TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
     send_text_func = build_telegram_send_text_func(application)
     application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = send_text_func
+    application.bot_data[tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY] = build_telegram_download_image_func(
+        proxy_url=outbound_proxy_url,
+    )
     application.bot_data[SIDECAR_HOST_SEND_TEXT_FUNC_KEY] = send_text_func
     if bt_tmdb_movie_candidates_lookup_func is not None:
         application.bot_data[tg.BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY] = bt_tmdb_movie_candidates_lookup_func

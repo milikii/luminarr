@@ -37,10 +37,13 @@ from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.bot.telegram_runtime_adapter import build_telegram_application as build_application
 from app.clients.adult_read_only_helper_chain import AdultReadOnlyLookupFunc, compose_adult_read_only_lookup_func
 from app.clients.avmoo_helper import AvmooReadOnlyHelperClient
+from app.clients.avsox_helper import AvsoxReadOnlyHelperClient
+from app.clients.caribbeancom_helper import CaribbeancomReadOnlyHelperClient
 from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
 from app.clients.jellyfin import JellyfinClient
+from app.clients.javbus_helper import JavBusReadOnlyHelperClient
 from app.clients.javlibrary_helper import JavLibraryReadOnlyHelperClient
 from app.clients.plex import PlexClient
 from app.clients.prowlarr import ProwlarrClient
@@ -75,7 +78,7 @@ from app.runtime.execution_policy import ExecutionGate
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
 from app.services.adult_archive_service import AdultArchiveService
-from app.services.bt_sources import BtSourceAdapter, BtSourceProvider
+from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, get_default_adult_bt_source_names
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
@@ -128,7 +131,8 @@ def _build_bt_source_providers(
     proxy_url: str,
 ) -> list[BtSourceProvider]:
     bt_source_providers: list[BtSourceProvider] = []
-    for source_name in configured_web_source_names:
+    source_names = configured_web_source_names or get_default_adult_bt_source_names()
+    for source_name in source_names:
         rule = get_configured_web_source_rule(source_name)
         if rule is None:
             emit_operational_log(
@@ -146,9 +150,15 @@ def _build_bt_source_providers(
 
 def _build_adult_read_only_lookup_func(*, proxy_url: str) -> AdultReadOnlyLookupFunc:
     avmoo_client = AvmooReadOnlyHelperClient(proxy_url=proxy_url)
+    avsox_client = AvsoxReadOnlyHelperClient(proxy_url=proxy_url)
+    javbus_client = JavBusReadOnlyHelperClient(proxy_url=proxy_url)
+    caribbeancom_client = CaribbeancomReadOnlyHelperClient(proxy_url=proxy_url)
     javlibrary_client = JavLibraryReadOnlyHelperClient(proxy_url=proxy_url)
     return compose_adult_read_only_lookup_func(
         avmoo_lookup_func=avmoo_client.lookup,
+        caribbeancom_lookup_func=caribbeancom_client.lookup,
+        avsox_lookup_func=avsox_client.lookup,
+        javbus_lookup_func=javbus_client.lookup,
         javlibrary_lookup_func=javlibrary_client.lookup,
     )
 
@@ -366,6 +376,7 @@ def main() -> None:
         bt_source_providers.append(BtSourceProvider(name="prowlarr", search_func=prowlarr_client.search))
     bt_source_adapter = BtSourceAdapter(tuple(bt_source_providers))
     tmdb_lookup_movie_func = None
+    tmdb_lookup_media_candidates_func = None
     scrape_metadata_func = None
     if settings.tmdb_api_key:
         async def _skip_fanart_images(_: str) -> None:
@@ -386,6 +397,7 @@ def main() -> None:
             proxy_url=settings.outbound_proxy_url,
         )
         tmdb_lookup_movie_func = tmdb_client.search_movie
+        tmdb_lookup_media_candidates_func = tmdb_client.search_media_candidates
         get_movie_images_func = _skip_fanart_images
         if settings.fanart_api_key:
             fanart_client = FanartClient(
@@ -408,6 +420,7 @@ def main() -> None:
         candidate_repo=candidate_repo,
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
+        lookup_media_candidates_func=tmdb_lookup_media_candidates_func,
         adult_content_registry_repo=adult_content_registry_repo,
         adult_read_only_lookup_func=_build_adult_read_only_lookup_func(proxy_url=settings.outbound_proxy_url),
     )

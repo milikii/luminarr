@@ -141,8 +141,8 @@ class BtReadOnlyDisplayService:
     async def lookup_helper_match(self, lookup_query: str) -> JavLibraryReadOnlyMatch | None:
         if self.adult_read_only_lookup_func is None:
             return None
-        content_match = extract_exact_adult_content_match(lookup_query, source_site="javlibrary")
-        if content_match is None or content_match.archive_category != "censored":
+        content_match = extract_exact_adult_content_match(lookup_query)
+        if content_match is None:
             return None
         try:
             return await self.adult_read_only_lookup_func(content_match.display_id)
@@ -233,8 +233,7 @@ def _should_lookup_helper_metadata(
         return True
     if not include_explicit_adult_metadata:
         return False
-    content_match = extract_exact_adult_content_match(lookup_query, source_site="javlibrary")
-    return content_match is not None and content_match.archive_category == "censored"
+    return extract_exact_adult_content_match(lookup_query) is not None
 
 
 def _copy_optional_helper_metadata(candidate: dict[str, Any], *, helper_match: JavLibraryReadOnlyMatch) -> None:

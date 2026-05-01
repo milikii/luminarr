@@ -26,6 +26,7 @@ from app.services.bt_sources import (
     BtSourceProvider,
     build_bt_candidate_dedupe_key,
     canonicalize_bt_source_name,
+    get_default_adult_bt_source_names,
     get_bt_source_profile,
     is_active_bt_source,
 )
@@ -147,6 +148,12 @@ def test_bt_source_registry_tracks_roles_and_helper_only_gate() -> None:
     assert is_active_bt_source("javlibrary") is False
 
 
+def test_default_adult_bt_sources_are_active_resource_providers_only() -> None:
+    assert get_default_adult_bt_source_names() == ("tokyotosho", "sukebei", "javbus")
+    assert "javlibrary" not in get_default_adult_bt_source_names()
+    assert all(is_active_bt_source(source_name) for source_name in get_default_adult_bt_source_names())
+
+
 def test_adult_metadata_source_ranking_keeps_javlibrary_backup_and_javbus_non_default() -> None:
     assert hasattr(bt_sources, "get_adult_metadata_source_rank")
     ranking = bt_sources.get_adult_metadata_source_rank()
@@ -164,8 +171,12 @@ def test_adult_metadata_source_ranking_keeps_javlibrary_backup_and_javbus_non_de
 def test_get_configured_web_source_rule_skips_helper_only_source() -> None:
     assert get_configured_web_source_rule("nyaa") is NYAA_RULE
     assert get_configured_web_source_rule("tokyotosho") is TOKYOTOSHO_RULE
+    assert get_configured_web_source_rule("www.tokyotosho.info") is TOKYOTOSHO_RULE
+    assert get_configured_web_source_rule("sukebei.nyaa.si") is SUKEBEI_RULE
     assert get_configured_web_source_rule("javbus") is JAVBUS_RULE
+    assert get_configured_web_source_rule("www.javbus.com") is JAVBUS_RULE
     assert get_configured_web_source_rule("javlibrary") is None
+    assert get_configured_web_source_rule("www.javlibrary.com") is None
 
 
 def test_get_configured_web_source_rule_skips_supported_but_unmodeled_source(monkeypatch) -> None:

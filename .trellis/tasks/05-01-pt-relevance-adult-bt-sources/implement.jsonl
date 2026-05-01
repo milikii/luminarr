@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index before implementing PT relevance-first search and adult BT source completion."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "This task changes provider/helper role boundaries, adult BT source behavior, and metadata source execution expectations."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep the change scoped and protect it with focused tests plus repo verification gates."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/prd.md", "reason": "Authoritative requirements for relevance-first PT search and adult BT completion."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/info.md", "reason": "Reviewed implementation plan, architecture notes, surfaced risks, and execution slices."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/test-plan.md", "reason": "Required codepath-to-test coverage map and real Telegram smoke targets for this task."}
+{"file": ".trellis/tasks/05-01-pt-relevance-adult-bt-sources/research/adult-metadata-source-probe-2026-05-01.md", "reason": "Current environment probe of requested adult metadata sites and the recommended implementation order for helper expansion."}

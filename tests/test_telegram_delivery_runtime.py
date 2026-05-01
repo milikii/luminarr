@@ -75,6 +75,31 @@ def test_build_telegram_send_text_func_sends_inline_keyboard_when_actions_exist(
     )
 
 
+def test_build_telegram_send_text_func_supports_url_inline_actions() -> None:
+    send_message = AsyncMock(return_value="text-message")
+    sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    text = "\n".join(
+        (
+            "成人资源候选",
+            "",
+            "下一步",
+            "🌐 查看详情 (avmoo)：打开 https://avmoo.shop/cn/movie/4221ec1035fdf66f",
+            "➡️ 下一步：发送 magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12",
+        )
+    )
+
+    result = asyncio.run(sender(chat_id=1001, text=text))
+
+    assert result == "text-message"
+    reply_markup = send_message.await_args.kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    first_button, second_button = reply_markup.inline_keyboard[0]
+    assert first_button.text == "🌐 查看详情 (avmoo)"
+    assert first_button.url == "https://avmoo.shop/cn/movie/4221ec1035fdf66f"
+    assert second_button.text == "➡️ 下一步"
+    assert second_button.callback_data == "magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12"
+
+
 def test_build_telegram_send_text_func_skips_oversized_callback_queries() -> None:
     send_message = AsyncMock(return_value="text-message")
     sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))

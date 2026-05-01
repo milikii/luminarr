@@ -63,12 +63,38 @@ def format_movie_query_reply(
     parsed_query: ParsedMovieQuery,
     tmdb_movie: TmdbMovie | None,
     candidates: Sequence[Candidate],
+    *,
+    tmdb_candidates: Sequence[TmdbMovie] = (),
 ) -> str:
     candidates_text = format_candidates(query, candidates)
     if not candidates:
         return candidates_text
-    card_text = format_movie_poster_card(parsed_query, tmdb_movie)
+    card_text = format_movie_poster_card(parsed_query, tmdb_movie, tmdb_candidates=tmdb_candidates)
     return f"{card_text}\n\n{candidates_text}"
+
+
+def format_media_candidate_confirmation_reply(
+    query: str,
+    parsed_query: ParsedMovieQuery,
+    tmdb_candidates: Sequence[TmdbMovie],
+) -> str:
+    if not tmdb_candidates:
+        return NO_RESULT_TEXT_TEMPLATE.format(query=query)
+    lines = [f"候选作品：{query}"]
+    for index, candidate in enumerate(tmdb_candidates[:5], start=1):
+        card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
+            parsed_query,
+            candidate,
+        )
+        lines.append(f"{index}. {card_title} ({card_year}) | {card_media_type}")
+        if card_poster != "暂未接入图片":
+            lines.append(f"   海报: {card_poster}")
+        if card_alias != "-":
+            lines.append(f"   原名: {card_alias}")
+        if card_overview:
+            lines.append(f"   简介: {truncate_text(card_overview, limit=80)}")
+    lines.append("直接回复对应序号确认作品，例如：1")
+    return "\n".join(lines)
 
 
 def render_search_results_reply(
@@ -78,12 +104,29 @@ def render_search_results_reply(
     tmdb_movie: TmdbMovie | None,
     candidates: Sequence[Candidate],
     channel: str,
+    tmdb_candidates: Sequence[TmdbMovie] = (),
 ) -> str:
     item = build_search_results_delivery_item(
         query=query,
         parsed_query=parsed_query,
         tmdb_movie=tmdb_movie,
         candidates=candidates,
+        tmdb_candidates=tmdb_candidates,
+    )
+    return render_delivery_item(item, channel=channel)
+
+
+def render_media_candidate_confirmation_reply(
+    *,
+    query: str,
+    parsed_query: ParsedMovieQuery,
+    tmdb_candidates: Sequence[TmdbMovie],
+    channel: str,
+) -> str:
+    item = build_media_candidate_confirmation_delivery_item(
+        query=query,
+        parsed_query=parsed_query,
+        tmdb_candidates=tmdb_candidates,
     )
     return render_delivery_item(item, channel=channel)
 
@@ -467,38 +510,120 @@ def format_candidates(query: str, candidates: Sequence[Candidate]) -> str:
     return "\n".join(lines)
 
 
-def format_movie_poster_card(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> str:
-    card_title, card_year, card_alias = resolve_movie_card_fields(parsed_query, tmdb_movie)
+def format_movie_poster_card(
+    parsed_query: ParsedMovieQuery,
+    tmdb_movie: TmdbMovie | None,
+    *,
+    tmdb_candidates: Sequence[TmdbMovie] = (),
+) -> str:
+    card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
+        parsed_query,
+        tmdb_movie,
+    )
     lines = [
         "电影海报卡片",
         f"片名: {card_title}",
         f"年份: {card_year}",
+        f"类型: {card_media_type}",
         f"别名: {card_alias}",
-        "海报: 暂未接入图片",
+        f"海报: {card_poster}",
     ]
+    if card_overview:
+        lines.append(f"简介: {truncate_text(card_overview, limit=120)}")
+    candidate_lines = format_tmdb_candidate_lines(tmdb_candidates)
+    if candidate_lines:
+        lines.append("相关作品:")
+        lines.extend(candidate_lines)
     return "\n".join(lines)
 
 
-def resolve_movie_card_fields(parsed_query: ParsedMovieQuery, tmdb_movie: TmdbMovie | None) -> tuple[str, str, str]:
+def resolve_movie_card_fields(
+    parsed_query: ParsedMovieQuery,
+    tmdb_movie: TmdbMovie | None,
+) -> tuple[str, str, str, str, str, str]:
     card_title = parsed_query.title or "-"
     card_year = parsed_query.year.strip() or "-"
+    card_media_type = "-"
     card_alias = "-"
+    card_poster = "暂未接入图片"
+    card_overview = ""
 
     if tmdb_movie is not None:
         original_title = normalize_spaces(tmdb_movie.original_title)
-        english_title = normalize_spaces(tmdb_movie.title)
-        if original_title:
+        localized_title = normalize_spaces(tmdb_movie.title)
+        if _contains_cjk(localized_title):
+            card_title = localized_title
+        elif original_title:
             card_title = original_title
-        elif english_title:
-            card_title = english_title
+        elif localized_title:
+            card_title = localized_title
 
         resolved_year = tmdb_movie.year.strip()
         if resolved_year:
             card_year = resolved_year
 
-        if english_title and english_title != card_title:
-            card_alias = english_title
-    return card_title, card_year, card_alias
+        if card_title == original_title and localized_title and localized_title != card_title:
+            card_alias = localized_title
+        elif original_title and original_title != card_title:
+            card_alias = original_title
+        if tmdb_movie.media_type.strip():
+            card_media_type = tmdb_movie.media_type.strip()
+        card_poster = resolve_tmdb_poster_url(tmdb_movie) or card_poster
+        card_overview = normalize_spaces(tmdb_movie.overview)
+    return card_title, card_year, card_media_type, card_alias, card_poster, card_overview
+
+
+def _contains_cjk(value: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]", value))
+
+
+def resolve_tmdb_poster_url(tmdb_movie: TmdbMovie) -> str:
+    poster_path = tmdb_movie.poster_path.strip()
+    if not poster_path:
+        return ""
+    if poster_path.startswith(("http://", "https://")):
+        return poster_path
+    if poster_path.startswith("/"):
+        return f"https://image.tmdb.org/t/p/w500{poster_path}"
+    return f"https://image.tmdb.org/t/p/w500/{poster_path}"
+
+
+def format_tmdb_candidate_lines(tmdb_candidates: Sequence[TmdbMovie]) -> tuple[str, ...]:
+    lines: list[str] = []
+    seen: set[tuple[str, str, str]] = set()
+    for candidate in tmdb_candidates[:5]:
+        title = normalize_spaces(candidate.original_title) or normalize_spaces(candidate.title) or "-"
+        alias = normalize_spaces(candidate.title)
+        year = candidate.year.strip() or "-"
+        media_type = candidate.media_type.strip() or "-"
+        key = (media_type, candidate.tmdb_id, title)
+        if key in seen:
+            continue
+        seen.add(key)
+        if alias and alias != title:
+            lines.append(f"- {media_type} | {title} / {alias} | {year}")
+        else:
+            lines.append(f"- {media_type} | {title} | {year}")
+    return tuple(lines)
+
+
+def format_ranked_tmdb_candidate_lines(tmdb_candidates: Sequence[TmdbMovie]) -> tuple[str, ...]:
+    lines: list[str] = []
+    for index, candidate in enumerate(tmdb_candidates[:5], start=1):
+        card_title, card_year, card_media_type, card_alias, _, card_overview = resolve_movie_card_fields(
+            ParsedMovieQuery(title=candidate.title, year=candidate.year),
+            candidate,
+        )
+        title_line = f"{index}. {card_title} ({card_year}) | {card_media_type}"
+        lines.append(title_line)
+        poster_url = resolve_tmdb_poster_url(candidate)
+        if poster_url:
+            lines.append(f"   海报: {poster_url}")
+        if card_alias != "-":
+            lines.append(f"   原名: {card_alias}")
+        if card_overview:
+            lines.append(f"   简介: {truncate_text(card_overview, limit=80)}")
+    return tuple(lines)
 
 
 def build_search_results_delivery_item(
@@ -507,30 +632,79 @@ def build_search_results_delivery_item(
     parsed_query: ParsedMovieQuery,
     tmdb_movie: TmdbMovie | None,
     candidates: Sequence[Candidate],
+    tmdb_candidates: Sequence[TmdbMovie] = (),
 ) -> DeliveryItem:
     if not candidates:
         raise ValueError("search results delivery requires at least one candidate")
-    card_title, card_year, card_alias = resolve_movie_card_fields(parsed_query, tmdb_movie)
+    card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
+        parsed_query,
+        tmdb_movie,
+    )
     candidate_lines: list[str] = []
     for index, item in enumerate(candidates, start=1):
         candidate_lines.append(f"{index}. {item.title} ({item.year})")
         candidate_lines.append(f"画质：{item.quality} ｜ 大小：{item.size} ｜ 站点：{item.indexer}")
+    media_info_lines = [
+        f"片名：{card_title}",
+        f"年份：{card_year}",
+        f"类型：{card_media_type}",
+        f"别名：{card_alias}",
+        f"海报：{card_poster}",
+    ]
+    if card_overview:
+        media_info_lines.append(f"简介：{truncate_text(card_overview, limit=120)}")
+    candidate_info_lines = format_tmdb_candidate_lines(tmdb_candidates)
+    if candidate_info_lines:
+        media_info_lines.append("相关作品：")
+        media_info_lines.extend(candidate_info_lines)
     return DeliveryItem(
         header=DeliveryHeader(kind="search_results", title=f"搜索：{query}", subtitle=f"候选结果（{len(candidates)} 条）"),
         sections=(
-            DeliverySection(
-                label="电影信息",
-                lines=(
-                    f"片名：{card_title}",
-                    f"年份：{card_year}",
-                    f"别名：{card_alias}",
-                    "海报：暂未接入图片",
-                ),
-            ),
+            DeliverySection(label="电影信息", lines=tuple(media_info_lines)),
             DeliverySection(label="候选结果", lines=tuple(candidate_lines)),
         ),
         actions=(
             DeliveryAction(label="开始下载", hint="发送 select 1", kind="primary"),
+            DeliveryAction(label="换关键词", hint=f"发送 search {query}", kind="secondary"),
+        ),
+        status="success",
+    )
+
+
+def build_media_candidate_confirmation_delivery_item(
+    *,
+    query: str,
+    parsed_query: ParsedMovieQuery,
+    tmdb_candidates: Sequence[TmdbMovie],
+) -> DeliveryItem:
+    if not tmdb_candidates:
+        raise ValueError("media candidate confirmation requires at least one candidate")
+    sections: list[DeliverySection] = []
+    for index, candidate in enumerate(tmdb_candidates[:5], start=1):
+        card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
+            ParsedMovieQuery(title=candidate.title, year=candidate.year),
+            candidate,
+        )
+        candidate_lines = [
+            f"海报：{card_poster}",
+            f"年份：{card_year}",
+            f"类型：{card_media_type}",
+        ]
+        if card_alias != "-":
+            candidate_lines.append(f"原名：{card_alias}")
+        if card_overview:
+            candidate_lines.append(f"简介：{truncate_text(card_overview, limit=120)}")
+        sections.append(
+            DeliverySection(
+                label=f"{index}. {card_title} ({card_year}) | {card_media_type}",
+                lines=tuple(candidate_lines),
+            )
+        )
+    return DeliveryItem(
+        header=DeliveryHeader(kind="media_candidate_confirmation", title=f"候选作品：{query}", subtitle=f"候选作品（{len(tmdb_candidates[:5])} 条）"),
+        sections=tuple(sections),
+        actions=(
+            DeliveryAction(label="确认作品", hint="发送 1", kind="primary"),
             DeliveryAction(label="换关键词", hint=f"发送 search {query}", kind="secondary"),
         ),
         status="success",

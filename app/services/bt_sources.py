@@ -21,6 +21,7 @@ BtSourceSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 BT_SOURCE_ROLE_PRIMARY = "primary"
 BT_SOURCE_ROLE_SUPPORTING = "supporting"
 BT_SOURCE_ROLE_HELPER_ONLY = "helper_only"
+DEFAULT_ADULT_BT_SOURCE_NAMES = ("tokyotosho", "sukebei", "javbus")
 
 _SOURCE_KEYS = ("source", "downloadUrl", "downloadurl", "magnetUrl", "magneturl", "guid", "link", "url")
 _INFO_HASH_KEYS = ("infoHash", "infohash", "torrentHash", "torrenthash", "hash")
@@ -106,6 +107,10 @@ def get_bt_source_priority(name: str) -> float:
     if profile is None:
         return 0.0
     return profile.adult_sort_priority
+
+
+def get_default_adult_bt_source_names() -> tuple[str, ...]:
+    return DEFAULT_ADULT_BT_SOURCE_NAMES
 
 
 def get_adult_metadata_source_rank() -> tuple[AdultMetadataSourceProfile, ...]:

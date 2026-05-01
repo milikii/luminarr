@@ -99,6 +99,46 @@ def test_handle_digit_selection_query_routes_add_by_selection() -> None:
     reply_text.assert_awaited_once_with("下载待确认")
 
 
+def test_handle_digit_selection_query_resolves_media_candidate_before_download() -> None:
+    reply_text = AsyncMock()
+    execution_gate = _ExecutionGateStub()
+    search_service = SearchMediaService(_fake_search)
+    search_service.is_clarification_pending = Mock(return_value=False)  # type: ignore[method-assign]
+    search_service.is_media_candidate_selection = Mock(return_value=True)  # type: ignore[method-assign]
+    search_service.search_resources_for_selected_media = AsyncMock(return_value="候选资源列表")  # type: ignore[method-assign]
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    add_service.add_by_selection = AsyncMock(return_value="不该直接下载")  # type: ignore[method-assign]
+
+    handled = asyncio.run(
+        handle_digit_selection_query(
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: search_service,
+                tg.ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+            },
+            execution_gate=execution_gate,
+            reply_func=reply_text,
+            query="1",
+            chat_id=1001,
+            user_id=2001,
+            channel="telegram",
+            resolve_downloader_execution=lambda: (
+                SimpleNamespace(name="pt-main", downloader_type="transmission", download_dir="/downloads"),
+                None,
+            ),
+            tg=tg,
+        )
+    )
+
+    assert handled is True
+    search_service.search_resources_for_selected_media.assert_awaited_once_with(
+        1001,
+        "1",
+        channel="telegram",
+    )
+    add_service.add_by_selection.assert_not_called()
+    reply_text.assert_awaited_once_with("候选资源列表")
+
+
 def test_handle_digit_selection_query_stops_on_clarification_lookup_failure() -> None:
     reply_text = AsyncMock()
     search_service = SearchMediaService(_fake_search)

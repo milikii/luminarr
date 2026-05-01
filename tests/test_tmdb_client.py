@@ -42,6 +42,8 @@ def test_get_movie_by_id_returns_valid_result() -> None:
                 "title": "星际穿越",
                 "original_title": "Interstellar",
                 "release_date": "2014-11-05",
+                "poster_path": "/interstellar.jpg",
+                "overview": "A journey across space and time.",
             }
         )
 
@@ -55,6 +57,8 @@ def test_get_movie_by_id_returns_valid_result() -> None:
     assert result.original_title == "Interstellar"
     assert result.year == "2014"
     assert result.tmdb_id == "157336"
+    assert result.poster_path == "/interstellar.jpg"
+    assert result.overview == "A journey across space and time."
 
 
 def test_search_movie_returns_first_valid_result() -> None:
@@ -257,6 +261,56 @@ def test_search_movie_prefers_trailing_word_number_alias_match_over_base_title()
     assert result is not None
     assert result.title == "Fast X"
     assert result.tmdb_id == "2"
+
+
+def test_search_media_candidates_prefers_exact_tmdb_identity_for_strong_japanese_title() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "你的名字"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 12,
+                            "title": "你的名字 特别收藏版",
+                            "original_title": "君の名は。4K Collection",
+                            "release_date": "2017-01-01",
+                        },
+                        {
+                            "id": 11,
+                            "title": "你的名字。",
+                            "original_title": "君の名は。",
+                            "release_date": "2016-08-26",
+                            "poster_path": "/your-name.jpg",
+                            "overview": "Two teenagers share a supernatural connection.",
+                        },
+                    ]
+                }
+            )
+        assert path == "/3/search/tv"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 21,
+                        "name": "你的名字：特辑",
+                        "original_name": "君の名は。 特別編",
+                        "first_air_date": "2018-01-01",
+                    }
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+
+    results = _run(client.search_media_candidates("你的名字", limit=5))
+
+    assert [item.tmdb_id for item in results] == ["11"]
+    assert results[0].title == "你的名字。"
+    assert results[0].poster_path == "/your-name.jpg"
+    assert results[0].overview == "Two teenagers share a supernatural connection."
 
 
 def test_search_movie_prefers_base_title_when_query_has_final_cut_noise() -> None:
@@ -517,6 +571,8 @@ def test_search_tv_candidates_returns_valid_results() -> None:
                         "name": "Three-Body",
                         "original_name": "三体",
                         "first_air_date": "2023-01-15",
+                        "poster_path": "/three-body.jpg",
+                        "overview": "A science fiction series.",
                     },
                     {
                         "id": 1002,
@@ -540,6 +596,135 @@ def test_search_tv_candidates_returns_valid_results() -> None:
     assert result[0].year == "2023"
     assert result[0].tmdb_id == "1001"
     assert result[0].media_type == "tv"
+    assert result[0].poster_path == "/three-body.jpg"
+    assert result[0].overview == "A science fiction series."
+
+
+def test_search_media_candidates_keeps_mixed_media_candidates_when_query_is_broad() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+    seen_paths: list[str] = []
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        seen_paths.append(path)
+        assert params["query"] == "丧尸"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 222,
+                            "title": "Zombie for Sale",
+                            "original_title": "기묘한 가족",
+                            "release_date": "2019-01-01",
+                            "poster_path": "/zombie-for-sale.jpg",
+                            "overview": "A family comedy about zombies.",
+                        }
+                    ]
+                }
+            )
+        if path == "/3/search/tv":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 111,
+                            "name": "Zombie Detective",
+                            "original_name": "좀비탐정",
+                            "first_air_date": "2020-01-01",
+                            "poster_path": "/zombie-detective.jpg",
+                            "overview": "A detective story with a zombie lead.",
+                        }
+                    ]
+                }
+            )
+        raise AssertionError(f"unexpected TMDB path: {path}")
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_media_candidates("丧尸", limit=3))
+
+    assert seen_paths == ["/3/search/movie", "/3/search/tv"]
+    assert {item.media_type for item in result} == {"tv", "movie"}
+    assert any(item.title == "Zombie Detective" for item in result)
+    assert any(item.title == "Zombie for Sale" for item in result)
+
+
+def test_search_media_candidates_prefers_exact_movie_identity_for_strong_title() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "你的名字"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 372058,
+                            "title": "你的名字。",
+                            "original_title": "君の名は。",
+                            "release_date": "2016-08-26",
+                            "poster_path": "/your-name.jpg",
+                            "overview": "Two teenagers share a mysterious connection.",
+                        }
+                    ]
+                }
+            )
+        if path == "/3/search/tv":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 9001,
+                            "name": "你的名字 特别篇",
+                            "original_name": "Your Name Special",
+                            "first_air_date": "2021-01-01",
+                            "poster_path": "/your-name-special.jpg",
+                            "overview": "A lower relevance expanded-title result.",
+                        }
+                    ]
+                }
+            )
+        raise AssertionError(f"unexpected TMDB path: {path}")
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_media_candidates("你的名字", limit=3))
+
+    assert [item.media_type for item in result] == ["movie"]
+    assert result[0].title == "你的名字。"
+    assert result[0].tmdb_id == "372058"
+
+
+def test_search_media_candidates_filters_out_low_relevance_expanded_titles_for_strong_query() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "你的名字"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 372058,
+                            "title": "你的名字。",
+                            "original_title": "君の名は。",
+                            "release_date": "2016-08-26",
+                        },
+                        {
+                            "id": 9002,
+                            "title": "你的名字我的姓氏",
+                            "original_title": "Your Name My Surname",
+                            "release_date": "2020-01-01",
+                        },
+                    ]
+                }
+            )
+        if path == "/3/search/tv":
+            return _FakeResponse({"results": []})
+        raise AssertionError(f"unexpected TMDB path: {path}")
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.search_media_candidates("你的名字", limit=5))
+
+    assert [item.tmdb_id for item in result] == ["372058"]
 
 
 def test_tmdb_client_passes_proxy_to_httpx(monkeypatch) -> None:

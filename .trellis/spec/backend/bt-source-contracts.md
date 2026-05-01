@@ -48,6 +48,7 @@
 #### Env wiring contract
 
 - `BT_WEB_SOURCES` may only create active `BtSourceProvider` entries for roles other than `helper_only`.
+- When `BT_WEB_SOURCES` is empty, active adult BT provider wiring falls back to the curated default set `tokyotosho`, `sukebei`, `javbus`.
 - A supported web-source rule is still inactive until it has an explicit entry in the BT source profile registry.
 - A helper-only source remains a supported rule for read-only helper logic, but it is not a valid active provider for downloader-facing search composition.
 
@@ -79,6 +80,7 @@
 
 - Good: `BT_WEB_SOURCES=tokyotosho,javbus` -> both become active providers; candidates get canonical names and roles.
 - Base: `BT_WEB_SOURCES=tokyotosho,javlibrary` -> `tokyotosho` is active; `javlibrary` is skipped from active wiring but can still appear as helper-only enrichment in read-only display.
+- Base: `BT_WEB_SOURCES` unset/empty -> active provider wiring uses curated defaults `tokyotosho,sukebei,javbus`.
 - Bad: treating `javlibrary` as an active download source because it exists in `SUPPORTED_WEB_SOURCE_RULES`.
 
 ### 6. Tests Required
@@ -91,6 +93,7 @@
 - Wiring tests:
   - `_build_bt_source_providers()` skips helper-only configured sources
   - `_build_bt_source_providers()` also skips supported-but-unmodeled configured sources
+  - `_build_bt_source_providers()` uses curated default providers when `BT_WEB_SOURCES` is empty
 - Search/display tests:
   - read-only display keeps using role-based priority lookup
   - helper-only metadata does not leak into cached candidate payloads unless explicitly persisted by design
@@ -125,6 +128,9 @@
 - `app.services.adult_metadata_sources.get_default_adult_metadata_source_names() -> tuple[str, ...]`
 - `app.services.bt_sources.get_adult_metadata_source_rank() -> tuple[AdultMetadataSourceProfile, ...]`
 - `app.clients.avmoo_helper.AvmooReadOnlyHelperClient.lookup(lookup_text: str) -> JavLibraryReadOnlyMatch | None`
+- `app.clients.avsox_helper.AvsoxReadOnlyHelperClient.lookup(lookup_text: str) -> JavLibraryReadOnlyMatch | None`
+- `app.clients.javbus_helper.JavBusReadOnlyHelperClient.lookup(lookup_text: str) -> JavLibraryReadOnlyMatch | None`
+- `app.clients.caribbeancom_helper.CaribbeancomReadOnlyHelperClient.lookup(lookup_text: str) -> JavLibraryReadOnlyMatch | None`
 - `app.clients.adult_read_only_helper_chain.compose_adult_read_only_lookup_func(...) -> AdultReadOnlyLookupFunc`
 - `app.bot.telegram_reply_formatter.format_telegram_reply(text: str) -> str`
 
@@ -137,8 +143,13 @@
 - `javbus` is `supporting`; it must not be a default main metadata source.
 - `fanza` is `conditional`; it must rank after default and supporting sources unless a future explicit Japan-IP capability changes the policy.
 - Aliases such as `avmoo.shop`, `avbase.net`, `jav321.com`, `avsox.click`, `missav123.com`, `javbus.com`, and `javlibrary.com` must canonicalize before ranking or display.
-- Runtime read-only helper lookup must compose Avmoo first and JavLibrary second. Avmoo returning no relevant exact censored-ID match, or raising `httpx.HTTPError`, must fall back to JavLibrary.
+- Runtime read-only helper lookup must keep the provider/helper split:
+  - `caribbeancom` is an exact-ID helper for `CARIB-*` uncensored IDs only. It uses the deterministic direct movie page URL and must return `None` for non-Caribbeancom IDs.
+  - Censored-ID helper order is `avmoo -> avsox -> javbus -> javlibrary`.
+  - `avmoo`, `avsox`, and `javbus` misses or `httpx.HTTPError` failures must fall through to the next helper. `javlibrary` remains the final backup/cross-check helper.
 - Avmoo helper lookup is static `httpx` + HTML parsing only. Browser automation, cookies, login flows, JS execution, and new downloader/PT provider wiring are out of contract for this helper.
+- Avsox and JavBus helper lookup follow the same static `httpx` + HTML parsing constraint. JavBus may be both an active BT provider and a supporting metadata helper, but these roles must remain separate clients/paths.
+- Avbase, Jav321, MissAV, and Fanza are policy-known but runtime-conditional/deferred unless a stable, scriptable probe path is added with tests.
 
 #### Candidate metadata fields
 
@@ -156,17 +167,17 @@
 
 - Adult-only direct hits and adult-only fallback hits must both use `format_adult_bt_resource_fallback_reply()` so the first line is `成人资源候选：<query>`.
 - Telegram formatting must transform adult candidates into:
-  - `【成人资源候选】 <query>`
-  - `候选结果（N 条）`
-  - `【1】 <title>` style candidate blocks
-  - visible poster and standard metadata lines when present
-  - bare `magnet:?` text as `磁力: <magnet>` for Telegram copy/click behavior
+  - `【成人资源候选】 <query>` as the routing/header marker.
+  - `海报: <url>` when a poster exists; Telegram send code consumes this line as the `sendPhoto` subject instead of leaving it as body text.
+  - An HTML caption headed by `🎬 <b>[番号] 标题</b>`, followed by grouped metadata (`演员` / `片商` / `系列` / `日期` / `时长` / `分类`) and a `💾 资源列表`.
+  - Magnet links shortened to `magnet:?xt=urn:btih:<hash>` and wrapped in `<code>...</code>` so Telegram clients expose copyable code blocks without `&dn=` / `&tr=` tracker noise.
+  - Action lines using `打开 <url>` for details and `发送 <short magnet>` for next-step callbacks, allowing Telegram `InlineKeyboardMarkup` to hide the detail URL and start the direct BT follow-up from the first resource.
 - Telegram adult formatting must omit the older `链接参考: magnet | infoHash=...` summary from the primary adult result view.
 
 ### 4. Validation & Error Matrix
 
 - Helper lookup/parsing failure -> log existing helper failure path and keep BT candidates visible without metadata enrichment.
-- Avmoo HTTP failure -> log Avmoo helper failure and continue to JavLibrary backup before dropping metadata enrichment.
+- Avmoo/Avsox/JavBus/Caribbeancom HTTP failure -> log that helper failure and continue to the next eligible helper before dropping metadata enrichment.
 - Missing optional metadata fields -> omit only those fields; keep title/source/seeders/size and magnet visible.
 - Unknown metadata source -> keep the canonicalized source text if available; do not promote it into default main policy.
 - Adult-only candidates from non-adult PT/Prowlarr proof -> continue rejecting them per adult-only fallback display contract.
@@ -174,8 +185,11 @@
 ### 5. Good / Base / Bad Cases
 
 - Good: `metadataSource=avmoo.shop` displays as `Metadata: avmoo (primary)` in Telegram.
+- Good: `CARIB-042123-001` helper lookup may return `Metadata: caribbeancom (primary)` from the deterministic direct page while keeping BT resources separate.
+- Good: `SSIS-123` helper lookup may fall through `avmoo -> avsox -> javbus -> javlibrary`; the first exact-ID metadata match wins.
 - Base: only JavLibrary helper data is available; display it as `Metadata: javlibrary (backup/cross-check)` and keep the resource candidate usable.
 - Bad: `javbus` poster data outranks configured primary metadata sources or appears in `get_default_adult_metadata_source_names()`.
+- Bad: claiming Avbase/Jav321/MissAV/Fanza runtime helper support without a stable client and regression test.
 
 ### 6. Tests Required
 
@@ -188,7 +202,15 @@
 - `tests/test_avmoo_helper.py`
   - Avmoo helper follows exact censored-ID search results to static detail HTML and extracts poster, standard fields, genres, and actors
 - `tests/test_adult_read_only_helper_chain.py`
-  - composed helper lookup prefers Avmoo and falls back to JavLibrary on Avmoo miss or `httpx.HTTPError`
+  - composed helper lookup prefers exact Caribbeancom for `CARIB-*`
+  - composed helper lookup tries Avmoo, Avsox, JavBus, then JavLibrary for censored IDs
+  - composed helper lookup logs helper `httpx.HTTPError` and continues to the next helper
+- `tests/test_avsox_helper.py`
+  - Avsox helper follows exact censored-ID search results to static detail HTML and extracts poster, standard fields, genres, and actors
+- `tests/test_javbus_helper.py`
+  - JavBus helper follows exact censored-ID search results to static detail HTML and extracts poster, standard fields, genres, and actors without changing active BT provider behavior
+- `tests/test_caribbeancom_helper.py`
+  - Caribbeancom helper reads exact direct uncensored page metadata for `CARIB-*` IDs and rejects non-Caribbeancom IDs
 - `tests/test_search_media.py`
   - adult-only direct hits use `成人资源候选` rich layout
   - helper metadata propagates to adult-only display without PT fallback
@@ -201,10 +223,12 @@
 
 - Add another adult metadata site by hard-coding its priority inside Telegram formatter.
 - Treat `javbus` or `javlibrary` as default main metadata because they already exist in BT source registries.
+- Treat helper source support as implemented just because the source appears in metadata policy.
 - Hide the full magnet behind `infoHash`-only text in Telegram adult results.
 
 #### Correct
 
 - Add metadata source policy in `app.services.adult_metadata_sources`, then consume canonical names in display code.
 - Keep `javlibrary` backup/cross-check and `javbus` supporting/non-default unless the task explicitly changes source strategy.
-- Preserve a bare `magnet:?` line in Telegram adult results while keeping adult-only source proof and PT rejection unchanged.
+- Add runtime helper source support through a dedicated helper client, wire it through `compose_adult_read_only_lookup_func()`, and cover exact-ID match plus failure fallback in tests.
+- Preserve a copyable short `magnet:?xt=urn:btih:<hash>` code line in Telegram adult results while keeping adult-only source proof and PT rejection unchanged.

@@ -107,6 +107,29 @@ def test_lookup_helper_match_logs_http_failure(capsys) -> None:
     assert "timeout" in output
 
 
+def test_lookup_helper_match_allows_exact_uncensored_helper_ids() -> None:
+    calls: list[str] = []
+
+    async def fake_lookup(lookup_text: str) -> JavLibraryReadOnlyMatch | None:
+        calls.append(lookup_text)
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="carib:042123-001",
+            display_id="CARIB-042123-001",
+            archive_category="uncensored",
+            title="CARIB-042123-001 Caribbean Detail",
+            detail_url="https://www.caribbeancom.com/moviepages/042123-001/index.html",
+            source_site="caribbeancom",
+        )
+
+    service = BtReadOnlyDisplayService(adult_read_only_lookup_func=fake_lookup)
+
+    result = asyncio.run(service.lookup_helper_match("CARIB-042123-001"))
+
+    assert result is not None
+    assert result.source_site == "caribbeancom"
+    assert calls == ["CARIB-042123-001"]
+
+
 def test_prepare_raw_candidates_logs_adult_history_persistence_failure(capsys) -> None:
     class FailingRegistryRepo:
         def get_by_content_id(self, *, normalized_content_id: str):

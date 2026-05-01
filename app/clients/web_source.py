@@ -86,10 +86,12 @@ def get_configured_web_source_rule(source_name: str) -> WebSourceRule | None:
     cleaned_name = source_name.strip().lower()
     if not cleaned_name:
         return None
-    rule = SUPPORTED_WEB_SOURCE_RULES.get(cleaned_name)
+    from app.services.bt_sources import canonicalize_bt_source_name, is_active_bt_source
+
+    canonical_name = canonicalize_bt_source_name(cleaned_name)
+    rule = SUPPORTED_WEB_SOURCE_RULES.get(canonical_name)
     if rule is None:
         return None
-    from app.services.bt_sources import is_active_bt_source
 
     if not is_active_bt_source(rule.name):
         return None

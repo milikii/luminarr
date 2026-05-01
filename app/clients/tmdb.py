@@ -17,6 +17,8 @@ class TmdbMovie:
     year: str
     tmdb_id: str = ""
     media_type: str = "movie"
+    poster_path: str = ""
+    overview: str = ""
 
 
 class TmdbClient:
@@ -92,6 +94,22 @@ class TmdbClient:
             limit=limit,
         )
 
+    async def search_media_candidates(
+        self,
+        title: str,
+        year: str = "",
+        *,
+        limit: int = 5,
+    ) -> list[TmdbMovie]:
+        movie_candidates = await self.search_movie_candidates(title, year=year, limit=limit)
+        tv_candidates = await self.search_tv_candidates(title, year=year, limit=limit)
+        return _rank_tmdb_candidates(
+            [*movie_candidates, *tv_candidates],
+            title=title,
+            year=year,
+            limit=limit,
+        )
+
     async def _search_candidates(
         self,
         *,
@@ -110,6 +128,7 @@ class TmdbClient:
             "api_key": self._api_key,
             "query": cleaned_title,
             "include_adult": "false",
+            "language": "zh-CN",
         }
         cleaned_year = year.strip()
         if cleaned_year:
@@ -166,6 +185,8 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
         original_title=original_title,
         year=year,
         media_type="movie",
+        poster_path=_safe_text(item.get("poster_path")),
+        overview=_safe_text(item.get("overview")),
     )
 
 
@@ -185,6 +206,8 @@ def _to_tmdb_tv(item: Mapping[str, Any]) -> TmdbMovie | None:
         original_title=original_title,
         year=year,
         media_type="tv",
+        poster_path=_safe_text(item.get("poster_path")),
+        overview=_safe_text(item.get("overview")),
     )
 
 
@@ -231,13 +254,68 @@ def _pick_best_tmdb_match(
     return best_candidate
 
 
+def _rank_tmdb_candidates(
+    candidates: list[TmdbMovie],
+    *,
+    title: str,
+    year: str,
+    limit: int,
+) -> list[TmdbMovie]:
+    cleaned_title = normalize_match_key(title)
+    cleaned_year = year.strip()
+    seen_keys: set[tuple[str, str]] = set()
+    ranked_candidates: list[TmdbMovie] = []
+    scored_candidates = [
+        (_score_tmdb_match(candidate, title=cleaned_title, year=cleaned_year), candidate)
+        for candidate in candidates
+    ]
+    scored_candidates.sort(key=lambda item: item[0], reverse=True)
+    if scored_candidates:
+        best_score = scored_candidates[0][0]
+        if best_score[0] >= 3 and best_score[1] > 0:
+            exact_compact_title = _compact_tmdb_match_key(cleaned_title)
+            exact_family: list[tuple[tuple[int, int, int], TmdbMovie]] = []
+            for score, candidate in scored_candidates:
+                normalized_title = _compact_tmdb_match_key(normalize_match_key(candidate.title))
+                normalized_original_title = _compact_tmdb_match_key(normalize_match_key(candidate.original_title))
+                if normalized_title == exact_compact_title or normalized_original_title == exact_compact_title:
+                    exact_family.append((score, candidate))
+            if exact_family:
+                scored_candidates = exact_family
+            else:
+                scored_candidates = [
+                    item for item in scored_candidates if item[0][0] >= best_score[0]
+                ]
+    for _, candidate in scored_candidates:
+        dedupe_key = (candidate.media_type, candidate.tmdb_id or f"{candidate.title}|{candidate.year}")
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+        ranked_candidates.append(candidate)
+        if len(ranked_candidates) >= max(1, limit):
+            break
+    return ranked_candidates
+
+
 def _score_tmdb_match(candidate: TmdbMovie, *, title: str, year: str) -> tuple[int, int, int]:
     normalized_title = normalize_match_key(candidate.title)
     normalized_original_title = normalize_match_key(candidate.original_title)
+    compact_query = _compact_tmdb_match_key(title)
+    compact_title = _compact_tmdb_match_key(normalized_title)
+    compact_original_title = _compact_tmdb_match_key(normalized_original_title)
     title_score = max(
         score_title_match(title, normalized_title),
         score_title_match(title, normalized_original_title),
     )
+    exact_bias = 0
+    if compact_query and (compact_title == compact_query or compact_original_title == compact_query):
+        exact_bias = 2
+    elif normalized_title == title or normalized_original_title == title:
+        exact_bias = 1
     year_score = 1 if year and candidate.year == year else 0
     exact_year_penalty = 0 if year_score or not year else -1
-    return title_score, year_score, exact_year_penalty
+    return title_score, exact_bias, year_score + exact_year_penalty
+
+
+def _compact_tmdb_match_key(value: str) -> str:
+    return re.sub(r"[\W_]+", "", value, flags=re.UNICODE).lower()
