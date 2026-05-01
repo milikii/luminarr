@@ -134,7 +134,11 @@ async def _reply_adult_bt_poster_caption_message(
         reply_text_func=reply_text_func,
         send_text_func=None,
         chat_id=None,
-        text=_compose_adult_bt_text_fallback(caption=caption, action_lines=action_lines),
+        text=_compose_adult_bt_text_fallback(
+            poster_url=poster_url,
+            caption=caption,
+            action_lines=action_lines,
+        ),
     )
 
 
@@ -192,8 +196,13 @@ def _build_adult_bt_inline_keyboard(action_lines: list[str]) -> InlineKeyboardMa
     return InlineKeyboardMarkup(rows)
 
 
-def _compose_adult_bt_text_fallback(*, caption: str, action_lines: list[str]) -> str:
-    parts = [caption.strip()]
+def _compose_adult_bt_text_fallback(*, poster_url: str, caption: str, action_lines: list[str]) -> str:
+    parts: list[str] = []
+    cleaned_poster_url = poster_url.strip()
+    if cleaned_poster_url:
+        parts.append(f"海报: {cleaned_poster_url}")
+    if caption.strip():
+        parts.append(caption.strip())
     if action_lines:
         parts.append("\n".join(action_lines).strip())
     return "\n\n".join(part for part in parts if part).strip()

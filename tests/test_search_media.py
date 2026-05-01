@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable
+import json
 from pathlib import Path
 
 import httpx
@@ -350,8 +351,96 @@ def test_search_bt_read_only_and_format_applies_general_adult_metadata_translati
     assert translated_queries == ["SSIS-842 彼女のリアルで生々しい姿をお見せします"]
     assert "标准信息: 标题: SSIS-842 让你看到她真实而鲜活的一面 | 原名: SSIS-842 彼女のリアルで生々しい姿をお見せします" in text
     assert "简介: 这是一段翻译后的中文简介，欲望与嫉妒在关系里彼此交错。" in text
-    assert "制作信息: 制作商: S1 顶级风格 | 系列: 真实性爱纪录 | 原系列: リアルSEXドキュメント | 导演: 莓原 | 演员: うんぱい（中文名未确认）" in text
+    assert "制作信息: 制作商: S1 顶级风格 | 系列: 真实性爱纪录 | 原系列: リアルSEXドキュメント | 导演: 莓原 | 演员: うんぱい" in text
+    assert "中文名未确认" not in text
     assert f"磁力链接: {magnet}" in text
+
+
+def test_search_bt_read_only_and_format_shared_helper_metadata_reuses_one_translation_for_all_candidates() -> None:
+    magnet_a = "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=ssis-491-a"
+    magnet_b = "magnet:?xt=urn:btih:2222222222222222222222222222222222222222&dn=ssis-491-b"
+    translation_batches: list[list[str]] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only translation reuse")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-491"
+        return [
+            {
+                "title": "SSIS-491 release A",
+                "source": magnet_a,
+                "infoHash": "1111111111111111111111111111111111111111",
+                "seeders": 8,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            },
+            {
+                "title": "SSIS-491 release B",
+                "source": magnet_b,
+                "infoHash": "2222222222222222222222222222222222222222",
+                "seeders": 6,
+                "size": 3 * 1024 * 1024 * 1024,
+                "indexerName": "javbus",
+                "sourceProvider": "javbus",
+            },
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-491"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-491",
+            display_id="SSIS-491",
+            archive_category="censored",
+            title="SSIS-491 日本語タイトル",
+            detail_url="https://avmoo.shop/cn/movie/491",
+            source_site="avmoo.shop",
+            poster_url="https://img.example/ssis-491.jpg",
+            release_date="2024-04-01",
+            runtime="120 分钟",
+            maker="S1",
+            series="シリーズ名",
+            actors=("うんぱい",),
+        )
+
+    def fake_request_chat_completion(_system_prompt: str, user_payload: dict[str, object]) -> str:
+        requests = user_payload["requests"]
+        assert isinstance(requests, list)
+        translation_batches.append([str(item["request_id"]) for item in requests])
+        assert len(requests) == 1
+        return json.dumps(
+            {
+                "translations": [
+                    {
+                        "request_id": str(requests[0]["request_id"]),
+                        "title_zh": "SSIS-491 中文标题",
+                        "series_zh": "中文系列",
+                        "maker_zh": "中文片商",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        )
+
+    translator = AdultMetadataTranslatorService(
+        api_key="adult-translate-key",
+        request_chat_completion_func=fake_request_chat_completion,
+    )
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+        adult_metadata_translate_func=translator.translate_candidates,
+    )
+
+    text = _run(service.search_bt_read_only_and_format("SSIS-491", adult_only=True))
+
+    assert translation_batches == [["candidate-1"]]
+    assert text.count("标准信息: 标题: SSIS-491 中文标题 | 原名: SSIS-491 日本語タイトル | 发行日: 2024-04-01 | 时长: 120 分钟") == 2
+    assert text.count("制作信息: 制作商: 中文片商 | 系列: 中文系列 | 原系列: シリーズ名 | 演员: うんぱい") == 2
+    assert f"磁力链接: {magnet_a}" in text
+    assert f"磁力链接: {magnet_b}" in text
 
 
 def test_search_bt_read_only_and_format_adult_only_renders_backup_helper_metadata() -> None:

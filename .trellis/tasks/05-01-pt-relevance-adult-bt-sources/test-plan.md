@@ -44,7 +44,8 @@ This plan covers:
 - `tests/test_telegram_reply_formatter.py`
   - PT Telegram card shows poster, type, year, alias/support text
   - adult Telegram card is poster-first and Chinese-readable
-  - adult Telegram card uses Chinese main title/overview/series/maker/director when localization or translation has trusted fields and keeps the Japanese title as subtitle
+  - adult Telegram card keeps the compact poster-first template while using the translated main title and keeping the Japanese title as subtitle
+  - adult Telegram photo-send fallback still retains `海报: <url>` in plain text
 - `tests/test_adult_metadata_localization.py`
   - trusted localized title/series/actor aliases are emitted with original fields retained
   - translation pipeline fields are consumed for title/overview/series/maker/director

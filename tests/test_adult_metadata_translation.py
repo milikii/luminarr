@@ -126,27 +126,109 @@ def test_translate_candidates_without_api_key_logs_and_keeps_original_candidates
     assert logged == [("成人 metadata 翻译未启用", "request_count=1 原因=missing api key")]
 
 
-def test_translate_candidates_logs_and_keeps_original_candidates_when_results_are_partial(monkeypatch) -> None:
+def test_translate_candidates_deduplicates_shared_metadata_and_fans_out_translations() -> None:
+    captured_request_batches: list[list[dict[str, object]]] = []
+
+    def fake_request_chat_completion(_system_prompt: str, user_payload: dict[str, object]) -> str:
+        requests = user_payload["requests"]
+        assert isinstance(requests, list)
+        captured_request_batches.append(list(requests))
+        assert len(requests) == 1
+        request_id = str(requests[0]["request_id"])
+        return json.dumps(
+            {
+                "translations": [
+                    {
+                        "request_id": request_id,
+                        "title_zh": "SSIS-491 中文标题",
+                        "overview_zh": "中文简介",
+                        "series_zh": "中文系列",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        )
+
+    service = AdultMetadataTranslatorService(
+        api_key="adult-translate-key",
+        request_chat_completion_func=fake_request_chat_completion,
+    )
+    candidates = (
+        {
+            "title": "SSIS-491 release A",
+            "read_only_adult_display_id": "SSIS-491",
+            "read_only_adult_source_site": "avmoo.shop",
+            "read_only_adult_detail_url": "https://avmoo.shop/cn/movie/491",
+            "read_only_adult_title": "SSIS-491 日本語タイトル",
+            "read_only_adult_overview": "日本語のあらすじ",
+            "read_only_adult_series": "シリーズ名",
+        },
+        {
+            "title": "SSIS-491 release B",
+            "read_only_adult_display_id": "SSIS-491",
+            "read_only_adult_source_site": "avmoo.shop",
+            "read_only_adult_detail_url": "https://avmoo.shop/cn/movie/491",
+            "read_only_adult_title": "SSIS-491 日本語タイトル",
+            "read_only_adult_overview": "日本語のあらすじ",
+            "read_only_adult_series": "シリーズ名",
+        },
+    )
+
+    translated = asyncio.run(service.translate_candidates(candidates))
+
+    assert len(captured_request_batches) == 1
+    assert captured_request_batches[0] == [
+        {
+            "request_id": "candidate-1",
+            "display_id": "SSIS-491",
+            "source_site": "avmoo.shop",
+            "title": "SSIS-491 日本語タイトル",
+            "overview": "日本語のあらすじ",
+            "series": "シリーズ名",
+            "maker": "",
+            "label": "",
+            "director": "",
+        }
+    ]
+    assert translated[0]["adult_translation_title_zh"] == "SSIS-491 中文标题"
+    assert translated[1]["adult_translation_title_zh"] == "SSIS-491 中文标题"
+    assert translated[0]["adult_translation_overview_zh"] == "中文简介"
+    assert translated[1]["adult_translation_series_zh"] == "中文系列"
+
+
+def test_translate_candidates_falls_back_when_batch_response_is_empty(monkeypatch) -> None:
     logged: list[tuple[str, str]] = []
+    request_batches: list[list[str]] = []
 
     monkeypatch.setattr(
         "app.services.adult_metadata_translation.emit_operational_log",
         lambda *, title, detail, fix_hint: logged.append((title, detail)),
     )
 
-    service = AdultMetadataTranslatorService(
-        api_key="adult-translate-key",
-        request_chat_completion_func=lambda _system_prompt, _user_payload: json.dumps(
+    def fake_request_chat_completion(_system_prompt: str, user_payload: dict[str, object]) -> str:
+        requests = user_payload["requests"]
+        assert isinstance(requests, list)
+        request_ids = [str(item["request_id"]) for item in requests]
+        request_batches.append(request_ids)
+        if len(requests) > 1:
+            return ""
+        request_id = request_ids[0]
+        display_id = str(requests[0]["display_id"])
+        return json.dumps(
             {
                 "translations": [
                     {
-                        "request_id": "candidate-1",
-                        "title_zh": "候选一中文标题",
+                        "request_id": request_id,
+                        "title_zh": f"{display_id} 中文标题",
                     }
                 ]
             },
             ensure_ascii=False,
-        ),
+        )
+
+    service = AdultMetadataTranslatorService(
+        api_key="adult-translate-key",
+        request_chat_completion_func=fake_request_chat_completion,
     )
     candidates = (
         {
@@ -161,7 +243,73 @@ def test_translate_candidates_logs_and_keeps_original_candidates_when_results_ar
 
     translated = asyncio.run(service.translate_candidates(candidates))
 
-    assert translated == candidates
+    assert request_batches == [["candidate-1", "candidate-2"], ["candidate-1"], ["candidate-2"]]
+    assert translated[0]["adult_translation_title_zh"] == "SSIS-842 中文标题"
+    assert translated[1]["adult_translation_title_zh"] == "SSIS-843 中文标题"
+    assert logged[0][0] == "成人 metadata 翻译批量失败"
+    assert "candidate-1,candidate-2" in logged[0][1]
+
+
+def test_translate_candidates_falls_back_for_missing_request_ids(monkeypatch) -> None:
+    logged: list[tuple[str, str]] = []
+    request_batches: list[list[str]] = []
+
+    monkeypatch.setattr(
+        "app.services.adult_metadata_translation.emit_operational_log",
+        lambda *, title, detail, fix_hint: logged.append((title, detail)),
+    )
+
+    def fake_request_chat_completion(_system_prompt: str, user_payload: dict[str, object]) -> str:
+        requests = user_payload["requests"]
+        assert isinstance(requests, list)
+        request_ids = [str(item["request_id"]) for item in requests]
+        request_batches.append(request_ids)
+        if len(requests) > 1:
+            return json.dumps(
+                {
+                    "translations": [
+                        {
+                            "request_id": "candidate-1",
+                            "title_zh": "候选一中文标题",
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            )
+        request_id = request_ids[0]
+        display_id = str(requests[0]["display_id"])
+        return json.dumps(
+            {
+                "translations": [
+                    {
+                        "request_id": request_id,
+                        "title_zh": f"{display_id} 中文标题",
+                    }
+                ]
+            },
+            ensure_ascii=False,
+        )
+
+    service = AdultMetadataTranslatorService(
+        api_key="adult-translate-key",
+        request_chat_completion_func=fake_request_chat_completion,
+    )
+    candidates = (
+        {
+            "read_only_adult_display_id": "SSIS-842",
+            "read_only_adult_title": "SSIS-842 日本語タイトル",
+        },
+        {
+            "read_only_adult_display_id": "SSIS-843",
+            "read_only_adult_title": "SSIS-843 日本語タイトル",
+        },
+    )
+
+    translated = asyncio.run(service.translate_candidates(candidates))
+
+    assert request_batches == [["candidate-1", "candidate-2"], ["candidate-2"]]
+    assert translated[0]["adult_translation_title_zh"] == "候选一中文标题"
+    assert translated[1]["adult_translation_title_zh"] == "SSIS-843 中文标题"
     assert logged == [("成人 metadata 翻译结果不完整", "request_ids=candidate-1,candidate-2 result_ids=candidate-1")]
 
 

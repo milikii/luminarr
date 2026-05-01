@@ -256,16 +256,11 @@ def _render_adult_caption_lines(candidate: _TelegramAdultBtCandidate, *, display
     if subtitle:
         lines.append(f"<i>{_html.escape(subtitle)}</i>")
     lines.append("━━━━━━━━━━━━━━━━━━")
-    overview_line = _format_adult_overview_line(candidate)
-    if overview_line:
-        lines.append(overview_line)
     metadata_lines = [
-        _format_adult_metadata_caption_line("👤", "演员", candidate.actors),
+        _format_adult_metadata_caption_line("👤", "演员", candidate.actors, code_style=True),
         _format_adult_metadata_caption_line("🏢", "片商", candidate.maker),
-        _format_adult_metadata_caption_line("🏭", "厂牌", candidate.label),
         _format_adult_metadata_caption_line("🏷", "系列", candidate.series),
         _format_adult_date_runtime_line(candidate),
-        _format_adult_metadata_caption_line("🎬", "导演", candidate.director),
         _format_adult_metadata_caption_line("📦", "分类", _format_adult_category_label(candidate.category)),
     ]
     lines.extend(line for line in metadata_lines if line)
@@ -308,11 +303,14 @@ def _resolve_adult_subtitle(candidate: _TelegramAdultBtCandidate, *, title: str)
     return candidate.title
 
 
-def _format_adult_metadata_caption_line(icon: str, label: str, value: str) -> str:
+def _format_adult_metadata_caption_line(icon: str, label: str, value: str, *, code_style: bool = False) -> str:
     cleaned_value = value.strip()
     if not cleaned_value:
         return ""
-    return f"{icon} <b>{label}：</b> {_html.escape(cleaned_value)}"
+    rendered_value = _html.escape(cleaned_value)
+    if code_style:
+        rendered_value = f"<code>{rendered_value}</code>"
+    return f"{icon} <b>{label}：</b> {rendered_value}"
 
 
 def _format_adult_date_runtime_line(candidate: _TelegramAdultBtCandidate) -> str:
@@ -322,13 +320,6 @@ def _format_adult_date_runtime_line(candidate: _TelegramAdultBtCandidate) -> str
     if candidate.runtime:
         parts.append(f"⏳ <b>时长：</b> {_html.escape(candidate.runtime)}")
     return "  |  ".join(parts)
-
-
-def _format_adult_overview_line(candidate: _TelegramAdultBtCandidate) -> str:
-    cleaned_overview = candidate.overview.strip()
-    if not cleaned_overview:
-        return ""
-    return f"📝 <b>简介：</b> {_html.escape(_truncate_text(cleaned_overview, limit=80))}"
 
 
 def _format_adult_category_label(category: str) -> str:

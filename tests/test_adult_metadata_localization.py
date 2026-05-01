@@ -84,8 +84,9 @@ def test_format_adult_metadata_lines_uses_translation_result_for_general_metadat
     assert (
         "制作信息: 制作商: S1 顶级风格 | 厂牌: S1 NO.1 STYLE | "
         "系列: 真实性爱纪录 | 原系列: リアルSEXドキュメント | "
-        "导演: 莓原 | 演员: うんぱい（中文名未确认）"
+        "导演: 莓原 | 演员: うんぱい"
     ) in lines
+    assert not any("中文名未确认" in line for line in lines)
 
 
 def test_format_adult_metadata_lines_does_not_blind_translate_unknown_actors() -> None:
@@ -94,12 +95,13 @@ def test_format_adult_metadata_lines_does_not_blind_translate_unknown_actors() -
             "read_only_adult_display_id": "SSIS-999",
             "read_only_adult_source_site": "avmoo.shop",
             "read_only_adult_title": "SSIS-999 テスト作品",
-            "read_only_adult_actors": ("架空りり",),
+            "read_only_adult_actors": ("東雲みれい",),
         }
     )
 
-    assert any("演员: 架空りり（中文名未确认）" in line for line in lines)
-    assert not any("演员: 架空莉莉" in line for line in lines)
+    assert any("演员: 東雲みれい" in line for line in lines)
+    assert not any("中文名未确认" in line for line in lines)
+    assert not any("演员: 东云美铃" in line for line in lines)
 
 
 def test_format_adult_metadata_lines_prefers_source_localized_fields_before_translation_result() -> None:

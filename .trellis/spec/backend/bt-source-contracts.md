@@ -187,10 +187,11 @@
 - Telegram formatting must transform adult candidates into:
   - `【成人资源候选】 <query>` as the routing/header marker.
   - `海报: <url>` when a poster exists; Telegram send code consumes this line as the `sendPhoto` subject instead of leaving it as body text.
-  - An HTML caption headed by `🎬 <b>[番号] 标题</b>`, followed by grouped metadata (`简介` / `演员` / `片商` / `系列` / `日期` / `时长` / `分类`) and a `💾 资源列表`.
-  - Localized Chinese title/overview/series/maker/director fields when they are trusted or translated; Japanese `原名` is rendered as the italic subtitle.
+  - An HTML caption headed by `🎬 <b>[番号] 标题</b>`, followed by grouped metadata (`演员` / `片商` / `系列` / `日期` / `时长` / `分类`) and a `💾 资源列表`.
+  - Localized Chinese title/series/maker fields when they are trusted or translated; Japanese `原名` is rendered as the italic subtitle.
   - Magnet links shortened to `magnet:?xt=urn:btih:<hash>` and wrapped in `<code>...</code>` so Telegram clients expose copyable code blocks without `&dn=` / `&tr=` tracker noise.
   - Action lines using `打开 <url>` for details and `发送 <short magnet>` for next-step callbacks, allowing Telegram `InlineKeyboardMarkup` to hide the detail URL and start the direct BT follow-up from the first resource.
+  - If `sendPhoto` fails and the runtime falls back to text, the fallback text must retain `海报: <url>` instead of silently dropping the poster entry point.
 - Telegram adult formatting must omit the older `链接参考: magnet | infoHash=...` summary from the primary adult result view.
 
 ### 4. Validation & Error Matrix
@@ -235,7 +236,8 @@
   - helper metadata propagates to adult-only display without PT fallback
   - adult-only translation runs after helper enrichment and retains resource candidates when translation fails
 - `tests/test_telegram_reply_formatter.py`
-  - Telegram adult candidate text is reformatted with candidate blocks, translated overview text, and copyable magnet text
+  - Telegram adult candidate text is reformatted with the compact poster-first card and copyable magnet text
+  - adult photo-send fallback keeps the poster URL in plain text
 - `tests/test_adult_metadata_translation.py`
   - translation request payload uses stable request IDs and adult metadata field extraction
   - missing API key returns empty translation results

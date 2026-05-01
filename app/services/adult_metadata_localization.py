@@ -272,7 +272,7 @@ def _resolve_localized_actors(item: Mapping[str, Any]) -> AdultLocalizedText:
             changed = True
             continue
         if _contains_japanese_kana(actor_name):
-            localized_parts.append(f"{actor_name}（中文名未确认）")
+            localized_parts.append(actor_name)
             unresolved = True
             continue
         localized_parts.append(actor_name)
