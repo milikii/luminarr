@@ -35,6 +35,8 @@ from app.bot.wecom_adapter import (
 )
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
 from app.bot.telegram_runtime_adapter import build_telegram_application as build_application
+from app.clients.adult_read_only_helper_chain import AdultReadOnlyLookupFunc, compose_adult_read_only_lookup_func
+from app.clients.avmoo_helper import AvmooReadOnlyHelperClient
 from app.clients.emby import EmbyClient
 from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
@@ -140,6 +142,15 @@ def _build_bt_source_providers(
             BtSourceProvider(name=rule.name, search_func=client.search, page_search_func=client.search_page)
         )
     return bt_source_providers
+
+
+def _build_adult_read_only_lookup_func(*, proxy_url: str) -> AdultReadOnlyLookupFunc:
+    avmoo_client = AvmooReadOnlyHelperClient(proxy_url=proxy_url)
+    javlibrary_client = JavLibraryReadOnlyHelperClient(proxy_url=proxy_url)
+    return compose_adult_read_only_lookup_func(
+        avmoo_lookup_func=avmoo_client.lookup,
+        javlibrary_lookup_func=javlibrary_client.lookup,
+    )
 
 
 def _resolve_downloader_client_for_dispatch(
@@ -398,9 +409,7 @@ def main() -> None:
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
         adult_content_registry_repo=adult_content_registry_repo,
-        adult_read_only_lookup_func=JavLibraryReadOnlyHelperClient(
-            proxy_url=settings.outbound_proxy_url,
-        ).lookup,
+        adult_read_only_lookup_func=_build_adult_read_only_lookup_func(proxy_url=settings.outbound_proxy_url),
     )
     transmission_client: TransmissionClient | None = None
     if settings.has_legacy_transmission_downloader():

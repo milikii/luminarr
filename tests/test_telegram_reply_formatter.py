@@ -137,6 +137,53 @@ def test_format_telegram_reply_formats_adult_resource_candidates_with_copyable_l
     assert "链接参考: magnet | infoHash" not in formatted
 
 
+def test_format_telegram_reply_preserves_avmoo_primary_adult_metadata() -> None:
+    magnet = "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=SSIS-483"
+    text = format_adult_bt_resource_fallback_reply(
+        "SSIS-483",
+        (
+            {
+                "title": "SSIS-483 Detail Title",
+                "source": magnet,
+                "infoHash": "1111111111111111111111111111111111111111",
+                "seeders": 10,
+                "size": 3 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+                "read_only_adult_source_site": "avmoo.shop",
+                "read_only_adult_display_id": "SSIS-483",
+                "read_only_adult_archive_category": "censored",
+                "read_only_adult_title": "SSIS-483 Detail Title",
+                "read_only_adult_detail_url": "https://avmoo.shop/cn/movie/4221ec1035fdf66f",
+                "read_only_adult_poster_url": "https://jp.netcdn.space/digital/video/ssis00483/ssis00483pl.jpg",
+                "read_only_adult_release_date": "2023-05-01",
+                "read_only_adult_runtime": "120分钟",
+                "read_only_adult_maker": "S1",
+                "read_only_adult_label": "S1 Label",
+                "read_only_adult_series": "Secret Mission",
+                "read_only_adult_actors": ("Aki", "Mei"),
+            },
+        ),
+    )
+
+    formatted = format_telegram_reply(text)
+
+    assert formatted.startswith("【成人资源候选】 SSIS-483")
+    assert "【1】 SSIS-483 Detail Title" in formatted
+    assert "只读补全: avmoo.shop | 番号: SSIS-483 | 分类: censored" in formatted
+    assert "海报: https://jp.netcdn.space/digital/video/ssis00483/ssis00483pl.jpg" in formatted
+    assert "发行日: 2023-05-01" in formatted
+    assert "时长: 120分钟" in formatted
+    assert "制作商: S1" in formatted
+    assert "厂牌: S1 Label" in formatted
+    assert "系列: Secret Mission" in formatted
+    assert "演员: Aki / Mei" in formatted
+    assert "Metadata: avmoo (primary)" in formatted
+    assert f"磁力: {magnet}" in formatted
+    assert "详情: https://avmoo.shop/cn/movie/4221ec1035fdf66f" in formatted
+    assert "链接参考: magnet | infoHash" not in formatted
+
+
 def test_format_telegram_reply_keeps_unrelated_text() -> None:
     text = "普通回复，不需要 Telegram 特殊格式化。"
 

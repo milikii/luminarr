@@ -124,6 +124,8 @@
 - `app.services.adult_metadata_sources.rank_adult_metadata_sources(source_names: tuple[str, ...] | list[str]) -> tuple[str, ...]`
 - `app.services.adult_metadata_sources.get_default_adult_metadata_source_names() -> tuple[str, ...]`
 - `app.services.bt_sources.get_adult_metadata_source_rank() -> tuple[AdultMetadataSourceProfile, ...]`
+- `app.clients.avmoo_helper.AvmooReadOnlyHelperClient.lookup(lookup_text: str) -> JavLibraryReadOnlyMatch | None`
+- `app.clients.adult_read_only_helper_chain.compose_adult_read_only_lookup_func(...) -> AdultReadOnlyLookupFunc`
 - `app.bot.telegram_reply_formatter.format_telegram_reply(text: str) -> str`
 
 ### 3. Contracts
@@ -135,6 +137,8 @@
 - `javbus` is `supporting`; it must not be a default main metadata source.
 - `fanza` is `conditional`; it must rank after default and supporting sources unless a future explicit Japan-IP capability changes the policy.
 - Aliases such as `avmoo.shop`, `avbase.net`, `jav321.com`, `avsox.click`, `missav123.com`, `javbus.com`, and `javlibrary.com` must canonicalize before ranking or display.
+- Runtime read-only helper lookup must compose Avmoo first and JavLibrary second. Avmoo returning no relevant exact censored-ID match, or raising `httpx.HTTPError`, must fall back to JavLibrary.
+- Avmoo helper lookup is static `httpx` + HTML parsing only. Browser automation, cookies, login flows, JS execution, and new downloader/PT provider wiring are out of contract for this helper.
 
 #### Candidate metadata fields
 
@@ -162,6 +166,7 @@
 ### 4. Validation & Error Matrix
 
 - Helper lookup/parsing failure -> log existing helper failure path and keep BT candidates visible without metadata enrichment.
+- Avmoo HTTP failure -> log Avmoo helper failure and continue to JavLibrary backup before dropping metadata enrichment.
 - Missing optional metadata fields -> omit only those fields; keep title/source/seeders/size and magnet visible.
 - Unknown metadata source -> keep the canonicalized source text if available; do not promote it into default main policy.
 - Adult-only candidates from non-adult PT/Prowlarr proof -> continue rejecting them per adult-only fallback display contract.
@@ -180,6 +185,10 @@
   - `javbus` is not default main
 - `tests/test_javlibrary_helper.py`
   - JavLibrary helper extracts poster, release date, duration, studio, series, genres, and actors from detail HTML
+- `tests/test_avmoo_helper.py`
+  - Avmoo helper follows exact censored-ID search results to static detail HTML and extracts poster, standard fields, genres, and actors
+- `tests/test_adult_read_only_helper_chain.py`
+  - composed helper lookup prefers Avmoo and falls back to JavLibrary on Avmoo miss or `httpx.HTTPError`
 - `tests/test_search_media.py`
   - adult-only direct hits use `成人资源候选` rich layout
   - helper metadata propagates to adult-only display without PT fallback

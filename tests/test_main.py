@@ -33,6 +33,7 @@ from app.downloader_route_lookup import (
     _resolve_lookup_client_for_task,
 )
 from app.main import (
+    _build_adult_read_only_lookup_func,
     _build_bt_source_providers,
     _build_refresh_media_server_func,
     _resolve_downloader_client_for_dispatch,
@@ -662,6 +663,41 @@ def test_build_bt_source_providers_skips_supported_but_unmodeled_web_sources(
 
     assert [provider.name for provider in providers] == ["tokyotosho", "javbus"]
     assert created_rules == ["tokyotosho", "javbus"]
+
+
+def test_build_adult_read_only_lookup_func_wires_avmoo_before_javlibrary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    class FakeAvmooReadOnlyHelperClient:
+        def __init__(self, *, proxy_url: str) -> None:
+            calls.append(f"avmoo:init:{proxy_url}")
+
+        async def lookup(self, lookup_text: str):
+            calls.append(f"avmoo:lookup:{lookup_text}")
+            return SimpleNamespace(source_site="avmoo")
+
+    class FakeJavLibraryReadOnlyHelperClient:
+        def __init__(self, *, proxy_url: str) -> None:
+            calls.append(f"javlibrary:init:{proxy_url}")
+
+        async def lookup(self, lookup_text: str):
+            calls.append(f"javlibrary:lookup:{lookup_text}")
+            return SimpleNamespace(source_site="javlibrary")
+
+    monkeypatch.setattr("app.main.AvmooReadOnlyHelperClient", FakeAvmooReadOnlyHelperClient)
+    monkeypatch.setattr("app.main.JavLibraryReadOnlyHelperClient", FakeJavLibraryReadOnlyHelperClient)
+
+    lookup = _build_adult_read_only_lookup_func(proxy_url="http://proxy.local:7890")
+    match = asyncio.run(lookup("SSIS-123"))
+
+    assert match.source_site == "avmoo"
+    assert calls == [
+        "avmoo:init:http://proxy.local:7890",
+        "javlibrary:init:http://proxy.local:7890",
+        "avmoo:lookup:SSIS-123",
+    ]
 
 
 class _MainSettings(SimpleNamespace):
