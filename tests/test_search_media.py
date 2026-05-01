@@ -412,6 +412,8 @@ def test_search_bt_read_only_and_format_returns_explicit_adult_source_empty_text
 
     assert fallback_queries == ["SSIS-123", "SSIS 123", "SSIS123"]
     assert text == ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE.format(query="SSIS-123")
+    assert "下一步" in text
+    assert "成人 BT 站点或 Prowlarr 成人索引器" in text
 
 
 def test_search_bt_read_only_and_format_rejects_generic_prowlarr_indexer_for_adult_fallback() -> None:

@@ -513,3 +513,20 @@
 
 ### 下轮目标
 - 若继续增强成人 metadata，优先做真实 Telegram smoke 或接第二个主 helper；若准备发布，进入 QA / ship
+
+## Round 31 — 2026-05-01 10:22
+
+### 完成
+- 接续 Trellis task `04-30-adult-search-fallback`，确认 `成人搜` adult-only fallback 已落地并保持在配置内成人 BT / Prowlarr 成人索引器边界
+- 补强当前已配置成人源为空时的回复文案，明确给出下一步检查 `BT_WEB_SOURCES` 成人 BT 站点或 Prowlarr 成人索引器配置，并说明不会扩大到 PT 主线搜索
+- 补充 focused regression 断言，保护空结果回复继续包含可操作下一步
+
+### 测试状态
+- 通过: 6 / 总计: 6
+
+### 遗留 / 下轮继续
+- `trellis-implement` 和 `trellis-check` 子 agent 均因 429 限流失败；本轮已在主线程执行同等 focused / lint / 主线 / adult BT wedge 验证
+- 尚未执行 commit；下一步按 Trellis Phase 3.4 确认提交计划
+
+### 下轮目标
+- 确认并提交 `adult-search-fallback` 文案与测试补强，然后进入 `/finish-work` 收尾

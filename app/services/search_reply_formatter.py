@@ -17,7 +17,10 @@ from app.services.search_query_parser import ParsedMovieQuery
 
 NO_RESULT_TEXT_TEMPLATE = "未找到候选结果：{query}"
 BT_READ_ONLY_NO_RESULT_TEXT_TEMPLATE = "BT 只读探索未找到候选：{query}"
-ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE = "当前已配置成人源无结果：{query}"
+ADULT_BT_SOURCE_EMPTY_TEXT_TEMPLATE = (
+    "当前已配置成人源无结果：{query}\n"
+    "下一步：请检查 BT_WEB_SOURCES 中的成人 BT 站点或 Prowlarr 成人索引器配置；当前不会扩大到 PT 主线搜索。"
+)
 BT_READ_ONLY_NOTICE_TEXT = (
     "只读说明：当前结果仅供手动 BT 探索和站点规则排查参考，不会创建审批或下载任务。\n"
     "如需走成人下载链，请直接发送磁力并选择 BT 成人链。"
