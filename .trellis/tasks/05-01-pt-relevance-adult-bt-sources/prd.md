@@ -80,6 +80,18 @@
 * adult BT 卡片不能继续表现成“信息很多但排版很烂、海报看不到、关键信息不聚合”。
 * adult BT 卡片的用户目标不是“展示很多行文本”，而是“让我一眼判断这是不是我要的资源，并且能马上复制/点击磁力或继续后续动作”。
 
+### R5. adult BT metadata 必须可信中文化
+
+* adult BT 卡片不能只把字段标签翻成中文；标题、系列、演员这些内容字段也要尽量展示可信中文。
+* 中文主字段的真相来源优先级：
+  * source/helper 明确给出的中文字段或别名；
+  * 多 metadata 源交叉验证后得到的一致中文字段；
+  * 本地 curated alias 表中已有的人工确认别名。
+* 日文原始标题必须保留为副标题或 `原名`，不能被丢掉。
+* 演员名不能盲目按读音机器翻译；只有 source-provided alias 或本地已确认 alias 才能替换成中文。
+* 如果演员中文名没有可信来源，应保留原名并标记 `中文名未确认`，不能伪装成准确中文。
+* formatter 层只负责展示 localization 层给出的 `localized/original` 字段，不能在 Telegram formatter 里硬编码站点翻译逻辑。
+
 ## Acceptance Criteria
 
 * [ ] PT 搜索在只发片名时，不默认要求补年份，而是返回按相关性排序的候选。
@@ -93,6 +105,8 @@
 * [ ] 当前讨论过的成人来源都被纳入实现方案，且角色边界清楚。
 * [ ] 至少主要成人信息源在 helper / metadata 层真正可查到信息，而不是只停留在排序 policy。
 * [ ] adult BT Telegram 卡片优先显示海报，并把核心字段整理成中文友好的结构化排版。
+* [ ] adult BT Telegram 卡片主标题、系列、演员优先显示可信中文，日文原名作为副标题保留。
+* [ ] 未确认的演员中文名不会被盲翻，必须显示原名并带 `中文名未确认` 标记。
 
 ## Out of Scope
 
@@ -113,6 +127,7 @@
   * `app/services/search_request_context.py`
   * `app/services/search_media.py`
   * `app/services/search_reply_formatter.py`
+  * `app/services/adult_metadata_localization.py`
   * `app/bot/telegram_reply_formatter.py`
   * `app/services/adult_metadata_sources.py`
   * `app/clients/adult_read_only_helper_chain.py`

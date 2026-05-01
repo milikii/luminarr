@@ -122,6 +122,7 @@ class _TelegramAdultBtCandidate:
     metadata_source: str = ""
     magnet: str = ""
     history_text: str = ""
+    original_title: str = ""
 
 
 def _parse_adult_bt_candidates(lines: list[str]) -> list[_TelegramAdultBtCandidate]:
@@ -178,6 +179,7 @@ def _apply_adult_bt_candidate_line(candidate: _TelegramAdultBtCandidate, line: s
     if line.startswith("标准信息:"):
         parts = _parse_telegram_field_parts(line.removeprefix("标准信息:").strip())
         candidate.metadata_title = parts.get("标题", candidate.metadata_title)
+        candidate.original_title = parts.get("原名", candidate.original_title)
         candidate.release_date = parts.get("发行日", candidate.release_date)
         candidate.runtime = parts.get("时长", candidate.runtime)
         return
@@ -289,6 +291,8 @@ def _format_adult_title(*, display_id: str, title: str) -> str:
 
 
 def _resolve_adult_subtitle(candidate: _TelegramAdultBtCandidate, *, title: str) -> str:
+    if candidate.original_title and candidate.original_title != title:
+        return candidate.original_title
     if not candidate.title or candidate.title == title:
         return ""
     if candidate.title.lower().startswith((candidate.content_id or "").lower()):

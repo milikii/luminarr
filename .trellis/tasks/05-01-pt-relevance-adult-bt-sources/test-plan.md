@@ -26,6 +26,8 @@ This plan covers:
 | adult helper fallback | primary helper fail -> backup helper | unit |
 | adult provider empty config | curated fallback or explicit config behavior stays deterministic | unit |
 | adult Telegram card | poster-first, Chinese labels, grouped metadata/resource sections | formatter + real smoke |
+| adult metadata localization | title/series/actors use trusted Chinese aliases and retain original Japanese title | unit + Telegram formatter |
+| unknown adult actor alias | no blind translation; original actor name is marked as unconfirmed | unit |
 | Telegram real smoke | `丧尸`, `你的名字`, `成人搜 SSIS-483` render readable result cards | real smoke |
 
 ## Required Test Updates
@@ -41,6 +43,10 @@ This plan covers:
 - `tests/test_telegram_reply_formatter.py`
   - PT Telegram card shows poster, type, year, alias/support text
   - adult Telegram card is poster-first and Chinese-readable
+  - adult Telegram card uses Chinese main title/actor when localization has trusted aliases and keeps the Japanese title as subtitle
+- `tests/test_adult_metadata_localization.py`
+  - trusted localized title/series/actor aliases are emitted with original fields retained
+  - unknown Japanese actor names are marked `中文名未确认` instead of being machine-translated
 - `tests/test_private_chat_search_runtime.py`
   - runtime returns card-style results for ambiguous title-only search
   - runtime does not dispatch resource search before media candidate confirmation

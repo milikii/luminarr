@@ -227,8 +227,10 @@ def test_format_telegram_reply_renders_adult_bt_as_poster_caption_card() -> None
     formatted = format_telegram_reply(text)
 
     assert formatted.startswith("【成人资源候选】 SSIS-483\n海报: https://jp.netcdn.space")
-    assert "🎬 <b>[SSIS-483] シン・交わる体液、濃密セックス 完全ノーカット5本番</b>" in formatted
-    assert "👤 <b>演员：</b> 七ツ森りり" in formatted
+    assert "🎬 <b>[SSIS-483] 新·交融的体液、浓密性爱 完全未删减 5本番</b>" in formatted
+    assert "<i>シン・交わる体液、濃密セックス 完全ノーカット5本番</i>" in formatted
+    assert "👤 <b>演员：</b> 七森莉莉" in formatted
+    assert "原演员: 七ツ森りり" not in formatted
     assert "🏢 <b>片商：</b> S1 NO.1 STYLE" in formatted
     assert "🏷 <b>系列：</b> 交融的体液、浓密性爱" in formatted
     assert "📅 <b>日期：</b> 2022-08-05  |  ⏳ <b>时长：</b> 220 分钟" in formatted

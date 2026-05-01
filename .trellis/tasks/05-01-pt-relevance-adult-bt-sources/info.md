@@ -114,6 +114,9 @@ THIS PLAN
    - Supporting reference:
      - https://deepwiki.com/jxxghp/MoviePilot/3.4-media-recognition
      - https://mattoid.top/docs/moviepilot/search
+7. `High`：adult BT “中文化”不能等同于“标签中文化”。
+   - 标题、系列、演员必须通过 source-provided 中文字段、多源一致字段或本地 curated alias 生成中文主显示。
+   - 日文原名保留为副标题，演员名没有可信中文 alias 时必须标记未确认，不能盲翻。
 
 ## Phase 3 — Engineering Review
 
@@ -174,6 +177,7 @@ adult query
    - 优先让海报和关键字段在 Telegram 中可读、中文化、可判断
    - 先补高价值主源，再补 supporting / conditional
    - 把资源字段与 metadata 字段做卡片分组，避免“文本很多但没层次”
+   - 新增 localization boundary：`search_reply_formatter` 消费可信中文字段，`telegram_reply_formatter` 只展示中文主字段和日文原名副标题
 
 ### Failure Modes Registry
 
@@ -185,6 +189,7 @@ adult query
 | High | anime 被错误地硬编码成 movie 或 tv | unified candidate model + explicit media_type display |
 | High | 某 metadata 站不稳定拖垮整条 adult 搜索 | fail-closed helper chain + per-source fallback |
 | High | adult BT 卡片仍然信息堆叠、海报不显眼、字段不中文化 | Telegram formatter 重构为 poster-first grouped card |
+| High | 演员名被机器音译成错误中文名 | 只允许 source alias / curated alias；缺失时标记中文名未确认 |
 | Medium | Telegram 卡片字段太多变噪声 | 只保留高判断价值字段 |
 
 ### Cross-phase themes
@@ -211,6 +216,7 @@ adult query
 | 4 | Design | Telegram 先展示判断字段再展示选择动作 | Mechanical | P5 | 更符合用户确认路径 | 继续以下载字段为主 |
 | 5 | Eng | 引入 unified TMDB media candidate lookup | Mechanical | P5 | 当前 movie-first 命名已构成结构性限制 | 继续在 movie lookup 上打补丁 |
 | 6 | Eng | `BT_WEB_SOURCES` 为空时建议提供 curated 默认源 | Taste | P1 | 提升 adult BT 实际可用性 | 继续完全手工配置 |
+| 7 | Eng | adult metadata 中文化放在 formatter 前的 localization 层 | Mechanical | P5 | 避免 Telegram formatter 硬编码站点翻译逻辑 | 在展示层临时替换日文字段 |
 
 ## Completion Summary
 

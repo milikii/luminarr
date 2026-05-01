@@ -553,3 +553,27 @@
 
 ### 下轮目标
 - 若继续收口当前 Trellis task，先确认提交分组，再进入 `/finish-work` 或后续 QA / ship。
+
+## Round 33 — 2026-05-01 18:00
+
+### 完成
+- 针对 `成人搜` Telegram 卡片补上可信中文化边界：标题、系列、演员优先使用 source/localized 字段、多源一致字段或本地 curated alias；日文原名保留为副标题。
+- 新增 `app/services/adult_metadata_localization.py`，避免在 Telegram formatter 里硬编码翻译逻辑。
+- 为 `SSIS-483` 这类当前反馈样例补回归测试：中文主标题、`七ツ森りり -> 七森莉莉`、日文原名保留；未知演员不盲翻并标记 `中文名未确认`。
+- 同步 Trellis PRD、test-plan 和 backend source contract，明确“中文化”不是只翻字段标签。
+
+### 测试状态
+- 通过: 7 / 总计: 7
+- `focused adult metadata/Telegram tests`
+- `make lint`
+- `make quality`
+- `make verify-mainline`
+- `make verify-adult-bt-wedge`
+- `make verify-stage1`
+- `git diff --check`
+
+### 遗留 / 下轮继续
+- 当前实现支持 source-provided localized 字段、多源一致字段和 curated alias；后续如要扩大覆盖面，应继续补更多演员/标题 alias 或把更多 metadata helper 的 localized 字段落进 `adult_metadata_candidates`。
+
+### 下轮目标
+- 提交本轮成人 metadata 中文化改动并重启本地 `app.main`，让 Telegram 实机测试使用最新代码。

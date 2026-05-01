@@ -12,6 +12,7 @@ from app.services.adult_metadata_sources import (
     canonicalize_adult_metadata_source_name,
     get_adult_metadata_source_profile,
 )
+from app.services.adult_metadata_localization import resolve_adult_localized_metadata
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_query_parser import ParsedMovieQuery
 
@@ -297,7 +298,11 @@ def format_adult_metadata_lines(item: Mapping[str, Any]) -> tuple[str, ...]:
 
 
 def format_adult_standard_metadata_summary(item: Mapping[str, Any]) -> str:
-    title = _first_text(item, ("adult_title", "metadataTitle", "metadata_title", "read_only_adult_title", "title"))
+    localized_metadata = resolve_adult_localized_metadata(item)
+    title = localized_metadata.title.value or _first_text(
+        item,
+        ("adult_title", "metadataTitle", "metadata_title", "read_only_adult_title", "title"),
+    )
     release_date = _first_text(
         item,
         ("adult_release_date", "releaseDate", "release_date", "date", "read_only_adult_release_date"),
@@ -309,6 +314,8 @@ def format_adult_standard_metadata_summary(item: Mapping[str, Any]) -> str:
     fields = []
     if title:
         fields.append(f"标题: {title}")
+    if localized_metadata.title.original:
+        fields.append(f"原名: {localized_metadata.title.original}")
     if release_date:
         fields.append(f"发行日: {release_date}")
     if runtime:
@@ -317,14 +324,18 @@ def format_adult_standard_metadata_summary(item: Mapping[str, Any]) -> str:
 
 
 def format_adult_production_metadata_summary(item: Mapping[str, Any]) -> str:
+    localized_metadata = resolve_adult_localized_metadata(item)
     maker = _first_text(
         item,
         ("adult_maker", "adult_studio", "maker", "studio", "publisher", "read_only_adult_maker", "read_only_adult_studio"),
     )
     label = _first_text(item, ("adult_label", "label", "read_only_adult_label"))
-    series = _first_text(item, ("adult_series", "series", "read_only_adult_series"))
+    series = localized_metadata.series.value or _first_text(item, ("adult_series", "series", "read_only_adult_series"))
     director = _first_text(item, ("adult_director", "director", "read_only_adult_director"))
-    actors = _first_sequence_text(item, ("adult_actors", "actors", "actresses", "cast", "read_only_adult_actors"))
+    actors = localized_metadata.actors.value or _first_sequence_text(
+        item,
+        ("adult_actors", "actors", "actresses", "cast", "read_only_adult_actors"),
+    )
     fields = []
     if maker:
         fields.append(f"制作商: {maker}")
@@ -332,10 +343,14 @@ def format_adult_production_metadata_summary(item: Mapping[str, Any]) -> str:
         fields.append(f"厂牌: {label}")
     if series:
         fields.append(f"系列: {series}")
+    if localized_metadata.series.original:
+        fields.append(f"原系列: {localized_metadata.series.original}")
     if director:
         fields.append(f"导演: {director}")
     if actors:
         fields.append(f"演员: {actors}")
+    if localized_metadata.actors.original:
+        fields.append(f"原演员: {localized_metadata.actors.original}")
     return " | ".join(fields)
 
 

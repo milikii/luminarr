@@ -159,9 +159,22 @@
   - `read_only_adult_runtime` / `runtime` / `duration`
   - `read_only_adult_maker` / `read_only_adult_studio` / `maker` / `studio`
   - `read_only_adult_series`, `read_only_adult_director`, `read_only_adult_actors`
+  - localized/source-truth fields such as `adult_title_zh`, `read_only_adult_title_zh`, `adult_series_zh`, `read_only_adult_series_zh`, `adult_actors_zh`, `read_only_adult_actors_zh`
+  - original/source fields such as `adult_original_title`, `read_only_adult_original_title`, `adult_original_series`, `read_only_adult_original_series`, `adult_original_actors`, `read_only_adult_original_actors`
+  - cross-check payloads such as `adult_metadata_candidates`, `read_only_adult_metadata_candidates`, or `metadata_candidates`, where each item may carry source-localized fields plus a source identifier
   - `metadataSource` / `read_only_adult_source_site`
   - `read_only_adult_metadata_source_role`
 - JavLibrary helper fields are backup/cross-check fields and must be copied into `read_only_adult_*` payload keys only after helper relevance checks pass.
+
+#### Adult metadata localization contract
+
+- Localized adult metadata must be resolved before Telegram rendering, currently through `app.services.adult_metadata_localization.resolve_adult_localized_metadata()`.
+- Trusted Chinese fields may come from source-provided localized fields, multiple metadata sources agreeing on the same localized value, or a local curated alias table.
+- When `adult_metadata_candidates`-style cross-check payloads include the same localized value from two or more distinct source names, that consensus value outranks a single raw source field.
+- Telegram formatter must not invent translations or hard-code per-site metadata translations; it only renders localized/original fields produced by the service layer.
+- Title and series may use curated aliases when exact source text is known. The original Japanese title must remain available as `原名` so Telegram can render it as the subtitle.
+- Actor names are stricter than titles: do not machine-translate or phonetic-guess actor names. If no source-provided or curated Chinese alias exists and the name contains Japanese kana, keep the original actor name with `中文名未确认`.
+- When only raw Japanese fields exist, the system must prefer honest unconfirmed text over a fabricated Chinese display string.
 
 #### Telegram adult result contract
 
@@ -170,6 +183,7 @@
   - `【成人资源候选】 <query>` as the routing/header marker.
   - `海报: <url>` when a poster exists; Telegram send code consumes this line as the `sendPhoto` subject instead of leaving it as body text.
   - An HTML caption headed by `🎬 <b>[番号] 标题</b>`, followed by grouped metadata (`演员` / `片商` / `系列` / `日期` / `时长` / `分类`) and a `💾 资源列表`.
+  - Localized Chinese title/series/actor fields when they are trusted; Japanese `原名` is rendered as the italic subtitle.
   - Magnet links shortened to `magnet:?xt=urn:btih:<hash>` and wrapped in `<code>...</code>` so Telegram clients expose copyable code blocks without `&dn=` / `&tr=` tracker noise.
   - Action lines using `打开 <url>` for details and `发送 <short magnet>` for next-step callbacks, allowing Telegram `InlineKeyboardMarkup` to hide the detail URL and start the direct BT follow-up from the first resource.
 - Telegram adult formatting must omit the older `链接参考: magnet | infoHash=...` summary from the primary adult result view.
@@ -216,6 +230,9 @@
   - helper metadata propagates to adult-only display without PT fallback
 - `tests/test_telegram_reply_formatter.py`
   - Telegram adult candidate text is reformatted with candidate blocks and copyable magnet text
+- `tests/test_adult_metadata_localization.py`
+  - adult metadata formatting uses trusted localized title/series/actor aliases and retains original Japanese title
+  - unknown Japanese actor aliases are marked unconfirmed instead of being blindly translated
 
 ### 7. Wrong vs Correct
 
@@ -225,10 +242,12 @@
 - Treat `javbus` or `javlibrary` as default main metadata because they already exist in BT source registries.
 - Treat helper source support as implemented just because the source appears in metadata policy.
 - Hide the full magnet behind `infoHash`-only text in Telegram adult results.
+- Translate actor names by pronunciation guessing or generic machine translation without source/curated alias proof.
 
 #### Correct
 
 - Add metadata source policy in `app.services.adult_metadata_sources`, then consume canonical names in display code.
+- Resolve adult metadata localization in `app.services.adult_metadata_localization`, then let formatter/display code consume the localized/original field contract.
 - Keep `javlibrary` backup/cross-check and `javbus` supporting/non-default unless the task explicitly changes source strategy.
 - Add runtime helper source support through a dedicated helper client, wire it through `compose_adult_read_only_lookup_func()`, and cover exact-ID match plus failure fallback in tests.
 - Preserve a copyable short `magnet:?xt=urn:btih:<hash>` code line in Telegram adult results while keeping adult-only source proof and PT rejection unchanged.
