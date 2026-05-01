@@ -16,7 +16,11 @@ class AdultLocalizedText:
 @dataclass(frozen=True, slots=True)
 class AdultLocalizedMetadata:
     title: AdultLocalizedText
+    overview: AdultLocalizedText
+    maker: AdultLocalizedText
+    label: AdultLocalizedText
     series: AdultLocalizedText
+    director: AdultLocalizedText
     actors: AdultLocalizedText
 
 
@@ -31,6 +35,7 @@ _TITLE_LOCALIZED_KEYS = (
     "chineseTitle",
     "zhTitle",
 )
+_TITLE_TRANSLATION_KEYS = ("adult_translation_title_zh",)
 _TITLE_ORIGINAL_KEYS = (
     "adult_original_title",
     "originalTitle",
@@ -44,6 +49,24 @@ _TITLE_SOURCE_KEYS = (
     "read_only_adult_title",
     "title",
 )
+_OVERVIEW_LOCALIZED_KEYS = (
+    "adult_overview_zh",
+    "adult_localized_overview",
+    "localized_adult_overview",
+    "read_only_adult_overview_zh",
+    "read_only_adult_localized_overview",
+    "chineseOverview",
+    "zhOverview",
+)
+_OVERVIEW_TRANSLATION_KEYS = ("adult_translation_overview_zh",)
+_OVERVIEW_SOURCE_KEYS = (
+    "adult_overview",
+    "read_only_adult_overview",
+    "overview",
+    "description",
+    "summary",
+    "plot",
+)
 _SERIES_LOCALIZED_KEYS = (
     "adult_series_zh",
     "adult_localized_series",
@@ -53,6 +76,7 @@ _SERIES_LOCALIZED_KEYS = (
     "chineseSeries",
     "zhSeries",
 )
+_SERIES_TRANSLATION_KEYS = ("adult_translation_series_zh",)
 _SERIES_ORIGINAL_KEYS = (
     "adult_original_series",
     "originalSeries",
@@ -60,6 +84,48 @@ _SERIES_ORIGINAL_KEYS = (
     "read_only_adult_original_series",
 )
 _SERIES_SOURCE_KEYS = ("adult_series", "series", "read_only_adult_series")
+_MAKER_LOCALIZED_KEYS = (
+    "adult_maker_zh",
+    "adult_studio_zh",
+    "adult_localized_maker",
+    "localized_adult_maker",
+    "read_only_adult_maker_zh",
+    "read_only_adult_studio_zh",
+    "chineseMaker",
+    "zhMaker",
+)
+_MAKER_TRANSLATION_KEYS = ("adult_translation_maker_zh",)
+_MAKER_SOURCE_KEYS = (
+    "adult_maker",
+    "adult_studio",
+    "maker",
+    "studio",
+    "publisher",
+    "read_only_adult_maker",
+    "read_only_adult_studio",
+)
+_LABEL_LOCALIZED_KEYS = (
+    "adult_label_zh",
+    "adult_localized_label",
+    "localized_adult_label",
+    "read_only_adult_label_zh",
+    "read_only_adult_localized_label",
+    "chineseLabel",
+    "zhLabel",
+)
+_LABEL_TRANSLATION_KEYS = ("adult_translation_label_zh",)
+_LABEL_SOURCE_KEYS = ("adult_label", "label", "read_only_adult_label")
+_DIRECTOR_LOCALIZED_KEYS = (
+    "adult_director_zh",
+    "adult_localized_director",
+    "localized_adult_director",
+    "read_only_adult_director_zh",
+    "read_only_adult_localized_director",
+    "chineseDirector",
+    "zhDirector",
+)
+_DIRECTOR_TRANSLATION_KEYS = ("adult_translation_director_zh",)
+_DIRECTOR_SOURCE_KEYS = ("adult_director", "director", "read_only_adult_director")
 _ACTORS_LOCALIZED_KEYS = (
     "adult_actors_zh",
     "adult_localized_actors",
@@ -107,62 +173,90 @@ def resolve_adult_localized_metadata(item: Mapping[str, Any]) -> AdultLocalizedM
     """Resolve trusted Chinese adult metadata while retaining original source text."""
     return AdultLocalizedMetadata(
         title=_resolve_localized_title(item),
+        overview=_resolve_localized_overview(item),
+        maker=_resolve_localized_maker(item),
+        label=_resolve_localized_label(item),
         series=_resolve_localized_series(item),
+        director=_resolve_localized_director(item),
         actors=_resolve_localized_actors(item),
     )
 
 
 def _resolve_localized_title(item: Mapping[str, Any]) -> AdultLocalizedText:
     source_title = _first_text(item, _TITLE_SOURCE_KEYS)
-    explicit_original = _first_text(item, _TITLE_ORIGINAL_KEYS)
-    consensus_title = _resolve_consensus_text(item, _TITLE_LOCALIZED_KEYS)
-    if consensus_title:
-        original = explicit_original or _original_when_different(consensus_title, source_title)
-        return AdultLocalizedText(value=consensus_title, original=original)
-    explicit_title = _first_text(item, _TITLE_LOCALIZED_KEYS)
-    if explicit_title:
-        original = explicit_original or _original_when_different(explicit_title, source_title)
-        return AdultLocalizedText(value=explicit_title, original=original)
+    return _resolve_localized_text(
+        item,
+        source_text=source_title,
+        localized_keys=_TITLE_LOCALIZED_KEYS,
+        translation_keys=_TITLE_TRANSLATION_KEYS,
+        original_keys=_TITLE_ORIGINAL_KEYS,
+        curated_value=_resolve_curated_title_alias(item, source_title),
+    )
 
-    curated_title = _resolve_curated_title_alias(item, source_title)
-    if curated_title:
-        return AdultLocalizedText(value=curated_title, original=source_title)
-    if explicit_original and source_title and explicit_original != source_title:
-        return AdultLocalizedText(value=source_title, original=explicit_original)
-    return AdultLocalizedText(value=source_title)
+
+def _resolve_localized_overview(item: Mapping[str, Any]) -> AdultLocalizedText:
+    source_overview = _first_text(item, _OVERVIEW_SOURCE_KEYS)
+    return _resolve_localized_text(
+        item,
+        source_text=source_overview,
+        localized_keys=_OVERVIEW_LOCALIZED_KEYS,
+        translation_keys=_OVERVIEW_TRANSLATION_KEYS,
+    )
 
 
 def _resolve_localized_series(item: Mapping[str, Any]) -> AdultLocalizedText:
     source_series = _first_text(item, _SERIES_SOURCE_KEYS)
-    explicit_original = _first_text(item, _SERIES_ORIGINAL_KEYS)
-    consensus_series = _resolve_consensus_text(item, _SERIES_LOCALIZED_KEYS)
-    if consensus_series:
-        original = explicit_original or _original_when_different(consensus_series, source_series)
-        return AdultLocalizedText(value=consensus_series, original=original)
-    explicit_series = _first_text(item, _SERIES_LOCALIZED_KEYS)
-    if explicit_series:
-        original = explicit_original or _original_when_different(explicit_series, source_series)
-        return AdultLocalizedText(value=explicit_series, original=original)
+    return _resolve_localized_text(
+        item,
+        source_text=source_series,
+        localized_keys=_SERIES_LOCALIZED_KEYS,
+        translation_keys=_SERIES_TRANSLATION_KEYS,
+        original_keys=_SERIES_ORIGINAL_KEYS,
+        curated_value=_CURATED_SERIES_ALIASES.get(source_series, ""),
+    )
 
-    curated_series = _CURATED_SERIES_ALIASES.get(source_series, "")
-    if curated_series:
-        return AdultLocalizedText(value=curated_series, original=source_series)
-    if explicit_original and source_series and explicit_original != source_series:
-        return AdultLocalizedText(value=source_series, original=explicit_original)
-    return AdultLocalizedText(value=source_series)
+
+def _resolve_localized_maker(item: Mapping[str, Any]) -> AdultLocalizedText:
+    source_maker = _first_text(item, _MAKER_SOURCE_KEYS)
+    return _resolve_localized_text(
+        item,
+        source_text=source_maker,
+        localized_keys=_MAKER_LOCALIZED_KEYS,
+        translation_keys=_MAKER_TRANSLATION_KEYS,
+    )
+
+
+def _resolve_localized_label(item: Mapping[str, Any]) -> AdultLocalizedText:
+    source_label = _first_text(item, _LABEL_SOURCE_KEYS)
+    return _resolve_localized_text(
+        item,
+        source_text=source_label,
+        localized_keys=_LABEL_LOCALIZED_KEYS,
+        translation_keys=_LABEL_TRANSLATION_KEYS,
+    )
+
+
+def _resolve_localized_director(item: Mapping[str, Any]) -> AdultLocalizedText:
+    source_director = _first_text(item, _DIRECTOR_SOURCE_KEYS)
+    return _resolve_localized_text(
+        item,
+        source_text=source_director,
+        localized_keys=_DIRECTOR_LOCALIZED_KEYS,
+        translation_keys=_DIRECTOR_TRANSLATION_KEYS,
+    )
 
 
 def _resolve_localized_actors(item: Mapping[str, Any]) -> AdultLocalizedText:
     source_actors = _first_sequence_text(item, _ACTORS_SOURCE_KEYS)
     explicit_original = _first_sequence_text(item, _ACTORS_ORIGINAL_KEYS)
-    consensus_actors = _resolve_consensus_sequence_text(item, _ACTORS_LOCALIZED_KEYS)
-    if consensus_actors:
-        original = explicit_original or _original_when_different(consensus_actors, source_actors)
-        return AdultLocalizedText(value=consensus_actors, original=original)
     explicit_actors = _first_sequence_text(item, _ACTORS_LOCALIZED_KEYS)
     if explicit_actors:
         original = explicit_original or _original_when_different(explicit_actors, source_actors)
         return AdultLocalizedText(value=explicit_actors, original=original)
+    consensus_actors = _resolve_consensus_sequence_text(item, _ACTORS_LOCALIZED_KEYS)
+    if consensus_actors:
+        original = explicit_original or _original_when_different(consensus_actors, source_actors)
+        return AdultLocalizedText(value=consensus_actors, original=original)
 
     source_parts = _split_actor_names(source_actors)
     if not source_parts:
@@ -195,6 +289,36 @@ def _resolve_curated_title_alias(item: Mapping[str, Any], source_title: str) -> 
         if curated_title:
             return curated_title
     return ""
+
+
+def _resolve_localized_text(
+    item: Mapping[str, Any],
+    *,
+    source_text: str,
+    localized_keys: Sequence[str],
+    translation_keys: Sequence[str] = (),
+    original_keys: Sequence[str] = (),
+    curated_value: str = "",
+) -> AdultLocalizedText:
+    explicit_original = _first_text(item, original_keys)
+    explicit_localized = _first_text(item, localized_keys)
+    if explicit_localized:
+        original = explicit_original or _original_when_different(explicit_localized, source_text)
+        return AdultLocalizedText(value=explicit_localized, original=original)
+    consensus_value = _resolve_consensus_text(item, localized_keys)
+    if consensus_value:
+        original = explicit_original or _original_when_different(consensus_value, source_text)
+        return AdultLocalizedText(value=consensus_value, original=original)
+    translated_value = _first_text(item, translation_keys)
+    if translated_value:
+        original = explicit_original or _original_when_different(translated_value, source_text)
+        return AdultLocalizedText(value=translated_value, original=original)
+    if curated_value:
+        original = source_text or explicit_original
+        return AdultLocalizedText(value=curated_value, original=original)
+    if explicit_original and source_text and explicit_original != source_text:
+        return AdultLocalizedText(value=source_text, original=explicit_original)
+    return AdultLocalizedText(value=source_text)
 
 
 def _resolve_consensus_text(item: Mapping[str, Any], keys: Sequence[str]) -> str:

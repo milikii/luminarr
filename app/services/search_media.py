@@ -83,6 +83,7 @@ ADULT_BT_AGGREGATOR_SOURCE_NAMES = frozenset({"prowlarr"})
 
 BatchPreviewSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 PrepareRawCandidatesFunc = Callable[[Sequence[Mapping[str, Any]], str], Sequence[Mapping[str, Any]]]
+AdultMetadataTranslateFunc = Callable[[Sequence[Mapping[str, Any]]], Awaitable[Sequence[Mapping[str, Any]]]]
 load_bt_scoring_rules = _load_bt_scoring_rules
 
 
@@ -150,6 +151,7 @@ class SearchMediaService:
         lookup_media_candidates_func: LookupMediaCandidatesFunc | None = None,
         adult_content_registry_repo: AdultContentRegistryRepo | None = None,
         adult_read_only_lookup_func: AdultReadOnlyLookupFunc | None = None,
+        adult_metadata_translate_func: AdultMetadataTranslateFunc | None = None,
     ) -> None:
         self._search_func = search_func
         self._raw_search_func = raw_search_func or search_func
@@ -163,6 +165,7 @@ class SearchMediaService:
             adult_content_registry_repo=adult_content_registry_repo,
             adult_read_only_lookup_func=adult_read_only_lookup_func,
         )
+        self._adult_metadata_translate_func = adult_metadata_translate_func
         self._recent_candidates_by_chat = self._candidate_state.recent_by_chat
         self._clarification_pending_by_chat = self._clarification_state.pending_by_chat
 
@@ -196,8 +199,16 @@ class SearchMediaService:
         if adult_only:
             adult_display_results = _filter_adult_only_display_candidates(display_results)
             if adult_display_results:
+                adult_display_results = await self._translate_adult_display_candidates(
+                    adult_display_results,
+                    lookup_query=cleaned_query,
+                )
                 return format_adult_bt_resource_fallback_reply(cleaned_query, adult_display_results)
             fallback_results = await self._search_adult_only_fallback_candidates(cleaned_query)
+            fallback_results = await self._translate_adult_display_candidates(
+                fallback_results,
+                lookup_query=cleaned_query,
+            )
             return format_adult_bt_resource_fallback_reply(cleaned_query, fallback_results)
         return format_bt_read_only_reply(cleaned_query, display_results)
 
@@ -499,6 +510,40 @@ class SearchMediaService:
         if not tmdb_candidates:
             return False
         return not str(parsed_query.year).strip()
+
+    async def _translate_adult_display_candidates(
+        self,
+        candidates: Sequence[Mapping[str, Any]],
+        *,
+        lookup_query: str,
+    ) -> tuple[Mapping[str, Any], ...]:
+        base_candidates = tuple({str(key): value for key, value in item.items()} for item in candidates)
+        if not base_candidates or self._adult_metadata_translate_func is None:
+            return base_candidates
+        try:
+            translated_candidates = await self._adult_metadata_translate_func(base_candidates)
+        except Exception as error:
+            emit_operational_log(
+                title="成人 metadata 翻译失败",
+                detail=f"query={lookup_query} 错误={error}",
+                fix_hint="检查 SUBTITLE_TRANSLATION_* 配置、翻译接口可达性和响应 JSON；当前会保留原始成人 metadata，不影响资源候选展示。",
+            )
+            return base_candidates
+        if not translated_candidates:
+            return base_candidates
+        normalized_candidates = tuple(
+            {str(key): value for key, value in item.items()}
+            for item in translated_candidates
+            if isinstance(item, Mapping)
+        )
+        if len(normalized_candidates) != len(base_candidates):
+            emit_operational_log(
+                title="成人 metadata 翻译结果不完整",
+                detail=f"query={lookup_query} input={len(base_candidates)} output={len(normalized_candidates)}",
+                fix_hint="检查成人 metadata 翻译边界的 request_id 对齐与结果合并逻辑；当前会回退到原始成人 metadata。",
+            )
+            return base_candidates
+        return normalized_candidates
 
 
 def _iter_adult_only_fallback_queries(query: str) -> tuple[str, ...]:

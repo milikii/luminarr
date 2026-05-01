@@ -953,6 +953,109 @@ def test_main_builds_qb_only_runtime_without_prowlarr_or_legacy_transmission(
     assert len(created["qb_client_calls"]) == 1
 
 
+def test_main_reuses_subtitle_translation_settings_for_adult_metadata_translation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        subtitle_translation_api_key="adult-translate-key",
+        subtitle_translation_base_url="https://openai.example/v1",
+        subtitle_translation_model="gpt-5.4-mini",
+        subtitle_translation_timeout_seconds=45.0,
+        outbound_proxy_url="http://proxy.local:7890",
+    )
+    created: dict[str, object] = {}
+    translate_candidates_sentinel = object()
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    class _FakeAdultMetadataTranslatorService:
+        def __init__(self, **kwargs: object) -> None:
+            created["adult_metadata_translator_kwargs"] = kwargs
+            self.translate_candidates = translate_candidates_sentinel
+
+    def _capture_search_media_service(*_args: object, **kwargs: object) -> SimpleNamespace:
+        created["search_media_service_kwargs"] = kwargs
+        return SimpleNamespace()
+
+    def _fake_build_application(
+        token: str,
+        search_service,
+        add_to_downloader_service,
+        get_download_status_service,
+        import_to_library_service,
+        cleanup_downloaded_source_service,
+        manage_watchlist_service,
+        manage_bt_subscription_service,
+        **kwargs: object,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(bot_data={tg.SEARCH_SERVICE_KEY: search_service})
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr("app.main._build_adult_read_only_lookup_func", lambda *, proxy_url: SimpleNamespace(proxy_url=proxy_url))
+    monkeypatch.setattr("app.main.SearchMediaService", _capture_search_media_service)
+    monkeypatch.setattr("app.main.AdultMetadataTranslatorService", _FakeAdultMetadataTranslatorService)
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fake_build_application)
+    monkeypatch.setattr("app.main._run_application_polling", lambda _application: None)
+    monkeypatch.setattr(
+        "app.main.ProwlarrClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("ProwlarrClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.TransmissionClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("legacy TransmissionClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.QbittorrentClient",
+        lambda **_kwargs: created.setdefault("qb_client_calls", []).append(_kwargs) or SimpleNamespace(),
+    )
+
+    run_main()
+
+    assert created["adult_metadata_translator_kwargs"] == {
+        "api_key": "adult-translate-key",
+        "base_url": "https://openai.example/v1",
+        "model": "gpt-5.4-mini",
+        "timeout_seconds": 45.0,
+        "proxy_url": "http://proxy.local:7890",
+    }
+    assert created["search_media_service_kwargs"]["adult_metadata_translate_func"] is translate_candidates_sentinel
+
+
 def test_main_uses_non_telegram_host_when_feishu_is_available(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

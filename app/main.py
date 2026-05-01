@@ -77,6 +77,7 @@ from app.operational_logging import emit_operational_log
 from app.runtime.execution_policy import ExecutionGate
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
+from app.services.adult_metadata_translation import AdultMetadataTranslatorService
 from app.services.adult_archive_service import AdultArchiveService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, get_default_adult_bt_source_names
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
@@ -423,6 +424,13 @@ def main() -> None:
         lookup_media_candidates_func=tmdb_lookup_media_candidates_func,
         adult_content_registry_repo=adult_content_registry_repo,
         adult_read_only_lookup_func=_build_adult_read_only_lookup_func(proxy_url=settings.outbound_proxy_url),
+        adult_metadata_translate_func=AdultMetadataTranslatorService(
+            api_key=settings.subtitle_translation_api_key,
+            base_url=settings.subtitle_translation_base_url,
+            model=settings.subtitle_translation_model,
+            timeout_seconds=settings.subtitle_translation_timeout_seconds,
+            proxy_url=settings.outbound_proxy_url,
+        ).translate_candidates,
     )
     transmission_client: TransmissionClient | None = None
     if settings.has_legacy_transmission_downloader():

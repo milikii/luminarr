@@ -185,6 +185,7 @@ def test_format_telegram_reply_preserves_avmoo_primary_adult_metadata() -> None:
     assert "海报: https://jp.netcdn.space/digital/video/ssis00483/ssis00483pl.jpg" in formatted
     assert "📅 <b>日期：</b> 2023-05-01  |  ⏳ <b>时长：</b> 120分钟" in formatted
     assert "🏢 <b>片商：</b> S1" in formatted
+    assert "🏭 <b>厂牌：</b> S1 Label" in formatted
     assert "🏷 <b>系列：</b> Secret Mission" in formatted
     assert "👤 <b>演员：</b> Aki / Mei" in formatted
     assert "<code>magnet:?xt=urn:btih:1111111111111111111111111111111111111111</code>" in formatted
@@ -242,6 +243,54 @@ def test_format_telegram_reply_renders_adult_bt_as_poster_caption_card() -> None
     assert "链接参考:" not in formatted
     assert "🌐 查看详情 (avmoo)：打开 https://avmoo.shop/cn/movie/4221ec1035fdf66f" in formatted
     assert "➡️ 下一步：发送 magnet:?xt=urn:btih:abcdef1234567890abcdef1234567890abcdef12" in formatted
+
+
+def test_format_telegram_reply_renders_translated_adult_overview_and_keeps_original_title_subtitle() -> None:
+    long_overview = (
+        "这是一段翻译后的中文简介，详细描述了人物关系、欲望冲突与情绪变化。"
+        "为了验证 Telegram 成人卡片会在展示时做合理截断，这里继续补充一段较长的说明文字，"
+        "并确保末尾这段不应该完整出现在最终卡片里。"
+    )
+    text = format_adult_bt_resource_fallback_reply(
+        "SSIS-842",
+        (
+            {
+                "title": "SSIS-842 release title",
+                "source": "magnet:?xt=urn:btih:9999999999999999999999999999999999999999&dn=SSIS-842",
+                "infoHash": "9999999999999999999999999999999999999999",
+                "seeders": 11,
+                "size": 3 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+                "read_only_adult_source_site": "avmoo.shop",
+                "read_only_adult_display_id": "SSIS-842",
+                "read_only_adult_archive_category": "censored",
+                "read_only_adult_title": "SSIS-842 彼女のリアルで生々しい姿をお見せします",
+                "read_only_adult_poster_url": "https://img.example/ssis-842.jpg",
+                "read_only_adult_series": "リアルSEXドキュメント",
+                "read_only_adult_maker": "エスワン ナンバーワンスタイル",
+                "read_only_adult_director": "苺原",
+                "read_only_adult_actors": ("うんぱい",),
+                "adult_translation_title_zh": "SSIS-842 让你看到她真实而鲜活的一面",
+                "adult_translation_overview_zh": long_overview,
+                "adult_translation_series_zh": "真实性爱纪录",
+                "adult_translation_maker_zh": "S1 顶级风格",
+                "adult_translation_director_zh": "莓原",
+            },
+        ),
+    )
+
+    formatted = format_telegram_reply(text)
+
+    assert formatted.startswith("【成人资源候选】 SSIS-842\n海报: https://img.example/ssis-842.jpg")
+    assert "🎬 <b>[SSIS-842] 让你看到她真实而鲜活的一面</b>" in formatted
+    assert "<i>SSIS-842 彼女のリアルで生々しい姿をお見せします</i>" in formatted
+    assert "📝 <b>简介：</b> 这是一段翻译后的中文简介" in formatted
+    assert "👤 <b>演员：</b> うんぱい（中文名未确认）" in formatted
+    assert "🏢 <b>片商：</b> S1 顶级风格" in formatted
+    assert "🏷 <b>系列：</b> 真实性爱纪录" in formatted
+    assert "🎬 <b>导演：</b> 莓原" in formatted
+    assert "末尾这段不应该完整出现在最终卡片里。" not in formatted
 
 
 def test_build_telegram_reply_func_sends_adult_bt_card_as_photo_caption_with_buttons() -> None:

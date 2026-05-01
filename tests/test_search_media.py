@@ -13,6 +13,7 @@ from app.db.candidate_repo import CandidateMappingRepo
 from app.db.candidate_repo import CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError, ClarificationRepo
 from app.db.sqlite import SqliteDatabase
+from app.services.adult_metadata_translation import AdultMetadataTranslatorService
 from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
 from app.services.search_media_state import CandidateStateStore, ClarificationStateStore
 from app.services.search_media import (
@@ -285,6 +286,74 @@ def test_search_bt_read_only_and_format_adult_only_direct_hit_uses_rich_resource
     assert f"磁力链接: {magnet}" in text
 
 
+def test_search_bt_read_only_and_format_applies_general_adult_metadata_translation() -> None:
+    magnet = "magnet:?xt=urn:btih:dddddddddddddddddddddddddddddddddddddddd&dn=ssis-842"
+    translated_queries: list[str] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only translation results")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-842"
+        return [
+            {
+                "title": "SSIS-842 resource title",
+                "source": magnet,
+                "infoHash": "dddddddddddddddddddddddddddddddddddddddd",
+                "seeders": 7,
+                "size": 2 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-842"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-842",
+            display_id="SSIS-842",
+            archive_category="censored",
+            title="SSIS-842 彼女のリアルで生々しい姿をお見せします",
+            detail_url="https://avmoo.shop/cn/movie/842",
+            source_site="avmoo.shop",
+            poster_url="https://img.example/ssis-842.jpg",
+            release_date="2024-02-02",
+            runtime="120 分钟",
+            maker="エスワン ナンバーワンスタイル",
+            series="リアルSEXドキュメント",
+            director="苺原",
+            actors=("うんぱい",),
+        )
+
+    async def fake_translate(candidates):
+        translated_queries.append(str(candidates[0].get("read_only_adult_title", "")))
+        translated = dict(candidates[0])
+        translated.update(
+            {
+                "adult_translation_title_zh": "SSIS-842 让你看到她真实而鲜活的一面",
+                "adult_translation_overview_zh": "这是一段翻译后的中文简介，欲望与嫉妒在关系里彼此交错。",
+                "adult_translation_series_zh": "真实性爱纪录",
+                "adult_translation_maker_zh": "S1 顶级风格",
+                "adult_translation_director_zh": "莓原",
+            }
+        )
+        return [translated]
+
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+        adult_metadata_translate_func=fake_translate,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-842", adult_only=True))
+
+    assert translated_queries == ["SSIS-842 彼女のリアルで生々しい姿をお見せします"]
+    assert "标准信息: 标题: SSIS-842 让你看到她真实而鲜活的一面 | 原名: SSIS-842 彼女のリアルで生々しい姿をお見せします" in text
+    assert "简介: 这是一段翻译后的中文简介，欲望与嫉妒在关系里彼此交错。" in text
+    assert "制作信息: 制作商: S1 顶级风格 | 系列: 真实性爱纪录 | 原系列: リアルSEXドキュメント | 导演: 莓原 | 演员: うんぱい（中文名未确认）" in text
+    assert f"磁力链接: {magnet}" in text
+
+
 def test_search_bt_read_only_and_format_adult_only_renders_backup_helper_metadata() -> None:
     magnet = "magnet:?xt=urn:btih:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb&dn=ssis-123"
 
@@ -335,6 +404,109 @@ def test_search_bt_read_only_and_format_adult_only_renders_backup_helper_metadat
     assert "标准信息: 标题: SSIS-123 Secret Mission Nurse | 发行日: 2025-12-31 | 时长: 118 分钟" in text
     assert "制作信息: 制作商: Backup Studio | 演员: Actor C" in text
     assert "Metadata源: javlibrary | 角色: backup_cross_check" in text
+    assert f"磁力链接: {magnet}" in text
+
+
+def test_search_bt_read_only_and_format_adult_translation_failure_is_soft_and_logs(monkeypatch: pytest.MonkeyPatch) -> None:
+    magnet = "magnet:?xt=urn:btih:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee&dn=ssis-842"
+    logged: list[tuple[str, str]] = []
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only translation failure")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-842"
+        return [
+            {
+                "title": "SSIS-842 resource title",
+                "source": magnet,
+                "infoHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "seeders": 4,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-842"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-842",
+            display_id="SSIS-842",
+            archive_category="censored",
+            title="SSIS-842 日本語タイトル",
+            detail_url="https://avmoo.shop/cn/movie/842",
+            source_site="avmoo.shop",
+            actors=("うんぱい",),
+        )
+
+    async def fake_translate(_candidates):
+        raise RuntimeError("translator boom")
+
+    monkeypatch.setattr(
+        "app.services.search_media.emit_operational_log",
+        lambda *, title, detail, fix_hint: logged.append((title, detail)),
+    )
+
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+        adult_metadata_translate_func=fake_translate,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-842", adult_only=True))
+
+    assert text.startswith("成人资源候选：SSIS-842")
+    assert "标准信息: 标题: SSIS-842 日本語タイトル" in text
+    assert f"磁力链接: {magnet}" in text
+    assert logged
+    assert logged[0][0] == "成人 metadata 翻译失败"
+    assert "SSIS-842" in logged[0][1]
+
+
+def test_search_bt_read_only_and_format_adult_translation_without_api_key_keeps_resources() -> None:
+    magnet = "magnet:?xt=urn:btih:ffffffffffffffffffffffffffffffffffffffff&dn=ssis-842"
+
+    async def unexpected_pt_search(_: str) -> list[dict[str, object]]:
+        raise AssertionError("PT search should not be used for adult-only no-key translation")
+
+    async def fake_raw_search(query: str) -> list[dict[str, object]]:
+        assert query == "SSIS-842"
+        return [
+            {
+                "title": "SSIS-842 resource title",
+                "source": magnet,
+                "infoHash": "ffffffffffffffffffffffffffffffffffffffff",
+                "seeders": 5,
+                "size": 1 * 1024 * 1024 * 1024,
+                "indexerName": "tokyotosho",
+                "sourceProvider": "tokyotosho",
+                "read_only_adult_overview": "日本語のあらすじ",
+            }
+        ]
+
+    async def fake_helper_lookup(lookup_query: str) -> JavLibraryReadOnlyMatch | None:
+        assert lookup_query == "SSIS-842"
+        return JavLibraryReadOnlyMatch(
+            normalized_content_id="censored:ssis-842",
+            display_id="SSIS-842",
+            archive_category="censored",
+            title="SSIS-842 日本語タイトル",
+            detail_url="https://avmoo.shop/cn/movie/842",
+            source_site="avmoo.shop",
+            actors=("うんぱい",),
+        )
+
+    service = SearchMediaService(
+        unexpected_pt_search,
+        raw_search_func=fake_raw_search,
+        adult_read_only_lookup_func=fake_helper_lookup,
+        adult_metadata_translate_func=AdultMetadataTranslatorService(api_key="").translate_candidates,
+    )
+    text = _run(service.search_bt_read_only_and_format("SSIS-842", adult_only=True))
+
+    assert text.startswith("成人资源候选：SSIS-842")
+    assert "标准信息: 标题: SSIS-842 日本語タイトル" in text
     assert f"磁力链接: {magnet}" in text
 
 

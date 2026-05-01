@@ -114,6 +114,7 @@ class _TelegramAdultBtCandidate:
     metadata_title: str = ""
     release_date: str = ""
     runtime: str = ""
+    overview: str = ""
     maker: str = ""
     label: str = ""
     series: str = ""
@@ -182,6 +183,9 @@ def _apply_adult_bt_candidate_line(candidate: _TelegramAdultBtCandidate, line: s
         candidate.original_title = parts.get("原名", candidate.original_title)
         candidate.release_date = parts.get("发行日", candidate.release_date)
         candidate.runtime = parts.get("时长", candidate.runtime)
+        return
+    if line.startswith("简介:"):
+        candidate.overview = line.removeprefix("简介:").strip()
         return
     if line.startswith("制作信息:"):
         parts = _parse_telegram_field_parts(line.removeprefix("制作信息:").strip())
@@ -252,9 +256,13 @@ def _render_adult_caption_lines(candidate: _TelegramAdultBtCandidate, *, display
     if subtitle:
         lines.append(f"<i>{_html.escape(subtitle)}</i>")
     lines.append("━━━━━━━━━━━━━━━━━━")
+    overview_line = _format_adult_overview_line(candidate)
+    if overview_line:
+        lines.append(overview_line)
     metadata_lines = [
         _format_adult_metadata_caption_line("👤", "演员", candidate.actors),
-        _format_adult_metadata_caption_line("🏢", "片商", candidate.maker or candidate.label),
+        _format_adult_metadata_caption_line("🏢", "片商", candidate.maker),
+        _format_adult_metadata_caption_line("🏭", "厂牌", candidate.label),
         _format_adult_metadata_caption_line("🏷", "系列", candidate.series),
         _format_adult_date_runtime_line(candidate),
         _format_adult_metadata_caption_line("🎬", "导演", candidate.director),
@@ -316,6 +324,13 @@ def _format_adult_date_runtime_line(candidate: _TelegramAdultBtCandidate) -> str
     return "  |  ".join(parts)
 
 
+def _format_adult_overview_line(candidate: _TelegramAdultBtCandidate) -> str:
+    cleaned_overview = candidate.overview.strip()
+    if not cleaned_overview:
+        return ""
+    return f"📝 <b>简介：</b> {_html.escape(_truncate_text(cleaned_overview, limit=80))}"
+
+
 def _format_adult_category_label(category: str) -> str:
     normalized = category.strip().lower()
     if normalized == "censored":
@@ -371,6 +386,14 @@ def _shorten_magnet_uri(value: str) -> str:
     if match is None:
         return value.strip()
     return f"magnet:?xt=urn:btih:{match.group('hash').lower()}"
+
+
+def _truncate_text(value: str, *, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    if limit <= 3:
+        return value[:limit]
+    return f"{value[: limit - 3]}..."
 
 
 def _format_telegram_media_candidate_reply(text: str) -> str:

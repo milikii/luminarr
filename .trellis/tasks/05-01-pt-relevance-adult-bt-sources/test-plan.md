@@ -26,8 +26,9 @@ This plan covers:
 | adult helper fallback | primary helper fail -> backup helper | unit |
 | adult provider empty config | curated fallback or explicit config behavior stays deterministic | unit |
 | adult Telegram card | poster-first, Chinese labels, grouped metadata/resource sections | formatter + real smoke |
-| adult metadata localization | title/series/actors use trusted Chinese aliases and retain original Japanese title | unit + Telegram formatter |
+| adult metadata localization | title/overview/series/maker/director use source-truth or translation pipeline, while actors stay trust-only | unit + Telegram formatter |
 | unknown adult actor alias | no blind translation; original actor name is marked as unconfirmed | unit |
+| adult metadata translation fail-soft | missing API key or translation failure keeps adult BT resources visible | unit + service |
 | Telegram real smoke | `丧尸`, `你的名字`, `成人搜 SSIS-483` render readable result cards | real smoke |
 
 ## Required Test Updates
@@ -43,10 +44,15 @@ This plan covers:
 - `tests/test_telegram_reply_formatter.py`
   - PT Telegram card shows poster, type, year, alias/support text
   - adult Telegram card is poster-first and Chinese-readable
-  - adult Telegram card uses Chinese main title/actor when localization has trusted aliases and keeps the Japanese title as subtitle
+  - adult Telegram card uses Chinese main title/overview/series/maker/director when localization or translation has trusted fields and keeps the Japanese title as subtitle
 - `tests/test_adult_metadata_localization.py`
   - trusted localized title/series/actor aliases are emitted with original fields retained
+  - translation pipeline fields are consumed for title/overview/series/maker/director
   - unknown Japanese actor names are marked `中文名未确认` instead of being machine-translated
+- `tests/test_adult_metadata_translation.py`
+  - translation request payload contains the normalized adult metadata fields
+  - missing API key returns empty translation results instead of blocking display
+  - translation results merge back into display candidates with stable request IDs
 - `tests/test_private_chat_search_runtime.py`
   - runtime returns card-style results for ambiguous title-only search
   - runtime does not dispatch resource search before media candidate confirmation
@@ -57,10 +63,11 @@ This plan covers:
   - adult provider hit returns resource results
   - helper-only hit does not masquerade as BT resource success
   - empty `BT_WEB_SOURCES` fallback behavior is deterministic
+  - adult-only candidate translation runs after helper enrichment and fails soft on runtime errors
 - `tests/test_bt_sources.py`
   - provider/helper role mapping for newly implemented sources
 - `tests/test_main.py`
-  - startup wiring builds expected adult provider/helper composition
+  - startup wiring builds expected adult provider/helper composition and reuses subtitle translation settings for adult metadata translation
 - `tests/test_telegram_reply_formatter.py`
   - adult Telegram card still preserves poster, metadata source role, and copyable magnet
 

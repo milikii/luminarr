@@ -577,3 +577,26 @@
 
 ### 下轮目标
 - 提交本轮成人 metadata 中文化改动并重启本地 `app.main`，让 Telegram 实机测试使用最新代码。
+
+## Round 34 — 2026-05-01 18:30
+
+### 完成
+- 把成人 metadata 中文化从“单番号 alias”升级为通用翻译 pipeline：adult-only 候选在 helper enrichment 后、formatter 前补齐中文标题、简介、系列、片商、厂牌和导演。
+- 保持演员名 trust-only 边界：演员字段不走机器翻译；未知日文演员继续显示 `中文名未确认`。
+- 补齐 fail-soft 留痕：无翻译 API key、翻译结果 request_id 不完整时会保留原始资源卡片，并写 operational log。
+- Telegram 成人卡片新增 `简介` 和独立 `厂牌` 行，避免翻译字段被吞掉。
+- 为 `main.py` 补回 startup wiring 测试，确保 adult metadata translation 复用 `subtitle_translation_*` 配置并注入 `SearchMediaService`。
+
+### 测试状态
+- 通过: 6 / 总计: 6
+- `pytest tests/test_adult_metadata_translation.py tests/test_adult_metadata_localization.py tests/test_search_media.py tests/test_telegram_reply_formatter.py tests/test_main.py -q`
+- `make lint`
+- `make quality`
+- `make verify-adult-bt-wedge`
+- `git diff --check`
+
+### 遗留 / 下轮继续
+- 当前翻译留痕覆盖的是运行时主链使用的 `translate_candidates()` 路径；如果未来新增直接调用 `translate_requests()` 的调用方，需要同步补上同类留痕约束。
+
+### 下轮目标
+- 提交通用 adult metadata 翻译 pipeline，并重启本地运行进程，供 Telegram 实机验证 `成人搜 SSIS-842`。

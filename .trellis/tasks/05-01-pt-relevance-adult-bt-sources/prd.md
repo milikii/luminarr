@@ -82,11 +82,13 @@
 
 ### R5. adult BT metadata 必须可信中文化
 
-* adult BT 卡片不能只把字段标签翻成中文；标题、系列、演员这些内容字段也要尽量展示可信中文。
+* adult BT 卡片不能只把字段标签翻成中文；标题、简介、系列、片商、厂牌、导演、演员这些内容字段也要尽量展示可信中文。
 * 中文主字段的真相来源优先级：
   * source/helper 明确给出的中文字段或别名；
   * 多 metadata 源交叉验证后得到的一致中文字段；
+  * 通用 adult metadata 翻译 pipeline 产出的中文字段（仅用于标题 / 简介 / 系列 / 片商 / 厂牌 / 导演，不用于演员）；
   * 本地 curated alias 表中已有的人工确认别名。
+* 这条翻译 pipeline 必须是“通用字段翻译边界”，不能继续退化成只给个别番号补本地 alias。
 * 日文原始标题必须保留为副标题或 `原名`，不能被丢掉。
 * 演员名不能盲目按读音机器翻译；只有 source-provided alias 或本地已确认 alias 才能替换成中文。
 * 如果演员中文名没有可信来源，应保留原名并标记 `中文名未确认`，不能伪装成准确中文。
@@ -105,7 +107,7 @@
 * [ ] 当前讨论过的成人来源都被纳入实现方案，且角色边界清楚。
 * [ ] 至少主要成人信息源在 helper / metadata 层真正可查到信息，而不是只停留在排序 policy。
 * [ ] adult BT Telegram 卡片优先显示海报，并把核心字段整理成中文友好的结构化排版。
-* [ ] adult BT Telegram 卡片主标题、系列、演员优先显示可信中文，日文原名作为副标题保留。
+* [ ] adult BT Telegram 卡片主标题、简介、系列、片商、导演优先显示可信中文，日文原名作为副标题保留。
 * [ ] 未确认的演员中文名不会被盲翻，必须显示原名并带 `中文名未确认` 标记。
 
 ## Out of Scope
@@ -126,6 +128,7 @@
 * 当前相关入口：
   * `app/services/search_request_context.py`
   * `app/services/search_media.py`
+  * `app/services/adult_metadata_translation.py`
   * `app/services/search_reply_formatter.py`
   * `app/services/adult_metadata_localization.py`
   * `app/bot/telegram_reply_formatter.py`

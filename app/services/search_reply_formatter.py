@@ -287,6 +287,10 @@ def format_adult_metadata_lines(item: Mapping[str, Any]) -> tuple[str, ...]:
     if standard_summary:
         lines.append(f"标准信息: {standard_summary}")
 
+    overview_summary = format_adult_overview_metadata_summary(item)
+    if overview_summary:
+        lines.append(f"简介: {overview_summary}")
+
     production_summary = format_adult_production_metadata_summary(item)
     if production_summary:
         lines.append(f"制作信息: {production_summary}")
@@ -299,10 +303,7 @@ def format_adult_metadata_lines(item: Mapping[str, Any]) -> tuple[str, ...]:
 
 def format_adult_standard_metadata_summary(item: Mapping[str, Any]) -> str:
     localized_metadata = resolve_adult_localized_metadata(item)
-    title = localized_metadata.title.value or _first_text(
-        item,
-        ("adult_title", "metadataTitle", "metadata_title", "read_only_adult_title", "title"),
-    )
+    title = localized_metadata.title.value or _first_text(item, ("adult_title", "metadataTitle", "metadata_title", "read_only_adult_title", "title"))
     release_date = _first_text(
         item,
         ("adult_release_date", "releaseDate", "release_date", "date", "read_only_adult_release_date"),
@@ -323,15 +324,23 @@ def format_adult_standard_metadata_summary(item: Mapping[str, Any]) -> str:
     return " | ".join(fields)
 
 
+def format_adult_overview_metadata_summary(item: Mapping[str, Any]) -> str:
+    localized_metadata = resolve_adult_localized_metadata(item)
+    overview = localized_metadata.overview.value
+    if not overview:
+        return ""
+    return truncate_text(overview, limit=160)
+
+
 def format_adult_production_metadata_summary(item: Mapping[str, Any]) -> str:
     localized_metadata = resolve_adult_localized_metadata(item)
-    maker = _first_text(
+    maker = localized_metadata.maker.value or _first_text(
         item,
         ("adult_maker", "adult_studio", "maker", "studio", "publisher", "read_only_adult_maker", "read_only_adult_studio"),
     )
-    label = _first_text(item, ("adult_label", "label", "read_only_adult_label"))
+    label = localized_metadata.label.value or _first_text(item, ("adult_label", "label", "read_only_adult_label"))
     series = localized_metadata.series.value or _first_text(item, ("adult_series", "series", "read_only_adult_series"))
-    director = _first_text(item, ("adult_director", "director", "read_only_adult_director"))
+    director = localized_metadata.director.value or _first_text(item, ("adult_director", "director", "read_only_adult_director"))
     actors = localized_metadata.actors.value or _first_sequence_text(
         item,
         ("adult_actors", "actors", "actresses", "cast", "read_only_adult_actors"),
