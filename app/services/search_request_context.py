@@ -16,11 +16,18 @@ from app.search_franchise_intent import (
     resolve_franchise_intent_boost,
 )
 from app.search_title_normalization import (
+    ShortQueryCandidateProfile,
+    SHORT_STRONG_TITLE_COMPACT_LIMIT,
     compact_match_key,
     is_confident_title_match,
+    is_title_match_prefix_family,
     normalize_match_key,
     normalize_spaces,
+    resolve_short_query_contains_slots,
+    resolve_title_match_relation,
     score_title_match,
+    should_preserve_short_query_candidate_spread,
+    title_match_relation_priority,
 )
 from app.services.search_query_parser import ParsedMovieQuery, parse_movie_query
 
@@ -32,7 +39,7 @@ MediaIdentityState = Literal["high_confidence_identity", "needs_confirmation", "
 HIGH_CONFIDENCE_IDENTITY: MediaIdentityState = "high_confidence_identity"
 NEEDS_CONFIRMATION: MediaIdentityState = "needs_confirmation"
 EMPTY_MEDIA_IDENTITY: MediaIdentityState = "empty"
-STRONG_TITLE_CONFIRMATION_LIMIT = 3
+STRONG_TITLE_CONFIRMATION_LIMIT = SHORT_STRONG_TITLE_COMPACT_LIMIT
 AMBIGUOUS_TITLE_CONFIRMATION_LIMIT = 5
 TITLE_MATCH_WEIGHT = 100
 EXACT_TITLE_BIAS_WEIGHT = 25
@@ -301,6 +308,11 @@ def _select_confirmation_tmdb_candidates(
         parsed_query=parsed_query,
         signals=signals,
     )
+    if _should_preserve_short_query_candidate_spread(parsed_query=parsed_query, signals=signals):
+        signals = _diversify_short_query_confirmation_signals(
+            parsed_query=parsed_query,
+            signals=signals,
+        )
     limit = _resolve_confirmation_candidate_limit(parsed_query=parsed_query, signals=signals)
     return tuple(signal.candidate for signal in signals[:limit])
 
@@ -359,6 +371,8 @@ def _should_compact_confirmation_candidates(
     signals: Sequence[_MediaIdentityCandidateSignal],
 ) -> bool:
     top_signal = signals[0]
+    if _should_preserve_short_query_candidate_spread(parsed_query=parsed_query, signals=signals):
+        return False
     if top_signal.title_match_score < STRONG_TITLE_MIN_MATCH_SCORE:
         return False
     if top_signal.exact_title_bias <= 0 and not top_signal.confident_title_match:
@@ -380,6 +394,128 @@ def _should_compact_confirmation_candidates(
     ):
         return True
     return False
+
+
+def _should_preserve_short_query_candidate_spread(
+    *,
+    parsed_query: ParsedMovieQuery,
+    signals: Sequence[_MediaIdentityCandidateSignal],
+) -> bool:
+    if not signals:
+        return False
+    competitor_profiles: list[ShortQueryCandidateProfile] = []
+    for signal in signals[1:]:
+        relation = _resolve_confirmation_candidate_match_relation(
+            query_title=parsed_query.title,
+            candidate=signal.candidate,
+        )
+        competitor_profiles.append(
+            ShortQueryCandidateProfile(
+                dedupe_key=f"{signal.candidate.media_type}:{signal.candidate.tmdb_id or f'{signal.candidate.title}|{signal.candidate.year}'}",
+                relation=relation,
+                popularity=signal.candidate.popularity,
+                vote_count=signal.candidate.vote_count,
+            )
+        )
+    return should_preserve_short_query_candidate_spread(
+        title=parsed_query.title,
+        year=parsed_query.year,
+        top_exact_bias=signals[0].exact_title_bias,
+        competitor_profiles=competitor_profiles,
+    )
+
+
+def _diversify_short_query_confirmation_signals(
+    *,
+    parsed_query: ParsedMovieQuery,
+    signals: Sequence[_MediaIdentityCandidateSignal],
+) -> tuple[_MediaIdentityCandidateSignal, ...]:
+    if len(signals) <= 1:
+        return tuple(signals)
+
+    top_signal = signals[0]
+    prefix_signals: list[_MediaIdentityCandidateSignal] = []
+    contains_signals: list[_MediaIdentityCandidateSignal] = []
+    fallback_signals: list[_MediaIdentityCandidateSignal] = []
+    for signal in signals[1:]:
+        relation = _resolve_confirmation_candidate_match_relation(
+            query_title=parsed_query.title,
+            candidate=signal.candidate,
+        )
+        if relation == "contains":
+            contains_signals.append(signal)
+        elif is_title_match_prefix_family(relation):
+            prefix_signals.append(signal)
+        else:
+            fallback_signals.append(signal)
+
+    prefix_signals.sort(key=_short_query_confirmation_prefix_sort_key, reverse=True)
+    contains_signals.sort(key=_short_query_confirmation_contains_sort_key, reverse=True)
+    top_relation = _resolve_confirmation_candidate_match_relation(
+        query_title=parsed_query.title,
+        candidate=top_signal.candidate,
+    )
+    family_candidate_count = len(prefix_signals) + (1 if is_title_match_prefix_family(top_relation) else 0)
+    contains_slots = resolve_short_query_contains_slots(
+        limit=AMBIGUOUS_TITLE_CONFIRMATION_LIMIT,
+        family_candidate_count=family_candidate_count,
+        contains_count=len(contains_signals),
+    )
+    selected: list[_MediaIdentityCandidateSignal] = [top_signal]
+    selected.extend(prefix_signals[: max(0, AMBIGUOUS_TITLE_CONFIRMATION_LIMIT - 1 - contains_slots)])
+    selected.extend(contains_signals[:contains_slots])
+
+    seen_keys = {
+        (signal.candidate.media_type, signal.candidate.tmdb_id or f"{signal.candidate.title}|{signal.candidate.year}")
+        for signal in selected
+    }
+    for signal in [*prefix_signals, *contains_signals, *fallback_signals]:
+        candidate_key = (
+            signal.candidate.media_type,
+            signal.candidate.tmdb_id or f"{signal.candidate.title}|{signal.candidate.year}",
+        )
+        if candidate_key in seen_keys:
+            continue
+        selected.append(signal)
+        seen_keys.add(candidate_key)
+        if len(selected) >= AMBIGUOUS_TITLE_CONFIRMATION_LIMIT:
+            break
+    return tuple(selected)
+
+
+def _resolve_confirmation_candidate_match_relation(*, query_title: str, candidate: TmdbMovie) -> str:
+    localized_relation = resolve_title_match_relation(query_title, candidate.title)
+    original_relation = resolve_title_match_relation(query_title, candidate.original_title)
+    if title_match_relation_priority(original_relation) > title_match_relation_priority(localized_relation):
+        return original_relation
+    return localized_relation
+
+
+def _short_query_confirmation_contains_sort_key(
+    signal: _MediaIdentityCandidateSignal,
+) -> tuple[int, float, int, int, int]:
+    candidate = signal.candidate
+    return (
+        signal.relevance_score,
+        candidate.popularity,
+        candidate.vote_count,
+        1 if candidate.poster_path else 0,
+        1 if candidate.overview else 0,
+    )
+
+
+def _short_query_confirmation_prefix_sort_key(
+    signal: _MediaIdentityCandidateSignal,
+) -> tuple[int, int, float, int, int, int]:
+    candidate = signal.candidate
+    return (
+        signal.relevance_score,
+        signal.exact_title_bias,
+        candidate.popularity,
+        candidate.vote_count,
+        1 if candidate.poster_path else 0,
+        1 if candidate.overview else 0,
+    )
 
 
 def _resolve_exact_title_bias(

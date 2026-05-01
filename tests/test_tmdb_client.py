@@ -314,6 +314,189 @@ def test_search_media_candidates_prefers_exact_tmdb_identity_for_strong_japanese
     assert results[0].overview == "Two teenagers share a supernatural connection."
 
 
+def test_search_media_candidates_keeps_broad_candidates_for_short_generic_cjk_query() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "传奇"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 100,
+                            "title": "传奇",
+                            "original_title": "Legend",
+                            "release_date": "2015-11-20",
+                            "poster_path": "/legend-2015.jpg",
+                            "popularity": 42.0,
+                            "vote_count": 1800,
+                        },
+                        {
+                            "id": 104,
+                            "title": "传奇联盟",
+                            "original_title": "Legend League",
+                            "release_date": "2016-01-01",
+                            "popularity": 5.0,
+                            "vote_count": 12,
+                        },
+                        {
+                            "id": 105,
+                            "title": "传奇少年",
+                            "original_title": "Legend Boy",
+                            "release_date": "2017-01-01",
+                            "popularity": 4.0,
+                            "vote_count": 8,
+                        },
+                        {
+                            "id": 106,
+                            "title": "传奇风云",
+                            "original_title": "Legend Storm",
+                            "release_date": "2018-01-01",
+                            "popularity": 3.0,
+                            "vote_count": 6,
+                        },
+                        {
+                            "id": 101,
+                            "title": "黑道传奇",
+                            "original_title": "Legend",
+                            "release_date": "2015-09-09",
+                            "popularity": 18.0,
+                            "vote_count": 220,
+                        },
+                        {
+                            "id": 102,
+                            "title": "我是传奇",
+                            "original_title": "I Am Legend",
+                            "release_date": "2007-12-14",
+                            "poster_path": "/i-am-legend.jpg",
+                            "overview": "A lone survivor searches for a cure in a devastated world.",
+                            "popularity": 68.0,
+                            "vote_count": 9500,
+                        },
+                        {
+                            "id": 103,
+                            "title": "纳尼亚传奇：狮子、女巫和魔衣橱",
+                            "original_title": "The Chronicles of Narnia: The Lion, the Witch and the Wardrobe",
+                            "release_date": "2005-12-07",
+                            "popularity": 55.0,
+                            "vote_count": 8200,
+                        },
+                    ]
+                }
+            )
+        if path == "/3/search/tv":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 201,
+                            "name": "传奇办公室",
+                            "original_name": "Le Bureau des Légendes",
+                            "first_air_date": "2015-04-27",
+                            "popularity": 24.0,
+                            "vote_count": 340,
+                        },
+                        {
+                            "id": 202,
+                            "name": "传奇训练营",
+                            "original_name": "Legend Camp",
+                            "first_air_date": "2019-02-01",
+                            "popularity": 2.0,
+                            "vote_count": 4,
+                        }
+                    ]
+                }
+            )
+        raise AssertionError(f"unexpected TMDB path: {path}")
+
+    client._get = fake_get  # type: ignore[method-assign]
+
+    results = _run(client.search_media_candidates("传奇", limit=5))
+
+    assert len(results) == 5
+    assert results[0].title == "传奇"
+    assert any(item.title == "我是传奇" for item in results)
+    assert any(item.title == "传奇办公室" for item in results)
+    assert any(item.title == "纳尼亚传奇：狮子、女巫和魔衣橱" for item in results)
+    assert all(item.title != "传奇训练营" for item in results)
+
+
+def test_search_media_candidates_keeps_compact_family_for_short_strong_cjk_title_with_single_mainstream_contains() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "色戒"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 401,
+                            "title": "色戒",
+                            "original_title": "Lust, Caution",
+                            "release_date": "2007-11-01",
+                            "poster_path": "/lust-caution.jpg",
+                            "overview": "An espionage drama set in occupied Shanghai.",
+                            "popularity": 36.0,
+                            "vote_count": 1600,
+                        },
+                        {
+                            "id": 402,
+                            "title": "色戒 导演剪辑版",
+                            "original_title": "Lust, Caution Director's Cut",
+                            "release_date": "2007-12-01",
+                            "poster_path": "/lust-caution-director.jpg",
+                            "overview": "A lower-priority cut of the same film.",
+                            "popularity": 9.0,
+                            "vote_count": 40,
+                        },
+                        {
+                            "id": 403,
+                            "title": "色戒 幕后纪事",
+                            "original_title": "Lust, Caution Behind the Scenes",
+                            "release_date": "2008-01-01",
+                            "poster_path": "/lust-caution-behind.jpg",
+                            "overview": "A featurette that should stay behind the main film.",
+                            "popularity": 6.0,
+                            "vote_count": 18,
+                        },
+                        {
+                            "id": 404,
+                            "title": "色戒 十五周年纪念版",
+                            "original_title": "Lust, Caution 15th Anniversary Edition",
+                            "release_date": "2022-01-01",
+                            "poster_path": "/lust-caution-anniversary.jpg",
+                            "overview": "A commemorative re-release that should stay out of the compact set.",
+                            "popularity": 3.0,
+                            "vote_count": 9,
+                        },
+                        {
+                            "id": 405,
+                            "title": "情陷色戒",
+                            "original_title": "Temptation Around Lust, Caution",
+                            "release_date": "2011-01-01",
+                            "poster_path": "/temptation-around-lust-caution.jpg",
+                            "overview": "A mainstream contains-style title that should not blow the query back open.",
+                            "popularity": 51.0,
+                            "vote_count": 6200,
+                        },
+                    ]
+                }
+            )
+        if path == "/3/search/tv":
+            return _FakeResponse({"results": []})
+        raise AssertionError(f"unexpected TMDB path: {path}")
+
+    client._get = fake_get  # type: ignore[method-assign]
+
+    results = _run(client.search_media_candidates("色戒", limit=5))
+
+    assert [item.tmdb_id for item in results] == ["401", "402", "403"]
+    assert results[0].title == "色戒"
+    assert all(item.title != "情陷色戒" for item in results)
+
+
 @pytest.mark.parametrize("query", ["魔戒", "指环王", "Lord of the Rings"])
 def test_search_media_candidates_prefers_lord_of_the_rings_franchise_for_explicit_alias_query(query: str) -> None:
     client = TmdbClient(api_key="tmdb-key")

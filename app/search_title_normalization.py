@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
 import re
 import unicodedata
 
@@ -121,6 +123,23 @@ _CHAPTER_TOKEN_PATTERN = re.compile(
 )
 _TRAILING_ORDINAL_WORD_PATTERN = re.compile(r"\b(?P<value>(?:one|two|three|four|five|six|seven|eight|nine|ten))\b$", re.IGNORECASE)
 _CHINESE_PART_PATTERN = re.compile(r"第\s*(?P<value>[一二三四五六七八九十两\d]+)\s*部", re.IGNORECASE)
+_SHORT_CJK_TITLE_QUERY_RE = re.compile(r"^[\u3400-\u9fff]{2,3}$")
+SHORT_GENERIC_QUERY_MIN_COMPETING_CANDIDATES = 2
+SHORT_GENERIC_QUERY_MIN_MATCH_SCORE = 2
+SHORT_GENERIC_QUERY_MIN_CONTAINS_CANDIDATES = 2
+SHORT_GENERIC_QUERY_MAINSTREAM_CONTAINS_POPULARITY = 15.0
+SHORT_GENERIC_QUERY_MAINSTREAM_CONTAINS_VOTE_COUNT = 100
+SHORT_GENERIC_QUERY_RESERVED_CONTAINS = 2
+SHORT_STRONG_TITLE_FAMILY_MIN_CANDIDATES = 2
+SHORT_STRONG_TITLE_MAX_MAINSTREAM_CONTAINS = 1
+SHORT_STRONG_TITLE_COMPACT_LIMIT = 3
+_SHORT_QUERY_RELATION_PRIORITY = {
+    "exact": 4,
+    "prefix": 3,
+    "contains": 2,
+    "compact_exact": 1,
+    "none": 0,
+}
 _CHINESE_NUMERAL_MAP = {
     "一": 1,
     "二": 2,
@@ -135,6 +154,14 @@ _CHINESE_NUMERAL_MAP = {
     "十": 10,
 }
 _TRAILING_QUERY_NOISE_RE = re.compile(rf"(?:\s+{SEARCH_TITLE_NOISE_PATTERN})+$", re.IGNORECASE)
+
+
+@dataclass(frozen=True, slots=True)
+class ShortQueryCandidateProfile:
+    dedupe_key: str
+    relation: str
+    popularity: float = 0.0
+    vote_count: int = 0
 
 
 def normalize_spaces(value: str) -> str:
@@ -157,6 +184,27 @@ def compact_match_key(value: str) -> str:
     return value.replace(" ", "")
 
 
+def is_short_cjk_title_query(query: str) -> bool:
+    compact_query = compact_match_key(normalize_match_key(query))
+    if not compact_query:
+        return False
+    return _SHORT_CJK_TITLE_QUERY_RE.fullmatch(compact_query) is not None
+
+
+def resolve_title_match_relation(query: str, candidate_title: str) -> str:
+    normalized_query = normalize_match_key(query)
+    normalized_candidate = normalize_match_key(candidate_title)
+    if not normalized_query or not normalized_candidate:
+        return "none"
+    if normalized_candidate == normalized_query:
+        return "exact"
+    if is_subtitle_extension_match(query, candidate_title) or normalized_candidate.startswith(normalized_query):
+        return "prefix"
+    if normalized_query in normalized_candidate:
+        return "contains"
+    return "compact_exact" if compact_match_key(normalized_candidate) == compact_match_key(normalized_query) else "none"
+
+
 def is_confident_title_match(query: str, candidate_title: str) -> bool:
     normalized_query = normalize_match_key(query)
     normalized_candidate = normalize_match_key(candidate_title)
@@ -171,17 +219,99 @@ def is_confident_title_match(query: str, candidate_title: str) -> bool:
 
 
 def score_title_match(query: str, candidate_title: str) -> int:
-    normalized_query = normalize_match_key(query)
-    normalized_candidate = normalize_match_key(candidate_title)
-    if not normalized_query or not normalized_candidate:
-        return 0
-    if normalized_candidate == normalized_query:
+    relation = resolve_title_match_relation(query, candidate_title)
+    if relation == "exact":
         return 4
-    if is_subtitle_extension_match(query, candidate_title) or normalized_candidate.startswith(normalized_query):
+    if relation == "prefix":
         return 3
-    if normalized_query in normalized_candidate:
+    if relation == "contains":
         return 2
-    return 1 if compact_match_key(normalized_candidate) == compact_match_key(normalized_query) else 0
+    return 1 if relation == "compact_exact" else 0
+
+
+def title_match_relation_priority(relation: str) -> int:
+    return _SHORT_QUERY_RELATION_PRIORITY.get(relation, 0)
+
+
+def is_title_match_prefix_family(relation: str) -> bool:
+    return relation in {"exact", "prefix", "compact_exact"}
+
+
+def is_mainstream_short_query_contains_candidate(*, popularity: float, vote_count: int) -> bool:
+    return (
+        popularity >= SHORT_GENERIC_QUERY_MAINSTREAM_CONTAINS_POPULARITY
+        or vote_count >= SHORT_GENERIC_QUERY_MAINSTREAM_CONTAINS_VOTE_COUNT
+    )
+
+
+def has_short_query_strong_title_protection(
+    *,
+    top_exact_bias: int,
+    family_candidate_count: int,
+    mainstream_contains_candidates: int,
+) -> bool:
+    return (
+        top_exact_bias > 0
+        and family_candidate_count >= SHORT_STRONG_TITLE_FAMILY_MIN_CANDIDATES
+        and mainstream_contains_candidates <= SHORT_STRONG_TITLE_MAX_MAINSTREAM_CONTAINS
+    )
+
+
+def should_preserve_short_query_candidate_spread(
+    *,
+    title: str,
+    year: str,
+    top_exact_bias: int,
+    competitor_profiles: Sequence[ShortQueryCandidateProfile],
+) -> bool:
+    if year.strip():
+        return False
+    if not is_short_cjk_title_query(title):
+        return False
+
+    competing_candidates = 0
+    family_candidate_count = 1 if top_exact_bias > 0 else 0
+    contains_candidates = 0
+    mainstream_contains_candidates = 0
+    seen_keys: set[str] = set()
+    for profile in competitor_profiles:
+        if title_match_relation_priority(profile.relation) < SHORT_GENERIC_QUERY_MIN_MATCH_SCORE:
+            continue
+        if profile.dedupe_key in seen_keys:
+            continue
+        seen_keys.add(profile.dedupe_key)
+        competing_candidates += 1
+        if profile.relation == "contains":
+            contains_candidates += 1
+            if is_mainstream_short_query_contains_candidate(
+                popularity=profile.popularity,
+                vote_count=profile.vote_count,
+            ):
+                mainstream_contains_candidates += 1
+            continue
+        if is_title_match_prefix_family(profile.relation):
+            family_candidate_count += 1
+    if has_short_query_strong_title_protection(
+        top_exact_bias=top_exact_bias,
+        family_candidate_count=family_candidate_count,
+        mainstream_contains_candidates=mainstream_contains_candidates,
+    ):
+        return False
+    return (
+        competing_candidates >= SHORT_GENERIC_QUERY_MIN_COMPETING_CANDIDATES
+        and (
+            contains_candidates >= SHORT_GENERIC_QUERY_MIN_CONTAINS_CANDIDATES
+            or mainstream_contains_candidates > 0
+        )
+    )
+
+
+def resolve_short_query_contains_slots(*, limit: int, family_candidate_count: int, contains_count: int) -> int:
+    if limit <= 1 or contains_count <= 0:
+        return 0
+    if limit >= 5 and family_candidate_count >= 3 and contains_count >= 2:
+        return min(SHORT_GENERIC_QUERY_RESERVED_CONTAINS, contains_count, limit - 1)
+    return 1
 
 
 def is_subtitle_extension_match(query: str, candidate_title: str) -> bool:

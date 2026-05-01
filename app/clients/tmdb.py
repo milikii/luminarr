@@ -12,7 +12,20 @@ from app.search_franchise_intent import (
     has_explicit_franchise_intent,
     resolve_franchise_intent_boost,
 )
-from app.search_title_normalization import normalize_match_key, score_title_match
+from app.search_title_normalization import (
+    ShortQueryCandidateProfile,
+    is_short_cjk_title_query,
+    is_title_match_prefix_family,
+    normalize_match_key,
+    resolve_short_query_contains_slots,
+    resolve_title_match_relation,
+    score_title_match,
+    should_preserve_short_query_candidate_spread,
+    title_match_relation_priority,
+    SHORT_STRONG_TITLE_COMPACT_LIMIT,
+)
+
+SHORT_GENERIC_QUERY_SAMPLE_LIMIT = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +37,8 @@ class TmdbMovie:
     media_type: str = "movie"
     poster_path: str = ""
     overview: str = ""
+    popularity: float = 0.0
+    vote_count: int = 0
 
 
 class TmdbClient:
@@ -106,8 +121,9 @@ class TmdbClient:
         *,
         limit: int = 5,
     ) -> list[TmdbMovie]:
-        movie_candidates = await self.search_movie_candidates(title, year=year, limit=limit)
-        tv_candidates = await self.search_tv_candidates(title, year=year, limit=limit)
+        sample_limit = _resolve_tmdb_sampling_limit(title=title, year=year, limit=limit)
+        movie_candidates = await self.search_movie_candidates(title, year=year, limit=sample_limit)
+        tv_candidates = await self.search_tv_candidates(title, year=year, limit=sample_limit)
         return _rank_tmdb_candidates(
             [*movie_candidates, *tv_candidates],
             title=title,
@@ -192,6 +208,8 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
         media_type="movie",
         poster_path=_safe_text(item.get("poster_path")),
         overview=_safe_text(item.get("overview")),
+        popularity=_safe_float(item.get("popularity")),
+        vote_count=_safe_int(item.get("vote_count")),
     )
 
 
@@ -213,6 +231,8 @@ def _to_tmdb_tv(item: Mapping[str, Any]) -> TmdbMovie | None:
         media_type="tv",
         poster_path=_safe_text(item.get("poster_path")),
         overview=_safe_text(item.get("overview")),
+        popularity=_safe_float(item.get("popularity")),
+        vote_count=_safe_int(item.get("vote_count")),
     )
 
 
@@ -232,6 +252,20 @@ def _safe_id(value: Any) -> str:
     if not text:
         return ""
     return text
+
+
+def _safe_float(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _extract_year(value: str) -> str:
@@ -277,7 +311,28 @@ def _rank_tmdb_candidates(
     scored_candidates.sort(key=lambda item: item[0], reverse=True)
     if has_explicit_franchise_intent(title):
         scored_candidates = _prefer_primary_franchise_cluster(scored_candidates, title=title)
-    if scored_candidates:
+    preserve_short_query_spread = _should_preserve_short_query_candidate_spread(
+        title=title,
+        year=cleaned_year,
+        scored_candidates=scored_candidates,
+    )
+    if preserve_short_query_spread:
+        scored_candidates = _diversify_short_query_scored_candidates(
+            title=title,
+            limit=limit,
+            scored_candidates=scored_candidates,
+        )
+    elif scored_candidates and _should_compact_short_strong_title_candidates(
+        title=title,
+        year=cleaned_year,
+        best_score=scored_candidates[0][0],
+    ):
+        scored_candidates = _compact_short_strong_title_candidates(
+            title=title,
+            limit=limit,
+            scored_candidates=scored_candidates,
+        )
+    elif scored_candidates:
         best_score = scored_candidates[0][0]
         if best_score[0] >= 3 and best_score[1] > 0:
             exact_compact_title = _compact_tmdb_match_key(cleaned_title)
@@ -317,6 +372,150 @@ def _prefer_primary_franchise_cluster(
     if primary_candidates:
         return primary_candidates
     return scored_candidates
+
+
+def _should_preserve_short_query_candidate_spread(
+    *,
+    title: str,
+    year: str,
+    scored_candidates: list[tuple[tuple[int, int, int], TmdbMovie]],
+) -> bool:
+    if not scored_candidates:
+        return False
+    competitor_profiles: list[ShortQueryCandidateProfile] = []
+    for _, candidate in scored_candidates[1:]:
+        relation = _resolve_tmdb_candidate_match_relation(title=title, candidate=candidate)
+        competitor_profiles.append(
+            ShortQueryCandidateProfile(
+                dedupe_key=f"{candidate.media_type}:{candidate.tmdb_id or f'{candidate.title}|{candidate.year}'}",
+                relation=relation,
+                popularity=candidate.popularity,
+                vote_count=candidate.vote_count,
+            )
+        )
+    return should_preserve_short_query_candidate_spread(
+        title=title,
+        year=year,
+        top_exact_bias=scored_candidates[0][0][1],
+        competitor_profiles=competitor_profiles,
+    )
+
+
+def _should_compact_short_strong_title_candidates(
+    *,
+    title: str,
+    year: str,
+    best_score: tuple[int, int, int],
+) -> bool:
+    return (
+        not year.strip()
+        and is_short_cjk_title_query(title)
+        and best_score[0] >= 3
+        and best_score[1] > 0
+    )
+
+
+def _compact_short_strong_title_candidates(
+    *,
+    title: str,
+    limit: int,
+    scored_candidates: list[tuple[tuple[int, int, int], TmdbMovie]],
+) -> list[tuple[tuple[int, int, int], TmdbMovie]]:
+    top_item = scored_candidates[0]
+    family_items: list[tuple[tuple[int, int, int], TmdbMovie]] = []
+    for item in scored_candidates[1:]:
+        relation = _resolve_tmdb_candidate_match_relation(title=title, candidate=item[1])
+        if is_title_match_prefix_family(relation):
+            family_items.append(item)
+    family_items.sort(key=_short_query_prefix_sort_key, reverse=True)
+    compact_limit = max(1, min(limit, SHORT_STRONG_TITLE_COMPACT_LIMIT))
+    return [top_item, *family_items[: max(0, compact_limit - 1)]]
+
+
+def _diversify_short_query_scored_candidates(
+    *,
+    title: str,
+    limit: int,
+    scored_candidates: list[tuple[tuple[int, int, int], TmdbMovie]],
+) -> list[tuple[tuple[int, int, int], TmdbMovie]]:
+    if len(scored_candidates) <= 1:
+        return scored_candidates
+
+    top_item = scored_candidates[0]
+    prefix_items: list[tuple[tuple[int, int, int], TmdbMovie]] = []
+    contains_items: list[tuple[tuple[int, int, int], TmdbMovie]] = []
+    fallback_items: list[tuple[tuple[int, int, int], TmdbMovie]] = []
+    for item in scored_candidates[1:]:
+        relation = _resolve_tmdb_candidate_match_relation(title=title, candidate=item[1])
+        if relation == "contains":
+            contains_items.append(item)
+        elif is_title_match_prefix_family(relation):
+            prefix_items.append(item)
+        else:
+            fallback_items.append(item)
+
+    prefix_items.sort(key=_short_query_prefix_sort_key, reverse=True)
+    contains_items.sort(key=_short_query_contains_sort_key, reverse=True)
+    top_relation = _resolve_tmdb_candidate_match_relation(title=title, candidate=top_item[1])
+    family_candidate_count = len(prefix_items) + (1 if is_title_match_prefix_family(top_relation) else 0)
+    contains_slots = resolve_short_query_contains_slots(
+        limit=limit,
+        family_candidate_count=family_candidate_count,
+        contains_count=len(contains_items),
+    )
+    selected: list[tuple[tuple[int, int, int], TmdbMovie]] = [top_item]
+    selected.extend(prefix_items[: max(0, limit - 1 - contains_slots)])
+    selected.extend(contains_items[:contains_slots])
+
+    seen_keys = {
+        (item[1].media_type, item[1].tmdb_id or f"{item[1].title}|{item[1].year}")
+        for item in selected
+    }
+    for item in [*prefix_items, *contains_items, *fallback_items]:
+        dedupe_key = (item[1].media_type, item[1].tmdb_id or f"{item[1].title}|{item[1].year}")
+        if dedupe_key in seen_keys:
+            continue
+        selected.append(item)
+        seen_keys.add(dedupe_key)
+        if len(selected) >= max(1, limit):
+            break
+    return selected
+
+def _short_query_contains_sort_key(item: tuple[tuple[int, int, int], TmdbMovie]) -> tuple[int, float, int, int, int]:
+    score, candidate = item
+    return (
+        score[0],
+        candidate.popularity,
+        candidate.vote_count,
+        1 if candidate.poster_path else 0,
+        1 if candidate.overview else 0,
+    )
+
+
+def _short_query_prefix_sort_key(item: tuple[tuple[int, int, int], TmdbMovie]) -> tuple[int, int, float, int, int, int]:
+    score, candidate = item
+    return (
+        score[0],
+        score[1],
+        candidate.popularity,
+        candidate.vote_count,
+        1 if candidate.poster_path else 0,
+        1 if candidate.overview else 0,
+    )
+
+
+def _resolve_tmdb_candidate_match_relation(*, title: str, candidate: TmdbMovie) -> str:
+    localized_relation = resolve_title_match_relation(title, candidate.title)
+    original_relation = resolve_title_match_relation(title, candidate.original_title)
+    if title_match_relation_priority(original_relation) > title_match_relation_priority(localized_relation):
+        return original_relation
+    return localized_relation
+
+
+def _resolve_tmdb_sampling_limit(*, title: str, year: str, limit: int) -> int:
+    if year.strip() or not is_short_cjk_title_query(title):
+        return max(1, limit)
+    return max(limit, SHORT_GENERIC_QUERY_SAMPLE_LIMIT)
 
 
 def _score_tmdb_match(candidate: TmdbMovie, *, title: str, year: str) -> tuple[int, int, int]:
