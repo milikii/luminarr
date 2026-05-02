@@ -4,6 +4,8 @@ import html as _html
 import re
 from dataclasses import dataclass
 
+from app.services.search_reply_formatter import get_media_candidate_confirmation_action_lines
+
 TELEGRAM_MOVIE_CARD_HEADER_TEXT = "电影海报卡片"
 TELEGRAM_SEARCH_RESULT_PREFIX = "搜索结果："
 TELEGRAM_MEDIA_CANDIDATE_PREFIX = "候选作品："
@@ -423,7 +425,7 @@ def _format_telegram_media_candidate_reply(text: str) -> str:
         if cleaned_line.startswith("直接回复对应序号确认作品"):
             continue
         formatted_lines.append(cleaned_line)
-    formatted_lines.extend(("", "下一步", _format_candidate_confirmation_hint(candidate_count)))
+    formatted_lines.extend(("", "下一步", *get_media_candidate_confirmation_action_lines()))
     return "\n".join(formatted_lines)
 
 
@@ -518,12 +520,6 @@ def _resolve_line_prefix(line: str) -> str:
 
 def _strip_delivery_status_marker(value: str) -> str:
     return re.sub(r"\s+[✓❌⏳⚠️]+$", "", value).strip()
-
-
-def _format_candidate_confirmation_hint(candidate_count: int) -> str:
-    if candidate_count <= 1:
-        return "直接回复 1 确认作品，例如：1"
-    return f"直接回复 1-{candidate_count} 中的序号确认作品，例如：1"
 
 
 def _format_telegram_selection_hint(candidate_count: int) -> str:

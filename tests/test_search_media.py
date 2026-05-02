@@ -3653,26 +3653,37 @@ def test_search_and_format_renders_tmdb_enriched_mixed_media_card() -> None:
 
     assert seen_queries == []
     assert text.startswith("候选作品：丧尸 ✓")
-    assert "先确认最可能的作品：" in text
+    assert "先确认最可能的作品：" not in text
     assert "1. Zombie Detective (2020) | tv" in text
     assert "海报：https://image.tmdb.org/t/p/w500/zombie-detective.jpg" in text
     assert "原名：좀비탐정" in text
     assert "年份：2020" in text
     assert "类型：tv" in text
     assert "简介：A detective story with a zombie lead." in text
+    assert "TMDB详情：https://www.themoviedb.org/tv/111" in text
     assert "2. Zombie for Sale (2019) | movie" in text
     assert "原名：기묘한 가족" in text
-    assert "简介：A family comedy about zombies." not in text
+    assert "年份：2019" in text
+    assert "类型：movie" in text
+    assert "简介：A family comedy about zombies." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/222" in text
     assert "3. All of Us Are Dead (2022) | tv" in text
+    assert "简介：A school zombie outbreak thriller." in text
+    assert "TMDB详情：https://www.themoviedb.org/tv/333" in text
     assert "4. Train to Busan (2016) | movie" in text
+    assert "简介：Passengers fight for survival on a fast train." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/444" in text
     assert "5. Kingdom (2019) | tv" in text
+    assert "简介：A Joseon political thriller with zombies." in text
+    assert "TMDB详情：https://www.themoviedb.org/tv/555" in text
     assert "6. Zom 100: Bucket List of the Dead (2023) | tv" not in text
     assert "海报：https://image.tmdb.org/t/p/w500/zombie-for-sale.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/all-of-us-are-dead.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/train-to-busan.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/kingdom.jpg" in text
     assert text.count("海报：https://image.tmdb.org/t/p/w500") == 5
-    assert text.count("简介：") == 1
+    assert text.count("简介：") == 5
+    assert text.count("TMDB详情：https://www.themoviedb.org/") == 5
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
@@ -3721,17 +3732,23 @@ def test_search_and_format_keeps_non_telegram_candidate_confirmation_layout_inta
     assert seen_queries == []
     assert text.startswith("【候选作品：你的名字】 ✓")
     assert "候选作品（2 条）" in text
-    assert "先确认最可能的作品：" in text
+    assert "先确认最可能的作品：" not in text
     assert "▸ 1. 你的名字。 (2016) | movie" in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name.jpg" in text
     assert "原名：君の名は。" in text
     assert "年份：2016" in text
     assert "类型：movie" in text
     assert "简介：Two teenagers share a supernatural connection." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/101" in text
     assert "▸ 2. 你的名字 特别收藏版 (2017) | movie" in text
+    assert "海报：https://image.tmdb.org/t/p/w500/your-name-collection.jpg" in text
     assert "原名：君の名は。4K Collection" in text
-    assert "确认作品：发送 1" in text
-    assert "换关键词：发送 search 你的名字" in text
+    assert "年份：2017" in text
+    assert "类型：movie" in text
+    assert "简介：A longer noisy collection title that should stay behind the exact film." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/102" in text
+    assert "确认作品：直接回复序号，例如 1" in text
+    assert "都不对：发送更详细的名称，或直接发送新的名字/关键词重新搜" in text
 
 
 def test_search_and_format_prefers_media_confirmation_for_strong_cjk_title_before_resource_search() -> None:
@@ -3809,20 +3826,30 @@ def test_search_and_format_prefers_media_confirmation_for_strong_cjk_title_befor
 
     assert seen_queries == []
     assert "候选作品：你的名字 ✓" in text
-    assert "先确认最可能的作品：" in text
+    assert "先确认最可能的作品：" not in text
     assert "1. 你的名字。 (2016) | movie" in text
     assert "年份：2016" in text
     assert "类型：movie" in text
+    assert "简介：Two teenagers share a supernatural connection." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/101" in text
     assert "2. 你的名字 特别收藏版 (2017) | movie" in text
+    assert "年份：2017" in text
+    assert "类型：movie" in text
+    assert "简介：A longer noisy collection title that should stay behind the exact film." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/102" in text
     assert "3. 你的名字 剧场纪念版 (2018) | movie" in text
+    assert "年份：2018" in text
+    assert "类型：movie" in text
+    assert "简介：A weaker commemorative release candidate." in text
+    assert "TMDB详情：https://www.themoviedb.org/movie/103" in text
     assert "4. 你的名字 官方原声带 (2016) | movie" not in text
     assert "4. 你的名字 4K 修复合集 (2020) | movie" not in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name-collection.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name-memorial.jpg" in text
     assert text.count("海报：https://image.tmdb.org/t/p/w500") == 3
-    assert text.count("简介：") == 1
-    assert "简介：A longer noisy collection title that should stay behind the exact film." not in text
+    assert text.count("简介：") == 3
+    assert text.count("TMDB详情：https://www.themoviedb.org/") == 3
     assert "站点:" not in text
     assert "链接参考:" not in text
     cached_candidate = service.get_cached_candidate(1001, 1)
