@@ -251,3 +251,37 @@ Bundled ffmpeg into the Docker image for subtitle translation, updated operator 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Telegram candidate poster cards
+
+**Date**: 2026-05-02
+**Task**: Telegram candidate poster cards
+**Branch**: `main`
+
+### Summary
+
+Upgraded Telegram candidate confirmation to per-candidate poster cards with TMDB/fanart/placeholder fallback while preserving candidate-first flow.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `48768ab` | (see git log) |
+| `c66fd20` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
