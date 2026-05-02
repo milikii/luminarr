@@ -45,6 +45,7 @@ def test_get_movie_by_id_returns_valid_result() -> None:
                 "release_date": "2014-11-05",
                 "poster_path": "/interstellar.jpg",
                 "overview": "A journey across space and time.",
+                "vote_average": 8.4,
             }
         )
 
@@ -60,6 +61,7 @@ def test_get_movie_by_id_returns_valid_result() -> None:
     assert result.tmdb_id == "157336"
     assert result.poster_path == "/interstellar.jpg"
     assert result.overview == "A journey across space and time."
+    assert result.vote_average == 8.4
 
 
 def test_get_tv_by_id_returns_valid_result() -> None:
@@ -77,6 +79,7 @@ def test_get_tv_by_id_returns_valid_result() -> None:
                 "first_air_date": "2023-01-15",
                 "poster_path": "/three-body.jpg",
                 "overview": "Humanity makes first contact.",
+                "vote_average": 7.9,
             }
         )
 
@@ -93,6 +96,7 @@ def test_get_tv_by_id_returns_valid_result() -> None:
     assert result.media_type == "tv"
     assert result.poster_path == "/three-body.jpg"
     assert result.overview == "Humanity makes first contact."
+    assert result.vote_average == 7.9
 
 
 def test_get_movie_credits_returns_localized_people() -> None:
@@ -577,6 +581,172 @@ def test_search_media_candidates_keeps_compact_family_for_short_strong_cjk_title
     assert [item.tmdb_id for item in results] == ["401", "402", "403"]
     assert results[0].title == "色戒"
     assert all(item.title != "情陷色戒" for item in results)
+
+
+def test_search_media_candidates_prefers_superman_family_for_explicit_superman_query() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "超人"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 501,
+                            "title": "女超人",
+                            "original_title": "Supergirl",
+                            "release_date": "1984-07-19",
+                            "poster_path": "/supergirl.jpg",
+                            "overview": "A related but different hero that should not pollute Superman intent.",
+                            "popularity": 61.0,
+                            "vote_count": 2400,
+                        },
+                        {
+                            "id": 502,
+                            "title": "超人",
+                            "original_title": "Superman",
+                            "release_date": "2025-07-11",
+                            "poster_path": "/superman-2025.jpg",
+                            "overview": "Clark Kent returns as Superman.",
+                            "popularity": 92.0,
+                            "vote_average": 7.8,
+                            "vote_count": 6800,
+                        },
+                        {
+                            "id": 503,
+                            "title": "超人2",
+                            "original_title": "Superman II",
+                            "release_date": "1980-12-04",
+                            "popularity": 57.0,
+                            "vote_average": 7.2,
+                            "vote_count": 3200,
+                        },
+                        {
+                            "id": 506,
+                            "title": "超人归来",
+                            "original_title": "Superman Returns",
+                            "release_date": "2006-06-28",
+                            "popularity": 57.0,
+                            "vote_average": 8.4,
+                            "vote_count": 900,
+                        },
+                        {
+                            "id": 504,
+                            "title": "一拳超人",
+                            "original_title": "One-Punch Man",
+                            "release_date": "2015-10-05",
+                            "popularity": 88.0,
+                            "vote_count": 4100,
+                        },
+                    ]
+                }
+            )
+        assert path == "/3/search/tv"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 505,
+                        "name": "超人前传",
+                        "original_name": "Smallville",
+                        "first_air_date": "2001-10-16",
+                        "poster_path": "/smallville.jpg",
+                        "overview": "Clark Kent grows into Superman.",
+                        "popularity": 57.0,
+                        "vote_average": 8.4,
+                        "vote_count": 2800,
+                    }
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+
+    results = _run(client.search_media_candidates("超人", limit=5))
+
+    assert [item.tmdb_id for item in results] == ["502", "505", "506"]
+    assert all(item.tmdb_id not in {"501", "504"} for item in results)
+
+
+def test_search_media_candidates_prefers_year_match_within_superman_family_for_explicit_year_query() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        assert params["query"] == "超人"
+        if path == "/3/search/movie":
+            return _FakeResponse(
+                {
+                    "results": [
+                        {
+                            "id": 501,
+                            "title": "女超人",
+                            "original_title": "Supergirl",
+                            "release_date": "1984-07-19",
+                            "popularity": 61.0,
+                            "vote_count": 2400,
+                        },
+                        {
+                            "id": 502,
+                            "title": "超人",
+                            "original_title": "Superman",
+                            "release_date": "2025-07-11",
+                            "popularity": 92.0,
+                            "vote_average": 7.8,
+                            "vote_count": 6800,
+                        },
+                        {
+                            "id": 503,
+                            "title": "超人2",
+                            "original_title": "Superman II",
+                            "release_date": "1980-12-04",
+                            "popularity": 57.0,
+                            "vote_average": 7.2,
+                            "vote_count": 3200,
+                        },
+                        {
+                            "id": 506,
+                            "title": "超人归来",
+                            "original_title": "Superman Returns",
+                            "release_date": "2006-06-28",
+                            "popularity": 57.0,
+                            "vote_average": 8.4,
+                            "vote_count": 900,
+                        },
+                    ]
+                }
+            )
+        assert path == "/3/search/tv"
+        return _FakeResponse(
+            {
+                "results": [
+                    {
+                        "id": 505,
+                        "name": "超人前传",
+                        "original_name": "Smallville",
+                        "first_air_date": "2001-10-16",
+                        "popularity": 57.0,
+                        "vote_average": 8.4,
+                        "vote_count": 2800,
+                    },
+                    {
+                        "id": 504,
+                        "name": "一拳超人",
+                        "original_name": "One-Punch Man",
+                        "first_air_date": "2015-10-05",
+                        "popularity": 88.0,
+                        "vote_count": 4100,
+                    },
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+
+    results = _run(client.search_media_candidates("超人", year="2001", limit=5))
+
+    assert [item.tmdb_id for item in results] == ["505", "502", "506", "503"]
+    assert all(item.tmdb_id not in {"501", "504"} for item in results)
 
 
 @pytest.mark.parametrize("query", ["魔戒", "指环王", "Lord of the Rings"])

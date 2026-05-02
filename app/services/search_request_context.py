@@ -12,6 +12,7 @@ from app.clients.tmdb import TmdbMovie
 from app.operational_logging import emit_operational_log
 from app.search_franchise_intent import (
     PRIMARY_FRANCHISE_INTENT_BOOST,
+    franchise_family_metric_sort_key,
     has_explicit_franchise_intent,
     resolve_franchise_intent_boost,
 )
@@ -349,8 +350,32 @@ def _prefer_primary_franchise_confirmation_signals(
         signal for signal in signals if signal.franchise_intent_boost >= PRIMARY_FRANCHISE_INTENT_BOOST
     )
     if primary_signals:
-        return primary_signals
+        return tuple(
+            sorted(
+                primary_signals,
+                key=lambda signal: _protected_franchise_confirmation_sort_key(
+                    signal,
+                    query_year=parsed_query.year,
+                ),
+                reverse=True,
+            )
+        )
     return tuple(signals)
+
+
+def _protected_franchise_confirmation_sort_key(
+    signal: _MediaIdentityCandidateSignal,
+    *,
+    query_year: str,
+) -> tuple[int, float, float, int]:
+    candidate = signal.candidate
+    metric_key = franchise_family_metric_sort_key(
+        popularity=candidate.popularity,
+        vote_average=candidate.vote_average,
+        vote_count=candidate.vote_count,
+    )
+    year_priority = 1 if query_year.strip() and candidate.year == query_year.strip() else 0
+    return year_priority, *metric_key
 
 
 def _resolve_confirmation_candidate_limit(
@@ -449,7 +474,13 @@ def _diversify_short_query_confirmation_signals(
         else:
             fallback_signals.append(signal)
 
-    prefix_signals.sort(key=_short_query_confirmation_prefix_sort_key, reverse=True)
+    if has_explicit_franchise_intent(parsed_query.title):
+        prefix_signals.sort(
+            key=lambda signal: _protected_franchise_confirmation_sort_key(signal, query_year=""),
+            reverse=True,
+        )
+    else:
+        prefix_signals.sort(key=_short_query_confirmation_prefix_sort_key, reverse=True)
     contains_signals.sort(key=_short_query_confirmation_contains_sort_key, reverse=True)
     top_relation = _resolve_confirmation_candidate_match_relation(
         query_title=parsed_query.title,

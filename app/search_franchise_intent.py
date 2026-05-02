@@ -36,6 +36,20 @@ _FRANCHISE_INTENT_RULES: tuple[_FranchiseIntentRule, ...] = (
             "thelordoftherings",
         ),
     ),
+    _FranchiseIntentRule(
+        query_alias_keys=(
+            "超人",
+            "superman",
+        ),
+        primary_candidate_keys=(
+            "超人",
+            "superman",
+        ),
+        family_candidate_keys=(
+            "超人",
+            "superman",
+        ),
+    ),
 )
 
 
@@ -74,9 +88,20 @@ def has_explicit_franchise_intent(query_title: str) -> bool:
     return _resolve_franchise_intent_rule(query_title) is not None
 
 
+def franchise_family_metric_sort_key(
+    *,
+    popularity: float,
+    vote_average: float,
+    vote_count: int,
+) -> tuple[float, float, int]:
+    """Return the explicit TMDB metric ordering for protected franchise families."""
+
+    return popularity, vote_average, vote_count
+
+
 def _candidate_matches_intent(candidate_keys: tuple[str, ...], expected_keys: tuple[str, ...]) -> bool:
     for candidate_key in candidate_keys:
-        if any(expected_key in candidate_key for expected_key in expected_keys):
+        if any(candidate_key == expected_key or candidate_key.startswith(expected_key) for expected_key in expected_keys):
             return True
     return False
 

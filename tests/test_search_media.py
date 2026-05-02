@@ -4575,6 +4575,215 @@ def test_search_and_format_prefers_lord_of_the_rings_franchise_for_explicit_alia
     assert service.get_cached_candidate(1001, 5) is None
 
 
+def test_search_and_format_prefers_superman_family_for_explicit_superman_query() -> None:
+    seen_queries: list[str] = []
+
+    async def unexpected_resource_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return [
+            {
+                "title": "Superman Collection 1080p BluRay",
+                "year": 2025,
+                "size": 16 * 1024 * 1024 * 1024,
+                "indexerName": "IndexerMovie",
+                "downloadUrl": "https://example.com/superman-collection.torrent",
+            }
+        ]
+
+    class _FakeTmdbResponse:
+        def __init__(self, payload: dict[str, object]) -> None:
+            self._payload = payload
+
+        def json(self) -> dict[str, object]:
+            return self._payload
+
+    client = TmdbClient(api_key="tmdb-key")
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeTmdbResponse:
+        assert params["query"] == "超人"
+        if path == "/3/search/movie":
+            return _FakeTmdbResponse(
+                {
+                    "results": [
+                        {
+                            "id": 601,
+                            "title": "女超人",
+                            "original_title": "Supergirl",
+                            "release_date": "1984-07-19",
+                            "poster_path": "/supergirl.jpg",
+                            "overview": "A related but different hero that should not pollute Superman intent.",
+                            "popularity": 61.0,
+                            "vote_count": 2400,
+                        },
+                        {
+                            "id": 602,
+                            "title": "超人",
+                            "original_title": "Superman",
+                            "release_date": "2025-07-11",
+                            "poster_path": "/superman-2025.jpg",
+                            "overview": "Clark Kent returns as Superman.",
+                            "popularity": 92.0,
+                            "vote_average": 7.8,
+                            "vote_count": 6800,
+                        },
+                        {
+                            "id": 603,
+                            "title": "超人2",
+                            "original_title": "Superman II",
+                            "release_date": "1980-12-04",
+                            "poster_path": "/superman-2.jpg",
+                            "overview": "Superman faces Zod and his allies.",
+                            "popularity": 57.0,
+                            "vote_average": 7.2,
+                            "vote_count": 3200,
+                        },
+                        {
+                            "id": 606,
+                            "title": "超人归来",
+                            "original_title": "Superman Returns",
+                            "release_date": "2006-06-28",
+                            "poster_path": "/superman-returns.jpg",
+                            "overview": "Another Superman film in the protected family.",
+                            "popularity": 57.0,
+                            "vote_average": 8.4,
+                            "vote_count": 900,
+                        },
+                        {
+                            "id": 605,
+                            "title": "一拳超人",
+                            "original_title": "One-Punch Man",
+                            "release_date": "2015-10-05",
+                            "poster_path": "/one-punch-man.jpg",
+                            "overview": "An unrelated hero satire that should not appear for Superman intent.",
+                            "popularity": 88.0,
+                            "vote_count": 4100,
+                        },
+                    ]
+                }
+            )
+        assert path == "/3/search/tv"
+        return _FakeTmdbResponse(
+            {
+                "results": [
+                    {
+                        "id": 604,
+                        "name": "超人前传",
+                        "original_name": "Smallville",
+                        "first_air_date": "2001-10-16",
+                        "poster_path": "/smallville.jpg",
+                        "overview": "Clark Kent grows into Superman.",
+                        "popularity": 57.0,
+                        "vote_average": 8.4,
+                        "vote_count": 2800,
+                    }
+                ]
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    service = SearchMediaService(
+        unexpected_resource_search,
+        lookup_media_candidates_func=client.search_media_candidates,
+    )
+
+    text = _run(service.search_and_format("超人", chat_id=1001))
+
+    assert seen_queries == []
+    assert text.startswith("候选作品：超人")
+    assert "候选作品（3 条）" in text
+    assert "1. 超人 (2025) | movie" in text
+    assert text.index("2. 超人前传 (2001) | tv") < text.index("3. 超人归来 (2006) | movie")
+    assert "超人2 (1980) | movie" not in text
+    assert "女超人" not in text
+    assert "一拳超人" not in text
+    cached_candidate = service.get_cached_candidate(1001, 1)
+    assert cached_candidate is not None
+    assert cached_candidate["media_identity"]["tmdb_id"] == "602"
+    second_candidate = service.get_cached_candidate(1001, 2)
+    assert second_candidate is not None
+    assert second_candidate["media_identity"]["tmdb_id"] == "604"
+    third_candidate = service.get_cached_candidate(1001, 3)
+    assert third_candidate is not None
+    assert third_candidate["media_identity"]["tmdb_id"] == "606"
+    assert service.get_cached_candidate(1001, 4) is None
+
+
+def test_search_and_format_prefers_year_match_within_superman_family_for_explicit_year_query() -> None:
+    seen_queries: list[str] = []
+
+    async def unexpected_resource_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "超人"
+        assert year == "2001"
+        return [
+            TmdbMovie(
+                title="超人",
+                original_title="Superman",
+                year="2025",
+                tmdb_id="602",
+                media_type="movie",
+                poster_path="/superman-2025.jpg",
+                overview="Clark Kent returns as Superman.",
+                popularity=92.0,
+                vote_average=7.8,
+                vote_count=6800,
+            ),
+            TmdbMovie(
+                title="超人前传",
+                original_title="Smallville",
+                year="2001",
+                tmdb_id="604",
+                media_type="tv",
+                poster_path="/smallville.jpg",
+                overview="Clark Kent grows into Superman.",
+                popularity=57.0,
+                vote_average=8.4,
+                vote_count=2800,
+            ),
+            TmdbMovie(
+                title="超人归来",
+                original_title="Superman Returns",
+                year="2006",
+                tmdb_id="606",
+                media_type="movie",
+                poster_path="/superman-returns.jpg",
+                overview="Another Superman film in the protected family.",
+                popularity=57.0,
+                vote_average=8.4,
+                vote_count=900,
+            ),
+            TmdbMovie(
+                title="超人2",
+                original_title="Superman II",
+                year="1980",
+                tmdb_id="603",
+                media_type="movie",
+                poster_path="/superman-2.jpg",
+                overview="Superman faces Zod and his allies.",
+                popularity=57.0,
+                vote_average=7.2,
+                vote_count=3200,
+            ),
+        ]
+
+    service = SearchMediaService(
+        unexpected_resource_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    text = _run(service.search_and_format("超人 2001", chat_id=1001))
+
+    assert seen_queries == []
+    assert text.startswith("候选作品：超人 2001")
+    assert "1. 超人前传 (2001) | tv" in text
+    cached_candidate = service.get_cached_candidate(1001, 1)
+    assert cached_candidate is not None
+    assert cached_candidate["media_identity"]["tmdb_id"] == "604"
+
+
 def test_search_and_format_with_explicit_year_prefers_media_confirmation_before_resource_search() -> None:
     seen_queries: list[str] = []
 

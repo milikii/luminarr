@@ -9,6 +9,7 @@ import httpx
 
 from app.search_franchise_intent import (
     PRIMARY_FRANCHISE_INTENT_BOOST,
+    franchise_family_metric_sort_key,
     has_explicit_franchise_intent,
     resolve_franchise_intent_boost,
 )
@@ -39,6 +40,7 @@ class TmdbMovie:
     overview: str = ""
     popularity: float = 0.0
     vote_count: int = 0
+    vote_average: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,6 +307,7 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
         overview=_safe_text(item.get("overview")),
         popularity=_safe_float(item.get("popularity")),
         vote_count=_safe_int(item.get("vote_count")),
+        vote_average=_safe_float(item.get("vote_average")),
     )
 
 
@@ -328,6 +331,7 @@ def _to_tmdb_tv(item: Mapping[str, Any]) -> TmdbMovie | None:
         overview=_safe_text(item.get("overview")),
         popularity=_safe_float(item.get("popularity")),
         vote_count=_safe_int(item.get("vote_count")),
+        vote_average=_safe_float(item.get("vote_average")),
     )
 
 
@@ -423,7 +427,11 @@ def _rank_tmdb_candidates(
     ]
     scored_candidates.sort(key=lambda item: item[0], reverse=True)
     if has_explicit_franchise_intent(title):
-        scored_candidates = _prefer_primary_franchise_cluster(scored_candidates, title=title)
+        scored_candidates = _prefer_primary_franchise_cluster(
+            scored_candidates,
+            title=title,
+            year=cleaned_year,
+        )
     preserve_short_query_spread = _should_preserve_short_query_candidate_spread(
         title=title,
         year=cleaned_year,
@@ -476,6 +484,7 @@ def _prefer_primary_franchise_cluster(
     scored_candidates: list[tuple[tuple[int, int, int], TmdbMovie]],
     *,
     title: str,
+    year: str,
 ) -> list[tuple[tuple[int, int, int], TmdbMovie]]:
     primary_candidates = [
         item
@@ -483,8 +492,27 @@ def _prefer_primary_franchise_cluster(
         if resolve_franchise_intent_boost(title, item[1].title, item[1].original_title) >= PRIMARY_FRANCHISE_INTENT_BOOST
     ]
     if primary_candidates:
+        primary_candidates.sort(
+            key=lambda item: _protected_franchise_sort_key(item, query_year=year),
+            reverse=True,
+        )
         return primary_candidates
     return scored_candidates
+
+
+def _protected_franchise_sort_key(
+    item: tuple[tuple[int, int, int], TmdbMovie],
+    *,
+    query_year: str,
+) -> tuple[int, float, float, int]:
+    _, candidate = item
+    metric_key = franchise_family_metric_sort_key(
+        popularity=candidate.popularity,
+        vote_average=candidate.vote_average,
+        vote_count=candidate.vote_count,
+    )
+    year_priority = 1 if query_year.strip() and candidate.year == query_year.strip() else 0
+    return year_priority, *metric_key
 
 
 def _should_preserve_short_query_candidate_spread(
@@ -540,7 +568,13 @@ def _compact_short_strong_title_candidates(
         relation = _resolve_tmdb_candidate_match_relation(title=title, candidate=item[1])
         if is_title_match_prefix_family(relation):
             family_items.append(item)
-    family_items.sort(key=_short_query_prefix_sort_key, reverse=True)
+    if has_explicit_franchise_intent(title):
+        family_items.sort(
+            key=lambda item: _protected_franchise_sort_key(item, query_year=""),
+            reverse=True,
+        )
+    else:
+        family_items.sort(key=_short_query_prefix_sort_key, reverse=True)
     compact_limit = max(1, min(limit, SHORT_STRONG_TITLE_COMPACT_LIMIT))
     return [top_item, *family_items[: max(0, compact_limit - 1)]]
 
@@ -567,7 +601,13 @@ def _diversify_short_query_scored_candidates(
         else:
             fallback_items.append(item)
 
-    prefix_items.sort(key=_short_query_prefix_sort_key, reverse=True)
+    if has_explicit_franchise_intent(title):
+        prefix_items.sort(
+            key=lambda item: _protected_franchise_sort_key(item, query_year=""),
+            reverse=True,
+        )
+    else:
+        prefix_items.sort(key=_short_query_prefix_sort_key, reverse=True)
     contains_items.sort(key=_short_query_contains_sort_key, reverse=True)
     top_relation = _resolve_tmdb_candidate_match_relation(title=title, candidate=top_item[1])
     family_candidate_count = len(prefix_items) + (1 if is_title_match_prefix_family(top_relation) else 0)
