@@ -217,3 +217,37 @@ Improved import-time subtitle translation quality by adding TMDB-linked trusted 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: Docker runtime subtitle deps
+
+**Date**: 2026-05-02
+**Task**: Docker runtime subtitle deps
+**Branch**: `main`
+
+### Summary
+
+Bundled ffmpeg into the Docker image for subtitle translation, updated operator docs to distinguish Docker vs local Python runtime dependency truth, and tracked the runtime-deps task in Trellis.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a2e41d7` | (see git log) |
+| `0bf62d5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

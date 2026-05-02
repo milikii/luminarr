@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 6
+- **Total Sessions**: 7
 - **Last Active**: 2026-05-02
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~219 | Active |
+| `journal-1.md` | ~253 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 7 | 2026-05-02 | Docker runtime subtitle deps | `a2e41d7`, `0bf62d5` | `main` |
 | 6 | 2026-05-02 | Subtitle translation quality MVP | `faef6d2`, `eb192fc` | `main` |
 | 5 | 2026-05-02 | PT relevance and Trellis cleanup | `7f76e98`, `990b89b`, `e2880dc`, `de8e325`, `cd6e3e6`, `7914485`, `fc4ba16`, `922180d` | `main` |
 | 4 | 2026-05-01 | Adult search fallback empty response | `66c9e15` | `main` |
