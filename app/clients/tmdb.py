@@ -41,6 +41,17 @@ class TmdbMovie:
     vote_count: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class TmdbCreditPerson:
+    person_id: str
+    name: str
+    original_name: str = ""
+    character: str = ""
+    department: str = ""
+    job: str = ""
+    order: int = 0
+
+
 class TmdbClient:
     def __init__(
         self,
@@ -92,11 +103,51 @@ class TmdbClient:
             return None
         return _to_tmdb_movie(data)
 
+    async def get_movie_credits(
+        self,
+        tmdb_id: str,
+        *,
+        language: str = "zh-CN",
+    ) -> tuple[TmdbCreditPerson, ...]:
+        return await self._get_credits(
+            path=f"/3/movie/{tmdb_id.strip()}/credits",
+            tmdb_id=tmdb_id,
+            language=language,
+        )
+
     async def search_tv(self, title: str, year: str = "") -> TmdbMovie | None:
         results = await self.search_tv_candidates(title, year=year, limit=5)
         if not results:
             return None
         return _pick_best_tmdb_match(results, title=title, year=year)
+
+    async def get_tv_by_id(self, tmdb_id: str) -> TmdbMovie | None:
+        cleaned_tmdb_id = tmdb_id.strip()
+        if not cleaned_tmdb_id:
+            return None
+        response = await self._get(
+            f"/3/tv/{cleaned_tmdb_id}",
+            params={
+                "api_key": self._api_key,
+                "language": "zh-CN",
+            },
+        )
+        data = response.json()
+        if not isinstance(data, Mapping):
+            return None
+        return _to_tmdb_tv(data)
+
+    async def get_tv_credits(
+        self,
+        tmdb_id: str,
+        *,
+        language: str = "zh-CN",
+    ) -> tuple[TmdbCreditPerson, ...]:
+        return await self._get_credits(
+            path=f"/3/tv/{tmdb_id.strip()}/credits",
+            tmdb_id=tmdb_id,
+            language=language,
+        )
 
     async def search_tv_candidates(
         self,
@@ -182,6 +233,50 @@ class TmdbClient:
                 break
         return resolved_results
 
+    async def _get_credits(
+        self,
+        *,
+        path: str,
+        tmdb_id: str,
+        language: str,
+    ) -> tuple[TmdbCreditPerson, ...]:
+        cleaned_tmdb_id = tmdb_id.strip()
+        if not cleaned_tmdb_id:
+            return ()
+        response = await self._get(
+            path,
+            params={
+                "api_key": self._api_key,
+                "language": language.strip() or "zh-CN",
+            },
+        )
+        data = response.json()
+        if not isinstance(data, Mapping):
+            return ()
+
+        results: list[TmdbCreditPerson] = []
+        seen_people: set[tuple[str, str, str]] = set()
+        for section_name in ("cast", "crew"):
+            raw_people = data.get(section_name)
+            if not isinstance(raw_people, list):
+                continue
+            for item in raw_people:
+                if not isinstance(item, Mapping):
+                    continue
+                person = _to_tmdb_credit_person(item)
+                if person is None:
+                    continue
+                dedupe_key = (
+                    person.person_id,
+                    person.department.casefold(),
+                    person.job.casefold(),
+                )
+                if dedupe_key in seen_people:
+                    continue
+                seen_people.add(dedupe_key)
+                results.append(person)
+        return tuple(results)
+
     async def _get(self, path: str, params: Mapping[str, str]) -> httpx.Response:
         url = f"{self._base_url}{path}"
         async with httpx.AsyncClient(timeout=self._timeout_seconds, proxy=self._proxy_url or None) as client:
@@ -266,6 +361,24 @@ def _safe_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _to_tmdb_credit_person(item: Mapping[str, Any]) -> TmdbCreditPerson | None:
+    person_id = _safe_id(item.get("id"))
+    name = _safe_text(item.get("name"))
+    original_name = _safe_text(item.get("original_name"))
+    resolved_name = name or original_name
+    if not person_id or not resolved_name:
+        return None
+    return TmdbCreditPerson(
+        person_id=person_id,
+        name=resolved_name,
+        original_name=original_name,
+        character=_safe_text(item.get("character")),
+        department=_safe_text(item.get("known_for_department")) or _safe_text(item.get("department")),
+        job=_safe_text(item.get("job")),
+        order=_safe_int(item.get("order")),
+    )
 
 
 def _extract_year(value: str) -> str:

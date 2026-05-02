@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 
 from app.clients.fanart import FanartMovieImages
-from app.clients.tmdb import TmdbMovie
+from app.clients.tmdb import TmdbCreditPerson, TmdbMovie
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScraperService
 
 
@@ -65,6 +65,144 @@ def test_scrape_for_import_writes_metadata_sidecar(tmp_path: Path) -> None:
     assert "https://img.example/poster.jpg" in nfo_text
     assert poster_path.read_bytes() == b"image:https://img.example/poster.jpg"
     assert backdrop_path.read_bytes() == b"image:https://img.example/bg.jpg"
+
+
+def test_scrape_for_import_writes_media_type_and_subtitle_translation_guidance(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="星际穿越",
+            original_title="Interstellar",
+            year="2014",
+            tmdb_id="157336",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, language: str) -> tuple[TmdbCreditPerson, ...]:
+        if language == "zh-CN":
+            return (
+                TmdbCreditPerson(
+                    person_id="100",
+                    name="马修·麦康纳",
+                    original_name="Matthew McConaughey",
+                    character="库珀",
+                ),
+            )
+        return (
+            TmdbCreditPerson(
+                person_id="100",
+                name="Matthew McConaughey",
+                original_name="Matthew McConaughey",
+                character="Cooper",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["media_type"] == "movie"
+    assert payload["subtitle_translation"]["trusted_name_map"] == {
+        "Matthew McConaughey": "马修·麦康纳",
+        "Cooper": "库珀",
+    }
+
+
+def test_scrape_for_import_falls_back_to_tv_lookup_by_tmdb_id_for_tv_identity(tmp_path: Path) -> None:
+    target_dir = tmp_path / "Three-Body.S01"
+    target_dir.mkdir()
+    (target_dir / "Three-Body.S01E01.mkv").write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return None
+
+    async def fake_movie_lookup_by_id(_: str) -> TmdbMovie | None:
+        request = httpx.Request("GET", "https://tmdb.example/3/movie/1001")
+        response = httpx.Response(404, request=request)
+        raise httpx.HTTPStatusError("not found", request=request, response=response)
+
+    async def fake_tv_lookup_by_id(tmdb_id: str) -> TmdbMovie | None:
+        assert tmdb_id == "1001"
+        return TmdbMovie(
+            title="三体",
+            original_title="Three-Body",
+            year="2023",
+            tmdb_id="1001",
+            media_type="tv",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_tv_credits(_: str, language: str) -> tuple[TmdbCreditPerson, ...]:
+        if language == "zh-CN":
+            return (
+                TmdbCreditPerson(
+                    person_id="300",
+                    name="张鲁一",
+                    original_name="Zhang Luyi",
+                    character="汪淼",
+                ),
+            )
+        return (
+            TmdbCreditPerson(
+                person_id="300",
+                name="Zhang Luyi",
+                original_name="Zhang Luyi",
+                character="Wang Miao",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_by_tmdb_id_func=fake_movie_lookup_by_id,
+        lookup_tv_by_tmdb_id_func=fake_tv_lookup_by_id,
+        lookup_tv_credits_func=fake_tv_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="tv-1001",
+                task_id="tv-1001",
+                task_hash="tv-hash-1001",
+                title="Three-Body",
+                year="2023",
+                target_path=str(target_dir),
+                tmdb_id="1001",
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads((target_dir / ".luminarr.metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["id"] == "1001"
+    assert payload["tmdb"]["media_type"] == "tv"
+    assert payload["subtitle_translation"]["trusted_name_map"] == {
+        "Zhang Luyi": "张鲁一",
+        "Wang Miao": "汪淼",
+    }
 
 
 def test_scrape_for_import_prefers_tmdb_id_lookup_when_available(tmp_path: Path) -> None:

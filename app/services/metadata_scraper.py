@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -11,13 +11,15 @@ from xml.sax.saxutils import escape
 import httpx
 
 from app.clients.fanart import FanartMovieImages
-from app.clients.tmdb import TmdbMovie
+from app.clients.tmdb import TmdbCreditPerson, TmdbMovie
 from app.operational_logging import emit_operational_log
 
 LookupMovieFunc = Callable[[str, str], Awaitable[TmdbMovie | None]]
 LookupMovieByTmdbIdFunc = Callable[[str], Awaitable[TmdbMovie | None]]
+LookupTvByTmdbIdFunc = Callable[[str], Awaitable[TmdbMovie | None]]
 GetMovieImagesFunc = Callable[[str], Awaitable[FanartMovieImages | None]]
 DownloadImageFunc = Callable[[str], Awaitable[bytes]]
+LookupMediaCreditsFunc = Callable[[str, str], Awaitable[tuple[TmdbCreditPerson, ...]]]
 
 WRITE_STRATEGY_OVERWRITE = "overwrite"
 WRITE_STRATEGY_MISSING_ONLY = "missing_only"
@@ -49,12 +51,18 @@ class MetadataScraperService:
         lookup_movie_func: LookupMovieFunc,
         get_movie_images_func: GetMovieImagesFunc,
         lookup_movie_by_tmdb_id_func: LookupMovieByTmdbIdFunc | None = None,
+        lookup_tv_by_tmdb_id_func: LookupTvByTmdbIdFunc | None = None,
         download_image_func: DownloadImageFunc | None = None,
+        lookup_movie_credits_func: LookupMediaCreditsFunc | None = None,
+        lookup_tv_credits_func: LookupMediaCreditsFunc | None = None,
     ) -> None:
         self._lookup_movie_func = lookup_movie_func
         self._get_movie_images_func = get_movie_images_func
         self._lookup_movie_by_tmdb_id_func = lookup_movie_by_tmdb_id_func
+        self._lookup_tv_by_tmdb_id_func = lookup_tv_by_tmdb_id_func
         self._download_image_func = download_image_func
+        self._lookup_movie_credits_func = lookup_movie_credits_func
+        self._lookup_tv_credits_func = lookup_tv_credits_func
 
     async def scrape_for_import(self, scrape_input: MetadataScrapeInput) -> MetadataScrapeResult:
         title = scrape_input.title.strip()
@@ -121,6 +129,7 @@ class MetadataScraperService:
                 nfo_path = primary_video_path.with_suffix(".nfo")
             else:
                 nfo_path = target_path / "movie.nfo"
+        subtitle_translation_payload = await self._build_subtitle_translation_payload(tmdb_movie)
         payload = {
             "task_ref": scrape_input.task_ref,
             "task_id": scrape_input.task_id,
@@ -131,12 +140,15 @@ class MetadataScraperService:
                 "title": tmdb_movie.title,
                 "original_title": tmdb_movie.original_title,
                 "year": tmdb_movie.year,
+                "media_type": tmdb_movie.media_type,
             },
             "fanart": {
                 "poster_url": fanart_images.poster_url if fanart_images is not None else "",
                 "backdrop_url": fanart_images.backdrop_url if fanart_images is not None else "",
             },
         }
+        if subtitle_translation_payload is not None:
+            payload["subtitle_translation"] = subtitle_translation_payload
         if _resolve_write_strategy_for_path(
             artifact_path=metadata_path,
             default_strategy=WRITE_STRATEGY_OVERWRITE,
@@ -203,6 +215,39 @@ class MetadataScraperService:
             nfo_path=str(nfo_path),
         )
 
+    async def _build_subtitle_translation_payload(
+        self,
+        tmdb_movie: TmdbMovie,
+    ) -> dict[str, object] | None:
+        trusted_name_map = await self._build_trusted_name_map(tmdb_movie)
+        if not trusted_name_map:
+            return None
+        return {
+            "trusted_name_map": trusted_name_map,
+            "source_priority": ("tmdb_zh_cn_credits", "original_name_fallback"),
+        }
+
+    async def _build_trusted_name_map(self, tmdb_movie: TmdbMovie) -> dict[str, str]:
+        lookup_func = self._resolve_media_credits_lookup(tmdb_movie.media_type)
+        if lookup_func is None or not tmdb_movie.tmdb_id.strip():
+            return {}
+        try:
+            localized_credits = await lookup_func(tmdb_movie.tmdb_id, "zh-CN")
+            reference_credits = await lookup_func(tmdb_movie.tmdb_id, "en-US")
+        except (httpx.HTTPError, ValueError) as exc:
+            emit_operational_log(
+                title="字幕人名映射生成失败",
+                detail=f"tmdb_id={tmdb_movie.tmdb_id or '-'} media_type={tmdb_movie.media_type or '-'} 错误={exc}",
+                fix_hint="检查 TMDB credits 接口、网络与本地化响应；当前会回退到无 trusted name map 的字幕翻译。",
+            )
+            return {}
+        return _build_trusted_person_name_map(localized_credits=localized_credits, reference_credits=reference_credits)
+
+    def _resolve_media_credits_lookup(self, media_type: str) -> LookupMediaCreditsFunc | None:
+        if media_type == "tv":
+            return self._lookup_tv_credits_func
+        return self._lookup_movie_credits_func
+
     async def _resolve_tmdb_movie(
         self,
         *,
@@ -210,16 +255,12 @@ class MetadataScraperService:
         year: str,
         tmdb_id: str,
     ) -> tuple[TmdbMovie | None, MetadataScrapeResult | None]:
-        if tmdb_id and self._lookup_movie_by_tmdb_id_func is not None:
-            try:
-                tmdb_movie = await self._lookup_movie_by_tmdb_id_func(tmdb_id)
-            except (httpx.HTTPError, ValueError) as exc:
-                message = f"TMDB 详情查询失败：{exc}"
-                _print_colored_error(
-                    problem=message,
-                    fix="检查 `TMDB_API_KEY`、网络连通性，以及 `TMDB_BASE_URL` 是否可访问；如果这是已确认媒体身份，优先确认 `tmdb_id` 是否仍有效。",
-                )
-                return None, MetadataScrapeResult(success=False, message=message)
+        if tmdb_id and (
+            self._lookup_movie_by_tmdb_id_func is not None or self._lookup_tv_by_tmdb_id_func is not None
+        ):
+            tmdb_movie, error_result = await self._lookup_localized_media_by_tmdb_id(tmdb_id)
+            if error_result is not None:
+                return None, error_result
             if tmdb_movie is None:
                 message = f"TMDB 未命中：tmdb_id={tmdb_id}"
                 _print_colored_error(
@@ -248,16 +289,12 @@ class MetadataScraperService:
                 fix="确认电影名和年份是否正确，或先用 `search` 指令确认资源标题。",
             )
             return None, MetadataScrapeResult(success=False, message=message)
-        if tmdb_movie.tmdb_id and self._lookup_movie_by_tmdb_id_func is not None:
-            try:
-                localized_movie = await self._lookup_movie_by_tmdb_id_func(tmdb_movie.tmdb_id)
-            except (httpx.HTTPError, ValueError) as exc:
-                message = f"TMDB 详情查询失败：{exc}"
-                _print_colored_error(
-                    problem=message,
-                    fix="检查 `TMDB_API_KEY`、网络连通性，以及 `TMDB_BASE_URL` 是否可访问；当前不会回退成英文标题刮削。",
-                )
-                return None, MetadataScrapeResult(success=False, message=message)
+        if tmdb_movie.tmdb_id and (
+            self._lookup_movie_by_tmdb_id_func is not None or self._lookup_tv_by_tmdb_id_func is not None
+        ):
+            localized_movie, error_result = await self._lookup_localized_media_by_tmdb_id(tmdb_movie.tmdb_id)
+            if error_result is not None:
+                return None, error_result
             if localized_movie is None:
                 message = f"TMDB 未命中：tmdb_id={tmdb_movie.tmdb_id}"
                 _print_colored_error(
@@ -273,6 +310,35 @@ class MetadataScraperService:
             tmdb_movie=tmdb_movie,
             failure_message=f"TMDB 未返回中文标题：title={title}, year={year or '-'}",
         )
+
+    async def _lookup_localized_media_by_tmdb_id(
+        self,
+        tmdb_id: str,
+    ) -> tuple[TmdbMovie | None, MetadataScrapeResult | None]:
+        for lookup_func in (self._lookup_movie_by_tmdb_id_func, self._lookup_tv_by_tmdb_id_func):
+            if lookup_func is None:
+                continue
+            try:
+                tmdb_movie = await lookup_func(tmdb_id)
+            except httpx.HTTPStatusError as exc:
+                if exc.response is not None and exc.response.status_code == 404:
+                    continue
+                message = f"TMDB 详情查询失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查 `TMDB_API_KEY`、网络连通性，以及 `TMDB_BASE_URL` 是否可访问；如果这是已确认媒体身份，优先确认 `tmdb_id` 是否仍有效。",
+                )
+                return None, MetadataScrapeResult(success=False, message=message)
+            except (httpx.HTTPError, ValueError) as exc:
+                message = f"TMDB 详情查询失败：{exc}"
+                _print_colored_error(
+                    problem=message,
+                    fix="检查 `TMDB_API_KEY`、网络连通性，以及 `TMDB_BASE_URL` 是否可访问；如果这是已确认媒体身份，优先确认 `tmdb_id` 是否仍有效。",
+                )
+                return None, MetadataScrapeResult(success=False, message=message)
+            if tmdb_movie is not None:
+                return tmdb_movie, None
+        return None, None
 
     async def _write_image_artifacts(
         self,
@@ -378,6 +444,54 @@ def _resolve_chinese_scrape_movie(
         ),
         None,
     )
+
+
+def _build_trusted_person_name_map(
+    *,
+    localized_credits: Sequence[TmdbCreditPerson],
+    reference_credits: Sequence[TmdbCreditPerson],
+) -> dict[str, str]:
+    localized_by_person_id = {item.person_id: item for item in localized_credits if item.person_id}
+    trusted_name_map: dict[str, str] = {}
+    for reference in reference_credits:
+        localized = localized_by_person_id.get(reference.person_id)
+        if localized is None:
+            continue
+        _add_trusted_name_mapping(
+            trusted_name_map,
+            source_name=reference.name,
+            localized_name=localized.name,
+        )
+        _add_trusted_name_mapping(
+            trusted_name_map,
+            source_name=reference.original_name,
+            localized_name=localized.name,
+        )
+        _add_trusted_name_mapping(
+            trusted_name_map,
+            source_name=reference.character,
+            localized_name=localized.character,
+        )
+    return trusted_name_map
+
+
+def _add_trusted_name_mapping(
+    trusted_name_map: dict[str, str],
+    *,
+    source_name: str,
+    localized_name: str,
+) -> None:
+    cleaned_source = source_name.strip()
+    cleaned_localized = localized_name.strip()
+    if not cleaned_source or not cleaned_localized:
+        return
+    if cleaned_source == cleaned_localized:
+        return
+    if not re.search(r"[\u4e00-\u9fff]", cleaned_localized):
+        return
+    trusted_name_map.setdefault(cleaned_source, cleaned_localized)
+
+
 def _resolve_write_strategy_for_path(*, artifact_path: Path, default_strategy: str) -> str:
     if default_strategy == WRITE_STRATEGY_OVERWRITE:
         return WRITE_STRATEGY_OVERWRITE

@@ -411,7 +411,16 @@ def main() -> None:
             lookup_movie_func=tmdb_client.search_movie,
             get_movie_images_func=get_movie_images_func,
             lookup_movie_by_tmdb_id_func=tmdb_client.get_movie_by_id,
+            lookup_tv_by_tmdb_id_func=tmdb_client.get_tv_by_id,
             download_image_func=_download_remote_image,
+            lookup_movie_credits_func=lambda tmdb_id, language: tmdb_client.get_movie_credits(
+                tmdb_id,
+                language=language,
+            ),
+            lookup_tv_credits_func=lambda tmdb_id, language: tmdb_client.get_tv_credits(
+                tmdb_id,
+                language=language,
+            ),
         )
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(

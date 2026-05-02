@@ -73,6 +73,7 @@ class SubtitleTranslatorService:
         translated_count, error_result = self._translate_pending_subtitle_files(
             subtitle_files=plan.subtitle_files,
             movie_title=plan.movie_title,
+            trusted_name_map=plan.trusted_name_map,
         )
         if error_result is not None:
             return error_result
@@ -129,12 +130,20 @@ class SubtitleTranslatorService:
         *,
         subtitle_file: _SubtitleFile,
         movie_title: str,
+        trusted_name_map: dict[str, str] | None = None,
     ) -> SubtitleTranslateResult:
+        resolved_trusted_name_map = trusted_name_map or {}
         success, error_message, failure = _translate_single_subtitle_file(
             subtitle_file=subtitle_file,
             movie_title=movie_title,
-            translate_srt=self._translate_srt_text,
-            translate_ass=self._translate_ass_text,
+            translate_srt=lambda **kwargs: self._translate_srt_text(
+                trusted_name_map=resolved_trusted_name_map,
+                **kwargs,
+            ),
+            translate_ass=lambda **kwargs: self._translate_ass_text(
+                trusted_name_map=resolved_trusted_name_map,
+                **kwargs,
+            ),
         )
         if failure is not None:
             return self._build_failed_result(
@@ -170,6 +179,7 @@ class SubtitleTranslatorService:
         *,
         subtitle_files: list[_SubtitleFile],
         movie_title: str,
+        trusted_name_map: dict[str, str],
     ) -> tuple[int, SubtitleTranslateResult | None]:
         translated_count = 0
         for subtitle_file in subtitle_files:
@@ -178,6 +188,7 @@ class SubtitleTranslatorService:
             result = self._translate_single_file(
                 subtitle_file=subtitle_file,
                 movie_title=movie_title,
+                trusted_name_map=trusted_name_map,
             )
             if not result.success:
                 return 0, result
@@ -222,6 +233,7 @@ class SubtitleTranslatorService:
         source_text: str,
         movie_title: str,
         subtitle_path: Path,
+        trusted_name_map: dict[str, str],
     ) -> tuple[str | None, str | None]:
         return _translate_srt_subtitle_content(
             source_text=source_text,
@@ -230,6 +242,7 @@ class SubtitleTranslatorService:
             translate_lines=lambda source_lines, resolved_movie_title: self._translate_lines_professional(
                 source_lines=source_lines,
                 movie_title=resolved_movie_title,
+                trusted_name_map=trusted_name_map,
             ),
         )
 
@@ -239,6 +252,7 @@ class SubtitleTranslatorService:
         source_text: str,
         movie_title: str,
         subtitle_path: Path,
+        trusted_name_map: dict[str, str],
     ) -> tuple[str | None, str | None]:
         return _translate_ass_subtitle_content(
             source_text=source_text,
@@ -247,13 +261,21 @@ class SubtitleTranslatorService:
             translate_lines=lambda source_lines, resolved_movie_title: self._translate_lines_professional(
                 source_lines=source_lines,
                 movie_title=resolved_movie_title,
+                trusted_name_map=trusted_name_map,
             ),
         )
 
-    def _translate_lines_professional(self, *, source_lines: list[str], movie_title: str) -> list[str]:
+    def _translate_lines_professional(
+        self,
+        *,
+        source_lines: list[str],
+        movie_title: str,
+        trusted_name_map: dict[str, str] | None = None,
+    ) -> list[str]:
         return _translate_subtitle_lines_professionally(
             source_lines=source_lines,
             movie_title=movie_title,
+            trusted_name_map=trusted_name_map or {},
             request_chat_completion=lambda system_prompt, user_payload: self._request_chat_completion(
                 system_prompt=system_prompt,
                 user_payload=user_payload,

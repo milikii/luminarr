@@ -62,6 +62,88 @@ def test_get_movie_by_id_returns_valid_result() -> None:
     assert result.overview == "A journey across space and time."
 
 
+def test_get_tv_by_id_returns_valid_result() -> None:
+    client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
+    captured: dict[str, Any] = {}
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        captured["path"] = path
+        captured["params"] = params
+        return _FakeResponse(
+            {
+                "id": 1001,
+                "name": "三体",
+                "original_name": "Three-Body",
+                "first_air_date": "2023-01-15",
+                "poster_path": "/three-body.jpg",
+                "overview": "Humanity makes first contact.",
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.get_tv_by_id("1001"))
+
+    assert captured["path"] == "/3/tv/1001"
+    assert captured["params"] == {"api_key": "tmdb-key", "language": "zh-CN"}
+    assert result is not None
+    assert result.title == "三体"
+    assert result.original_title == "Three-Body"
+    assert result.year == "2023"
+    assert result.tmdb_id == "1001"
+    assert result.media_type == "tv"
+    assert result.poster_path == "/three-body.jpg"
+    assert result.overview == "Humanity makes first contact."
+
+
+def test_get_movie_credits_returns_localized_people() -> None:
+    client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
+    captured: dict[str, Any] = {}
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        captured["path"] = path
+        captured["params"] = params
+        return _FakeResponse(
+            {
+                "cast": [
+                    {
+                        "id": 100,
+                        "name": "马修·麦康纳",
+                        "original_name": "Matthew McConaughey",
+                        "character": "库珀",
+                        "order": 0,
+                    }
+                ],
+                "crew": [
+                    {
+                        "id": 200,
+                        "name": "克里斯托弗·诺兰",
+                        "original_name": "Christopher Nolan",
+                        "job": "Director",
+                        "department": "Directing",
+                    }
+                ],
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.get_movie_credits("157336", language="zh-CN"))
+
+    assert captured["path"] == "/3/movie/157336/credits"
+    assert captured["params"] == {"api_key": "tmdb-key", "language": "zh-CN"}
+    assert result[0].person_id == "100"
+    assert result[0].name == "马修·麦康纳"
+    assert result[0].original_name == "Matthew McConaughey"
+    assert result[0].character == "库珀"
+    assert result[1].name == "克里斯托弗·诺兰"
+    assert result[1].job == "Director"
+
+
+def test_get_tv_credits_returns_empty_on_empty_tmdb_id() -> None:
+    client = TmdbClient(api_key="tmdb-key")
+    result = _run(client.get_tv_credits("   "))
+    assert result == ()
+
+
 def test_search_movie_returns_first_valid_result() -> None:
     client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
     captured: dict[str, Any] = {}

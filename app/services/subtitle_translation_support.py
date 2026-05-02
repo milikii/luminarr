@@ -60,6 +60,7 @@ class _SubtitleImportPreparationFailure:
 class _SubtitleImportTranslationPlan:
     subtitle_files: list[_SubtitleFile]
     movie_title: str
+    trusted_name_map: dict[str, str]
 
 
 _VIDEO_FILE_SUFFIXES = frozenset({".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"})
@@ -330,18 +331,26 @@ def _build_professional_subtitle_translation_request(
     *,
     movie_title: str,
     source_lines: list[str],
+    trusted_name_map: dict[str, str],
 ) -> tuple[str, dict[str, object]]:
     system_prompt = (
         "你是专业影视字幕译者。任务：把英文字幕逐行翻译为简体中文。"
         "必须保留每行语气、语境、人物关系，不要删减信息，不要总结。"
         "脏话、双关、俚语要自然等价翻译。"
+        "译文必须像能直接观看的中文字幕：简洁、口语化、少书面腔，不要解释性扩写。"
+        "如果 `trusted_name_map` 给出了人名/角色名的可信中文写法，必须严格使用并保持一致。"
+        "如果遇到影视人名而 `trusted_name_map` 没给出可靠中文名，优先保留原文，不要擅自音译或编造常用译名。"
+        "必须保持一行源文对应一行译文，返回严格 JSON。"
     )
     user_payload: dict[str, object] = {
         "movie_title": movie_title,
         "source_lines": source_lines,
+        "trusted_name_map": trusted_name_map,
         "rules": {
             "target_language": "zh-CN",
             "style": "专业影视字幕",
+            "dialogue_tone": "自然口语、适合直接观看的中文字幕",
+            "proper_noun_policy": "trusted-name-map-first, otherwise keep unresolved film-tv names in original form",
             "return_json_only": True,
             "json_schema": {"translations": ["与 source_lines 等长的中文字符串数组"]},
         },
@@ -353,11 +362,13 @@ def _translate_subtitle_lines_professionally(
     *,
     source_lines: list[str],
     movie_title: str,
+    trusted_name_map: dict[str, str],
     request_chat_completion: Callable[[str, dict[str, object]], str],
 ) -> list[str]:
     system_prompt, user_payload = _build_professional_subtitle_translation_request(
         movie_title=movie_title,
         source_lines=source_lines,
+        trusted_name_map=trusted_name_map,
     )
     response_text = request_chat_completion(system_prompt, user_payload)
     translations = _extract_translations_from_response(response_text)
@@ -546,6 +557,7 @@ def _prepare_subtitle_translation_for_import(
     return _SubtitleImportTranslationPlan(
         subtitle_files=subtitle_files,
         movie_title=read_metadata_title(metadata_path),
+        trusted_name_map=_read_metadata_trusted_name_map(metadata_path),
     ), None
 
 
@@ -1039,23 +1051,8 @@ def _load_json_object(content: str) -> dict[str, object]:
 
 
 def _read_metadata_title(metadata_path: Path) -> str:
-    if not str(metadata_path).strip():
-        return ""
-    if not metadata_path.exists() or not metadata_path.is_file():
-        return ""
-    try:
-        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, ValueError) as error:
-        _print_colored_error(
-            problem=f"读取字幕元数据失败：{metadata_path}，原因={error}",
-            fix="检查 metadata JSON 文件是否仍可读、编码是否为 UTF-8，以及 tmdb 字段结构是否完整。",
-        )
-        return ""
-    if not isinstance(payload, dict):
-        _print_colored_error(
-            problem=f"读取字幕元数据失败：{metadata_path}，原因=metadata JSON 根不是对象",
-            fix="检查 metadata JSON 文件是否仍是对象结构，并确认 tmdb 字段保持对象。",
-        )
+    payload = _read_metadata_payload(metadata_path)
+    if payload is None:
         return ""
     tmdb_block = payload.get("tmdb")
     if not isinstance(tmdb_block, dict):
@@ -1068,6 +1065,50 @@ def _read_metadata_title(metadata_path: Path) -> str:
     if title:
         return title
     return str(tmdb_block.get("original_title", "")).strip()
+
+
+def _read_metadata_trusted_name_map(metadata_path: Path) -> dict[str, str]:
+    payload = _read_metadata_payload(metadata_path)
+    if payload is None:
+        return {}
+    translation_block = payload.get("subtitle_translation")
+    if not isinstance(translation_block, dict):
+        return {}
+    raw_name_map = translation_block.get("trusted_name_map")
+    if not isinstance(raw_name_map, dict):
+        return {}
+    trusted_name_map: dict[str, str] = {}
+    for raw_key, raw_value in raw_name_map.items():
+        if not isinstance(raw_key, str) or not isinstance(raw_value, str):
+            continue
+        key = raw_key.strip()
+        value = raw_value.strip()
+        if not key or not value:
+            continue
+        trusted_name_map[key] = value
+    return trusted_name_map
+
+
+def _read_metadata_payload(metadata_path: Path) -> dict[str, object] | None:
+    if not str(metadata_path).strip():
+        return None
+    if not metadata_path.exists() or not metadata_path.is_file():
+        return None
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        _print_colored_error(
+            problem=f"读取字幕元数据失败：{metadata_path}，原因={error}",
+            fix="检查 metadata JSON 文件是否仍可读、编码是否为 UTF-8，以及 tmdb 字段结构是否完整。",
+        )
+        return None
+    if not isinstance(payload, dict):
+        _print_colored_error(
+            problem=f"读取字幕元数据失败：{metadata_path}，原因=metadata JSON 根不是对象",
+            fix="检查 metadata JSON 文件是否仍是对象结构，并确认 tmdb 字段保持对象。",
+        )
+        return None
+    return payload
 
 
 def _print_colored_error(*, problem: str, fix: str) -> None:

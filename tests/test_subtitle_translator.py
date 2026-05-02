@@ -90,6 +90,70 @@ def test_translate_for_import_success_message_prefers_metadata_title(tmp_path: P
     assert result.message == "字幕翻译成功：星际穿越，已生成 1 个字幕文件。"
 
 
+def test_translate_for_import_injects_trusted_name_map_from_metadata(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nMatthew McConaughey meets Cooper\n",
+        encoding="utf-8",
+    )
+    metadata_path = library_dir / "Interstellar (2014).metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "tmdb": {
+                    "id": "157336",
+                    "title": "星际穿越",
+                    "original_title": "Interstellar",
+                    "year": "2014",
+                    "media_type": "movie",
+                },
+                "subtitle_translation": {
+                    "trusted_name_map": {
+                        "Matthew McConaughey": "马修·麦康纳",
+                        "Cooper": "库珀",
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    seen_system_prompt: list[str] = []
+    seen_payloads: list[dict[str, object]] = []
+
+    def fake_request(system_prompt: str, user_payload: dict[str, object]) -> str:
+        seen_system_prompt.append(system_prompt)
+        seen_payloads.append(user_payload)
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-trusted-map",
+            task_id="trusted-map",
+            task_hash="hash-trusted-map",
+            target_path=str(target_file),
+            metadata_path=str(metadata_path),
+        )
+    )
+
+    assert result.success is True
+    assert seen_system_prompt and "trusted_name_map" in seen_system_prompt[0]
+    assert seen_payloads[0]["trusted_name_map"] == {
+        "Matthew McConaughey": "马修·麦康纳",
+        "Cooper": "库珀",
+    }
+
+
 def test_translate_for_import_translates_large_srt_in_chunks(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
@@ -1359,17 +1423,22 @@ def test_translate_lines_professional_builds_expected_request_payload() -> None:
     result = service._translate_lines_professional(
         source_lines=["hello"],
         movie_title="Interstellar",
+        trusted_name_map={"Cooper": "库珀"},
     )
 
     assert result == ["专业译文：hello"]
     assert seen_system_prompt and "专业影视字幕译者" in seen_system_prompt[0]
+    assert "trusted_name_map" in seen_system_prompt[0]
     assert seen_user_payload == [
         {
             "movie_title": "Interstellar",
             "source_lines": ["hello"],
+            "trusted_name_map": {"Cooper": "库珀"},
             "rules": {
                 "target_language": "zh-CN",
                 "style": "专业影视字幕",
+                "dialogue_tone": "自然口语、适合直接观看的中文字幕",
+                "proper_noun_policy": "trusted-name-map-first, otherwise keep unresolved film-tv names in original form",
                 "return_json_only": True,
                 "json_schema": {"translations": ["与 source_lines 等长的中文字符串数组"]},
             },
