@@ -183,3 +183,37 @@ Completed the PT relevance-first confirmation flow, adult BT source work, remove
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Subtitle translation quality MVP
+
+**Date**: 2026-05-02
+**Task**: Subtitle translation quality MVP
+**Branch**: `main`
+
+### Summary
+
+Improved import-time subtitle translation quality by adding TMDB-linked trusted name guidance, stronger subtitle-style translation rules, metadata sidecar contracts, and focused regression coverage for movie/TV identity plumbing.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `faef6d2` | (see git log) |
+| `eb192fc` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
