@@ -341,14 +341,14 @@
 6. 自动归档
 7. 到期后清理
 
-## 11. Superpowers 执行方式
+## 11. Trellis 执行方式
 
-这轮**不要**直接让 Superpowers 自由探索执行。正确顺序应该是：
+这轮**不要**让实现代理自由探索执行。正确顺序应该是：
 
 1. 用这份文档做输入
-2. 先跑 `/writing-plans`
-3. 产出 task-by-task 的执行计划
-4. 再跑 `/executing-plans`
+2. 先用 `trellis-brainstorm` 把范围和任务上下文收口到任务文档
+3. 实施时按 task-by-task 的最小闭环推进
+4. 每轮用 `trellis-implement` 执行，并用 `trellis-check` 收口验证
 
 原因：
 
@@ -377,6 +377,6 @@
 
 ---
 
-## 给 Superpowers 的一句话
+## 给当前实现代理的一句话
 
 > 当前唯一主线是“成人 BT 最小可用闭环”，不是平台重构，不是继续 services 总清洗。先修 docs gate，再按“搜索与展示 -> 下载确认 -> 归档与保留期清理 -> 验证收尾”顺序推进；严格遵守 `NOT in scope`。

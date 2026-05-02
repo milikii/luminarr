@@ -529,7 +529,7 @@
 - 尚未执行 commit；下一步按 Trellis Phase 3.4 确认提交计划
 
 ### 下轮目标
-- 确认并提交 `adult-search-fallback` 文案与测试补强，然后进入 `/finish-work` 收尾
+- 确认并提交 `adult-search-fallback` 文案与测试补强，然后进入 `trellis-finish-work` 收尾
 
 ## Round 32 — 2026-05-01 17:24
 
@@ -552,7 +552,7 @@
 - 当前仓库仍有大量本轮之前已存在的未提交改动；本轮未自动提交，避免混入无关变更。
 
 ### 下轮目标
-- 若继续收口当前 Trellis task，先确认提交分组，再进入 `/finish-work` 或后续 QA / ship。
+- 若继续收口当前 Trellis task，先确认提交分组，再进入 `trellis-finish-work` 或后续 QA / 发布准备。
 
 ## Round 33 — 2026-05-01 18:00
 

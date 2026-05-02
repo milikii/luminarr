@@ -1,6 +1,6 @@
 # Luminarr 任务清单
 
-> 我正在使用 `superpowers:writing-plans` 基于 `docs/PRD.md`、`docs/ARCHITECTURE.md` 和当前已批准的 Stage 1 设计拆解任务。  
+> 本清单基于 `docs/PRD.md`、`docs/ARCHITECTURE.md` 和当前已批准的 Stage 1 设计整理任务。
 > 本清单按 2026-04-30 当前仓库真相标注状态；执行阶段始终从第一个 `状态：未完成` 的任务开始。
 
 ## 使用说明

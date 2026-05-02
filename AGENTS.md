@@ -7,15 +7,15 @@
 
 ## 一、当前阶段 ← 每次推进前手动更新这一行
 
-**当前阶段：执行阶段 / 工具：Superpowers /subagent-driven-development**
+**当前阶段：收尾阶段 / 工具：`trellis-finish-work`**
 
 ```
 阶段选项（手动切换）：
-- 决策阶段   → Gstack /plan-ceo-review /plan-eng-review
-- 拆解阶段   → Superpowers /writing-plans
-- 执行阶段   → Superpowers /subagent-driven-development   ← 编码时锁在这里
-- 排查阶段   → Superpowers /investigate
-- 收尾阶段   → Gstack /qa → Superpowers /ship
+- 决策阶段   → `trellis-brainstorm`
+- 拆解阶段   → `trellis-brainstorm`（把需求和执行上下文收口到任务文档）
+- 执行阶段   → `trellis-implement` + `trellis-check`
+- 排查阶段   → 根因排查；重复问题优先走 `trellis-break-loop`
+- 收尾阶段   → `trellis-finish-work`
 ```
 
 ---
@@ -152,10 +152,10 @@ codex "读取 AGENTS.md 和 docs/PROGRESS.md，找到上次中断点，从 docs/
 
 ### 遇到 blocker 排查
 ```
-codex "读取 AGENTS.md 和 docs/BLOCKERS.md，针对记录的问题用 /investigate 模式排查，给出根因分析和修复方案，修复后验证通过再 commit"
+codex "读取 AGENTS.md 和 docs/BLOCKERS.md，针对记录的问题做根因排查，给出修复方案并完成验证；若属于重复调试问题，再补一次 trellis-break-loop 复盘"
 ```
 
 ### 收尾 QA 与发布
 ```
-codex "读取 AGENTS.md，当前进入收尾阶段，运行完整测试套件，整理分支，执行 /ship 流程，最终 git push 并输出发布摘要"
+codex "读取 AGENTS.md，当前进入收尾阶段，运行完整测试套件，整理分支，完成 QA 复核与发布准备，最终 git push 并输出发布摘要"
 ```

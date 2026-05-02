@@ -1,6 +1,6 @@
 # Adult Duplicate Memory Execution Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Follow the Trellis execute loop: use `trellis-implement` to carry each task slice, then `trellis-check` to close verification. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship the first executable slice of Stage 1 by adding an adult-only duplicate-memory guard that warns before creating pending downloads, keeps exact-code evidence in SQLite, and requires explicit operator override to continue.
 

@@ -1,6 +1,6 @@
 # Adult BT Minimum Wedge Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Follow the Trellis execute loop: use `trellis-implement` to carry each task slice, then `trellis-check` to close verification. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship a user-visible adult BT minimum wedge by fixing the docs gate first, then improving adult query entry/results, adult pending download replies, and adult-focused verification without changing SQLite schema or PT/movie-first semantics.
 
@@ -499,9 +499,9 @@ Expected: `15`
 
 This plan is already the execution plan. Do **not** spend another round re-planning it.
 
-Recommended next step for Superpowers:
+Recommended next step in Trellis:
 
-1. Use `superpowers:executing-plans`
+1. Use `trellis-implement`
 2. Start with Task 1 immediately
 3. Do not widen scope
-4. Do not reopen the `services`-wide cleanup campaign
+4. After each slice, run `trellis-check`; do not reopen the `services`-wide cleanup campaign

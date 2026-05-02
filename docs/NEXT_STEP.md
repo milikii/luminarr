@@ -16,7 +16,7 @@
 
 ## Only do
 
-- 只做收尾阶段动作：QA、ship 准备、文档漂移复查，以及在环境恢复后补真实 Telegram smoke。
+- 只做收尾阶段动作：QA、发布准备、文档漂移复查，以及在环境恢复后补真实 Telegram smoke。
 - 继续保持 adult-only BT 边界、显式 `confirm` 边界、`watchlist sync` fail-closed 边界和 `T16/T17/T18` 当前体验不回退。
 - 继续保持 `make verify-stage1`、`make quality`、`make verify-mainline`、`make verify-adult-bt-wedge` 和 `make lint` 可复验。
 
@@ -33,9 +33,9 @@
 3. `make verify-mainline` 继续通过。
 4. `make verify-adult-bt-wedge` 继续通过。
 5. `make lint` 继续通过。
-6. 收尾阶段 QA / ship 已启动，或明确记录为何暂不发布。
+6. 收尾阶段 QA / 发布准备已启动，或明确记录为何暂不发布。
 
 ## After this step
 
-1. 若准备发布，进入 Gstack `/qa` 再走 Superpowers `/ship`。
+1. 若准备发布，先完成一轮 QA 复核，再按当前发布流程整理分支与发布动作。
 2. 若要补新的真实 Telegram smoke，先恢复 `api.telegram.org` 可达与本地 `app.main` 运行，再把新 trace/evidence 回写到 `docs/STATUS.md`。
