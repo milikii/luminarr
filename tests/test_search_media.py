@@ -7,6 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from app.clients.fanart import FanartMovieImages
 from app.clients.javlibrary_helper import JavLibraryReadOnlyMatch
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.clients.tmdb import TmdbClient, TmdbMovie
@@ -3689,6 +3690,94 @@ def test_search_and_format_renders_tmdb_enriched_mixed_media_card() -> None:
     assert cached_candidate["candidate_stage"] == "media_candidate"
     assert cached_candidate["media_identity"]["tmdb_id"] == "111"
     assert "downloadUrl" not in cached_candidate
+
+
+def test_search_and_format_telegram_confirmation_uses_fanart_poster_when_tmdb_missing() -> None:
+    seen_queries: list[str] = []
+    seen_fanart_ids: list[str] = []
+
+    async def unexpected_resource_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == "2021"
+        return [
+            TmdbMovie(
+                title="Dune",
+                original_title="Dune",
+                year="2021",
+                tmdb_id="438631",
+                media_type="movie",
+                poster_path="",
+                overview="Paul Atreides leads nomadic tribes in a battle to control Arrakis.",
+            ),
+        ]
+
+    async def fake_get_movie_images(tmdb_id: str) -> FanartMovieImages | None:
+        seen_fanart_ids.append(tmdb_id)
+        return FanartMovieImages(
+            poster_url="https://img.example/fanart-dune.jpg",
+            backdrop_url="",
+        )
+
+    service = SearchMediaService(
+        unexpected_resource_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+        get_movie_images_func=fake_get_movie_images,
+    )
+
+    text = _run(service.search_and_format("Dune 2021", chat_id=1001, channel="telegram"))
+
+    assert seen_queries == []
+    assert seen_fanart_ids == ["438631"]
+    assert text.startswith("候选作品：Dune 2021")
+    assert "海报：https://img.example/fanart-dune.jpg" in text
+
+
+def test_search_and_format_default_candidate_confirmation_uses_fanart_poster_when_channel_omitted() -> None:
+    seen_queries: list[str] = []
+    seen_fanart_ids: list[str] = []
+
+    async def unexpected_resource_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == "2021"
+        return [
+            TmdbMovie(
+                title="Dune",
+                original_title="Dune",
+                year="2021",
+                tmdb_id="438631",
+                media_type="movie",
+                poster_path="",
+                overview="Paul Atreides leads nomadic tribes in a battle to control Arrakis.",
+            ),
+        ]
+
+    async def fake_get_movie_images(tmdb_id: str) -> FanartMovieImages | None:
+        seen_fanart_ids.append(tmdb_id)
+        return FanartMovieImages(
+            poster_url="https://img.example/fanart-dune.jpg",
+            backdrop_url="",
+        )
+
+    service = SearchMediaService(
+        unexpected_resource_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+        get_movie_images_func=fake_get_movie_images,
+    )
+
+    text = _run(service.search_and_format("Dune 2021", chat_id=1001))
+
+    assert seen_queries == []
+    assert seen_fanart_ids == ["438631"]
+    assert text.startswith("候选作品：Dune 2021")
+    assert "海报：https://img.example/fanart-dune.jpg" in text
 
 
 def test_search_and_format_keeps_non_telegram_candidate_confirmation_layout_intact() -> None:

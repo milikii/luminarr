@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 from telegram import InlineKeyboardMarkup
 
+from app.bot import telegram_update_runtime
 from app.clients.tmdb import TmdbMovie
 from app.bot.telegram_update_runtime import build_telegram_reply_func
 from app.bot.telegram_reply_formatter import format_telegram_reply
@@ -14,6 +15,36 @@ from app.services.search_reply_formatter import (
     format_adult_bt_resource_fallback_reply,
     render_media_candidate_confirmation_reply,
 )
+
+
+def _expected_candidate_caption(
+    *,
+    index: int,
+    title: str,
+    original_title: str,
+    year: str,
+    media_type: str,
+    overview: str,
+    tmdb_detail_url: str,
+) -> str:
+    return (
+        f"【{index}】 <b>{title} ({year}) | {media_type}</b>\n"
+        f"<i>{original_title}</i>\n"
+        f"📅 <b>年份：</b> {year}\n"
+        f"🎞 <b>类型：</b> {media_type}\n"
+        f"📝 <b>简介：</b> {overview}\n"
+        f"🌐 <b>TMDB详情：</b> {tmdb_detail_url}"
+    )
+
+
+def _assert_single_candidate_button(reply_markup: InlineKeyboardMarkup, *, index: str) -> None:
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (
+        (f"确认作品 {index}",),
+    )
+    assert tuple(tuple(button.callback_data for button in row) for row in reply_markup.inline_keyboard) == (
+        (index,),
+    )
 
 
 def test_format_telegram_reply_formats_search_result() -> None:
@@ -101,29 +132,29 @@ def test_format_telegram_reply_formats_media_candidate_confirmation_with_primary
 
     assert formatted.startswith("【候选作品】 你的名字\n候选作品（3 条）")
     assert "先确认最可能的作品：" not in formatted
-    assert "【1】 你的名字。 (2016) | movie" in formatted
+    assert "【1】 <b>你的名字。 (2016) | movie</b>" in formatted
     assert "海报: https://image.tmdb.org/t/p/w500/your-name.jpg" in formatted
-    assert "原名: 君の名は。" in formatted
-    assert "年份: 2016" in formatted
-    assert "类型: movie" in formatted
-    assert "简介: Two teenagers share a supernatural connection." in formatted
-    assert "TMDB详情: https://www.themoviedb.org/movie/101" in formatted
-    assert "【2】 你的名字 特别收藏版 (2017) | movie" in formatted
+    assert "<i>君の名は。</i>" in formatted
+    assert "📅 <b>年份：</b> 2016" in formatted
+    assert "🎞 <b>类型：</b> movie" in formatted
+    assert "📝 <b>简介：</b> Two teenagers share a supernatural connection." in formatted
+    assert "🌐 <b>TMDB详情：</b> https://www.themoviedb.org/movie/101" in formatted
+    assert "【2】 <b>你的名字 特别收藏版 (2017) | movie</b>" in formatted
     assert "海报: https://image.tmdb.org/t/p/w500/your-name-collection.jpg" in formatted
-    assert "原名: 君の名は。4K Collection" in formatted
-    assert "年份: 2017" in formatted
-    assert "类型: movie" in formatted
-    assert "简介: A longer noisy collection title that should stay behind the exact film." in formatted
-    assert "TMDB详情: https://www.themoviedb.org/movie/102" in formatted
-    assert "【3】 你的名字 剧场纪念版 (2018) | movie" in formatted
+    assert "<i>君の名は。4K Collection</i>" in formatted
+    assert "📅 <b>年份：</b> 2017" in formatted
+    assert "🎞 <b>类型：</b> movie" in formatted
+    assert "📝 <b>简介：</b> A longer noisy collection title that should stay behind the exact film." in formatted
+    assert "🌐 <b>TMDB详情：</b> https://www.themoviedb.org/movie/102" in formatted
+    assert "【3】 <b>你的名字 剧场纪念版 (2018) | movie</b>" in formatted
     assert "海报: https://image.tmdb.org/t/p/w500/your-name-memorial.jpg" in formatted
-    assert "原名: 君の名は。 Memorial Edition" in formatted
-    assert "年份: 2018" in formatted
-    assert "类型: movie" in formatted
-    assert "简介: A weaker commemorative release candidate." in formatted
-    assert "TMDB详情: https://www.themoviedb.org/movie/103" in formatted
+    assert "<i>君の名は。 Memorial Edition</i>" in formatted
+    assert "📅 <b>年份：</b> 2018" in formatted
+    assert "🎞 <b>类型：</b> movie" in formatted
+    assert "📝 <b>简介：</b> A weaker commemorative release candidate." in formatted
+    assert "🌐 <b>TMDB详情：</b> https://www.themoviedb.org/movie/103" in formatted
     assert formatted.count("海报: https://image.tmdb.org/t/p/w500") == 3
-    assert formatted.count("简介:") == 3
+    assert formatted.count("📝 <b>简介：</b>") == 3
     assert formatted.endswith(
         "下一步\n"
         "确认作品：直接回复序号，例如 1\n"
@@ -468,32 +499,41 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
     assert sent_media[0] == (
         1001,
         "downloaded:https://image.tmdb.org/t/p/w500/your-name.jpg",
-        "【1】 你的名字。 (2016) | movie\n"
-        "原名：君の名は。\n"
-        "年份：2016\n"
-        "类型：movie\n"
-        "简介：Two teenagers share a supernatural connection.\n"
-        "TMDB详情：https://www.themoviedb.org/movie/101",
+        _expected_candidate_caption(
+            index=1,
+            title="你的名字。",
+            original_title="君の名は。",
+            year="2016",
+            media_type="movie",
+            overview="Two teenagers share a supernatural connection.",
+            tmdb_detail_url="https://www.themoviedb.org/movie/101",
+        ),
     )
     assert sent_media[1] == (
         1001,
         "downloaded:https://image.tmdb.org/t/p/w500/your-name-collection.jpg",
-        "【2】 你的名字 特别收藏版 (2017) | movie\n"
-        "原名：君の名は。4K Collection\n"
-        "年份：2017\n"
-        "类型：movie\n"
-        "简介：A longer noisy collection title that should stay behind the exact film.\n"
-        "TMDB详情：https://www.themoviedb.org/movie/102",
+        _expected_candidate_caption(
+            index=2,
+            title="你的名字 特别收藏版",
+            original_title="君の名は。4K Collection",
+            year="2017",
+            media_type="movie",
+            overview="A longer noisy collection title that should stay behind the exact film.",
+            tmdb_detail_url="https://www.themoviedb.org/movie/102",
+        ),
     )
     assert sent_media[2] == (
         1001,
         "downloaded:https://image.tmdb.org/t/p/w500/your-name-memorial.jpg",
-        "【3】 你的名字 剧场纪念版 (2018) | movie\n"
-        "原名：君の名は。 Memorial Edition\n"
-        "年份：2018\n"
-        "类型：movie\n"
-        "简介：A weaker commemorative release candidate.\n"
-        "TMDB详情：https://www.themoviedb.org/movie/103",
+        _expected_candidate_caption(
+            index=3,
+            title="你的名字 剧场纪念版",
+            original_title="君の名は。 Memorial Edition",
+            year="2018",
+            media_type="movie",
+            overview="A weaker commemorative release candidate.",
+            tmdb_detail_url="https://www.themoviedb.org/movie/103",
+        ),
     )
     reply_text.assert_not_called()
     send_text.assert_awaited_once()
@@ -563,13 +603,14 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
 
     assert result == "text-ok"
     assert len(sent_media) == 1
-    assert sent_media[0][2] == (
-        "【1】 Dune (2021) | movie\n"
-        "原名：Dune\n"
-        "年份：2021\n"
-        "类型：movie\n"
-        "简介：Paul Atreides leads nomadic tribes in a battle to control Arrakis.\n"
-        "TMDB详情：https://www.themoviedb.org/movie/438631"
+    assert sent_media[0][2] == _expected_candidate_caption(
+        index=1,
+        title="Dune",
+        original_title="Dune",
+        year="2021",
+        media_type="movie",
+        overview="Paul Atreides leads nomadic tribes in a battle to control Arrakis.",
+        tmdb_detail_url="https://www.themoviedb.org/movie/438631",
     )
     reply_text.assert_not_called()
     send_text.assert_awaited_once()
@@ -588,9 +629,144 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
     )
 
 
-def test_build_telegram_reply_func_keeps_posterless_candidate_in_text_followup() -> None:
+def test_build_telegram_reply_func_adds_html_candidate_caption_and_per_card_button() -> None:
+    reply_text = AsyncMock(return_value="text-sent")
+    reply_photo = AsyncMock(return_value="photo-sent")
+    reply_func = build_telegram_reply_func(
+        reply_text,
+        formatter=format_telegram_reply,
+        reply_photo_func=reply_photo,
+    )
+    text = (
+        "候选作品：Dune 2021\n"
+        "1. Dune (2021) | movie\n"
+        "   海报: https://image.tmdb.org/t/p/w500/dune.jpg\n"
+        "   原名: Dune\n"
+        "   年份: 2021\n"
+        "   类型: movie\n"
+        "   简介: Paul Atreides leads nomadic tribes in a battle to control Arrakis.\n"
+        "   TMDB详情: https://www.themoviedb.org/movie/438631"
+    )
+
+    result = asyncio.run(reply_func(text))
+
+    assert result == "text-sent"
+    reply_photo.assert_awaited_once()
+    kwargs = reply_photo.await_args.kwargs
+    assert kwargs["caption"] == (
+        "【1】 <b>Dune (2021) | movie</b>\n"
+        "<i>Dune</i>\n"
+        "📅 <b>年份：</b> 2021\n"
+        "🎞 <b>类型：</b> movie\n"
+        "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis.\n"
+        "🌐 <b>TMDB详情：</b> https://www.themoviedb.org/movie/438631"
+    )
+    assert kwargs["parse_mode"] == "HTML"
+    reply_markup = kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("确认作品 1",),)
+    assert tuple(tuple(button.callback_data for button in row) for row in reply_markup.inline_keyboard) == (("1",),)
+
+
+def test_build_telegram_reply_func_generates_placeholder_media_for_posterless_candidate() -> None:
     send_text = AsyncMock(return_value="text-ok")
-    sent_media: list[tuple[int, str, str | None]] = []
+    sent_media: list[tuple[int, bytes, str | None, str | None, InlineKeyboardMarkup | None]] = []
+
+    async def fake_send_media(
+        chat_id: int,
+        file_path: str | Path,
+        caption: str | None = None,
+        parse_mode: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> object:
+        resolved_path = Path(file_path)
+        assert resolved_path.is_file()
+        sent_media.append((chat_id, resolved_path.read_bytes(), caption, parse_mode, reply_markup))
+        return "media-ok"
+
+    download_image = AsyncMock(return_value=b"unused")
+    reply_text = AsyncMock(return_value="fallback")
+    reply_func = build_telegram_reply_func(
+        reply_text,
+        formatter=format_telegram_reply,
+        chat_id=1001,
+        send_text_func=send_text,
+        send_media_func=fake_send_media,
+        download_image_func=download_image,
+    )
+    text = render_media_candidate_confirmation_reply(
+        query="Zombie for Sale",
+        parsed_query=ParsedMovieQuery(title="Zombie for Sale", year="2019"),
+        tmdb_candidates=(
+            TmdbMovie(
+                title="Zombie for Sale",
+                original_title="기묘한 가족",
+                year="2019",
+                tmdb_id="222",
+                media_type="movie",
+                poster_path="",
+                overview="A family comedy about zombies.",
+            ),
+        ),
+        channel="telegram",
+    )
+
+    result = asyncio.run(reply_func(text))
+
+    assert result == "text-ok"
+    assert len(sent_media) == 1
+    chat_id, payload, caption, parse_mode, reply_markup = sent_media[0]
+    assert chat_id == 1001
+    assert payload
+    assert caption == (
+        "【1】 <b>Zombie for Sale (2019) | movie</b>\n"
+        "<i>기묘한 가족</i>\n"
+        "📅 <b>年份：</b> 2019\n"
+        "🎞 <b>类型：</b> movie\n"
+        "📝 <b>简介：</b> A family comedy about zombies.\n"
+        "🌐 <b>TMDB详情：</b> https://www.themoviedb.org/movie/222"
+    )
+    assert parse_mode == "HTML"
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("确认作品 1",),)
+    assert tuple(tuple(button.callback_data for button in row) for row in reply_markup.inline_keyboard) == (("1",),)
+    download_image.assert_not_awaited()
+    sent_text = send_text.await_args.kwargs["text"]
+    assert sent_text == (
+        "【候选作品】 Zombie for Sale\n"
+        "候选作品（1 条）\n\n"
+        "下一步\n"
+        "确认作品：直接回复序号，例如 1\n"
+        "都不对：发送更详细的名称，或直接发送新的名字/关键词重新搜"
+    )
+
+
+def test_candidate_placeholder_font_prefers_cjk_fonts(monkeypatch) -> None:
+    attempts: list[str] = []
+    fallback_font = object()
+
+    def fake_truetype(path: str, size: int) -> object:
+        attempts.append(path)
+        if path.endswith("DejaVuSans.ttf"):
+            return fallback_font
+        raise OSError("missing")
+
+    monkeypatch.setattr(telegram_update_runtime.ImageFont, "truetype", fake_truetype)
+    monkeypatch.setattr(telegram_update_runtime.ImageFont, "load_default", lambda: object())
+
+    font = telegram_update_runtime._load_placeholder_font(24)
+
+    assert font is fallback_font
+    assert attempts == [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+
+
+def test_build_telegram_reply_func_uses_placeholder_media_for_posterless_candidate_in_mixed_list() -> None:
+    send_text = AsyncMock(return_value="text-ok")
+    sent_media: list[tuple[int, bytes, str | None]] = []
 
     async def fake_send_media(
         chat_id: int,
@@ -600,7 +776,7 @@ def test_build_telegram_reply_func_keeps_posterless_candidate_in_text_followup()
     ) -> object:
         resolved_path = Path(file_path)
         assert resolved_path.is_file()
-        sent_media.append((chat_id, resolved_path.read_text(encoding="utf-8"), caption))
+        sent_media.append((chat_id, resolved_path.read_bytes(), caption))
         return "media-ok"
 
     async def fake_download_image(url: str) -> bytes:
@@ -653,33 +829,42 @@ def test_build_telegram_reply_func_keeps_posterless_candidate_in_text_followup()
     result = asyncio.run(reply_func(text))
 
     assert result == "text-ok"
-    assert len(sent_media) == 2
-    assert sent_media[0][2] == (
-        "【1】 Zombie Detective (2020) | tv\n"
-        "原名：좀비탐정\n"
-        "年份：2020\n"
-        "类型：tv\n"
-        "简介：A detective story with a zombie lead.\n"
-        "TMDB详情：https://www.themoviedb.org/tv/111"
+    assert len(sent_media) == 3
+    assert sent_media[0][1].decode("utf-8") == "downloaded:https://image.tmdb.org/t/p/w500/zombie-detective.jpg"
+    assert sent_media[0][2] == _expected_candidate_caption(
+        index=1,
+        title="Zombie Detective",
+        original_title="좀비탐정",
+        year="2020",
+        media_type="tv",
+        overview="A detective story with a zombie lead.",
+        tmdb_detail_url="https://www.themoviedb.org/tv/111",
     )
-    assert sent_media[1][2] == (
-        "【3】 All of Us Are Dead (2022) | tv\n"
-        "原名：지금 우리 학교는\n"
-        "年份：2022\n"
-        "类型：tv\n"
-        "简介：A school zombie outbreak thriller.\n"
-        "TMDB详情：https://www.themoviedb.org/tv/333"
+    assert sent_media[1][1]
+    assert sent_media[1][2] == _expected_candidate_caption(
+        index=2,
+        title="Zombie for Sale",
+        original_title="기묘한 가족",
+        year="2019",
+        media_type="movie",
+        overview="A family comedy about zombies.",
+        tmdb_detail_url="https://www.themoviedb.org/movie/222",
+    )
+    assert sent_media[2][1].decode("utf-8") == "downloaded:https://image.tmdb.org/t/p/w500/all-of-us-are-dead.jpg"
+    assert sent_media[2][2] == _expected_candidate_caption(
+        index=3,
+        title="All of Us Are Dead",
+        original_title="지금 우리 학교는",
+        year="2022",
+        media_type="tv",
+        overview="A school zombie outbreak thriller.",
+        tmdb_detail_url="https://www.themoviedb.org/tv/333",
     )
     sent_text = send_text.await_args.kwargs["text"]
     assert sent_text.startswith("【候选作品】 丧尸\n候选作品（3 条）")
     assert "先确认最可能的作品：" not in sent_text
     assert "【1】 Zombie Detective (2020) | tv" not in sent_text
-    assert "【2】 Zombie for Sale (2019) | movie" in sent_text
-    assert "原名：기묘한 가족" in sent_text
-    assert "年份：2019" in sent_text
-    assert "类型：movie" in sent_text
-    assert "简介：A family comedy about zombies." in sent_text
-    assert "TMDB详情：https://www.themoviedb.org/movie/222" in sent_text
+    assert "【2】 Zombie for Sale (2019) | movie" not in sent_text
     assert "【3】 All of Us Are Dead (2022) | tv" not in sent_text
     assert "原名：지금 우리 학교는" not in sent_text
     assert sent_text.endswith(
@@ -758,32 +943,34 @@ def test_build_telegram_reply_func_refills_failed_candidate_poster_block_into_te
 
     assert result == "text-ok"
     assert len(sent_media) == 2
-    assert sent_media[0][2] == (
-        "【1】 你的名字。 (2016) | movie\n"
-        "原名：君の名は。\n"
-        "年份：2016\n"
-        "类型：movie\n"
-        "简介：Two teenagers share a supernatural connection.\n"
-        "TMDB详情：https://www.themoviedb.org/movie/101"
+    assert sent_media[0][2] == _expected_candidate_caption(
+        index=1,
+        title="你的名字。",
+        original_title="君の名は。",
+        year="2016",
+        media_type="movie",
+        overview="Two teenagers share a supernatural connection.",
+        tmdb_detail_url="https://www.themoviedb.org/movie/101",
     )
-    assert sent_media[1][2] == (
-        "【3】 你的名字 剧场纪念版 (2018) | movie\n"
-        "原名：君の名は。 Memorial Edition\n"
-        "年份：2018\n"
-        "类型：movie\n"
-        "简介：A weaker commemorative release candidate.\n"
-        "TMDB详情：https://www.themoviedb.org/movie/103"
+    assert sent_media[1][2] == _expected_candidate_caption(
+        index=3,
+        title="你的名字 剧场纪念版",
+        original_title="君の名は。 Memorial Edition",
+        year="2018",
+        media_type="movie",
+        overview="A weaker commemorative release candidate.",
+        tmdb_detail_url="https://www.themoviedb.org/movie/103",
     )
     sent_text = send_text.await_args.kwargs["text"]
     assert sent_text.startswith("【候选作品】 你的名字\n候选作品（3 条）")
     assert "先确认最可能的作品：" not in sent_text
     assert "【1】 你的名字。 (2016) | movie" not in sent_text
-    assert "【2】 你的名字 特别收藏版 (2017) | movie" in sent_text
-    assert "原名：君の名は。4K Collection" in sent_text
-    assert "年份：2017" in sent_text
-    assert "类型：movie" in sent_text
-    assert "简介：A longer noisy collection title that should stay behind the exact film." in sent_text
-    assert "TMDB详情：https://www.themoviedb.org/movie/102" in sent_text
+    assert "【2】 <b>你的名字 特别收藏版 (2017) | movie</b>" in sent_text
+    assert "<i>君の名は。4K Collection</i>" in sent_text
+    assert "📅 <b>年份：</b> 2017" in sent_text
+    assert "🎞 <b>类型：</b> movie" in sent_text
+    assert "📝 <b>简介：</b> A longer noisy collection title that should stay behind the exact film." in sent_text
+    assert "🌐 <b>TMDB详情：</b> https://www.themoviedb.org/movie/102" in sent_text
     assert "【3】 你的名字 剧场纪念版 (2018) | movie" not in sent_text
     assert sent_text.endswith(
         "下一步\n"
@@ -878,28 +1065,32 @@ def test_build_telegram_reply_func_sends_candidate_cards_as_photo_messages_when_
     result = asyncio.run(reply_func(text))
 
     assert result == "text-sent"
-    reply_photo.assert_any_await(
-        photo="https://image.tmdb.org/t/p/w500/your-name.jpg",
-        caption=(
-            "【1】 你的名字。 (2016) | movie\n"
-            "原名: 君の名は。\n"
-            "年份: 2016\n"
-            "类型: movie\n"
-            "简介: Two teenagers share a mysterious connection.\n"
-            "TMDB详情: https://www.themoviedb.org/movie/101"
-        ),
+    first_call = reply_photo.await_args_list[0].kwargs
+    assert first_call["photo"] == "https://image.tmdb.org/t/p/w500/your-name.jpg"
+    assert first_call["caption"] == _expected_candidate_caption(
+        index=1,
+        title="你的名字。",
+        original_title="君の名は。",
+        year="2016",
+        media_type="movie",
+        overview="Two teenagers share a mysterious connection.",
+        tmdb_detail_url="https://www.themoviedb.org/movie/101",
     )
-    reply_photo.assert_any_await(
-        photo="https://image.tmdb.org/t/p/w500/your-name-special.jpg",
-        caption=(
-            "【2】 Your Name Special (2021) | tv\n"
-            "原名: Your Name Special\n"
-            "年份: 2021\n"
-            "类型: tv\n"
-            "简介: A lower relevance expanded-title result.\n"
-            "TMDB详情: https://www.themoviedb.org/tv/202"
-        ),
+    assert first_call["parse_mode"] == "HTML"
+    _assert_single_candidate_button(first_call["reply_markup"], index="1")
+    second_call = reply_photo.await_args_list[1].kwargs
+    assert second_call["photo"] == "https://image.tmdb.org/t/p/w500/your-name-special.jpg"
+    assert second_call["caption"] == _expected_candidate_caption(
+        index=2,
+        title="Your Name Special",
+        original_title="Your Name Special",
+        year="2021",
+        media_type="tv",
+        overview="A lower relevance expanded-title result.",
+        tmdb_detail_url="https://www.themoviedb.org/tv/202",
     )
+    assert second_call["parse_mode"] == "HTML"
+    _assert_single_candidate_button(second_call["reply_markup"], index="2")
     reply_text.assert_any_await("【候选作品】 你的名字\n候选作品（2 条）")
     reply_text.assert_any_await(
         "下一步\n"
@@ -932,12 +1123,16 @@ def test_build_telegram_reply_func_falls_back_to_text_when_photo_send_fails(caps
     assert result == "text-sent"
     reply_photo.assert_awaited_once()
     reply_text.assert_any_await(
-        "【1】 你的名字。 (2016) | movie\n"
-        "原名: 君の名は。\n"
-        "年份: 2016\n"
-        "类型: movie\n"
-        "简介: Two teenagers share a mysterious connection.\n"
-        "TMDB详情: https://www.themoviedb.org/movie/101"
+        _expected_candidate_caption(
+            index=1,
+            title="你的名字。",
+            original_title="君の名は。",
+            year="2016",
+            media_type="movie",
+            overview="Two teenagers share a mysterious connection.",
+            tmdb_detail_url="https://www.themoviedb.org/movie/101",
+        ),
+        parse_mode="HTML",
     )
     output = capsys.readouterr().out
     assert "[Telegram 候选海报发送失败]" in output

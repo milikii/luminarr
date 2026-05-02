@@ -378,6 +378,7 @@ def main() -> None:
     bt_source_adapter = BtSourceAdapter(tuple(bt_source_providers))
     tmdb_lookup_movie_func = None
     tmdb_lookup_media_candidates_func = None
+    get_movie_images_func = None
     scrape_metadata_func = None
     if settings.tmdb_api_key:
         async def _skip_fanart_images(_: str) -> None:
@@ -431,6 +432,7 @@ def main() -> None:
         clarification_repo=clarification_repo,
         lookup_movie_func=tmdb_lookup_movie_func,
         lookup_media_candidates_func=tmdb_lookup_media_candidates_func,
+        get_movie_images_func=get_movie_images_func,
         adult_content_registry_repo=adult_content_registry_repo,
         adult_read_only_lookup_func=_build_adult_read_only_lookup_func(proxy_url=settings.outbound_proxy_url),
         adult_metadata_translate_func=AdultMetadataTranslatorService(

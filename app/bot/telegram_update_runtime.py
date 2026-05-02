@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import inspect
 import sqlite3
-import tempfile
 import shutil
+import tempfile
+import textwrap
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 import re
 from urllib.parse import urlparse
 
 import httpx
+from PIL import Image, ImageDraw, ImageFont
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -20,7 +23,7 @@ from app.operational_logging import emit_operational_log
 
 TelegramReplyTextFunc = Callable[[str], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
-TelegramSendMediaFunc = Callable[[int, str | Path, str | None, str | None], Awaitable[object]]
+TelegramSendMediaFunc = Callable[[int, str | Path, str | None, str | None, InlineKeyboardMarkup | None], Awaitable[object]]
 DownloadImageFunc = Callable[[str], Awaitable[bytes]]
 
 
@@ -87,6 +90,12 @@ _STRIP_HTML_RE = re.compile(r"</?(?:b|i|u|s|code|pre|a)\b[^>]*>")
 _ADULT_BT_CARD_PREFIX = "【成人资源候选】"
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
 _SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
+_PLACEHOLDER_POSTER_SIZE = (720, 1080)
+_PLACEHOLDER_BACKGROUND = "#101A29"
+_PLACEHOLDER_PANEL = "#22324A"
+_PLACEHOLDER_ACCENT = "#E0B04B"
+_PLACEHOLDER_TEXT = "#F5F7FA"
+_PLACEHOLDER_SUBTEXT = "#B8C4D6"
 
 
 def _strip_telegram_html_tags(text: str) -> str:
@@ -225,24 +234,31 @@ async def _reply_candidate_card_messages(
             text="\n".join(header_lines),
         )
     for block in candidate_blocks:
-        poster_url = ""
-        caption_lines: list[str] = []
-        for line in block:
-            if line.startswith("海报:"):
-                poster_url = line.removeprefix("海报:").strip()
-                continue
-            caption_lines.append(_strip_telegram_html_tags(line))
-        caption = "\n".join(caption_lines).strip()
-        if poster_url:
+        poster_url, cleaned_lines = _extract_candidate_block_media(block)
+        caption = _resolve_candidate_block_caption(cleaned_lines)
+        reply_markup = _build_candidate_selection_inline_keyboard(cleaned_lines)
+        placeholder_artifact: Path | None = None
+        media_source: str | Path | None = poster_url
+        if not media_source:
+            placeholder_artifact = _build_candidate_placeholder_media_artifact(cleaned_lines)
+            media_source = placeholder_artifact
+        if media_source and caption:
             try:
-                last_result = await reply_photo_func(photo=poster_url, caption=caption)
+                kwargs: dict[str, object] = {"photo": media_source, "caption": caption}
+                if _has_telegram_html(caption):
+                    kwargs["parse_mode"] = "HTML"
+                if reply_markup is not None:
+                    kwargs["reply_markup"] = reply_markup
+                last_result = await reply_photo_func(**kwargs)
                 continue
             except Exception as error:
                 emit_operational_log(
                     title="Telegram 候选海报发送失败",
-                    detail=f"url={poster_url} 原因={error}",
+                    detail=f"url={str(media_source)} 原因={error}",
                     fix_hint="检查 Telegram 侧媒体发送权限、图片格式和候选海报 URL；当前会退回纯文本候选卡，不影响后续数字确认。",
                 )
+            finally:
+                _cleanup_temp_media_artifact(placeholder_artifact)
         last_result = await _send_or_reply_text(
             reply_text_func=reply_text_func,
             send_text_func=None,
@@ -272,27 +288,36 @@ async def _send_candidate_card_messages(
     cleaned_blocks: list[list[str]] = []
     for block in candidate_blocks:
         poster_url, cleaned_lines = _extract_candidate_block_media(block)
+        reply_markup = _build_candidate_selection_inline_keyboard(cleaned_lines)
         sent_as_media = False
-        if not poster_url:
-            cleaned_blocks.append(cleaned_lines)
-            continue
-        artifact = await _download_candidate_media_artifact(
-            download_image_func=download_image_func,
-            poster_url=poster_url,
-        )
+        artifact: Path | None
+        if poster_url:
+            artifact = await _download_candidate_media_artifact(
+                download_image_func=download_image_func,
+                poster_url=poster_url,
+            )
+        else:
+            artifact = _build_candidate_placeholder_media_artifact(cleaned_lines)
         if artifact is None:
             cleaned_blocks.append(cleaned_lines)
             continue
         try:
             try:
                 caption = _resolve_candidate_block_caption(cleaned_lines)
-                caption = _strip_telegram_html_tags(caption)
-                await send_media_func(chat_id, artifact, caption, None)
+                parse_mode = "HTML" if caption and _has_telegram_html(caption) else None
+                await _call_send_media_func(
+                    send_media_func=send_media_func,
+                    chat_id=chat_id,
+                    artifact=artifact,
+                    caption=caption,
+                    parse_mode=parse_mode,
+                    reply_markup=reply_markup,
+                )
                 sent_as_media = True
             except Exception as error:
                 emit_operational_log(
                     title="Telegram 候选海报发送失败",
-                    detail=f"url={poster_url} 原因={error}",
+                    detail=f"url={poster_url or str(artifact)} 原因={error}",
                     fix_hint="检查 Telegram 侧媒体发送权限、图片格式和候选海报 URL；当前会退回纯文本候选卡，不影响后续数字确认。",
                 )
         finally:
@@ -362,6 +387,85 @@ def _extract_candidate_block_media(block: list[str]) -> tuple[str, list[str]]:
     return poster_url, cleaned_lines
 
 
+def _build_candidate_selection_inline_keyboard(block_lines: list[str]) -> InlineKeyboardMarkup | None:
+    if not block_lines:
+        return None
+    first_line = _strip_telegram_html_tags(block_lines[0]).strip()
+    match = _CANDIDATE_BLOCK_START_RE.match(first_line)
+    if match is None:
+        return None
+    index = str(match.group("index") or "").strip()
+    if not index or len(index.encode("utf-8")) > 64:
+        return None
+    return InlineKeyboardMarkup([[InlineKeyboardButton(text=f"确认作品 {index}", callback_data=index)]])
+
+
+def _build_candidate_placeholder_media_artifact(block_lines: list[str]) -> Path | None:
+    artifact_dir = Path(tempfile.mkdtemp(prefix="luminarr-telegram-card-"))
+    artifact_path = artifact_dir / "poster.jpg"
+    title = _resolve_candidate_placeholder_title(block_lines)
+    try:
+        image = Image.new("RGB", _PLACEHOLDER_POSTER_SIZE, _PLACEHOLDER_BACKGROUND)
+        draw = ImageDraw.Draw(image)
+        panel_bounds = (52, 80, _PLACEHOLDER_POSTER_SIZE[0] - 52, _PLACEHOLDER_POSTER_SIZE[1] - 80)
+        draw.rounded_rectangle(panel_bounds, radius=28, fill=_PLACEHOLDER_PANEL)
+        draw.rectangle((96, 148, _PLACEHOLDER_POSTER_SIZE[0] - 96, 166), fill=_PLACEHOLDER_ACCENT)
+
+        brand_font = _load_placeholder_font(30)
+        title_font = _load_placeholder_font(46)
+        subtitle_font = _load_placeholder_font(24)
+        body_font = _load_placeholder_font(26)
+
+        draw.text((96, 196), "Luminarr", fill=_PLACEHOLDER_ACCENT, font=brand_font)
+        draw.text((96, 246), "Poster unavailable", fill=_PLACEHOLDER_TEXT, font=subtitle_font)
+
+        wrapped_title = "\n".join(textwrap.wrap(title, width=16, break_long_words=True)[:4]) or "Candidate"
+        draw.multiline_text(
+            (96, 326),
+            wrapped_title,
+            fill=_PLACEHOLDER_TEXT,
+            font=title_font,
+            spacing=14,
+        )
+        draw.text(
+            (96, _PLACEHOLDER_POSTER_SIZE[1] - 186),
+            "TMDB and Fanart did not provide a poster for this candidate.",
+            fill=_PLACEHOLDER_SUBTEXT,
+            font=body_font,
+        )
+        image.save(artifact_path, format="JPEG", quality=90)
+        return artifact_path
+    except Exception as error:
+        emit_operational_log(
+            title="Telegram 候选占位海报生成失败",
+            detail=f"title={title} 原因={error}",
+            fix_hint="检查 Pillow 运行环境与本地临时目录写权限；当前会退回纯文本候选卡。",
+        )
+        shutil.rmtree(artifact_dir, ignore_errors=True)
+        return None
+
+
+def _load_placeholder_font(size: int) -> ImageFont.ImageFont:
+    font_candidates = (
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    )
+    for font_path in font_candidates:
+        try:
+            return ImageFont.truetype(font_path, size=size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def _resolve_candidate_placeholder_title(block_lines: list[str]) -> str:
+    if not block_lines:
+        return "Candidate"
+    first_line = _strip_telegram_html_tags(block_lines[0]).strip()
+    return _CANDIDATE_BLOCK_START_RE.sub("", first_line).strip() or "Candidate"
+
+
 async def _download_candidate_media_artifact(
     *,
     download_image_func: DownloadImageFunc,
@@ -411,6 +515,30 @@ def _resolve_candidate_block_caption(block_lines: list[str]) -> str | None:
     if len(caption) > 1000:
         caption = caption[:997] + "..."
     return caption
+
+
+async def _call_send_media_func(
+    *,
+    send_media_func: TelegramSendMediaFunc,
+    chat_id: int,
+    artifact: Path,
+    caption: str | None,
+    parse_mode: str | None,
+    reply_markup: InlineKeyboardMarkup | None,
+) -> object:
+    try:
+        signature = inspect.signature(send_media_func)
+    except (TypeError, ValueError):
+        signature = None
+    if signature is not None and "reply_markup" in signature.parameters:
+        return await send_media_func(
+            chat_id,
+            artifact,
+            caption,
+            parse_mode,
+            reply_markup=reply_markup,
+        )
+    return await send_media_func(chat_id, artifact, caption, parse_mode)
 
 
 def _compose_candidate_card_text(

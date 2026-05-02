@@ -389,6 +389,34 @@ def _truncate_text(value: str, *, limit: int) -> str:
     return f"{value[: limit - 3]}..."
 
 
+def _split_candidate_field(line: str) -> tuple[str, str]:
+    for label in ("海报", "原名", "年份", "类型", "简介", "TMDB详情"):
+        for separator in ("：", ":"):
+            prefix = f"{label}{separator}"
+            if line.startswith(prefix):
+                return label, line.removeprefix(prefix).strip()
+    return "", ""
+
+
+def _format_telegram_media_candidate_detail_line(line: str) -> str:
+    label, value = _split_candidate_field(line)
+    if not label:
+        return _apply_telegram_html(line)
+    if label == "海报":
+        return f"海报: {value}"
+    if label == "原名":
+        return f"<i>{_html.escape(value)}</i>"
+    if label == "年份":
+        return f"📅 <b>年份：</b> {_html.escape(value)}"
+    if label == "类型":
+        return f"🎞 <b>类型：</b> {_html.escape(value)}"
+    if label == "简介":
+        return f"📝 <b>简介：</b> {_html.escape(value)}"
+    if label == "TMDB详情":
+        return f"🌐 <b>TMDB详情：</b> {_html.escape(value)}"
+    return _apply_telegram_html(line)
+
+
 def _format_telegram_media_candidate_reply(text: str) -> str:
     stripped_text = text.strip()
     if not stripped_text.startswith(TELEGRAM_MEDIA_CANDIDATE_PREFIX):
@@ -420,11 +448,13 @@ def _format_telegram_media_candidate_reply(text: str) -> str:
         if candidate_match is not None:
             if formatted_lines[-1] != f"候选作品（{candidate_count} 条）":
                 formatted_lines.append("")
-            formatted_lines.append(f"【{candidate_match.group('index')}】 {str(candidate_match.group('title') or '').strip()}")
+            formatted_lines.append(
+                f"【{candidate_match.group('index')}】 <b>{_html.escape(str(candidate_match.group('title') or '').strip())}</b>"
+            )
             continue
         if cleaned_line.startswith("直接回复对应序号确认作品"):
             continue
-        formatted_lines.append(cleaned_line)
+        formatted_lines.append(_format_telegram_media_candidate_detail_line(cleaned_line))
     formatted_lines.extend(("", "下一步", *get_media_candidate_confirmation_action_lines()))
     return "\n".join(formatted_lines)
 

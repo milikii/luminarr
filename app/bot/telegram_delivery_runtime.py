@@ -15,7 +15,10 @@ TELEGRAM_PHOTO_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
 TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64
 _SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
-TelegramSendMediaFunc = Callable[[int, str | Path, str | None, str | None], Awaitable[object]]
+TelegramSendMediaFunc = Callable[
+    [int, str | Path, str | None, str | None, InlineKeyboardMarkup | None],
+    Awaitable[object],
+]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 
 
@@ -25,6 +28,7 @@ def build_telegram_send_media_func(application: Application):
         file_path: str | Path,
         caption: str | None = None,
         parse_mode: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
     ) -> object:
         return await _send_telegram_media(
             application=application,
@@ -32,6 +36,7 @@ def build_telegram_send_media_func(application: Application):
             file_path=Path(file_path).expanduser(),
             caption=caption,
             parse_mode=parse_mode,
+            reply_markup=reply_markup,
         )
 
     return send_media
@@ -57,6 +62,7 @@ async def _send_telegram_media(
     file_path: Path,
     caption: str | None,
     parse_mode: str | None = None,
+    reply_markup: InlineKeyboardMarkup | None = None,
 ) -> object:
     if not file_path.is_file():
         emit_operational_log(
@@ -71,10 +77,14 @@ async def _send_telegram_media(
             kwargs = {"chat_id": chat_id, "photo": file_path, "caption": caption}
             if parse_mode:
                 kwargs["parse_mode"] = parse_mode
+            if reply_markup is not None:
+                kwargs["reply_markup"] = reply_markup
             return await application.bot.send_photo(**kwargs)
         kwargs = {"chat_id": chat_id, "document": file_path, "caption": caption, "filename": file_path.name}
         if parse_mode:
             kwargs["parse_mode"] = parse_mode
+        if reply_markup is not None:
+            kwargs["reply_markup"] = reply_markup
         return await application.bot.send_document(**kwargs)
     except TelegramError as error:
         emit_operational_log(

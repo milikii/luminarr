@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from telegram import InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.bot.telegram_delivery_runtime import build_telegram_send_media_func, build_telegram_send_text_func
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
@@ -151,6 +151,32 @@ def test_build_telegram_send_media_func_uses_document_for_non_image_path(
         document=file_path,
         caption="登录辅助文件",
         filename="wechat-login.txt",
+    )
+
+
+def test_build_telegram_send_media_func_passes_reply_markup_to_photo_messages(tmp_path: Path) -> None:
+    send_photo = AsyncMock(return_value="photo-message")
+    sender = build_telegram_send_media_func(
+        SimpleNamespace(
+            bot=SimpleNamespace(
+                send_photo=send_photo,
+                send_document=AsyncMock(),
+            )
+        )
+    )
+    file_path = tmp_path / "candidate.jpg"
+    file_path.write_bytes(b"poster")
+    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text="确认作品 1", callback_data="1")]])
+
+    result = asyncio.run(sender(1001, file_path, "候选卡片", "HTML", reply_markup))
+
+    assert result == "photo-message"
+    send_photo.assert_awaited_once_with(
+        chat_id=1001,
+        photo=file_path,
+        caption="候选卡片",
+        parse_mode="HTML",
+        reply_markup=reply_markup,
     )
 
 

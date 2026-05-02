@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import replace
 from typing import Any
 
 import httpx
 
+from app.clients.fanart import FanartMovieImages
+from app.clients.tmdb import TmdbMovie
 from app.clients.web_source import (
     looks_like_http_url,
     looks_like_web_source_page_request,
@@ -84,6 +87,7 @@ ADULT_BT_AGGREGATOR_SOURCE_NAMES = frozenset({"prowlarr"})
 BatchPreviewSearchFunc = Callable[[str], Awaitable[Sequence[Mapping[str, Any]]]]
 PrepareRawCandidatesFunc = Callable[[Sequence[Mapping[str, Any]], str], Sequence[Mapping[str, Any]]]
 AdultMetadataTranslateFunc = Callable[[Sequence[Mapping[str, Any]]], Awaitable[Sequence[Mapping[str, Any]]]]
+GetMovieImagesFunc = Callable[[str], Awaitable[FanartMovieImages | None]]
 load_bt_scoring_rules = _load_bt_scoring_rules
 
 
@@ -149,6 +153,7 @@ class SearchMediaService:
         clarification_repo: ClarificationRepo | None = None,
         lookup_movie_func: LookupMovieFunc | None = None,
         lookup_media_candidates_func: LookupMediaCandidatesFunc | None = None,
+        get_movie_images_func: GetMovieImagesFunc | None = None,
         adult_content_registry_repo: AdultContentRegistryRepo | None = None,
         adult_read_only_lookup_func: AdultReadOnlyLookupFunc | None = None,
         adult_metadata_translate_func: AdultMetadataTranslateFunc | None = None,
@@ -161,6 +166,7 @@ class SearchMediaService:
         self._clarification_state = ClarificationStateStore(repo=clarification_repo)
         self._lookup_movie_func = lookup_movie_func
         self._lookup_media_candidates_func = lookup_media_candidates_func
+        self._get_movie_images_func = get_movie_images_func
         self._bt_read_only_display = BtReadOnlyDisplayService(
             adult_content_registry_repo=adult_content_registry_repo,
             adult_read_only_lookup_func=adult_read_only_lookup_func,
@@ -296,7 +302,10 @@ class SearchMediaService:
         )
         parsed_query = request_context.parsed_query
         tmdb_movie = request_context.tmdb_movie
-        tmdb_candidates = request_context.tmdb_candidates
+        tmdb_candidates = await self._resolve_confirmation_candidates_for_channel(
+            tmdb_candidates=request_context.tmdb_candidates,
+            channel=channel,
+        )
         raw_results = request_context.raw_results
         media_identity = build_media_identity_from_tmdb_movie(request_context.tmdb_identity_movie)
 
@@ -513,6 +522,49 @@ class SearchMediaService:
         if not tmdb_candidates:
             return False
         return True
+
+    async def _resolve_confirmation_candidates_for_channel(
+        self,
+        *,
+        tmdb_candidates: Sequence[TmdbMovie],
+        channel: str | None,
+    ) -> tuple[TmdbMovie, ...]:
+        channel_name = (channel or "").strip().lower()
+        if channel_name not in {"", "telegram"}:
+            return tuple(tmdb_candidates)
+        if self._get_movie_images_func is None:
+            return tuple(tmdb_candidates)
+
+        resolved_candidates: list[TmdbMovie] = []
+        fanart_cache: dict[str, FanartMovieImages | None] = {}
+        for candidate in tmdb_candidates:
+            if search_reply_formatter.resolve_tmdb_poster_url(candidate):
+                resolved_candidates.append(candidate)
+                continue
+            if candidate.media_type != "movie" or not candidate.tmdb_id.strip():
+                resolved_candidates.append(candidate)
+                continue
+            fanart_images = fanart_cache.get(candidate.tmdb_id)
+            if candidate.tmdb_id not in fanart_cache:
+                fanart_images = await self._lookup_confirmation_fanart_images(candidate.tmdb_id)
+                fanart_cache[candidate.tmdb_id] = fanart_images
+            if fanart_images is not None and fanart_images.poster_url.strip():
+                resolved_candidates.append(replace(candidate, poster_path=fanart_images.poster_url.strip()))
+                continue
+            resolved_candidates.append(candidate)
+        return tuple(resolved_candidates)
+
+    async def _lookup_confirmation_fanart_images(self, tmdb_id: str) -> FanartMovieImages | None:
+        assert self._get_movie_images_func is not None
+        try:
+            return await self._get_movie_images_func(tmdb_id)
+        except (httpx.HTTPError, ValueError) as error:
+            emit_operational_log(
+                title="作品候选 Fanart 海报查询失败",
+                detail=f"tmdb_id={tmdb_id} 错误={error}",
+                fix_hint="检查 FANART_API_KEY、网络和代理；当前会继续返回无海报候选，并在 Telegram 侧回退统一占位海报。",
+            )
+            return None
 
     async def _translate_adult_display_candidates(
         self,
