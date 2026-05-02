@@ -143,3 +143,43 @@ Clarified the adult-search empty configured-source response so it gives an actio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: PT relevance and Trellis cleanup
+
+**Date**: 2026-05-02
+**Task**: PT relevance and Trellis cleanup
+**Branch**: `main`
+
+### Summary
+
+Completed the PT relevance-first confirmation flow, adult BT source work, removed Superpowers workflow references from repo docs, verified Trellis is already on beta.19, and archived the task after updating local Trellis workflow state.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7f76e98` | (see git log) |
+| `990b89b` | (see git log) |
+| `e2880dc` | (see git log) |
+| `de8e325` | (see git log) |
+| `cd6e3e6` | (see git log) |
+| `7914485` | (see git log) |
+| `fc4ba16` | (see git log) |
+| `922180d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 4
-- **Last Active**: 2026-05-01
+- **Total Sessions**: 5
+- **Last Active**: 2026-05-02
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~145 | Active |
+| `journal-1.md` | ~185 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 5 | 2026-05-02 | PT relevance and Trellis cleanup | `7f76e98`, `990b89b`, `e2880dc`, `de8e325`, `cd6e3e6`, `7914485`, `fc4ba16`, `922180d` | `main` |
 | 4 | 2026-05-01 | Adult search fallback empty response | `66c9e15` | `main` |
 | 3 | 2026-05-01 | Avmoo adult metadata helper | `1aafbc9`, `8b8ea95` | `main` |
 | 2 | 2026-05-01 | Telegram adult result UX and metadata | `830fdb2`, `50d1b8a` | `main` |
