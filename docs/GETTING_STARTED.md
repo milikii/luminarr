@@ -37,12 +37,12 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 标准 `requirements.txt` 已包含 Feishu SDK，不需要再额外执行一条 Feishu 专用安装命令。是否真的启用 Feishu 长连接，仍取决于你是否同时填写 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
 
-## 3. 运行时外部依赖真相
+## 3. 运行时依赖真相
 
 这一节是当前唯一主真相入口。`README.md`、`docs/OPERATOR_RUNBOOK.md`、`docs/STATUS.md` 只做引用，不再重复写细节。
 
 - `ffmpeg` / `ffprobe`
-  只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要。`ffmpeg` 必须在当前 shell 的 `PATH` 里可执行；`ffprobe` 可选，存在时会优先用于探测，缺失时会自动回退到 `ffmpeg -i`。
+  只有在导入目标里没有外挂字幕、需要继续检查或提取视频内嵌字幕时才需要。如果你用仓库自带 `Dockerfile` / `docker-compose.yml` 构建镜像，字幕翻译所需二进制现在已经内置在镜像里：安装 `ffmpeg` Debian 包时会一并提供 `ffprobe`。如果你直接用本地 Python 运行，仍然要求宿主机的 `ffmpeg` 在当前 shell 的 `PATH` 里可执行；`ffprobe` 可选，存在时会优先用于探测，缺失时会自动回退到 `ffmpeg -i`。
 - personal WeChat 登录态
   personal WeChat 不是靠一组 `.env` 凭据启动，而是依赖本机已存在的 `wechat-clawbot` 登录态。首次使用先在本地 Python 运行里完成扫码登录，让登录态目录先落盘；如果改用容器，再把同一个登录态目录挂进容器。容器重启后若 `context_token` 失效，需要重新登录。
 - Feishu SDK
@@ -74,7 +74,7 @@ cp .env.example .env
 - 如果 WSL 机器不能直连 Telegram / TMDB / Fanart / OpenAI / BT 外站，可以额外填写 `OUTBOUND_PROXY_URL`；Transmission / Emby / Prowlarr 这类本地或内网地址继续直连
 - 如果你填了 `DOWNLOADER_INSTANCES` 但没填 `PT_DOWNLOADER` / `BT_DOWNLOADER`，当前代码会默认取第一个实例名
 - direct magnet 入口当前仍会先问“观影 PT 链 / BT 成人链”；不会因为你配置了成人 BT 站点就自动走成人链
-- 运行时外部依赖的细节只看上一节；这里不再重复抄 `ffmpeg`、personal WeChat 登录态、Feishu SDK、WeCom 回调要求
+- 运行时依赖的细节只看上一节；这里不再重复抄 `ffmpeg`、personal WeChat 登录态、Feishu SDK、WeCom 回调要求
 
 ## 5. 启动本地测试栈（需要真实 import / refresh 时）
 
@@ -144,6 +144,12 @@ ENV_FILE=/绝对路径/你的.env make run
 
 ```bash
 LUMINARR_ENV_FILE=.env.example docker compose config
+```
+
+如果你之前已经构建过旧镜像，想让容器路径拿到这轮补进来的字幕翻译二进制，先重建一次镜像：
+
+```bash
+docker compose build luminarr
 ```
 
 启动：
