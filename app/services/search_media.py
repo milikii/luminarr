@@ -315,11 +315,13 @@ class SearchMediaService:
                     return CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
                 if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=media_candidates):
                     return CANDIDATE_STATE_UNAVAILABLE_TEXT
-            if (channel or "").strip().lower() == "telegram":
-                return format_media_candidate_confirmation_reply(
-                    cleaned_query,
-                    parsed_query,
-                    tmdb_candidates,
+            channel_name = (channel or "").strip().lower()
+            if channel_name in {"", "telegram"}:
+                return render_media_candidate_confirmation_reply(
+                    query=cleaned_query,
+                    parsed_query=parsed_query,
+                    tmdb_candidates=tmdb_candidates,
+                    channel="telegram",
                 )
             if channel in SUPPORTED_DELIVERY_CHANNELS:
                 return render_media_candidate_confirmation_reply(

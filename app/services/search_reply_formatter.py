@@ -78,6 +78,8 @@ def format_media_candidate_confirmation_reply(
     query: str,
     parsed_query: ParsedMovieQuery,
     tmdb_candidates: Sequence[TmdbMovie],
+    *,
+    include_poster_for_all_candidates: bool = False,
 ) -> str:
     if not tmdb_candidates:
         return NO_RESULT_TEXT_TEMPLATE.format(query=query)
@@ -89,6 +91,7 @@ def format_media_candidate_confirmation_reply(
             candidate=candidate,
             index=index,
             expanded=index == 1,
+            include_poster=include_poster_for_all_candidates or index == 1,
         )
         lines.append(section_label)
         lines.extend(candidate_lines)
@@ -122,10 +125,12 @@ def render_media_candidate_confirmation_reply(
     tmdb_candidates: Sequence[TmdbMovie],
     channel: str,
 ) -> str:
+    channel_name = channel.strip().lower()
     item = build_media_candidate_confirmation_delivery_item(
         query=query,
         parsed_query=parsed_query,
         tmdb_candidates=tmdb_candidates,
+        include_poster_for_all_candidates=channel_name in {"", "telegram"},
     )
     return render_delivery_item(item, channel=channel)
 
@@ -739,6 +744,7 @@ def build_media_candidate_confirmation_delivery_item(
     query: str,
     parsed_query: ParsedMovieQuery,
     tmdb_candidates: Sequence[TmdbMovie],
+    include_poster_for_all_candidates: bool = False,
 ) -> DeliveryItem:
     if not tmdb_candidates:
         raise ValueError("media candidate confirmation requires at least one candidate")
@@ -751,6 +757,7 @@ def build_media_candidate_confirmation_delivery_item(
             index=index,
             field_delimiter="：",
             expanded=index == 1,
+            include_poster=include_poster_for_all_candidates or index == 1,
         )
         sections.append(
             DeliverySection(
@@ -780,6 +787,7 @@ def build_media_candidate_confirmation_entry(
     index: int,
     field_delimiter: str = ": ",
     expanded: bool = True,
+    include_poster: bool = True,
 ) -> tuple[str, list[str]]:
     card_title, card_year, card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
         parsed_query,
@@ -788,7 +796,7 @@ def build_media_candidate_confirmation_entry(
     )
     section_label = f"{index}. {card_title} ({card_year}) | {card_media_type}"
     candidate_lines: list[str] = []
-    if expanded and card_poster != "暂未接入图片":
+    if include_poster and card_poster != "暂未接入图片":
         candidate_lines.append(f"海报{field_delimiter}{card_poster}")
     if card_alias != "-":
         candidate_lines.append(f"原名{field_delimiter}{card_alias}")

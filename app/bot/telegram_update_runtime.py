@@ -272,20 +272,23 @@ async def _send_candidate_card_messages(
     cleaned_blocks: list[list[str]] = []
     for block in candidate_blocks:
         poster_url, cleaned_lines = _extract_candidate_block_media(block)
-        cleaned_blocks.append(cleaned_lines)
+        sent_as_media = False
         if not poster_url:
+            cleaned_blocks.append(cleaned_lines)
             continue
         artifact = await _download_candidate_media_artifact(
             download_image_func=download_image_func,
             poster_url=poster_url,
         )
         if artifact is None:
+            cleaned_blocks.append(cleaned_lines)
             continue
         try:
             try:
                 caption = _resolve_candidate_block_caption(cleaned_lines)
                 caption = _strip_telegram_html_tags(caption)
                 await send_media_func(chat_id, artifact, caption, None)
+                sent_as_media = True
             except Exception as error:
                 emit_operational_log(
                     title="Telegram 候选海报发送失败",
@@ -294,8 +297,13 @@ async def _send_candidate_card_messages(
                 )
         finally:
             _cleanup_temp_media_artifact(artifact)
+        if not sent_as_media:
+            cleaned_blocks.append(cleaned_lines)
     cleaned_text = _compose_candidate_card_text(
-        header_lines=header_lines,
+        header_lines=_normalize_candidate_card_header_lines(
+            header_lines=header_lines,
+            has_remaining_candidate_blocks=bool(cleaned_blocks),
+        ),
         candidate_blocks=cleaned_blocks,
         action_lines=action_lines,
     )
@@ -426,6 +434,16 @@ def _compose_candidate_card_text(
             lines.append("")
         lines.extend(action_lines)
     return "\n".join(lines).strip()
+
+
+def _normalize_candidate_card_header_lines(
+    *,
+    header_lines: list[str],
+    has_remaining_candidate_blocks: bool,
+) -> list[str]:
+    if has_remaining_candidate_blocks:
+        return header_lines
+    return [line for line in header_lines if line != "先确认最可能的作品："]
 
 
 async def _send_or_reply_text(
