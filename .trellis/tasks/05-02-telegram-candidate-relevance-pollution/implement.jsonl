@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for repo conventions and available guideline files."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verification expectations for a search relevance bugfix touching ranking behavior and tests."}

@@ -19,6 +19,7 @@ This directory contains guidelines for backend development. Fill in each file wi
 | [BT Source Contracts](./bt-source-contracts.md) | Adult BT source roles, env wiring, and candidate metadata contracts | Filled |
 | [Subtitle Translation Contracts](./subtitle-translation-contracts.md) | Import-time subtitle translation guidance, metadata sidecar fields, and trusted-name fallback rules | Filled |
 | [Telegram Candidate Card Contracts](./telegram-candidate-card-contracts.md) | Candidate-first Telegram poster-card flow, poster fallbacks, and media-button transport rules | Filled |
+| [TMDB Candidate Ranking Contracts](./tmdb-candidate-ranking-contracts.md) | Protected-franchise candidate filtering and TMDB metric ordering rules | Filled |
 | [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
 | [Quality Guidelines](./quality-guidelines.md) | Code standards, verification entrypoints, and docs-gate expectations | Filled |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
