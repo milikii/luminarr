@@ -58,6 +58,7 @@ from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_can
 from app.services.telegram_pt_resource_cards import (
     TelegramPtResourceCardState,
     build_telegram_pt_resource_reply_marker,
+    prepare_telegram_pt_resource_items,
 )
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
@@ -464,33 +465,36 @@ class SearchMediaService:
             media_kind=_resolve_bt_scoring_media_kind(tmdb_movie),
             load_bt_scoring_rules_func=_load_bt_scoring_rules,
         )
-        selected_raw_results = [{str(key): value for key, value in item.items()} for item in ordered_raw_results[: self._limit]]
-        if media_identity is not None:
-            selected_raw_results = [
-                {
-                    **item,
-                    "media_identity": media_identity,
-                }
-                for item in selected_raw_results
-            ]
-        self._recent_candidates_by_chat[chat_id] = selected_raw_results
-        if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=selected_raw_results):
-            return CANDIDATE_STATE_UNAVAILABLE_TEXT
-
         query_label = (
             media_identity.get("title", "").strip()
             or media_identity.get("original_title", "").strip()
             or safe_text(candidate.get("title"), default="")
         )
         parsed_query = parse_movie_query(query_label)
-        normalized_candidates = [normalize_candidate(item) for item in selected_raw_results]
         channel_name = (channel or "").strip().lower()
-        if channel_name == "telegram" and selected_raw_results:
+        annotated_ordered_results = [{str(key): value for key, value in item.items()} for item in ordered_raw_results]
+        if media_identity is not None:
+            annotated_ordered_results = [
+                {
+                    **item,
+                    "media_identity": media_identity,
+                }
+                for item in annotated_ordered_results
+            ]
+        if channel_name == "telegram" and annotated_ordered_results:
             card_title, card_year, _card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
                 parsed_query,
                 tmdb_movie,
                 prefer_localized_title=True,
             )
+            telegram_resource_items = prepare_telegram_pt_resource_items(
+                title=card_title,
+                year=card_year,
+                resource_items=annotated_ordered_results,
+            )
+            self._recent_candidates_by_chat[chat_id] = list(telegram_resource_items)
+            if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=telegram_resource_items):
+                return CANDIDATE_STATE_UNAVAILABLE_TEXT
             session = self._telegram_pt_resource_card_state.create_session(
                 chat_id=chat_id,
                 title=card_title,
@@ -499,9 +503,14 @@ class SearchMediaService:
                 media_type=safe_text(getattr(tmdb_movie, "media_type", ""), default="movie"),
                 poster_url="" if card_poster == "暂未接入图片" else card_poster,
                 overview=card_overview,
-                resource_items=selected_raw_results,
+                resource_items=telegram_resource_items,
             )
             return build_telegram_pt_resource_reply_marker(session.session_token)
+        selected_raw_results = annotated_ordered_results[: self._limit]
+        self._recent_candidates_by_chat[chat_id] = selected_raw_results
+        if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=selected_raw_results):
+            return CANDIDATE_STATE_UNAVAILABLE_TEXT
+        normalized_candidates = [normalize_candidate(item) for item in selected_raw_results]
         if channel in SUPPORTED_DELIVERY_CHANNELS and normalized_candidates:
             return render_search_results_reply(
                 query=query_label,

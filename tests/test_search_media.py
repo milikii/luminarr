@@ -5179,6 +5179,113 @@ def test_search_resources_for_selected_media_returns_telegram_pt_card_marker_aft
     assert session.resource_items[0]["downloadUrl"] == "https://example.com/zombie-detective.torrent"
 
 
+def test_search_resources_for_selected_media_telegram_path_is_not_capped_by_global_limit() -> None:
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        assert query == "Dune 2021"
+        return [
+            {
+                "title": "Dune 2021 2160p WEB-DL PTP",
+                "year": 2021,
+                "quality": "2160p WEB-DL",
+                "size": 45 * 1024 * 1024 * 1024,
+                "seeders": 88,
+                "indexerName": "PTP",
+                "downloadUrl": "https://example.com/dune-ptp-2160p.torrent",
+            },
+            {
+                "title": "Dune 2021 1440p WEB-DL PTP",
+                "year": 2021,
+                "quality": "1440p WEB-DL",
+                "size": 32 * 1024 * 1024 * 1024,
+                "seeders": 61,
+                "indexerName": "PTP",
+                "downloadUrl": "https://example.com/dune-ptp-1440p.torrent",
+            },
+            {
+                "title": "Dune 2021 1080p WEB-DL PTP",
+                "year": 2021,
+                "quality": "1080p WEB-DL",
+                "size": 18 * 1024 * 1024 * 1024,
+                "seeders": 57,
+                "indexerName": "PTP",
+                "downloadUrl": "https://example.com/dune-ptp-1080p.torrent",
+            },
+            {
+                "title": "Dune 2021 2160p BluRay HDB",
+                "year": 2021,
+                "quality": "2160p BluRay",
+                "size": 56 * 1024 * 1024 * 1024,
+                "seeders": 43,
+                "indexerName": "HDB",
+                "downloadUrl": "https://example.com/dune-hdb-2160p.torrent",
+            },
+            {
+                "title": "Dune 2021 1440p BluRay HDB",
+                "year": 2021,
+                "quality": "1440p BluRay",
+                "size": 34 * 1024 * 1024 * 1024,
+                "seeders": 35,
+                "indexerName": "HDB",
+                "downloadUrl": "https://example.com/dune-hdb-1440p.torrent",
+            },
+            {
+                "title": "Dune 2021 1080p BluRay HDB",
+                "year": 2021,
+                "quality": "1080p BluRay",
+                "size": 22 * 1024 * 1024 * 1024,
+                "seeders": 29,
+                "indexerName": "HDB",
+                "downloadUrl": "https://example.com/dune-hdb-1080p.torrent",
+            },
+            {
+                "title": "Dune 2021 2160p WEB-DL BHD",
+                "year": 2021,
+                "quality": "2160p WEB-DL",
+                "size": 47 * 1024 * 1024 * 1024,
+                "seeders": 22,
+                "indexerName": "BHD",
+                "downloadUrl": "https://example.com/dune-bhd-2160p.torrent",
+            },
+        ]
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "Dune"
+        assert year == ""
+        return [
+            TmdbMovie(
+                title="Dune",
+                original_title="Dune",
+                year="2021",
+                tmdb_id="438631",
+                media_type="movie",
+                poster_path="/dune.jpg",
+                overview="Paul Atreides leads the fight for Arrakis.",
+            ),
+        ]
+
+    service = SearchMediaService(
+        fake_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+        limit=2,
+    )
+
+    _run(service.search_and_format("Dune", chat_id=1001, channel="telegram"))
+    text = _run(service.search_resources_for_selected_media(1001, "1", channel="telegram"))
+
+    assert text.startswith(TELEGRAM_PT_RESOURCE_CARD_REPLY_PREFIX)
+    session_token = parse_telegram_pt_resource_reply_marker(text)
+    assert session_token is not None
+    session = service.telegram_pt_resource_card_state.get_session(session_token)
+    assert session is not None
+    assert len(session.resource_items) == 7
+    resource_urls = {str(item["downloadUrl"]) for item in session.resource_items}
+    assert "https://example.com/dune-ptp-2160p.torrent" in resource_urls
+    assert "https://example.com/dune-hdb-2160p.torrent" in resource_urls
+    assert "https://example.com/dune-bhd-2160p.torrent" in resource_urls
+    assert service.get_cached_candidate(1001, 7) is not None
+    assert service.get_cached_candidate(1001, 7)["downloadUrl"] == "https://example.com/dune-bhd-2160p.torrent"
+
+
 def test_candidate_state_store_persists_candidates_for_restart(tmp_path: Path) -> None:
     db_path = tmp_path / "state.sqlite3"
     database = SqliteDatabase(str(db_path))

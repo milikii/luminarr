@@ -8,7 +8,6 @@ import textwrap
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 import re
-from html import escape as escape_html
 from urllib.parse import urlparse
 
 import httpx
@@ -21,11 +20,13 @@ from app.bot.telegram_reply_formatter import _has_telegram_html
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.operational_logging import emit_operational_log
-from app.services.search_reply_formatter import format_seeder_count, format_size, truncate_text
+from app.services.search_reply_formatter import format_size, truncate_text
 from app.services.telegram_pt_resource_cards import (
     TelegramPtResourceCardSession,
     TelegramPtResourceCardState,
     build_telegram_pt_resource_callback_data,
+    format_telegram_pt_resource_card_caption,
+    format_telegram_pt_resource_detail_message,
     parse_telegram_pt_resource_reply_marker,
 )
 
@@ -429,7 +430,8 @@ async def _send_pt_resource_card_message(
             chat_id=chat_id,
             text="PT 资源卡状态不可用，请重新锁定作品后再试。",
         )
-    caption = _compose_pt_resource_card_caption(session=session)
+    caption = format_telegram_pt_resource_card_caption(session=session)
+    detail_text = format_telegram_pt_resource_detail_message(session=session)
     reply_markup = _build_pt_resource_inline_keyboard(session=session)
     result: object | None = None
     artifact: Path | None = None
@@ -463,6 +465,11 @@ async def _send_pt_resource_card_message(
             parse_mode="HTML",
             reply_markup=reply_markup,
         )
+    await send_text_func(
+        chat_id=chat_id,
+        text=detail_text,
+        parse_mode="HTML",
+    )
     message_id = _extract_message_id(result)
     telegram_pt_resource_card_state.register_message(session_token, message_id)
     return result
@@ -633,34 +640,9 @@ def _cleanup_temp_media_artifact(artifact_path: Path | None) -> None:
         shutil.rmtree(artifact_path.parent, ignore_errors=True)
 
 
-def _compose_pt_resource_card_caption(*, session: TelegramPtResourceCardSession) -> str:
-    resource_lines: list[str] = []
-    for index, item in enumerate(_iter_visible_pt_resource_items(session=session), start=1):
-        title = truncate_text(str(item.get("title", "")).strip() or "(no title)", limit=72)
-        quality = str(item.get("quality", "")).strip() or "-"
-        size = format_size(item.get("size"))
-        seeders = format_seeder_count(item.get("seeders"))
-        indexer = str(item.get("indexerName", "") or item.get("indexer", "")).strip() or "-"
-        resource_lines.extend(
-            (
-                f"<b>【资源 {index}】 {escape_html(title)}</b>",
-                f"🎞 {escape_html(quality)} ｜ 💾 {escape_html(size)} ｜ 🌱 {escape_html(seeders)} ｜ 🏷 {escape_html(indexer)}",
-            )
-        )
-    lines = [f"🎬 <b>{escape_html(session.title)} ({escape_html(session.year)})</b>"]
-    if session.original_title:
-        lines.append(f"<i>{escape_html(session.original_title)}</i>")
-    lines.append(f"🎞 <b>类型：</b> {escape_html(session.media_type)}")
-    if session.overview:
-        lines.append(f"📝 <b>简介：</b> {escape_html(truncate_text(session.overview, limit=120))}")
-    if resource_lines:
-        lines.extend(("", "━━━━━━━━━━━━━━━━━━", *resource_lines))
-    return "\n".join(lines).strip()
-
-
 def _build_pt_resource_inline_keyboard(*, session: TelegramPtResourceCardSession) -> InlineKeyboardMarkup:
     buttons: list[InlineKeyboardButton] = []
-    for index, item in enumerate(_iter_visible_pt_resource_items(session=session), start=1):
+    for index, item in enumerate(session.resource_items, start=1):
         buttons.append(
             InlineKeyboardButton(
                 text=_build_pt_resource_button_label(index=index, item=item),
@@ -669,12 +651,6 @@ def _build_pt_resource_inline_keyboard(*, session: TelegramPtResourceCardSession
         )
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
     return InlineKeyboardMarkup(rows)
-
-
-def _iter_visible_pt_resource_items(*, session: TelegramPtResourceCardSession) -> tuple[dict[str, object], ...]:
-    limit = 3 if session.poster_url else 5
-    return tuple(session.resource_items[:limit])
-
 
 def _build_pt_resource_button_label(*, index: int, item: dict[str, object]) -> str:
     quality = str(item.get("quality", "")).strip() or "-"
