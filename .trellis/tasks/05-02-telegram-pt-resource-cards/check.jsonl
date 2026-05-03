@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for review-time convention context."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Quality and verification expectations for checking Telegram PT interaction changes."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Existing Telegram candidate-card contracts that must not regress while adding PT cards."}
+{"file": "docs/plans/2026-05-02-moviepilot-telegram-pt-resource-interaction.md", "reason": "Approved Phase 1 scope and state model for Telegram PT resource cards."}
+{"file": "docs/plans/2026-05-02-moviepilot-telegram-pt-resource-interaction-test-plan.md", "reason": "Expected coverage and regression checks for Telegram PT resource cards."}
