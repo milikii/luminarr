@@ -32,6 +32,7 @@ from app.services.search_media_state import (
     ClarificationStateStore,
 )
 from app.services.search_reply_formatter import (
+    DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT,
     format_media_candidate_confirmation_reply,
     format_adult_bt_resource_fallback_reply,
     format_bt_batch_preview_reply,
@@ -41,6 +42,7 @@ from app.services.search_reply_formatter import (
     normalize_candidate,
     render_media_candidate_confirmation_reply,
     render_search_results_reply,
+    resolve_movie_card_fields,
     safe_indexer,
     safe_text,
 )
@@ -53,6 +55,10 @@ from app.services.search_request_context import (
 )
 from app.services.bt_candidate_scorer import load_bt_scoring_rules as _load_bt_scoring_rules
 from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
+from app.services.telegram_pt_resource_cards import (
+    TelegramPtResourceCardState,
+    build_telegram_pt_resource_reply_marker,
+)
 
 EMPTY_QUERY_TEXT = "请输入要搜索的内容。"
 NO_RESULT_TEXT_TEMPLATE = search_reply_formatter.NO_RESULT_TEXT_TEMPLATE
@@ -174,6 +180,11 @@ class SearchMediaService:
         self._adult_metadata_translate_func = adult_metadata_translate_func
         self._recent_candidates_by_chat = self._candidate_state.recent_by_chat
         self._clarification_pending_by_chat = self._clarification_state.pending_by_chat
+        self._telegram_pt_resource_card_state = TelegramPtResourceCardState()
+
+    @property
+    def telegram_pt_resource_card_state(self) -> TelegramPtResourceCardState:
+        return self._telegram_pt_resource_card_state
 
     async def search_raw_candidates(self, query: str) -> Sequence[Mapping[str, Any]]:
         cleaned_query = query.strip()
@@ -293,12 +304,15 @@ class SearchMediaService:
         cleaned_query = query.strip()
         if not cleaned_query:
             return EMPTY_QUERY_TEXT
+        channel_name = (channel or "").strip().lower()
 
+        max_confirmation_candidates = _resolve_media_confirmation_candidate_limit(channel_name)
         request_context = await build_search_request_context(
             user_query=cleaned_query,
             search_func=self._search_func,
             lookup_movie_func=self._lookup_movie_func,
             lookup_media_candidates_func=self._lookup_media_candidates_func,
+            confirmation_candidate_limit=max_confirmation_candidates,
         )
         parsed_query = request_context.parsed_query
         tmdb_movie = request_context.tmdb_movie
@@ -312,7 +326,10 @@ class SearchMediaService:
         if self._should_confirm_media_candidates(
             tmdb_candidates=tmdb_candidates,
         ):
-            media_candidates = _build_media_selection_candidates(tmdb_candidates)
+            media_candidates = _build_media_selection_candidates(
+                tmdb_candidates,
+                max_candidates=max_confirmation_candidates,
+            )
             if chat_id is not None:
                 self._recent_candidates_by_chat[chat_id] = media_candidates
                 clarification_pending = self.is_clarification_pending(chat_id)
@@ -324,13 +341,13 @@ class SearchMediaService:
                     return CLARIFICATION_CLEAR_STATE_UNAVAILABLE_TEXT
                 if not self._candidate_state.persist_search_candidates(chat_id=chat_id, candidates=media_candidates):
                     return CANDIDATE_STATE_UNAVAILABLE_TEXT
-            channel_name = (channel or "").strip().lower()
             if channel_name in {"", "telegram"}:
                 return render_media_candidate_confirmation_reply(
                     query=cleaned_query,
                     parsed_query=parsed_query,
                     tmdb_candidates=tmdb_candidates,
                     channel="telegram",
+                    max_candidates=max_confirmation_candidates,
                 )
             if channel in SUPPORTED_DELIVERY_CHANNELS:
                 return render_media_candidate_confirmation_reply(
@@ -338,11 +355,13 @@ class SearchMediaService:
                     parsed_query=parsed_query,
                     tmdb_candidates=tmdb_candidates,
                     channel=channel or "telegram",
+                    max_candidates=max_confirmation_candidates,
                 )
             return format_media_candidate_confirmation_reply(
                 cleaned_query,
                 parsed_query,
                 tmdb_candidates,
+                max_candidates=max_confirmation_candidates,
             )
 
         ordered_raw_results = order_media_bt_results(
@@ -465,6 +484,24 @@ class SearchMediaService:
         )
         parsed_query = parse_movie_query(query_label)
         normalized_candidates = [normalize_candidate(item) for item in selected_raw_results]
+        channel_name = (channel or "").strip().lower()
+        if channel_name == "telegram" and selected_raw_results:
+            card_title, card_year, _card_media_type, card_alias, card_poster, card_overview = resolve_movie_card_fields(
+                parsed_query,
+                tmdb_movie,
+                prefer_localized_title=True,
+            )
+            session = self._telegram_pt_resource_card_state.create_session(
+                chat_id=chat_id,
+                title=card_title,
+                original_title="" if card_alias == "-" else card_alias,
+                year=card_year,
+                media_type=safe_text(getattr(tmdb_movie, "media_type", ""), default="movie"),
+                poster_url="" if card_poster == "暂未接入图片" else card_poster,
+                overview=card_overview,
+                resource_items=selected_raw_results,
+            )
+            return build_telegram_pt_resource_reply_marker(session.session_token)
         if channel in SUPPORTED_DELIVERY_CHANNELS and normalized_candidates:
             return render_search_results_reply(
                 query=query_label,
@@ -637,9 +674,14 @@ def _is_media_candidate_payload(candidate: Mapping[str, Any] | None) -> bool:
     )
 
 
-def _build_media_selection_candidates(tmdb_candidates: Sequence[Any]) -> list[dict[str, Any]]:
+def _build_media_selection_candidates(
+    tmdb_candidates: Sequence[Any],
+    *,
+    max_candidates: int | None = DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT,
+) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
-    for candidate in tmdb_candidates[:5]:
+    visible_candidates = tmdb_candidates if max_candidates is None or max_candidates <= 0 else tmdb_candidates[:max_candidates]
+    for candidate in visible_candidates:
         media_identity = build_media_identity_from_tmdb_movie(candidate, source="search_candidate")
         if media_identity is None:
             continue
@@ -657,6 +699,12 @@ def _build_media_selection_candidates(tmdb_candidates: Sequence[Any]) -> list[di
             }
         )
     return candidates
+
+
+def _resolve_media_confirmation_candidate_limit(channel_name: str) -> int | None:
+    if channel_name in {"", "telegram"}:
+        return 0
+    return DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT
 
 
 def _build_media_identity_resource_queries(media_identity: Mapping[str, Any]) -> tuple[str, ...]:

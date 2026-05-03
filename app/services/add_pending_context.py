@@ -83,16 +83,42 @@ class AddPendingContextBuilder:
                 return PendingAddBuildResult(pending_add=None, error_text=SELECT_NOT_FOUND_TEXT)
             return PendingAddBuildResult(pending_add=None, error_text=SELECT_OUT_OF_RANGE_TEXT)
 
+        return self.build_from_candidate(
+            candidate=candidate,
+            task_ref=str(index),
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
+        )
+
+    def build_from_candidate(
+        self,
+        *,
+        candidate: Mapping[str, Any],
+        task_ref: str,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> PendingAddBuildResult:
+        cleaned_task_ref = task_ref.strip()
+        if not cleaned_task_ref:
+            return PendingAddBuildResult(pending_add=None, error_text=SELECT_USAGE_TEXT)
+
         source = _resolve_source(candidate)
         if not source:
             return PendingAddBuildResult(pending_add=None, error_text=CANDIDATE_SOURCE_MISSING_TEXT)
 
         title = str(candidate.get("title", "")).strip() or "(no title)"
         media_identity = normalize_media_identity_payload(candidate.get("media_identity"))
-        adult_content_match = extract_exact_adult_content_match(
-            title,
-            source_site=str(candidate.get("sourceProvider", "")).strip() or str(candidate.get("indexerName", "")).strip(),
-        )
+        adult_content_match = None
+        if media_identity is None:
+            adult_content_match = extract_exact_adult_content_match(
+                title,
+                source_site=str(candidate.get("sourceProvider", "")).strip()
+                or str(candidate.get("indexerName", "")).strip(),
+            )
         adult_content_id = str(candidate.get("adult_content_id", "")).strip() or (
             adult_content_match.normalized_content_id if adult_content_match is not None else ""
         )
@@ -101,7 +127,7 @@ class AddPendingContextBuilder:
             adult_history_text = self._resolve_adult_history_text(content_id=adult_content_id)
         return PendingAddBuildResult(
             pending_add=build_pending_add_context(
-                task_ref=str(index),
+                task_ref=cleaned_task_ref,
                 title=title,
                 source=source,
                 media_identity=media_identity,

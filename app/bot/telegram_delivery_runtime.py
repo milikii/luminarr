@@ -43,13 +43,21 @@ def build_telegram_send_media_func(application: Application):
 
 
 def build_telegram_send_text_func(application: Application):
-    async def send_text(*, chat_id: int, text: str) -> object:
-        reply_markup = _build_inline_keyboard_markup(text)
+    async def send_text(
+        *,
+        chat_id: int,
+        text: str,
+        parse_mode: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> object:
+        resolved_reply_markup = reply_markup or _build_inline_keyboard_markup(text)
         kwargs: dict = {"chat_id": chat_id, "text": text}
-        if _has_telegram_html(text):
+        if parse_mode:
+            kwargs["parse_mode"] = parse_mode
+        elif _has_telegram_html(text):
             kwargs["parse_mode"] = "HTML"
-        if reply_markup is not None:
-            kwargs["reply_markup"] = reply_markup
+        if resolved_reply_markup is not None:
+            kwargs["reply_markup"] = resolved_reply_markup
         return await application.bot.send_message(**kwargs)
 
     return send_text

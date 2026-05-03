@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -51,6 +52,7 @@ STRONG_TITLE_LARGE_GAP = 60
 STRONG_TITLE_EXACT_GAP = 25
 STRONG_TITLE_YEAR_GAP = 20
 FRANCHISE_INTENT_RELEVANCE_WEIGHT = 500
+EXPANDED_CONFIRMATION_CANDIDATE_LOOKUP_LIMIT = 30
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +91,7 @@ async def build_search_request_context(
     search_func: SearchFunc,
     lookup_movie_func: LookupMovieFunc | None,
     lookup_media_candidates_func: LookupMediaCandidatesFunc | None = None,
+    confirmation_candidate_limit: int | None = None,
 ) -> SearchRequestContext:
     parsed_query = parse_movie_query(user_query)
     tmdb_movie: TmdbMovie | None = None
@@ -101,7 +104,14 @@ async def build_search_request_context(
 
     if lookup_media_candidates_func is not None:
         try:
-            tmdb_candidates = tuple(await lookup_media_candidates_func(parsed_query.title, parsed_query.year))
+            tmdb_candidates = tuple(
+                await _lookup_confirmation_media_candidates(
+                    lookup_media_candidates_func=lookup_media_candidates_func,
+                    title=parsed_query.title,
+                    year=parsed_query.year,
+                    confirmation_candidate_limit=confirmation_candidate_limit,
+                )
+            )
         except (httpx.HTTPError, json.JSONDecodeError) as error:
             emit_operational_log(
                 title="TMDB 候选查询失败",
@@ -112,6 +122,7 @@ async def build_search_request_context(
             tmdb_candidates = _select_confirmation_tmdb_candidates(
                 parsed_query=parsed_query,
                 tmdb_candidates=tmdb_candidates,
+                confirmation_candidate_limit=confirmation_candidate_limit,
             )
             tmdb_movie = tmdb_candidates[0]
         media_identity_assessment = _assess_media_identity(
@@ -168,6 +179,33 @@ async def build_search_request_context(
         resolved_query=resolved_query,
         raw_results=raw_results,
     )
+
+
+async def _lookup_confirmation_media_candidates(
+    *,
+    lookup_media_candidates_func: LookupMediaCandidatesFunc,
+    title: str,
+    year: str,
+    confirmation_candidate_limit: int | None,
+) -> Sequence[TmdbMovie]:
+    desired_limit = _resolve_confirmation_candidate_lookup_limit(confirmation_candidate_limit)
+    if desired_limit is None:
+        return await lookup_media_candidates_func(title, year)
+    try:
+        signature = inspect.signature(lookup_media_candidates_func)
+    except (TypeError, ValueError):
+        signature = None
+    if signature is None or "limit" not in signature.parameters:
+        return await lookup_media_candidates_func(title, year)
+    return await lookup_media_candidates_func(title, year, limit=desired_limit)
+
+
+def _resolve_confirmation_candidate_lookup_limit(confirmation_candidate_limit: int | None) -> int | None:
+    if confirmation_candidate_limit is None:
+        return None
+    if confirmation_candidate_limit <= 0:
+        return EXPANDED_CONFIRMATION_CANDIDATE_LOOKUP_LIMIT
+    return confirmation_candidate_limit
 
 
 def _assess_media_identity(
@@ -297,6 +335,7 @@ def _select_confirmation_tmdb_candidates(
     *,
     parsed_query: ParsedMovieQuery,
     tmdb_candidates: Sequence[TmdbMovie],
+    confirmation_candidate_limit: int | None = None,
 ) -> tuple[TmdbMovie, ...]:
     if not tmdb_candidates:
         return ()
@@ -314,7 +353,12 @@ def _select_confirmation_tmdb_candidates(
             parsed_query=parsed_query,
             signals=signals,
         )
-    limit = _resolve_confirmation_candidate_limit(parsed_query=parsed_query, signals=signals)
+    if confirmation_candidate_limit is None:
+        limit = _resolve_confirmation_candidate_limit(parsed_query=parsed_query, signals=signals)
+    elif confirmation_candidate_limit <= 0:
+        limit = len(signals)
+    else:
+        limit = min(len(signals), confirmation_candidate_limit)
     return tuple(signal.candidate for signal in signals[:limit])
 
 

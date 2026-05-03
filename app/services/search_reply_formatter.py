@@ -39,6 +39,7 @@ MEDIA_CANDIDATE_CONFIRM_ACTION_LABEL = "确认作品"
 MEDIA_CANDIDATE_CONFIRM_ACTION_HINT = "直接回复序号，例如 1"
 MEDIA_CANDIDATE_REVISE_ACTION_LABEL = "都不对"
 MEDIA_CANDIDATE_REVISE_ACTION_HINT = "发送更详细的名称，或直接发送新的名字/关键词重新搜"
+DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,12 +85,17 @@ def format_media_candidate_confirmation_reply(
     tmdb_candidates: Sequence[TmdbMovie],
     *,
     include_poster_for_all_candidates: bool = True,
+    max_candidates: int | None = DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT,
 ) -> str:
     if not tmdb_candidates:
         return NO_RESULT_TEXT_TEMPLATE.format(query=query)
-    candidate_count = len(tmdb_candidates[:5])
+    visible_candidates = _resolve_visible_media_confirmation_candidates(
+        tmdb_candidates,
+        max_candidates=max_candidates,
+    )
+    candidate_count = len(visible_candidates)
     lines = [f"候选作品：{query}", f"候选作品（{candidate_count} 条）"]
-    for index, candidate in enumerate(tmdb_candidates[:5], start=1):
+    for index, candidate in enumerate(visible_candidates, start=1):
         section_label, candidate_lines = build_media_candidate_confirmation_entry(
             parsed_query=parsed_query,
             candidate=candidate,
@@ -127,12 +133,14 @@ def render_media_candidate_confirmation_reply(
     parsed_query: ParsedMovieQuery,
     tmdb_candidates: Sequence[TmdbMovie],
     channel: str,
+    max_candidates: int | None = DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT,
 ) -> str:
     item = build_media_candidate_confirmation_delivery_item(
         query=query,
         parsed_query=parsed_query,
         tmdb_candidates=tmdb_candidates,
         include_poster_for_all_candidates=True,
+        max_candidates=max_candidates,
     )
     return render_delivery_item(item, channel=channel)
 
@@ -756,12 +764,17 @@ def build_media_candidate_confirmation_delivery_item(
     parsed_query: ParsedMovieQuery,
     tmdb_candidates: Sequence[TmdbMovie],
     include_poster_for_all_candidates: bool = True,
+    max_candidates: int | None = DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT,
 ) -> DeliveryItem:
     if not tmdb_candidates:
         raise ValueError("media candidate confirmation requires at least one candidate")
-    candidate_count = len(tmdb_candidates[:5])
+    visible_candidates = _resolve_visible_media_confirmation_candidates(
+        tmdb_candidates,
+        max_candidates=max_candidates,
+    )
+    candidate_count = len(visible_candidates)
     sections: list[DeliverySection] = []
-    for index, candidate in enumerate(tmdb_candidates[:5], start=1):
+    for index, candidate in enumerate(visible_candidates, start=1):
         section_label, candidate_lines = build_media_candidate_confirmation_entry(
             parsed_query=ParsedMovieQuery(title=candidate.title, year=candidate.year),
             candidate=candidate,
@@ -796,6 +809,16 @@ def build_media_candidate_confirmation_delivery_item(
         ),
         status="success",
     )
+
+
+def _resolve_visible_media_confirmation_candidates(
+    tmdb_candidates: Sequence[TmdbMovie],
+    *,
+    max_candidates: int | None,
+) -> tuple[TmdbMovie, ...]:
+    if max_candidates is None or max_candidates <= 0:
+        return tuple(tmdb_candidates)
+    return tuple(tmdb_candidates[:max_candidates])
 
 
 def build_media_candidate_confirmation_entry(

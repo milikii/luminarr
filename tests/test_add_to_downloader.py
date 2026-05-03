@@ -74,6 +74,36 @@ def test_add_by_selection_returns_pending_approval() -> None:
     add_torrent.assert_not_awaited()
 
 
+def test_add_by_candidate_returns_pending_approval_for_pt_resource_card_task_ref() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(search_service=search_service, add_torrent_func=add_torrent)
+
+    reply = _run(
+        service.add_by_candidate(
+            chat_id=1001,
+            candidate={
+                "title": "Dune 2021 2160p WEB-DL",
+                "downloadUrl": "https://example.com/dune-2021.torrent",
+                "media_identity": {
+                    "title": "Dune",
+                    "year": "2021",
+                    "tmdb_id": "438631",
+                    "media_type": "movie",
+                },
+                "indexerName": "PTP",
+            },
+            task_ref="pt-deadbeef-1",
+        )
+    )
+
+    assert reply == ADD_APPROVAL_PENDING_TEXT.format(
+        title="Dune 2021 2160p WEB-DL",
+        task_ref="pt-deadbeef-1",
+    )
+    add_torrent.assert_not_awaited()
+
+
 def test_add_by_selection_uses_delivery_renderer_for_personal_wechat_channel() -> None:
     search_service = SearchMediaService(_fake_search_with_download_url)
     _run(search_service.search_and_format("dune", chat_id=1001))
@@ -352,6 +382,47 @@ def test_confirm_add_by_task_ref_dispatches_download() -> None:
     assert "任务 ID: 42" in confirm_reply
     assert "任务 Hash: abc123" in confirm_reply
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
+
+
+def test_confirm_add_by_task_ref_dispatches_download_for_pt_resource_card_task_ref(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+    )
+
+    pending_reply = _run(
+        service.add_by_candidate(
+            chat_id=1001,
+            candidate={
+                "title": "Dune 2021 2160p WEB-DL",
+                "downloadUrl": "https://example.com/dune-2021.torrent",
+                "media_identity": {
+                    "title": "Dune",
+                    "year": "2021",
+                    "tmdb_id": "438631",
+                    "media_type": "movie",
+                },
+                "indexerName": "PTP",
+            },
+            task_ref="pt-deadbeef-1",
+            user_id=2001,
+            channel="telegram",
+        )
+    )
+    confirm_reply = _run(service.confirm_add_by_task_ref("pt-deadbeef-1", chat_id=1001, user_id=2001))
+
+    assert pending_reply.startswith("待确认：下载 ⏳")
+    assert "片名：Dune 2021 2160p WEB-DL" in pending_reply
+    assert "选择序号：pt-deadbeef-1" in pending_reply
+    assert "确认下载：发送 confirm pt-deadbeef-1" in pending_reply
+    assert "任务 ID: 42" in confirm_reply
+    assert "任务 Hash: abc123" in confirm_reply
+    add_torrent.assert_awaited_once_with("https://example.com/dune-2021.torrent")
 
 
 def test_confirm_add_by_task_ref_dispatches_with_keyword_downloader_context() -> None:

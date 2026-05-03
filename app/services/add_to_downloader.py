@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import sqlite3
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -1533,6 +1533,36 @@ class AddToDownloaderService:
         build_result = self._pending_context_builder.build_from_selection(
             chat_id=chat_id,
             selection_text=selection_text,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
+        )
+        if build_result.pending_add is None:
+            return build_result.error_text
+        return self._persist_pending_add(
+            chat_id=chat_id,
+            user_id=user_id,
+            pending_add=build_result.pending_add,
+            channel=channel,
+        )
+
+    async def add_by_candidate(
+        self,
+        *,
+        chat_id: int,
+        candidate: Mapping[str, object],
+        task_ref: str,
+        user_id: int | None = None,
+        channel: str | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> str:
+        build_result = self._pending_context_builder.build_from_candidate(
+            candidate=candidate,
+            task_ref=task_ref,
             downloader_name=downloader_name,
             downloader_type=downloader_type,
             download_dir=download_dir,

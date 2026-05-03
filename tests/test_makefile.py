@@ -212,6 +212,9 @@ def test_makefile_verify_stage1_telegram_delivery_group_keeps_current_regression
     assert commands == [
         "$(PYTHON) -m pytest -q tests/test_delivery_renderers.py tests/test_telegram_delivery_runtime.py",
         "$(PYTHON) -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k \"routes_search_with_channel_delivery_renderer or routes_add_pending_with_channel_delivery_renderer or routes_status_with_channel_delivery_renderer or import_formats_import_approval_for_telegram or routes_duplicate_override_follow_up\"",
+        "$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_reply_formatter.py -k \"prefers_media_confirmation_for_strong_cjk_title_before_resource_search or keeps_non_telegram_candidate_confirmation_layout_intact or formats_media_candidate_confirmation_with_primary_hero_block or sends_aggregate_candidate_confirmation_as_html_text or splits_aggregate_candidate_confirmation_at_telegram_limit\"",
+        "$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_pt_resource_cards.py tests/test_telegram_runtime_adapter.py -k \"returns_telegram_pt_card_marker_after_media_lock or pt_resource or consumes_pt_resource_card or rejects_cancelled_pt_resource_card\"",
+        "$(PYTHON) -m pytest -q tests/test_add_to_downloader.py -k pt_resource_card_task_ref",
     ]
 
 

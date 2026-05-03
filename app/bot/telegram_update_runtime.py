@@ -8,6 +8,7 @@ import textwrap
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 import re
+from html import escape as escape_html
 from urllib.parse import urlparse
 
 import httpx
@@ -20,6 +21,13 @@ from app.bot.telegram_reply_formatter import _has_telegram_html
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.operational_logging import emit_operational_log
+from app.services.search_reply_formatter import format_seeder_count, format_size, truncate_text
+from app.services.telegram_pt_resource_cards import (
+    TelegramPtResourceCardSession,
+    TelegramPtResourceCardState,
+    build_telegram_pt_resource_callback_data,
+    parse_telegram_pt_resource_reply_marker,
+)
 
 TelegramReplyTextFunc = Callable[[str], Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
@@ -49,13 +57,36 @@ def build_telegram_reply_func(
     send_text_func: TelegramSendTextFunc | None = None,
     send_media_func: TelegramSendMediaFunc | None = None,
     download_image_func: DownloadImageFunc | None = None,
+    telegram_pt_resource_card_state: TelegramPtResourceCardState | None = None,
 ) -> Callable[[str], Awaitable[object]]:
     async def wrapped(text: str) -> object:
         formatted_text = formatter(text)
+        if (
+            chat_id is not None
+            and send_text_func is not None
+            and telegram_pt_resource_card_state is not None
+            and _is_pt_resource_card_reply(formatted_text)
+        ):
+            return await _send_pt_resource_card_message(
+                reply_text_func=reply_func,
+                send_text_func=send_text_func,
+                send_media_func=send_media_func,
+                download_image_func=download_image_func,
+                chat_id=chat_id,
+                text=formatted_text,
+                telegram_pt_resource_card_state=telegram_pt_resource_card_state,
+            )
         if reply_photo_func is not None and _is_adult_bt_poster_caption_reply(formatted_text):
             return await _reply_adult_bt_poster_caption_message(
                 reply_text_func=reply_func,
                 reply_photo_func=reply_photo_func,
+                text=formatted_text,
+            )
+        if _is_aggregate_candidate_reply(formatted_text):
+            return await _send_aggregate_candidate_messages(
+                reply_text_func=reply_func,
+                send_text_func=send_text_func,
+                chat_id=chat_id,
                 text=formatted_text,
             )
         if (
@@ -88,6 +119,8 @@ def build_telegram_reply_func(
 _CANDIDATE_BLOCK_START_RE = re.compile(r"^【(?P<index>\d+)】\s+")
 _STRIP_HTML_RE = re.compile(r"</?(?:b|i|u|s|code|pre|a)\b[^>]*>")
 _ADULT_BT_CARD_PREFIX = "【成人资源候选】"
+_PT_RESOURCE_CARD_PREFIX = "【PT资源卡】"
+_AGGREGATE_CANDIDATE_HEADER_RE = re.compile(r"^【.+】共找到\s+\d+\s+条相关信息，请选择操作$")
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
 _SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
 _PLACEHOLDER_POSTER_SIZE = (720, 1080)
@@ -96,6 +129,7 @@ _PLACEHOLDER_PANEL = "#22324A"
 _PLACEHOLDER_ACCENT = "#E0B04B"
 _PLACEHOLDER_TEXT = "#F5F7FA"
 _PLACEHOLDER_SUBTEXT = "#B8C4D6"
+_TELEGRAM_MESSAGE_CHAR_LIMIT = 4096
 
 
 def _strip_telegram_html_tags(text: str) -> str:
@@ -110,6 +144,17 @@ def _strip_telegram_html_tags(text: str) -> str:
 def _is_candidate_card_reply(text: str) -> bool:
     stripped_text = text.strip()
     return stripped_text.startswith("【候选作品】") or stripped_text.startswith(_ADULT_BT_CARD_PREFIX)
+
+
+def _is_pt_resource_card_reply(text: str) -> bool:
+    return text.strip().startswith(_PT_RESOURCE_CARD_PREFIX)
+
+
+def _is_aggregate_candidate_reply(text: str) -> bool:
+    stripped_text = text.strip()
+    if not stripped_text:
+        return False
+    return bool(_AGGREGATE_CANDIDATE_HEADER_RE.match(stripped_text.splitlines()[0]))
 
 
 def _is_adult_bt_poster_caption_reply(text: str) -> bool:
@@ -340,6 +385,89 @@ async def _send_candidate_card_messages(
     )
 
 
+async def _send_aggregate_candidate_messages(
+    *,
+    reply_text_func: TelegramReplyTextFunc,
+    send_text_func: TelegramSendTextFunc | None,
+    chat_id: int | None,
+    text: str,
+) -> object:
+    last_result: object | None = None
+    for chunk in _split_telegram_text_chunks(text):
+        last_result = await _send_or_reply_text(
+            reply_text_func=reply_text_func,
+            send_text_func=send_text_func,
+            chat_id=chat_id,
+            text=chunk,
+        )
+    return last_result
+
+
+async def _send_pt_resource_card_message(
+    *,
+    reply_text_func: TelegramReplyTextFunc,
+    send_text_func: TelegramSendTextFunc,
+    send_media_func: TelegramSendMediaFunc | None,
+    download_image_func: DownloadImageFunc | None,
+    chat_id: int,
+    text: str,
+    telegram_pt_resource_card_state: TelegramPtResourceCardState,
+) -> object:
+    session_token = parse_telegram_pt_resource_reply_marker(text)
+    if not session_token:
+        return await _send_or_reply_text(
+            reply_text_func=reply_text_func,
+            send_text_func=send_text_func,
+            chat_id=chat_id,
+            text=text,
+        )
+    session = telegram_pt_resource_card_state.get_session(session_token)
+    if session is None:
+        return await _send_or_reply_text(
+            reply_text_func=reply_text_func,
+            send_text_func=send_text_func,
+            chat_id=chat_id,
+            text="PT 资源卡状态不可用，请重新锁定作品后再试。",
+        )
+    caption = _compose_pt_resource_card_caption(session=session)
+    reply_markup = _build_pt_resource_inline_keyboard(session=session)
+    result: object | None = None
+    artifact: Path | None = None
+    if session.poster_url and send_media_func is not None and download_image_func is not None:
+        artifact = await _download_candidate_media_artifact(
+            download_image_func=download_image_func,
+            poster_url=session.poster_url,
+        )
+        if artifact is not None:
+            try:
+                result = await _call_send_media_func(
+                    send_media_func=send_media_func,
+                    chat_id=chat_id,
+                    artifact=artifact,
+                    caption=caption,
+                    parse_mode="HTML",
+                    reply_markup=reply_markup,
+                )
+            except Exception as error:
+                emit_operational_log(
+                    title="Telegram PT 资源卡海报发送失败",
+                    detail=f"url={session.poster_url or str(artifact)} 原因={error}",
+                    fix_hint="检查 Telegram 媒体发送权限、TMDB 海报可达性和本地临时文件权限；当前会退回文本 PT 资源卡。",
+                )
+            finally:
+                _cleanup_temp_media_artifact(artifact)
+    if result is None:
+        result = await send_text_func(
+            chat_id=chat_id,
+            text=caption,
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+        )
+    message_id = _extract_message_id(result)
+    telegram_pt_resource_card_state.register_message(session_token, message_id)
+    return result
+
+
 def _split_candidate_card_reply(text: str) -> tuple[list[str], list[list[str]], list[str]]:
     lines = [line.rstrip() for line in text.splitlines()]
     header_lines: list[str] = []
@@ -505,6 +633,79 @@ def _cleanup_temp_media_artifact(artifact_path: Path | None) -> None:
         shutil.rmtree(artifact_path.parent, ignore_errors=True)
 
 
+def _compose_pt_resource_card_caption(*, session: TelegramPtResourceCardSession) -> str:
+    resource_lines: list[str] = []
+    for index, item in enumerate(_iter_visible_pt_resource_items(session=session), start=1):
+        title = truncate_text(str(item.get("title", "")).strip() or "(no title)", limit=72)
+        quality = str(item.get("quality", "")).strip() or "-"
+        size = format_size(item.get("size"))
+        seeders = format_seeder_count(item.get("seeders"))
+        indexer = str(item.get("indexerName", "") or item.get("indexer", "")).strip() or "-"
+        resource_lines.extend(
+            (
+                f"<b>【资源 {index}】 {escape_html(title)}</b>",
+                f"🎞 {escape_html(quality)} ｜ 💾 {escape_html(size)} ｜ 🌱 {escape_html(seeders)} ｜ 🏷 {escape_html(indexer)}",
+            )
+        )
+    lines = [f"🎬 <b>{escape_html(session.title)} ({escape_html(session.year)})</b>"]
+    if session.original_title:
+        lines.append(f"<i>{escape_html(session.original_title)}</i>")
+    lines.append(f"🎞 <b>类型：</b> {escape_html(session.media_type)}")
+    if session.overview:
+        lines.append(f"📝 <b>简介：</b> {escape_html(truncate_text(session.overview, limit=120))}")
+    if resource_lines:
+        lines.extend(("", "━━━━━━━━━━━━━━━━━━", *resource_lines))
+    return "\n".join(lines).strip()
+
+
+def _build_pt_resource_inline_keyboard(*, session: TelegramPtResourceCardSession) -> InlineKeyboardMarkup:
+    buttons: list[InlineKeyboardButton] = []
+    for index, item in enumerate(_iter_visible_pt_resource_items(session=session), start=1):
+        buttons.append(
+            InlineKeyboardButton(
+                text=_build_pt_resource_button_label(index=index, item=item),
+                callback_data=build_telegram_pt_resource_callback_data(session.session_token, index),
+            )
+        )
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(rows)
+
+
+def _iter_visible_pt_resource_items(*, session: TelegramPtResourceCardSession) -> tuple[dict[str, object], ...]:
+    limit = 3 if session.poster_url else 5
+    return tuple(session.resource_items[:limit])
+
+
+def _build_pt_resource_button_label(*, index: int, item: dict[str, object]) -> str:
+    quality = str(item.get("quality", "")).strip() or "-"
+    compact_size = _format_compact_button_size(item.get("size"))
+    label = f"{index} · {quality}".strip()
+    if compact_size:
+        with_size = f"{label} {compact_size}".strip()
+        if len(with_size) <= 18:
+            return with_size
+    if len(label) <= 18:
+        return label
+    return truncate_text(label, limit=18)
+
+
+def _format_compact_button_size(size_value: object) -> str:
+    formatted = format_size(size_value)
+    if formatted == "-":
+        return ""
+    compact = formatted.replace(" ", "")
+    compact = compact.replace(".0GB", "G").replace(".0MB", "M").replace(".0TB", "T").replace(".0KB", "K")
+    compact = compact.replace("GB", "G").replace("MB", "M").replace("TB", "T").replace("KB", "K")
+    return compact
+
+
+def _extract_message_id(result: object) -> int | None:
+    message_id = getattr(result, "message_id", None)
+    if isinstance(message_id, int) and message_id > 0:
+        return message_id
+    return None
+
+
 def _resolve_candidate_block_caption(block_lines: list[str]) -> str | None:
     if not block_lines:
         return None
@@ -564,6 +765,50 @@ def _compose_candidate_card_text(
     return "\n".join(lines).strip()
 
 
+def _split_telegram_text_chunks(text: str, *, limit: int = _TELEGRAM_MESSAGE_CHAR_LIMIT) -> tuple[str, ...]:
+    normalized_text = text.strip()
+    if len(normalized_text) <= limit:
+        return (normalized_text,)
+    chunks: list[str] = []
+    current_chunk = ""
+    for block in _split_telegram_text_blocks(normalized_text, limit=limit):
+        if not current_chunk:
+            current_chunk = block
+            continue
+        candidate_chunk = f"{current_chunk}\n\n{block}"
+        if len(candidate_chunk) <= limit:
+            current_chunk = candidate_chunk
+            continue
+        chunks.append(current_chunk)
+        current_chunk = block
+    if current_chunk:
+        chunks.append(current_chunk)
+    return tuple(chunks)
+
+
+def _split_telegram_text_blocks(text: str, *, limit: int) -> tuple[str, ...]:
+    blocks = [block.strip() for block in text.split("\n\n") if block.strip()]
+    resolved_blocks: list[str] = []
+    for block in blocks:
+        if len(block) <= limit:
+            resolved_blocks.append(block)
+            continue
+        current_block = ""
+        for line in [line.rstrip() for line in block.splitlines() if line.strip()]:
+            if not current_block:
+                current_block = line
+                continue
+            candidate_block = f"{current_block}\n{line}"
+            if len(candidate_block) <= limit:
+                current_block = candidate_block
+                continue
+            resolved_blocks.append(current_block)
+            current_block = line
+        if current_block:
+            resolved_blocks.append(current_block)
+    return tuple(resolved_blocks)
+
+
 def _normalize_candidate_card_header_lines(
     *,
     header_lines: list[str],
@@ -582,7 +827,10 @@ async def _send_or_reply_text(
     text: str,
 ) -> object:
     if send_text_func is not None and chat_id is not None:
-        return await send_text_func(chat_id=chat_id, text=text)
+        kwargs: dict[str, object] = {"chat_id": chat_id, "text": text}
+        if _has_telegram_html(text):
+            kwargs["parse_mode"] = "HTML"
+        return await send_text_func(**kwargs)
     if _has_telegram_html(text):
         return await reply_text_func(text, parse_mode="HTML")
     return await reply_text_func(text)

@@ -4,6 +4,10 @@ import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
+from app.bot import telegram_bot as tg
+from app.services.add_to_downloader import AddToDownloaderService
+from app.services.search_media import SearchMediaService
+from app.services.telegram_pt_resource_cards import build_telegram_pt_resource_callback_data
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.bot.telegram_bot import TELEGRAM_UPDATE_REPO_KEY
 from app.bot.telegram_runtime_adapter import handle_telegram_callback_query, handle_telegram_message
@@ -55,6 +59,21 @@ def _build_callback_update(
         effective_user=SimpleNamespace(id=user_id) if include_effective_context else None,
     )
     return update, reply_text, answer
+
+
+async def _fake_search(_query: str) -> list[dict[str, object]]:
+    return []
+
+
+class _ExecutionGateStub:
+    def __init__(self) -> None:
+        self.run = AsyncMock(side_effect=self._run)
+
+    async def _run(self, _action: str, handler):
+        result = handler()
+        if asyncio.iscoroutine(result):
+            return await result
+        return result
 
 
 def test_handle_telegram_message_routes_through_dispatch_private_chat_text(monkeypatch) -> None:
@@ -127,6 +146,161 @@ def test_handle_telegram_callback_query_forwards_callback_data_unchanged(monkeyp
     answer.assert_awaited_once()
     dispatch_private_chat_text.assert_awaited_once()
     assert dispatch_private_chat_text.await_args.kwargs["query"] == "status hash-87"
+
+
+def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared_dispatch(monkeypatch) -> None:
+    search_service = SearchMediaService(_fake_search)
+    session = search_service.telegram_pt_resource_card_state.create_session(
+        chat_id=1001,
+        title="Dune",
+        original_title="Dune",
+        year="2021",
+        media_type="movie",
+        poster_url="https://image.tmdb.org/t/p/w500/dune.jpg",
+        overview="Paul Atreides leads the fight for Arrakis.",
+        resource_items=(
+            {
+                "title": "Dune 2021 2160p WEB-DL",
+                "quality": "4K WEB-DL",
+                "size": 45 * 1024 * 1024 * 1024,
+                "seeders": 88,
+                "indexerName": "PTP",
+                "downloadUrl": "https://example.com/dune-2021.torrent",
+                "media_identity": {
+                    "title": "Dune",
+                    "year": "2021",
+                    "tmdb_id": "438631",
+                    "media_type": "movie",
+                },
+            },
+        ),
+    )
+    search_service._recent_candidates_by_chat[1001] = [  # type: ignore[attr-defined]
+        {
+            "title": "WRONG",
+            "downloadUrl": "https://example.com/wrong.torrent",
+        }
+    ]
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    add_service.add_by_candidate = AsyncMock(  # type: ignore[method-assign]
+        return_value="下载待确认：Dune\n选择序号: pt-ref-1\n请发送 confirm pt-ref-1 执行下载。"
+    )
+    execution_gate = _ExecutionGateStub()
+    update, reply_text, answer = _build_callback_update(
+        build_telegram_pt_resource_callback_data(session.session_token, 1)
+    )
+    edit_message_reply_markup = AsyncMock()
+    update.callback_query.edit_message_reply_markup = edit_message_reply_markup
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: search_service,
+                tg.ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                tg.EXECUTION_GATE_KEY: execution_gate,
+            }
+        )
+    )
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.telegram_runtime_adapter.resolve_execution_gate", lambda **_: execution_gate)
+
+    asyncio.run(handle_telegram_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    dispatch_private_chat_text.assert_not_awaited()
+    execution_gate.run.assert_awaited_once()
+    add_service.add_by_candidate.assert_awaited_once()
+    kwargs = add_service.add_by_candidate.await_args.kwargs
+    assert kwargs["candidate"]["title"] == "Dune 2021 2160p WEB-DL"
+    assert kwargs["task_ref"].startswith("pt-")
+    edit_message_reply_markup.assert_awaited_once_with(reply_markup=None)
+    reply_text.assert_awaited_once()
+    assert "confirm pt-ref-1" in reply_text.await_args.args[0]
+    stored_session = search_service.telegram_pt_resource_card_state.get_session(session.session_token)
+    assert stored_session is not None
+    assert stored_session.status == "selected"
+
+
+def test_handle_telegram_callback_query_rejects_cancelled_pt_resource_card(monkeypatch) -> None:
+    search_service = SearchMediaService(_fake_search)
+    stale_session = search_service.telegram_pt_resource_card_state.create_session(
+        chat_id=1001,
+        title="Dune",
+        original_title="Dune",
+        year="2021",
+        media_type="movie",
+        poster_url="https://image.tmdb.org/t/p/w500/dune.jpg",
+        overview="Paul Atreides leads the fight for Arrakis.",
+        resource_items=(
+            {
+                "title": "Dune 2021 2160p WEB-DL",
+                "quality": "4K WEB-DL",
+                "size": 45 * 1024 * 1024 * 1024,
+                "seeders": 88,
+                "indexerName": "PTP",
+                "downloadUrl": "https://example.com/dune-2021.torrent",
+                "media_identity": {
+                    "title": "Dune",
+                    "year": "2021",
+                    "tmdb_id": "438631",
+                    "media_type": "movie",
+                },
+            },
+        ),
+    )
+    search_service.telegram_pt_resource_card_state.create_session(
+        chat_id=1001,
+        title="Dune Messiah",
+        original_title="Dune Messiah",
+        year="2027",
+        media_type="movie",
+        poster_url="",
+        overview="A newer search invalidates the old card.",
+        resource_items=(
+            {
+                "title": "Dune Messiah 2027 1080p WEB-DL",
+                "quality": "1080p WEB-DL",
+                "size": 12 * 1024 * 1024 * 1024,
+                "seeders": 55,
+                "indexerName": "HDB",
+                "downloadUrl": "https://example.com/dune-messiah.torrent",
+                "media_identity": {
+                    "title": "Dune Messiah",
+                    "year": "2027",
+                    "tmdb_id": "999",
+                    "media_type": "movie",
+                },
+            },
+        ),
+    )
+    add_service = AddToDownloaderService(search_service, AsyncMock())
+    add_service.add_by_candidate = AsyncMock(return_value="不该被调用")  # type: ignore[method-assign]
+    update, reply_text, answer = _build_callback_update(
+        build_telegram_pt_resource_callback_data(stale_session.session_token, 1)
+    )
+    edit_message_reply_markup = AsyncMock()
+    update.callback_query.edit_message_reply_markup = edit_message_reply_markup
+    context = SimpleNamespace(
+        application=SimpleNamespace(
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: search_service,
+                tg.ADD_TO_DOWNLOADER_SERVICE_KEY: add_service,
+                tg.EXECUTION_GATE_KEY: _ExecutionGateStub(),
+            }
+        )
+    )
+    dispatch_private_chat_text = AsyncMock()
+    monkeypatch.setattr("app.bot.private_chat_runtime.handle_private_chat_query_text", dispatch_private_chat_text)
+    monkeypatch.setattr("app.bot.telegram_runtime_adapter.resolve_execution_gate", lambda **_: _ExecutionGateStub())
+
+    asyncio.run(handle_telegram_callback_query(update, context))
+
+    answer.assert_awaited_once()
+    dispatch_private_chat_text.assert_not_awaited()
+    add_service.add_by_candidate.assert_not_called()
+    edit_message_reply_markup.assert_awaited_once_with(reply_markup=None)
+    reply_text.assert_awaited_once()
+    assert "已失效" in reply_text.await_args.args[0]
 
 
 def test_handle_telegram_message_deduplicates_update(tmp_path, monkeypatch) -> None:

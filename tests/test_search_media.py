@@ -37,6 +37,10 @@ from app.services.search_media import (
 from app.services.pure_bt import BTBatchPreviewRequest
 from app.services.search_query_parser import parse_movie_query
 from app.services.search_request_context import build_search_request_context
+from app.services.telegram_pt_resource_cards import (
+    TELEGRAM_PT_RESOURCE_CARD_REPLY_PREFIX,
+    parse_telegram_pt_resource_reply_marker,
+)
 
 
 async def _fake_search_with_results(query: str) -> list[dict[str, object]]:
@@ -3677,19 +3681,23 @@ def test_search_and_format_renders_tmdb_enriched_mixed_media_card() -> None:
     assert "5. Kingdom (2019) | tv" in text
     assert "简介：A Joseon political thriller with zombies." in text
     assert "TMDB详情：https://www.themoviedb.org/tv/555" in text
-    assert "6. Zom 100: Bucket List of the Dead (2023) | tv" not in text
+    assert "6. Zom 100: Bucket List of the Dead (2023) | tv" in text
     assert "海报：https://image.tmdb.org/t/p/w500/zombie-for-sale.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/all-of-us-are-dead.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/train-to-busan.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/kingdom.jpg" in text
-    assert text.count("海报：https://image.tmdb.org/t/p/w500") == 5
-    assert text.count("简介：") == 5
-    assert text.count("TMDB详情：https://www.themoviedb.org/") == 5
+    assert "海报：https://image.tmdb.org/t/p/w500/zom-100.jpg" in text
+    assert text.count("海报：https://image.tmdb.org/t/p/w500") == 6
+    assert text.count("简介：") == 6
+    assert text.count("TMDB详情：https://www.themoviedb.org/") == 6
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
     assert cached_candidate["media_identity"]["tmdb_id"] == "111"
     assert "downloadUrl" not in cached_candidate
+    sixth_candidate = service.get_cached_candidate(1001, 6)
+    assert sixth_candidate is not None
+    assert sixth_candidate["media_identity"]["tmdb_id"] == "666"
 
 
 def test_search_and_format_telegram_confirmation_uses_fanart_poster_when_tmdb_missing() -> None:
@@ -3931,20 +3939,23 @@ def test_search_and_format_prefers_media_confirmation_for_strong_cjk_title_befor
     assert "类型：movie" in text
     assert "简介：A weaker commemorative release candidate." in text
     assert "TMDB详情：https://www.themoviedb.org/movie/103" in text
-    assert "4. 你的名字 官方原声带 (2016) | movie" not in text
-    assert "4. 你的名字 4K 修复合集 (2020) | movie" not in text
+    assert "4. 你的名字 官方原声带 (2016) | movie" in text
+    assert "5. 你的名字 4K 修复合集 (2020) | movie" in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name-collection.jpg" in text
     assert "海报：https://image.tmdb.org/t/p/w500/your-name-memorial.jpg" in text
-    assert text.count("海报：https://image.tmdb.org/t/p/w500") == 3
-    assert text.count("简介：") == 3
-    assert text.count("TMDB详情：https://www.themoviedb.org/") == 3
+    assert "海报：https://image.tmdb.org/t/p/w500/your-name-soundtrack.jpg" in text
+    assert "海报：https://image.tmdb.org/t/p/w500/your-name-4k-collection.jpg" in text
+    assert text.count("海报：https://image.tmdb.org/t/p/w500") == 5
+    assert text.count("简介：") == 5
+    assert text.count("TMDB详情：https://www.themoviedb.org/") == 5
     assert "站点:" not in text
     assert "链接参考:" not in text
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["candidate_stage"] == "media_candidate"
     assert cached_candidate["media_identity"]["tmdb_id"] == "101"
+    assert service.get_cached_candidate(1001, 5) is not None
 
 
 def test_search_and_format_keeps_broad_confirmation_for_short_generic_cjk_query() -> None:
@@ -4057,10 +4068,11 @@ def test_search_and_format_keeps_broad_confirmation_for_short_generic_cjk_query(
     assert "1. 传奇 (2015) | movie" in text
     assert "我是传奇 (2007) | movie" in text
     assert "纳尼亚传奇" in text
-    assert "传奇少年" not in text
+    assert "传奇少年" in text
     assert text.count("\n1. ") == 1
     assert service.get_cached_candidate(1001, 4) is not None
     assert service.get_cached_candidate(1001, 5) is not None
+    assert service.get_cached_candidate(1001, 6) is not None
 
 
 def test_search_and_format_real_chain_keeps_i_am_legend_in_top_five_for_crowded_legend_page() -> None:
@@ -4370,12 +4382,13 @@ def test_search_and_format_keeps_compact_confirmation_for_yearless_short_strong_
     assert "1. 色戒 (2007) | movie" in text
     assert "2. 色戒 导演剪辑版 (2007) | movie" in text
     assert "3. 色戒 幕后纪事 (2008) | movie" in text
-    assert "4. 色戒 十五周年纪念版 (2022) | movie" not in text
-    assert "5. 色戒 原声带 (2007) | movie" not in text
-    assert "情陷色戒" not in text
+    assert "4. 色戒 十五周年纪念版 (2022) | movie" in text
+    assert "5. 色戒 原声带 (2007) | movie" in text
+    assert "情陷色戒" in text
     assert service.get_cached_candidate(1001, 3) is not None
-    assert service.get_cached_candidate(1001, 4) is None
-    assert service.get_cached_candidate(1001, 5) is None
+    assert service.get_cached_candidate(1001, 4) is not None
+    assert service.get_cached_candidate(1001, 5) is not None
+    assert service.get_cached_candidate(1001, 6) is not None
 
 
 def test_search_and_format_real_chain_keeps_compact_confirmation_for_short_strong_cjk_title() -> None:
@@ -4887,6 +4900,43 @@ def test_build_search_request_context_marks_low_confidence_year_query_as_needs_c
     assert seen_queries == []
 
 
+def test_build_search_request_context_expands_confirmation_candidate_lookup_limit_for_telegram_style_flow() -> None:
+    seen_limits: list[int] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        raise AssertionError(f"search_func should not run, got {query}")
+
+    async def fake_tmdb_candidates(title: str, year: str, *, limit: int = 5) -> list[TmdbMovie]:
+        assert title == "超人"
+        assert year == ""
+        seen_limits.append(limit)
+        return [
+            TmdbMovie(
+                title=f"候选 {index}",
+                original_title=f"Candidate {index}",
+                year="2025",
+                tmdb_id=str(index),
+                media_type="movie",
+            )
+            for index in range(1, 9)
+        ]
+
+    context = _run(
+        build_search_request_context(
+            user_query="超人",
+            search_func=fake_search,
+            lookup_movie_func=None,
+            lookup_media_candidates_func=fake_tmdb_candidates,
+            confirmation_candidate_limit=0,
+        )
+    )
+
+    assert seen_limits == [30]
+    assert len(context.tmdb_candidates) == 8
+    assert context.resolved_query == ""
+    assert context.raw_results == ()
+
+
 def test_search_and_format_with_explicit_year_but_low_confidence_tmdb_hit_prefers_confirmation() -> None:
     seen_queries: list[str] = []
 
@@ -5071,6 +5121,62 @@ def test_search_resources_for_selected_media_returns_resource_results_after_conf
     cached_candidate = service.get_cached_candidate(1001, 1)
     assert cached_candidate is not None
     assert cached_candidate["downloadUrl"] == "https://example.com/zombie-detective.torrent"
+
+
+def test_search_resources_for_selected_media_returns_telegram_pt_card_marker_after_media_lock() -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "좀비탐정 2020":
+            return [
+                {
+                    "title": "Zombie Detective S01 1080p WEB-DL",
+                    "year": 2020,
+                    "quality": "1080p WEB-DL",
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "seeders": 16,
+                    "indexerName": "IndexerTV",
+                    "downloadUrl": "https://example.com/zombie-detective.torrent",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "丧尸"
+        assert year == ""
+        return [
+            TmdbMovie(
+                title="Zombie Detective",
+                original_title="좀비탐정",
+                year="2020",
+                tmdb_id="111",
+                media_type="tv",
+                poster_path="/zombie-detective.jpg",
+                overview="A detective story with a zombie lead.",
+            ),
+        ]
+
+    service = SearchMediaService(
+        fake_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    _run(service.search_and_format("丧尸", chat_id=1001, channel="telegram"))
+    text = _run(service.search_resources_for_selected_media(1001, "1", channel="telegram"))
+
+    assert seen_queries == ["좀비탐정 2020"]
+    assert text.startswith(TELEGRAM_PT_RESOURCE_CARD_REPLY_PREFIX)
+    assert "搜索结果：" not in text
+    session_token = parse_telegram_pt_resource_reply_marker(text)
+    assert session_token is not None
+    session = service.telegram_pt_resource_card_state.get_session(session_token)
+    assert session is not None
+    assert session.title == "Zombie Detective"
+    assert session.original_title == "좀비탐정"
+    assert session.poster_url.endswith("/zombie-detective.jpg")
+    assert len(session.resource_items) == 1
+    assert session.resource_items[0]["downloadUrl"] == "https://example.com/zombie-detective.torrent"
 
 
 def test_candidate_state_store_persists_candidates_for_restart(tmp_path: Path) -> None:

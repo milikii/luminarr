@@ -26,6 +26,7 @@ from app.bot.telegram_delivery_runtime import (
     build_telegram_send_media_func,
     build_telegram_send_text_func,
 )
+from app.bot.telegram_downloader_execution_runtime import resolve_telegram_bound_downloader_execution_from_context
 from app.bot.telegram_reply_formatter import format_telegram_reply
 from app.bot.telegram_update_runtime import (
     build_telegram_download_image_func,
@@ -35,6 +36,12 @@ from app.bot.telegram_update_runtime import (
     resolve_telegram_callback_message,
     resolve_telegram_chat_id,
     resolve_telegram_user_id,
+)
+from app.bot.execution_runtime import resolve_execution_gate
+from app.services.telegram_pt_resource_cards import (
+    TELEGRAM_PT_RESOURCE_CARD_STALE_TEXT,
+    build_telegram_pt_resource_task_ref,
+    parse_telegram_pt_resource_callback_data,
 )
 
 
@@ -57,6 +64,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
         telegram_update_repo_key=tg.TELEGRAM_UPDATE_REPO_KEY,
     ):
         return
+    search_service = context.application.bot_data.get(tg.SEARCH_SERVICE_KEY)
 
     await dispatch_private_chat_text(
         query=query_text,
@@ -68,6 +76,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
             send_text_func=context.application.bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY),
             send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
             download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
+            telegram_pt_resource_card_state=search_service.telegram_pt_resource_card_state if isinstance(search_service, SearchMediaService) else None,
         ),
         chat_id=chat_id,
         user_id=user_id,
@@ -108,6 +117,19 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
     if not query:
         return
 
+    search_service = context.application.bot_data.get(tg.SEARCH_SERVICE_KEY)
+    if await _handle_telegram_pt_resource_card_callback(
+        query=query,
+        context=context,
+        callback_query=callback_query,
+        message=message,
+        chat_id=chat_id,
+        user_id=user_id,
+        tg=tg,
+        search_service=search_service,
+    ):
+        return
+
     await dispatch_private_chat_text(
         query=query,
         reply_func=build_telegram_reply_func(
@@ -118,6 +140,7 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
             send_text_func=context.application.bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY),
             send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
             download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
+            telegram_pt_resource_card_state=search_service.telegram_pt_resource_card_state if isinstance(search_service, SearchMediaService) else None,
         ),
         chat_id=chat_id,
         user_id=user_id,
@@ -203,3 +226,137 @@ def build_telegram_application(
     application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, handle_telegram_message))
     application.add_handler(CallbackQueryHandler(handle_telegram_callback_query))
     return application
+
+
+async def _handle_telegram_pt_resource_card_callback(
+    *,
+    query: str,
+    context: ContextTypes.DEFAULT_TYPE,
+    callback_query,
+    message,
+    chat_id: int | None,
+    user_id: int | None,
+    tg,
+    search_service: object,
+) -> bool:
+    parsed = parse_telegram_pt_resource_callback_data(query)
+    if parsed is None:
+        return False
+    if not isinstance(search_service, SearchMediaService):
+        await _reply_telegram_callback_message(
+            message=message,
+            context=context,
+            chat_id=chat_id,
+            text=tg.SERVICE_NOT_READY_TEXT,
+            search_service=None,
+            tg=tg,
+        )
+        return True
+    add_service = context.application.bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
+    if not isinstance(add_service, AddToDownloaderService) or chat_id is None:
+        await _clear_telegram_callback_markup(callback_query, message=message)
+        await _reply_telegram_callback_message(
+            message=message,
+            context=context,
+            chat_id=chat_id,
+            text=tg.SERVICE_NOT_READY_TEXT,
+            search_service=search_service,
+            tg=tg,
+        )
+        return True
+    session_token, selection_index = parsed
+    selection = search_service.telegram_pt_resource_card_state.consume_selection(
+        session_token=session_token,
+        chat_id=chat_id,
+        selection_index=selection_index,
+    )
+    if selection.status != "selected" or selection.candidate is None:
+        await _clear_telegram_callback_markup(callback_query, message=message)
+        await _reply_telegram_callback_message(
+            message=message,
+            context=context,
+            chat_id=chat_id,
+            text=selection.rejection_text or TELEGRAM_PT_RESOURCE_CARD_STALE_TEXT,
+            search_service=search_service,
+            tg=tg,
+        )
+        return True
+    await _clear_telegram_callback_markup(callback_query, message=message)
+    downloader_execution, resolution_error = resolve_telegram_bound_downloader_execution_from_context(
+        context=context,
+        role="pt",
+        tg=tg,
+    )
+    if resolution_error is not None:
+        await _reply_telegram_callback_message(
+            message=message,
+            context=context,
+            chat_id=chat_id,
+            text=resolution_error,
+            search_service=search_service,
+            tg=tg,
+        )
+        return True
+    execution_gate = resolve_execution_gate(
+        bot_data=context.application.bot_data,
+        execution_gate_key=tg.EXECUTION_GATE_KEY,
+    )
+    reply = await execution_gate.run(
+        tg.ACTION_ADD_TO_DOWNLOADER,
+        lambda: add_service.add_by_candidate(
+            chat_id=chat_id,
+            candidate=selection.candidate,
+            task_ref=build_telegram_pt_resource_task_ref(session_token, selection_index),
+            user_id=user_id,
+            channel="telegram",
+            downloader_name=downloader_execution.name if downloader_execution is not None else "",
+            downloader_type=downloader_execution.downloader_type if downloader_execution is not None else "transmission",
+            download_dir=downloader_execution.download_dir if downloader_execution is not None else "",
+        ),
+    )
+    await _reply_telegram_callback_message(
+        message=message,
+        context=context,
+        chat_id=chat_id,
+        text=reply,
+        search_service=search_service,
+        tg=tg,
+    )
+    return True
+
+
+async def _reply_telegram_callback_message(
+    *,
+    message,
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int | None,
+    text: str,
+    search_service: SearchMediaService | None,
+    tg,
+) -> object:
+    return await build_telegram_reply_func(
+        message.reply_text,
+        formatter=format_telegram_reply,
+        reply_photo_func=getattr(message, "reply_photo", None),
+        chat_id=chat_id,
+        send_text_func=context.application.bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY),
+        send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
+        download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
+        telegram_pt_resource_card_state=search_service.telegram_pt_resource_card_state if search_service is not None else None,
+    )(text)
+
+
+async def _clear_telegram_callback_markup(callback_query, *, message) -> None:
+    edit_message_reply_markup = getattr(callback_query, "edit_message_reply_markup", None)
+    if callable(edit_message_reply_markup):
+        try:
+            await edit_message_reply_markup(reply_markup=None)
+            return
+        except Exception:
+            pass
+    edit_reply_markup = getattr(message, "edit_reply_markup", None)
+    if callable(edit_reply_markup):
+        try:
+            await edit_reply_markup(reply_markup=None)
+        except Exception:
+            return
