@@ -600,3 +600,38 @@
 
 ### 下轮目标
 - 提交通用 adult metadata 翻译 pipeline，并重启本地运行进程，供 Telegram 实机验证 `成人搜 SSIS-842`。
+
+## Round 35 — 2026-05-05 17:34
+
+### 完成
+- 为字幕翻译新增独立 `SUBTITLE_TRANSLATION_USE_PROXY` 开关，默认不复用全局 `OUTBOUND_PROXY_URL`
+- 在 `app/main.py` 收口字幕翻译代理解析 helper，仅影响 `SubtitleTranslatorService` 装配
+- 保留 repo-local `ffmpeg` 内嵌字幕提取修复，并补齐 focused tests 覆盖 config、main helper、subtitle translator 与本地 ffmpeg 提取路径
+
+### 测试状态
+- 通过: 10 / 总计: 10
+- `.venv/bin/python -m pytest tests/test_config.py::test_load_settings_reads_token tests/test_config.py::test_load_settings_disables_subtitle_translation_proxy_by_default tests/test_config.py::test_load_settings_enables_subtitle_translation_proxy_when_requested tests/test_config.py::test_load_settings_rejects_invalid_subtitle_translation_use_proxy tests/test_main.py::test_build_ai_cast_localization_service_reuses_subtitle_translation_settings tests/test_main.py::test_resolve_subtitle_translation_proxy_url_defaults_to_disabled tests/test_main.py::test_resolve_subtitle_translation_proxy_url_uses_outbound_proxy_when_enabled tests/test_subtitle_translator.py::test_subtitle_translator_defaults_to_no_proxy tests/test_subtitle_translator.py::test_subtitle_translator_passes_proxy_to_httpx tests/test_subtitle_translator.py::test_translate_for_import_prefers_repo_local_ffmpeg_for_embedded_subtitle_extract`
+
+### 遗留 / 下轮继续
+- 当前仓库仍有本轮之前已存在的其他未提交改动；本轮未自动提交，避免混入无关变更。
+
+### 下轮目标
+- 若要进入收尾或提交，先按本轮文件边界确认 commit 分组。
+
+## Round 36 — 2026-05-05 18:12
+
+### 完成
+- 复核 Telegram-first 观影 PT 主链，确认显式资源选择后已走 `add_by_selection_with_auto_confirm` / `add_by_candidate_with_auto_confirm`，用户面不再暴露下载 `confirm`。
+- 复核下载完成后的默认硬链接导入路径，确认 `post_download_auto_import -> auto_import_by_task_ref` 已直接复用现有 import confirm execution tail，不再向用户暴露导入待确认文案；copy fallback 仍保留显式确认边界。
+- 收紧 `tests/test_telegram_runtime_adapter.py` 的 PT 资源卡回调契约，明确断言 Telegram 回调直接返回最终“已添加下载”回包，而不是旧的待确认下载文案。
+
+### 测试状态
+- 通过: 3 / 总计: 3
+- `./.venv/bin/python -m pytest -q tests/test_private_chat_selection_runtime.py tests/test_telegram_runtime_adapter.py tests/test_import_to_library.py tests/test_get_download_status.py tests/test_download_follow_up_runtime.py -k "auto_confirm or auto_import or pt_resource or download_follow_up or import_by_task_ref_with_auto_confirm or handle_digit_selection_query_routes_add_by_selection or handle_telegram_callback_query_consumes_pt_resource_card_without_shared_dispatch"`
+- `./.venv/bin/python -m pytest -q tests/test_telegram_runtime_adapter.py tests/test_private_chat_selection_runtime.py tests/test_telegram_bot.py tests/test_telegram_reply_formatter.py -k "pt_resource or digit_selection or import_formats_import_approval_for_telegram or format_telegram_reply_formats_import_approval or format_telegram_reply_formats_add_approval"`
+
+### 遗留 / 下轮继续
+- 本轮只补了 Telegram PT 主链的行为回归，没有扩到 Feishu / personal WeChat / WeCom，也没有改 copy fallback、清理语义或字幕/provider/proxy 并行任务。
+
+### 下轮目标
+- 若进入收尾或提交，按 Telegram-first slice 与并行字幕任务分开做 commit 分组。

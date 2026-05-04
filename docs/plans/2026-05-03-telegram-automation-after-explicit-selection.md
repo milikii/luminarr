@@ -786,3 +786,111 @@ Edge cases
 
 - actor avatar 不是纯本地文件问题，而是“TMDB credits truth -> metadata/NFO -> 媒体服务器实际消费”的跨层问题
 - 因此实现时应先补全 truth，再用真实媒体服务器验证显示效果，避免一开始就过度实现本地头像落盘
+
+---
+
+## AUTOPLAN REVIEW ADDENDUM — 2026-05-05
+
+### Scope Recut
+
+用户已经明确把字幕验证后置，当前最有价值的推进顺序变成：
+
+1. 去掉“已经完成明确选择之后”的多余确认
+2. 看清各渠道后台通知到底长什么样、哪些渠道真的能发
+
+并且用户已经进一步确认：
+
+- **先从 Telegram 开始**
+- **每个渠道单独适配、优化、测试**
+- `Feishu / personal WeChat / WeCom` 不再和 Telegram 自动化主链绑成同一轮并行交付
+- **“只做硬链接、不做 copy fallback”是全局存储语义决策，但不并入 Telegram 第一刀**
+
+因此，本计划当前不应继续把以下内容绑在同一轮：
+
+- direct magnet 降问询
+- MoviePilot 级 metadata / poster / backdrop / cast 质量提升
+- 字幕翻译完成态验证
+- 硬链接/清理语义的全局重构
+
+这些都是真需求，但不属于这一刀最小、最可验证的 blast radius。
+
+### CEO Verdict
+
+- **方向不变，但范围必须缩小。**
+  “显式选择后自动化”仍然是对的；真正要砍的是用户摩擦，不是内部真相。
+- **Telegram-first 是正确 wedge。**
+  先把一个真实入口做成，再逐个渠道适配，明显优于四渠道同时推进。
+- **当前 slice 的用户价值很纯：**
+  - 资源选完就下载
+  - 下载完成就自动导入
+  - 关键节点有低噪音通知
+- **现在不要再混 direct magnet。**
+  direct magnet 的自动识别和降问询是下一刀，不是这一刀。它会把 TMDB 置信度、媒体类型歧义、标题清洗一起卷进来，明显扩大 blast radius。
+
+### Eng Verdict
+
+- **自动下载 / 自动导入只应该建立在现有 truth 之上。**
+  - `approval_record`
+  - `jobs`
+  - `lease_version / executed_version`
+  这些继续保留。
+- **“只做硬链接、不做 copy fallback”已经是新产品方向，但不并入这一刀。**
+  这条会同时碰 `import_to_library`、`import_transfer_execution`、cleanup、adult archive 和跨文件系统失败语义，blast radius 明显大于 Telegram 自动化主链本身。
+- **当前“四渠道通知主线”并不对称。**
+  从现有实现看：
+  - `Telegram`：支持主动发文本
+  - `Feishu`：支持 proactive send
+  - `personal WeChat`：支持 proactive send，但依赖登录态
+  - `WeCom`：当前 shared sender 明确 `unsupported for channel: wecom`
+
+这意味着本轮“各渠道通知实测”不能写成“四渠道都必须通过”的伪目标，必须写成能力矩阵：
+
+| Channel | Current proactive notification capability | This slice |
+| --- | --- | --- |
+| Telegram | Yes | In scope smoke |
+| Feishu | Yes | In scope smoke |
+| personal WeChat | Yes, login-state dependent | In scope smoke |
+| WeCom | No proactive send yet | Explicitly deferred / expected fail |
+
+### Revised Implementation Order
+
+1. **Telegram: PT 资源显式选择后的 auto-dispatch**
+   - 用户不再看到下载 `confirm`
+   - 仍走内部 pending -> confirm -> dispatch tail
+2. **Telegram: 下载完成后的 hardlink-path auto-import**
+   - 用户不再看到导入 `confirm`
+   - 当前仍沿现有默认硬链接路径设计
+3. **Telegram: 导入后聚合总结通知**
+   - `下载完成，开始自动导入`
+   - `导入 / metadata / subtitle / refresh` 汇总成 1 条
+4. **Telegram: 实测与排版/通知优化**
+5. **Feishu: 单独适配 / 优化 / 测试**
+6. **personal WeChat: 单独适配 / 优化 / 测试**
+7. **WeCom: 单独适配 / 优化 / 测试**
+8. **硬链接 / 清理语义单独收口**
+   - 不做 copy fallback
+   - PT 跟随 Emby 文件状态决定原任务/原文件生命周期
+   - 成人 BT 硬链接 7 天后删除原文件和下载任务，仅保留可查询记录
+
+### Revised Acceptance Criteria
+
+- PT 资源选定后，用户不再看到下载待确认文本
+- Telegram 下载完成后的默认硬链接路径，不再要求用户手发导入确认
+- 后台自动导入完成后，用户收到 1 条聚合总结，而不是多条工程化碎消息
+- Telegram 先完成 1 轮真实通知 smoke，明确看到回包样式
+- 其他渠道的通知样式和能力缺口按各自独立任务单独验证
+
+### User Challenge
+
+无。
+
+原因：
+
+- 用户已经明确把当前主线改成“先去确认摩擦，再看通知实测”
+- 这个 recut 只是把计划收窄到更容易验证的 wedge，不是在反对目标本身
+
+### New Main Risk
+
+- 如果继续把 `WeCom` 当成“本轮和 Telegram 一样可发”的目标写进计划，执行阶段会被一个当前根本不存在的主动发送能力卡死。
+- 如果把 `direct magnet` 一起做，本轮会从“删确认 + 看通知”膨胀成“标题识别 / TMDB / 类型推断 / 后台通知”混合包，验证和回滚都会变差。
+- 如果把“禁用 copy fallback + PT/成人 BT 清理语义重构”一起塞进 Telegram 第一刀，本轮会从渠道体验 slice 膨胀成存储/生命周期语义重构，失去最小可验证性。
