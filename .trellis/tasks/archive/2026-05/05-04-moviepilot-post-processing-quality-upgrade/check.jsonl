@@ -1,0 +1,10 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Check post-processing changes against backend spec entrypoint"}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Verify scraping upgrades do not regress subtitle translation contracts"}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Verify domestic enrichment stays helper-only and never upgrades into a second metadata main source"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify code/tests/docs stay aligned with repo quality gates"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Review metadata/NFO/image/cast changes across layers"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/prd.md", "reason": "Validate implementation against the approved quality-upgrade requirements"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/research/current-scrape-gap-snapshot.md", "reason": "Verify the real Akron sample gaps are actually addressed"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/research/domestic-enrichment-sources.md", "reason": "Verify helper-only domestic enrichment stays within the researched TMDB-main boundary"}
+{"file": "docs/plans/2026-05-03-telegram-automation-after-explicit-selection.md", "reason": "Review implementation against the approved automation and quality plan"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/research/library-truth-model.md", "reason": "Validate output against the user-provided production library truth model"}

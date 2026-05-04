@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify any docs/evidence updates stay aligned with quality/doc gates"}
+{"file": ".trellis/tasks/05-02-telegram-real-smoke-restore/research/current-environment-snapshots.md", "reason": "Verify smoke restoration conclusions match the observed environment"}
+{"file": ".trellis/spec/backend/index.md", "reason": "Verify smoke conclusions and any doc updates against backend spec entrypoints"}
+{"file": ".trellis/tasks/05-02-telegram-real-smoke-restore/research/post-selection-notification-chain.md", "reason": "Verify reported notification truth matches the audited pipeline behavior"}
+{"file": "docs/plans/2026-05-03-telegram-automation-after-explicit-selection.md", "reason": "Review implementation against the approved automation and post-processing quality plan"}

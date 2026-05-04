@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
-- **Last Active**: 2026-05-03
+- **Total Sessions**: 11
+- **Last Active**: 2026-05-04
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~357 | Active |
+| `journal-1.md` | ~390 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-05-04 | MoviePilot post-processing quality upgrade | `3ab7e88` | `main` |
 | 10 | 2026-05-03 | Telegram PT resource card detail delivery | `e9bcde3` | `main` |
 | 9 | 2026-05-03 | Telegram candidate delivery and PT interaction | `74430f3`, `7d96eb9`, `45bf3c3`, `17545fb`, `0d1e657` | `main` |
 | 8 | 2026-05-02 | Telegram candidate poster cards | `48768ab`, `c66fd20` | `main` |

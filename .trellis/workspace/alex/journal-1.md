@@ -355,3 +355,36 @@ Expanded Telegram PT resource delivery into a two-message flow with site-grouped
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: MoviePilot post-processing quality upgrade
+
+**Date**: 2026-05-04
+**Task**: MoviePilot post-processing quality upgrade
+**Branch**: `main`
+
+### Summary
+
+Upgraded import outputs toward a MoviePilot-style local library: movie folder naming, richer metadata/NFO, poster/backdrop artifacts, conservative AI cast localization, and bilingual ASS subtitle sidecars.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3ab7e88` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

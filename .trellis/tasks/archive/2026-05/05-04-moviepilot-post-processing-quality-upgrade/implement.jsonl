@@ -1,0 +1,11 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load backend spec entrypoint for post-processing quality changes"}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Preserve the now-working subtitle translation contracts while upgrading post-processing quality"}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Reuse the existing helper-only source boundary for domestic metadata enrichment instead of inventing a second main-source path"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep new implementation aligned with repo verification and docs gates"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Avoid creating parallel metadata or naming flows while upgrading post-processing quality"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Think through TMDB -> metadata/NFO -> media-server truth across layers"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/prd.md", "reason": "Primary requirements for MoviePilot-level post-processing quality upgrade"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/research/current-scrape-gap-snapshot.md", "reason": "Use the real Akron sample quality gaps as implementation truth"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/research/domestic-enrichment-sources.md", "reason": "Use the researched TMDB-main + helper-only domestic enrichment boundary before implementing cast localization supplements"}
+{"file": "docs/plans/2026-05-03-telegram-automation-after-explicit-selection.md", "reason": "Approved plan covering automation plus MoviePilot-level post-processing goals"}
+{"file": ".trellis/tasks/05-04-moviepilot-post-processing-quality-upgrade/research/library-truth-model.md", "reason": "User-provided production library layout and truth model for NFO/image/video/subtitle hierarchy"}
