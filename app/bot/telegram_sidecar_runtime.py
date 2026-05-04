@@ -331,6 +331,7 @@ async def _stop_bt_subscription_scheduler_if_running(host: SidecarHost) -> None:
 def _start_post_download_auto_import_scheduler(host: SidecarHost, *, config: TelegramSidecarRuntimeConfig) -> None:
     start_download_follow_up_scheduler(
         application=host,
+        send_text_func_key=SIDECAR_HOST_SEND_TEXT_FUNC_KEY,
         post_download_auto_import_service_key=config.post_download_auto_import_service_key,
         post_download_auto_import_stop_event_key=config.post_download_auto_import_stop_event_key,
         post_download_auto_import_task_key=config.post_download_auto_import_task_key,

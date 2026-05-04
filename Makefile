@@ -3,10 +3,10 @@ PYTHON ?= .venv/bin/python
 PIP ?= .venv/bin/pip
 ENV_FILE ?= .env
 
-.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-stage1-duplicate-memory verify-stage1-telegram-delivery verify-stage1-bt-source-roles verify-adult-bt-wedge verify-mainline-status-and-channels verify-mainline-bt-paths verify-mainline-execution-paths verify-mainline-user-intents test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
+.PHONY: help install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-stage1-duplicate-memory verify-stage1-telegram-delivery verify-stage1-bt-source-roles verify-adult-bt-wedge verify-subtitle-provider-smoke verify-mainline-status-and-channels verify-mainline-bt-paths verify-mainline-execution-paths verify-mainline-user-intents test-cleanup-smoke test-cleanup-service-not-ready test-cleanup-telegram test-cleanup-personal-wechat test-cleanup-feishu test-cleanup-wecom test-cleanup-feishu-webhook test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs
 
 help:
-	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-adult-bt-wedge test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
+	@printf '%s\n' 'targets: install test quality lint test-downloader-focused test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-adult-bt-wedge verify-subtitle-provider-smoke test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate test-cleanup-window sync-cleanup-doc-snapshots compile run docker-build docker-up docker-logs'
 
 install:
 	$(PIP) install -r requirements.txt
@@ -66,6 +66,10 @@ verify-adult-bt-wedge:
 	$(PYTHON) -m pytest -q tests/test_query_text_runtime.py tests/test_bt_read_only_display.py tests/test_search_media.py
 	$(PYTHON) -m pytest -q tests/test_add_pending_context.py tests/test_add_to_downloader.py tests/test_private_chat_runtime.py
 	$(PYTHON) -m pytest -q tests/test_adult_archive_service.py tests/test_get_download_status.py
+
+verify-subtitle-provider-smoke:
+	@if [ ! -f "$(ENV_FILE)" ]; then printf '\033[31m[环境文件缺失]\033[0m 未找到字幕 provider 自检所需环境文件：%s\n\033[33m[处理建议]\033[0m 先执行 cp .env.example .env，再补齐 SUBTITLE_TRANSLATION_*；如果环境文件不在仓库根目录，请使用 ENV_FILE=/绝对路径 make verify-subtitle-provider-smoke。\n' "$(ENV_FILE)"; exit 1; fi
+	@set -a && . "$(ENV_FILE)" && set +a && $(PYTHON) -m app.maintenance.verify_subtitle_provider_smoke
 
 verify-mainline-status-and-channels:
 	$(PYTHON) -m pytest -q tests/test_get_download_status.py -k "parse_status_query or get_status_text_success or personal_wechat_channel or render_status_reply or download_monitor or completion_event or auto_import_terminal or skip_event"

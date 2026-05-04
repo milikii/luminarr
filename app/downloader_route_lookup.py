@@ -47,7 +47,7 @@ def _resolve_downloader_task_route(
     task_ref: str,
     chat_id: int | None,
     job_repo: JobRepo,
-) -> tuple[str, str] | None:
+) -> tuple[str, str, str] | None:
     if chat_id is None or chat_id <= 0:
         _emit_downloader_issue_log(
             title="下载器路由未命中",
@@ -114,7 +114,23 @@ def _resolve_downloader_task_route(
             fix_hint="检查当前任务是否已写入 downloader job、payload 里是否保留了 downloader_name，并确认状态/导入查询使用的是同一私聊会话。",
         )
         return None
-    return downloader_name, download_dir
+    lookup_task_ref = _resolve_downloader_lookup_ref(
+        downloader_job=downloader_job,
+        fallback_task_ref=task_ref,
+    )
+    return downloader_name, download_dir, lookup_task_ref
+
+
+def _resolve_downloader_lookup_ref(*, downloader_job: object, fallback_task_ref: str) -> str:
+    for candidate in (
+        getattr(downloader_job, "task_hash", ""),
+        getattr(downloader_job, "task_id", ""),
+        fallback_task_ref,
+    ):
+        cleaned_candidate = str(candidate).strip()
+        if cleaned_candidate:
+            return cleaned_candidate
+    return fallback_task_ref.strip()
 
 
 def _resolve_lookup_client_for_task(
@@ -127,7 +143,7 @@ def _resolve_lookup_client_for_task(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     operation: str,
 ) -> tuple[
-    tuple[str, str],
+    tuple[str, str, str],
     DownloaderInstanceConfig | None,
     TransmissionClient | QbittorrentClient,
 ]:
@@ -138,7 +154,7 @@ def _resolve_lookup_client_for_task(
     )
     if route is None:
         raise DownloaderRouteLookupError(f"downloader route unavailable for {operation} task: {task_ref}")
-    downloader_name, _ = route
+    downloader_name, _, _ = route
     cleaned_name, instance, client = _resolve_downloader_instance_and_client(
         downloader_name=downloader_name,
         downloader_instances_by_name=downloader_instances_by_name,
@@ -208,10 +224,10 @@ async def _get_torrent_import_source_with_routing(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
         operation="import",
     )
-    import_source = await client.get_torrent_import_source(task_ref)
+    _, route_download_dir, lookup_task_ref = route
+    import_source = await client.get_torrent_import_source(lookup_task_ref)
     if import_source is None:
         return None
-    _, route_download_dir = route
     route_download_dir = route_download_dir.strip()
     host_download_dir = route_download_dir or instance.download_dir.strip()
     if not host_download_dir or host_download_dir == import_source.download_dir:
@@ -236,7 +252,7 @@ async def _get_torrent_status_with_routing(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
 ) -> TransmissionTaskStatus | None:
     try:
-        _, _, client = _resolve_lookup_client_for_task(
+        route, _, client = _resolve_lookup_client_for_task(
             task_ref=task_ref,
             chat_id=chat_id,
             job_repo=job_repo,
@@ -257,7 +273,7 @@ async def _get_torrent_status_with_routing(
             fix_hint="检查 SQLite/jobs 表读取是否正常，并确认当前任务引用仍能命中 downloader job 真相。",
         )
         raise DownloaderRouteLookupError(f"downloader route unavailable for status task: {task_ref}") from error
-    return await client.get_torrent_status(task_ref)
+    return await client.get_torrent_status(route[2])
 
 
 async def _remove_torrent_with_routing(
@@ -270,7 +286,7 @@ async def _remove_torrent_with_routing(
     qbittorrent_clients_by_name: dict[str, QbittorrentClient],
     delete_local_data: bool,
 ) -> None:
-    _, _, client = _resolve_lookup_client_for_task(
+    route, _, client = _resolve_lookup_client_for_task(
         task_ref=task_ref,
         chat_id=chat_id,
         job_repo=job_repo,
@@ -279,4 +295,4 @@ async def _remove_torrent_with_routing(
         qbittorrent_clients_by_name=qbittorrent_clients_by_name,
         operation="remove",
     )
-    await client.remove_torrent(task_ref, delete_local_data=delete_local_data)
+    await client.remove_torrent(route[2], delete_local_data=delete_local_data)

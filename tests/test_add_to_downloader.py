@@ -384,6 +384,21 @@ def test_confirm_add_by_task_ref_dispatches_download() -> None:
     add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
 
 
+def test_add_by_selection_with_auto_confirm_dispatches_without_pending_reply() -> None:
+    search_service = SearchMediaService(_fake_search_with_download_url)
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(search_service=search_service, add_torrent_func=add_torrent)
+
+    reply = _run(service.add_by_selection_with_auto_confirm(1001, "1", user_id=2001))
+
+    assert "已添加下载：" in reply
+    assert "任务 ID: 42" in reply
+    assert "待确认：下载" not in reply
+    add_torrent.assert_awaited_once_with("https://example.com/dune.torrent")
+
+
 def test_confirm_add_by_task_ref_dispatches_download_for_pt_resource_card_task_ref(tmp_path: Path) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
     database.initialize()
@@ -422,6 +437,43 @@ def test_confirm_add_by_task_ref_dispatches_download_for_pt_resource_card_task_r
     assert "确认下载：发送 confirm pt-deadbeef-1" in pending_reply
     assert "任务 ID: 42" in confirm_reply
     assert "任务 Hash: abc123" in confirm_reply
+    add_torrent.assert_awaited_once_with("https://example.com/dune-2021.torrent")
+
+
+def test_add_by_candidate_with_auto_confirm_dispatches_for_pt_resource_card_task_ref(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(
+        search_service=SearchMediaService(_fake_search_with_download_url),
+        add_torrent_func=add_torrent,
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+    )
+
+    reply = _run(
+        service.add_by_candidate_with_auto_confirm(
+            chat_id=1001,
+            candidate={
+                "title": "Dune 2021 2160p WEB-DL",
+                "downloadUrl": "https://example.com/dune-2021.torrent",
+                "media_identity": {
+                    "title": "Dune",
+                    "year": "2021",
+                    "tmdb_id": "438631",
+                    "media_type": "movie",
+                },
+                "indexerName": "PTP",
+            },
+            task_ref="pt-deadbeef-1",
+            user_id=2001,
+            channel="telegram",
+        )
+    )
+
+    assert "已添加下载：" in reply
+    assert "任务 ID: 42" in reply
+    assert "待确认：下载" not in reply
     add_torrent.assert_awaited_once_with("https://example.com/dune-2021.torrent")
 
 
@@ -3200,6 +3252,42 @@ def test_confirm_add_by_task_ref_registers_download_monitor_truth(tmp_path) -> N
     pending_records = monitor_repo.list_pending_completion()
     assert len(pending_records) == 1
     assert pending_records[0].task_hash == "abc123"
+
+
+def test_confirm_add_by_task_ref_persists_real_downloader_identity_for_completed_truth(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    search_service = SearchMediaService(
+        _fake_search_with_download_url,
+        candidate_repo=CandidateMappingRepo(database),
+    )
+    _run(search_service.search_and_format("dune", chat_id=1001))
+
+    add_torrent = AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123"))
+    service = AddToDownloaderService(
+        search_service=search_service,
+        add_torrent_func=add_torrent,
+        approval_repo=ApprovalRepo(database),
+        job_repo=JobRepo(database),
+        download_monitor_repo=DownloadMonitorRepo(database),
+    )
+
+    _run(service.add_by_selection(1001, "1"))
+    confirm_reply = _run(service.confirm_add_by_task_ref("1", chat_id=1001, user_id=2001))
+
+    assert "任务 ID: 42" in confirm_reply
+
+    completed_job = JobRepo(database).get_downloader_job_for_chat_ref(chat_id=1001, task_ref="42")
+    assert completed_job is not None
+    assert completed_job.state == "completed"
+    assert completed_job.task_ref == "1"
+    assert completed_job.task_id == "42"
+    assert completed_job.task_hash == "abc123"
+
+    approval_record = ApprovalRepo(database).get_downloader_approval(task_id="42", task_hash="abc123")
+    assert approval_record is not None
+    assert approval_record.status == "approved"
+    assert approval_record.executed_version == approval_record.lease_version
 
 
 def test_confirm_add_by_task_ref_keeps_duplicate_bt_confirm_idempotent_without_warning(tmp_path) -> None:

@@ -8,6 +8,7 @@ import httpx
 
 from app.clients.fanart import FanartMovieImages
 from app.clients.tmdb import TmdbCreditPerson, TmdbMovie
+from app.services.cast_localization import CastLocalizationMatch, CastLocalizationService
 from app.services.metadata_scraper import MetadataScrapeInput, MetadataScraperService
 
 
@@ -127,6 +128,623 @@ def test_scrape_for_import_writes_media_type_and_subtitle_translation_guidance(t
         "Matthew McConaughey": "马修·麦康纳",
         "Cooper": "库珀",
     }
+
+
+def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_path: Path) -> None:
+    target_file = tmp_path / "爱的进行时 (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+            overview="一段关于成长与爱情的青春故事。",
+            popularity=12.5,
+            vote_count=128,
+            vote_average=6.7,
+            genres=(
+                {"id": "18", "name": "剧情"},
+                {"id": "10749", "name": "爱情"},
+            ),
+            countries=(
+                {"iso_3166_1": "US", "name": "美国"},
+            ),
+            studios=(
+                {"id": "932", "name": "Great Great Great"},
+            ),
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return FanartMovieImages(
+            poster_url="https://img.example/akron-poster.jpg",
+            backdrop_url="https://img.example/akron-backdrop.jpg",
+        )
+
+    async def fake_movie_credits(_: str, language: str) -> tuple[TmdbCreditPerson, ...]:
+        if language == "zh-CN":
+            return (
+                TmdbCreditPerson(
+                    person_id="10",
+                    name="埃德蒙·多诺万",
+                    original_name="Edmund Donovan",
+                    character="克里斯托弗",
+                    order=0,
+                    profile_path="/edmund.jpg",
+                ),
+            )
+        return (
+            TmdbCreditPerson(
+                person_id="10",
+                name="Edmund Donovan",
+                original_name="Edmund Donovan",
+                character="Christopher",
+                order=0,
+                profile_path="/edmund.jpg",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="20",
+                task_id="20",
+                task_hash="hash-20",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["overview"] == "一段关于成长与爱情的青春故事。"
+    assert payload["tmdb"]["popularity"] == 12.5
+    assert payload["tmdb"]["vote_count"] == 128
+    assert payload["tmdb"]["vote_average"] == 6.7
+    assert payload["tmdb"]["genres"] == [
+        {"id": "18", "name": "剧情"},
+        {"id": "10749", "name": "爱情"},
+    ]
+    assert payload["tmdb"]["countries"] == [
+        {"iso_3166_1": "US", "name": "美国"},
+    ]
+    assert payload["tmdb"]["studios"] == [
+        {"id": "932", "name": "Great Great Great"},
+    ]
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "10",
+            "name": "埃德蒙·多诺万",
+            "original_name": "Edmund Donovan",
+            "character": "克里斯托弗",
+            "original_character": "Christopher",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "/edmund.jpg",
+            "profile_image_url": "https://image.tmdb.org/t/p/original/edmund.jpg",
+        }
+    ]
+    nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<plot>一段关于成长与爱情的青春故事。</plot>" in nfo_text
+    assert "<rating>6.7</rating>" in nfo_text
+    assert "<votes>128</votes>" in nfo_text
+    assert "<genre>剧情</genre>" in nfo_text
+    assert "<genre>爱情</genre>" in nfo_text
+    assert "<country>美国</country>" in nfo_text
+    assert "<studio>Great Great Great</studio>" in nfo_text
+    assert "<actor>" in nfo_text
+    assert "<name>埃德蒙·多诺万</name>" in nfo_text
+    assert "<role>克里斯托弗</role>" in nfo_text
+    assert "<sortname>Edmund Donovan</sortname>" in nfo_text
+    assert "<thumb>https://image.tmdb.org/t/p/original/edmund.jpg</thumb>" in nfo_text
+
+
+def test_scrape_for_import_preserves_cast_truth_when_person_is_also_crew(tmp_path: Path) -> None:
+    target_file = tmp_path / "Argo (2012).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="逃离德黑兰",
+            original_title="Argo",
+            year="2012",
+            tmdb_id="640",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, language: str) -> tuple[TmdbCreditPerson, ...]:
+        if language == "zh-CN":
+            return (
+                TmdbCreditPerson(
+                    person_id="11",
+                    name="本·阿弗莱克",
+                    original_name="Ben Affleck",
+                    character="托尼",
+                    order=0,
+                ),
+                TmdbCreditPerson(
+                    person_id="11",
+                    name="本·阿弗莱克",
+                    original_name="Ben Affleck",
+                    department="Directing",
+                    job="Director",
+                    order=0,
+                ),
+            )
+        return (
+            TmdbCreditPerson(
+                person_id="11",
+                name="Ben Affleck",
+                original_name="Ben Affleck",
+                character="Tony",
+                order=0,
+            ),
+            TmdbCreditPerson(
+                person_id="11",
+                name="Ben Affleck",
+                original_name="Ben Affleck",
+                department="Directing",
+                job="Director",
+                order=0,
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="argo-1",
+                task_id="argo-1",
+                task_hash="argo-hash-1",
+                title="Argo",
+                year="2012",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["subtitle_translation"]["trusted_name_map"] == {
+        "Ben Affleck": "本·阿弗莱克",
+        "Tony": "托尼",
+    }
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "11",
+            "name": "本·阿弗莱克",
+            "original_name": "Ben Affleck",
+            "character": "托尼",
+            "original_character": "Tony",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "",
+            "profile_image_url": "",
+        }
+    ]
+
+
+def test_scrape_for_import_merges_complementary_localized_credit_truth(tmp_path: Path) -> None:
+    target_file = tmp_path / "爱的进行时 (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, language: str) -> tuple[TmdbCreditPerson, ...]:
+        if language == "zh-CN":
+            return (
+                TmdbCreditPerson(
+                    person_id="1388315",
+                    name="马修·弗莱斯",
+                    original_name="Matthew Frias",
+                    character="",
+                    order=0,
+                ),
+                TmdbCreditPerson(
+                    person_id="1388315",
+                    name="Matthew Frias",
+                    original_name="Matthew Frias",
+                    character="班尼·克鲁兹",
+                    order=0,
+                    profile_path="/matthew.jpg",
+                ),
+            )
+        return (
+            TmdbCreditPerson(
+                person_id="1388315",
+                name="Matthew Frias",
+                original_name="Matthew Frias",
+                character="Benny Cruz",
+                order=0,
+                profile_path="/matthew.jpg",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="akron-1",
+                task_id="akron-1",
+                task_hash="akron-hash-1",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["subtitle_translation"]["trusted_name_map"] == {
+        "Matthew Frias": "马修·弗莱斯",
+        "Benny Cruz": "班尼·克鲁兹",
+    }
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "1388315",
+            "name": "马修·弗莱斯",
+            "original_name": "Matthew Frias",
+            "character": "班尼·克鲁兹",
+            "original_character": "Benny Cruz",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "/matthew.jpg",
+            "profile_image_url": "https://image.tmdb.org/t/p/original/matthew.jpg",
+        }
+    ]
+    nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<name>马修·弗莱斯</name>" in nfo_text
+    assert "<role>班尼·克鲁兹</role>" in nfo_text
+
+
+def test_scrape_for_import_keeps_tmdb_cast_truth_when_cast_localization_is_missing(tmp_path: Path) -> None:
+    target_file = tmp_path / "Akron (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, __: str) -> tuple[TmdbCreditPerson, ...]:
+        return (
+            TmdbCreditPerson(
+                person_id="10",
+                name="Edmund Donovan",
+                original_name="Edmund Donovan",
+                character="Christopher",
+                order=0,
+                profile_path="/edmund.jpg",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="cast-localization-disabled-1",
+                task_id="cast-localization-disabled-1",
+                task_hash="cast-localization-disabled-hash-1",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "10",
+            "name": "Edmund Donovan",
+            "original_name": "Edmund Donovan",
+            "character": "Christopher",
+            "original_character": "Christopher",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "/edmund.jpg",
+            "profile_image_url": "https://image.tmdb.org/t/p/original/edmund.jpg",
+        }
+    ]
+    nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<name>Edmund Donovan</name>" in nfo_text
+    assert "<role>Christopher</role>" in nfo_text
+
+
+def test_scrape_for_import_localizes_cast_truth_with_ai_seam(tmp_path: Path) -> None:
+    target_file = tmp_path / "Akron (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, __: str) -> tuple[TmdbCreditPerson, ...]:
+        return (
+            TmdbCreditPerson(
+                person_id="10",
+                name="Edmund Donovan",
+                original_name="Edmund Donovan",
+                character="Christopher",
+                order=0,
+                profile_path="/edmund.jpg",
+            ),
+        )
+
+    async def fake_cast_localization_lookup(enrichment_input) -> tuple[CastLocalizationMatch, ...]:
+        assert enrichment_input.title == "爱的进行时"
+        assert enrichment_input.original_title == "Akron"
+        assert enrichment_input.year == "2015"
+        assert enrichment_input.tmdb_id == "361018"
+        assert enrichment_input.cast_truth == (
+            {
+                "id": "10",
+                "name": "Edmund Donovan",
+                "original_name": "Edmund Donovan",
+                "character": "Christopher",
+                "original_character": "Christopher",
+                "department": "",
+                "job": "",
+                "order": 0,
+                "profile_path": "/edmund.jpg",
+                "profile_image_url": "https://image.tmdb.org/t/p/original/edmund.jpg",
+            },
+        )
+        return (
+            CastLocalizationMatch(
+                cast_id="10",
+                order=0,
+                localized_name="埃德蒙·多诺万",
+                localized_character="克里斯托弗",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+        cast_localization_service=CastLocalizationService(fake_cast_localization_lookup),
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="cast-localization-success-1",
+                task_id="cast-localization-success-1",
+                task_hash="cast-localization-success-hash-1",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "10",
+            "name": "埃德蒙·多诺万",
+            "original_name": "Edmund Donovan",
+            "character": "克里斯托弗",
+            "original_character": "Christopher",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "/edmund.jpg",
+            "profile_image_url": "https://image.tmdb.org/t/p/original/edmund.jpg",
+        }
+    ]
+    assert "subtitle_translation" not in payload
+    nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<name>埃德蒙·多诺万</name>" in nfo_text
+    assert "<role>克里斯托弗</role>" in nfo_text
+    assert "<thumb>https://image.tmdb.org/t/p/original/edmund.jpg</thumb>" in nfo_text
+    assert "domestic.example" not in nfo_text
+
+
+def test_scrape_for_import_keeps_actor_original_when_ai_name_is_not_confident(
+    tmp_path: Path,
+) -> None:
+    target_file = tmp_path / "Akron (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, __: str) -> tuple[TmdbCreditPerson, ...]:
+        return (
+            TmdbCreditPerson(
+                person_id="10",
+                name="Edmund Donovan",
+                original_name="Edmund Donovan",
+                character="Christopher",
+                order=0,
+                profile_path="/edmund.jpg",
+            ),
+        )
+
+    async def fake_cast_localization_lookup(_enrichment_input) -> tuple[CastLocalizationMatch, ...]:
+        return (
+            CastLocalizationMatch(
+                cast_id="10",
+                order=0,
+                localized_name="Edmund Donovan",
+                localized_character="克里斯托弗",
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+        cast_localization_service=CastLocalizationService(fake_cast_localization_lookup),
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="cast-localization-conservative-1",
+                task_id="cast-localization-conservative-1",
+                task_hash="cast-localization-conservative-hash-1",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "10",
+            "name": "Edmund Donovan",
+            "original_name": "Edmund Donovan",
+            "character": "克里斯托弗",
+            "original_character": "Christopher",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "/edmund.jpg",
+            "profile_image_url": "https://image.tmdb.org/t/p/original/edmund.jpg",
+        }
+    ]
+    nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<name>Edmund Donovan</name>" in nfo_text
+    assert "<role>克里斯托弗</role>" in nfo_text
+
+
+def test_scrape_for_import_soft_fails_when_cast_localization_errors(tmp_path: Path, capsys) -> None:
+    target_file = tmp_path / "Akron (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, __: str) -> tuple[TmdbCreditPerson, ...]:
+        return (
+            TmdbCreditPerson(
+                person_id="10",
+                name="Edmund Donovan",
+                original_name="Edmund Donovan",
+                character="Christopher",
+                order=0,
+            ),
+        )
+
+    async def failing_cast_localization_lookup(_enrichment_input) -> tuple[CastLocalizationMatch, ...]:
+        raise RuntimeError("llm timeout")
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+        cast_localization_service=CastLocalizationService(failing_cast_localization_lookup),
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="cast-localization-soft-fail-1",
+                task_id="cast-localization-soft-fail-1",
+                task_hash="cast-localization-soft-fail-hash-1",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["tmdb"]["cast"] == [
+        {
+            "id": "10",
+            "name": "Edmund Donovan",
+            "original_name": "Edmund Donovan",
+            "character": "Christopher",
+            "original_character": "Christopher",
+            "department": "",
+            "job": "",
+            "order": 0,
+            "profile_path": "",
+            "profile_image_url": "",
+        }
+    ]
+    output = capsys.readouterr().out
+    assert "[演员中文化补充失败]" in output
+    assert "llm timeout" in output
 
 
 def test_scrape_for_import_falls_back_to_tv_lookup_by_tmdb_id_for_tv_identity(tmp_path: Path) -> None:
@@ -496,6 +1114,118 @@ def test_scrape_for_import_keeps_existing_nfo_when_missing_only(tmp_path: Path) 
 
     assert result.success is True
     assert nfo_path.read_text(encoding="utf-8") == "<movie>manual</movie>\n"
+
+
+def test_scrape_for_import_falls_back_to_tmdb_poster_when_fanart_missing(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="星际穿越",
+            original_title="Interstellar",
+            year="2014",
+            tmdb_id="157336",
+        )
+
+    async def fake_tmdb_lookup_by_id(_: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="星际穿越",
+            original_title="Interstellar",
+            year="2014",
+            tmdb_id="157336",
+            poster_path="/poster-path.jpg",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    seen_urls: list[str] = []
+
+    async def fake_download_image(url: str) -> bytes:
+        seen_urls.append(url)
+        return f"image:{url}".encode("utf-8")
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_by_tmdb_id_func=fake_tmdb_lookup_by_id,
+        download_image_func=fake_download_image,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="87",
+                task_id="87",
+                task_hash="hash-87",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    poster_path = target_file.with_name("Interstellar (2014)-poster.jpg")
+    assert poster_path.exists()
+    assert seen_urls == ["https://image.tmdb.org/t/p/original/poster-path.jpg"]
+    assert poster_path.read_bytes() == b"image:https://image.tmdb.org/t/p/original/poster-path.jpg"
+
+
+def test_scrape_for_import_falls_back_to_tmdb_backdrop_when_fanart_missing(tmp_path: Path) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="星际穿越",
+            original_title="Interstellar",
+            year="2014",
+            tmdb_id="157336",
+        )
+
+    async def fake_tmdb_lookup_by_id(_: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="星际穿越",
+            original_title="Interstellar",
+            year="2014",
+            tmdb_id="157336",
+            backdrop_path="/backdrop-path.jpg",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    seen_urls: list[str] = []
+
+    async def fake_download_image(url: str) -> bytes:
+        seen_urls.append(url)
+        return f"image:{url}".encode("utf-8")
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_by_tmdb_id_func=fake_tmdb_lookup_by_id,
+        download_image_func=fake_download_image,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="88",
+                task_id="88",
+                task_hash="hash-88",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    backdrop_path = target_file.with_name("Interstellar (2014)-backdrop.jpg")
+    assert backdrop_path.exists()
+    assert seen_urls == ["https://image.tmdb.org/t/p/original/backdrop-path.jpg"]
+    assert backdrop_path.read_bytes() == b"image:https://image.tmdb.org/t/p/original/backdrop-path.jpg"
 
 
 def test_scrape_for_import_keeps_existing_images_when_missing_only(tmp_path: Path) -> None:

@@ -285,3 +285,73 @@ Upgraded Telegram candidate confirmation to per-candidate poster cards with TMDB
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: Telegram candidate delivery and PT interaction
+
+**Date**: 2026-05-03
+**Task**: Telegram candidate delivery and PT interaction
+**Branch**: `main`
+
+### Summary
+
+Tightened protected-franchise candidate ranking, shipped Telegram PT resource cards, and switched Telegram candidate confirmation to an aggregate TMDB-linked message flow with continuation past 4096 chars.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `74430f3` | (see git log) |
+| `7d96eb9` | (see git log) |
+| `45bf3c3` | (see git log) |
+| `17545fb` | (see git log) |
+| `0d1e657` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 10: Telegram PT resource card detail delivery
+
+**Date**: 2026-05-03
+**Task**: Telegram PT resource card detail delivery
+**Branch**: `main`
+
+### Summary
+
+Expanded Telegram PT resource delivery into a two-message flow with site-grouped detail text, broader per-site candidate coverage, and matching callback numbering; verified via focused tests, lint, and real Telegram smoke after restarting app.main.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e9bcde3` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

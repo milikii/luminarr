@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-05-02
+- **Total Sessions**: 10
+- **Last Active**: 2026-05-03
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~287 | Active |
+| `journal-1.md` | ~357 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 10 | 2026-05-03 | Telegram PT resource card detail delivery | `e9bcde3` | `main` |
+| 9 | 2026-05-03 | Telegram candidate delivery and PT interaction | `74430f3`, `7d96eb9`, `45bf3c3`, `17545fb`, `0d1e657` | `main` |
 | 8 | 2026-05-02 | Telegram candidate poster cards | `48768ab`, `c66fd20` | `main` |
 | 7 | 2026-05-02 | Docker runtime subtitle deps | `a2e41d7`, `0bf62d5` | `main` |
 | 6 | 2026-05-02 | Subtitle translation quality MVP | `faef6d2`, `eb192fc` | `main` |

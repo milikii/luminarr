@@ -303,7 +303,7 @@ async def _handle_telegram_pt_resource_card_callback(
     )
     reply = await execution_gate.run(
         tg.ACTION_ADD_TO_DOWNLOADER,
-        lambda: add_service.add_by_candidate(
+        lambda: add_service.add_by_candidate_with_auto_confirm(
             chat_id=chat_id,
             candidate=selection.candidate,
             task_ref=build_telegram_pt_resource_task_ref(session_token, selection_index),

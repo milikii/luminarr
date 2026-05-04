@@ -17,6 +17,7 @@ from app.services.media_name_parser import parse_media_name
 
 GetImportSourceFunc = Callable[..., Awaitable[TransmissionImportSource | None]]
 RecordImportEventFunc = Callable[..., None]
+ResolveConfirmedMediaIdentityFunc = Callable[[str, str], dict[str, str] | None]
 
 
 def _log_import_prepare_error(*, title: str, detail: str, fix_hint: str) -> None:
@@ -30,6 +31,7 @@ class ImportPrepareState:
         get_import_source_func: GetImportSourceFunc,
         library_target_dir: Path,
         job_event_repo: JobEventRepo | None,
+        resolve_confirmed_media_identity_func: ResolveConfirmedMediaIdentityFunc | None,
         record_event_func: RecordImportEventFunc,
         import_query_failed_text: str,
         import_not_found_text: str,
@@ -41,6 +43,7 @@ class ImportPrepareState:
         self._get_import_source_func = get_import_source_func
         self._library_target_dir = library_target_dir
         self._job_event_repo = job_event_repo
+        self._resolve_confirmed_media_identity_func = resolve_confirmed_media_identity_func
         self._record_event = record_event_func
         self._import_query_failed_text = import_query_failed_text
         self._import_not_found_text = import_not_found_text
@@ -125,14 +128,11 @@ class ImportPrepareState:
             )
             return None, message
 
-        naming_truth = self.resolve_normalized_naming_truth(
+        normalized_target_name = self._build_preferred_target_name(
+            source_path=source_path,
             task_id=import_source.task_id,
             task_hash=import_source.task_hash,
             fallback_name=import_source.name,
-        )
-        normalized_target_name = build_normalized_target_name(
-            source_path=source_path,
-            naming_truth=naming_truth,
         )
         target_path = target_root / normalized_target_name
         if target_path.exists():
@@ -152,6 +152,36 @@ class ImportPrepareState:
             return None, message
 
         return PreparedImport(import_source=import_source, source_path=source_path, target_path=target_path), ""
+
+    def _build_preferred_target_name(
+        self,
+        *,
+        source_path: Path,
+        task_id: str,
+        task_hash: str,
+        fallback_name: str,
+    ) -> str:
+        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
+        if confirmed_media_identity is not None and confirmed_media_identity.get("media_type", "").strip() == "movie":
+            preferred_base = build_movie_target_name_from_identity(
+                title=confirmed_media_identity.get("title", "").strip(),
+                original_title=confirmed_media_identity.get("original_title", "").strip(),
+                year=confirmed_media_identity.get("year", "").strip(),
+                suffix="",
+            )
+            if preferred_base:
+                if source_path.is_file():
+                    return str(Path(preferred_base) / f"{preferred_base}{source_path.suffix}")
+                return preferred_base
+        naming_truth = self.resolve_normalized_naming_truth(
+            task_id=task_id,
+            task_hash=task_hash,
+            fallback_name=fallback_name,
+        )
+        return build_normalized_target_name(
+            source_path=source_path,
+            naming_truth=naming_truth,
+        )
 
     def resolve_normalized_naming_truth(
         self,
@@ -182,6 +212,11 @@ class ImportPrepareState:
             if title:
                 return title
         return fallback
+
+    def _resolve_confirmed_media_identity(self, *, task_id: str, task_hash: str) -> dict[str, str] | None:
+        if self._resolve_confirmed_media_identity_func is None:
+            return None
+        return self._resolve_confirmed_media_identity_func(task_id=task_id, task_hash=task_hash)
 
     async def _get_import_source(
         self,
@@ -291,6 +326,24 @@ def build_normalized_target_name(*, source_path: Path, naming_truth: str) -> str
     if suffix:
         return f"{sanitized_base}{suffix}"
     return sanitized_base
+
+
+def build_movie_target_name_from_identity(
+    *,
+    title: str,
+    original_title: str,
+    year: str,
+    suffix: str,
+) -> str:
+    preferred_title = _sanitize_target_component(title) or _sanitize_target_component(original_title)
+    if not preferred_title:
+        return ""
+    cleaned_year = year.strip()
+    final_base = f"{preferred_title} ({cleaned_year})" if cleaned_year else preferred_title
+    sanitized_base = _sanitize_target_component(final_base)
+    if not sanitized_base:
+        return ""
+    return f"{sanitized_base}{suffix}" if suffix else sanitized_base
 
 
 def _build_target_base_from_parsed_name(parsed_name) -> str:

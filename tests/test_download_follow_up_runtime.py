@@ -31,26 +31,35 @@ from app.services.post_download_auto_import import AutoImportRunResult, PostDown
 
 def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
     stop_event = asyncio.Event()
+    send_text = AsyncMock()
 
     async def run_once() -> AutoImportRunResult:
         stop_event.set()
-        return AutoImportRunResult(scanned=1, progressed=1, replies=("导入待确认",))
+        return AutoImportRunResult(
+            scanned=1,
+            progressed=1,
+            replies=("导入成功",),
+            notifications=(SimpleNamespace(chat_id=1001, text="导入成功"),),
+        )
 
     service = SimpleNamespace(run_once=AsyncMock(side_effect=run_once))
 
     asyncio.run(
         post_download_auto_import_scheduler_loop(
             service=service,
+            send_text_func=send_text,
             stop_event=stop_event,
             interval_seconds=300.0,
         )
     )
 
     service.run_once.assert_awaited_once()
+    send_text.assert_awaited_once_with(chat_id=1001, text="导入成功")
 
 
 def test_post_download_auto_import_scheduler_loop_logs_state_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
     stop_event = asyncio.Event()
+    send_text = AsyncMock()
 
     async def run_once() -> AutoImportRunResult:
         stop_event.set()
@@ -61,6 +70,7 @@ def test_post_download_auto_import_scheduler_loop_logs_state_unavailable(capsys:
     asyncio.run(
         post_download_auto_import_scheduler_loop(
             service=service,
+            send_text_func=send_text,
             stop_event=stop_event,
             interval_seconds=300.0,
         )
@@ -70,6 +80,7 @@ def test_post_download_auto_import_scheduler_loop_logs_state_unavailable(capsys:
     assert "[下载完成后台轮询状态读取失败]" in output
     assert "scanned=2" in output
     assert "[处理建议]" in output
+    send_text.assert_not_awaited()
 
 
 def test_poll_pending_download_completion_once_reuses_status_service() -> None:
@@ -203,12 +214,14 @@ def test_start_download_follow_up_scheduler_also_starts_download_completion_poll
         bot_data={
             GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
             POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY: PostDownloadAutoImportService(monitor_repo, JobEventRepo(database), AsyncMock()),
+            "sidecar_host_send_text_func": AsyncMock(),
         },
         create_task=Mock(return_value=SimpleNamespace()),
     )
 
     start_download_follow_up_scheduler(
         application=app,
+        send_text_func_key="sidecar_host_send_text_func",
         post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
         post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
         post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
@@ -231,12 +244,16 @@ def test_start_download_follow_up_scheduler_starts_completion_polling_without_au
     database.initialize()
     monitor_repo = DownloadMonitorRepo(database)
     app = SimpleNamespace(
-        bot_data={GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)},
+        bot_data={
+            GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo),
+            "sidecar_host_send_text_func": AsyncMock(),
+        },
         create_task=Mock(return_value=SimpleNamespace()),
     )
 
     start_download_follow_up_scheduler(
         application=app,
+        send_text_func_key="sidecar_host_send_text_func",
         post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
         post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
         post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
@@ -254,12 +271,16 @@ def test_start_download_follow_up_scheduler_logs_fix_hint_when_completion_pollin
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     app = SimpleNamespace(
-        bot_data={GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock())},
+        bot_data={
+            GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock()),
+            "sidecar_host_send_text_func": AsyncMock(),
+        },
         create_task=Mock(return_value=SimpleNamespace()),
     )
 
     start_download_follow_up_scheduler(
         application=app,
+        send_text_func_key="sidecar_host_send_text_func",
         post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
         post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
         post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
@@ -272,6 +293,38 @@ def test_start_download_follow_up_scheduler_logs_fix_hint_when_completion_pollin
     captured = capsys.readouterr()
     assert "[下载完成状态轮询未启动]" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_start_download_follow_up_scheduler_logs_missing_send_text_for_auto_import_push(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    database = SqliteDatabase(":memory:")
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    app = SimpleNamespace(
+        bot_data={
+            GET_DOWNLOAD_STATUS_SERVICE_KEY: GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo),
+            POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY: PostDownloadAutoImportService(monitor_repo, JobEventRepo(database), AsyncMock()),
+        },
+        create_task=Mock(return_value=SimpleNamespace()),
+    )
+
+    start_download_follow_up_scheduler(
+        application=app,
+        send_text_func_key="sidecar_host_send_text_func",
+        post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
+        post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
+        post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
+        get_download_status_service_key=GET_DOWNLOAD_STATUS_SERVICE_KEY,
+        download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
+        download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
+        interval_seconds=300.0,
+    )
+
+    captured = capsys.readouterr()
+    assert "[下载完成后台轮询未启动主动通知]" in captured.out
+    assert [item.kwargs["name"] for item in app.create_task.call_args_list] == ["download_completion_polling_scheduler"]
+    app.create_task.call_args_list[0].args[0].close()
 
 
 def test_stop_download_follow_up_scheduler_stops_download_completion_polling_task() -> None:

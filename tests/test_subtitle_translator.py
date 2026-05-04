@@ -13,6 +13,10 @@ import pytest
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslatorService
 
 
+def _command_name(args: list[str]) -> str:
+    return Path(args[0]).name
+
+
 def test_translate_for_import_creates_zh_subtitle_for_file_target(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
@@ -44,11 +48,17 @@ def test_translate_for_import_creates_zh_subtitle_for_file_target(tmp_path: Path
     )
 
     translated_file = library_dir / "Interstellar (2014).zh.srt"
+    bilingual_file = library_dir / "Interstellar (2014).dual.ass"
     assert result.success is True
     assert result.skipped is False
     assert translated_file.exists()
+    assert bilingual_file.exists()
     payload = translated_file.read_text(encoding="utf-8")
     assert "专业译文：hello movie" in payload
+    bilingual_payload = bilingual_file.read_text(encoding="utf-8")
+    assert "LXGW WenKai" in bilingual_payload
+    assert "专业译文：hello movie" in bilingual_payload
+    assert "hello movie" in bilingual_payload
 
 
 def test_translate_for_import_success_message_prefers_metadata_title(tmp_path: Path) -> None:
@@ -200,6 +210,160 @@ def test_translate_for_import_translates_large_srt_in_chunks(tmp_path: Path) -> 
     assert "专业译文：line 62" in payload
 
 
+def test_translate_for_import_retries_with_smaller_chunks_when_line_count_drifts(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Akron.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Akron.srt"
+    subtitle_file.write_text(
+        "\n\n".join(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index + 1:02d},000\nline {index}"
+            for index in range(1, 63)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    seen_chunk_sizes: list[int] = []
+    mismatched_large_chunk_count = 0
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        nonlocal mismatched_large_chunk_count
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        seen_chunk_sizes.append(len(source_lines))
+        if len(source_lines) == 60 and mismatched_large_chunk_count < 2:
+            mismatched_large_chunk_count += 1
+            return json.dumps(
+                {"translations": [f"漂移译文 {index}" for index in range(64)]},
+                ensure_ascii=False,
+            )
+        return json.dumps(
+            {"translations": [f"专业译文：{line}" for line in source_lines]},
+            ensure_ascii=False,
+        )
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-split-retry",
+            task_id="split-retry",
+            task_hash="hash-split-retry",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Akron.zh.srt"
+    assert result.success is True
+    assert result.skipped is False
+    assert translated_file.exists()
+    assert seen_chunk_sizes[:2] == [60, 60]
+    assert any(size < 60 for size in seen_chunk_sizes[1:])
+    payload = translated_file.read_text(encoding="utf-8")
+    assert "专业译文：line 1" in payload
+    assert "专业译文：line 62" in payload
+
+
+def test_translate_for_import_retries_same_chunk_before_splitting_when_line_count_drifts(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Akron.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Akron.srt"
+    subtitle_file.write_text(
+        "\n\n".join(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index + 1:02d},000\nline {index}"
+            for index in range(1, 63)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    seen_chunk_sizes: list[int] = []
+    mismatched_large_chunk = False
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        nonlocal mismatched_large_chunk
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        seen_chunk_sizes.append(len(source_lines))
+        if len(source_lines) == 60 and not mismatched_large_chunk:
+            mismatched_large_chunk = True
+            return json.dumps(
+                {"translations": [f"漂移译文 {index}" for index in range(64)]},
+                ensure_ascii=False,
+            )
+        return json.dumps(
+            {"translations": [f"专业译文：{line}" for line in source_lines]},
+            ensure_ascii=False,
+        )
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-same-chunk-retry",
+            task_id="same-chunk-retry",
+            task_hash="hash-same-chunk-retry",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Akron.zh.srt"
+    assert result.success is True
+    assert result.skipped is False
+    assert translated_file.exists()
+    assert seen_chunk_sizes == [60, 60, 2]
+    payload = translated_file.read_text(encoding="utf-8")
+    assert "专业译文：line 1" in payload
+    assert "专业译文：line 62" in payload
+
+
+def test_translate_for_import_fails_when_single_line_chunk_still_drifts(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Akron.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Akron.srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nonly line\n",
+        encoding="utf-8",
+    )
+
+    seen_chunk_sizes: list[int] = []
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        seen_chunk_sizes.append(len(source_lines))
+        return json.dumps({"translations": ["第一行", "多出来的一行"]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-single-drift",
+            task_id="single-drift",
+            task_hash="hash-single-drift",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is False
+    assert seen_chunk_sizes == [1, 1]
+    assert "翻译行数不一致（source=1, translated=2）" in result.message
+    assert not (library_dir / "Akron.zh.srt").exists()
+
+
 def test_translate_for_import_skips_when_translated_subtitle_already_exists(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
@@ -230,6 +394,53 @@ def test_translate_for_import_skips_when_translated_subtitle_already_exists(tmp_
     assert result.skipped is True
     assert result.translated_count == 0
     assert result.message == "字幕翻译已跳过：目标中文字幕文件已存在。"
+
+
+def test_translate_for_import_ignores_generated_bilingual_ass_sidecar_on_rerun(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+    translated_file = library_dir / "Interstellar (2014).zh.srt"
+    translated_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\n你好，电影\n",
+        encoding="utf-8",
+    )
+    bilingual_file = library_dir / "Interstellar (2014).dual.ass"
+    bilingual_file.write_text(
+        "[Script Info]\n"
+        "[Events]\n"
+        "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\fnLXGW WenKai\\fs44}你好，电影\\N"
+        "{\\fnLXGW WenKai\\fs24}hello movie\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, __: dict[str, object]) -> str:
+        raise AssertionError("generated bilingual sidecar should not be translated again")
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-skip-dual-sidecar",
+            task_id="skip-dual-sidecar",
+            task_hash="hash-skip-dual-sidecar",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert result.translated_count == 0
+    assert result.message == "字幕翻译已跳过：目标中文字幕文件已存在。"
+    assert not (library_dir / "Interstellar (2014).dual.zh.ass").exists()
 
 
 def test_translate_for_import_skips_when_target_path_is_missing(tmp_path: Path) -> None:
@@ -286,12 +497,18 @@ def test_translate_for_import_creates_zh_ass_subtitle_for_file_target(tmp_path: 
     )
 
     translated_file = library_dir / "Frieren - 01.zh.ass"
+    bilingual_file = library_dir / "Frieren - 01.dual.ass"
     assert result.success is True
     assert result.skipped is False
     assert translated_file.exists()
+    assert bilingual_file.exists()
     payload = translated_file.read_text(encoding="utf-8")
     assert "Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,专业译文：hello mage" in payload
     assert "[Script Info]" in payload
+    bilingual_payload = bilingual_file.read_text(encoding="utf-8")
+    assert "LXGW WenKai" in bilingual_payload
+    assert "专业译文：hello mage" in bilingual_payload
+    assert "hello mage" in bilingual_payload
 
 
 def test_translate_for_import_directory_translates_each_episode_without_global_chinese_skip(tmp_path: Path) -> None:
@@ -381,7 +598,7 @@ def test_translate_for_import_directory_reports_chinese_embedded_skip_when_all_e
     episode2.write_bytes(b"video-2")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -464,7 +681,7 @@ def test_translate_for_import_directory_mixes_external_and_embedded_episode_subt
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
-        if args[0] == "ffprobe":
+        if _command_name(args) == "ffprobe":
             assert str(episode2) in args
             return subprocess.CompletedProcess(
                 args=args,
@@ -483,7 +700,7 @@ def test_translate_for_import_directory_mixes_external_and_embedded_episode_subt
                 ),
                 stderr="",
             )
-        if args[0] == "ffmpeg":
+        if _command_name(args) == "ffmpeg":
             Path(args[-1]).write_text(
                 "1\n00:00:01,000 --> 00:00:03,000\nhello embedded\n",
                 encoding="utf-8",
@@ -521,7 +738,7 @@ def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path, monkey
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -706,7 +923,7 @@ def test_translate_for_import_extracts_embedded_english_subtitle_when_no_externa
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
-        if args[0] == "ffprobe":
+        if _command_name(args) == "ffprobe":
             return subprocess.CompletedProcess(
                 args=args,
                 returncode=0,
@@ -724,7 +941,7 @@ def test_translate_for_import_extracts_embedded_english_subtitle_when_no_externa
                 ),
                 stderr="",
             )
-        if args[0] == "ffmpeg":
+        if _command_name(args) == "ffmpeg":
             Path(args[-1]).write_text(
                 "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
                 encoding="utf-8",
@@ -766,7 +983,7 @@ def test_translate_for_import_skips_when_embedded_chinese_subtitle_exists(
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -812,7 +1029,7 @@ def test_translate_for_import_prefers_chinese_embedded_skip_over_extractable_eng
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -864,7 +1081,7 @@ def test_translate_for_import_skips_when_only_non_text_embedded_english_subtitle
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -905,9 +1122,9 @@ def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        if args[0] == "ffprobe":
+        if _command_name(args) == "ffprobe":
             raise FileNotFoundError("ffprobe")
-        assert args[0] == "ffmpeg"
+        assert _command_name(args) == "ffmpeg"
         return subprocess.CompletedProcess(
             args=args,
             returncode=1,
@@ -927,6 +1144,48 @@ def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_
     assert streams[0].codec_name == "subrip"
 
 
+def test_probe_embedded_subtitles_prefers_repo_local_ffprobe_when_present(tmp_path: Path, monkeypatch) -> None:
+    target_file = tmp_path / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    local_ffmpeg_dir = tmp_path / ".tools" / "ffmpeg"
+    local_ffmpeg_dir.mkdir(parents=True)
+    local_ffprobe = local_ffmpeg_dir / "ffprobe"
+    local_ffprobe.write_text("#!/bin/sh\n", encoding="utf-8")
+    local_ffprobe.chmod(0o755)
+
+    monkeypatch.setattr(subtitle_support, "_LOCAL_FFMPEG_DIR", local_ffmpeg_dir)
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert args[0] == str(local_ffprobe)
+        return subprocess.CompletedProcess(
+            args=args,
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "streams": [
+                        {
+                            "index": 2,
+                            "codec_name": "subrip",
+                            "tags": {"language": "eng", "title": "English"},
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    streams, error = service._probe_embedded_subtitles(target_file)
+
+    assert error is None
+    assert len(streams) == 1
+    assert streams[0].stream_index == 2
+
+
 def test_probe_embedded_subtitles_fails_when_ffprobe_and_ffmpeg_are_both_missing(
     tmp_path: Path,
     monkeypatch,
@@ -935,9 +1194,9 @@ def test_probe_embedded_subtitles_fails_when_ffprobe_and_ffmpeg_are_both_missing
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        if args[0] == "ffprobe":
+        if _command_name(args) == "ffprobe":
             raise FileNotFoundError("ffprobe")
-        if args[0] == "ffmpeg":
+        if _command_name(args) == "ffmpeg":
             raise FileNotFoundError("ffmpeg")
         raise AssertionError(f"unexpected command: {args}")
 
@@ -957,7 +1216,7 @@ def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path:
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -1000,7 +1259,7 @@ def test_probe_embedded_subtitles_fails_when_ffprobe_output_is_not_json(tmp_path
     target_file.write_bytes(b"video")
 
     def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
-        assert args[0] == "ffprobe"
+        assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
             returncode=0,
@@ -1032,7 +1291,7 @@ def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_inv
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
-        if args[0] == "ffprobe":
+        if _command_name(args) == "ffprobe":
             return subprocess.CompletedProcess(
                 args=args,
                 returncode=0,
@@ -1050,7 +1309,7 @@ def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_inv
                 ),
                 stderr="",
             )
-        if args[0] == "ffmpeg":
+        if _command_name(args) == "ffmpeg":
             Path(args[-1]).write_text("hello movie", encoding="utf-8")
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
         raise AssertionError(f"unexpected command: {args}")
@@ -1089,7 +1348,7 @@ def test_translate_for_import_cleans_partial_extracted_subtitle_when_ffmpeg_extr
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
-        if args[0] == "ffprobe":
+        if _command_name(args) == "ffprobe":
             return subprocess.CompletedProcess(
                 args=args,
                 returncode=0,
@@ -1107,7 +1366,7 @@ def test_translate_for_import_cleans_partial_extracted_subtitle_when_ffmpeg_extr
                 ),
                 stderr="",
             )
-        if args[0] == "ffmpeg":
+        if _command_name(args) == "ffmpeg":
             Path(args[-1]).write_text("partial subtitle", encoding="utf-8")
             return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="extract failed")
         raise AssertionError(f"unexpected command: {args}")
@@ -1204,6 +1463,56 @@ def test_translate_for_import_fails_when_writing_translated_subtitle(tmp_path: P
     assert result.success is False
     assert result.skipped is False
     assert "写入字幕文件失败" in result.message
+
+
+def test_translate_for_import_keeps_plain_output_when_bilingual_sidecar_write_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    original_write_text = Path.write_text
+
+    def failing_write_text(self: Path, data: str, encoding: str | None = None, errors: str | None = None, newline: str | None = None) -> int:
+        if self.name.endswith(".dual.ass"):
+            raise OSError("disk full")
+        return original_write_text(self, data, encoding=encoding, errors=errors, newline=newline)
+
+    monkeypatch.setattr(Path, "write_text", failing_write_text)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-dual-sidecar",
+            task_id="dual-sidecar",
+            task_hash="hash-dual-sidecar",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Interstellar (2014).zh.srt"
+    bilingual_file = library_dir / "Interstellar (2014).dual.ass"
+    assert result.success is True
+    assert result.skipped is False
+    assert translated_file.exists()
+    assert not bilingual_file.exists()
+    assert "专业译文：hello movie" in translated_file.read_text(encoding="utf-8")
 
 
 def test_translate_for_import_returns_failed_result_when_model_runtime_error(tmp_path: Path) -> None:
@@ -1351,6 +1660,19 @@ def test_request_chat_completion_raises_on_http_error(monkeypatch) -> None:
     service = SubtitleTranslatorService(api_key="demo-key")
 
     with pytest.raises(RuntimeError, match="HTTP 401"):
+        service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
+
+
+def test_request_chat_completion_raises_runtime_error_on_timeout(monkeypatch) -> None:
+    client_ctor = Mock()
+    post = Mock(side_effect=httpx.ReadTimeout("The read operation timed out"))
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+
+    with pytest.raises(RuntimeError, match="请求超时"):
         service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
 
 

@@ -235,6 +235,7 @@ class PersonalWeChatTextService:
         self._long_poll_timeout_ms = long_poll_timeout_ms
         self._stop_event: asyncio.Event | None = None
         self._poll_task: asyncio.Task[None] | None = None
+        self._active_account_state: tuple[str, str, str] | None = None
 
     def is_available(self) -> bool:
         return (
@@ -267,6 +268,7 @@ class PersonalWeChatTextService:
             return
 
         account_id, base_url, token = account_state
+        self._active_account_state = account_state
         self._restore_context_tokens_func(account_id)
         stop_event = asyncio.Event()
         self._stop_event = stop_event
@@ -291,6 +293,7 @@ class PersonalWeChatTextService:
         poll_task = self._poll_task
         self._stop_event = None
         self._poll_task = None
+        self._active_account_state = None
         if isinstance(stop_event, asyncio.Event):
             stop_event.set()
         if isinstance(poll_task, asyncio.Task):
@@ -299,6 +302,21 @@ class PersonalWeChatTextService:
                 await poll_task
         if self._close_client_func is not None:
             await self._close_client_func()
+
+    async def send_proactive_text(self, *, external_chat_id: str, text: str) -> object:
+        if not self.is_available() or self._active_account_state is None or self._send_text_func is None:
+            raise RuntimeError("personal wechat proactive send unavailable")
+        account_id, base_url, token = self._active_account_state
+        context_token = None
+        if self._get_context_token_func is not None:
+            cached_context_token = self._get_context_token_func(account_id, external_chat_id)
+            context_token = str(cached_context_token or "").strip() or None
+        opts = WeixinApiOptions(
+            base_url=base_url,
+            token=token,
+            context_token=context_token,
+        )
+        return await self._send_text_func(external_chat_id, text, opts)
 
     def _resolve_single_account_state(self) -> tuple[str, str, str] | None:
         raw_account_ids = self._list_account_ids_func() or []

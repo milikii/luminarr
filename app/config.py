@@ -53,6 +53,7 @@ class Settings:
     tmdb_api_key: str
     fanart_base_url: str
     fanart_api_key: str
+    douban_cast_enrichment_base_url: str
     transmission_base_url: str
     transmission_username: str
     transmission_password: str
@@ -103,6 +104,14 @@ class Settings:
 
     def has_wecom_host(self) -> bool:
         return bool(self.wecom_token and self.wecom_encoding_aes_key and self.wecom_receive_id)
+
+    @property
+    def domestic_cast_helper_source(self) -> str:
+        return "douban" if self.douban_cast_enrichment_base_url else ""
+
+    @property
+    def douban_base_url(self) -> str:
+        return self.douban_cast_enrichment_base_url
 
 
 def _read_required(env: Mapping[str, str], key: str) -> str:
@@ -227,6 +236,16 @@ def _normalize_base_url(raw_value: str) -> str:
 def _read_base_url(env: Mapping[str, str], key: str, *, required: bool = False) -> str:
     raw_value = _read_required(env, key) if required else _read_optional(env, key)
     return _normalize_base_url(raw_value)
+
+
+def _read_douban_cast_enrichment_base_url(env: Mapping[str, str]) -> str:
+    explicit_base_url = _read_base_url(env, "DOUBAN_CAST_ENRICHMENT_BASE_URL")
+    if explicit_base_url:
+        return explicit_base_url
+    legacy_helper_source = _read_optional(env, "DOMESTIC_CAST_HELPER_SOURCE").strip().lower()
+    if legacy_helper_source != "douban":
+        return ""
+    return _read_base_url(env, "DOUBAN_BASE_URL")
 
 
 def _read_optional_lower_choice(
@@ -522,6 +541,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         tmdb_api_key=_read_optional(env, "TMDB_API_KEY"),
         fanart_base_url=fanart_base_url or "https://webservice.fanart.tv/v3",
         fanart_api_key=_read_optional(env, "FANART_API_KEY"),
+        douban_cast_enrichment_base_url=_read_douban_cast_enrichment_base_url(env),
         transmission_base_url=transmission_base_url,
         transmission_username=_read_optional(env, "TRANSMISSION_USERNAME"),
         transmission_password=_read_optional(env, "TRANSMISSION_PASSWORD"),

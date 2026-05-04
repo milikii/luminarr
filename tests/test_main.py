@@ -9,7 +9,9 @@ from telegram.error import NetworkError
 
 from app.bot import telegram_bot as tg
 from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
+from app.bot.shared_private_chat_sender import build_shared_private_chat_send_text_func
 from app.bot.feishu_long_connection import FEISHU_LONG_CONNECTION_SERVICE_KEY
+from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
 from app.bot.telegram_sidecar_runtime import (
     BT_SUBSCRIPTION_SCHEDULER_TASK_KEY,
     DOWNLOADER_INSTANCES_KEY,
@@ -23,7 +25,7 @@ from app.bot.wecom_adapter import (
     WECOM_TOKEN_BOT_DATA_KEY,
 )
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
-from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, load_settings
 from app.db.job_repo import JobPersistenceError
 from app.downloader_route_lookup import (
     DownloaderRouteLookupError,
@@ -33,6 +35,7 @@ from app.downloader_route_lookup import (
     _resolve_lookup_client_for_task,
 )
 from app.main import (
+    _build_ai_cast_localization_service,
     _build_adult_read_only_lookup_func,
     _build_bt_source_providers,
     _build_refresh_media_server_func,
@@ -53,6 +56,14 @@ def test_run_application_polling_prints_colored_fix_hint_on_network_error(
     captured = capsys.readouterr()
     assert "[Telegram 启动失败]" in captured.out
     assert "[处理建议]" in captured.out
+
+
+def test_build_shared_private_chat_send_text_func_avoids_adapter_import_cycle() -> None:
+    bot_data = {
+        CHANNEL_CONTACT_REGISTRY_KEY: ChannelContactRegistry(),
+    }
+    sender = build_shared_private_chat_send_text_func(bot_data=bot_data)
+    assert callable(sender)
 
 
 def test_run_application_polling_uses_bootstrap_retries_for_transient_proxy_network() -> None:
@@ -194,7 +205,7 @@ def test_resolve_downloader_client_for_lookup_returns_route_instance_and_client(
         operation="import",
     )
 
-    assert route == ("pt-main", "/data/downloads/tr")
+    assert route == ("pt-main", "/data/downloads/tr", "87")
     assert instance is not None
     assert instance.downloader_type == "transmission"
     assert resolved_client is client
@@ -336,6 +347,43 @@ def test_get_torrent_status_with_routing_returns_none_for_real_not_found() -> No
     )
 
     assert result is None
+
+
+def test_get_torrent_status_with_routing_accepts_real_downloader_task_id_lookup() -> None:
+    captured_task_refs: list[str] = []
+
+    async def _get_status(task_ref: str):
+        captured_task_refs.append(task_ref)
+        return "status-result"
+
+    client = SimpleNamespace(get_torrent_status=_get_status)
+    seen_queries: list[str] = []
+
+    def _get_job_for_chat_ref(**kwargs):
+        seen_queries.append(kwargs["task_ref"])
+        assert kwargs["task_ref"] == "42"
+        return SimpleNamespace(
+            payload_json='{"downloader_name":"pt-main"}',
+            task_id="42",
+            task_hash="hash-42",
+        )
+
+    job_repo = SimpleNamespace(get_downloader_job_for_chat_ref=_get_job_for_chat_ref)
+
+    result = asyncio.run(
+        _get_torrent_status_with_routing(
+            task_ref="42",
+            chat_id=1001,
+            job_repo=job_repo,
+            downloader_instances_by_name={"pt-main": SimpleNamespace(downloader_type="transmission")},
+            transmission_clients_by_name={"pt-main": client},
+            qbittorrent_clients_by_name={},
+        )
+    )
+
+    assert seen_queries == ["42"]
+    assert captured_task_refs == ["hash-42"]
+    assert result == "status-result"
 
 
 def test_resolve_downloader_client_for_dispatch_rejects_unknown_explicit_instance() -> None:
@@ -785,6 +833,7 @@ def _build_main_settings(**overrides: object) -> _MainSettings:
         "tmdb_api_key": "",
         "fanart_base_url": "https://webservice.fanart.tv/v3",
         "fanart_api_key": "",
+        "douban_cast_enrichment_base_url": "",
         "transmission_base_url": "",
         "transmission_username": "",
         "transmission_password": "",
@@ -820,6 +869,308 @@ def _build_main_settings(**overrides: object) -> _MainSettings:
     }
     defaults.update(overrides)
     return _MainSettings(**defaults)
+
+
+def test_load_settings_reads_douban_cast_enrichment_base_url() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "DOUBAN_CAST_ENRICHMENT_BASE_URL": " https://movie.douban.test/ ",
+        }
+    )
+
+    assert settings.douban_cast_enrichment_base_url == "https://movie.douban.test"
+
+
+def test_build_ai_cast_localization_service_returns_none_when_subtitle_translation_is_disabled() -> None:
+    settings = _build_main_settings(subtitle_translation_api_key="")
+
+    assert _build_ai_cast_localization_service(settings) is None
+
+
+def test_build_ai_cast_localization_service_reuses_subtitle_translation_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        subtitle_translation_api_key="cast-localize-key",
+        subtitle_translation_base_url="https://openai.example/v1",
+        subtitle_translation_model="gpt-5.4-mini",
+        subtitle_translation_timeout_seconds=45.0,
+        outbound_proxy_url="http://proxy.local:7890",
+    )
+    created: dict[str, object] = {}
+
+    class FakeAICastLocalizationService:
+        def __init__(self, **kwargs: object) -> None:
+            created["kwargs"] = kwargs
+
+        async def localize(self, *_args: object, **_kwargs: object):
+            return ()
+
+    monkeypatch.setattr("app.main.AICastLocalizationService", FakeAICastLocalizationService)
+
+    service = _build_ai_cast_localization_service(settings)
+
+    assert service is not None
+    assert created["kwargs"] == {
+        "api_key": "cast-localize-key",
+        "base_url": "https://openai.example/v1",
+        "model": "gpt-5.4-mini",
+        "timeout_seconds": 45.0,
+        "proxy_url": "http://proxy.local:7890",
+    }
+
+
+def test_main_keeps_tmdb_only_metadata_scraper_when_ai_cast_localization_is_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        tmdb_api_key="tmdb-key",
+        subtitle_translation_api_key="",
+    )
+    created: dict[str, object] = {}
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    class _FakeTmdbClient:
+        def __init__(self, **kwargs: object) -> None:
+            created["tmdb_client_kwargs"] = kwargs
+
+        async def search_movie(self, *_args: object, **_kwargs: object):
+            return None
+
+        async def search_media_candidates(self, *_args: object, **_kwargs: object):
+            return []
+
+        async def search_movie_candidates(self, *_args: object, **_kwargs: object):
+            return []
+
+        async def search_tv_candidates(self, *_args: object, **_kwargs: object):
+            return []
+
+        async def get_movie_by_id(self, *_args: object, **_kwargs: object):
+            return None
+
+        async def get_tv_by_id(self, *_args: object, **_kwargs: object):
+            return None
+
+        async def get_movie_credits(self, *_args: object, **_kwargs: object):
+            return ()
+
+        async def get_tv_credits(self, *_args: object, **_kwargs: object):
+            return ()
+
+    class _FakeMetadataScraperService:
+        def __init__(self, **kwargs: object) -> None:
+            created["metadata_scraper_kwargs"] = kwargs
+            self.scrape_for_import = AsyncMock()
+
+    def _fake_build_application(
+        token: str,
+        search_service,
+        add_to_downloader_service,
+        get_download_status_service,
+        import_to_library_service,
+        cleanup_downloaded_source_service,
+        manage_watchlist_service,
+        manage_bt_subscription_service,
+        **kwargs: object,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: search_service,
+                tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: manage_bt_subscription_service,
+                CHANNEL_CONTACT_REGISTRY_KEY: kwargs["channel_contact_registry"],
+            }
+        )
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr("app.main._build_adult_read_only_lookup_func", lambda *, proxy_url: None)
+    monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.TmdbClient", _FakeTmdbClient)
+    monkeypatch.setattr("app.main.MetadataScraperService", _FakeMetadataScraperService)
+    monkeypatch.setattr(
+        "app.main.AICastLocalizationService",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("AI cast localization should stay disabled")),
+    )
+    monkeypatch.setattr("app.main.AdultMetadataTranslatorService", lambda **_kwargs: SimpleNamespace(translate_candidates=None))
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main.PersonalWeChatTextService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fake_build_application)
+    monkeypatch.setattr("app.main._run_application_polling", lambda _application: None)
+
+    run_main()
+
+    assert created["metadata_scraper_kwargs"]["cast_localization_service"] is None
+
+
+def test_main_injects_ai_cast_localization_into_metadata_scraper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        tmdb_api_key="tmdb-key",
+        subtitle_translation_api_key="cast-localize-key",
+        subtitle_translation_base_url="https://openai.example/v1",
+        subtitle_translation_model="gpt-5.4-mini",
+        subtitle_translation_timeout_seconds=45.0,
+        outbound_proxy_url="http://proxy.local:7890",
+    )
+    created: dict[str, object] = {}
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    class _FakeTmdbClient:
+        def __init__(self, **kwargs: object) -> None:
+            created["tmdb_client_kwargs"] = kwargs
+
+        async def search_movie(self, *_args: object, **_kwargs: object):
+            return None
+
+        async def search_media_candidates(self, *_args: object, **_kwargs: object):
+            return []
+
+        async def search_movie_candidates(self, *_args: object, **_kwargs: object):
+            return []
+
+        async def search_tv_candidates(self, *_args: object, **_kwargs: object):
+            return []
+
+        async def get_movie_by_id(self, *_args: object, **_kwargs: object):
+            return None
+
+        async def get_tv_by_id(self, *_args: object, **_kwargs: object):
+            return None
+
+        async def get_movie_credits(self, *_args: object, **_kwargs: object):
+            return ()
+
+        async def get_tv_credits(self, *_args: object, **_kwargs: object):
+            return ()
+
+    class _FakeMetadataScraperService:
+        def __init__(self, **kwargs: object) -> None:
+            created["metadata_scraper_kwargs"] = kwargs
+            self.scrape_for_import = AsyncMock()
+
+    class _FakeAICastLocalizationService:
+        def __init__(self, **kwargs: object) -> None:
+            created["cast_localization_kwargs"] = kwargs
+
+        async def localize(self, *_args: object, **_kwargs: object):
+            return ()
+
+    def _fake_build_application(
+        token: str,
+        search_service,
+        add_to_downloader_service,
+        get_download_status_service,
+        import_to_library_service,
+        cleanup_downloaded_source_service,
+        manage_watchlist_service,
+        manage_bt_subscription_service,
+        **kwargs: object,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            bot_data={
+                tg.SEARCH_SERVICE_KEY: search_service,
+                tg.MANAGE_BT_SUBSCRIPTION_SERVICE_KEY: manage_bt_subscription_service,
+                CHANNEL_CONTACT_REGISTRY_KEY: kwargs["channel_contact_registry"],
+            }
+        )
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr("app.main._build_adult_read_only_lookup_func", lambda *, proxy_url: None)
+    monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.TmdbClient", _FakeTmdbClient)
+    monkeypatch.setattr("app.main.MetadataScraperService", _FakeMetadataScraperService)
+    monkeypatch.setattr("app.main.AICastLocalizationService", _FakeAICastLocalizationService)
+    monkeypatch.setattr("app.main.AdultMetadataTranslatorService", lambda **_kwargs: SimpleNamespace(translate_candidates=None))
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", lambda **_kwargs: SimpleNamespace(translate_for_import=None))
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main.PersonalWeChatTextService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fake_build_application)
+    monkeypatch.setattr("app.main._run_application_polling", lambda _application: None)
+
+    run_main()
+
+    assert created["cast_localization_kwargs"] == {
+        "api_key": "cast-localize-key",
+        "base_url": "https://openai.example/v1",
+        "model": "gpt-5.4-mini",
+        "timeout_seconds": 45.0,
+        "proxy_url": "http://proxy.local:7890",
+    }
+    assert created["metadata_scraper_kwargs"]["cast_localization_service"] is not None
 
 
 class _FakeDatabase:
@@ -1146,6 +1497,7 @@ def test_main_uses_non_telegram_host_when_feishu_is_available(
     assert created["config"].post_download_auto_import_service_key == "post_download_auto_import_service"
     assert FEISHU_LONG_CONNECTION_SERVICE_KEY in host.bot_data
     assert isinstance(host.bot_data[CHANNEL_CONTACT_REGISTRY_KEY], ChannelContactRegistry)
+    assert callable(host.bot_data[SIDECAR_HOST_SEND_TEXT_FUNC_KEY])
     assert created["feishu_client_calls"][0]["app_id"] == "feishu-app-id"
     assert created["feishu_service_calls"][0]["config"].app_id == "feishu-app-id"
     assert created["feishu_service_calls"][0]["config"].app_secret == "feishu-app-secret"
@@ -1245,6 +1597,7 @@ def test_main_uses_non_telegram_host_when_wecom_is_available(
     assert WECOM_ENCODING_AES_KEY_BOT_DATA_KEY in host.bot_data
     assert WECOM_RECEIVE_ID_BOT_DATA_KEY in host.bot_data
     assert isinstance(host.bot_data[CHANNEL_CONTACT_REGISTRY_KEY], ChannelContactRegistry)
+    assert callable(host.bot_data[SIDECAR_HOST_SEND_TEXT_FUNC_KEY])
     assert isinstance(host.bot_data["wecom_webhook_server_config"], WeComWebhookServerConfig)
     assert FEISHU_LONG_CONNECTION_SERVICE_KEY not in host.bot_data
 

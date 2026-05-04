@@ -271,6 +271,56 @@ def test_get_torrent_import_source_with_routing_keeps_client_dir_when_host_dir_u
     assert import_source.download_dir == "/downloads/complete"
 
 
+def test_get_torrent_import_source_with_routing_uses_persisted_downloader_identity_for_historical_task_ref() -> None:
+    class FakeJobRepo:
+        def get_downloader_job_for_chat_ref(self, *, chat_id: int, task_ref: str):
+            assert chat_id == 1001
+            assert task_ref == "15"
+            return type(
+                "FakeJob",
+                (),
+                {
+                    "payload_json": '{"downloader_name":"tr-bt","download_dir":"/data/downloads/tr-bt"}',
+                    "task_id": "selection:15",
+                    "task_hash": "hash-42",
+                },
+            )()
+
+    class FakeTransmissionClient:
+        async def get_torrent_import_source(self, task_ref: str) -> TransmissionImportSource | None:
+            assert task_ref == "hash-42"
+            return TransmissionImportSource(
+                task_id="42",
+                task_hash="hash-42",
+                name="SSIS-456-smoke.mp4",
+                download_dir="/downloads/complete",
+                is_finished=True,
+                percent_done=1.0,
+            )
+
+    import_source = asyncio.run(
+        _get_torrent_import_source_with_routing(
+            task_ref="15",
+            chat_id=1001,
+            job_repo=FakeJobRepo(),
+            downloader_instances_by_name={
+                "tr-bt": DownloaderInstanceConfig(
+                    name="tr-bt",
+                    downloader_type="transmission",
+                    base_url="http://127.0.0.1:19092",
+                    download_dir="/data/downloads/tr-bt",
+                    dispatch_download_dir="/downloads/complete",
+                )
+            },
+            transmission_clients_by_name={"tr-bt": FakeTransmissionClient()},
+            qbittorrent_clients_by_name={},
+        )
+    )
+
+    assert import_source is not None
+    assert import_source.task_hash == "hash-42"
+
+
 def test_remove_torrent_with_routing_uses_routed_client() -> None:
     calls: list[tuple[str, bool]] = []
 
@@ -305,3 +355,47 @@ def test_remove_torrent_with_routing_uses_routed_client() -> None:
     )
 
     assert calls == [("hash-42", False)]
+
+
+def test_remove_torrent_with_routing_uses_persisted_downloader_identity_for_historical_task_ref() -> None:
+    calls: list[tuple[str, bool]] = []
+
+    class FakeJobRepo:
+        def get_downloader_job_for_chat_ref(self, *, chat_id: int, task_ref: str):
+            assert chat_id == 1001
+            assert task_ref == "15"
+            return type(
+                "FakeJob",
+                (),
+                {
+                    "payload_json": '{"downloader_name":"tr-bt"}',
+                    "task_id": "selection:15",
+                    "task_hash": "hash-42",
+                },
+            )()
+
+    class FakeTransmissionClient:
+        async def remove_torrent(self, task_ref: str, *, delete_local_data: bool) -> None:
+            calls.append((task_ref, delete_local_data))
+
+    asyncio.run(
+        _remove_torrent_with_routing(
+            task_ref="15",
+            chat_id=1001,
+            job_repo=FakeJobRepo(),
+            downloader_instances_by_name={
+                "tr-bt": DownloaderInstanceConfig(
+                    name="tr-bt",
+                    downloader_type="transmission",
+                    base_url="http://127.0.0.1:19092",
+                    download_dir="/data/downloads/tr-bt",
+                    dispatch_download_dir="/downloads/complete",
+                )
+            },
+            transmission_clients_by_name={"tr-bt": FakeTransmissionClient()},
+            qbittorrent_clients_by_name={},
+            delete_local_data=True,
+        )
+    )
+
+    assert calls == [("hash-42", True)]

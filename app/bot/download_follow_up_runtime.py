@@ -4,6 +4,7 @@ import asyncio
 import sqlite3
 
 from app.bot.sidecar_host_runtime import SidecarHost
+from app.bot.shared_private_chat_sender import log_shared_private_chat_send_error
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.operational_logging import emit_operational_log
 from app.services.get_download_status import GetDownloadStatusService
@@ -17,12 +18,18 @@ class DownloadCompletionPendingListError(RuntimeError):
 async def post_download_auto_import_scheduler_loop(
     *,
     service: PostDownloadAutoImportService,
+    send_text_func,
     stop_event: asyncio.Event,
     interval_seconds: float,
 ) -> None:
     while not stop_event.is_set():
         try:
             result = await service.run_once()
+            for notification in result.notifications:
+                try:
+                    await send_text_func(chat_id=notification.chat_id, text=notification.text)
+                except Exception as error:
+                    log_shared_private_chat_send_error(chat_id=notification.chat_id, error=error)
             if result.state_unavailable:
                 _log_post_download_auto_import_scheduler_state_unavailable(scanned=result.scanned)
         except Exception as error:
@@ -73,6 +80,7 @@ async def download_completion_polling_loop(
 def start_download_follow_up_scheduler(
     *,
     application: SidecarHost,
+    send_text_func_key: str,
     post_download_auto_import_service_key: str,
     post_download_auto_import_stop_event_key: str,
     post_download_auto_import_task_key: str,
@@ -82,20 +90,26 @@ def start_download_follow_up_scheduler(
     interval_seconds: float,
 ) -> None:
     service = application.bot_data.get(post_download_auto_import_service_key)
+    send_text_func = application.bot_data.get(send_text_func_key)
     existing_task = application.bot_data.get(post_download_auto_import_task_key)
     if isinstance(service, PostDownloadAutoImportService) and not (
         isinstance(existing_task, asyncio.Task) and not existing_task.done()
-    ):
+    ) and callable(send_text_func):
         stop_event = asyncio.Event()
         application.bot_data[post_download_auto_import_stop_event_key] = stop_event
         application.bot_data[post_download_auto_import_task_key] = application.create_task(
             post_download_auto_import_scheduler_loop(
                 service=service,
+                send_text_func=send_text_func,
                 stop_event=stop_event,
                 interval_seconds=interval_seconds,
             ),
             name="post_download_auto_import_scheduler",
         )
+    elif isinstance(service, PostDownloadAutoImportService) and not (
+        isinstance(existing_task, asyncio.Task) and not existing_task.done()
+    ):
+        _log_post_download_auto_import_send_capability_missing()
 
     status_service = application.bot_data.get(get_download_status_service_key)
     download_monitor_repo = getattr(status_service, "download_monitor_repo", None)
@@ -174,6 +188,14 @@ def _log_post_download_auto_import_scheduler_stop_error(*, error: Exception) -> 
         title="下载完成后台轮询停止失败",
         detail=f"原因={error}",
         fix_hint="检查 post-download auto-import 后台 task 的异常日志；当前停机将继续上抛该错误，避免静默吞掉未完成的导入后处理。",
+    )
+
+
+def _log_post_download_auto_import_send_capability_missing() -> None:
+    emit_operational_log(
+        title="下载完成后台轮询未启动主动通知",
+        detail="原因=宿主未注入可用的 shared private-chat send_text 回调。",
+        fix_hint="检查当前宿主是否已注入跨渠道主动发送能力；内部自动导入仍会推进，但用户不会收到后台总结通知。",
     )
 
 

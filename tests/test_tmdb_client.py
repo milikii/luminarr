@@ -32,11 +32,34 @@ def test_get_movie_by_id_returns_none_on_empty_tmdb_id() -> None:
 
 def test_get_movie_by_id_returns_valid_result() -> None:
     client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
-    captured: dict[str, Any] = {}
+    captured: list[tuple[str, dict[str, str]]] = []
 
     async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
-        captured["path"] = path
-        captured["params"] = params
+        captured.append((path, params))
+        if params["language"] == "en-US":
+            return _FakeResponse(
+                {
+                    "id": 157336,
+                    "title": "Interstellar",
+                    "original_title": "Interstellar",
+                    "release_date": "2014-11-05",
+                    "poster_path": "/interstellar.jpg",
+                    "overview": "A journey across space and time.",
+                    "popularity": 82.4,
+                    "vote_count": 20123,
+                    "vote_average": 8.4,
+                    "genres": [
+                        {"id": 878, "name": "Science Fiction"},
+                        {"id": 12, "name": "Adventure"},
+                    ],
+                    "production_countries": [
+                        {"iso_3166_1": "US", "name": "United States of America"},
+                    ],
+                    "production_companies": [
+                        {"id": 923, "name": "Legendary Pictures"},
+                    ],
+                }
+            )
         return _FakeResponse(
             {
                 "id": 157336,
@@ -45,15 +68,29 @@ def test_get_movie_by_id_returns_valid_result() -> None:
                 "release_date": "2014-11-05",
                 "poster_path": "/interstellar.jpg",
                 "overview": "A journey across space and time.",
+                "popularity": 82.4,
+                "vote_count": 20123,
                 "vote_average": 8.4,
+                "genres": [
+                    {"id": 878, "name": "科幻"},
+                    {"id": 12, "name": "冒险"},
+                ],
+                "production_countries": [
+                    {"iso_3166_1": "US", "name": "美国"},
+                ],
+                "production_companies": [
+                    {"id": 923, "name": "Legendary Pictures"},
+                ],
             }
         )
 
     client._get = fake_get  # type: ignore[method-assign]
     result = _run(client.get_movie_by_id("157336"))
 
-    assert captured["path"] == "/3/movie/157336"
-    assert captured["params"] == {"api_key": "tmdb-key", "language": "zh-CN"}
+    assert captured == [
+        ("/3/movie/157336", {"api_key": "tmdb-key", "language": "zh-CN"}),
+        ("/3/movie/157336", {"api_key": "tmdb-key", "language": "en-US"}),
+    ]
     assert result is not None
     assert result.title == "星际穿越"
     assert result.original_title == "Interstellar"
@@ -61,16 +98,110 @@ def test_get_movie_by_id_returns_valid_result() -> None:
     assert result.tmdb_id == "157336"
     assert result.poster_path == "/interstellar.jpg"
     assert result.overview == "A journey across space and time."
+    assert result.popularity == 82.4
+    assert result.vote_count == 20123
     assert result.vote_average == 8.4
+    assert result.genres == (
+        {"id": "878", "name": "科幻"},
+        {"id": "12", "name": "冒险"},
+    )
+    assert result.countries == (
+        {
+            "iso_3166_1": "US",
+            "name": "美国",
+            "original_name": "United States of America",
+        },
+    )
+    assert result.studios == (
+        {"id": "923", "name": "Legendary Pictures"},
+    )
+
+
+def test_get_movie_by_id_merges_localized_and_reference_detail_truth() -> None:
+    client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
+    captured: list[tuple[str, dict[str, str]]] = []
+
+    async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
+        captured.append((path, params))
+        if params["language"] == "zh-CN":
+            return _FakeResponse(
+                {
+                    "id": 361018,
+                    "title": "爱的进行时",
+                    "original_title": "Akron",
+                    "release_date": "2015-10-02",
+                    "poster_path": "/poster.jpg",
+                    "backdrop_path": "/backdrop.jpg",
+                    "production_countries": [
+                        {"iso_3166_1": "US", "name": "美国"},
+                    ],
+                    "production_companies": [
+                        {"id": 108748, "name": "拖船之路制片"},
+                    ],
+                }
+            )
+        return _FakeResponse(
+            {
+                "id": 361018,
+                "title": "Akron",
+                "original_title": "Akron",
+                "release_date": "2015-10-02",
+                "poster_path": "/poster.jpg",
+                "backdrop_path": "/backdrop.jpg",
+                "production_countries": [
+                    {"iso_3166_1": "US", "name": "United States of America"},
+                ],
+                "production_companies": [
+                    {"id": 108748, "name": "Towpath Productions"},
+                ],
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.get_movie_by_id("361018"))
+
+    assert captured == [
+        ("/3/movie/361018", {"api_key": "tmdb-key", "language": "zh-CN"}),
+        ("/3/movie/361018", {"api_key": "tmdb-key", "language": "en-US"}),
+    ]
+    assert result is not None
+    assert result.title == "爱的进行时"
+    assert result.original_title == "Akron"
+    assert result.backdrop_path == "/backdrop.jpg"
+    assert result.countries == (
+        {
+            "iso_3166_1": "US",
+            "name": "美国",
+            "original_name": "United States of America",
+        },
+    )
+    assert result.studios == (
+        {
+            "id": "108748",
+            "name": "拖船之路制片",
+            "original_name": "Towpath Productions",
+        },
+    )
 
 
 def test_get_tv_by_id_returns_valid_result() -> None:
     client = TmdbClient(api_key="tmdb-key", base_url="https://tmdb.example")
-    captured: dict[str, Any] = {}
+    captured: list[tuple[str, dict[str, str]]] = []
 
     async def fake_get(path: str, params: dict[str, str]) -> _FakeResponse:
-        captured["path"] = path
-        captured["params"] = params
+        captured.append((path, params))
+        if params["language"] == "en-US":
+            return _FakeResponse(
+                {
+                    "id": 1001,
+                    "name": "Three-Body",
+                    "original_name": "Three-Body",
+                    "first_air_date": "2023-01-15",
+                    "poster_path": "/three-body.jpg",
+                    "overview": "Humanity makes first contact.",
+                    "vote_average": 7.9,
+                }
+            )
         return _FakeResponse(
             {
                 "id": 1001,
@@ -86,8 +217,10 @@ def test_get_tv_by_id_returns_valid_result() -> None:
     client._get = fake_get  # type: ignore[method-assign]
     result = _run(client.get_tv_by_id("1001"))
 
-    assert captured["path"] == "/3/tv/1001"
-    assert captured["params"] == {"api_key": "tmdb-key", "language": "zh-CN"}
+    assert captured == [
+        ("/3/tv/1001", {"api_key": "tmdb-key", "language": "zh-CN"}),
+        ("/3/tv/1001", {"api_key": "tmdb-key", "language": "en-US"}),
+    ]
     assert result is not None
     assert result.title == "三体"
     assert result.original_title == "Three-Body"
@@ -115,6 +248,7 @@ def test_get_movie_credits_returns_localized_people() -> None:
                         "original_name": "Matthew McConaughey",
                         "character": "库珀",
                         "order": 0,
+                        "profile_path": "/matthew.jpg",
                     }
                 ],
                 "crew": [
@@ -138,6 +272,7 @@ def test_get_movie_credits_returns_localized_people() -> None:
     assert result[0].name == "马修·麦康纳"
     assert result[0].original_name == "Matthew McConaughey"
     assert result[0].character == "库珀"
+    assert result[0].profile_path == "/matthew.jpg"
     assert result[1].name == "克里斯托弗·诺兰"
     assert result[1].job == "Director"
 

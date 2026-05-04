@@ -63,7 +63,7 @@ def test_handle_digit_selection_query_routes_add_by_selection() -> None:
     search_service = SearchMediaService(_fake_search)
     search_service.is_clarification_pending = Mock(return_value=False)  # type: ignore[method-assign]
     add_service = AddToDownloaderService(search_service, AsyncMock())
-    add_service.add_by_selection = AsyncMock(return_value="下载待确认")  # type: ignore[method-assign]
+    add_service.add_by_selection_with_auto_confirm = AsyncMock(return_value="已添加下载")  # type: ignore[method-assign]
 
     handled = asyncio.run(
         handle_digit_selection_query(
@@ -87,7 +87,7 @@ def test_handle_digit_selection_query_routes_add_by_selection() -> None:
 
     assert handled is True
     execution_gate.run.assert_awaited_once()
-    add_service.add_by_selection.assert_awaited_once_with(
+    add_service.add_by_selection_with_auto_confirm.assert_awaited_once_with(
         1001,
         "1",
         user_id=2001,
@@ -96,7 +96,7 @@ def test_handle_digit_selection_query_routes_add_by_selection() -> None:
         downloader_type="transmission",
         download_dir="/downloads",
     )
-    reply_text.assert_awaited_once_with("下载待确认")
+    reply_text.assert_awaited_once_with("已添加下载")
 
 
 def test_handle_digit_selection_query_resolves_media_candidate_before_download() -> None:
@@ -107,7 +107,7 @@ def test_handle_digit_selection_query_resolves_media_candidate_before_download()
     search_service.is_media_candidate_selection = Mock(return_value=True)  # type: ignore[method-assign]
     search_service.search_resources_for_selected_media = AsyncMock(return_value="候选资源列表")  # type: ignore[method-assign]
     add_service = AddToDownloaderService(search_service, AsyncMock())
-    add_service.add_by_selection = AsyncMock(return_value="不该直接下载")  # type: ignore[method-assign]
+    add_service.add_by_selection_with_auto_confirm = AsyncMock(return_value="不该直接下载")  # type: ignore[method-assign]
 
     handled = asyncio.run(
         handle_digit_selection_query(
@@ -135,7 +135,7 @@ def test_handle_digit_selection_query_resolves_media_candidate_before_download()
         "1",
         channel="telegram",
     )
-    add_service.add_by_selection.assert_not_called()
+    add_service.add_by_selection_with_auto_confirm.assert_not_called()
     reply_text.assert_awaited_once_with("候选资源列表")
 
 

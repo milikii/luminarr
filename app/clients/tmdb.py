@@ -37,10 +37,14 @@ class TmdbMovie:
     tmdb_id: str = ""
     media_type: str = "movie"
     poster_path: str = ""
+    backdrop_path: str = ""
     overview: str = ""
     popularity: float = 0.0
     vote_count: int = 0
     vote_average: float = 0.0
+    genres: tuple[dict[str, str], ...] = ()
+    countries: tuple[dict[str, str], ...] = ()
+    studios: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +56,7 @@ class TmdbCreditPerson:
     department: str = ""
     job: str = ""
     order: int = 0
+    profile_path: str = ""
 
 
 class TmdbClient:
@@ -93,17 +98,10 @@ class TmdbClient:
         cleaned_tmdb_id = tmdb_id.strip()
         if not cleaned_tmdb_id:
             return None
-        response = await self._get(
-            f"/3/movie/{cleaned_tmdb_id}",
-            params={
-                "api_key": self._api_key,
-                "language": "zh-CN",
-            },
+        return await self._get_media_by_id(
+            path=f"/3/movie/{cleaned_tmdb_id}",
+            result_builder=_to_tmdb_movie,
         )
-        data = response.json()
-        if not isinstance(data, Mapping):
-            return None
-        return _to_tmdb_movie(data)
 
     async def get_movie_credits(
         self,
@@ -127,17 +125,10 @@ class TmdbClient:
         cleaned_tmdb_id = tmdb_id.strip()
         if not cleaned_tmdb_id:
             return None
-        response = await self._get(
-            f"/3/tv/{cleaned_tmdb_id}",
-            params={
-                "api_key": self._api_key,
-                "language": "zh-CN",
-            },
+        return await self._get_media_by_id(
+            path=f"/3/tv/{cleaned_tmdb_id}",
+            result_builder=_to_tmdb_tv,
         )
-        data = response.json()
-        if not isinstance(data, Mapping):
-            return None
-        return _to_tmdb_tv(data)
 
     async def get_tv_credits(
         self,
@@ -235,6 +226,57 @@ class TmdbClient:
                 break
         return resolved_results
 
+    async def _get_media_by_id(
+        self,
+        *,
+        path: str,
+        result_builder: Callable[[Mapping[str, Any]], TmdbMovie | None],
+    ) -> TmdbMovie | None:
+        localized = await self._get_media_detail(path=path, language="zh-CN", result_builder=result_builder)
+        if localized is None:
+            return None
+        reference = await self._get_optional_media_detail(
+            path=path,
+            language="en-US",
+            result_builder=result_builder,
+        )
+        return _merge_tmdb_movie_truth(localized=localized, reference=reference)
+
+    async def _get_media_detail(
+        self,
+        *,
+        path: str,
+        language: str,
+        result_builder: Callable[[Mapping[str, Any]], TmdbMovie | None],
+    ) -> TmdbMovie | None:
+        response = await self._get(
+            path,
+            params={
+                "api_key": self._api_key,
+                "language": language,
+            },
+        )
+        data = response.json()
+        if not isinstance(data, Mapping):
+            return None
+        return result_builder(data)
+
+    async def _get_optional_media_detail(
+        self,
+        *,
+        path: str,
+        language: str,
+        result_builder: Callable[[Mapping[str, Any]], TmdbMovie | None],
+    ) -> TmdbMovie | None:
+        try:
+            return await self._get_media_detail(
+                path=path,
+                language=language,
+                result_builder=result_builder,
+            )
+        except (httpx.HTTPError, ValueError):
+            return None
+
     async def _get_credits(
         self,
         *,
@@ -304,10 +346,14 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
         year=year,
         media_type="movie",
         poster_path=_safe_text(item.get("poster_path")),
+        backdrop_path=_safe_text(item.get("backdrop_path")),
         overview=_safe_text(item.get("overview")),
         popularity=_safe_float(item.get("popularity")),
         vote_count=_safe_int(item.get("vote_count")),
         vote_average=_safe_float(item.get("vote_average")),
+        genres=_normalize_named_rows(item.get("genres")),
+        countries=_normalize_named_rows(item.get("production_countries"), id_key="iso_3166_1"),
+        studios=_normalize_named_rows(item.get("production_companies")),
     )
 
 
@@ -328,10 +374,14 @@ def _to_tmdb_tv(item: Mapping[str, Any]) -> TmdbMovie | None:
         year=year,
         media_type="tv",
         poster_path=_safe_text(item.get("poster_path")),
+        backdrop_path=_safe_text(item.get("backdrop_path")),
         overview=_safe_text(item.get("overview")),
         popularity=_safe_float(item.get("popularity")),
         vote_count=_safe_int(item.get("vote_count")),
         vote_average=_safe_float(item.get("vote_average")),
+        genres=_normalize_named_rows(item.get("genres")),
+        countries=_normalize_named_rows(item.get("origin_country"), id_key="iso_3166_1", name_key="name"),
+        studios=_normalize_named_rows(item.get("production_companies")),
     )
 
 
@@ -382,7 +432,115 @@ def _to_tmdb_credit_person(item: Mapping[str, Any]) -> TmdbCreditPerson | None:
         department=_safe_text(item.get("known_for_department")) or _safe_text(item.get("department")),
         job=_safe_text(item.get("job")),
         order=_safe_int(item.get("order")),
+        profile_path=_safe_text(item.get("profile_path")),
     )
+
+
+def _normalize_named_rows(
+    value: Any,
+    *,
+    id_key: str = "id",
+    name_key: str = "name",
+) -> tuple[dict[str, str], ...]:
+    if not isinstance(value, list):
+        return ()
+    rows: list[dict[str, str]] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            identifier = _safe_text(item.get(id_key))
+            name = _safe_text(item.get(name_key))
+        else:
+            identifier = _safe_text(item)
+            name = _safe_text(item)
+        if not name:
+            continue
+        row: dict[str, str] = {name_key: name}
+        if identifier:
+            row[id_key] = identifier
+        rows.append(row)
+    return tuple(rows)
+
+
+def _merge_tmdb_movie_truth(
+    *,
+    localized: TmdbMovie,
+    reference: TmdbMovie | None,
+) -> TmdbMovie:
+    if reference is None:
+        return localized
+    return TmdbMovie(
+        title=localized.title or reference.title,
+        original_title=reference.original_title or localized.original_title or reference.title or localized.title,
+        year=localized.year or reference.year,
+        tmdb_id=localized.tmdb_id or reference.tmdb_id,
+        media_type=localized.media_type or reference.media_type,
+        poster_path=localized.poster_path or reference.poster_path,
+        backdrop_path=localized.backdrop_path or reference.backdrop_path,
+        overview=localized.overview or reference.overview,
+        popularity=localized.popularity or reference.popularity,
+        vote_count=localized.vote_count or reference.vote_count,
+        vote_average=localized.vote_average or reference.vote_average,
+        genres=localized.genres or reference.genres,
+        countries=_merge_named_rows_with_reference(
+            localized.countries,
+            reference.countries,
+            id_key="iso_3166_1",
+        ),
+        studios=_merge_named_rows_with_reference(
+            localized.studios,
+            reference.studios,
+            id_key="id",
+        ),
+    )
+
+
+def _merge_named_rows_with_reference(
+    localized_rows: tuple[dict[str, str], ...],
+    reference_rows: tuple[dict[str, str], ...],
+    *,
+    id_key: str,
+) -> tuple[dict[str, str], ...]:
+    if not reference_rows:
+        return localized_rows
+    reference_by_key = {_named_row_merge_key(row, id_key=id_key): row for row in reference_rows}
+    merged_rows: list[dict[str, str]] = []
+    seen_keys: set[str] = set()
+    for localized_row in localized_rows:
+        merge_key = _named_row_merge_key(localized_row, id_key=id_key)
+        merged_rows.append(
+            _merge_named_row(
+                localized_row=localized_row,
+                reference_row=reference_by_key.get(merge_key),
+            )
+        )
+        seen_keys.add(merge_key)
+    for reference_row in reference_rows:
+        merge_key = _named_row_merge_key(reference_row, id_key=id_key)
+        if merge_key in seen_keys:
+            continue
+        merged_rows.append(_merge_named_row(localized_row={}, reference_row=reference_row))
+    return tuple(merged_rows)
+
+
+def _merge_named_row(
+    *,
+    localized_row: Mapping[str, str],
+    reference_row: Mapping[str, str] | None,
+) -> dict[str, str]:
+    merged = dict(reference_row or {})
+    merged.update(localized_row)
+    localized_name = _safe_text(localized_row.get("name"))
+    reference_name = _safe_text(reference_row.get("name")) if reference_row is not None else ""
+    if reference_name and localized_name and localized_name != reference_name:
+        merged["original_name"] = reference_name
+    return merged
+
+
+def _named_row_merge_key(row: Mapping[str, str], *, id_key: str) -> str:
+    identifier = _safe_text(row.get(id_key))
+    if identifier:
+        return identifier
+    return _safe_text(row.get("name")).casefold()
 
 
 def _extract_year(value: str) -> str:

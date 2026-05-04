@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from collections.abc import Callable
@@ -65,6 +66,12 @@ class _SubtitleImportTranslationPlan:
 
 _VIDEO_FILE_SUFFIXES = frozenset({".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"})
 _SUBTITLE_FILE_SUFFIXES = (".srt", ".ass")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_LOCAL_FFMPEG_DIR = _REPO_ROOT / ".tools" / "ffmpeg"
+_BILINGUAL_ASS_OUTPUT_SUFFIX = ".dual.ass"
+_BILINGUAL_ASS_FONT_FAMILY = "LXGW WenKai"
+_BILINGUAL_ASS_CHINESE_FONT_SIZE = 44
+_BILINGUAL_ASS_ENGLISH_FONT_SIZE = 24
 _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX = {
     "ass": ".ass",
     "mov_text": ".srt",
@@ -143,6 +150,8 @@ def _extract_adjacent_subtitle_suffix(*, target_path: Path, subtitle_path: Path)
 
 def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
     if not path.exists() or not path.is_file():
+        return None
+    if path.name.lower().endswith(_BILINGUAL_ASS_OUTPUT_SUFFIX):
         return None
     if _is_chinese_subtitle_path(path):
         return None
@@ -430,7 +439,7 @@ def _request_subtitle_chat_completion(
 ) -> str:
     payload = {
         "model": model,
-        "temperature": 0.2,
+        "temperature": 0,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
@@ -440,8 +449,13 @@ def _request_subtitle_chat_completion(
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-    with httpx.Client(timeout=timeout_seconds, proxy=proxy_url or None) as client:
-        response = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+    try:
+        with httpx.Client(timeout=timeout_seconds, proxy=proxy_url or None) as client:
+            response = client.post(f"{base_url}/chat/completions", headers=headers, json=payload)
+    except httpx.TimeoutException as exc:
+        raise RuntimeError(f"请求超时：{exc}") from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"请求失败：{exc}") from exc
     if response.status_code >= 400:
         raise RuntimeError(f"HTTP {response.status_code}: {response.text[:300]}")
     try:
@@ -741,7 +755,7 @@ def _probe_embedded_subtitle_streams_for_video(
     timeout_seconds: float,
 ) -> tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]:
     command = [
-        "ffprobe",
+        _resolve_local_ffmpeg_command("ffprobe"),
         "-v",
         "error",
         "-select_streams",
@@ -782,7 +796,7 @@ def _probe_embedded_subtitle_streams_with_ffmpeg(
     timeout_seconds: float,
 ) -> tuple[list[_EmbeddedSubtitleStream], _SubtitleCommandFailure | None]:
     command = [
-        "ffmpeg",
+        _resolve_local_ffmpeg_command("ffmpeg"),
         "-hide_banner",
         "-i",
         str(video_path),
@@ -802,6 +816,13 @@ def _probe_embedded_subtitle_streams_with_ffmpeg(
         output_text=completed.stderr or completed.stdout or "",
     )
     return parsed_streams, None
+
+
+def _resolve_local_ffmpeg_command(command_name: str) -> str:
+    local_binary = _LOCAL_FFMPEG_DIR / command_name
+    if local_binary.is_file() and os.access(local_binary, os.X_OK):
+        return str(local_binary)
+    return command_name
 
 
 def _parse_srt_blocks(content: str) -> list[_SrtBlock]:
@@ -849,15 +870,82 @@ def _translate_blocks_in_chunks(
     return translated_blocks, None
 
 
-def _translate_chunk_lines(
+def _is_line_count_mismatch_runtime_error(error_message: str) -> bool:
+    return error_message.startswith("翻译行数不一致（source=")
+
+
+def _translate_chunk_lines_by_splitting(
     *,
     source_lines: list[str],
     translate_lines: Callable[[list[str]], list[str]],
     subtitle_path: Path,
 ) -> tuple[list[str] | None, str | None]:
+    midpoint = len(source_lines) // 2
+    left_lines, left_error = _translate_chunk_lines(
+        source_lines=source_lines[:midpoint],
+        translate_lines=translate_lines,
+        subtitle_path=subtitle_path,
+    )
+    if left_lines is None:
+        return None, left_error
+
+    right_lines, right_error = _translate_chunk_lines(
+        source_lines=source_lines[midpoint:],
+        translate_lines=translate_lines,
+        subtitle_path=subtitle_path,
+    )
+    if right_lines is None:
+        return None, right_error
+    return left_lines + right_lines, None
+
+
+def _retry_or_split_line_count_mismatch(
+    *,
+    source_lines: list[str],
+    translate_lines: Callable[[list[str]], list[str]],
+    subtitle_path: Path,
+    remaining_same_chunk_retries: int,
+    mismatch_message: str,
+) -> tuple[list[str] | None, str | None]:
+    if remaining_same_chunk_retries > 0:
+        return _translate_chunk_lines(
+            source_lines=source_lines,
+            translate_lines=translate_lines,
+            subtitle_path=subtitle_path,
+            remaining_same_chunk_retries=remaining_same_chunk_retries - 1,
+        )
+    if len(source_lines) > 1:
+        return _translate_chunk_lines_by_splitting(
+            source_lines=source_lines,
+                translate_lines=translate_lines,
+                subtitle_path=subtitle_path,
+            )
+    message = f"模型翻译失败：{subtitle_path}，原因：{mismatch_message}"
+    _print_colored_error(
+        problem=message,
+        fix="检查模型输出格式约束，确保返回严格 JSON translations 数组；必要时更换更稳的模型。",
+    )
+    return None, message
+
+
+def _translate_chunk_lines(
+    *,
+    source_lines: list[str],
+    translate_lines: Callable[[list[str]], list[str]],
+    subtitle_path: Path,
+    remaining_same_chunk_retries: int = 1,
+) -> tuple[list[str] | None, str | None]:
     try:
         translated_lines = translate_lines(source_lines)
     except RuntimeError as exc:
+        if _is_line_count_mismatch_runtime_error(str(exc)):
+            return _retry_or_split_line_count_mismatch(
+                source_lines=source_lines,
+                translate_lines=translate_lines,
+                subtitle_path=subtitle_path,
+                remaining_same_chunk_retries=remaining_same_chunk_retries,
+                mismatch_message=str(exc),
+            )
         message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
         _print_colored_error(
             problem=message,
@@ -866,12 +954,27 @@ def _translate_chunk_lines(
         return None, message
 
     if len(translated_lines) != len(source_lines):
-        message = f"模型返回行数不一致：源={len(source_lines)}，译文={len(translated_lines)}，文件={subtitle_path}"
-        _print_colored_error(
-            problem=message,
-            fix="检查模型输出格式约束，确保返回严格 JSON translations 数组。",
+        if remaining_same_chunk_retries > 0:
+            return _translate_chunk_lines(
+                source_lines=source_lines,
+                translate_lines=translate_lines,
+                subtitle_path=subtitle_path,
+                remaining_same_chunk_retries=remaining_same_chunk_retries - 1,
+            )
+        if len(source_lines) > 1:
+            return _translate_chunk_lines_by_splitting(
+                source_lines=source_lines,
+                translate_lines=translate_lines,
+                subtitle_path=subtitle_path,
+            )
+        mismatch_message = f"翻译行数不一致（source={len(source_lines)}, translated={len(translated_lines)}）"
+        return _retry_or_split_line_count_mismatch(
+            source_lines=source_lines,
+            translate_lines=translate_lines,
+            subtitle_path=subtitle_path,
+            remaining_same_chunk_retries=0,
+            mismatch_message=mismatch_message,
         )
-        return None, message
     return translated_lines, None
 
 
@@ -908,6 +1011,14 @@ def _translate_srt_subtitle_content(
     )
     if translated_blocks is None:
         return None, error_message
+    bilingual_ass_output = _render_bilingual_ass_from_srt_blocks(
+        blocks=blocks,
+        translated_blocks=translated_blocks,
+    )
+    _write_bilingual_ass_sidecar(
+        source_path=subtitle_path,
+        bilingual_output=bilingual_ass_output,
+    )
     return _render_srt(translated_blocks), None
 
 
@@ -942,6 +1053,14 @@ def _translate_ass_subtitle_content(
         return None, error_message
     for dialogue_line, translated_text in zip(dialogue_lines, translated_lines):
         lines[dialogue_line.line_index] = dialogue_line.prefix + translated_text
+    _write_bilingual_ass_sidecar(
+        source_path=subtitle_path,
+        bilingual_output=_render_bilingual_ass_from_ass_lines(
+            lines=lines,
+            dialogue_lines=dialogue_lines,
+            translated_lines=translated_lines,
+        ),
+    )
     return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
 
 
@@ -1005,6 +1124,128 @@ def _render_ass_lines(lines: list[str], *, had_trailing_newline: bool) -> str:
     if had_trailing_newline:
         return rendered + "\n"
     return rendered
+
+
+def _render_bilingual_ass_from_srt_blocks(
+    *,
+    blocks: list[_SrtBlock],
+    translated_blocks: list[_SrtBlock],
+) -> str:
+    header = _build_bilingual_ass_header()
+    dialogue_lines: list[str] = []
+    for source_block, translated_block in zip(blocks, translated_blocks):
+        start_time, end_time = _convert_srt_timecode_to_ass(source_block.timecode)
+        bilingual_text = _build_bilingual_ass_dialogue_text(
+            chinese_text=translated_block.text,
+            english_text=source_block.text,
+        )
+        dialogue_lines.append(
+            f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{bilingual_text}"
+        )
+    return header + "\n".join(dialogue_lines) + "\n"
+
+
+def _render_bilingual_ass_from_ass_lines(
+    *,
+    lines: list[str],
+    dialogue_lines: list[_AssDialogueLine],
+    translated_lines: list[str],
+) -> str:
+    bilingual_lines = list(lines)
+    for dialogue_line, translated_text in zip(dialogue_lines, translated_lines):
+        bilingual_lines[dialogue_line.line_index] = (
+            dialogue_line.prefix
+            + _build_bilingual_ass_dialogue_text(
+                chinese_text=translated_text,
+                english_text=dialogue_line.text,
+            )
+        )
+    return _render_ass_lines(bilingual_lines, had_trailing_newline=bool(lines and lines[-1] == ""))
+
+
+def _build_bilingual_ass_header() -> str:
+    return (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        "WrapStyle: 2\n"
+        "ScaledBorderAndShadow: yes\n"
+        "PlayResX: 1920\n"
+        "PlayResY: 1080\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
+        "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        f"Style: Default,{_BILINGUAL_ASS_FONT_FAMILY},{_BILINGUAL_ASS_CHINESE_FONT_SIZE},"
+        "&H00FFFFFF,&H00FFFFFF,&H00111111,&H64000000,0,0,0,0,100,100,0,0,1,1,0,2,30,30,20,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+
+
+def _convert_srt_timecode_to_ass(timecode: str) -> tuple[str, str]:
+    start_raw, end_raw = [part.strip() for part in timecode.split("-->")]
+    return _normalize_srt_timestamp_for_ass(start_raw), _normalize_srt_timestamp_for_ass(end_raw)
+
+
+def _normalize_srt_timestamp_for_ass(timestamp: str) -> str:
+    hours_text, minutes_text, rest_text = timestamp.split(":")
+    seconds_text, milliseconds_text = rest_text.split(",")
+    hours = int(hours_text)
+    milliseconds = int(milliseconds_text)
+    centiseconds = round(milliseconds / 10)
+    if centiseconds >= 100:
+        seconds = int(seconds_text) + 1
+        centiseconds = 0
+    else:
+        seconds = int(seconds_text)
+    return f"{hours}:{int(minutes_text):02d}:{seconds:02d}.{centiseconds:02d}"
+
+
+def _build_bilingual_ass_dialogue_text(*, chinese_text: str, english_text: str) -> str:
+    chinese = _escape_ass_text(chinese_text.strip())
+    english = _escape_ass_text(english_text.strip())
+    if chinese and english:
+        return (
+            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_CHINESE_FONT_SIZE}\\an2}}"
+            f"{chinese}"
+            f"\\N{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_ENGLISH_FONT_SIZE}}}{english}"
+        )
+    if chinese:
+        return (
+            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_CHINESE_FONT_SIZE}\\an2}}"
+            f"{chinese}"
+        )
+    if english:
+        return (
+            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_ENGLISH_FONT_SIZE}\\an2}}"
+            f"{english}"
+        )
+    return ""
+
+
+def _escape_ass_text(value: str) -> str:
+    return (
+        value.replace("\\", r"\\")
+        .replace("{", r"\{")
+        .replace("}", r"\}")
+        .replace("\r\n", r"\N")
+        .replace("\n", r"\N")
+        .replace("\r", r"\N")
+    )
+
+
+def _write_bilingual_ass_sidecar(*, source_path: Path, bilingual_output: str) -> None:
+    bilingual_path = source_path.with_suffix(_BILINGUAL_ASS_OUTPUT_SUFFIX)
+    try:
+        bilingual_path.write_text(bilingual_output, encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        emit_operational_log(
+            title="双排字幕写入失败",
+            detail=f"source={source_path} target={bilingual_path} 错误={exc}",
+            fix_hint="检查字幕目录写权限和磁盘空间；当前 plain 字幕仍会保留。",
+        )
 
 
 def _is_timecode_line(line: str) -> bool:

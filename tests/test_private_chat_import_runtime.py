@@ -42,7 +42,7 @@ def test_handle_import_query_routes_to_import_service() -> None:
     reply_func = AsyncMock()
     execution_gate = _ExecutionGate()
     import_service = ImportToLibraryService(AsyncMock(return_value=None), "/data/library/movies")
-    import_service.import_by_task_ref = AsyncMock(return_value="导入待确认")
+    import_service.import_by_task_ref = AsyncMock(return_value="导入成功\n\n后处理总结")
 
     handled = asyncio.run(
         handle_import_query(
@@ -58,7 +58,7 @@ def test_handle_import_query_routes_to_import_service() -> None:
 
     assert handled is True
     assert execution_gate.actions == [tg.ACTION_IMPORT_TO_LIBRARY]
-    reply_func.assert_awaited_once_with("导入待确认")
+    reply_func.assert_awaited_once_with("导入成功\n\n后处理总结")
     import_service.import_by_task_ref.assert_awaited_once_with("87", chat_id=1001, user_id=2001)
 
 

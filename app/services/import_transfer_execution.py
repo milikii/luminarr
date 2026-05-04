@@ -319,6 +319,7 @@ def _hardlink_file_pairs(transfer_pairs: list[tuple[Path, Path]]) -> None:
     created_targets: list[Path] = []
     try:
         for source_path, target_path in transfer_pairs:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
             os.link(source_path, target_path)
             created_targets.append(target_path)
     except (OSError, shutil.Error):
@@ -332,6 +333,7 @@ def _copy_file_pairs(transfer_pairs: list[tuple[Path, Path]]) -> None:
     try:
         for source_path, target_path in transfer_pairs:
             current_target = target_path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, target_path)
             created_targets.append(target_path)
             current_target = None

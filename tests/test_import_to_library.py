@@ -127,11 +127,36 @@ def test_confirm_import_by_task_ref_executes_after_pending(tmp_path: Path) -> No
     assert "导入待确认" in pending_text
 
     text = _run(service.confirm_import_by_task_ref("87"))
-    target_file = target_dir / "Dune (2021).mkv"
     assert "导入成功" in text
-    assert str(target_file) in text
-    assert target_file.exists()
-    assert source_file.stat().st_ino == target_file.stat().st_ino
+
+
+def test_import_by_task_ref_with_auto_confirm_executes_without_pending_reply(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    target_dir = tmp_path / "library"
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        AsyncMock(return_value=import_source),
+        str(target_dir),
+        refresh_media_server_func=AsyncMock(return_value="媒体库刷新成功。"),
+    )
+
+    text = _run(service.import_by_task_ref_with_auto_confirm("87"))
+
+    assert "导入成功" in text
+    assert "导入待确认" not in text
+    assert "后处理总结" in text
+    assert "目标路径:" in text
 
 
 def test_confirm_import_by_task_ref_hardlinks_matching_external_subtitles(tmp_path: Path) -> None:
@@ -3290,6 +3315,7 @@ def test_confirm_import_by_task_ref_success_with_refresh_success(tmp_path: Path)
 
     assert "导入成功" in text
     assert "媒体库刷新成功。" in text
+    assert "后处理总结" in text
     refresh.assert_awaited_once()
 
 
@@ -3320,6 +3346,7 @@ def test_confirm_import_by_task_ref_success_with_refresh_failure_text(tmp_path: 
 
     assert "导入成功" in text
     assert "媒体库刷新失败：connection timeout" in text
+    assert "后处理总结" in text
     refresh.assert_awaited_once()
 
 
@@ -3350,6 +3377,7 @@ def test_confirm_import_by_task_ref_success_with_refresh_exception(tmp_path: Pat
 
     assert "导入成功" in text
     assert IMPORT_REFRESH_FAILED_TEXT in text
+    assert "后处理总结" in text
     refresh.assert_awaited_once()
 
 
@@ -3459,6 +3487,31 @@ def test_confirm_import_by_task_ref_cross_filesystem_error(tmp_path: Path, monke
     _run(service.import_by_task_ref("87"))
     monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
     text = _run(service.confirm_import_by_task_ref("87"))
+    assert text == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
+
+
+def test_import_by_task_ref_with_auto_confirm_keeps_copy_fallback_confirmation(tmp_path: Path, monkeypatch) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Dune.2021.mkv"
+    source_file.write_bytes(b"demo")
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(AsyncMock(return_value=import_source), str(tmp_path / "library"))
+
+    def _raise_exdev(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
+    text = _run(service.import_by_task_ref_with_auto_confirm("87"))
+
     assert text == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="87")
 
 
@@ -3598,6 +3651,77 @@ def test_confirm_import_copy_fallback_copies_matching_external_subtitles(tmp_pat
     assert "导入方式: 复制" in second_confirm
     target_file = tmp_path / "library" / "Dune (2021).mkv"
     target_subtitle = tmp_path / "library" / "Dune (2021).en.srt"
+    assert target_file.exists()
+    assert target_subtitle.exists()
+    assert source_file.stat().st_ino != target_file.stat().st_ino
+    assert source_subtitle.stat().st_ino != target_subtitle.stat().st_ino
+
+
+def test_confirm_import_copy_fallback_preserves_directoryized_movie_sidecars(tmp_path: Path, monkeypatch) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Akron.2015.1080p.AMZN.WEB-DL.DDP2.0.H.264-NZMA.mkv"
+    source_file.write_bytes(b"demo")
+    source_subtitle = download_dir / "Akron.2015.1080p.AMZN.WEB-DL.DDP2.0.H.264-NZMA.zh.srt"
+    source_subtitle.write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    approval_repo = ApprovalRepo(database)
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="1",
+        task_id="20",
+        task_hash="hash-20",
+        event_type=MEDIA_IDENTITY_EVENT_TYPE,
+        message=media_identity_to_json(
+            {
+                "media_type": "movie",
+                "tmdb_id": "361018",
+                "title": "爱的进行时",
+                "original_title": "Akron",
+                "year": "2015",
+                "source": "search_confirmed",
+            }
+        ),
+    )
+
+    import_source = TransmissionImportSource(
+        task_id="20",
+        task_hash="hash-20",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(tmp_path / "library"),
+        approval_repo=approval_repo,
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("20"))
+
+    def _raise_exdev(src: str | Path, dst: str | Path) -> None:
+        raise OSError(errno.EXDEV, "Invalid cross-device link")
+
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _raise_exdev)
+    first_confirm = _run(service.confirm_import_by_task_ref("20"))
+    assert first_confirm == IMPORT_COPY_APPROVAL_PENDING_TEXT.format(task_ref="20")
+
+    def _unexpected_hardlink(src: str | Path, dst: str | Path) -> None:
+        raise AssertionError("copy confirm should not call os.link again")
+
+    monkeypatch.setattr(import_module.import_transfer_execution.os, "link", _unexpected_hardlink)
+    second_confirm = _run(service.confirm_import_by_task_ref("20"))
+
+    target_directory = tmp_path / "library" / "爱的进行时 (2015)"
+    target_file = target_directory / "爱的进行时 (2015).mkv"
+    target_subtitle = target_directory / "爱的进行时 (2015).zh.srt"
+    assert "导入成功" in second_confirm
+    assert "导入方式: 复制" in second_confirm
+    assert target_directory.is_dir()
     assert target_file.exists()
     assert target_subtitle.exists()
     assert source_file.stat().st_ino != target_file.stat().st_ino
@@ -4116,6 +4240,70 @@ def test_resolve_metadata_title_year_prefers_confirmed_media_identity(tmp_path: 
     assert year == "2014"
 
 
+def test_confirm_import_prefers_confirmed_media_identity_for_movie_target_name(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Akron.2015.1080p.AMZN.WEB-DL.DDP2.0.H.264-NZMA.mkv"
+    source_file.write_bytes(b"demo")
+    source_subtitle = download_dir / "Akron.2015.1080p.AMZN.WEB-DL.DDP2.0.H.264-NZMA.zh.srt"
+    source_subtitle.write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="1",
+        task_id="20",
+        task_hash="hash-20",
+        event_type="downloader.succeeded",
+        message="Akron.2015.1080p.AMZN.WEB-DL.DDP2.0.H.264-NZMA",
+    )
+    event_repo.append_event(
+        task_ref="1",
+        task_id="20",
+        task_hash="hash-20",
+        event_type=MEDIA_IDENTITY_EVENT_TYPE,
+        message=media_identity_to_json(
+            {
+                "media_type": "movie",
+                "tmdb_id": "361018",
+                "title": "爱的进行时",
+                "original_title": "Akron",
+                "year": "2015",
+                "source": "search_confirmed",
+            }
+        ),
+    )
+
+    import_source = TransmissionImportSource(
+        task_id="20",
+        task_hash="hash-20",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("20"))
+    text = _run(service.confirm_import_by_task_ref("20"))
+
+    target_directory = target_dir / "爱的进行时 (2015)"
+    target_file = target_directory / "爱的进行时 (2015).mkv"
+    target_subtitle = target_directory / "爱的进行时 (2015).zh.srt"
+    assert target_directory.is_dir()
+    assert target_file.exists()
+    assert target_subtitle.exists()
+    assert str(target_file) in text
+    assert source_file.stat().st_ino == target_file.stat().st_ino
+    assert source_subtitle.stat().st_ino == target_subtitle.stat().st_ino
+
+
 def test_confirm_import_renames_directory_with_normalized_movie_name(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)
@@ -4181,6 +4369,7 @@ def test_confirm_import_triggers_metadata_scrape_success_event(tmp_path: Path) -
     _run(service.import_by_task_ref("87"))
     text = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in text
+    assert "metadata：成功；metadata 刮削成功：/tmp/demo.metadata.json" in text
     assert len(seen_inputs) == 1
     assert seen_inputs[0].title == "Interstellar"
     assert seen_inputs[0].year == "2014"
@@ -4231,6 +4420,7 @@ def test_confirm_import_metadata_scrape_prefers_downloader_title_truth(tmp_path:
     _run(service.import_by_task_ref("87"))
     text = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in text
+    assert "字幕：跳过" in text
     assert len(seen_inputs) == 1
     assert seen_inputs[0].title == "Mission: Impossible - Fallout"
     assert seen_inputs[0].year == "2018"
@@ -4287,6 +4477,7 @@ def test_confirm_import_metadata_scrape_passes_confirmed_tmdb_id(tmp_path: Path)
     _run(service.import_by_task_ref("87"))
     text = _run(service.confirm_import_by_task_ref("87"))
     assert "导入成功" in text
+    assert "字幕：跳过" in text
     assert len(seen_inputs) == 1
     assert seen_inputs[0].tmdb_id == "157336"
     assert seen_inputs[0].title == "Interstellar"

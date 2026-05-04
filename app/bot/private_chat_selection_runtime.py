@@ -58,7 +58,7 @@ async def handle_digit_selection_query(
         return True
     reply = await execution_gate.run(
         tg.ACTION_ADD_TO_DOWNLOADER,
-        lambda: add_service.add_by_selection(
+        lambda: add_service.add_by_selection_with_auto_confirm(
             chat_id,
             query,
             user_id=user_id,

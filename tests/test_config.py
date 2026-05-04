@@ -256,6 +256,22 @@ def test_load_settings_reads_fanart_settings() -> None:
     assert settings.fanart_api_key == "fanart-api-key"
 
 
+def test_load_settings_reads_domestic_cast_helper_settings() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "DOMESTIC_CAST_HELPER_SOURCE": "douban",
+            "DOUBAN_BASE_URL": "https://movie.douban.test/",
+        }
+    )
+
+    assert settings.domestic_cast_helper_source == "douban"
+    assert settings.douban_base_url == "https://movie.douban.test"
+
+
 def test_load_settings_reads_sqlite_path() -> None:
     settings = load_settings(
         {

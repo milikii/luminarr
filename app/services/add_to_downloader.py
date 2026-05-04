@@ -1032,7 +1032,7 @@ class AddConfirmFinalizationState:
         approval_identity_moved = move_completed_approval_identity(
             current_task_id=pending_add.task_id,
             current_task_hash=pending_add.task_hash,
-            new_task_id=pending_add.task_id,
+            new_task_id=result.task_id,
             new_task_hash=result.task_hash,
         )
         if approval_identity_moved is not True:
@@ -1040,7 +1040,7 @@ class AddConfirmFinalizationState:
         if claimed_job:
             completed_context = to_completed_pending_add_context(
                 pending_add,
-                actual_task_id=pending_add.task_id,
+                actual_task_id=result.task_id,
                 actual_task_hash=result.task_hash,
             )
             job_completed = mark_completed_job(
@@ -1547,6 +1547,32 @@ class AddToDownloaderService:
             channel=channel,
         )
 
+    async def add_by_selection_with_auto_confirm(
+        self,
+        chat_id: int,
+        selection_text: str,
+        *,
+        user_id: int | None = None,
+        channel: str | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> str:
+        pending_reply = await self.add_by_selection(
+            chat_id,
+            selection_text,
+            user_id=user_id,
+            channel=channel,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
+        )
+        if not self.has_pending_add(chat_id, selection_text):
+            return pending_reply
+        return await self.confirm_add_by_task_ref(selection_text, chat_id=chat_id, user_id=user_id)
+
     async def add_by_candidate(
         self,
         *,
@@ -1576,6 +1602,34 @@ class AddToDownloaderService:
             pending_add=build_result.pending_add,
             channel=channel,
         )
+
+    async def add_by_candidate_with_auto_confirm(
+        self,
+        *,
+        chat_id: int,
+        candidate: Mapping[str, object],
+        task_ref: str,
+        user_id: int | None = None,
+        channel: str | None = None,
+        downloader_name: str = "",
+        downloader_type: str = "transmission",
+        download_dir: str = "",
+        auto_import_enabled: bool = True,
+    ) -> str:
+        pending_reply = await self.add_by_candidate(
+            chat_id=chat_id,
+            candidate=candidate,
+            task_ref=task_ref,
+            user_id=user_id,
+            channel=channel,
+            downloader_name=downloader_name,
+            downloader_type=downloader_type,
+            download_dir=download_dir,
+            auto_import_enabled=auto_import_enabled,
+        )
+        if not self.has_pending_add(chat_id, task_ref):
+            return pending_reply
+        return await self.confirm_add_by_task_ref(task_ref, chat_id=chat_id, user_id=user_id)
 
     async def add_by_batch_selection(
         self,

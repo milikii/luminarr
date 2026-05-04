@@ -43,10 +43,17 @@ _LOW_QUALITY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 
 
 @dataclass(frozen=True, slots=True)
+class AutoImportNotification:
+    chat_id: int
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class AutoImportRunResult:
     scanned: int
     progressed: int
     replies: tuple[str, ...]
+    notifications: tuple[AutoImportNotification, ...] = ()
     state_unavailable: bool = False
 
 
@@ -54,6 +61,7 @@ class AutoImportRunResult:
 class AutoImportBatchProgress:
     progressed: int
     replies: tuple[str, ...]
+    notifications: tuple[AutoImportNotification, ...]
     state_unavailable: bool = False
 
 
@@ -99,6 +107,7 @@ class PostDownloadAutoImportService:
             scanned=len(candidates),
             progressed=progress.progressed,
             replies=progress.replies,
+            notifications=progress.notifications,
             state_unavailable=progress.state_unavailable,
         )
 
@@ -307,6 +316,7 @@ async def run_auto_import_candidates(
     state_unavailable_error: type[BaseException],
 ) -> AutoImportBatchProgress:
     replies: list[str] = []
+    notifications: list[AutoImportNotification] = []
     progressed = 0
     state_unavailable = False
 
@@ -319,12 +329,15 @@ async def run_auto_import_candidates(
         if reply is None:
             continue
         replies.append(reply)
+        if candidate.chat_id > 0:
+            notifications.append(AutoImportNotification(chat_id=candidate.chat_id, text=reply))
         if count_as_progress(candidate, reply):
             progressed += 1
 
     return AutoImportBatchProgress(
         progressed=progressed,
         replies=tuple(replies),
+        notifications=tuple(notifications),
         state_unavailable=state_unavailable,
     )
 

@@ -30,6 +30,12 @@ class ImportPostProcessRequest:
 @dataclass(frozen=True, slots=True)
 class ImportPostProcessResult:
     reply_suffix: str = ""
+    metadata_message: str = ""
+    subtitle_message: str = ""
+    refresh_message: str = ""
+    metadata_status: str = ""
+    subtitle_status: str = ""
+    refresh_status: str = ""
 
 
 class ImportPostProcessingService:
@@ -52,9 +58,13 @@ class ImportPostProcessingService:
 
     async def run(self, request: ImportPostProcessRequest) -> ImportPostProcessResult:
         metadata_result = await self._try_scrape_metadata(request=request)
-        self._try_translate_subtitle(request=request, metadata_result=metadata_result)
-        refresh_suffix = await self._try_refresh(request=request)
-        return ImportPostProcessResult(reply_suffix=refresh_suffix)
+        subtitle_result = self._try_translate_subtitle(request=request, metadata_result=metadata_result)
+        refresh_result = await self._try_refresh(request=request)
+        return build_import_post_process_result(
+            metadata_result=metadata_result,
+            subtitle_result=subtitle_result,
+            refresh_result=refresh_result,
+        )
 
     async def _try_scrape_metadata(
         self,
@@ -111,9 +121,9 @@ class ImportPostProcessingService:
         *,
         request: ImportPostProcessRequest,
         metadata_result: MetadataScrapeResult | None,
-    ) -> None:
+    ) -> SubtitleTranslateResult | None:
         if self._translate_subtitle_func is None:
-            return
+            return None
         if metadata_result is not None and metadata_result.metadata_path.strip():
             metadata_path = metadata_result.metadata_path.strip()
         else:
@@ -140,7 +150,7 @@ class ImportPostProcessingService:
                 message=message,
                 fix_hint="检查字幕文件编码和目录写权限，再重试 confirm 导入。",
             )
-            return
+            return SubtitleTranslateResult(success=False, message=message)
 
         if result.skipped:
             event_type = "subtitle.skipped"
@@ -160,6 +170,7 @@ class ImportPostProcessingService:
                 message=result.message,
                 fix_hint="检查字幕文件内容、编码和目录写权限，再重试 confirm 导入。",
             )
+        return result
 
     async def _try_refresh(self, *, request: ImportPostProcessRequest) -> str:
         if self._refresh_media_server_func is None:
@@ -197,6 +208,74 @@ def _resolve_metadata_sidecar_path(target_path: Path) -> Path:
     if target_path.is_dir():
         return target_path / ".luminarr.metadata.json"
     return target_path.with_suffix(".metadata.json")
+
+
+def build_import_post_process_result(
+    *,
+    metadata_result: MetadataScrapeResult | None,
+    subtitle_result: SubtitleTranslateResult | None,
+    refresh_result: str,
+) -> ImportPostProcessResult:
+    metadata_message = metadata_result.message.strip() if metadata_result is not None else ""
+    subtitle_message = subtitle_result.message.strip() if subtitle_result is not None else ""
+    refresh_message = refresh_result.strip()
+    metadata_status = _resolve_metadata_status(metadata_result)
+    subtitle_status = _resolve_subtitle_status(subtitle_result)
+    refresh_status = _resolve_refresh_status(refresh_message)
+
+    summary_lines = [
+        _format_summary_line("metadata", metadata_status, metadata_message),
+        _format_summary_line("字幕", subtitle_status, subtitle_message),
+        _format_summary_line("刷新", refresh_status, refresh_message),
+    ]
+    summary_lines = [line for line in summary_lines if line]
+
+    if not summary_lines:
+        return ImportPostProcessResult()
+
+    reply_suffix = "\n\n后处理总结\n" + "\n".join(f"- {line}" for line in summary_lines)
+    return ImportPostProcessResult(
+        reply_suffix=reply_suffix,
+        metadata_message=metadata_message,
+        subtitle_message=subtitle_message,
+        refresh_message=refresh_message,
+        metadata_status=metadata_status,
+        subtitle_status=subtitle_status,
+        refresh_status=refresh_status,
+    )
+
+
+def _resolve_metadata_status(result: MetadataScrapeResult | None) -> str:
+    if result is None:
+        return "skipped"
+    return "success" if result.success else "failed"
+
+
+def _resolve_subtitle_status(result: SubtitleTranslateResult | None) -> str:
+    if result is None:
+        return "skipped"
+    if result.skipped:
+        return "skipped"
+    return "success" if result.success else "failed"
+
+
+def _resolve_refresh_status(message: str) -> str:
+    if not message:
+        return "skipped"
+    return "success" if message == IMPORT_REFRESH_SUCCESS_TEXT else "failed"
+
+
+def _format_summary_line(label: str, status: str, message: str) -> str:
+    if status == "skipped" and not message:
+        return f"{label}：跳过"
+    status_text = {
+        "success": "成功",
+        "failed": "失败",
+        "skipped": "跳过",
+    }.get(status, status)
+    if not message:
+        return f"{label}：{status_text}"
+    return f"{label}：{status_text}；{message}"
 
 
 def _log_import_metadata_scrape_failed(*, message: str) -> None:

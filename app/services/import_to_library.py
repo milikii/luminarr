@@ -19,6 +19,7 @@ from app.services.import_approval_state import ImportApprovalState, ImportTarget
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
 from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
 from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
+from app.services.import_prepare_state import build_movie_target_name_from_identity
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_from_json
 from app.services.workflow_trace_logger import WorkflowTraceLogger
@@ -151,6 +152,7 @@ class ImportToLibraryService:
             get_import_source_func=get_import_source_func,
             library_target_dir=self._library_target_dir,
             job_event_repo=job_event_repo,
+            resolve_confirmed_media_identity_func=self._resolve_confirmed_media_identity,
             record_event_func=self._record_event,
             import_query_failed_text=IMPORT_QUERY_FAILED_TEXT,
             import_not_found_text=IMPORT_NOT_FOUND_TEXT,
@@ -198,6 +200,57 @@ class ImportToLibraryService:
             record_pending_job=self._record_pending_job,
             record_event=self._record_event,
             log_trace=self._trace_logger.log,
+        )
+
+    async def auto_import_by_task_ref(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
+        cleaned_ref = task_ref.strip()
+        pending_reply = await self.import_by_task_ref(
+            cleaned_ref,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        has_pending_import = self._has_pending_import(
+            chat_id=chat_id,
+            task_ref=cleaned_ref,
+        )
+        if has_pending_import is not True:
+            return pending_reply
+        return await self.confirm_import_by_task_ref(
+            cleaned_ref,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+
+    async def import_by_task_ref_with_auto_confirm(
+        self,
+        task_ref: str,
+        *,
+        chat_id: int | None = None,
+        user_id: int | None = None,
+    ) -> str:
+        cleaned_ref = task_ref.strip()
+        pending_reply = await self.import_by_task_ref(
+            cleaned_ref,
+            chat_id=chat_id,
+            user_id=user_id,
+        )
+        has_pending_import = self._has_pending_import(
+            chat_id=chat_id,
+            task_ref=cleaned_ref,
+        )
+        if has_pending_import is not True:
+            if "导入待确认" not in pending_reply:
+                return pending_reply
+        return await self.confirm_import_by_task_ref(
+            cleaned_ref,
+            chat_id=chat_id,
+            user_id=user_id,
         )
 
     async def confirm_import_by_task_ref(
@@ -682,6 +735,25 @@ class ImportToLibraryService:
     ) -> tuple[PreparedImport | None, str]:
         return await self._prepare_state.prepare_import(task_ref=task_ref, chat_id=chat_id)
 
+    def _resolve_identity_preferred_target_name(
+        self,
+        *,
+        source_path: Path,
+        task_id: str,
+        task_hash: str,
+    ) -> str:
+        confirmed_media_identity = self._resolve_confirmed_media_identity(task_id=task_id, task_hash=task_hash)
+        if confirmed_media_identity is None:
+            return ""
+        if confirmed_media_identity.get("media_type", "").strip() != "movie":
+            return ""
+        return build_movie_target_name_from_identity(
+            title=confirmed_media_identity.get("title", "").strip(),
+            original_title=confirmed_media_identity.get("original_title", "").strip(),
+            year=confirmed_media_identity.get("year", "").strip(),
+            suffix=source_path.suffix if source_path.is_file() else "",
+        )
+
     def _is_raw_bt_task(self, *, chat_id: int | None, task_ref: str) -> bool | None:
         lookup = self._context_lookup.lookup_raw_bt_task(chat_id=chat_id, task_ref=task_ref)
         if lookup.error_kind == "row_corrupted":
@@ -991,6 +1063,21 @@ class ImportToLibraryService:
             pending_job = None
             pending_lookup_failed = True
         return pending_job, pending_lookup_failed
+
+    def _has_pending_import(self, *, chat_id: int | None, task_ref: str) -> bool | None:
+        cleaned_ref = task_ref.strip()
+        if chat_id is None or chat_id <= 0 or not cleaned_ref or self._job_repo is None:
+            return False
+        try:
+            pending_job = self._job_repo.get_import_job_for_chat_ref(
+                chat_id=chat_id,
+                task_ref=cleaned_ref,
+            )
+        except (JobPersistenceError, sqlite3.Error):
+            return None
+        if pending_job is None:
+            return False
+        return pending_job.state == JOB_STATE_PENDING_APPROVAL
 
     def _cancel_pending_import_approval(
         self,

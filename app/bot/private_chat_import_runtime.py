@@ -26,7 +26,7 @@ async def handle_import_query(
 
     reply = await execution_gate.run(
         tg.ACTION_IMPORT_TO_LIBRARY,
-        lambda: import_service.import_by_task_ref(
+        lambda: import_service.auto_import_by_task_ref(
             import_ref,
             chat_id=chat_id,
             user_id=user_id,

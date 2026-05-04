@@ -105,9 +105,11 @@ def test_makefile_help_lists_quality_targets() -> None:
     assert "verify-quality-gates" in makefile_text
     assert "verify-mainline" in makefile_text
     assert "verify-stage1" in makefile_text
+    assert "verify-subtitle-provider-smoke" in makefile_text
     assert (
         "targets: install test quality lint test-downloader-focused "
         "test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-adult-bt-wedge "
+        "verify-subtitle-provider-smoke "
         "test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate "
         "test-cleanup-window sync-cleanup-doc-snapshots compile run "
         "docker-build docker-up docker-logs"
@@ -158,6 +160,7 @@ def test_makefile_verify_adult_bt_wedge_target_points_to_current_focused_regress
     assert (
         "targets: install test quality lint test-downloader-focused "
         "test-import-focused verify-quality-gates verify-mainline verify-stage1 verify-adult-bt-wedge "
+        "verify-subtitle-provider-smoke "
         "test-cleanup-smoke test-cleanup test-docs test-cleanup-docs-gate "
         "test-cleanup-window sync-cleanup-doc-snapshots compile run "
         "docker-build docker-up docker-logs"
@@ -168,6 +171,18 @@ def test_makefile_verify_adult_bt_wedge_target_points_to_current_focused_regress
         "$(PYTHON) -m pytest -q tests/test_query_text_runtime.py tests/test_bt_read_only_display.py tests/test_search_media.py",
         "$(PYTHON) -m pytest -q tests/test_add_pending_context.py tests/test_add_to_downloader.py tests/test_private_chat_runtime.py",
         "$(PYTHON) -m pytest -q tests/test_adult_archive_service.py tests/test_get_download_status.py",
+    ]
+
+
+def test_makefile_verify_subtitle_provider_smoke_target_points_to_module_entrypoint() -> None:
+    makefile_text = Path("Makefile").read_text(encoding="utf-8")
+
+    assert "verify-subtitle-provider-smoke" in makefile_text
+    commands = _extract_makefile_target_commands(makefile_text, "verify-subtitle-provider-smoke")
+
+    assert commands == [
+        'if [ ! -f "$(ENV_FILE)" ]; then printf \'\\033[31m[环境文件缺失]\\033[0m 未找到字幕 provider 自检所需环境文件：%s\\n\\033[33m[处理建议]\\033[0m 先执行 cp .env.example .env，再补齐 SUBTITLE_TRANSLATION_*；如果环境文件不在仓库根目录，请使用 ENV_FILE=/绝对路径 make verify-subtitle-provider-smoke。\\n\' "$(ENV_FILE)"; exit 1; fi',
+        'set -a && . "$(ENV_FILE)" && set +a && $(PYTHON) -m app.maintenance.verify_subtitle_provider_smoke',
     ]
 
 

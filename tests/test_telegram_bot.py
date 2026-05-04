@@ -2129,11 +2129,9 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     asyncio.run(handle_message(update, context))
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "待确认：下载 ⏳" in sent_text
-    assert "片名：Dune (2021)" in sent_text
-    assert "选择序号：1" in sent_text
-    assert "确认下载：发送 confirm 1" in sent_text
-    assert "取消下载：发送 cancel 1" in sent_text
+    assert "已添加下载：" in sent_text
+    assert "任务 ID: 11" in sent_text
+    assert "待确认：下载" not in sent_text
 
 
 def test_handle_callback_query_digit_routes_to_add_service() -> None:
@@ -2162,10 +2160,9 @@ def test_handle_callback_query_digit_routes_to_add_service() -> None:
     answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "待确认：下载 ⏳" in sent_text
-    assert "片名：Dune (2021)" in sent_text
-    assert "选择序号：1" in sent_text
-    assert "确认下载：发送 confirm 1" in sent_text
+    assert "已添加下载：" in sent_text
+    assert "任务 ID: 11" in sent_text
+    assert "待确认：下载" not in sent_text
 
 
 def test_handle_callback_query_magnet_routes_to_bt_direct_split() -> None:
@@ -2302,10 +2299,9 @@ def test_handle_callback_query_digit_uses_callback_context_when_effective_contex
     answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "待确认：下载 ⏳" in sent_text
-    assert "片名：Dune (2021)" in sent_text
-    assert "选择序号：1" in sent_text
-    assert "确认下载：发送 confirm 1" in sent_text
+    assert "已添加下载：" in sent_text
+    assert "任务 ID: 11" in sent_text
+    assert "待确认：下载" not in sent_text
 
 
 def test_handle_message_digit_replies_service_not_ready() -> None:
@@ -6990,6 +6986,7 @@ def test_build_application_registers_services() -> None:
     assert application.bot_data[CHANNEL_CONTACT_REGISTRY_KEY] is channel_contact_registry
     assert callable(application.bot_data[TELEGRAM_SEND_MEDIA_FUNC_KEY])
     assert callable(application.bot_data[TELEGRAM_SEND_TEXT_FUNC_KEY])
+    assert callable(application.bot_data[SIDECAR_HOST_SEND_TEXT_FUNC_KEY])
     assert any(
         isinstance(handler, CallbackQueryHandler)
         for handlers in application.handlers.values()

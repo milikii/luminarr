@@ -14,6 +14,11 @@ from app.bot.feishu_long_connection import (
     FeishuLongConnectionService,
 )
 from app.bot.non_telegram_runtime_host import NonTelegramRuntimeHost
+from app.bot.shared_private_chat_sender import (
+    build_feishu_proactive_send_text_func,
+    build_personal_wechat_proactive_send_text_func,
+    build_shared_private_chat_send_text_func,
+)
 from app.bot.private_chat_bt_subscription_runtime import (
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT,
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
@@ -23,11 +28,13 @@ from app.bot.private_chat_search_runtime import (
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
 )
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
+from app.bot.personal_wechat_text import PERSONAL_WECHAT_TEXT_SERVICE_KEY, PersonalWeChatTextService
 from app.bot.telegram_sidecar_runtime import (
     TELEGRAM_SIDECAR_RUNTIME_CONFIG,
     start_non_telegram_sidecar_host_lifecycle,
     stop_non_telegram_sidecar_host_lifecycle,
 )
+from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
     WECOM_RECEIVE_ID_BOT_DATA_KEY,
@@ -85,6 +92,7 @@ from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
 from app.services.manage_watchlist import ManageWatchlistService
 from app.services.manage_bt_subscription import ManageBtSubscriptionService
+from app.services.cast_localization import AICastLocalizationService
 from app.services.metadata_scraper import MetadataScraperService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService
@@ -111,6 +119,18 @@ async def _run_non_telegram_host(host: NonTelegramRuntimeHost, *, config) -> Non
         await host.wait_until_stopped()
     finally:
         await stop_non_telegram_sidecar_host_lifecycle(host, config=config)
+
+
+def _build_ai_cast_localization_service(settings) -> AICastLocalizationService | None:
+    if not settings.subtitle_translation_api_key.strip():
+        return None
+    return AICastLocalizationService(
+        api_key=settings.subtitle_translation_api_key,
+        base_url=settings.subtitle_translation_base_url,
+        model=settings.subtitle_translation_model,
+        timeout_seconds=settings.subtitle_translation_timeout_seconds,
+        proxy_url=settings.outbound_proxy_url,
+    )
 
 
 def _resolve_runtime_host_mode(settings) -> str:
@@ -422,6 +442,7 @@ def main() -> None:
                 tmdb_id,
                 language=language,
             ),
+            cast_localization_service=_build_ai_cast_localization_service(settings),
         )
         scrape_metadata_func = metadata_scraper_service.scrape_for_import
     search_service = SearchMediaService(
@@ -564,7 +585,7 @@ def main() -> None:
     post_download_auto_import_service = PostDownloadAutoImportService(
         download_monitor_repo=download_monitor_repo,
         job_event_repo=job_event_repo,
-        auto_import_func=lambda task_ref, chat_id, user_id: import_to_library_service.import_by_task_ref(
+        auto_import_func=lambda task_ref, chat_id, user_id: import_to_library_service.auto_import_by_task_ref(
             task_ref,
             chat_id=chat_id,
             user_id=user_id,
@@ -600,8 +621,12 @@ def main() -> None:
         search_func=bt_source_adapter.search,
         add_to_downloader_service=add_to_downloader_service,
     )
-    bt_tmdb_movie_candidates_lookup_func = tmdb_client.search_movie_candidates if settings.tmdb_api_key else None
-    bt_tmdb_tv_candidates_lookup_func = tmdb_client.search_tv_candidates if settings.tmdb_api_key else None
+    bt_tmdb_movie_candidates_lookup_func = (
+        getattr(tmdb_client, "search_movie_candidates", None) if settings.tmdb_api_key else None
+    )
+    bt_tmdb_tv_candidates_lookup_func = (
+        getattr(tmdb_client, "search_tv_candidates", None) if settings.tmdb_api_key else None
+    )
     runtime_host: object
     if has_telegram_host:
         runtime_host = build_application(
@@ -655,12 +680,15 @@ def main() -> None:
     if trace_log_path is not None:
         bot_data[TRACE_LOG_PATH_BOT_DATA_KEY] = trace_log_path
     bot_data[PERSONAL_WECHAT_LOGIN_SERVICE_KEY] = PersonalWeChatLoginService()
+    if PERSONAL_WECHAT_TEXT_SERVICE_KEY not in bot_data:
+        bot_data[PERSONAL_WECHAT_TEXT_SERVICE_KEY] = PersonalWeChatTextService()
     if host_mode in {"telegram", "feishu"} and settings.has_feishu_host():
         feishu_client = FeishuClient(
             app_id=settings.feishu_app_id,
             app_secret=settings.feishu_app_secret,
             base_url=settings.feishu_base_url,
         )
+        bot_data["feishu_client"] = feishu_client
         bot_data[FEISHU_LONG_CONNECTION_SERVICE_KEY] = FeishuLongConnectionService(
             config=FeishuLongConnectionConfig(
                 app_id=settings.feishu_app_id,
@@ -676,6 +704,18 @@ def main() -> None:
             host=settings.wecom_webhook_host,
             port=settings.wecom_webhook_port,
             path=settings.wecom_webhook_path,
+        )
+    if SIDECAR_HOST_SEND_TEXT_FUNC_KEY not in bot_data:
+        telegram_send_text_func = bot_data.get(tg.TELEGRAM_SEND_TEXT_FUNC_KEY)
+        bot_data[SIDECAR_HOST_SEND_TEXT_FUNC_KEY] = build_shared_private_chat_send_text_func(
+            bot_data=bot_data,
+            telegram_send_text_func=telegram_send_text_func if callable(telegram_send_text_func) else None,
+            feishu_send_text_func=(
+                build_feishu_proactive_send_text_func(bot_data=bot_data)
+                if "feishu_client" in bot_data
+                else None
+            ),
+            personal_wechat_send_text_func=build_personal_wechat_proactive_send_text_func(bot_data=bot_data),
         )
     if has_telegram_host:
         _run_application_polling(runtime_host)

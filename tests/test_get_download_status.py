@@ -616,7 +616,14 @@ def test_get_status_text_progresses_completed_download_to_auto_import_pending(tm
         user_id=2001,
     )
     event_repo = JobEventRepo(database)
-    auto_import = AsyncMock(return_value="导入待确认：Dune 1984\n请发送 confirm hash-87 执行导入。")
+    auto_import = AsyncMock(
+        return_value=(
+            "导入成功：Dune 1984\n\n"
+            "后处理总结\n"
+            "- metadata：metadata 刮削成功：/tmp/demo.metadata.json\n"
+            "- 刷新：媒体库刷新成功。"
+        )
+    )
     auto_import_service = PostDownloadAutoImportService(
         download_monitor_repo=monitor_repo,
         job_event_repo=event_repo,
@@ -642,7 +649,8 @@ def test_get_status_text_progresses_completed_download_to_auto_import_pending(tm
     text = _run(service.get_status_text("87"))
 
     assert "状态: 做种中" in text
-    assert "导入待确认：Dune 1984" in text
+    assert "导入成功：Dune 1984" in text
+    assert "后处理总结" in text
     auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
 
 
@@ -702,7 +710,7 @@ def test_get_status_text_does_not_repeat_auto_import_when_import_activity_exists
     text = _run(service.get_status_text("87"))
 
     assert "状态: 做种中" in text
-    assert "导入待确认" not in text
+    assert "导入成功" not in text
     auto_import.assert_not_awaited()
 
 
@@ -1315,7 +1323,7 @@ def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: 
             eta_seconds=-1,
         )
     )
-    auto_import = AsyncMock(return_value="导入待确认：Dune 2024 1080p WEB-DL")
+    auto_import = AsyncMock(return_value="导入成功：Dune 2024 1080p WEB-DL")
     auto_import_service = PostDownloadAutoImportService(
         download_monitor_repo=monitor_repo,
         job_event_repo=JobEventRepo(database),
@@ -1327,6 +1335,10 @@ def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: 
     assert result.scanned == 2
     assert result.progressed == 1
     assert len(result.replies) == 2
+    assert tuple((item.chat_id, item.text) for item in result.notifications) == (
+        (1001, "导入成功：Dune 2024 1080p WEB-DL"),
+        (1001, "资源自动规则已跳过自动导入：Dune 2024 CAM\n原因：命中低质量来源标记 CAM。\n如仍需导入，请手动发送 import hash-88。"),
+    )
     auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
 
 
