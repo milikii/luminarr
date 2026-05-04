@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index and pre-development checklist before changing Telegram-first automation behavior."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep verification and docs-gate expectations aligned while changing Telegram automation and notification behavior."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Preserve candidate-first ordering and Telegram-specific delivery behavior while removing extra confirmations after explicit selection."}
+{"file": ".trellis/tasks/05-05-telegram-first-auto-confirm-notify/research/channel-notify-capability-matrix.md", "reason": "Lock the Telegram-first slice, channel capability matrix, and the explicit decision to defer copy-fallback redesign and non-Telegram adaptation."}

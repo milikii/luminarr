@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Check the Telegram-first automation changes against the backend spec entrypoint and package-level expectations."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify focused tests, regression entrypoints, and docs consistency expectations for this slice."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Ensure Telegram candidate/resource ordering and transport behavior do not regress while removing user-visible confirmations."}
+{"file": ".trellis/tasks/05-05-telegram-first-auto-confirm-notify/research/channel-notify-capability-matrix.md", "reason": "Check that implementation stays Telegram-first, does not silently expand to other channels, and keeps copy-fallback redesign out of scope."}
