@@ -182,8 +182,8 @@ def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared
         }
     ]
     add_service = AddToDownloaderService(search_service, AsyncMock())
-    add_service.add_by_candidate = AsyncMock(  # type: ignore[method-assign]
-        return_value="下载待确认：Dune\n选择序号: pt-ref-1\n请发送 confirm pt-ref-1 执行下载。"
+    add_service.add_by_candidate_with_auto_confirm = AsyncMock(  # type: ignore[method-assign]
+        return_value="已添加下载：Dune 2021 2160p WEB-DL\n任务 ID: 42\n任务 Hash: abc123"
     )
     execution_gate = _ExecutionGateStub()
     update, reply_text, answer = _build_callback_update(
@@ -209,13 +209,16 @@ def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared
     answer.assert_awaited_once()
     dispatch_private_chat_text.assert_not_awaited()
     execution_gate.run.assert_awaited_once()
-    add_service.add_by_candidate.assert_awaited_once()
-    kwargs = add_service.add_by_candidate.await_args.kwargs
+    add_service.add_by_candidate_with_auto_confirm.assert_awaited_once()
+    kwargs = add_service.add_by_candidate_with_auto_confirm.await_args.kwargs
     assert kwargs["candidate"]["title"] == "Dune 2021 2160p WEB-DL"
     assert kwargs["task_ref"].startswith("pt-")
     edit_message_reply_markup.assert_awaited_once_with(reply_markup=None)
     reply_text.assert_awaited_once()
-    assert "confirm pt-ref-1" in reply_text.await_args.args[0]
+    sent_text = reply_text.await_args.args[0]
+    assert "已添加下载：" in sent_text
+    assert "任务 ID: 42" in sent_text
+    assert "confirm " not in sent_text
     stored_session = search_service.telegram_pt_resource_card_state.get_session(session.session_token)
     assert stored_session is not None
     assert stored_session.status == "selected"
