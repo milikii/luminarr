@@ -69,6 +69,7 @@ class Settings:
     subtitle_translation_base_url: str
     subtitle_translation_model: str
     subtitle_translation_timeout_seconds: float
+    subtitle_translation_use_proxy: bool
     pt_min_seed_hours: int
     sqlite_db_path: str
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...]
@@ -200,6 +201,18 @@ def _read_optional_float(env: Mapping[str, str], key: str, default: float) -> fl
         parse=float,
         parse_error_message=f"{key} must be a number",
     )
+
+
+def _read_optional_bool(env: Mapping[str, str], key: str, default: bool) -> bool:
+    raw_value = _read_optional(env, key)
+    if not raw_value:
+        return default
+    normalized_value = raw_value.strip().lower()
+    if normalized_value in {"1", "true", "yes", "on"}:
+        return True
+    if normalized_value in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigError(f"{key} must be a boolean")
 
 
 def _read_optional_int(env: Mapping[str, str], key: str, default: int) -> int:
@@ -557,6 +570,7 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         subtitle_translation_base_url=subtitle_translation_base_url or "https://api.openai.com/v1",
         subtitle_translation_model=_read_optional(env, "SUBTITLE_TRANSLATION_MODEL") or "gpt-5.4",
         subtitle_translation_timeout_seconds=subtitle_translation_timeout_seconds,
+        subtitle_translation_use_proxy=_read_optional_bool(env, "SUBTITLE_TRANSLATION_USE_PROXY", False),
         pt_min_seed_hours=_read_optional_non_negative_int(env, "PT_MIN_SEED_HOURS", 0),
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
         raw_bt_destination_options=_read_raw_bt_destination_options(env),

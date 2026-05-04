@@ -72,6 +72,7 @@ _BILINGUAL_ASS_OUTPUT_SUFFIX = ".dual.ass"
 _BILINGUAL_ASS_FONT_FAMILY = "LXGW WenKai"
 _BILINGUAL_ASS_CHINESE_FONT_SIZE = 44
 _BILINGUAL_ASS_ENGLISH_FONT_SIZE = 24
+_SUBTITLE_TRANSLATION_CHUNK_SIZE = 20
 _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX = {
     "ass": ".ass",
     "mov_text": ".srt",
@@ -195,7 +196,7 @@ def _build_embedded_subtitle_extract_command(
     output_path: Path,
 ) -> list[str]:
     return [
-        "ffmpeg",
+        _resolve_local_ffmpeg_command("ffmpeg"),
         "-y",
         "-loglevel",
         "error",
@@ -996,7 +997,7 @@ def _translate_srt_subtitle_content(
 
     translated_blocks, error_message = _translate_blocks_in_chunks(
         blocks=blocks,
-        size=60,
+        size=_SUBTITLE_TRANSLATION_CHUNK_SIZE,
         get_source_text=lambda block: block.text,
         translate_chunk=lambda source_lines: _translate_chunk_lines(
             source_lines=source_lines,
@@ -1040,7 +1041,7 @@ def _translate_ass_subtitle_content(
 
     translated_lines, error_message = _translate_blocks_in_chunks(
         blocks=dialogue_lines,
-        size=60,
+        size=_SUBTITLE_TRANSLATION_CHUNK_SIZE,
         get_source_text=lambda line: line.text,
         translate_chunk=lambda source_lines: _translate_chunk_lines(
             source_lines=source_lines,

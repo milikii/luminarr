@@ -40,6 +40,7 @@ from app.main import (
     _build_bt_source_providers,
     _build_refresh_media_server_func,
     _resolve_downloader_client_for_dispatch,
+    _resolve_subtitle_translation_proxy_url,
     _run_application_polling,
     main as run_main,
 )
@@ -849,6 +850,7 @@ def _build_main_settings(**overrides: object) -> _MainSettings:
         "subtitle_translation_base_url": "https://api.openai.com/v1",
         "subtitle_translation_model": "gpt-5.4",
         "subtitle_translation_timeout_seconds": 60.0,
+        "subtitle_translation_use_proxy": False,
         "pt_min_seed_hours": 0,
         "sqlite_db_path": "/tmp/luminarr.db",
         "raw_bt_destination_options": (),
@@ -922,6 +924,24 @@ def test_build_ai_cast_localization_service_reuses_subtitle_translation_settings
         "timeout_seconds": 45.0,
         "proxy_url": "http://proxy.local:7890",
     }
+
+
+def test_resolve_subtitle_translation_proxy_url_defaults_to_disabled() -> None:
+    settings = _build_main_settings(
+        outbound_proxy_url="http://proxy.local:7890",
+        subtitle_translation_use_proxy=False,
+    )
+
+    assert _resolve_subtitle_translation_proxy_url(settings) == ""
+
+
+def test_resolve_subtitle_translation_proxy_url_uses_outbound_proxy_when_enabled() -> None:
+    settings = _build_main_settings(
+        outbound_proxy_url="http://proxy.local:7890",
+        subtitle_translation_use_proxy=True,
+    )
+
+    assert _resolve_subtitle_translation_proxy_url(settings) == "http://proxy.local:7890"
 
 
 def test_main_keeps_tmdb_only_metadata_scraper_when_ai_cast_localization_is_disabled(

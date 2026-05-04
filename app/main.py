@@ -318,6 +318,12 @@ def _build_refresh_media_server_func(settings):
     return refresh_service.refresh_text
 
 
+def _resolve_subtitle_translation_proxy_url(settings) -> str:
+    if settings.subtitle_translation_use_proxy:
+        return settings.outbound_proxy_url
+    return ""
+
+
 def _populate_non_telegram_runtime_bot_data(
     *,
     bot_data: dict[str, object],
@@ -575,7 +581,7 @@ def main() -> None:
             base_url=settings.subtitle_translation_base_url,
             model=settings.subtitle_translation_model,
             timeout_seconds=settings.subtitle_translation_timeout_seconds,
-            proxy_url=settings.outbound_proxy_url,
+            proxy_url=_resolve_subtitle_translation_proxy_url(settings),
         ).translate_for_import,
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,

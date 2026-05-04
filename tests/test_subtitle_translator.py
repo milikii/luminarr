@@ -204,7 +204,7 @@ def test_translate_for_import_translates_large_srt_in_chunks(tmp_path: Path) -> 
     translated_file = library_dir / "Interstellar (2014).zh.srt"
     assert result.success is True
     assert result.skipped is False
-    assert seen_chunk_sizes == [60, 2]
+    assert seen_chunk_sizes == [20, 20, 20, 2]
     payload = translated_file.read_text(encoding="utf-8")
     assert "专业译文：line 1" in payload
     assert "专业译文：line 62" in payload
@@ -233,7 +233,7 @@ def test_translate_for_import_retries_with_smaller_chunks_when_line_count_drifts
         source_lines = user_payload.get("source_lines")
         assert isinstance(source_lines, list)
         seen_chunk_sizes.append(len(source_lines))
-        if len(source_lines) == 60 and mismatched_large_chunk_count < 2:
+        if len(source_lines) == 20 and mismatched_large_chunk_count < 2:
             mismatched_large_chunk_count += 1
             return json.dumps(
                 {"translations": [f"漂移译文 {index}" for index in range(64)]},
@@ -261,8 +261,8 @@ def test_translate_for_import_retries_with_smaller_chunks_when_line_count_drifts
     assert result.success is True
     assert result.skipped is False
     assert translated_file.exists()
-    assert seen_chunk_sizes[:2] == [60, 60]
-    assert any(size < 60 for size in seen_chunk_sizes[1:])
+    assert seen_chunk_sizes[:2] == [20, 20]
+    assert any(size < 20 for size in seen_chunk_sizes[1:])
     payload = translated_file.read_text(encoding="utf-8")
     assert "专业译文：line 1" in payload
     assert "专业译文：line 62" in payload
@@ -291,7 +291,7 @@ def test_translate_for_import_retries_same_chunk_before_splitting_when_line_coun
         source_lines = user_payload.get("source_lines")
         assert isinstance(source_lines, list)
         seen_chunk_sizes.append(len(source_lines))
-        if len(source_lines) == 60 and not mismatched_large_chunk:
+        if len(source_lines) == 20 and not mismatched_large_chunk:
             mismatched_large_chunk = True
             return json.dumps(
                 {"translations": [f"漂移译文 {index}" for index in range(64)]},
@@ -319,7 +319,7 @@ def test_translate_for_import_retries_same_chunk_before_splitting_when_line_coun
     assert result.success is True
     assert result.skipped is False
     assert translated_file.exists()
-    assert seen_chunk_sizes == [60, 60, 2]
+    assert seen_chunk_sizes == [20, 20, 20, 20, 2]
     payload = translated_file.read_text(encoding="utf-8")
     assert "专业译文：line 1" in payload
     assert "专业译文：line 62" in payload
@@ -1186,6 +1186,78 @@ def test_probe_embedded_subtitles_prefers_repo_local_ffprobe_when_present(tmp_pa
     assert streams[0].stream_index == 2
 
 
+def test_translate_for_import_prefers_repo_local_ffmpeg_for_embedded_subtitle_extract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+
+    local_ffmpeg_dir = tmp_path / ".tools" / "ffmpeg"
+    local_ffmpeg_dir.mkdir(parents=True)
+    local_ffmpeg = local_ffmpeg_dir / "ffmpeg"
+    local_ffprobe = local_ffmpeg_dir / "ffprobe"
+    local_ffmpeg.write_text("#!/bin/sh\n", encoding="utf-8")
+    local_ffprobe.write_text("#!/bin/sh\n", encoding="utf-8")
+    local_ffmpeg.chmod(0o755)
+    local_ffprobe.chmod(0o755)
+
+    monkeypatch.setattr(subtitle_support, "_LOCAL_FFMPEG_DIR", local_ffmpeg_dir)
+
+    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+        assert capture_output is True
+        assert text is True
+        assert timeout == 60.0
+        if Path(args[0]) == local_ffprobe:
+            return subprocess.CompletedProcess(
+                args=args,
+                returncode=0,
+                stdout=json.dumps(
+                    {
+                        "streams": [
+                            {
+                                "index": 2,
+                                "codec_name": "subrip",
+                                "tags": {"language": "eng", "title": "English"},
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                stderr="",
+            )
+        if Path(args[0]) == local_ffmpeg:
+            Path(args[-1]).write_text("1\n00:00:01,000 --> 00:00:03,000\nhello movie\n", encoding="utf-8")
+            return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
+        raise AssertionError(f"unexpected command: {args}")
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-local-ffmpeg",
+            task_id="local-ffmpeg",
+            task_hash="hash-local-ffmpeg",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is True
+    assert (library_dir / "Interstellar (2014).zh.srt").exists()
+    assert (library_dir / "Interstellar (2014).dual.ass").exists()
+
+
 def test_probe_embedded_subtitles_fails_when_ffprobe_and_ffmpeg_are_both_missing(
     tmp_path: Path,
     monkeypatch,
@@ -1642,6 +1714,26 @@ def test_subtitle_translator_passes_proxy_to_httpx(monkeypatch) -> None:
 
     assert result == "{\"translations\": [\"ok\"]}"
     client_ctor.assert_called_once_with(timeout=60.0, proxy="http://192.168.2.110:7890")
+
+
+def test_subtitle_translator_defaults_to_no_proxy(monkeypatch) -> None:
+    client_ctor = Mock()
+    post = Mock(
+        return_value=httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "{\"translations\": [\"ok\"]}"}}]},
+            request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions"),
+        )
+    )
+    client_instance = Mock(__enter__=Mock(return_value=Mock(post=post)), __exit__=Mock(return_value=None))
+    client_ctor.return_value = client_instance
+    monkeypatch.setattr(httpx, "Client", client_ctor)
+
+    service = SubtitleTranslatorService(api_key="demo-key")
+    result = service._request_chat_completion(system_prompt="system", user_payload={"source_lines": ["hello"]})
+
+    assert result == "{\"translations\": [\"ok\"]}"
+    client_ctor.assert_called_once_with(timeout=60.0, proxy=None)
 
 
 def test_request_chat_completion_raises_on_http_error(monkeypatch) -> None:

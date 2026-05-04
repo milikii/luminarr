@@ -39,6 +39,7 @@ def test_load_settings_reads_token() -> None:
     assert settings.subtitle_translation_base_url == "https://api.openai.com/v1"
     assert settings.subtitle_translation_model == "gpt-5.4"
     assert settings.subtitle_translation_timeout_seconds == 60.0
+    assert settings.subtitle_translation_use_proxy is False
     assert settings.sqlite_db_path == "/data/luminarr.db"
     assert settings.feishu_app_id == ""
     assert settings.feishu_app_secret == ""
@@ -121,6 +122,48 @@ def test_load_settings_reads_outbound_proxy_url() -> None:
         }
     )
     assert settings.outbound_proxy_url == "http://192.168.2.110:7890"
+
+
+def test_load_settings_disables_subtitle_translation_proxy_by_default() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "OUTBOUND_PROXY_URL": "http://192.168.2.110:7890",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+        }
+    )
+
+    assert settings.subtitle_translation_use_proxy is False
+
+
+def test_load_settings_enables_subtitle_translation_proxy_when_requested() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "OUTBOUND_PROXY_URL": "http://192.168.2.110:7890",
+            "SUBTITLE_TRANSLATION_USE_PROXY": "true",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+        }
+    )
+
+    assert settings.subtitle_translation_use_proxy is True
+
+
+def test_load_settings_rejects_invalid_subtitle_translation_use_proxy() -> None:
+    with pytest.raises(ConfigError, match="SUBTITLE_TRANSLATION_USE_PROXY"):
+        load_settings(
+            {
+                "TELEGRAM_BOT_TOKEN": "token-value",
+                "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+                "PROWLARR_API_KEY": "api-key",
+                "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+                "SUBTITLE_TRANSLATION_USE_PROXY": "maybe",
+            }
+        )
 
 
 def test_load_settings_strips_whitespace_from_base_urls() -> None:
