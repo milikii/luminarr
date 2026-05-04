@@ -388,3 +388,38 @@ Upgraded import outputs toward a MoviePilot-style local library: movie folder na
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Telegram-first auto-confirm and subtitle provider controls
+
+**Date**: 2026-05-05
+**Task**: Telegram-first auto-confirm and subtitle provider controls
+**Branch**: `main`
+
+### Summary
+
+Added subtitle translation proxy toggle and repo-local ffmpeg guardrails, recut the Telegram-first automation plan, and locked the Telegram auto-confirm callback path with focused verification.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `483183b` | (see git log) |
+| `b84243f` | (see git log) |
+| `c610fed` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
