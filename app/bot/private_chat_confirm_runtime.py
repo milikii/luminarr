@@ -28,6 +28,7 @@ async def reply_confirm_add(
     confirm_ref: str,
     chat_id: int | None,
     user_id: int | None,
+    channel: str,
     tg,
 ) -> bool:
     add_service = bot_data.get(tg.ADD_TO_DOWNLOADER_SERVICE_KEY)
@@ -40,6 +41,7 @@ async def reply_confirm_add(
             confirm_ref,
             chat_id=chat_id,
             user_id=user_id,
+            channel=channel,
         ),
     )
     await reply_func(reply)
@@ -80,6 +82,7 @@ async def handle_confirm_query(
     confirm_ref: str | None,
     chat_id: int | None,
     user_id: int | None,
+    channel: str,
     tg,
 ) -> bool:
     if confirm_ref is None:
@@ -106,6 +109,7 @@ async def handle_confirm_query(
                     confirm_ref=confirm_ref,
                     chat_id=chat_id,
                     user_id=user_id,
+                    channel=channel,
                     tg=tg,
                 )
             if matched_job is not None and matched_job.workflow_type == tg.WORKFLOW_IMPORT_TO_LIBRARY:
@@ -137,6 +141,7 @@ async def handle_confirm_query(
             confirm_ref=confirm_ref,
             chat_id=chat_id,
             user_id=user_id,
+            channel=channel,
             tg=tg,
         )
     return await reply_confirm_import(

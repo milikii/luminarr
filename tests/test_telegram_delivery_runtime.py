@@ -75,6 +75,32 @@ def test_build_telegram_send_text_func_sends_inline_keyboard_when_actions_exist(
     )
 
 
+def test_build_telegram_send_text_func_uses_html_parse_mode_for_card_text() -> None:
+    send_message = AsyncMock(return_value="text-message")
+    sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    text = (
+        "✅ <b>已添加下载</b>\n"
+        "🎬 <b>Dune 2021 2160p WEB-DL</b>\n\n"
+        "任务信息\n"
+        "ID\n"
+        "<code>42</code>\n"
+        "Hash\n"
+        "<code>abc123</code>\n\n"
+        "下一步\n"
+        "查看状态：发送 status abc123"
+    )
+
+    result = asyncio.run(sender(chat_id=1001, text=text))
+
+    assert result == "text-message"
+    send_message.assert_awaited_once_with(
+        chat_id=1001,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="查看状态", callback_data="status abc123")]]),
+    )
+
+
 def test_build_telegram_send_text_func_supports_url_inline_actions() -> None:
     send_message = AsyncMock(return_value="text-message")
     sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))

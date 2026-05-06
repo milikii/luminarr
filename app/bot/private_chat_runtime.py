@@ -367,6 +367,7 @@ async def _handle_tail_routes(
         confirm_ref=tg.parse_confirm_query(query),
         chat_id=chat_id,
         user_id=user_id,
+        channel=channel,
         tg=tg,
     ):
         return True

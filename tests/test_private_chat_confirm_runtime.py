@@ -77,13 +77,19 @@ def test_handle_confirm_query_routes_workflow_add(tmp_path: Path) -> None:
             confirm_ref="87",
             chat_id=1001,
             user_id=2001,
+            channel="telegram",
             tg=tg,
         )
     )
 
     assert handled is True
     execution_gate.run.assert_awaited_once()
-    add_service.confirm_add_by_task_ref.assert_awaited_once_with("87", chat_id=1001, user_id=2001)
+    add_service.confirm_add_by_task_ref.assert_awaited_once_with(
+        "87",
+        chat_id=1001,
+        user_id=2001,
+        channel="telegram",
+    )
     reply_text.assert_awaited_once_with("下载确认成功")
 
 
@@ -105,6 +111,7 @@ def test_handle_confirm_query_stops_on_job_lookup_failure(
             confirm_ref="87",
             chat_id=1001,
             user_id=2001,
+            channel="telegram",
             tg=tg,
         )
     )
@@ -137,6 +144,7 @@ def test_handle_confirm_query_falls_back_to_import_when_no_pending_add() -> None
             confirm_ref="hash-87",
             chat_id=1001,
             user_id=2001,
+            channel="telegram",
             tg=tg,
         )
     )

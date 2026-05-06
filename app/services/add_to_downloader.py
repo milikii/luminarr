@@ -145,6 +145,7 @@ class AddExecutionFollowUpService:
         pending_add: PendingAddContext,
         chat_id: int | None,
         user_id: int | None,
+        channel: str | None = None,
     ) -> AddExecutionOutcome:
         try:
             task = await self._invoke_add_torrent(pending_add)
@@ -171,7 +172,16 @@ class AddExecutionFollowUpService:
             return AddExecutionOutcome(reply=self._add_failed_text)
 
         result = AddResult(task_id=task.task_id, task_hash=task.task_hash, title=pending_add.title)
-        reply = f"已添加下载：{result.title}\n任务 ID: {result.task_id}\n任务 Hash: {result.task_hash}"
+        reply_lines = [
+            f"已添加下载：{result.title}",
+            f"任务 ID: {result.task_id}",
+            f"任务 Hash: {result.task_hash}",
+        ]
+        if channel == "telegram":
+            downloader_label = _format_downloader_success_label(pending_add=pending_add)
+            if downloader_label:
+                reply_lines.append(f"下载器: {downloader_label}")
+        reply = "\n".join(reply_lines)
         self.record_event(
             task_ref=task_ref,
             task_id=result.task_id,
@@ -1571,7 +1581,12 @@ class AddToDownloaderService:
         )
         if not self.has_pending_add(chat_id, selection_text):
             return pending_reply
-        return await self.confirm_add_by_task_ref(selection_text, chat_id=chat_id, user_id=user_id)
+        return await self.confirm_add_by_task_ref(
+            selection_text,
+            chat_id=chat_id,
+            user_id=user_id,
+            channel=channel,
+        )
 
     async def add_by_candidate(
         self,
@@ -1629,7 +1644,12 @@ class AddToDownloaderService:
         )
         if not self.has_pending_add(chat_id, task_ref):
             return pending_reply
-        return await self.confirm_add_by_task_ref(task_ref, chat_id=chat_id, user_id=user_id)
+        return await self.confirm_add_by_task_ref(
+            task_ref,
+            chat_id=chat_id,
+            user_id=user_id,
+            channel=channel,
+        )
 
     async def add_by_batch_selection(
         self,
@@ -1735,6 +1755,7 @@ class AddToDownloaderService:
         *,
         chat_id: int | None = None,
         user_id: int | None = None,
+        channel: str | None = None,
     ) -> str:
         cleaned_ref = task_ref.strip()
         if not cleaned_ref:
@@ -1769,6 +1790,7 @@ class AddToDownloaderService:
             pending_add=pending_add,
             chat_id=chat_id,
             user_id=user_id,
+            channel=channel,
             expected_lease_version=preparation.expected_lease_version,
             claimed_job=preparation.claimed_job,
             claimed_job_id=preparation.claimed_job_id,
@@ -2208,6 +2230,7 @@ class AddToDownloaderService:
         pending_add: PendingAddContext,
         chat_id: int | None,
         user_id: int | None,
+        channel: str | None = None,
         expected_lease_version: int,
         claimed_job: bool,
         claimed_job_id: str,
@@ -2227,6 +2250,7 @@ class AddToDownloaderService:
             pending_add=pending_add,
             chat_id=chat_id,
             user_id=user_id,
+            channel=channel,
         )
         if execution.result is None:
             approval_restored = self._restore_pending_approval(
@@ -2504,6 +2528,18 @@ def build_duplicate_warning_delivery_item(
         ),
         status="warning",
     )
+
+
+def _format_downloader_success_label(*, pending_add: PendingAddContext) -> str:
+    name = pending_add.downloader_name.strip()
+    downloader_type = pending_add.downloader_type.strip()
+    if name and downloader_type:
+        return f"{name} · {downloader_type}"
+    if name:
+        return name
+    if downloader_type:
+        return downloader_type
+    return ""
 
 
 def _is_download_monitor_register_row_corrupted_error(error: Exception) -> bool:

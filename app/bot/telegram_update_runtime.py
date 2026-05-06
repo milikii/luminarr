@@ -62,6 +62,11 @@ def build_telegram_reply_func(
 ) -> Callable[[str], Awaitable[object]]:
     async def wrapped(text: str) -> object:
         formatted_text = formatter(text)
+        if _is_telegram_add_success_reply(formatted_text):
+            return await _reply_telegram_add_success_message(
+                reply_text_func=reply_func,
+                text=formatted_text,
+            )
         if (
             chat_id is not None
             and send_text_func is not None
@@ -112,6 +117,13 @@ def build_telegram_reply_func(
                 reply_photo_func=reply_photo_func,
                 text=formatted_text,
             )
+        if _has_telegram_html(formatted_text):
+            return await _send_or_reply_text(
+                reply_text_func=reply_func,
+                send_text_func=send_text_func,
+                chat_id=chat_id,
+                text=formatted_text,
+            )
         return await reply_func(formatted_text)
 
     return wrapped
@@ -122,6 +134,7 @@ _STRIP_HTML_RE = re.compile(r"</?(?:b|i|u|s|code|pre|a)\b[^>]*>")
 _ADULT_BT_CARD_PREFIX = "【成人资源候选】"
 _PT_RESOURCE_CARD_PREFIX = "【PT资源卡】"
 _AGGREGATE_CANDIDATE_HEADER_RE = re.compile(r"^【.+】共找到\s+\d+\s+条相关信息，请选择操作$")
+_ADD_SUCCESS_HEADER_RE = re.compile(r"^✅\s*<b>已添加下载</b>$")
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
 _SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
 _PLACEHOLDER_POSTER_SIZE = (720, 1080)
@@ -156,6 +169,13 @@ def _is_aggregate_candidate_reply(text: str) -> bool:
     if not stripped_text:
         return False
     return bool(_AGGREGATE_CANDIDATE_HEADER_RE.match(stripped_text.splitlines()[0]))
+
+
+def _is_telegram_add_success_reply(text: str) -> bool:
+    stripped_text = text.strip()
+    if not stripped_text:
+        return False
+    return bool(_ADD_SUCCESS_HEADER_RE.match(stripped_text.splitlines()[0]))
 
 
 def _is_adult_bt_poster_caption_reply(text: str) -> bool:
@@ -197,6 +217,18 @@ async def _reply_adult_bt_poster_caption_message(
     )
 
 
+async def _reply_telegram_add_success_message(
+    *,
+    reply_text_func: TelegramReplyTextFunc,
+    text: str,
+) -> object:
+    reply_markup = _build_inline_keyboard_from_text(text)
+    kwargs: dict[str, object] = {"parse_mode": "HTML"}
+    if reply_markup is not None:
+        kwargs["reply_markup"] = reply_markup
+    return await reply_text_func(text, **kwargs)
+
+
 def _split_adult_bt_poster_caption_reply(text: str) -> tuple[str, str, list[str]]:
     poster_url = ""
     caption_lines: list[str] = []
@@ -230,6 +262,38 @@ def _build_adult_bt_inline_keyboard(action_lines: list[str]) -> InlineKeyboardMa
     buttons: list[InlineKeyboardButton] = []
     for line in action_lines:
         if line == "下一步":
+            continue
+        url_match = _URL_ACTION_LINE_PATTERN.match(line)
+        if url_match is not None:
+            label = str(url_match.group("label") or "").strip()
+            url = str(url_match.group("url") or "").strip()
+            if label and url:
+                buttons.append(InlineKeyboardButton(text=label, url=url))
+            continue
+        send_match = _SEND_ACTION_LINE_PATTERN.match(line)
+        if send_match is None:
+            continue
+        label = str(send_match.group("label") or "").strip()
+        query = str(send_match.group("query") or "").strip()
+        if label and query and len(query.encode("utf-8")) <= 64:
+            buttons.append(InlineKeyboardButton(text=label, callback_data=query))
+    if not buttons:
+        return None
+    rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
+    return InlineKeyboardMarkup(rows)
+
+
+def _build_inline_keyboard_from_text(text: str) -> InlineKeyboardMarkup | None:
+    buttons: list[InlineKeyboardButton] = []
+    in_actions = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == "下一步":
+            in_actions = True
+            continue
+        if not in_actions:
             continue
         url_match = _URL_ACTION_LINE_PATTERN.match(line)
         if url_match is not None:

@@ -216,8 +216,12 @@ def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared
     edit_message_reply_markup.assert_awaited_once_with(reply_markup=None)
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "已添加下载：" in sent_text
-    assert "任务 ID: 42" in sent_text
+    assert "┏━ ✅ <b>下载已开始</b>" in sent_text
+    assert "<code>42</code>" in sent_text
+    assert "<code>abc123</code>" in sent_text
+    assert "<code>status abc123</code>" in sent_text
+    assert "下一阶段会在这里接入实时进度同步" in sent_text
+    assert "不展示伪实时进度" in sent_text
     assert "confirm " not in sent_text
     stored_session = search_service.telegram_pt_resource_card_state.get_session(session.session_token)
     assert stored_session is not None

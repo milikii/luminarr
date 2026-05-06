@@ -10,8 +10,12 @@ TELEGRAM_MOVIE_CARD_HEADER_TEXT = "电影海报卡片"
 TELEGRAM_SEARCH_RESULT_PREFIX = "搜索结果："
 TELEGRAM_MEDIA_CANDIDATE_PREFIX = "候选作品："
 TELEGRAM_ADULT_BT_RESULT_PREFIX = "成人资源候选："
+TELEGRAM_ADD_SUCCESS_PREFIX = "已添加下载："
 TELEGRAM_ADD_APPROVAL_PREFIX = "下载待确认："
 TELEGRAM_ADD_APPROVAL_TASK_REF_PREFIX = "选择序号:"
+TELEGRAM_ADD_SUCCESS_TASK_ID_PREFIX = "任务 ID:"
+TELEGRAM_ADD_SUCCESS_TASK_HASH_PREFIX = "任务 Hash:"
+TELEGRAM_ADD_SUCCESS_DOWNLOADER_PREFIX = "下载器:"
 TELEGRAM_IMPORT_APPROVAL_PREFIX = "导入待确认："
 TELEGRAM_IMPORT_APPROVAL_TASK_ID_PREFIX = "任务 ID:"
 TELEGRAM_IMPORT_APPROVAL_TASK_HASH_PREFIX = "任务 Hash:"
@@ -19,8 +23,10 @@ TELEGRAM_IMPORT_APPROVAL_TASK_HASH_PREFIX = "任务 Hash:"
 
 def format_telegram_reply(text: str) -> str:
     return _format_telegram_import_approval_reply(
-        _format_telegram_add_approval_reply(
-            _format_telegram_adult_bt_reply(_format_telegram_media_candidate_reply(_format_telegram_search_reply(text)))
+        _format_telegram_add_success_reply(
+            _format_telegram_add_approval_reply(
+                _format_telegram_adult_bt_reply(_format_telegram_media_candidate_reply(_format_telegram_search_reply(text)))
+            )
         )
     )
 
@@ -645,6 +651,53 @@ def _format_telegram_add_approval_reply(text: str) -> str:
             f"直接回复 {expected_confirm} 执行下载",
         ]
     )
+
+
+def _format_telegram_add_success_reply(text: str) -> str:
+    stripped_text = text.strip()
+    if not stripped_text.startswith(TELEGRAM_ADD_SUCCESS_PREFIX):
+        return text
+
+    lines = [line.strip() for line in stripped_text.splitlines() if line.strip()]
+    if len(lines) < 3:
+        return text
+
+    title = lines[0].removeprefix(TELEGRAM_ADD_SUCCESS_PREFIX).strip()
+    task_id = lines[1].removeprefix(TELEGRAM_ADD_SUCCESS_TASK_ID_PREFIX).strip()
+    task_hash = lines[2].removeprefix(TELEGRAM_ADD_SUCCESS_TASK_HASH_PREFIX).strip()
+    if not title or not task_id or not task_hash:
+        return text
+
+    downloader_label = ""
+    trailing_start_index = 3
+    if len(lines) > 3 and lines[3].startswith(TELEGRAM_ADD_SUCCESS_DOWNLOADER_PREFIX):
+        downloader_label = lines[3].removeprefix(TELEGRAM_ADD_SUCCESS_DOWNLOADER_PREFIX).strip()
+        trailing_start_index = 4
+    trailing_lines = lines[trailing_start_index:]
+    rendered_lines = [
+        "┏━ ✅ <b>下载已开始</b>",
+        f"🎬 <b>{_html.escape(title)}</b>",
+    ]
+    if downloader_label:
+        rendered_lines.append(f"🧩 <b>下载器</b>  <code>{_html.escape(downloader_label)}</code>")
+    rendered_lines.extend(
+        [
+        "",
+        "├─ <b>任务</b>",
+        f"│  ID    <code>{_html.escape(task_id)}</code>",
+        f"│  Hash  <code>{_html.escape(task_hash)}</code>",
+        "",
+        "├─ <b>状态</b>",
+        "│  下一阶段会在这里接入实时进度同步",
+        "│  当前阶段仅提供任务创建结果，不展示伪实时进度",
+        "",
+        "└─ <b>操作</b>",
+        "   状态命令",
+        f"   <code>status { _html.escape(task_hash) }</code>",
+    ])
+    if trailing_lines:
+        rendered_lines.extend(("", *(_html.escape(line) for line in trailing_lines)))
+    return "\n".join(rendered_lines)
 
 
 def _format_telegram_import_approval_reply(text: str) -> str:
