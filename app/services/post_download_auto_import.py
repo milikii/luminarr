@@ -330,7 +330,8 @@ async def run_auto_import_candidates(
             continue
         replies.append(reply)
         if candidate.chat_id > 0:
-            notifications.append(AutoImportNotification(chat_id=candidate.chat_id, text=reply))
+            for text in _build_auto_import_notification_texts(reply):
+                notifications.append(AutoImportNotification(chat_id=candidate.chat_id, text=text))
         if count_as_progress(candidate, reply):
             progressed += 1
 
@@ -348,6 +349,60 @@ def _is_auto_import_completed_row_corrupted_error(error: Exception) -> bool:
 
 def _is_auto_import_skip_event_row_corrupted_error(error: Exception) -> bool:
     return isinstance(error, JobEventPersistenceError) and str(error).endswith("corrupted after read")
+
+
+def _build_auto_import_notification_texts(reply: str) -> tuple[str, ...]:
+    stripped_reply = reply.strip()
+    if not stripped_reply:
+        return ()
+
+    import_text, summary_text = _split_auto_import_summary(stripped_reply)
+    if not import_text or not summary_text:
+        return (stripped_reply,)
+
+    subtitle_text = _extract_stage_notification_text(
+        summary_text=summary_text,
+        source_label="字幕",
+        notification_label="字幕翻译",
+    )
+    refresh_text = _extract_stage_notification_text(
+        summary_text=summary_text,
+        source_label="刷新",
+        notification_label="媒体库刷新",
+    )
+    if not subtitle_text or not refresh_text:
+        return (stripped_reply,)
+    return (import_text, subtitle_text, refresh_text, summary_text)
+
+
+def _split_auto_import_summary(reply: str) -> tuple[str, str]:
+    marker = "\n\n后处理总结\n"
+    if marker not in reply:
+        return reply, ""
+    import_text, _, summary_tail = reply.partition(marker)
+    cleaned_import_text = import_text.strip()
+    cleaned_summary_tail = summary_tail.strip()
+    if not cleaned_import_text or not cleaned_summary_tail:
+        return reply, ""
+    return cleaned_import_text, f"后处理总结\n{cleaned_summary_tail}"
+
+
+def _extract_stage_notification_text(
+    *,
+    summary_text: str,
+    source_label: str,
+    notification_label: str,
+) -> str:
+    prefix = f"- {source_label}："
+    for line in summary_text.splitlines():
+        stripped_line = line.strip()
+        if not stripped_line.startswith(prefix):
+            continue
+        suffix = stripped_line.removeprefix(prefix).strip()
+        if not suffix:
+            return notification_label
+        return f"{notification_label}：{suffix}"
+    return ""
 
 
 def _log_auto_import_terminal_lookup_failed(*, task_id: str, task_hash: str, reason: str) -> None:

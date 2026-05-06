@@ -2129,10 +2129,10 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     asyncio.run(handle_message(update, context))
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "┏━ ✅ <b>下载已开始</b>" in sent_text
+    assert "✅ <b>任务已添加并开始下载</b>" in sent_text
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "<code>status h11</code>" in sent_text
+    assert "📍 <b>当前状态：</b> 等待下载器首次同步" in sent_text
     assert "待确认：下载" not in sent_text
 
 
@@ -2162,10 +2162,10 @@ def test_handle_callback_query_digit_routes_to_add_service() -> None:
     answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "┏━ ✅ <b>下载已开始</b>" in sent_text
+    assert "✅ <b>任务已添加并开始下载</b>" in sent_text
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "<code>status h11</code>" in sent_text
+    assert "📍 <b>当前状态：</b> 等待下载器首次同步" in sent_text
     assert "待确认：下载" not in sent_text
 
 
@@ -2303,10 +2303,10 @@ def test_handle_callback_query_digit_uses_callback_context_when_effective_contex
     answer.assert_awaited_once()
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "┏━ ✅ <b>下载已开始</b>" in sent_text
+    assert "✅ <b>任务已添加并开始下载</b>" in sent_text
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "<code>status h11</code>" in sent_text
+    assert "消息每 5 秒自动刷新一次" in sent_text
     assert "待确认：下载" not in sent_text
 
 
@@ -6589,7 +6589,7 @@ def test_handle_message_confirm_routes_to_add_service_when_downloader_pending(tm
     sent_text = reply_text.await_args.args[0]
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "<code>status h11</code>" in sent_text
+    assert "消息每 5 秒自动刷新一次" in sent_text
     import_service.confirm_import_by_task_ref.assert_not_called()
 
 
@@ -6632,7 +6632,7 @@ def test_handle_callback_query_confirm_routes_to_add_service_when_downloader_pen
     sent_text = reply_text.await_args.args[0]
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "<code>status h11</code>" in sent_text
+    assert "消息每 5 秒自动刷新一次" in sent_text
     import_service.confirm_import_by_task_ref.assert_not_called()
 
 

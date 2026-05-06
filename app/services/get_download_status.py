@@ -41,6 +41,7 @@ STATUS_CODE_LABELS = {
 }
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 TELEGRAM_LIVE_PROGRESS_CHANNEL = "telegram_live_progress"
+TELEGRAM_LIVE_PROGRESS_BAR_WIDTH = 20
 
 
 class StatusFollowUpStateError(RuntimeError):
@@ -273,27 +274,28 @@ def render_telegram_live_progress_reply(
     auto_import_text: str | None,
 ) -> str:
     progress_percent = _clamp_progress(task_status.percent_done)
-    status_label = STATUS_CODE_LABELS.get(task_status.status_code, f"未知({task_status.status_code})")
     completed = progress_percent >= 100
-    sections: list[tuple[str, tuple[str, ...]]] = [
-        (
-            "任务",
-            (
-                f"ID    <code>{html.escape(task_status.task_id)}</code>",
-                f"Hash  <code>{html.escape(task_status.task_hash)}</code>",
-            ),
-        ),
-        (
-            "进度",
-            (
-                f"状态  {html.escape(status_label)}",
-                f"进度条 <code>{_format_progress_bar(progress_percent)}</code>",
-                f"进度  {progress_percent:.1f}%",
-                f"速度  {_format_speed(task_status.rate_download)}",
-                f"ETA   {_format_eta(task_status.eta_seconds)}",
-            ),
-        ),
+    status_label = STATUS_CODE_LABELS.get(task_status.status_code, f"未知({task_status.status_code})")
+    lines = [
+        f"{'✅' if completed else '⏳'} <b>{'下载完成' if completed else '任务下载中'}</b>",
+        "━━━━━━━━━━━━━━━━━━",
+        "🎬 <b>资源标题：</b>",
+        f"<i>{html.escape(task_status.name.strip() or '-')}</i>",
+        f"📍 <b>当前状态：</b> {html.escape(status_label)}",
+        "📊 <b>实时进度：</b>",
+        f"<code>{_format_progress_bar(progress_percent, width=TELEGRAM_LIVE_PROGRESS_BAR_WIDTH, filled_char='█', empty_char='░')}</code> {progress_percent:.1f}%",
+        f"⚡ <b>速度：</b> {_format_speed(task_status.rate_download)}",
+        f"⏳ <b>剩余：</b> {_format_live_eta(task_status.eta_seconds, completed=completed)}",
+        "⚙️ <b>任务信息：</b>",
+        f"🆔 <b>任务 ID：</b> <code>{html.escape(task_status.task_id)}</code>",
+        "🔑 <b>特征 Hash (点击复制)：</b>",
+        f"<code>{html.escape(task_status.task_hash)}</code>",
+        "━━━━━━━━━━━━━━━━━━",
     ]
+    if completed:
+        lines.append("✅ <b>下载已完成，等待后续处理</b>")
+    else:
+        lines.append("⏱️ <b>消息每 5 秒自动刷新一次</b>")
     if auto_import_text:
         follow_up_lines = tuple(
             html.escape(line.strip())
@@ -301,25 +303,7 @@ def render_telegram_live_progress_reply(
             if line.strip()
         )
         if follow_up_lines:
-            sections.append(("后续", follow_up_lines))
-    lines = [
-        f"┏━ {'✅' if completed else '⏳'} <b>{'下载完成' if completed else '下载进行中'}</b>",
-        f"🎬 <b>{html.escape(task_status.name.strip() or '-')}</b>",
-        "",
-    ]
-    for index, (label, section_lines) in enumerate(sections):
-        is_last = index == len(sections) - 1
-        branch = "└─" if is_last else "├─"
-        lines.append(f"{branch} <b>{label}</b>")
-        lines.extend(f"│  {line}" for line in section_lines)
-        lines.append("")
-    lines.extend(
-        (
-            "└─ <b>操作</b>",
-            f"   刷新状态：发送 status {task_ref}",
-            f"   <code>status {html.escape(task_ref)}</code>",
-        )
-    )
+            lines.extend(("", "📦 <b>后续处理：</b>", *follow_up_lines))
     return "\n".join(lines)
 
 
@@ -381,7 +365,13 @@ def _format_speed(raw_speed: int) -> str:
     return f"{speed:.1f} {units[unit_index]}"
 
 
-def _format_progress_bar(progress_percent: float, *, width: int = 12) -> str:
+def _format_progress_bar(
+    progress_percent: float,
+    *,
+    width: int = 12,
+    filled_char: str = "#",
+    empty_char: str = "-",
+) -> str:
     if width <= 0:
         return "[]"
     if progress_percent >= 100:
@@ -391,7 +381,19 @@ def _format_progress_bar(progress_percent: float, *, width: int = 12) -> str:
     else:
         filled = round(progress_percent / 100 * width)
         filled = max(1, min(width - 1, filled))
-    return f"[{'#' * filled}{'-' * (width - filled)}]"
+    return f"[{filled_char * filled}{empty_char * (width - filled)}]"
+
+
+def _format_live_eta(eta_seconds: int, *, completed: bool) -> str:
+    if completed:
+        return "已完成"
+    if eta_seconds < 0:
+        return "--"
+    hours, remainder = divmod(eta_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours:02d}h {minutes:02d}m"
+    return f"{minutes:02d}m {seconds:02d}s"
 
 
 def _format_eta(eta_seconds: int) -> str:

@@ -6,6 +6,7 @@ import sqlite3
 
 from app.bot.sidecar_host_runtime import SidecarHost
 from app.bot.shared_private_chat_sender import log_shared_private_chat_send_error
+from app.bot.telegram_delivery_runtime import build_telegram_status_inline_keyboard
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.operational_logging import emit_operational_log
 from app.services.get_download_status import GetDownloadStatusService
@@ -124,6 +125,9 @@ def start_download_follow_up_scheduler(
     download_completion_polling_stop_event_key: str,
     download_completion_polling_task_key: str,
     interval_seconds: float,
+    download_completion_interval_seconds: float | None = None,
+    download_completion_polling_interval_seconds: float | None = None,
+    min_telegram_progress_edit_interval_seconds: float | None = None,
 ) -> None:
     service = application.bot_data.get(post_download_auto_import_service_key)
     send_text_func = application.bot_data.get(send_text_func_key)
@@ -162,14 +166,28 @@ def start_download_follow_up_scheduler(
     stop_event = asyncio.Event()
     application.bot_data[download_completion_polling_stop_event_key] = stop_event
     telegram_edit_message_func = application.bot_data.get(telegram_edit_message_func_key) if telegram_edit_message_func_key else None
+    resolved_download_completion_interval_seconds = (
+        download_completion_polling_interval_seconds
+        if download_completion_polling_interval_seconds is not None
+        else (
+            download_completion_interval_seconds
+            if download_completion_interval_seconds is not None
+            else interval_seconds
+        )
+    )
+    resolved_min_telegram_progress_edit_interval_seconds = (
+        min_telegram_progress_edit_interval_seconds
+        if min_telegram_progress_edit_interval_seconds is not None
+        else resolved_download_completion_interval_seconds
+    )
     application.bot_data[download_completion_polling_task_key] = application.create_task(
         download_completion_polling_loop(
             download_monitor_repo=download_monitor_repo,
             status_service=status_service,
             stop_event=stop_event,
-            interval_seconds=interval_seconds,
+            interval_seconds=resolved_download_completion_interval_seconds,
             telegram_edit_message_func=telegram_edit_message_func,
-            min_telegram_progress_edit_interval_seconds=interval_seconds,
+            min_telegram_progress_edit_interval_seconds=resolved_min_telegram_progress_edit_interval_seconds,
         ),
         name="download_completion_polling_scheduler",
     )
@@ -298,8 +316,8 @@ def _is_telegram_live_progress_card_text(text: str) -> bool:
         return False
     first_line = stripped_text.splitlines()[0]
     return first_line in {
-        "┏━ ⏳ <b>下载进行中</b>",
-        "┏━ ✅ <b>下载完成</b>",
+        "⏳ <b>任务下载中</b>",
+        "✅ <b>下载完成</b>",
     }
 
 
@@ -334,6 +352,7 @@ async def _edit_telegram_progress_message(
             message_id=record.telegram_message_id,
             text=text,
             parse_mode="HTML",
+            reply_markup=build_telegram_status_inline_keyboard(record.task_hash),
         )
     except Exception as error:
         _log_telegram_progress_edit_error(record=record, error=error)

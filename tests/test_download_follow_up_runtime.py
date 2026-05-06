@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call
 
 import pytest
+from telegram import InlineKeyboardMarkup
 
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.download_follow_up_runtime import (
@@ -56,6 +57,43 @@ def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
 
     service.run_once.assert_awaited_once()
     send_text.assert_awaited_once_with(chat_id=1001, text="导入成功")
+
+
+def test_post_download_auto_import_scheduler_loop_sends_staged_notifications_in_order() -> None:
+    stop_event = asyncio.Event()
+    send_text = AsyncMock()
+
+    async def run_once() -> AutoImportRunResult:
+        stop_event.set()
+        return AutoImportRunResult(
+            scanned=1,
+            progressed=1,
+            replies=("后处理总结",),
+            notifications=(
+                SimpleNamespace(chat_id=1001, text="导入成功：Dune 2024"),
+                SimpleNamespace(chat_id=1001, text="字幕翻译：成功；字幕翻译成功：已生成 1 个字幕文件。"),
+                SimpleNamespace(chat_id=1001, text="媒体库刷新：成功；媒体库刷新成功。"),
+                SimpleNamespace(chat_id=1001, text="后处理总结\n- metadata：成功\n- 字幕：成功\n- 刷新：成功"),
+            ),
+        )
+
+    service = SimpleNamespace(run_once=AsyncMock(side_effect=run_once))
+
+    asyncio.run(
+        post_download_auto_import_scheduler_loop(
+            service=service,
+            send_text_func=send_text,
+            stop_event=stop_event,
+            interval_seconds=300.0,
+        )
+    )
+
+    assert send_text.await_args_list == [
+        call(chat_id=1001, text="导入成功：Dune 2024"),
+        call(chat_id=1001, text="字幕翻译：成功；字幕翻译成功：已生成 1 个字幕文件。"),
+        call(chat_id=1001, text="媒体库刷新：成功；媒体库刷新成功。"),
+        call(chat_id=1001, text="后处理总结\n- metadata：成功\n- 字幕：成功\n- 刷新：成功"),
+    ]
 
 
 def test_post_download_auto_import_scheduler_loop_logs_state_unavailable(capsys: pytest.CaptureFixture[str]) -> None:
@@ -155,9 +193,13 @@ def test_poll_pending_download_completion_once_edits_bound_telegram_message_and_
     assert kwargs["chat_id"] == 1001
     assert kwargs["message_id"] == 321
     assert kwargs["parse_mode"] == "HTML"
-    assert kwargs["text"].startswith("┏━ ⏳ <b>下载进行中</b>")
-    assert "进度条 <code>[#######-----]</code>" in kwargs["text"]
-    assert "56.0%" in kwargs["text"]
+    assert kwargs["text"].startswith("⏳ <b>任务下载中</b>")
+    assert "📍 <b>当前状态：</b> 下载中" in kwargs["text"]
+    assert "<code>[███████████░░░░░░░░░]</code> 56.0%" in kwargs["text"]
+    assert "⚡ <b>速度：</b> 1.0 MB/s" in kwargs["text"]
+    reply_markup = kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
 
 
 def test_poll_pending_download_completion_once_edits_completion_card_once_then_stops(tmp_path) -> None:
@@ -225,7 +267,7 @@ def test_poll_pending_download_completion_once_edits_completion_card_once_then_s
     )
 
     assert edit_message_text.await_count == 2
-    assert edit_message_text.await_args_list[1].kwargs["text"].startswith("┏━ ✅ <b>下载完成</b>")
+    assert edit_message_text.await_args_list[1].kwargs["text"].startswith("✅ <b>下载完成</b>")
     assert monitor_repo.list_pending_completion() == []
 
 
@@ -357,6 +399,7 @@ def test_start_download_follow_up_scheduler_also_starts_download_completion_poll
         download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
         download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
         interval_seconds=300.0,
+        download_completion_interval_seconds=5.0,
     )
 
     assert [item.kwargs["name"] for item in app.create_task.call_args_list] == [
@@ -365,6 +408,57 @@ def test_start_download_follow_up_scheduler_also_starts_download_completion_poll
     ]
     for item in app.create_task.call_args_list:
         item.args[0].close()
+
+
+def test_start_download_follow_up_scheduler_uses_fast_completion_polling_interval() -> None:
+    database = SqliteDatabase(":memory:")
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    status_service = GetDownloadStatusService(AsyncMock(), download_monitor_repo=monitor_repo)
+    app = SimpleNamespace(
+        bot_data={
+            GET_DOWNLOAD_STATUS_SERVICE_KEY: status_service,
+            POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY: PostDownloadAutoImportService(monitor_repo, JobEventRepo(database), AsyncMock()),
+            "sidecar_host_send_text_func": AsyncMock(),
+        },
+        create_task=Mock(return_value=SimpleNamespace()),
+    )
+    captured: list[tuple[str, float]] = []
+
+    async def fake_auto_import_loop(*, interval_seconds: float, **kwargs) -> None:
+        captured.append(("auto_import", interval_seconds))
+
+    async def fake_completion_loop(*, interval_seconds: float, min_telegram_progress_edit_interval_seconds: float | None = None, **kwargs) -> None:
+        captured.append(("completion", interval_seconds))
+        captured.append(("completion_edit", float(min_telegram_progress_edit_interval_seconds or -1)))
+
+    from app.bot import download_follow_up_runtime as runtime
+
+    original_auto_import_loop = runtime.post_download_auto_import_scheduler_loop
+    original_completion_loop = runtime.download_completion_polling_loop
+    runtime.post_download_auto_import_scheduler_loop = fake_auto_import_loop
+    runtime.download_completion_polling_loop = fake_completion_loop
+    try:
+        start_download_follow_up_scheduler(
+            application=app,
+            send_text_func_key="sidecar_host_send_text_func",
+            post_download_auto_import_service_key=POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY,
+            post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
+            post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
+            get_download_status_service_key=GET_DOWNLOAD_STATUS_SERVICE_KEY,
+            download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
+            download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
+            interval_seconds=300.0,
+            download_completion_polling_interval_seconds=5.0,
+            min_telegram_progress_edit_interval_seconds=5.0,
+        )
+    finally:
+        runtime.post_download_auto_import_scheduler_loop = original_auto_import_loop
+        runtime.download_completion_polling_loop = original_completion_loop
+
+    asyncio.run(app.create_task.call_args_list[0].args[0])
+    asyncio.run(app.create_task.call_args_list[1].args[0])
+    assert captured == [("auto_import", 300.0), ("completion", 5.0), ("completion_edit", 5.0)]
 
 
 def test_start_download_follow_up_scheduler_starts_completion_polling_without_auto_import_service() -> None:
@@ -389,6 +483,7 @@ def test_start_download_follow_up_scheduler_starts_completion_polling_without_au
         download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
         download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
         interval_seconds=300.0,
+        download_completion_interval_seconds=5.0,
     )
 
     assert [item.kwargs["name"] for item in app.create_task.call_args_list] == ["download_completion_polling_scheduler"]
@@ -416,6 +511,7 @@ def test_start_download_follow_up_scheduler_logs_fix_hint_when_completion_pollin
         download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
         download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
         interval_seconds=300.0,
+        download_completion_interval_seconds=5.0,
     )
 
     captured = capsys.readouterr()
@@ -447,6 +543,7 @@ def test_start_download_follow_up_scheduler_logs_missing_send_text_for_auto_impo
         download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
         download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
         interval_seconds=300.0,
+        download_completion_interval_seconds=5.0,
     )
 
     captured = capsys.readouterr()

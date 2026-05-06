@@ -105,15 +105,16 @@ def test_get_status_text_renders_telegram_live_progress_card() -> None:
 
     text = _run(service.get_status_text("87", channel="telegram_live_progress"))
 
-    assert text.startswith("┏━ ⏳ <b>下载进行中</b>")
-    assert "🎬 <b>Dune 1984</b>" in text
-    assert "│  ID    <code>87</code>" in text
-    assert "│  Hash  <code>b305bf</code>" in text
-    assert "│  进度条 <code>[#######-----]</code>" in text
-    assert "56.0%" in text
-    assert "1.0 MB/s" in text
-    assert "02:01" in text
-    assert "<code>status 87</code>" in text
+    assert text.startswith("⏳ <b>任务下载中</b>")
+    assert "🎬 <b>资源标题：</b>" in text
+    assert "<i>Dune 1984</i>" in text
+    assert "📍 <b>当前状态：</b> 下载中" in text
+    assert "🆔 <b>任务 ID：</b> <code>87</code>" in text
+    assert "<code>b305bf</code>" in text
+    assert "<code>[███████████░░░░░░░░░]</code> 56.0%" in text
+    assert "⚡ <b>速度：</b> 1.0 MB/s" in text
+    assert "⏳ <b>剩余：</b> 02m 01s" in text
+    assert "消息每 5 秒自动刷新一次" in text
 
 
 def test_get_status_text_not_found() -> None:
@@ -1367,6 +1368,121 @@ def test_post_download_auto_import_run_once_counts_only_real_progress(tmp_path: 
         (1001, "资源自动规则已跳过自动导入：Dune 2024 CAM\n原因：命中低质量来源标记 CAM。\n如仍需导入，请手动发送 import hash-88。"),
     )
     auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
+
+
+def test_post_download_auto_import_run_once_splits_standard_import_reply_into_four_stage_notifications(
+    tmp_path: Path,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 1080p WEB-DL",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 2024 1080p WEB-DL",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    auto_import_reply = (
+        "导入成功：Dune 2024 1080p WEB-DL\n"
+        "任务 ID: 87\n"
+        "任务 Hash: hash-87\n"
+        "目标路径: /library/Dune 2024\n\n"
+        "后处理总结\n"
+        "- metadata：成功；metadata 刮削成功：/tmp/demo.metadata.json\n"
+        "- 字幕：成功；字幕翻译成功：已生成 1 个字幕文件。\n"
+        "- 刷新：成功；媒体库刷新成功。"
+    )
+    auto_import = AsyncMock(return_value=auto_import_reply)
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=JobEventRepo(database),
+        auto_import_func=auto_import,
+    )
+
+    result = asyncio.run(auto_import_service.run_once())
+
+    assert result.replies == (auto_import_reply,)
+    assert tuple((item.chat_id, item.text) for item in result.notifications) == (
+        (
+            1001,
+            "导入成功：Dune 2024 1080p WEB-DL\n任务 ID: 87\n任务 Hash: hash-87\n目标路径: /library/Dune 2024",
+        ),
+        (1001, "字幕翻译：成功；字幕翻译成功：已生成 1 个字幕文件。"),
+        (1001, "媒体库刷新：成功；媒体库刷新成功。"),
+        (
+            1001,
+            "后处理总结\n"
+            "- metadata：成功；metadata 刮削成功：/tmp/demo.metadata.json\n"
+            "- 字幕：成功；字幕翻译成功：已生成 1 个字幕文件。\n"
+            "- 刷新：成功；媒体库刷新成功。",
+        ),
+    )
+    auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
+
+
+def test_post_download_auto_import_run_once_keeps_skipped_stages_as_explicit_notifications(
+    tmp_path: Path,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 2024 1080p WEB-DL",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 2024 1080p WEB-DL",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    auto_import_reply = (
+        "导入成功：Dune 2024 1080p WEB-DL\n"
+        "任务 ID: 87\n"
+        "任务 Hash: hash-87\n"
+        "目标路径: /library/Dune 2024\n\n"
+        "后处理总结\n"
+        "- metadata：跳过\n"
+        "- 字幕：跳过\n"
+        "- 刷新：跳过"
+    )
+    auto_import_service = PostDownloadAutoImportService(
+        download_monitor_repo=monitor_repo,
+        job_event_repo=JobEventRepo(database),
+        auto_import_func=AsyncMock(return_value=auto_import_reply),
+    )
+
+    result = asyncio.run(auto_import_service.run_once())
+
+    assert tuple((item.chat_id, item.text) for item in result.notifications) == (
+        (
+            1001,
+            "导入成功：Dune 2024 1080p WEB-DL\n任务 ID: 87\n任务 Hash: hash-87\n目标路径: /library/Dune 2024",
+        ),
+        (1001, "字幕翻译：跳过"),
+        (1001, "媒体库刷新：跳过"),
+        (1001, "后处理总结\n- metadata：跳过\n- 字幕：跳过\n- 刷新：跳过"),
+    )
 
 
 def test_post_download_auto_import_run_once_marks_state_unavailable_when_skip_event_write_fails(
