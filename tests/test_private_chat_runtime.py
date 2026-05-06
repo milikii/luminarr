@@ -13,6 +13,7 @@ from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_STARTED_TEXT,
     PersonalWeChatLoginService,
 )
+from app.clients.transmission import TransmissionTask
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -238,7 +239,12 @@ def test_dispatch_private_chat_text_replies_invalid_bt_batch_confirm_selection_w
 
 def test_dispatch_private_chat_text_routes_add_pending_with_channel_delivery_renderer() -> None:
     reply_text = AsyncMock()
-    bot_data = _build_bot_data()
+    search_service = SearchMediaService(_fake_search)
+    add_service = AddToDownloaderService(
+        search_service,
+        AsyncMock(return_value=TransmissionTask(task_id="42", task_hash="abc123")),
+    )
+    bot_data = _build_bot_data(search_service=search_service, add_service=add_service)
     search_service = bot_data[SEARCH_SERVICE_KEY]
     assert isinstance(search_service, SearchMediaService)
     asyncio.run(search_service.search_and_format("dune", chat_id=1001))
@@ -256,8 +262,10 @@ def test_dispatch_private_chat_text_routes_add_pending_with_channel_delivery_ren
 
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert sent_text.startswith("【待确认：下载】 ⏳")
-    assert "确认下载：发送 confirm 1" in sent_text
+    assert sent_text.startswith("已添加下载：Dune (2021)")
+    assert "任务 ID: 42" in sent_text
+    assert "任务 Hash: abc123" in sent_text
+    assert "待确认：下载" not in sent_text
 
 
 def test_dispatch_private_chat_text_routes_duplicate_override_follow_up() -> None:

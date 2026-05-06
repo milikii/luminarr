@@ -220,8 +220,8 @@ def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared
     assert "<code>42</code>" in sent_text
     assert "<code>abc123</code>" in sent_text
     assert "<code>status abc123</code>" in sent_text
-    assert "下一阶段会在这里接入实时进度同步" in sent_text
-    assert "不展示伪实时进度" in sent_text
+    assert "后台会在此消息内同步真实下载进度" in sent_text
+    assert "刷新后会显示进度条 / 速度 / ETA" in sent_text
     assert "confirm " not in sent_text
     stored_session = search_service.telegram_pt_resource_card_state.get_session(session.session_token)
     assert stored_session is not None
