@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index and checklist before changing Telegram-specific delivery formatting."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep focused verification and docs expectations aligned while changing Telegram delivery text."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Preserve Telegram-specific delivery patterns and avoid regressing candidate/resource card behavior while adjusting success-message presentation."}
+{"file": ".trellis/tasks/05-06-telegram-download-card-live-progress/research/scope-split.md", "reason": "Lock this task to Phase A only: download-success card beautification, with live progress editing explicitly deferred."}

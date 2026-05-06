@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load the backend spec index and checklist before changing Telegram progress-sync behavior."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep verification expectations aligned while adding Telegram message editing and progress sync."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Preserve existing Telegram delivery and PT resource card behavior while extending Telegram-only progress updates."}
+{"file": ".trellis/tasks/05-06-telegram-phase-b-live-progress-sync/research/phase-b-boundary.md", "reason": "Lock the task to Telegram-only live progress sync, with message tracking/editing allowed and cross-channel expansion forbidden."}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Check the Telegram download-success card changes against the backend spec entrypoint."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify the focused test/lint expectations for a Telegram delivery formatting slice."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Ensure the Telegram delivery update stays presentation-only and does not regress existing candidate/resource card transport contracts."}
+{"file": ".trellis/tasks/05-06-telegram-download-card-live-progress/research/scope-split.md", "reason": "Verify the implementation stays within Phase A and does not silently pull live progress syncing into this task."}

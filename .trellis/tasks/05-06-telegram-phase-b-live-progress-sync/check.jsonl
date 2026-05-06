@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Check the Telegram live-progress sync changes against the backend spec entrypoint."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify focused regression, lint, and docs expectations for the Telegram-only progress sync slice."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Ensure Telegram progress-sync changes do not regress existing PT resource card transport or candidate/resource ordering behavior."}
+{"file": ".trellis/tasks/05-06-telegram-phase-b-live-progress-sync/research/phase-b-boundary.md", "reason": "Verify implementation stays Telegram-only and does not drift into cross-channel or downloader semantics changes."}
