@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from app.bot.telegram_delivery_runtime import build_telegram_status_inline_keyboard
 from app.bot.telegram_reply_formatter import _has_telegram_html
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
@@ -31,7 +32,7 @@ from app.services.telegram_pt_resource_cards import (
     parse_telegram_pt_resource_reply_marker,
 )
 
-TelegramReplyTextFunc = Callable[[str], Awaitable[object]]
+TelegramReplyTextFunc = Callable[..., Awaitable[object]]
 TelegramSendTextFunc = Callable[..., Awaitable[object]]
 TelegramSendMediaFunc = Callable[[int, str | Path, str | None, str | None, InlineKeyboardMarkup | None], Awaitable[object]]
 DownloadImageFunc = Callable[[str], Awaitable[bytes]]
@@ -98,6 +99,8 @@ def build_telegram_reply_func(
             return await _send_aggregate_candidate_messages(
                 reply_text_func=reply_func,
                 send_text_func=send_text_func,
+                send_media_func=send_media_func,
+                download_image_func=download_image_func,
                 chat_id=chat_id,
                 text=formatted_text,
             )
@@ -140,8 +143,9 @@ _STRIP_HTML_RE = re.compile(r"</?(?:b|i|u|s|code|pre|a)\b[^>]*>")
 _ADULT_BT_CARD_PREFIX = "【成人资源候选】"
 _PT_RESOURCE_CARD_PREFIX = "【PT资源卡】"
 _AGGREGATE_CANDIDATE_HEADER_RE = re.compile(r"^【.+】共找到\s+\d+\s+条相关信息，请选择操作$")
+_AGGREGATE_CANDIDATE_ITEM_RE = re.compile(r"^\d+\.\s+")
 _ADD_SUCCESS_HEADER_RE = re.compile(r"^✅\s*<b>已添加下载</b>$")
-_ADD_SUCCESS_CARD_HEADER_RE = re.compile(r"^┏━\s*✅\s*<b>下载已开始</b>$")
+_ADD_SUCCESS_CARD_HEADER_RE = re.compile(r"^✅\s*<b>任务已添加并开始下载</b>$")
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
 _SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
 _PLACEHOLDER_POSTER_SIZE = (720, 1080)
@@ -234,12 +238,14 @@ async def _reply_telegram_add_success_message(
     text: str,
     download_monitor_repo: DownloadMonitorRepo | None = None,
 ) -> object:
+    task_identity = _extract_add_success_task_identity(original_text)
     result = await _send_or_reply_text(
         reply_text_func=reply_text_func,
         send_text_func=send_text_func,
         chat_id=chat_id,
         text=text,
         parse_mode="HTML",
+        reply_markup=build_telegram_status_inline_keyboard(task_identity[1]) if task_identity is not None else None,
     )
     _bind_telegram_add_success_message(
         download_monitor_repo=download_monitor_repo,
@@ -515,9 +521,18 @@ async def _send_aggregate_candidate_messages(
     *,
     reply_text_func: TelegramReplyTextFunc,
     send_text_func: TelegramSendTextFunc | None,
+    send_media_func: TelegramSendMediaFunc | None,
+    download_image_func: DownloadImageFunc | None,
     chat_id: int | None,
     text: str,
 ) -> object:
+    if chat_id is not None and send_media_func is not None and download_image_func is not None:
+        await _send_first_aggregate_candidate_poster(
+            send_media_func=send_media_func,
+            download_image_func=download_image_func,
+            chat_id=chat_id,
+            text=text,
+        )
     last_result: object | None = None
     for chunk in _split_telegram_text_chunks(text):
         last_result = await _send_or_reply_text(
@@ -527,6 +542,70 @@ async def _send_aggregate_candidate_messages(
             text=chunk,
         )
     return last_result
+
+
+async def _send_first_aggregate_candidate_poster(
+    *,
+    send_media_func: TelegramSendMediaFunc,
+    download_image_func: DownloadImageFunc,
+    chat_id: int,
+    text: str,
+) -> object | None:
+    poster_url, caption = _extract_first_aggregate_candidate_poster_card(text)
+    if not poster_url:
+        return None
+    artifact = await _download_candidate_media_artifact(
+        download_image_func=download_image_func,
+        poster_url=poster_url,
+    )
+    if artifact is None:
+        return None
+    try:
+        parse_mode = "HTML" if caption and _has_telegram_html(caption) else None
+        return await _call_send_media_func(
+            send_media_func=send_media_func,
+            chat_id=chat_id,
+            artifact=artifact,
+            caption=caption,
+            parse_mode=parse_mode,
+            reply_markup=None,
+        )
+    except Exception as error:
+        emit_operational_log(
+            title="Telegram 候选海报发送失败",
+            detail=f"url={poster_url or str(artifact)} 原因={error}",
+            fix_hint="检查 Telegram 侧媒体发送权限、图片格式和候选海报 URL；当前会退回纯文本候选卡，不影响后续数字确认。",
+        )
+        return None
+    finally:
+        _cleanup_temp_media_artifact(artifact)
+
+
+def _extract_first_aggregate_candidate_poster_card(text: str) -> tuple[str, str | None]:
+    lines = [line.strip() for line in text.splitlines()]
+    candidate_lines: list[str] = []
+    poster_url = ""
+    in_first_candidate = False
+    for line in lines:
+        if not line:
+            continue
+        if line == "下一步":
+            break
+        if _AGGREGATE_CANDIDATE_ITEM_RE.match(line):
+            if in_first_candidate:
+                break
+            in_first_candidate = True
+            candidate_lines.append(line)
+            continue
+        if not in_first_candidate:
+            continue
+        if line.startswith("海报预览："):
+            poster_match = re.search(r'href="(?P<url>https?://[^"]+)"', line)
+            if poster_match is not None:
+                poster_url = str(poster_match.group("url") or "").strip()
+            continue
+        candidate_lines.append(line)
+    return poster_url, _resolve_candidate_block_caption(candidate_lines)
 
 
 async def _send_pt_resource_card_message(
@@ -927,6 +1006,7 @@ async def _send_or_reply_text(
     chat_id: int | None,
     text: str,
     parse_mode: str | None = None,
+    reply_markup: InlineKeyboardMarkup | None = None,
 ) -> object:
     if send_text_func is not None and chat_id is not None:
         kwargs: dict[str, object] = {"chat_id": chat_id, "text": text}
@@ -934,12 +1014,17 @@ async def _send_or_reply_text(
             kwargs["parse_mode"] = parse_mode
         elif _has_telegram_html(text):
             kwargs["parse_mode"] = "HTML"
+        if reply_markup is not None:
+            kwargs["reply_markup"] = reply_markup
         return await send_text_func(**kwargs)
+    kwargs = {}
     if parse_mode:
-        return await reply_text_func(text, parse_mode=parse_mode)
-    if _has_telegram_html(text):
-        return await reply_text_func(text, parse_mode="HTML")
-    return await reply_text_func(text)
+        kwargs["parse_mode"] = parse_mode
+    elif _has_telegram_html(text):
+        kwargs["parse_mode"] = "HTML"
+    if reply_markup is not None:
+        kwargs["reply_markup"] = reply_markup
+    return await reply_text_func(text, **kwargs)
 
 
 def resolve_telegram_chat_id(

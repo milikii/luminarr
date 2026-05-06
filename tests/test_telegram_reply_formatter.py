@@ -162,18 +162,22 @@ def test_format_telegram_reply_formats_add_success_as_copy_friendly_card() -> No
     formatted = format_telegram_reply(text)
 
     assert formatted == (
-        "┏━ ✅ <b>下载已开始</b>\n"
-        "🎬 <b>Dune 2021 2160p WEB-DL</b>\n"
-        "🧩 <b>下载器</b>  <code>pt-main · qbittorrent</code>\n\n"
-        "├─ <b>任务</b>\n"
-        "│  ID    <code>42</code>\n"
-        "│  Hash  <code>abc123</code>\n\n"
-        "├─ <b>状态</b>\n"
-        "│  后台会在此消息内同步真实下载进度\n"
-        "│  刷新后会显示进度条 / 速度 / ETA\n\n"
-        "└─ <b>操作</b>\n"
-        "   刷新状态：发送 status abc123\n"
-        "   <code>status abc123</code>\n\n"
+        "✅ <b>任务已添加并开始下载</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🎬 <b>资源标题：</b>\n"
+        "<i>Dune 2021 2160p WEB-DL</i>\n"
+        "🧩 <b>下载器：</b> <code>pt-main · qbittorrent</code>\n"
+        "📍 <b>当前状态：</b> 等待下载器首次同步\n"
+        "📊 <b>实时进度：</b>\n"
+        "<code>[░░░░░░░░░░░░░░░░░░░░]</code> 等待首次同步\n"
+        "⚡ <b>速度：</b> --\n"
+        "⏳ <b>剩余：</b> --\n"
+        "⚙️ <b>任务信息：</b>\n"
+        "🆔 <b>任务 ID：</b> <code>42</code>\n"
+        "🔑 <b>特征 Hash (点击复制)：</b>\n"
+        "<code>abc123</code>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "⏱️ <b>消息每 5 秒自动刷新一次</b>\n\n"
         "注意：下载已执行，但状态回写失败，请勿重复 confirm。\n"
         "请稍后用 status 查询任务状态，或检查 SQLite/approval_record 与 jobs 表。"
     )
@@ -496,12 +500,16 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
 
 def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after_local_poster_send() -> None:
     send_text = AsyncMock(return_value="text-ok")
+    send_media = AsyncMock(return_value="media-ok")
+    download_image = AsyncMock(return_value=b"fake-image")
     reply_text = AsyncMock(return_value="fallback")
     reply_func = build_telegram_reply_func(
         reply_text,
         formatter=format_telegram_reply,
         chat_id=1001,
         send_text_func=send_text,
+        send_media_func=send_media,
+        download_image_func=download_image,
     )
     text = render_media_candidate_confirmation_reply(
         query="Dune 2021",
@@ -524,6 +532,11 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
 
     assert result == "text-ok"
     reply_text.assert_not_called()
+    download_image.assert_awaited_once_with("https://image.tmdb.org/t/p/w500/dune.jpg")
+    send_media.assert_awaited_once()
+    assert send_media.await_args.args[0] == 1001
+    assert send_media.await_args.args[2] is not None
+    assert send_media.await_args.args[3] == "HTML"
     send_text.assert_awaited_once()
     kwargs = send_text.await_args.kwargs
     sent_text = kwargs["text"]
@@ -719,20 +732,27 @@ def test_build_telegram_reply_func_replies_add_success_card_as_html() -> None:
     assert result == "sent"
     reply_text.assert_awaited_once()
     assert reply_text.await_args.args[0] == (
-        "┏━ ✅ <b>下载已开始</b>\n"
-        "🎬 <b>Dune 2021 2160p WEB-DL</b>\n"
-        "🧩 <b>下载器</b>  <code>pt-main · qbittorrent</code>\n\n"
-        "├─ <b>任务</b>\n"
-        "│  ID    <code>42</code>\n"
-        "│  Hash  <code>abc123</code>\n\n"
-        "├─ <b>状态</b>\n"
-        "│  后台会在此消息内同步真实下载进度\n"
-        "│  刷新后会显示进度条 / 速度 / ETA\n\n"
-        "└─ <b>操作</b>\n"
-        "   刷新状态：发送 status abc123\n"
-        "   <code>status abc123</code>"
+        "✅ <b>任务已添加并开始下载</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🎬 <b>资源标题：</b>\n"
+        "<i>Dune 2021 2160p WEB-DL</i>\n"
+        "🧩 <b>下载器：</b> <code>pt-main · qbittorrent</code>\n"
+        "📍 <b>当前状态：</b> 等待下载器首次同步\n"
+        "📊 <b>实时进度：</b>\n"
+        "<code>[░░░░░░░░░░░░░░░░░░░░]</code> 等待首次同步\n"
+        "⚡ <b>速度：</b> --\n"
+        "⏳ <b>剩余：</b> --\n"
+        "⚙️ <b>任务信息：</b>\n"
+        "🆔 <b>任务 ID：</b> <code>42</code>\n"
+        "🔑 <b>特征 Hash (点击复制)：</b>\n"
+        "<code>abc123</code>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "⏱️ <b>消息每 5 秒自动刷新一次</b>"
     )
     assert reply_text.await_args.kwargs["parse_mode"] == "HTML"
+    reply_markup = reply_text.await_args.kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
 
 
 def test_build_telegram_reply_func_sends_add_success_card_via_send_text_when_available() -> None:
@@ -754,18 +774,25 @@ def test_build_telegram_reply_func_sends_add_success_card_via_send_text_when_ava
     assert send_text.await_args.kwargs["chat_id"] == 1001
     assert send_text.await_args.kwargs["parse_mode"] == "HTML"
     assert send_text.await_args.kwargs["text"] == (
-        "┏━ ✅ <b>下载已开始</b>\n"
-        "🎬 <b>Dune 2021 2160p WEB-DL</b>\n\n"
-        "├─ <b>任务</b>\n"
-        "│  ID    <code>42</code>\n"
-        "│  Hash  <code>abc123</code>\n\n"
-        "├─ <b>状态</b>\n"
-        "│  后台会在此消息内同步真实下载进度\n"
-        "│  刷新后会显示进度条 / 速度 / ETA\n\n"
-        "└─ <b>操作</b>\n"
-        "   刷新状态：发送 status abc123\n"
-        "   <code>status abc123</code>"
+        "✅ <b>任务已添加并开始下载</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🎬 <b>资源标题：</b>\n"
+        "<i>Dune 2021 2160p WEB-DL</i>\n"
+        "📍 <b>当前状态：</b> 等待下载器首次同步\n"
+        "📊 <b>实时进度：</b>\n"
+        "<code>[░░░░░░░░░░░░░░░░░░░░]</code> 等待首次同步\n"
+        "⚡ <b>速度：</b> --\n"
+        "⏳ <b>剩余：</b> --\n"
+        "⚙️ <b>任务信息：</b>\n"
+        "🆔 <b>任务 ID：</b> <code>42</code>\n"
+        "🔑 <b>特征 Hash (点击复制)：</b>\n"
+        "<code>abc123</code>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "⏱️ <b>消息每 5 秒自动刷新一次</b>"
     )
+    reply_markup = send_text.await_args.kwargs["reply_markup"]
+    assert isinstance(reply_markup, InlineKeyboardMarkup)
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
 
 
 def test_build_telegram_reply_func_tracks_add_success_message_id_in_download_monitor(tmp_path: Path) -> None:
