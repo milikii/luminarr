@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load backend spec index before touching metadata and subtitle-adjacent code paths."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep focused verification and docs gate expectations aligned while changing metadata outputs."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Metadata sidecar fields and subtitle guidance are coupled; preserve that contract while enriching metadata truth."}
+{"file": ".trellis/tasks/05-07-metadata-scrape-quality-overwrite-and-enrichment/research/root-cause.md", "reason": "Implement against the confirmed root cause: release NFO/image overwrite gaps and missing TMDB detail fields."}

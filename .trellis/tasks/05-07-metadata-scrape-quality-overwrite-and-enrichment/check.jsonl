@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Check agent should validate metadata output changes against current backend guidance."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check focused tests remain the authoritative proof for this metadata quality patch."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Verify metadata sidecar enrichment does not break subtitle guidance and related contracts."}
+{"file": ".trellis/tasks/05-07-metadata-scrape-quality-overwrite-and-enrichment/research/root-cause.md", "reason": "Review implementation against the confirmed overwrite/enrichment root cause."}

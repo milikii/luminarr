@@ -655,3 +655,27 @@
 
 ### 下轮目标
 - 若要提交或收尾，先按“四段式 TG 通知补丁”和其他并行中的 Telegram/UI 变更重新做 commit 分组。
+
+## Round 38 — 2026-05-07 00:42
+
+### 完成
+- 收口 movie metadata 工件质量：目录型导入下的 metadata/NFO/图片产物改为覆盖写入，避免下载源自带 release NFO 和旧封面继续污染 Emby/Jellyfin 最终显示。
+- 扩充 TMDB/Fanart 真相落盘：metadata sidecar / NFO 现已写出 `release_date`、`runtime_minutes`、`tagline`、关键 `crew`（导演/编剧/故事/剧本）以及 `poster/backdrop/logo/clearart/banner/disc/thumb` 资产矩阵。
+- 修正 `job_event` 同 `task_id`/不同 `task_hash` 串号，避免 Telegram 完成态卡片把别的任务的字幕失败误合并进来。
+- 收紧字幕跳过语义：GB18030/GBK 外挂字幕可读，中文内容外挂字幕不再误送翻译 provider，并在 Telegram 完成态卡片内显示 `字幕：✅ 已有中文字幕`。
+- 现场对 `功夫熊猫 (2008)` 重跑 metadata / subtitle 判定，确认目录内已落 `poster.jpg`、`backdrop.jpg`、`logo.png`、`clearart.png`、`banner.jpg`、`disc.png`、`thumb.jpg` 与更新后的 XML NFO。
+
+### 测试状态
+- 通过: 5 / 总计: 5
+- `.venv/bin/python -m pytest -q tests/test_metadata_scraper.py`
+- `.venv/bin/python -m pytest -q tests/test_tmdb_client.py tests/test_fanart_client.py`
+- `.venv/bin/python -m pytest -q tests/test_subtitle_translator.py -k "gb18030 or 中文字幕外挂字幕"`
+- `.venv/bin/python -m pytest -q tests/test_import_to_library.py tests/test_get_download_status.py -k "chinese_ready or 中文字幕外挂字幕"`
+- `.venv/bin/python -m pytest -q tests/test_persistence_sqlite.py tests/test_get_download_status.py tests/test_download_follow_up_runtime.py -k "job_event_repo_list_events_for_task_identity_requires_both_task_id_and_task_hash_when_both_present or telegram_live_progress or final_summary or auto_import"
+
+### 遗留 / 下轮继续
+- `country / studio / cast / crew` 的中文化仍不是完全拉满；当前主要靠 TMDB zh-CN truth 与现有 cast localization seam，尚未引入新的本地化 provider。
+- 当前工作树仍混有 Telegram/status/字幕与 task bookkeeping 的并行未提交改动；提交时必须分组，不能一把梭。
+
+### 下轮目标
+- 若进入提交，先按 `metadata scrape quality overwrite and enrichment` 与 `telegram four-stage follow-up notifications` 两条主线拆 commit 组，再决定是否 push。
