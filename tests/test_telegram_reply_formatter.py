@@ -1,10 +1,14 @@
 import asyncio
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from telegram import InlineKeyboardMarkup
 
 from app.bot import telegram_update_runtime
 from app.clients.tmdb import TmdbMovie
+from app.db.download_monitor_repo import DownloadMonitorRepo
+from app.db.sqlite import SqliteDatabase
 from app.bot.telegram_update_runtime import build_telegram_reply_func
 from app.bot.telegram_reply_formatter import format_telegram_reply
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
@@ -165,10 +169,10 @@ def test_format_telegram_reply_formats_add_success_as_copy_friendly_card() -> No
         "│  ID    <code>42</code>\n"
         "│  Hash  <code>abc123</code>\n\n"
         "├─ <b>状态</b>\n"
-        "│  下一阶段会在这里接入实时进度同步\n"
-        "│  当前阶段仅提供任务创建结果，不展示伪实时进度\n\n"
+        "│  后台会在此消息内同步真实下载进度\n"
+        "│  刷新后会显示进度条 / 速度 / ETA\n\n"
         "└─ <b>操作</b>\n"
-        "   状态命令\n"
+        "   刷新状态：发送 status abc123\n"
         "   <code>status abc123</code>\n\n"
         "注意：下载已执行，但状态回写失败，请勿重复 confirm。\n"
         "请稍后用 status 查询任务状态，或检查 SQLite/approval_record 与 jobs 表。"
@@ -722,10 +726,10 @@ def test_build_telegram_reply_func_replies_add_success_card_as_html() -> None:
         "│  ID    <code>42</code>\n"
         "│  Hash  <code>abc123</code>\n\n"
         "├─ <b>状态</b>\n"
-        "│  下一阶段会在这里接入实时进度同步\n"
-        "│  当前阶段仅提供任务创建结果，不展示伪实时进度\n\n"
+        "│  后台会在此消息内同步真实下载进度\n"
+        "│  刷新后会显示进度条 / 速度 / ETA\n\n"
         "└─ <b>操作</b>\n"
-        "   状态命令\n"
+        "   刷新状态：发送 status abc123\n"
         "   <code>status abc123</code>"
     )
     assert reply_text.await_args.kwargs["parse_mode"] == "HTML"
@@ -756,12 +760,44 @@ def test_build_telegram_reply_func_sends_add_success_card_via_send_text_when_ava
         "│  ID    <code>42</code>\n"
         "│  Hash  <code>abc123</code>\n\n"
         "├─ <b>状态</b>\n"
-        "│  下一阶段会在这里接入实时进度同步\n"
-        "│  当前阶段仅提供任务创建结果，不展示伪实时进度\n\n"
+        "│  后台会在此消息内同步真实下载进度\n"
+        "│  刷新后会显示进度条 / 速度 / ETA\n\n"
         "└─ <b>操作</b>\n"
-        "   状态命令\n"
+        "   刷新状态：发送 status abc123\n"
         "   <code>status abc123</code>"
     )
+
+
+def test_build_telegram_reply_func_tracks_add_success_message_id_in_download_monitor(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    monitor_repo.register_download(
+        task_id="42",
+        task_hash="abc123",
+        name="Dune 2021 2160p WEB-DL",
+        chat_id=1001,
+        user_id=2001,
+    )
+    reply_text = AsyncMock(return_value="reply-sent")
+    send_text = AsyncMock(return_value=SimpleNamespace(message_id=654))
+    reply_func = build_telegram_reply_func(
+        reply_text,
+        formatter=format_telegram_reply,
+        chat_id=1001,
+        send_text_func=send_text,
+        download_monitor_repo=monitor_repo,
+    )
+    text = "已添加下载：Dune 2021 2160p WEB-DL\n任务 ID: 42\n任务 Hash: abc123"
+
+    result = asyncio.run(reply_func(text))
+
+    assert result.message_id == 654
+    reply_text.assert_not_awaited()
+    send_text.assert_awaited_once()
+    record = monitor_repo.get_record(task_id="42", task_hash="abc123")
+    assert record is not None
+    assert record.telegram_message_id == 654
 
 
 def test_build_telegram_reply_func_sends_candidate_cards_as_photo_messages_when_poster_exists() -> None:

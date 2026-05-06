@@ -63,6 +63,7 @@ class TelegramSidecarRuntimeConfig:
     post_download_auto_import_stop_event_key: str
     post_download_auto_import_task_key: str
     get_download_status_service_key: str
+    telegram_edit_text_func_key: str
     download_completion_polling_stop_event_key: str
     download_completion_polling_task_key: str
     wecom_webhook_server_config_key: str
@@ -76,6 +77,7 @@ TELEGRAM_SIDECAR_RUNTIME_CONFIG = TelegramSidecarRuntimeConfig(
     post_download_auto_import_stop_event_key=POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
     post_download_auto_import_task_key=POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
     get_download_status_service_key=GET_DOWNLOAD_STATUS_SERVICE_KEY,
+    telegram_edit_text_func_key="telegram_edit_text_func",
     download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
     download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
     wecom_webhook_server_config_key=WECOM_WEBHOOK_SERVER_CONFIG_KEY,
@@ -332,6 +334,7 @@ def _start_post_download_auto_import_scheduler(host: SidecarHost, *, config: Tel
     start_download_follow_up_scheduler(
         application=host,
         send_text_func_key=SIDECAR_HOST_SEND_TEXT_FUNC_KEY,
+        telegram_edit_message_func_key=config.telegram_edit_text_func_key,
         post_download_auto_import_service_key=config.post_download_auto_import_service_key,
         post_download_auto_import_stop_event_key=config.post_download_auto_import_stop_event_key,
         post_download_auto_import_task_key=config.post_download_auto_import_task_key,

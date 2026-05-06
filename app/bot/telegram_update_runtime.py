@@ -17,6 +17,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from app.bot.telegram_reply_formatter import _has_telegram_html
+from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.operational_logging import emit_operational_log
@@ -59,13 +60,18 @@ def build_telegram_reply_func(
     send_media_func: TelegramSendMediaFunc | None = None,
     download_image_func: DownloadImageFunc | None = None,
     telegram_pt_resource_card_state: TelegramPtResourceCardState | None = None,
+    download_monitor_repo: DownloadMonitorRepo | None = None,
 ) -> Callable[[str], Awaitable[object]]:
     async def wrapped(text: str) -> object:
         formatted_text = formatter(text)
         if _is_telegram_add_success_reply(formatted_text):
             return await _reply_telegram_add_success_message(
                 reply_text_func=reply_func,
+                send_text_func=send_text_func,
+                chat_id=chat_id,
+                original_text=text,
                 text=formatted_text,
+                download_monitor_repo=download_monitor_repo,
             )
         if (
             chat_id is not None
@@ -135,6 +141,7 @@ _ADULT_BT_CARD_PREFIX = "【成人资源候选】"
 _PT_RESOURCE_CARD_PREFIX = "【PT资源卡】"
 _AGGREGATE_CANDIDATE_HEADER_RE = re.compile(r"^【.+】共找到\s+\d+\s+条相关信息，请选择操作$")
 _ADD_SUCCESS_HEADER_RE = re.compile(r"^✅\s*<b>已添加下载</b>$")
+_ADD_SUCCESS_CARD_HEADER_RE = re.compile(r"^┏━\s*✅\s*<b>下载已开始</b>$")
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
 _SEND_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：发送\s+(?P<query>.+?)\s*$")
 _PLACEHOLDER_POSTER_SIZE = (720, 1080)
@@ -175,7 +182,8 @@ def _is_telegram_add_success_reply(text: str) -> bool:
     stripped_text = text.strip()
     if not stripped_text:
         return False
-    return bool(_ADD_SUCCESS_HEADER_RE.match(stripped_text.splitlines()[0]))
+    first_line = stripped_text.splitlines()[0]
+    return bool(_ADD_SUCCESS_HEADER_RE.match(first_line) or _ADD_SUCCESS_CARD_HEADER_RE.match(first_line))
 
 
 def _is_adult_bt_poster_caption_reply(text: str) -> bool:
@@ -220,13 +228,25 @@ async def _reply_adult_bt_poster_caption_message(
 async def _reply_telegram_add_success_message(
     *,
     reply_text_func: TelegramReplyTextFunc,
+    send_text_func: TelegramSendTextFunc | None = None,
+    chat_id: int | None = None,
+    original_text: str,
     text: str,
+    download_monitor_repo: DownloadMonitorRepo | None = None,
 ) -> object:
-    reply_markup = _build_inline_keyboard_from_text(text)
-    kwargs: dict[str, object] = {"parse_mode": "HTML"}
-    if reply_markup is not None:
-        kwargs["reply_markup"] = reply_markup
-    return await reply_text_func(text, **kwargs)
+    result = await _send_or_reply_text(
+        reply_text_func=reply_text_func,
+        send_text_func=send_text_func,
+        chat_id=chat_id,
+        text=text,
+        parse_mode="HTML",
+    )
+    _bind_telegram_add_success_message(
+        download_monitor_repo=download_monitor_repo,
+        source_text=original_text,
+        result=result,
+    )
+    return result
 
 
 def _split_adult_bt_poster_caption_reply(text: str) -> tuple[str, str, list[str]]:
@@ -313,6 +333,47 @@ def _build_inline_keyboard_from_text(text: str) -> InlineKeyboardMarkup | None:
         return None
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
     return InlineKeyboardMarkup(rows)
+
+
+def _bind_telegram_add_success_message(
+    *,
+    download_monitor_repo: DownloadMonitorRepo | None,
+    source_text: str,
+    result: object,
+) -> None:
+    if download_monitor_repo is None:
+        return
+    task_identity = _extract_add_success_task_identity(source_text)
+    message_id = _extract_message_id(result)
+    if task_identity is None or message_id is None:
+        return
+    try:
+        download_monitor_repo.bind_telegram_message(
+            task_id=task_identity[0],
+            task_hash=task_identity[1],
+            message_id=message_id,
+        )
+    except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
+        emit_operational_log(
+            title="Telegram 下载进度消息绑定失败",
+            detail=f"task_id={task_identity[0]} task_hash={task_identity[1]} message_id={message_id} 原因={error}",
+            fix_hint="检查 download_monitor 是否已先登记该下载任务，以及 SQLite/download_monitor 表写入是否正常；当前下载消息已发出，但后台实时进度同步不会编辑回这条原消息。",
+        )
+
+
+def _extract_add_success_task_identity(text: str) -> tuple[str, str] | None:
+    task_id = ""
+    task_hash = ""
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("任务 ID:"):
+            task_id = line.removeprefix("任务 ID:").strip()
+            continue
+        if line.startswith("任务 Hash:"):
+            task_hash = line.removeprefix("任务 Hash:").strip()
+    if not task_id or not task_hash:
+        return None
+    return task_id, task_hash
 
 
 def _compose_adult_bt_text_fallback(*, poster_url: str, caption: str, action_lines: list[str]) -> str:
@@ -865,12 +926,17 @@ async def _send_or_reply_text(
     send_text_func: TelegramSendTextFunc | None,
     chat_id: int | None,
     text: str,
+    parse_mode: str | None = None,
 ) -> object:
     if send_text_func is not None and chat_id is not None:
         kwargs: dict[str, object] = {"chat_id": chat_id, "text": text}
-        if _has_telegram_html(text):
+        if parse_mode:
+            kwargs["parse_mode"] = parse_mode
+        elif _has_telegram_html(text):
             kwargs["parse_mode"] = "HTML"
         return await send_text_func(**kwargs)
+    if parse_mode:
+        return await reply_text_func(text, parse_mode=parse_mode)
     if _has_telegram_html(text):
         return await reply_text_func(text, parse_mode="HTML")
     return await reply_text_func(text)

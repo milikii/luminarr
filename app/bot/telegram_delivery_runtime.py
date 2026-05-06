@@ -63,6 +63,28 @@ def build_telegram_send_text_func(application: Application):
     return send_text
 
 
+def build_telegram_edit_text_func(application: Application):
+    async def edit_text(
+        *,
+        chat_id: int,
+        message_id: int,
+        text: str,
+        parse_mode: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> object:
+        resolved_reply_markup = reply_markup or _build_inline_keyboard_markup(text)
+        kwargs: dict = {"chat_id": chat_id, "message_id": message_id, "text": text}
+        if parse_mode:
+            kwargs["parse_mode"] = parse_mode
+        elif _has_telegram_html(text):
+            kwargs["parse_mode"] = "HTML"
+        if resolved_reply_markup is not None:
+            kwargs["reply_markup"] = resolved_reply_markup
+        return await application.bot.edit_message_text(**kwargs)
+
+    return edit_text
+
+
 async def _send_telegram_media(
     *,
     application: Application,
@@ -130,16 +152,14 @@ def _build_inline_keyboard_markup(text: str) -> InlineKeyboardMarkup | None:
 
 
 def _extract_inline_action_rows(text: str) -> tuple[InlineKeyboardButton, ...]:
-    in_actions = False
     action_rows: list[InlineKeyboardButton] = []
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        if line == "下一步":
-            in_actions = True
+        if line.startswith(("│", "├", "└", "┏")):
             continue
-        if not in_actions:
+        if line == "下一步":
             continue
         url_match = _URL_ACTION_LINE_PATTERN.match(line)
         if url_match is not None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import sqlite3
 
 from app.bot.sidecar_host_runtime import SidecarHost
@@ -44,6 +45,8 @@ async def poll_pending_download_completion_once(
     *,
     download_monitor_repo: DownloadMonitorRepo,
     status_service: GetDownloadStatusService,
+    telegram_edit_message_func=None,
+    min_telegram_progress_edit_interval_seconds: float = 300.0,
 ) -> None:
     try:
         pending_records = download_monitor_repo.list_pending_completion()
@@ -53,6 +56,30 @@ async def poll_pending_download_completion_once(
         _log_download_completion_pending_list_error(error=error)
         return
     for record in pending_records:
+        if _can_edit_telegram_progress(record=record, telegram_edit_message_func=telegram_edit_message_func):
+            text = await status_service.get_status_text(
+                record.task_hash,
+                chat_id=record.chat_id,
+                channel="telegram_live_progress",
+            )
+            if not _is_telegram_live_progress_card_text(text):
+                continue
+            refreshed_record = download_monitor_repo.get_record(task_id=record.task_id, task_hash=record.task_hash)
+            if refreshed_record is None:
+                continue
+            if not _should_edit_telegram_progress(
+                record=refreshed_record,
+                text=text,
+                min_interval_seconds=min_telegram_progress_edit_interval_seconds,
+            ):
+                continue
+            await _edit_telegram_progress_message(
+                download_monitor_repo=download_monitor_repo,
+                record=refreshed_record,
+                text=text,
+                telegram_edit_message_func=telegram_edit_message_func,
+            )
+            continue
         await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
 
 
@@ -62,12 +89,20 @@ async def download_completion_polling_loop(
     status_service: GetDownloadStatusService,
     stop_event: asyncio.Event,
     interval_seconds: float,
+    telegram_edit_message_func=None,
+    min_telegram_progress_edit_interval_seconds: float | None = None,
 ) -> None:
     while not stop_event.is_set():
         try:
             await poll_pending_download_completion_once(
                 download_monitor_repo=download_monitor_repo,
                 status_service=status_service,
+                telegram_edit_message_func=telegram_edit_message_func,
+                min_telegram_progress_edit_interval_seconds=(
+                    interval_seconds
+                    if min_telegram_progress_edit_interval_seconds is None
+                    else min_telegram_progress_edit_interval_seconds
+                ),
             )
         except Exception as error:
             _log_download_completion_polling_loop_error(error=error)
@@ -81,6 +116,7 @@ def start_download_follow_up_scheduler(
     *,
     application: SidecarHost,
     send_text_func_key: str,
+    telegram_edit_message_func_key: str = "",
     post_download_auto_import_service_key: str,
     post_download_auto_import_stop_event_key: str,
     post_download_auto_import_task_key: str,
@@ -125,12 +161,15 @@ def start_download_follow_up_scheduler(
 
     stop_event = asyncio.Event()
     application.bot_data[download_completion_polling_stop_event_key] = stop_event
+    telegram_edit_message_func = application.bot_data.get(telegram_edit_message_func_key) if telegram_edit_message_func_key else None
     application.bot_data[download_completion_polling_task_key] = application.create_task(
         download_completion_polling_loop(
             download_monitor_repo=download_monitor_repo,
             status_service=status_service,
             stop_event=stop_event,
             interval_seconds=interval_seconds,
+            telegram_edit_message_func=telegram_edit_message_func,
+            min_telegram_progress_edit_interval_seconds=interval_seconds,
         ),
         name="download_completion_polling_scheduler",
     )
@@ -246,4 +285,90 @@ def _log_download_completion_polling_stop_error(*, error: Exception) -> None:
         title="下载完成状态轮询停止失败",
         detail=f"原因={error}",
         fix_hint="检查下载完成轮询 task 的退出路径、SQLite 连接状态，以及 stop_event 触发后的清理逻辑。",
+    )
+
+
+def _can_edit_telegram_progress(*, record, telegram_edit_message_func) -> bool:
+    return callable(telegram_edit_message_func) and record.chat_id > 0 and record.telegram_message_id > 0
+
+
+def _is_telegram_live_progress_card_text(text: str) -> bool:
+    stripped_text = text.strip()
+    if not stripped_text:
+        return False
+    first_line = stripped_text.splitlines()[0]
+    return first_line in {
+        "┏━ ⏳ <b>下载进行中</b>",
+        "┏━ ✅ <b>下载完成</b>",
+    }
+
+
+def _should_edit_telegram_progress(
+    *,
+    record,
+    text: str,
+    min_interval_seconds: float,
+) -> bool:
+    if record.telegram_message_id <= 0 or record.chat_id <= 0:
+        return False
+    if record.telegram_progress_last_text == text:
+        return False
+    if record.is_complete:
+        return True
+    last_synced_at = _parse_sqlite_timestamp(record.telegram_progress_last_synced_at)
+    if last_synced_at is None:
+        return True
+    return (datetime.utcnow() - last_synced_at).total_seconds() >= max(0.0, min_interval_seconds)
+
+
+async def _edit_telegram_progress_message(
+    *,
+    download_monitor_repo: DownloadMonitorRepo,
+    record,
+    text: str,
+    telegram_edit_message_func,
+) -> None:
+    try:
+        await telegram_edit_message_func(
+            chat_id=record.chat_id,
+            message_id=record.telegram_message_id,
+            text=text,
+            parse_mode="HTML",
+        )
+    except Exception as error:
+        _log_telegram_progress_edit_error(record=record, error=error)
+        return
+    try:
+        download_monitor_repo.record_telegram_progress_sync(
+            task_id=record.task_id,
+            task_hash=record.task_hash,
+            text=text,
+        )
+    except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
+        _log_telegram_progress_sync_error(record=record, error=error)
+
+
+def _parse_sqlite_timestamp(value: str) -> datetime | None:
+    cleaned_value = value.strip()
+    if not cleaned_value:
+        return None
+    try:
+        return datetime.strptime(cleaned_value, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def _log_telegram_progress_edit_error(*, record, error: Exception) -> None:
+    emit_operational_log(
+        title="Telegram 下载进度消息编辑失败",
+        detail=f"task_id={record.task_id} task_hash={record.task_hash} chat_id={record.chat_id} message_id={record.telegram_message_id} 原因={error}",
+        fix_hint="检查 Telegram message_id/chat_id 是否仍有效、Bot 是否具备编辑消息权限，以及当前下载进度卡片内容是否满足 Telegram 文本限制。",
+    )
+
+
+def _log_telegram_progress_sync_error(*, record, error: Exception) -> None:
+    emit_operational_log(
+        title="Telegram 下载进度同步真相落盘失败",
+        detail=f"task_id={record.task_id} task_hash={record.task_hash} chat_id={record.chat_id} message_id={record.telegram_message_id} 原因={error}",
+        fix_hint="检查 SQLite/download_monitor 表写入是否正常；当前 Telegram 消息可能已经被编辑，但本地下次轮询无法可靠去重。",
     )

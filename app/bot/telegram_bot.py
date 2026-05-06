@@ -196,6 +196,7 @@ WECOM_WEBHOOK_SERVER_CONFIG_KEY = "wecom_webhook_server_config"
 WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 TELEGRAM_SEND_MEDIA_FUNC_KEY = "telegram_send_media_func"
 TELEGRAM_SEND_TEXT_FUNC_KEY = "telegram_send_text_func"
+TELEGRAM_EDIT_TEXT_FUNC_KEY = "telegram_edit_text_func"
 TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY = "telegram_download_image_func"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 LookupTmdbCandidatesFunc = Callable[[str, str], Awaitable[list[TmdbMovie]]]

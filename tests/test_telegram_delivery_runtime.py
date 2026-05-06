@@ -8,7 +8,11 @@ from unittest.mock import AsyncMock
 import pytest
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.bot.telegram_delivery_runtime import build_telegram_send_media_func, build_telegram_send_text_func
+from app.bot.telegram_delivery_runtime import (
+    build_telegram_edit_text_func,
+    build_telegram_send_media_func,
+    build_telegram_send_text_func,
+)
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
 
 
@@ -98,6 +102,33 @@ def test_build_telegram_send_text_func_uses_html_parse_mode_for_card_text() -> N
         text=text,
         parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="查看状态", callback_data="status abc123")]]),
+    )
+
+
+def test_build_telegram_edit_text_func_uses_html_parse_mode_for_card_text() -> None:
+    edit_message_text = AsyncMock(return_value="edited-message")
+    sender = build_telegram_edit_text_func(
+        SimpleNamespace(bot=SimpleNamespace(edit_message_text=edit_message_text))
+    )
+    text = (
+        "┏━ ⏳ <b>下载进行中</b>\n"
+        "🎬 <b>Dune 2021 2160p WEB-DL</b>\n\n"
+        "├─ <b>任务</b>\n"
+        "│  ID    <code>42</code>\n"
+        "│  Hash  <code>abc123</code>\n\n"
+        "└─ <b>操作</b>\n"
+        "   刷新状态：发送 status abc123"
+    )
+
+    result = asyncio.run(sender(chat_id=1001, message_id=321, text=text))
+
+    assert result == "edited-message"
+    edit_message_text.assert_awaited_once_with(
+        chat_id=1001,
+        message_id=321,
+        text=text,
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="刷新状态", callback_data="status abc123")]]),
     )
 
 

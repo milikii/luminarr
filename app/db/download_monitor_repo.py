@@ -21,6 +21,9 @@ class DownloadMonitorRecord:
     last_observed_at: str
     created_at: str
     updated_at: str
+    telegram_message_id: int = 0
+    telegram_progress_last_text: str = ""
+    telegram_progress_last_synced_at: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +194,76 @@ class DownloadMonitorRepo:
             raise DownloadMonitorPersistenceError("download monitor task identity missing for query")
         return self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
 
+    def bind_telegram_message(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        message_id: int,
+    ) -> None:
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        cleaned_message_id = int(message_id)
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise DownloadMonitorPersistenceError("download monitor task identity missing for telegram bind")
+        if cleaned_message_id <= 0:
+            raise DownloadMonitorPersistenceError("download monitor telegram message identity missing")
+
+        with self._database.connect() as connection:
+            connection.execute(
+                """
+                UPDATE download_monitor
+                SET
+                    telegram_message_id = ?,
+                    telegram_progress_last_text = '',
+                    telegram_progress_last_synced_at = '',
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE task_id = ? AND task_hash = ?
+                """,
+                (
+                    cleaned_message_id,
+                    cleaned_task_id,
+                    cleaned_task_hash,
+                ),
+            )
+            connection.commit()
+        record = self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
+        if record is None or record.telegram_message_id != cleaned_message_id:
+            raise DownloadMonitorPersistenceError("download monitor telegram message missing after bind")
+
+    def record_telegram_progress_sync(
+        self,
+        *,
+        task_id: str,
+        task_hash: str,
+        text: str,
+    ) -> None:
+        cleaned_task_id = task_id.strip()
+        cleaned_task_hash = task_hash.strip()
+        if not cleaned_task_id or not cleaned_task_hash:
+            raise DownloadMonitorPersistenceError("download monitor task identity missing for telegram progress sync")
+
+        with self._database.connect() as connection:
+            connection.execute(
+                """
+                UPDATE download_monitor
+                SET
+                    telegram_progress_last_text = ?,
+                    telegram_progress_last_synced_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE task_id = ? AND task_hash = ?
+                """,
+                (
+                    text,
+                    cleaned_task_id,
+                    cleaned_task_hash,
+                ),
+            )
+            connection.commit()
+        record = self._get_record_by_identity(task_id=cleaned_task_id, task_hash=cleaned_task_hash)
+        if record is None or record.telegram_progress_last_text != text:
+            raise DownloadMonitorPersistenceError("download monitor telegram progress missing after sync")
+
     def list_pending_completion(self, *, limit: int = 100) -> list[DownloadMonitorRecord]:
         with self._database.connect() as connection:
             rows = connection.execute(
@@ -206,6 +279,9 @@ class DownloadMonitorRepo:
                     is_complete,
                     completion_observed_at,
                     last_observed_at,
+                    telegram_message_id,
+                    telegram_progress_last_text,
+                    telegram_progress_last_synced_at,
                     created_at,
                     updated_at
                 FROM download_monitor
@@ -232,6 +308,9 @@ class DownloadMonitorRepo:
                     is_complete,
                     completion_observed_at,
                     last_observed_at,
+                    telegram_message_id,
+                    telegram_progress_last_text,
+                    telegram_progress_last_synced_at,
                     created_at,
                     updated_at
                 FROM download_monitor
@@ -262,6 +341,9 @@ class DownloadMonitorRepo:
                     is_complete,
                     completion_observed_at,
                     last_observed_at,
+                    telegram_message_id,
+                    telegram_progress_last_text,
+                    telegram_progress_last_synced_at,
                     created_at,
                     updated_at
                 FROM download_monitor
@@ -288,6 +370,7 @@ def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRec
     user_id = int(row["user_id"])
     status_code = int(row["status_code"])
     percent_done = float(row["percent_done"])
+    telegram_message_id = int(row["telegram_message_id"])
 
     if not task_id or not task_hash:
         raise DownloadMonitorPersistenceError("download monitor row identity corrupted after read")
@@ -299,6 +382,8 @@ def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRec
         raise DownloadMonitorPersistenceError("download monitor status corrupted after read")
     if percent_done < 0:
         raise DownloadMonitorPersistenceError("download monitor progress corrupted after read")
+    if telegram_message_id < 0:
+        raise DownloadMonitorPersistenceError("download monitor telegram message identity corrupted after read")
 
     return DownloadMonitorRecord(
         task_id=task_id,
@@ -313,6 +398,9 @@ def _to_download_monitor_record(row: Mapping[str, object]) -> DownloadMonitorRec
         last_observed_at=str(row["last_observed_at"]),
         created_at=str(row["created_at"]),
         updated_at=str(row["updated_at"]),
+        telegram_message_id=telegram_message_id,
+        telegram_progress_last_text=str(row["telegram_progress_last_text"]),
+        telegram_progress_last_synced_at=str(row["telegram_progress_last_synced_at"]),
     )
 
 

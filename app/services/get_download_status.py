@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import sqlite3
 import re
 from collections.abc import Awaitable, Callable
@@ -39,6 +40,7 @@ STATUS_CODE_LABELS = {
     6: "做种中",
 }
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
+TELEGRAM_LIVE_PROGRESS_CHANNEL = "telegram_live_progress"
 
 
 class StatusFollowUpStateError(RuntimeError):
@@ -200,6 +202,12 @@ class GetDownloadStatusService:
         if task_status is None:
             return STATUS_NOT_FOUND_TEXT
         auto_import_text = await self._record_status_observation(task_ref=cleaned_ref, task_status=task_status)
+        if channel == TELEGRAM_LIVE_PROGRESS_CHANNEL:
+            return render_telegram_live_progress_reply(
+                task_ref=cleaned_ref,
+                task_status=task_status,
+                auto_import_text=auto_import_text,
+            )
         if channel in SUPPORTED_DELIVERY_CHANNELS:
             return render_status_reply(
                 task_ref=cleaned_ref,
@@ -258,6 +266,63 @@ def render_status_reply(
     )
 
 
+def render_telegram_live_progress_reply(
+    *,
+    task_ref: str,
+    task_status: TransmissionTaskStatus,
+    auto_import_text: str | None,
+) -> str:
+    progress_percent = _clamp_progress(task_status.percent_done)
+    status_label = STATUS_CODE_LABELS.get(task_status.status_code, f"未知({task_status.status_code})")
+    completed = progress_percent >= 100
+    sections: list[tuple[str, tuple[str, ...]]] = [
+        (
+            "任务",
+            (
+                f"ID    <code>{html.escape(task_status.task_id)}</code>",
+                f"Hash  <code>{html.escape(task_status.task_hash)}</code>",
+            ),
+        ),
+        (
+            "进度",
+            (
+                f"状态  {html.escape(status_label)}",
+                f"进度条 <code>{_format_progress_bar(progress_percent)}</code>",
+                f"进度  {progress_percent:.1f}%",
+                f"速度  {_format_speed(task_status.rate_download)}",
+                f"ETA   {_format_eta(task_status.eta_seconds)}",
+            ),
+        ),
+    ]
+    if auto_import_text:
+        follow_up_lines = tuple(
+            html.escape(line.strip())
+            for line in auto_import_text.splitlines()
+            if line.strip()
+        )
+        if follow_up_lines:
+            sections.append(("后续", follow_up_lines))
+    lines = [
+        f"┏━ {'✅' if completed else '⏳'} <b>{'下载完成' if completed else '下载进行中'}</b>",
+        f"🎬 <b>{html.escape(task_status.name.strip() or '-')}</b>",
+        "",
+    ]
+    for index, (label, section_lines) in enumerate(sections):
+        is_last = index == len(sections) - 1
+        branch = "└─" if is_last else "├─"
+        lines.append(f"{branch} <b>{label}</b>")
+        lines.extend(f"│  {line}" for line in section_lines)
+        lines.append("")
+    lines.extend(
+        (
+            "└─ <b>操作</b>",
+            f"   刷新状态：发送 status {task_ref}",
+            f"   <code>status {html.escape(task_ref)}</code>",
+        )
+    )
+    return "\n".join(lines)
+
+
 def build_status_delivery_item(
     *,
     task_ref: str,
@@ -314,6 +379,19 @@ def _format_speed(raw_speed: int) -> str:
     if unit_index == 0:
         return f"{int(speed)} {units[unit_index]}"
     return f"{speed:.1f} {units[unit_index]}"
+
+
+def _format_progress_bar(progress_percent: float, *, width: int = 12) -> str:
+    if width <= 0:
+        return "[]"
+    if progress_percent >= 100:
+        filled = width
+    elif progress_percent <= 0:
+        filled = 0
+    else:
+        filled = round(progress_percent / 100 * width)
+        filled = max(1, min(width - 1, filled))
+    return f"[{'#' * filled}{'-' * (width - filled)}]"
 
 
 def _format_eta(eta_seconds: int) -> str:

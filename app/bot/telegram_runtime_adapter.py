@@ -23,6 +23,7 @@ from app.bot.telegram_sidecar_runtime import (
     stop_telegram_application_lifecycle,
 )
 from app.bot.telegram_delivery_runtime import (
+    build_telegram_edit_text_func,
     build_telegram_send_media_func,
     build_telegram_send_text_func,
 )
@@ -65,6 +66,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
     ):
         return
     search_service = context.application.bot_data.get(tg.SEARCH_SERVICE_KEY)
+    status_service = context.application.bot_data.get(tg.GET_DOWNLOAD_STATUS_SERVICE_KEY)
 
     await dispatch_private_chat_text(
         query=query_text,
@@ -77,6 +79,7 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
             send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
             download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
             telegram_pt_resource_card_state=search_service.telegram_pt_resource_card_state if isinstance(search_service, SearchMediaService) else None,
+            download_monitor_repo=status_service.download_monitor_repo if isinstance(status_service, GetDownloadStatusService) else None,
         ),
         chat_id=chat_id,
         user_id=user_id,
@@ -118,6 +121,7 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
         return
 
     search_service = context.application.bot_data.get(tg.SEARCH_SERVICE_KEY)
+    status_service = context.application.bot_data.get(tg.GET_DOWNLOAD_STATUS_SERVICE_KEY)
     if await _handle_telegram_pt_resource_card_callback(
         query=query,
         context=context,
@@ -141,6 +145,7 @@ async def handle_telegram_callback_query(update: Update, context: ContextTypes.D
             send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
             download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
             telegram_pt_resource_card_state=search_service.telegram_pt_resource_card_state if isinstance(search_service, SearchMediaService) else None,
+            download_monitor_repo=status_service.download_monitor_repo if isinstance(status_service, GetDownloadStatusService) else None,
         ),
         chat_id=chat_id,
         user_id=user_id,
@@ -208,6 +213,7 @@ def build_telegram_application(
     application.bot_data[tg.TELEGRAM_SEND_MEDIA_FUNC_KEY] = build_telegram_send_media_func(application)
     send_text_func = build_telegram_send_text_func(application)
     application.bot_data[tg.TELEGRAM_SEND_TEXT_FUNC_KEY] = send_text_func
+    application.bot_data[tg.TELEGRAM_EDIT_TEXT_FUNC_KEY] = build_telegram_edit_text_func(application)
     application.bot_data[tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY] = build_telegram_download_image_func(
         proxy_url=outbound_proxy_url,
     )
@@ -334,6 +340,7 @@ async def _reply_telegram_callback_message(
     search_service: SearchMediaService | None,
     tg,
 ) -> object:
+    status_service = context.application.bot_data.get(tg.GET_DOWNLOAD_STATUS_SERVICE_KEY)
     return await build_telegram_reply_func(
         message.reply_text,
         formatter=format_telegram_reply,
@@ -343,6 +350,7 @@ async def _reply_telegram_callback_message(
         send_media_func=context.application.bot_data.get(tg.TELEGRAM_SEND_MEDIA_FUNC_KEY),
         download_image_func=context.application.bot_data.get(tg.TELEGRAM_DOWNLOAD_IMAGE_FUNC_KEY),
         telegram_pt_resource_card_state=search_service.telegram_pt_resource_card_state if search_service is not None else None,
+        download_monitor_repo=status_service.download_monitor_repo if isinstance(status_service, GetDownloadStatusService) else None,
     )(text)
 
 

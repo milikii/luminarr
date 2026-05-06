@@ -89,6 +89,33 @@ def test_get_status_text_uses_delivery_renderer_for_personal_wechat_channel() ->
     assert "刷新状态：发送 status 87" in text
 
 
+def test_get_status_text_renders_telegram_live_progress_card() -> None:
+    get_status = AsyncMock(
+        return_value=TransmissionTaskStatus(
+            task_id="87",
+            task_hash="b305bf",
+            name="Dune 1984",
+            status_code=4,
+            percent_done=0.56,
+            rate_download=1048576,
+            eta_seconds=121,
+        )
+    )
+    service = GetDownloadStatusService(get_status)
+
+    text = _run(service.get_status_text("87", channel="telegram_live_progress"))
+
+    assert text.startswith("┏━ ⏳ <b>下载进行中</b>")
+    assert "🎬 <b>Dune 1984</b>" in text
+    assert "│  ID    <code>87</code>" in text
+    assert "│  Hash  <code>b305bf</code>" in text
+    assert "│  进度条 <code>[#######-----]</code>" in text
+    assert "56.0%" in text
+    assert "1.0 MB/s" in text
+    assert "02:01" in text
+    assert "<code>status 87</code>" in text
+
+
 def test_get_status_text_not_found() -> None:
     service = GetDownloadStatusService(AsyncMock(return_value=None))
     text = _run(service.get_status_text("missing"))

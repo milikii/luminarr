@@ -134,6 +134,9 @@ SCHEMA_STATEMENTS = (
         is_complete INTEGER NOT NULL DEFAULT 0,
         completion_observed_at TEXT NOT NULL DEFAULT '',
         last_observed_at TEXT NOT NULL DEFAULT '',
+        telegram_message_id INTEGER NOT NULL DEFAULT 0,
+        telegram_progress_last_text TEXT NOT NULL DEFAULT '',
+        telegram_progress_last_synced_at TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (task_id, task_hash)
@@ -236,6 +239,14 @@ def _ensure_download_monitor_columns(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE download_monitor ADD COLUMN chat_id INTEGER NOT NULL DEFAULT 0")
     if "user_id" not in existing_columns:
         connection.execute("ALTER TABLE download_monitor ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
+    if "telegram_message_id" not in existing_columns:
+        connection.execute("ALTER TABLE download_monitor ADD COLUMN telegram_message_id INTEGER NOT NULL DEFAULT 0")
+    if "telegram_progress_last_text" not in existing_columns:
+        connection.execute("ALTER TABLE download_monitor ADD COLUMN telegram_progress_last_text TEXT NOT NULL DEFAULT ''")
+    if "telegram_progress_last_synced_at" not in existing_columns:
+        connection.execute(
+            "ALTER TABLE download_monitor ADD COLUMN telegram_progress_last_synced_at TEXT NOT NULL DEFAULT ''"
+        )
 
 
 def _ensure_watchlist_item_columns(connection: sqlite3.Connection) -> None:

@@ -682,19 +682,20 @@ def _format_telegram_add_success_reply(text: str) -> str:
         rendered_lines.append(f"🧩 <b>下载器</b>  <code>{_html.escape(downloader_label)}</code>")
     rendered_lines.extend(
         [
-        "",
-        "├─ <b>任务</b>",
-        f"│  ID    <code>{_html.escape(task_id)}</code>",
-        f"│  Hash  <code>{_html.escape(task_hash)}</code>",
-        "",
-        "├─ <b>状态</b>",
-        "│  下一阶段会在这里接入实时进度同步",
-        "│  当前阶段仅提供任务创建结果，不展示伪实时进度",
-        "",
-        "└─ <b>操作</b>",
-        "   状态命令",
-        f"   <code>status { _html.escape(task_hash) }</code>",
-    ])
+            "",
+            "├─ <b>任务</b>",
+            f"│  ID    <code>{_html.escape(task_id)}</code>",
+            f"│  Hash  <code>{_html.escape(task_hash)}</code>",
+            "",
+            "├─ <b>状态</b>",
+            "│  后台会在此消息内同步真实下载进度",
+            "│  刷新后会显示进度条 / 速度 / ETA",
+            "",
+            "└─ <b>操作</b>",
+            f"   刷新状态：发送 status {_html.escape(task_hash)}",
+            f"   <code>status {_html.escape(task_hash)}</code>",
+        ]
+    )
     if trailing_lines:
         rendered_lines.extend(("", *(_html.escape(line) for line in trailing_lines)))
     return "\n".join(rendered_lines)
