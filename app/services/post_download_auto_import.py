@@ -24,6 +24,7 @@ AutoImportFunc = Callable[[str, int | None, int | None], Awaitable[str]]
 AutoImportRecordRunner = Callable[[DownloadMonitorRecord], Awaitable[str | None]]
 AutoImportProgressPredicate = Callable[[DownloadMonitorRecord, str], bool]
 AUTO_IMPORT_SKIPPED_BY_RULE_EVENT = "auto_import.skipped_by_rule"
+POST_PROCESSING_SUMMARY_EVENT = "post_processing.summary"
 AUTO_IMPORT_SKIP_EVENT_RESULT_MISSING_REASON = "auto import skip event missing after append"
 AUTO_IMPORT_COMPLETED_LIST_RESULT_MISSING_REASON = "auto import completed list result missing"
 AUTO_IMPORT_SKIPPED_TEXT = (
@@ -138,7 +139,9 @@ class PostDownloadAutoImportService:
                 task_ref=candidate.task_hash,
             )
         user_id = candidate.user_id if candidate.user_id > 0 else None
-        return await self._auto_import_func(candidate.task_hash, candidate.chat_id, user_id)
+        reply = await self._auto_import_func(candidate.task_hash, candidate.chat_id, user_id)
+        self._record_post_processing_summary_event(candidate=candidate, reply=reply)
+        return reply
 
     def _get_adult_registry_record(self, candidate: DownloadMonitorRecord):
         if self._adult_content_registry_repo is None:
@@ -257,6 +260,24 @@ class PostDownloadAutoImportService:
                 f"auto import skip event append failed for {candidate.task_id}/{candidate.task_hash}"
             ) from error
 
+    def _record_post_processing_summary_event(self, *, candidate: DownloadMonitorRecord, reply: str) -> None:
+        if "后处理总结" not in reply:
+            return
+        try:
+            self._job_event_repo.append_event(
+                task_ref=candidate.task_hash,
+                task_id=candidate.task_id,
+                task_hash=candidate.task_hash,
+                event_type=POST_PROCESSING_SUMMARY_EVENT,
+                message=reply,
+            )
+        except (JobEventPersistenceError, sqlite3.Error) as error:
+            emit_operational_log(
+                title="后处理总结事件落盘失败",
+                detail=f"task_id={candidate.task_id} task_hash={candidate.task_hash} 错误={error}",
+                fix_hint="检查 SQLite/job_event 表写入是否正常；当前自动导入结果不受影响，但 Telegram 最终态卡片与总结消息可能缺少稳定真相源。",
+            )
+
 
 def _match_low_quality_reason(name: str) -> str | None:
     cleaned_name = name.strip()
@@ -356,23 +377,10 @@ def _build_auto_import_notification_texts(reply: str) -> tuple[str, ...]:
     if not stripped_reply:
         return ()
 
-    import_text, summary_text = _split_auto_import_summary(stripped_reply)
-    if not import_text or not summary_text:
+    summary_text = _build_auto_import_summary_notification_text(stripped_reply)
+    if not summary_text:
         return (stripped_reply,)
-
-    subtitle_text = _extract_stage_notification_text(
-        summary_text=summary_text,
-        source_label="字幕",
-        notification_label="字幕翻译",
-    )
-    refresh_text = _extract_stage_notification_text(
-        summary_text=summary_text,
-        source_label="刷新",
-        notification_label="媒体库刷新",
-    )
-    if not subtitle_text or not refresh_text:
-        return (stripped_reply,)
-    return (import_text, subtitle_text, refresh_text, summary_text)
+    return (summary_text,)
 
 
 def _split_auto_import_summary(reply: str) -> tuple[str, str]:
@@ -387,21 +395,37 @@ def _split_auto_import_summary(reply: str) -> tuple[str, str]:
     return cleaned_import_text, f"后处理总结\n{cleaned_summary_tail}"
 
 
-def _extract_stage_notification_text(
-    *,
-    summary_text: str,
-    source_label: str,
-    notification_label: str,
-) -> str:
-    prefix = f"- {source_label}："
-    for line in summary_text.splitlines():
-        stripped_line = line.strip()
-        if not stripped_line.startswith(prefix):
-            continue
-        suffix = stripped_line.removeprefix(prefix).strip()
-        if not suffix:
-            return notification_label
-        return f"{notification_label}：{suffix}"
+def _build_auto_import_summary_notification_text(reply: str) -> str:
+    import_text, summary_text = _split_auto_import_summary(reply)
+    if not import_text or not summary_text:
+        return ""
+    title = _extract_imported_title(import_text)
+    library_path = _extract_import_target_path(import_text)
+    if not title or not library_path:
+        return ""
+    return (
+        "🏁 <b>入库完成</b>\n"
+        f"<b>{title}</b>\n\n"
+        "✅ 全部后处理已完成\n\n"
+        "📁 <b>入库路径：</b>\n"
+        f"<code>{library_path}</code>"
+    )
+
+
+def _extract_imported_title(import_text: str) -> str:
+    first_line = import_text.strip().splitlines()[0] if import_text.strip() else ""
+    prefix = "导入成功："
+    if not first_line.startswith(prefix):
+        return ""
+    return first_line.removeprefix(prefix).strip()
+
+
+def _extract_import_target_path(import_text: str) -> str:
+    prefix = "目标路径:"
+    for raw_line in import_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith(prefix):
+            return line.removeprefix(prefix).strip()
     return ""
 
 

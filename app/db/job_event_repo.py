@@ -95,7 +95,7 @@ class JobEventRepo:
         params: tuple[str, ...]
         condition: str
         if cleaned_task_id and cleaned_task_hash:
-            condition = "(task_id = ? OR task_hash = ?)"
+            condition = "(task_id = ? AND task_hash = ?)"
             params = (cleaned_task_id, cleaned_task_hash)
         elif cleaned_task_id:
             condition = "task_id = ?"

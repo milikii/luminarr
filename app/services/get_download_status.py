@@ -4,17 +4,22 @@ import html
 import sqlite3
 import re
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
 import httpx
 
 from app.clients.qbittorrent import QbittorrentError
 from app.clients.transmission import TransmissionError, TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
+from app.db.job_event_repo import JobEvent, JobEventPersistenceError, JobEventRepo
 from app.downloader_route_lookup import DownloaderRouteLookupError
 from app.operational_logging import emit_operational_log
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
-from app.services.post_download_auto_import import AutoImportStateUnavailableError, PostDownloadAutoImportService
+from app.services.post_download_auto_import import (
+    AutoImportStateUnavailableError,
+    POST_PROCESSING_SUMMARY_EVENT,
+    PostDownloadAutoImportService,
+)
 
 GetStatusFunc = Callable[..., Awaitable[TransmissionTaskStatus | None]]
 
@@ -41,7 +46,21 @@ STATUS_CODE_LABELS = {
 }
 SUPPORTED_DELIVERY_CHANNELS = frozenset({"telegram", "feishu", "personal_wechat", "wecom"})
 TELEGRAM_LIVE_PROGRESS_CHANNEL = "telegram_live_progress"
-TELEGRAM_LIVE_PROGRESS_BAR_WIDTH = 20
+TELEGRAM_LIVE_PROGRESS_BAR_WIDTH = 10
+TELEGRAM_LIVE_PROGRESS_DIVIDER = "━━━━━━━━━━━━"
+TELEGRAM_SUMMARY_SENT_EVENT = "telegram.summary_sent"
+_TERMINAL_STAGE_STATUSES = frozenset({"✅ 已完成", "❌ 失败", "跳过", "✅ 已有中文字幕"})
+
+
+@dataclass(frozen=True, slots=True)
+class TelegramPostProcessingSnapshot:
+    overall_state: str
+    status_text: str
+    import_status: str
+    metadata_status: str
+    subtitle_status: str
+    refresh_status: str
+    library_path: str = ""
 
 
 class StatusFollowUpStateError(RuntimeError):
@@ -177,6 +196,60 @@ class GetDownloadStatusService:
     def download_monitor_repo(self) -> DownloadMonitorRepo | None:
         return self._download_monitor_repo
 
+    def build_pending_telegram_summary(self, *, task_id: str, task_hash: str, title: str) -> str | None:
+        events = _safe_list_job_events(
+            job_event_repo=self._job_event_repo,
+            task_id=task_id,
+            task_hash=task_hash,
+        )
+        if events is None:
+            return None
+        if any(event.event_type == TELEGRAM_SUMMARY_SENT_EVENT for event in events):
+            return None
+        snapshot = _resolve_telegram_post_processing_snapshot(
+            task_status=None,
+            auto_import_text="",
+            events=events,
+        )
+        if snapshot.overall_state != "finished" or not snapshot.library_path:
+            return None
+        success_summary = all(
+            status == "✅ 已完成"
+            for status in (
+                snapshot.import_status,
+                snapshot.metadata_status,
+                snapshot.subtitle_status,
+                snapshot.refresh_status,
+            )
+        )
+        completion_line = "✅ 全部后处理已完成" if success_summary else "ℹ️ 后处理已结束"
+        resolved_title = title.strip() or _extract_summary_title_from_events(events) or "-"
+        return (
+            "🏁 <b>入库完成</b>\n"
+            f"<b>{html.escape(resolved_title)}</b>\n\n"
+            f"{completion_line}\n\n"
+            "📁 <b>入库路径：</b>\n"
+            f"<code>{html.escape(snapshot.library_path)}</code>"
+        )
+
+    def mark_telegram_summary_sent(self, *, task_id: str, task_hash: str) -> None:
+        if self._job_event_repo is None:
+            return
+        try:
+            self._job_event_repo.append_event(
+                task_ref=task_hash,
+                task_id=task_id,
+                task_hash=task_hash,
+                event_type=TELEGRAM_SUMMARY_SENT_EVENT,
+                message="telegram summary sent",
+            )
+        except (JobEventPersistenceError, sqlite3.Error) as error:
+            emit_operational_log(
+                title="Telegram 总结消息落盘失败",
+                detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+                fix_hint="检查 SQLite/job_event 表写入是否正常；当前总结消息可能已发出，但去重真相未稳定落盘。",
+            )
+
     async def get_status_text(
         self,
         task_ref: str,
@@ -203,11 +276,17 @@ class GetDownloadStatusService:
         if task_status is None:
             return STATUS_NOT_FOUND_TEXT
         auto_import_text = await self._record_status_observation(task_ref=cleaned_ref, task_status=task_status)
+        events = _safe_list_job_events(
+            job_event_repo=self._job_event_repo,
+            task_id=task_status.task_id,
+            task_hash=task_status.task_hash,
+        )
         if channel == TELEGRAM_LIVE_PROGRESS_CHANNEL:
             return render_telegram_live_progress_reply(
                 task_ref=cleaned_ref,
                 task_status=task_status,
                 auto_import_text=auto_import_text,
+                events=events or (),
             )
         if channel in SUPPORTED_DELIVERY_CHANNELS:
             return render_status_reply(
@@ -272,38 +351,54 @@ def render_telegram_live_progress_reply(
     task_ref: str,
     task_status: TransmissionTaskStatus,
     auto_import_text: str | None,
+    events: tuple[JobEvent, ...] | list[JobEvent],
 ) -> str:
-    progress_percent = _clamp_progress(task_status.percent_done)
-    completed = progress_percent >= 100
-    status_label = STATUS_CODE_LABELS.get(task_status.status_code, f"未知({task_status.status_code})")
-    lines = [
-        f"{'✅' if completed else '⏳'} <b>{'下载完成' if completed else '任务下载中'}</b>",
-        "━━━━━━━━━━━━━━━━━━",
-        "🎬 <b>资源标题：</b>",
-        f"<i>{html.escape(task_status.name.strip() or '-')}</i>",
-        f"📍 <b>当前状态：</b> {html.escape(status_label)}",
-        "📊 <b>实时进度：</b>",
-        f"<code>{_format_progress_bar(progress_percent, width=TELEGRAM_LIVE_PROGRESS_BAR_WIDTH, filled_char='█', empty_char='░')}</code> {progress_percent:.1f}%",
-        f"⚡ <b>速度：</b> {_format_speed(task_status.rate_download)}",
-        f"⏳ <b>剩余：</b> {_format_live_eta(task_status.eta_seconds, completed=completed)}",
-        "⚙️ <b>任务信息：</b>",
-        f"🆔 <b>任务 ID：</b> <code>{html.escape(task_status.task_id)}</code>",
-        "🔑 <b>特征 Hash (点击复制)：</b>",
-        f"<code>{html.escape(task_status.task_hash)}</code>",
-        "━━━━━━━━━━━━━━━━━━",
-    ]
-    if completed:
-        lines.append("✅ <b>下载已完成，等待后续处理</b>")
+    snapshot = _resolve_telegram_post_processing_snapshot(
+        task_status=task_status,
+        auto_import_text=auto_import_text or "",
+        events=tuple(events),
+    )
+    raw_progress_percent = _clamp_progress(task_status.percent_done)
+    progress_percent = 100 if snapshot.overall_state in {"processing", "finished"} else int(round(raw_progress_percent))
+    if snapshot.overall_state == "finished":
+        lines = ["🎉 <b>任务完成</b>"]
+    elif snapshot.overall_state == "processing":
+        lines = ["✅ <b>下载完成</b>"]
     else:
-        lines.append("⏱️ <b>消息每 5 秒自动刷新一次</b>")
-    if auto_import_text:
-        follow_up_lines = tuple(
-            html.escape(line.strip())
-            for line in auto_import_text.splitlines()
-            if line.strip()
+        lines = ["⏳ <b>任务下载中</b>"]
+    lines.extend(
+        [
+            f"<i>{html.escape(task_status.name.strip() or '-')}</i>",
+            TELEGRAM_LIVE_PROGRESS_DIVIDER,
+            f"<b>状态：</b> {html.escape(snapshot.status_text)}",
+            f"<b>下载进度：</b> {progress_percent}%",
+            f"<code>{_format_progress_bar(float(progress_percent), width=TELEGRAM_LIVE_PROGRESS_BAR_WIDTH, filled_char='█', empty_char='░')}</code>",
+            "",
+        ]
+    )
+    if snapshot.overall_state == "pending":
+        lines.extend(
+            [
+                f"⚡ <b>速度：</b> {_format_speed(task_status.rate_download)}  |  <b>剩余：</b> {_format_live_eta(task_status.eta_seconds, completed=False)}",
+                TELEGRAM_LIVE_PROGRESS_DIVIDER,
+            ]
         )
-        if follow_up_lines:
-            lines.extend(("", "📦 <b>后续处理：</b>", *follow_up_lines))
+    else:
+        lines.append(TELEGRAM_LIVE_PROGRESS_DIVIDER)
+    lines.extend(
+        [
+            "<b>后处理</b>",
+            f"- 导入：{snapshot.import_status}",
+            f"- 刮削：{snapshot.metadata_status}",
+            f"- 字幕：{snapshot.subtitle_status}",
+            f"- 刷新：{snapshot.refresh_status}",
+            TELEGRAM_LIVE_PROGRESS_DIVIDER,
+            f"🆔 <b>任务 ID：</b> <code>{html.escape(task_status.task_id)}</code>",
+            f"🔑 <b>Hash：</b> <code>{html.escape(task_status.task_hash)}</code>",
+        ]
+    )
+    if snapshot.overall_state == "pending":
+        lines.extend(("", "⏱️ <b>消息每 5 秒自动刷新一次</b>"))
     return "\n".join(lines)
 
 
@@ -404,6 +499,214 @@ def _format_eta(eta_seconds: int) -> str:
     if hours > 0:
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
     return f"{minutes:02d}:{seconds:02d}"
+
+
+def _safe_list_job_events(
+    *,
+    job_event_repo: JobEventRepo | None,
+    task_id: str,
+    task_hash: str,
+) -> list[JobEvent] | None:
+    if job_event_repo is None:
+        return []
+    list_events = getattr(job_event_repo, "list_events_for_task_identity", None)
+    if not callable(list_events):
+        return []
+    try:
+        return list_events(task_id=task_id, task_hash=task_hash)
+    except (JobEventPersistenceError, sqlite3.Error) as error:
+        emit_operational_log(
+            title="Telegram 后处理状态查询失败",
+            detail=f"task_id={task_id} task_hash={task_hash} 错误={error}",
+            fix_hint="检查 SQLite/job_event 表读取是否正常；当前状态卡片会回退成基础下载状态，不展示稳定的后处理分阶段真相。",
+        )
+        return None
+
+
+def _resolve_telegram_post_processing_snapshot(
+    *,
+    task_status: TransmissionTaskStatus | None,
+    auto_import_text: str,
+    events: tuple[JobEvent, ...],
+) -> TelegramPostProcessingSnapshot:
+    summary_text = _resolve_post_processing_summary_text(auto_import_text=auto_import_text, events=events)
+    import_status = _resolve_import_stage_status(events=events, summary_text=summary_text)
+    metadata_status = _resolve_stage_status(
+        summary_text=summary_text,
+        summary_label="metadata",
+        success_event="metadata.succeeded",
+        failure_event="metadata.failed",
+        skipped_event="",
+        events=events,
+        prerequisite_status=import_status,
+        later_event_prefixes=("subtitle.", "refresh."),
+    )
+    subtitle_status = _resolve_stage_status(
+        summary_text=summary_text,
+        summary_label="字幕",
+        success_event="subtitle.succeeded",
+        failure_event="subtitle.failed",
+        skipped_event="subtitle.skipped",
+        events=events,
+        prerequisite_status=metadata_status if import_status in _TERMINAL_STAGE_STATUSES else import_status,
+        later_event_prefixes=("refresh.",),
+    )
+    refresh_status = _resolve_stage_status(
+        summary_text=summary_text,
+        summary_label="刷新",
+        success_event="refresh.succeeded",
+        failure_event="refresh.failed",
+        skipped_event="",
+        events=events,
+        prerequisite_status=subtitle_status if metadata_status in _TERMINAL_STAGE_STATUSES else metadata_status,
+        later_event_prefixes=(),
+    )
+    library_path = _resolve_library_path(events=events, summary_text=summary_text)
+    progress_percent = _clamp_progress(task_status.percent_done) if task_status is not None else 100.0
+    completed = progress_percent >= 100
+    if not completed:
+        status_text = STATUS_CODE_LABELS.get(task_status.status_code, f"未知({task_status.status_code})") if task_status is not None else "下载中"
+        return TelegramPostProcessingSnapshot(
+            overall_state="pending",
+            status_text=status_text,
+            import_status="等待",
+            metadata_status="等待",
+            subtitle_status="等待",
+            refresh_status="等待",
+            library_path=library_path,
+        )
+    statuses = (import_status, metadata_status, subtitle_status, refresh_status)
+    terminal = all(status in _TERMINAL_STAGE_STATUSES for status in statuses)
+    if terminal:
+        failed = any(status == "❌ 失败" for status in statuses)
+        status_text = "处理结束" if failed else "全部完成"
+        overall_state = "finished"
+    else:
+        status_text = "后处理中"
+        overall_state = "processing"
+    return TelegramPostProcessingSnapshot(
+        overall_state=overall_state,
+        status_text=status_text,
+        import_status=import_status,
+        metadata_status=metadata_status,
+        subtitle_status=subtitle_status,
+        refresh_status=refresh_status,
+        library_path=library_path,
+    )
+
+
+def _resolve_post_processing_summary_text(*, auto_import_text: str, events: tuple[JobEvent, ...]) -> str:
+    if "后处理总结" in auto_import_text:
+        return auto_import_text
+    for event in reversed(events):
+        if event.event_type == POST_PROCESSING_SUMMARY_EVENT and event.message.strip():
+            return event.message.strip()
+    return ""
+
+
+def _resolve_import_stage_status(*, events: tuple[JobEvent, ...], summary_text: str) -> str:
+    if any(event.event_type == "import.succeeded" for event in events):
+        return "✅ 已完成"
+    if summary_text.startswith("导入成功："):
+        return "✅ 已完成"
+    if any(event.event_type.startswith("import.") for event in events):
+        return "❌ 失败"
+    return "等待"
+
+
+def _resolve_stage_status(
+    *,
+    summary_text: str,
+    summary_label: str,
+    success_event: str,
+    failure_event: str,
+    skipped_event: str,
+    events: tuple[JobEvent, ...],
+    prerequisite_status: str,
+    later_event_prefixes: tuple[str, ...],
+) -> str:
+    parsed_status = _extract_summary_stage_status(summary_text=summary_text, label=summary_label)
+    if parsed_status:
+        return parsed_status
+    if any(event.event_type == success_event for event in events):
+        return "✅ 已完成"
+    if failure_event and any(event.event_type == failure_event for event in events):
+        return "❌ 失败"
+    if skipped_event and any(event.event_type == skipped_event for event in events):
+        skipped_message = _resolve_latest_event_message(events=events, event_type=skipped_event)
+        return _resolve_skipped_stage_status(skipped_message)
+    if later_event_prefixes and any(
+        any(event.event_type.startswith(prefix) for prefix in later_event_prefixes) for event in events
+    ):
+        return "跳过"
+    if prerequisite_status in _TERMINAL_STAGE_STATUSES or prerequisite_status == "✅ 已完成":
+        return "⏳ 进行中"
+    return "等待"
+
+
+def _extract_summary_stage_status(*, summary_text: str, label: str) -> str:
+    prefix = f"- {label}："
+    for raw_line in summary_text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith(prefix):
+            continue
+        status_text = line.removeprefix(prefix).split("；", 1)[0].strip()
+        if status_text == "成功":
+            return "✅ 已完成"
+        if status_text == "失败":
+            return "❌ 失败"
+        if status_text == "跳过":
+            return "跳过"
+        if status_text == "已有中文字幕":
+            return "✅ 已有中文字幕"
+        if status_text == "✅ 已有中文字幕":
+            return "✅ 已有中文字幕"
+    return ""
+
+
+def _resolve_latest_event_message(*, events: tuple[JobEvent, ...], event_type: str) -> str:
+    for event in reversed(events):
+        if event.event_type == event_type:
+            return event.message.strip()
+    return ""
+
+
+def _resolve_skipped_stage_status(message: str) -> str:
+    if any(
+        marker in message
+        for marker in (
+            "已检测到中文字幕外挂字幕",
+            "视频内已检测到中文字幕轨",
+            "目标中文字幕文件已存在",
+        )
+    ):
+        return "✅ 已有中文字幕"
+    return "跳过"
+
+
+def _resolve_library_path(*, events: tuple[JobEvent, ...], summary_text: str) -> str:
+    for event in reversed(events):
+        if event.event_type == "import.succeeded":
+            target_path = event.target_path.strip() or event.message.strip()
+            if target_path:
+                return target_path
+    prefix = "目标路径:"
+    for raw_line in summary_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith(prefix):
+            return line.removeprefix(prefix).strip()
+    return ""
+
+
+def _extract_summary_title_from_events(events: tuple[JobEvent, ...]) -> str:
+    for event in reversed(events):
+        if event.event_type != POST_PROCESSING_SUMMARY_EVENT:
+            continue
+        first_line = event.message.strip().splitlines()[0] if event.message.strip() else ""
+        prefix = "导入成功："
+        if first_line.startswith(prefix):
+            return first_line.removeprefix(prefix).strip()
+    return ""
 
 
 def _log_download_monitor_observation_failed(

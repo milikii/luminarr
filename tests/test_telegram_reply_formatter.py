@@ -163,20 +163,22 @@ def test_format_telegram_reply_formats_add_success_as_copy_friendly_card() -> No
 
     assert formatted == (
         "✅ <b>任务已添加并开始下载</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "🎬 <b>资源标题：</b>\n"
+        "━━━━━━━━━━━━\n"
         "<i>Dune 2021 2160p WEB-DL</i>\n"
         "🧩 <b>下载器：</b> <code>pt-main · qbittorrent</code>\n"
-        "📍 <b>当前状态：</b> 等待下载器首次同步\n"
-        "📊 <b>实时进度：</b>\n"
-        "<code>[░░░░░░░░░░░░░░░░░░░░]</code> 等待首次同步\n"
-        "⚡ <b>速度：</b> --\n"
-        "⏳ <b>剩余：</b> --\n"
-        "⚙️ <b>任务信息：</b>\n"
+        "<b>状态：</b> 等待下载器同步\n"
+        "<b>下载进度：</b> 0%\n"
+        "<code>[░░░░░░░░░░]</code>\n\n"
+        "⚡ <b>速度：</b> --  |  <b>剩余：</b> --\n"
+        "━━━━━━━━━━━━\n"
+        "<b>后处理</b>\n"
+        "- 导入：等待\n"
+        "- 刮削：等待\n"
+        "- 字幕：等待\n"
+        "- 刷新：等待\n"
+        "━━━━━━━━━━━━\n"
         "🆔 <b>任务 ID：</b> <code>42</code>\n"
-        "🔑 <b>特征 Hash (点击复制)：</b>\n"
-        "<code>abc123</code>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
+        "🔑 <b>Hash：</b> <code>abc123</code>\n\n"
         "⏱️ <b>消息每 5 秒自动刷新一次</b>\n\n"
         "注意：下载已执行，但状态回写失败，请勿重复 confirm。\n"
         "请稍后用 status 查询任务状态，或检查 SQLite/approval_record 与 jobs 表。"
@@ -530,25 +532,23 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
 
     result = asyncio.run(reply_func(text))
 
-    assert result == "text-ok"
+    assert result == "media-ok"
     reply_text.assert_not_called()
     download_image.assert_awaited_once_with("https://image.tmdb.org/t/p/w500/dune.jpg")
     send_media.assert_awaited_once()
     assert send_media.await_args.args[0] == 1001
     assert send_media.await_args.args[2] is not None
     assert send_media.await_args.args[3] == "HTML"
-    send_text.assert_awaited_once()
-    kwargs = send_text.await_args.kwargs
-    sent_text = kwargs["text"]
-    assert kwargs["parse_mode"] == "HTML"
-    assert sent_text.startswith("【Dune 2021】共找到 1 条相关信息，请选择操作")
-    assert '1. <a href="https://www.themoviedb.org/movie/438631">Dune (2021) | movie</a>' in sent_text
-    assert '海报预览：<a href="https://image.tmdb.org/t/p/w500/dune.jpg">打开海报</a>' in sent_text
-    assert "<i>Dune</i>" in sent_text
-    assert "📅 <b>年份：</b> 2021" in sent_text
-    assert "🎞 <b>类型：</b> movie" in sent_text
-    assert "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis." in sent_text
-    assert sent_text.endswith(
+    send_text.assert_not_awaited()
+    caption = send_media.await_args.args[2]
+    assert caption.startswith("【Dune 2021】共找到 1 条相关信息，请选择操作")
+    assert '1. <a href="https://www.themoviedb.org/movie/438631">Dune (2021) | movie</a>' in caption
+    assert "海报预览：" not in caption
+    assert "<i>Dune</i>" in caption
+    assert "📅 <b>年份：</b> 2021" in caption
+    assert "🎞 <b>类型：</b> movie" in caption
+    assert "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis." in caption
+    assert caption.endswith(
         "下一步\n"
         "确认作品：直接回复序号，例如 1\n"
         "都不对：发送更详细的名称，或直接发送新的名字/关键词重新搜"
@@ -733,20 +733,22 @@ def test_build_telegram_reply_func_replies_add_success_card_as_html() -> None:
     reply_text.assert_awaited_once()
     assert reply_text.await_args.args[0] == (
         "✅ <b>任务已添加并开始下载</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "🎬 <b>资源标题：</b>\n"
+        "━━━━━━━━━━━━\n"
         "<i>Dune 2021 2160p WEB-DL</i>\n"
         "🧩 <b>下载器：</b> <code>pt-main · qbittorrent</code>\n"
-        "📍 <b>当前状态：</b> 等待下载器首次同步\n"
-        "📊 <b>实时进度：</b>\n"
-        "<code>[░░░░░░░░░░░░░░░░░░░░]</code> 等待首次同步\n"
-        "⚡ <b>速度：</b> --\n"
-        "⏳ <b>剩余：</b> --\n"
-        "⚙️ <b>任务信息：</b>\n"
+        "<b>状态：</b> 等待下载器同步\n"
+        "<b>下载进度：</b> 0%\n"
+        "<code>[░░░░░░░░░░]</code>\n\n"
+        "⚡ <b>速度：</b> --  |  <b>剩余：</b> --\n"
+        "━━━━━━━━━━━━\n"
+        "<b>后处理</b>\n"
+        "- 导入：等待\n"
+        "- 刮削：等待\n"
+        "- 字幕：等待\n"
+        "- 刷新：等待\n"
+        "━━━━━━━━━━━━\n"
         "🆔 <b>任务 ID：</b> <code>42</code>\n"
-        "🔑 <b>特征 Hash (点击复制)：</b>\n"
-        "<code>abc123</code>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
+        "🔑 <b>Hash：</b> <code>abc123</code>\n\n"
         "⏱️ <b>消息每 5 秒自动刷新一次</b>"
     )
     assert reply_text.await_args.kwargs["parse_mode"] == "HTML"
@@ -775,19 +777,21 @@ def test_build_telegram_reply_func_sends_add_success_card_via_send_text_when_ava
     assert send_text.await_args.kwargs["parse_mode"] == "HTML"
     assert send_text.await_args.kwargs["text"] == (
         "✅ <b>任务已添加并开始下载</b>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
-        "🎬 <b>资源标题：</b>\n"
+        "━━━━━━━━━━━━\n"
         "<i>Dune 2021 2160p WEB-DL</i>\n"
-        "📍 <b>当前状态：</b> 等待下载器首次同步\n"
-        "📊 <b>实时进度：</b>\n"
-        "<code>[░░░░░░░░░░░░░░░░░░░░]</code> 等待首次同步\n"
-        "⚡ <b>速度：</b> --\n"
-        "⏳ <b>剩余：</b> --\n"
-        "⚙️ <b>任务信息：</b>\n"
+        "<b>状态：</b> 等待下载器同步\n"
+        "<b>下载进度：</b> 0%\n"
+        "<code>[░░░░░░░░░░]</code>\n\n"
+        "⚡ <b>速度：</b> --  |  <b>剩余：</b> --\n"
+        "━━━━━━━━━━━━\n"
+        "<b>后处理</b>\n"
+        "- 导入：等待\n"
+        "- 刮削：等待\n"
+        "- 字幕：等待\n"
+        "- 刷新：等待\n"
+        "━━━━━━━━━━━━\n"
         "🆔 <b>任务 ID：</b> <code>42</code>\n"
-        "🔑 <b>特征 Hash (点击复制)：</b>\n"
-        "<code>abc123</code>\n"
-        "━━━━━━━━━━━━━━━━━━\n"
+        "🔑 <b>Hash：</b> <code>abc123</code>\n\n"
         "⏱️ <b>消息每 5 秒自动刷新一次</b>"
     )
     reply_markup = send_text.await_args.kwargs["reply_markup"]

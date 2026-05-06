@@ -196,6 +196,34 @@ def test_job_event_repo_keeps_append_order(tmp_path: Path) -> None:
     assert events[1].message == "媒体库刷新成功。"
 
 
+def test_job_event_repo_list_events_for_task_identity_requires_both_task_id_and_task_hash_when_both_present(
+    tmp_path: Path,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = JobEventRepo(database)
+
+    repo.append_event(
+        task_ref="hash-akron",
+        task_id="20",
+        task_hash="hash-akron",
+        event_type="subtitle.failed",
+        message="Akron subtitle failed",
+    )
+    repo.append_event(
+        task_ref="hash-kungfu",
+        task_id="20",
+        task_hash="hash-kungfu",
+        event_type="import.succeeded",
+        message="/data/library/movies/功夫熊猫 (2008)",
+    )
+
+    events = repo.list_events_for_task_identity(task_id="20", task_hash="hash-kungfu")
+
+    assert [event.event_type for event in events] == ["import.succeeded"]
+    assert events[0].message == "/data/library/movies/功夫熊猫 (2008)"
+
+
 def test_job_event_repo_raises_when_appended_row_missing(tmp_path: Path) -> None:
     class MissingRowJobEventRepo(JobEventRepo):
         def _get_event_by_id(self, event_id: int):
@@ -328,6 +356,44 @@ def test_download_monitor_truth_persists_for_restart_and_completion_observation(
         task_hash="hash-42",
     )
     assert [event.event_type for event in events] == ["downloader.completed_observed"]
+
+
+def test_download_monitor_register_download_resets_completed_row_to_pending(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    repo = DownloadMonitorRepo(database)
+
+    repo.register_download(task_id="42", task_hash="hash-42", name="Dune: Part Two", chat_id=1001, user_id=2001)
+    repo.bind_telegram_message(task_id="42", task_hash="hash-42", message_id=321)
+    repo.record_status(
+        TransmissionTaskStatus(
+            task_id="42",
+            task_hash="hash-42",
+            name="Dune: Part Two",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+
+    completed_record = repo.get_record(task_id="42", task_hash="hash-42")
+    assert completed_record is not None
+    assert completed_record.is_complete is True
+    assert completed_record.telegram_message_id == 321
+
+    repo.register_download(task_id="42", task_hash="hash-42", name="Dune: Part Two", chat_id=1001, user_id=2001)
+
+    pending_record = repo.get_record(task_id="42", task_hash="hash-42")
+    assert pending_record is not None
+    assert pending_record.is_complete is False
+    assert pending_record.status_code == 0
+    assert pending_record.percent_done == 0
+    assert pending_record.completion_observed_at == ""
+    assert pending_record.last_observed_at == ""
+    assert pending_record.telegram_message_id == 0
+    assert pending_record.telegram_progress_last_text == ""
+    assert pending_record.telegram_progress_last_synced_at == ""
 
 
 def test_download_monitor_repo_rejects_missing_task_identity(tmp_path: Path) -> None:

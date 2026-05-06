@@ -106,15 +106,116 @@ def test_get_status_text_renders_telegram_live_progress_card() -> None:
     text = _run(service.get_status_text("87", channel="telegram_live_progress"))
 
     assert text.startswith("⏳ <b>任务下载中</b>")
-    assert "🎬 <b>资源标题：</b>" in text
     assert "<i>Dune 1984</i>" in text
-    assert "📍 <b>当前状态：</b> 下载中" in text
+    assert "<b>状态：</b> 下载中" in text
     assert "🆔 <b>任务 ID：</b> <code>87</code>" in text
     assert "<code>b305bf</code>" in text
-    assert "<code>[███████████░░░░░░░░░]</code> 56.0%" in text
-    assert "⚡ <b>速度：</b> 1.0 MB/s" in text
-    assert "⏳ <b>剩余：</b> 02m 01s" in text
+    assert "<b>下载进度：</b> 56%" in text
+    assert "<code>[██████░░░░]</code>" in text
+    assert "⚡ <b>速度：</b> 1.0 MB/s  |  <b>剩余：</b> 02m 01s" in text
     assert "消息每 5 秒自动刷新一次" in text
+    assert "<b>后处理</b>" in text
+    assert "- 导入：等待" in text
+    assert "- 刮削：等待" in text
+    assert "- 字幕：等待" in text
+    assert "- 刷新：等待" in text
+
+
+def test_get_status_text_renders_completed_telegram_live_progress_card_with_post_processing_statuses(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message="/library/Dune 1984",
+        target_path="/library/Dune 1984",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="metadata.succeeded",
+        message="metadata 刮削成功：/tmp/demo.metadata.json",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="subtitle.succeeded",
+        message="字幕翻译成功：已生成 1 个字幕文件。",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="refresh.succeeded",
+        message="媒体库刷新成功。",
+    )
+    get_status = AsyncMock(
+        return_value=TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 1984",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    service = GetDownloadStatusService(get_status, job_event_repo=event_repo)
+
+    text = _run(service.get_status_text("87", channel="telegram_live_progress"))
+
+    assert text.startswith("🎉 <b>任务完成</b>")
+    assert "<b>状态：</b> 全部完成" in text
+    assert "<b>下载进度：</b> 100%" in text
+    assert "<code>[██████████]</code>" in text
+    assert "⚡ <b>速度：</b>" not in text
+    assert "⏳ <b>剩余：</b>" not in text
+    assert "- 导入：✅ 已完成" in text
+    assert "- 刮削：✅ 已完成" in text
+    assert "- 字幕：✅ 已完成" in text
+    assert "- 刷新：✅ 已完成" in text
+
+
+def test_get_status_text_renders_chinese_ready_subtitle_status_in_telegram_live_progress_card(tmp_path: Path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message="/library/Dune 1984",
+        target_path="/library/Dune 1984",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="subtitle.skipped",
+        message="字幕翻译已跳过：已检测到中文字幕外挂字幕。",
+    )
+    get_status = AsyncMock(
+        return_value=TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 1984",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    service = GetDownloadStatusService(get_status, job_event_repo=event_repo)
+
+    text = _run(service.get_status_text("87", channel="telegram_live_progress"))
+
+    assert "- 字幕：✅ 已有中文字幕" in text
 
 
 def test_get_status_text_not_found() -> None:
@@ -1417,22 +1518,13 @@ def test_post_download_auto_import_run_once_splits_standard_import_reply_into_fo
     assert tuple((item.chat_id, item.text) for item in result.notifications) == (
         (
             1001,
-            "导入成功：Dune 2024 1080p WEB-DL\n任务 ID: 87\n任务 Hash: hash-87\n目标路径: /library/Dune 2024",
-        ),
-        (1001, "字幕翻译：成功；字幕翻译成功：已生成 1 个字幕文件。"),
-        (1001, "媒体库刷新：成功；媒体库刷新成功。"),
-        (
-            1001,
-            "后处理总结\n"
-            "- metadata：成功；metadata 刮削成功：/tmp/demo.metadata.json\n"
-            "- 字幕：成功；字幕翻译成功：已生成 1 个字幕文件。\n"
-            "- 刷新：成功；媒体库刷新成功。",
+            "🏁 <b>入库完成</b>\n<b>Dune 2024 1080p WEB-DL</b>\n\n✅ 全部后处理已完成\n\n📁 <b>入库路径：</b>\n<code>/library/Dune 2024</code>",
         ),
     )
     auto_import.assert_awaited_once_with("hash-87", 1001, 2001)
 
 
-def test_post_download_auto_import_run_once_keeps_skipped_stages_as_explicit_notifications(
+def test_post_download_auto_import_run_once_sends_single_final_summary_when_stages_are_skipped(
     tmp_path: Path,
 ) -> None:
     database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
@@ -1477,11 +1569,8 @@ def test_post_download_auto_import_run_once_keeps_skipped_stages_as_explicit_not
     assert tuple((item.chat_id, item.text) for item in result.notifications) == (
         (
             1001,
-            "导入成功：Dune 2024 1080p WEB-DL\n任务 ID: 87\n任务 Hash: hash-87\n目标路径: /library/Dune 2024",
+            "🏁 <b>入库完成</b>\n<b>Dune 2024 1080p WEB-DL</b>\n\n✅ 全部后处理已完成\n\n📁 <b>入库路径：</b>\n<code>/library/Dune 2024</code>",
         ),
-        (1001, "字幕翻译：跳过"),
-        (1001, "媒体库刷新：跳过"),
-        (1001, "后处理总结\n- metadata：跳过\n- 字幕：跳过\n- 刷新：跳过"),
     )
 
 

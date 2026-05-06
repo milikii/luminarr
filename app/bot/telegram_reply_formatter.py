@@ -70,6 +70,7 @@ def _format_telegram_search_reply(text: str) -> str:
 
 _MAGNET_URI_RE = re.compile(r"magnet:\?[^\s<]+")
 _MAGNET_BT_HASH_RE = re.compile(r"magnet:\?xt=urn:btih:(?P<hash>[^&\s<]+)", re.IGNORECASE)
+_TELEGRAM_LIVE_PROGRESS_BAR_WIDTH = 10
 
 
 def _apply_telegram_html(line: str) -> str:
@@ -675,30 +676,41 @@ def _format_telegram_add_success_reply(text: str) -> str:
         trailing_start_index = 4
     trailing_lines = lines[trailing_start_index:]
     rendered_lines = [
-        "┏━ ✅ <b>下载已开始</b>",
-        f"🎬 <b>{_html.escape(title)}</b>",
+        "✅ <b>任务已添加并开始下载</b>",
+        "━━━━━━━━━━━━",
+        f"<i>{_html.escape(title)}</i>",
     ]
     if downloader_label:
-        rendered_lines.append(f"🧩 <b>下载器</b>  <code>{_html.escape(downloader_label)}</code>")
+        rendered_lines.append(f"🧩 <b>下载器：</b> <code>{_html.escape(downloader_label)}</code>")
     rendered_lines.extend(
         [
+            "<b>状态：</b> 等待下载器同步",
+            "<b>下载进度：</b> 0%",
+            f"<code>{_format_telegram_live_progress_bar(0.0)}</code>",
             "",
-            "├─ <b>任务</b>",
-            f"│  ID    <code>{_html.escape(task_id)}</code>",
-            f"│  Hash  <code>{_html.escape(task_hash)}</code>",
+            "⚡ <b>速度：</b> --  |  <b>剩余：</b> --",
+            "━━━━━━━━━━━━",
+            "<b>后处理</b>",
+            "- 导入：等待",
+            "- 刮削：等待",
+            "- 字幕：等待",
+            "- 刷新：等待",
+            "━━━━━━━━━━━━",
+            f"🆔 <b>任务 ID：</b> <code>{_html.escape(task_id)}</code>",
+            f"🔑 <b>Hash：</b> <code>{_html.escape(task_hash)}</code>",
             "",
-            "├─ <b>状态</b>",
-            "│  后台会在此消息内同步真实下载进度",
-            "│  刷新后会显示进度条 / 速度 / ETA",
-            "",
-            "└─ <b>操作</b>",
-            f"   刷新状态：发送 status {_html.escape(task_hash)}",
-            f"   <code>status {_html.escape(task_hash)}</code>",
+            "⏱️ <b>消息每 5 秒自动刷新一次</b>",
         ]
     )
     if trailing_lines:
         rendered_lines.extend(("", *(_html.escape(line) for line in trailing_lines)))
     return "\n".join(rendered_lines)
+
+
+def _format_telegram_live_progress_bar(progress_percent: float) -> str:
+    filled = round((_TELEGRAM_LIVE_PROGRESS_BAR_WIDTH * max(0.0, min(progress_percent, 100.0))) / 100.0)
+    filled = max(0, min(_TELEGRAM_LIVE_PROGRESS_BAR_WIDTH, filled))
+    return f"[{'█' * filled}{'░' * (_TELEGRAM_LIVE_PROGRESS_BAR_WIDTH - filled)}]"
 
 
 def _format_telegram_import_approval_reply(text: str) -> str:

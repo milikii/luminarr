@@ -28,7 +28,11 @@ from app.db.download_monitor_repo import DownloadMonitorPersistenceError, Downlo
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.get_download_status import GetDownloadStatusService
-from app.services.post_download_auto_import import AutoImportRunResult, PostDownloadAutoImportService
+from app.services.post_download_auto_import import (
+    AutoImportRunResult,
+    POST_PROCESSING_SUMMARY_EVENT,
+    PostDownloadAutoImportService,
+)
 
 
 def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
@@ -59,7 +63,7 @@ def test_post_download_auto_import_scheduler_loop_runs_once_and_stops() -> None:
     send_text.assert_awaited_once_with(chat_id=1001, text="导入成功")
 
 
-def test_post_download_auto_import_scheduler_loop_sends_staged_notifications_in_order() -> None:
+def test_post_download_auto_import_scheduler_loop_sends_single_final_summary_notification() -> None:
     stop_event = asyncio.Event()
     send_text = AsyncMock()
 
@@ -70,10 +74,10 @@ def test_post_download_auto_import_scheduler_loop_sends_staged_notifications_in_
             progressed=1,
             replies=("后处理总结",),
             notifications=(
-                SimpleNamespace(chat_id=1001, text="导入成功：Dune 2024"),
-                SimpleNamespace(chat_id=1001, text="字幕翻译：成功；字幕翻译成功：已生成 1 个字幕文件。"),
-                SimpleNamespace(chat_id=1001, text="媒体库刷新：成功；媒体库刷新成功。"),
-                SimpleNamespace(chat_id=1001, text="后处理总结\n- metadata：成功\n- 字幕：成功\n- 刷新：成功"),
+                SimpleNamespace(
+                    chat_id=1001,
+                    text="🏁 <b>入库完成</b>\n<b>Dune 2024</b>\n\n✅ 全部后处理已完成\n\n📁 <b>入库路径：</b>\n<code>/library/Dune 2024</code>",
+                ),
             ),
         )
 
@@ -89,10 +93,10 @@ def test_post_download_auto_import_scheduler_loop_sends_staged_notifications_in_
     )
 
     assert send_text.await_args_list == [
-        call(chat_id=1001, text="导入成功：Dune 2024"),
-        call(chat_id=1001, text="字幕翻译：成功；字幕翻译成功：已生成 1 个字幕文件。"),
-        call(chat_id=1001, text="媒体库刷新：成功；媒体库刷新成功。"),
-        call(chat_id=1001, text="后处理总结\n- metadata：成功\n- 字幕：成功\n- 刷新：成功"),
+        call(
+            chat_id=1001,
+            text="🏁 <b>入库完成</b>\n<b>Dune 2024</b>\n\n✅ 全部后处理已完成\n\n📁 <b>入库路径：</b>\n<code>/library/Dune 2024</code>",
+        ),
     ]
 
 
@@ -194,8 +198,9 @@ def test_poll_pending_download_completion_once_edits_bound_telegram_message_and_
     assert kwargs["message_id"] == 321
     assert kwargs["parse_mode"] == "HTML"
     assert kwargs["text"].startswith("⏳ <b>任务下载中</b>")
-    assert "📍 <b>当前状态：</b> 下载中" in kwargs["text"]
-    assert "<code>[███████████░░░░░░░░░]</code> 56.0%" in kwargs["text"]
+    assert "<b>状态：</b> 下载中" in kwargs["text"]
+    assert "<b>下载进度：</b> 56%" in kwargs["text"]
+    assert "<code>[██████░░░░]</code>" in kwargs["text"]
     assert "⚡ <b>速度：</b> 1.0 MB/s" in kwargs["text"]
     reply_markup = kwargs["reply_markup"]
     assert isinstance(reply_markup, InlineKeyboardMarkup)
@@ -268,7 +273,105 @@ def test_poll_pending_download_completion_once_edits_completion_card_once_then_s
 
     assert edit_message_text.await_count == 2
     assert edit_message_text.await_args_list[1].kwargs["text"].startswith("✅ <b>下载完成</b>")
+    assert "<b>状态：</b> 后处理中" in edit_message_text.await_args_list[1].kwargs["text"]
     assert monitor_repo.list_pending_completion() == []
+
+
+def test_poll_pending_download_completion_once_sends_single_final_summary_after_terminal_post_processing(
+    tmp_path,
+) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    monitor_repo = DownloadMonitorRepo(database)
+    event_repo = JobEventRepo(database)
+    monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 1984",
+        chat_id=1001,
+        user_id=2001,
+    )
+    monitor_repo.bind_telegram_message(task_id="87", task_hash="hash-87", message_id=321)
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message="/library/Dune 1984",
+        target_path="/library/Dune 1984",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="metadata.succeeded",
+        message="metadata 刮削成功：/tmp/demo.metadata.json",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="subtitle.succeeded",
+        message="字幕翻译成功：已生成 1 个字幕文件。",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="refresh.succeeded",
+        message="媒体库刷新成功。",
+    )
+    event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type=POST_PROCESSING_SUMMARY_EVENT,
+        message=(
+            "导入成功：Dune 1984\n"
+            "任务 ID: 87\n"
+            "任务 Hash: hash-87\n"
+            "目标路径: /library/Dune 1984\n\n"
+            "后处理总结\n"
+            "- metadata：成功；metadata 刮削成功：/tmp/demo.metadata.json\n"
+            "- 字幕：成功；字幕翻译成功：已生成 1 个字幕文件。\n"
+            "- 刷新：成功；媒体库刷新成功。"
+        ),
+    )
+    status_service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+    )
+    edit_message_text = AsyncMock(return_value="edited")
+    send_text = AsyncMock(return_value="sent")
+
+    asyncio.run(
+        poll_pending_download_completion_once(
+            download_monitor_repo=monitor_repo,
+            status_service=status_service,
+            send_text_func=send_text,
+            telegram_edit_message_func=edit_message_text,
+            min_telegram_progress_edit_interval_seconds=300.0,
+        )
+    )
+
+    send_text.assert_awaited_once_with(
+        chat_id=1001,
+        text="🏁 <b>入库完成</b>\n<b>Dune 1984</b>\n\n✅ 全部后处理已完成\n\n📁 <b>入库路径：</b>\n<code>/library/Dune 1984</code>",
+        parse_mode="HTML",
+    )
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert any(event.event_type == "telegram.summary_sent" for event in events)
 
 
 def test_poll_pending_download_completion_once_logs_pending_list_failure(capsys: pytest.CaptureFixture[str]) -> None:

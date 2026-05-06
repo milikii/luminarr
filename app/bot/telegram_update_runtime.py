@@ -527,12 +527,14 @@ async def _send_aggregate_candidate_messages(
     text: str,
 ) -> object:
     if chat_id is not None and send_media_func is not None and download_image_func is not None:
-        await _send_first_aggregate_candidate_poster(
+        media_result = await _send_single_aggregate_candidate_card(
             send_media_func=send_media_func,
             download_image_func=download_image_func,
             chat_id=chat_id,
             text=text,
         )
+        if media_result is not None:
+            return media_result
     last_result: object | None = None
     for chunk in _split_telegram_text_chunks(text):
         last_result = await _send_or_reply_text(
@@ -544,14 +546,16 @@ async def _send_aggregate_candidate_messages(
     return last_result
 
 
-async def _send_first_aggregate_candidate_poster(
+async def _send_single_aggregate_candidate_card(
     *,
     send_media_func: TelegramSendMediaFunc,
     download_image_func: DownloadImageFunc,
     chat_id: int,
     text: str,
 ) -> object | None:
-    poster_url, caption = _extract_first_aggregate_candidate_poster_card(text)
+    if not _is_single_aggregate_candidate(text):
+        return None
+    poster_url, caption = _extract_single_aggregate_candidate_card(text)
     if not poster_url:
         return None
     artifact = await _download_candidate_media_artifact(
@@ -581,31 +585,30 @@ async def _send_first_aggregate_candidate_poster(
         _cleanup_temp_media_artifact(artifact)
 
 
-def _extract_first_aggregate_candidate_poster_card(text: str) -> tuple[str, str | None]:
+def _is_single_aggregate_candidate(text: str) -> bool:
+    count = 0
+    for line in text.splitlines():
+        if _AGGREGATE_CANDIDATE_ITEM_RE.match(line.strip()):
+            count += 1
+            if count > 1:
+                return False
+    return count == 1
+
+
+def _extract_single_aggregate_candidate_card(text: str) -> tuple[str, str | None]:
     lines = [line.strip() for line in text.splitlines()]
-    candidate_lines: list[str] = []
+    caption_lines: list[str] = []
     poster_url = ""
-    in_first_candidate = False
     for line in lines:
         if not line:
-            continue
-        if line == "下一步":
-            break
-        if _AGGREGATE_CANDIDATE_ITEM_RE.match(line):
-            if in_first_candidate:
-                break
-            in_first_candidate = True
-            candidate_lines.append(line)
-            continue
-        if not in_first_candidate:
             continue
         if line.startswith("海报预览："):
             poster_match = re.search(r'href="(?P<url>https?://[^"]+)"', line)
             if poster_match is not None:
                 poster_url = str(poster_match.group("url") or "").strip()
             continue
-        candidate_lines.append(line)
-    return poster_url, _resolve_candidate_block_caption(candidate_lines)
+        caption_lines.append(line)
+    return poster_url, _resolve_candidate_block_caption(caption_lines)
 
 
 async def _send_pt_resource_card_message(

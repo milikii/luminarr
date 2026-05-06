@@ -46,6 +46,7 @@ async def poll_pending_download_completion_once(
     *,
     download_monitor_repo: DownloadMonitorRepo,
     status_service: GetDownloadStatusService,
+    send_text_func=None,
     telegram_edit_message_func=None,
     min_telegram_progress_edit_interval_seconds: float = 300.0,
 ) -> None:
@@ -80,6 +81,11 @@ async def poll_pending_download_completion_once(
                 text=text,
                 telegram_edit_message_func=telegram_edit_message_func,
             )
+            await _send_telegram_completion_summary_if_needed(
+                status_service=status_service,
+                record=refreshed_record,
+                send_text_func=send_text_func,
+            )
             continue
         await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
 
@@ -90,6 +96,7 @@ async def download_completion_polling_loop(
     status_service: GetDownloadStatusService,
     stop_event: asyncio.Event,
     interval_seconds: float,
+    send_text_func=None,
     telegram_edit_message_func=None,
     min_telegram_progress_edit_interval_seconds: float | None = None,
 ) -> None:
@@ -98,6 +105,7 @@ async def download_completion_polling_loop(
             await poll_pending_download_completion_once(
                 download_monitor_repo=download_monitor_repo,
                 status_service=status_service,
+                send_text_func=send_text_func,
                 telegram_edit_message_func=telegram_edit_message_func,
                 min_telegram_progress_edit_interval_seconds=(
                     interval_seconds
@@ -186,6 +194,7 @@ def start_download_follow_up_scheduler(
             status_service=status_service,
             stop_event=stop_event,
             interval_seconds=resolved_download_completion_interval_seconds,
+            send_text_func=send_text_func,
             telegram_edit_message_func=telegram_edit_message_func,
             min_telegram_progress_edit_interval_seconds=resolved_min_telegram_progress_edit_interval_seconds,
         ),
@@ -318,6 +327,7 @@ def _is_telegram_live_progress_card_text(text: str) -> bool:
     return first_line in {
         "⏳ <b>任务下载中</b>",
         "✅ <b>下载完成</b>",
+        "🎉 <b>任务完成</b>",
     }
 
 
@@ -365,6 +375,29 @@ async def _edit_telegram_progress_message(
         )
     except (DownloadMonitorPersistenceError, sqlite3.Error) as error:
         _log_telegram_progress_sync_error(record=record, error=error)
+
+
+async def _send_telegram_completion_summary_if_needed(
+    *,
+    status_service: GetDownloadStatusService,
+    record,
+    send_text_func,
+) -> None:
+    if not callable(send_text_func) or record.chat_id <= 0:
+        return
+    summary_text = status_service.build_pending_telegram_summary(
+        task_id=record.task_id,
+        task_hash=record.task_hash,
+        title=record.name,
+    )
+    if not summary_text:
+        return
+    try:
+        await send_text_func(chat_id=record.chat_id, text=summary_text, parse_mode="HTML")
+    except Exception as error:
+        log_shared_private_chat_send_error(chat_id=record.chat_id, error=error)
+        return
+    status_service.mark_telegram_summary_sent(task_id=record.task_id, task_hash=record.task_hash)
 
 
 def _parse_sqlite_timestamp(value: str) -> datetime | None:

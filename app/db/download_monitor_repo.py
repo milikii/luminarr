@@ -86,6 +86,14 @@ class DownloadMonitorRepo:
                         WHEN excluded.user_id > 0 THEN excluded.user_id
                         ELSE download_monitor.user_id
                     END,
+                    status_code = 0,
+                    percent_done = 0,
+                    is_complete = 0,
+                    completion_observed_at = '',
+                    last_observed_at = '',
+                    telegram_message_id = 0,
+                    telegram_progress_last_text = '',
+                    telegram_progress_last_synced_at = '',
                     updated_at = CURRENT_TIMESTAMP
                 """,
                 (

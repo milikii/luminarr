@@ -216,13 +216,16 @@ def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared
     edit_message_reply_markup.assert_awaited_once_with(reply_markup=None)
     reply_text.assert_awaited_once()
     sent_text = reply_text.await_args.args[0]
-    assert "┏━ ✅ <b>下载已开始</b>" in sent_text
+    assert "✅ <b>任务已添加并开始下载</b>" in sent_text
     assert "<code>42</code>" in sent_text
     assert "<code>abc123</code>" in sent_text
-    assert "<code>status abc123</code>" in sent_text
-    assert "后台会在此消息内同步真实下载进度" in sent_text
-    assert "刷新后会显示进度条 / 速度 / ETA" in sent_text
+    assert "<b>状态：</b> 等待下载器同步" in sent_text
+    assert "<b>下载进度：</b> 0%" in sent_text
+    assert "<code>[░░░░░░░░░░]</code>" in sent_text
+    assert "消息每 5 秒自动刷新一次" in sent_text
     assert "confirm " not in sent_text
+    reply_markup = reply_text.await_args.kwargs["reply_markup"]
+    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
     stored_session = search_service.telegram_pt_resource_card_state.get_session(session.session_token)
     assert stored_session is not None
     assert stored_session.status == "selected"
