@@ -255,7 +255,7 @@ def _resolve_subtitle_status(result: SubtitleTranslateResult | None) -> str:
     if result is None:
         return "skipped"
     if result.skipped:
-        return "skipped"
+        return _resolve_skipped_subtitle_status(result.message)
     return "success" if result.success else "failed"
 
 
@@ -272,10 +272,24 @@ def _format_summary_line(label: str, status: str, message: str) -> str:
         "success": "成功",
         "failed": "失败",
         "skipped": "跳过",
+        "chinese_ready": "✅ 已有中文字幕",
     }.get(status, status)
     if not message:
         return f"{label}：{status_text}"
     return f"{label}：{status_text}；{message}"
+
+
+def _resolve_skipped_subtitle_status(message: str) -> str:
+    if any(
+        marker in message
+        for marker in (
+            "已检测到中文字幕外挂字幕",
+            "视频内已检测到中文字幕轨",
+            "目标中文字幕文件已存在",
+        )
+    ):
+        return "chinese_ready"
+    return "skipped"
 
 
 def _log_import_metadata_scrape_failed(*, message: str) -> None:

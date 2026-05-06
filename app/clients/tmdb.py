@@ -36,6 +36,9 @@ class TmdbMovie:
     year: str
     tmdb_id: str = ""
     media_type: str = "movie"
+    release_date: str = ""
+    runtime_minutes: int = 0
+    tagline: str = ""
     poster_path: str = ""
     backdrop_path: str = ""
     overview: str = ""
@@ -345,6 +348,9 @@ def _to_tmdb_movie(item: Mapping[str, Any]) -> TmdbMovie | None:
         original_title=original_title,
         year=year,
         media_type="movie",
+        release_date=release_date,
+        runtime_minutes=_safe_int(item.get("runtime")),
+        tagline=_safe_text(item.get("tagline")),
         poster_path=_safe_text(item.get("poster_path")),
         backdrop_path=_safe_text(item.get("backdrop_path")),
         overview=_safe_text(item.get("overview")),
@@ -373,6 +379,9 @@ def _to_tmdb_tv(item: Mapping[str, Any]) -> TmdbMovie | None:
         original_title=original_title,
         year=year,
         media_type="tv",
+        release_date=first_air_date,
+        runtime_minutes=_safe_runtime_minutes(item.get("episode_run_time")),
+        tagline=_safe_text(item.get("tagline")),
         poster_path=_safe_text(item.get("poster_path")),
         backdrop_path=_safe_text(item.get("backdrop_path")),
         overview=_safe_text(item.get("overview")),
@@ -415,6 +424,16 @@ def _safe_int(value: Any) -> int:
         return int(value)
     except (TypeError, ValueError):
         return 0
+
+
+def _safe_runtime_minutes(value: Any) -> int:
+    if isinstance(value, list):
+        for item in value:
+            runtime = _safe_int(item)
+            if runtime > 0:
+                return runtime
+        return 0
+    return _safe_int(value)
 
 
 def _to_tmdb_credit_person(item: Mapping[str, Any]) -> TmdbCreditPerson | None:
@@ -474,6 +493,9 @@ def _merge_tmdb_movie_truth(
         year=localized.year or reference.year,
         tmdb_id=localized.tmdb_id or reference.tmdb_id,
         media_type=localized.media_type or reference.media_type,
+        release_date=localized.release_date or reference.release_date,
+        runtime_minutes=localized.runtime_minutes or reference.runtime_minutes,
+        tagline=localized.tagline or reference.tagline,
         poster_path=localized.poster_path or reference.poster_path,
         backdrop_path=localized.backdrop_path or reference.backdrop_path,
         overview=localized.overview or reference.overview,

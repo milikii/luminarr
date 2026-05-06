@@ -52,6 +52,36 @@ def test_get_movie_images_returns_first_valid_urls() -> None:
     assert result.backdrop_url == "https://img.example/bg.jpg"
 
 
+def test_get_movie_images_keeps_extended_assets_separate_from_poster_and_backdrop() -> None:
+    client = FanartClient(api_key="fanart-key", base_url="https://fanart.example")
+
+    async def fake_get(_: str, params: dict[str, str]) -> _FakeResponse:
+        _ = params
+        return _FakeResponse(
+            {
+                "hdmovieclearart": [
+                    {"url": "https://img.example/clearart.png"},
+                ],
+                "movielogo": [
+                    {"url": "https://img.example/logo.png"},
+                ],
+                "moviethumb": [
+                    {"url": "https://img.example/thumb.jpg"},
+                ],
+            }
+        )
+
+    client._get = fake_get  # type: ignore[method-assign]
+    result = _run(client.get_movie_images("157336"))
+
+    assert result is not None
+    assert result.poster_url == ""
+    assert result.backdrop_url == ""
+    assert result.logo_url == "https://img.example/logo.png"
+    assert result.clearart_url == "https://img.example/clearart.png"
+    assert result.thumb_url == "https://img.example/thumb.jpg"
+
+
 def test_get_movie_images_returns_none_without_urls() -> None:
     client = FanartClient(api_key="fanart-key")
 

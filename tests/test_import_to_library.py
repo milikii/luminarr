@@ -4598,6 +4598,48 @@ def test_confirm_import_triggers_subtitle_translate_success_event(tmp_path: Path
     assert any(event.event_type == "subtitle.succeeded" for event in events)
 
 
+def test_confirm_import_reports_chinese_subtitle_skip_as_chinese_ready(tmp_path: Path) -> None:
+    download_dir = tmp_path / "downloads"
+    download_dir.mkdir(parents=True)
+    source_file = download_dir / "Interstellar.2014.mkv"
+    source_file.write_bytes(b"demo")
+    target_dir = tmp_path / "library"
+
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+    event_repo = JobEventRepo(database)
+
+    def fake_translate(_: SubtitleTranslateInput) -> SubtitleTranslateResult:
+        return SubtitleTranslateResult(
+            success=False,
+            skipped=True,
+            message="字幕翻译已跳过：已检测到中文字幕外挂字幕。",
+            translated_count=0,
+        )
+
+    import_source = TransmissionImportSource(
+        task_id="87",
+        task_hash="hash-87",
+        name=source_file.name,
+        download_dir=str(download_dir),
+        is_finished=True,
+        percent_done=1.0,
+    )
+    service = ImportToLibraryService(
+        get_import_source_func=AsyncMock(return_value=import_source),
+        library_target_dir=str(target_dir),
+        translate_subtitle_func=fake_translate,
+        job_event_repo=event_repo,
+    )
+
+    _run(service.import_by_task_ref("87"))
+    text = _run(service.confirm_import_by_task_ref("87"))
+
+    assert "字幕：✅ 已有中文字幕；字幕翻译已跳过：已检测到中文字幕外挂字幕。" in text
+    events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
+    assert any(event.event_type == "subtitle.skipped" for event in events)
+
+
 def test_confirm_import_subtitle_translate_exception_does_not_break_import(tmp_path: Path) -> None:
     download_dir = tmp_path / "downloads"
     download_dir.mkdir(parents=True)

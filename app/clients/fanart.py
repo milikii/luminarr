@@ -11,6 +11,11 @@ import httpx
 class FanartMovieImages:
     poster_url: str
     backdrop_url: str
+    logo_url: str = ""
+    clearart_url: str = ""
+    banner_url: str = ""
+    disc_url: str = ""
+    thumb_url: str = ""
 
 
 class FanartClient:
@@ -41,11 +46,24 @@ class FanartClient:
         if not isinstance(data, Mapping):
             return None
 
-        poster_url = _pick_image_url(data, "movieposter", "hdmovieclearart", "moviethumb")
-        backdrop_url = _pick_image_url(data, "moviebackground", "moviethumb")
-        if not poster_url and not backdrop_url:
+        poster_url = _pick_image_url(data, "movieposter")
+        backdrop_url = _pick_image_url(data, "moviebackground")
+        logo_url = _pick_image_url(data, "hdmovielogo", "movielogo")
+        clearart_url = _pick_image_url(data, "hdmovieclearart", "movieclearart")
+        banner_url = _pick_image_url(data, "moviebanner")
+        disc_url = _pick_image_url(data, "moviedisc")
+        thumb_url = _pick_image_url(data, "moviethumb")
+        if not any((poster_url, backdrop_url, logo_url, clearart_url, banner_url, disc_url, thumb_url)):
             return None
-        return FanartMovieImages(poster_url=poster_url, backdrop_url=backdrop_url)
+        return FanartMovieImages(
+            poster_url=poster_url,
+            backdrop_url=backdrop_url,
+            logo_url=logo_url,
+            clearart_url=clearart_url,
+            banner_url=banner_url,
+            disc_url=disc_url,
+            thumb_url=thumb_url,
+        )
 
     async def _get(self, path: str, params: Mapping[str, str]) -> httpx.Response:
         url = f"{self._base_url}{path}"

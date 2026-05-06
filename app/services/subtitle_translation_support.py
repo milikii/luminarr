@@ -154,7 +154,7 @@ def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
         return None
     if path.name.lower().endswith(_BILINGUAL_ASS_OUTPUT_SUFFIX):
         return None
-    if _is_chinese_subtitle_path(path):
+    if _is_chinese_subtitle_path(path) or _subtitle_content_looks_chinese(path):
         return None
     suffix = path.suffix.lower()
     if suffix == ".srt":
@@ -173,7 +173,7 @@ def _resolve_external_subtitle_files(video_path: Path) -> tuple[list[_SubtitleFi
     ]
     if external_subtitle_files:
         return external_subtitle_files, "external"
-    if any(_is_chinese_subtitle_path(path) for path in external_subtitle_paths):
+    if any(_is_chinese_subtitle_path(path) or _subtitle_content_looks_chinese(path) for path in external_subtitle_paths):
         return [], "chinese_external"
     return [], "none"
 
@@ -279,14 +279,27 @@ def _extract_embedded_subtitle_file_for_video(
 
 
 def _read_subtitle_source_text(source_path: Path) -> tuple[str | None, _SubtitleCommandFailure | None]:
-    try:
-        return source_path.read_text(encoding="utf-8"), None
-    except (OSError, UnicodeError) as exc:
-        return None, _SubtitleCommandFailure(
-            reason="read_source",
-            problem=f"读取字幕文件失败：{source_path}，原因：{exc}",
-            fix="确认字幕是 UTF-8 编码，必要时先转码后再重试。",
-        )
+    last_error: Exception | None = None
+    for encoding in ("utf-8", "utf-8-sig", "gb18030"):
+        try:
+            return source_path.read_text(encoding=encoding), None
+        except (OSError, UnicodeError) as exc:
+            last_error = exc
+            continue
+    return None, _SubtitleCommandFailure(
+        reason="read_source",
+        problem=f"读取字幕文件失败：{source_path}，原因：{last_error}",
+        fix="确认字幕编码是 UTF-8、UTF-8 BOM 或 GB18030；必要时先转码后再重试。",
+    )
+
+
+def _subtitle_content_looks_chinese(source_path: Path) -> bool:
+    source_text, failure = _read_subtitle_source_text(source_path)
+    if failure is not None or not source_text:
+        return False
+    cjk_count = sum(1 for char in source_text if "\u4e00" <= char <= "\u9fff")
+    ascii_letter_count = sum(1 for char in source_text if ("a" <= char.lower() <= "z"))
+    return cjk_count >= 3 and cjk_count >= max(1, ascii_letter_count)
 
 
 def _write_translated_subtitle_file(

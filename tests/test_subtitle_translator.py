@@ -1494,6 +1494,52 @@ def test_translate_for_import_fails_when_subtitle_not_utf8(tmp_path: Path) -> No
     assert "读取字幕文件失败" in result.message
 
 
+def test_read_subtitle_source_text_supports_gb18030(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    subtitle_file = library_dir / "Kung Fu Panda (2008).srt"
+    subtitle_file.write_bytes(
+        "1\n00:00:01,000 --> 00:00:03,000\n功夫熊猫\n".encode("gb18030")
+    )
+
+    text, failure = subtitle_support._read_subtitle_source_text(subtitle_file)
+
+    assert failure is None
+    assert text is not None
+    assert "功夫熊猫" in text
+
+
+def test_translate_for_import_skips_when_external_subtitle_content_is_chinese_even_without_label(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Kung Fu Panda (2008).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Kung Fu Panda (2008).srt"
+    subtitle_file.write_bytes(
+        "1\n00:00:01,000 --> 00:00:03,000\n功夫熊猫\n".encode("gb18030")
+    )
+
+    def fake_request(_: str, __: dict[str, object]) -> str:
+        raise AssertionError("Chinese external subtitle content should be skipped before translation request")
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-gbk-skip",
+            task_id="gbk-skip",
+            task_hash="hash-gbk-skip",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is False
+    assert result.skipped is True
+    assert "中文字幕外挂字幕" in result.message
+
+
 def test_translate_for_import_fails_when_writing_translated_subtitle(tmp_path: Path, monkeypatch) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)

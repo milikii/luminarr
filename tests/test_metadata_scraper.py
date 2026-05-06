@@ -141,6 +141,9 @@ def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_pat
             year="2015",
             tmdb_id="361018",
             media_type="movie",
+            release_date="2015-07-10",
+            runtime_minutes=95,
+            tagline="Love is worth the fight.",
             overview="一段关于成长与爱情的青春故事。",
             popularity=12.5,
             vote_count=128,
@@ -174,6 +177,22 @@ def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_pat
                     order=0,
                     profile_path="/edmund.jpg",
                 ),
+                TmdbCreditPerson(
+                    person_id="20",
+                    name="萨沙·金德瑞德",
+                    original_name="Sascha King",
+                    department="Directing",
+                    job="Director",
+                    order=99,
+                ),
+                TmdbCreditPerson(
+                    person_id="30",
+                    name="布赖恩·奥唐纳",
+                    original_name="Brian O'Donnell",
+                    department="Writing",
+                    job="Writer",
+                    order=100,
+                ),
             )
         return (
             TmdbCreditPerson(
@@ -182,8 +201,24 @@ def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_pat
                 original_name="Edmund Donovan",
                 character="Christopher",
                 order=0,
-                profile_path="/edmund.jpg",
-            ),
+                    profile_path="/edmund.jpg",
+                ),
+                TmdbCreditPerson(
+                    person_id="20",
+                    name="Sascha King",
+                    original_name="Sascha King",
+                    department="Directing",
+                    job="Director",
+                    order=99,
+                ),
+                TmdbCreditPerson(
+                    person_id="30",
+                    name="Brian O'Donnell",
+                    original_name="Brian O'Donnell",
+                    department="Writing",
+                    job="Writer",
+                    order=100,
+                ),
         )
 
     service = MetadataScraperService(
@@ -207,6 +242,9 @@ def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_pat
     assert result.success is True
     payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
     assert payload["tmdb"]["overview"] == "一段关于成长与爱情的青春故事。"
+    assert payload["tmdb"]["release_date"] == "2015-07-10"
+    assert payload["tmdb"]["runtime_minutes"] == 95
+    assert payload["tmdb"]["tagline"] == "Love is worth the fight."
     assert payload["tmdb"]["popularity"] == 12.5
     assert payload["tmdb"]["vote_count"] == 128
     assert payload["tmdb"]["vote_average"] == 6.7
@@ -234,7 +272,30 @@ def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_pat
             "profile_image_url": "https://image.tmdb.org/t/p/original/edmund.jpg",
         }
     ]
+    assert payload["tmdb"]["crew"] == [
+        {
+            "id": "20",
+            "name": "萨沙·金德瑞德",
+            "original_name": "Sascha King",
+            "department": "Directing",
+            "job": "Director",
+            "profile_path": "",
+            "profile_image_url": "",
+        },
+        {
+            "id": "30",
+            "name": "布赖恩·奥唐纳",
+            "original_name": "Brian O'Donnell",
+            "department": "Writing",
+            "job": "Writer",
+            "profile_path": "",
+            "profile_image_url": "",
+        },
+    ]
     nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<tagline>Love is worth the fight.</tagline>" in nfo_text
+    assert "<premiered>2015-07-10</premiered>" in nfo_text
+    assert "<runtime>95</runtime>" in nfo_text
     assert "<plot>一段关于成长与爱情的青春故事。</plot>" in nfo_text
     assert "<rating>6.7</rating>" in nfo_text
     assert "<votes>128</votes>" in nfo_text
@@ -247,6 +308,8 @@ def test_scrape_for_import_writes_richer_movie_truth_to_metadata_and_nfo(tmp_pat
     assert "<role>克里斯托弗</role>" in nfo_text
     assert "<sortname>Edmund Donovan</sortname>" in nfo_text
     assert "<thumb>https://image.tmdb.org/t/p/original/edmund.jpg</thumb>" in nfo_text
+    assert "<director>萨沙·金德瑞德</director>" in nfo_text
+    assert "<credits>布赖恩·奥唐纳</credits>" in nfo_text
 
 
 def test_scrape_for_import_preserves_cast_truth_when_person_is_also_crew(tmp_path: Path) -> None:
@@ -340,6 +403,17 @@ def test_scrape_for_import_preserves_cast_truth_when_person_is_also_crew(tmp_pat
             "profile_image_url": "",
         }
     ]
+    assert payload["tmdb"]["crew"] == [
+        {
+            "id": "11",
+            "name": "本·阿弗莱克",
+            "original_name": "Ben Affleck",
+            "department": "Directing",
+            "job": "Director",
+            "profile_path": "",
+            "profile_image_url": "",
+        }
+    ]
 
 
 def test_scrape_for_import_merges_complementary_localized_credit_truth(tmp_path: Path) -> None:
@@ -429,6 +503,97 @@ def test_scrape_for_import_merges_complementary_localized_credit_truth(tmp_path:
     nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
     assert "<name>马修·弗莱斯</name>" in nfo_text
     assert "<role>班尼·克鲁兹</role>" in nfo_text
+
+
+def test_scrape_for_import_keeps_localized_only_cast_and_crew_truth(tmp_path: Path) -> None:
+    target_file = tmp_path / "Akron (2015).mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(
+            title="爱的进行时",
+            original_title="Akron",
+            year="2015",
+            tmdb_id="361018",
+            media_type="movie",
+        )
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return None
+
+    async def fake_movie_credits(_: str, language: str) -> tuple[TmdbCreditPerson, ...]:
+        if language == "zh-CN":
+            return (
+                TmdbCreditPerson(
+                    person_id="10",
+                    name="埃德蒙·多诺万",
+                    original_name="Edmund Donovan",
+                    character="克里斯托弗",
+                    order=0,
+                ),
+                TmdbCreditPerson(
+                    person_id="21",
+                    name="安妮·墨菲",
+                    original_name="Annie Murphy",
+                    character="莎拉",
+                    order=1,
+                ),
+                TmdbCreditPerson(
+                    person_id="30",
+                    name="李四",
+                    original_name="Li Si",
+                    department="Writing",
+                    job="Writer",
+                    order=2,
+                ),
+            )
+        return (
+            TmdbCreditPerson(
+                person_id="10",
+                name="Edmund Donovan",
+                original_name="Edmund Donovan",
+                character="Christopher",
+                order=0,
+            ),
+        )
+
+    service = MetadataScraperService(
+        fake_tmdb_lookup,
+        fake_fanart,
+        lookup_movie_credits_func=fake_movie_credits,
+    )
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="akron-2",
+                task_id="akron-2",
+                task_hash="akron-hash-2",
+                title="Akron",
+                year="2015",
+                target_path=str(target_file),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(target_file.with_suffix(".metadata.json").read_text(encoding="utf-8"))
+    assert payload["subtitle_translation"]["trusted_name_map"] == {
+        "Edmund Donovan": "埃德蒙·多诺万",
+        "Christopher": "克里斯托弗",
+        "Annie Murphy": "安妮·墨菲",
+    }
+    cast_by_id = {row["id"]: row for row in payload["tmdb"]["cast"]}
+    assert set(cast_by_id) == {"10", "21"}
+    assert cast_by_id["21"]["name"] == "安妮·墨菲"
+    assert cast_by_id["21"]["original_name"] == "Annie Murphy"
+    assert cast_by_id["21"]["character"] == "莎拉"
+    crew_by_id = {row["id"]: row for row in payload["tmdb"]["crew"]}
+    assert set(crew_by_id) == {"30"}
+    assert crew_by_id["30"]["name"] == "李四"
+    assert crew_by_id["30"]["original_name"] == "Li Si"
+    nfo_text = target_file.with_suffix(".nfo").read_text(encoding="utf-8")
+    assert "<name>安妮·墨菲</name>" in nfo_text
+    assert "<credits>李四</credits>" in nfo_text
 
 
 def test_scrape_for_import_keeps_tmdb_cast_truth_when_cast_localization_is_missing(tmp_path: Path) -> None:
@@ -1086,7 +1251,102 @@ def test_scrape_for_import_writes_nfo_next_to_primary_video_in_directory_target(
     assert backdrop_path.read_bytes() == b"image:https://img.example/bg.webp"
 
 
-def test_scrape_for_import_keeps_existing_nfo_when_missing_only(tmp_path: Path) -> None:
+def test_scrape_for_import_writes_extended_fanart_assets_for_directory_target(tmp_path: Path) -> None:
+    target_dir = tmp_path / "Interstellar (2014)"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "movie.mkv"
+    target_file.write_bytes(b"demo")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="星际穿越", original_title="Interstellar", year="2014", tmdb_id="157336")
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return FanartMovieImages(
+            poster_url="https://img.example/poster.png",
+            backdrop_url="https://img.example/bg.webp",
+            logo_url="https://img.example/logo.png",
+            clearart_url="https://img.example/clearart.png",
+            banner_url="https://img.example/banner.jpg",
+            disc_url="https://img.example/disc.png",
+            thumb_url="https://img.example/thumb.jpg",
+        )
+
+    async def fake_download_image(url: str) -> bytes:
+        return f"image:{url}".encode("utf-8")
+
+    service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="88",
+                task_id="88",
+                task_hash="hash-88",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_dir),
+            )
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads((target_dir / ".luminarr.metadata.json").read_text(encoding="utf-8"))
+    assert payload["fanart"]["logo_url"] == "https://img.example/logo.png"
+    assert payload["fanart"]["clearart_url"] == "https://img.example/clearart.png"
+    assert payload["fanart"]["banner_url"] == "https://img.example/banner.jpg"
+    assert payload["fanart"]["disc_url"] == "https://img.example/disc.png"
+    assert payload["fanart"]["thumb_url"] == "https://img.example/thumb.jpg"
+    assert (target_dir / "logo.png").read_bytes() == b"image:https://img.example/logo.png"
+    assert (target_dir / "clearart.png").read_bytes() == b"image:https://img.example/clearart.png"
+    assert (target_dir / "banner.jpg").read_bytes() == b"image:https://img.example/banner.jpg"
+    assert (target_dir / "disc.png").read_bytes() == b"image:https://img.example/disc.png"
+    assert (target_dir / "thumb.jpg").read_bytes() == b"image:https://img.example/thumb.jpg"
+    nfo_text = (target_dir / "movie.nfo").read_text(encoding="utf-8")
+    assert '<thumb aspect="clearlogo">https://img.example/logo.png</thumb>' in nfo_text
+    assert '<thumb aspect="clearart">https://img.example/clearart.png</thumb>' in nfo_text
+    assert '<thumb aspect="banner">https://img.example/banner.jpg</thumb>' in nfo_text
+    assert '<thumb aspect="thumb">https://img.example/thumb.jpg</thumb>' in nfo_text
+
+
+def test_scrape_for_import_removes_legacy_cover_when_poster_is_regenerated(tmp_path: Path) -> None:
+    target_dir = tmp_path / "Interstellar (2014)"
+    target_dir.mkdir(parents=True)
+    target_file = target_dir / "movie.mkv"
+    target_file.write_bytes(b"demo")
+    legacy_cover = target_dir / "cover.jpg"
+    legacy_cover.write_bytes(b"legacy-cover")
+
+    async def fake_tmdb_lookup(_: str, __: str) -> TmdbMovie | None:
+        return TmdbMovie(title="星际穿越", original_title="Interstellar", year="2014", tmdb_id="157336")
+
+    async def fake_fanart(_: str) -> FanartMovieImages | None:
+        return FanartMovieImages(
+            poster_url="https://img.example/poster.jpg",
+            backdrop_url="https://img.example/bg.jpg",
+        )
+
+    async def fake_download_image(url: str) -> bytes:
+        return f"image:{url}".encode("utf-8")
+
+    service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
+    result = _run(
+        service.scrape_for_import(
+            MetadataScrapeInput(
+                task_ref="89",
+                task_id="89",
+                task_hash="hash-89",
+                title="Interstellar",
+                year="2014",
+                target_path=str(target_dir),
+            )
+        )
+    )
+
+    assert result.success is True
+    assert not legacy_cover.exists()
+    assert (target_dir / "poster.jpg").exists()
+
+
+def test_scrape_for_import_overwrites_existing_nfo(tmp_path: Path) -> None:
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"demo")
     nfo_path = target_file.with_suffix(".nfo")
@@ -1113,7 +1373,10 @@ def test_scrape_for_import_keeps_existing_nfo_when_missing_only(tmp_path: Path) 
     )
 
     assert result.success is True
-    assert nfo_path.read_text(encoding="utf-8") == "<movie>manual</movie>\n"
+    nfo_text = nfo_path.read_text(encoding="utf-8")
+    assert "<movie>" in nfo_text
+    assert "<title>星际穿越</title>" in nfo_text
+    assert "<movie>manual</movie>" not in nfo_text
 
 
 def test_scrape_for_import_falls_back_to_tmdb_poster_when_fanart_missing(tmp_path: Path) -> None:
@@ -1228,7 +1491,7 @@ def test_scrape_for_import_falls_back_to_tmdb_backdrop_when_fanart_missing(tmp_p
     assert backdrop_path.read_bytes() == b"image:https://image.tmdb.org/t/p/original/backdrop-path.jpg"
 
 
-def test_scrape_for_import_keeps_existing_images_when_missing_only(tmp_path: Path) -> None:
+def test_scrape_for_import_overwrites_existing_images(tmp_path: Path) -> None:
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"demo")
     poster_path = target_file.with_name("Interstellar (2014)-poster.jpg")
@@ -1264,8 +1527,8 @@ def test_scrape_for_import_keeps_existing_images_when_missing_only(tmp_path: Pat
     )
 
     assert result.success is True
-    assert seen_urls == ["https://img.example/bg.jpg"]
-    assert poster_path.read_bytes() == b"manual-poster"
+    assert seen_urls == ["https://img.example/poster.jpg", "https://img.example/bg.jpg"]
+    assert poster_path.read_bytes() == b"image:https://img.example/poster.jpg"
     assert target_file.with_name("Interstellar (2014)-backdrop.jpg").exists()
 
 

@@ -152,6 +152,10 @@ class MetadataScraperService:
             tmdb_movie=tmdb_movie,
             cast_truth=cast_truth,
         )
+        crew_truth = _build_crew_truth(
+            localized_credits=localized_credits,
+            reference_credits=reference_credits,
+        )
         payload = {
             "task_ref": scrape_input.task_ref,
             "task_id": scrape_input.task_id,
@@ -163,6 +167,9 @@ class MetadataScraperService:
                 "original_title": tmdb_movie.original_title,
                 "year": tmdb_movie.year,
                 "media_type": tmdb_movie.media_type,
+                "release_date": tmdb_movie.release_date,
+                "runtime_minutes": tmdb_movie.runtime_minutes,
+                "tagline": tmdb_movie.tagline,
                 "overview": tmdb_movie.overview,
                 "popularity": tmdb_movie.popularity,
                 "vote_count": tmdb_movie.vote_count,
@@ -174,10 +181,17 @@ class MetadataScraperService:
             "fanart": {
                 "poster_url": fanart_images.poster_url if fanart_images is not None else "",
                 "backdrop_url": fanart_images.backdrop_url if fanart_images is not None else "",
+                "logo_url": fanart_images.logo_url if fanart_images is not None else "",
+                "clearart_url": fanart_images.clearart_url if fanart_images is not None else "",
+                "banner_url": fanart_images.banner_url if fanart_images is not None else "",
+                "disc_url": fanart_images.disc_url if fanart_images is not None else "",
+                "thumb_url": fanart_images.thumb_url if fanart_images is not None else "",
             },
         }
         if cast_truth:
             payload["tmdb"]["cast"] = cast_truth
+        if crew_truth:
+            payload["tmdb"]["crew"] = crew_truth
         if subtitle_translation_payload is not None:
             payload["subtitle_translation"] = subtitle_translation_payload
         if _resolve_write_strategy_for_path(
@@ -195,7 +209,7 @@ class MetadataScraperService:
                 return MetadataScrapeResult(success=False, message=message)
         if _resolve_write_strategy_for_path(
             artifact_path=nfo_path,
-            default_strategy=WRITE_STRATEGY_MISSING_ONLY,
+            default_strategy=WRITE_STRATEGY_OVERWRITE,
         ) != WRITE_STRATEGY_SKIP:
             try:
                 nfo_lines = [
@@ -206,6 +220,12 @@ class MetadataScraperService:
                 ]
                 if tmdb_movie.year:
                     nfo_lines.append(f"  <year>{escape(tmdb_movie.year)}</year>")
+                if tmdb_movie.release_date:
+                    nfo_lines.append(f"  <premiered>{escape(tmdb_movie.release_date)}</premiered>")
+                if tmdb_movie.runtime_minutes > 0:
+                    nfo_lines.append(f"  <runtime>{escape(str(tmdb_movie.runtime_minutes))}</runtime>")
+                if tmdb_movie.tagline:
+                    nfo_lines.append(f"  <tagline>{escape(tmdb_movie.tagline)}</tagline>")
                 if tmdb_movie.tmdb_id:
                     nfo_lines.append(f"  <tmdbid>{escape(tmdb_movie.tmdb_id)}</tmdbid>")
                     nfo_lines.append(f"  <uniqueid type=\"tmdb\" default=\"true\">{escape(tmdb_movie.tmdb_id)}</uniqueid>")
@@ -227,6 +247,15 @@ class MetadataScraperService:
                     studio_name = str(studio.get("name", "")).strip()
                     if studio_name:
                         nfo_lines.append(f"  <studio>{escape(studio_name)}</studio>")
+                for crew_member in crew_truth:
+                    crew_name = str(crew_member.get("name", "")).strip()
+                    crew_job = str(crew_member.get("job", "")).strip()
+                    if not crew_name:
+                        continue
+                    if crew_job == "Director":
+                        nfo_lines.append(f"  <director>{escape(crew_name)}</director>")
+                    if crew_job in {"Writer", "Screenplay", "Story"}:
+                        nfo_lines.append(f"  <credits>{escape(crew_name)}</credits>")
                 for cast_member in cast_truth:
                     cast_name = str(cast_member.get("name", "")).strip()
                     cast_role = str(cast_member.get("character", "")).strip()
@@ -245,6 +274,14 @@ class MetadataScraperService:
                     nfo_lines.append("  </actor>")
                 if fanart_images is not None and fanart_images.poster_url:
                     nfo_lines.append(f"  <thumb aspect=\"poster\">{escape(fanart_images.poster_url)}</thumb>")
+                if fanart_images is not None and fanart_images.logo_url:
+                    nfo_lines.append(f"  <thumb aspect=\"clearlogo\">{escape(fanart_images.logo_url)}</thumb>")
+                if fanart_images is not None and fanart_images.clearart_url:
+                    nfo_lines.append(f"  <thumb aspect=\"clearart\">{escape(fanart_images.clearart_url)}</thumb>")
+                if fanart_images is not None and fanart_images.banner_url:
+                    nfo_lines.append(f"  <thumb aspect=\"banner\">{escape(fanart_images.banner_url)}</thumb>")
+                if fanart_images is not None and fanart_images.thumb_url:
+                    nfo_lines.append(f"  <thumb aspect=\"thumb\">{escape(fanart_images.thumb_url)}</thumb>")
                 if fanart_images is not None and fanart_images.backdrop_url:
                     nfo_lines.extend(
                         [
@@ -481,11 +518,56 @@ class MetadataScraperService:
             else:
                 backdrop_path = target_path / f"backdrop{backdrop_suffix}"
             artifact_specs.append(("backdrop", fanart_images.backdrop_url, backdrop_path))
+        if fanart_images.logo_url:
+            logo_suffix = Path(urlparse(fanart_images.logo_url).path).suffix.lower()
+            if logo_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                logo_suffix = ".png"
+            if target_path.is_file():
+                logo_path = target_path.with_name(f"{target_path.stem}-logo{logo_suffix}")
+            else:
+                logo_path = target_path / f"logo{logo_suffix}"
+            artifact_specs.append(("logo", fanart_images.logo_url, logo_path))
+        if fanart_images.clearart_url:
+            clearart_suffix = Path(urlparse(fanart_images.clearart_url).path).suffix.lower()
+            if clearart_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                clearart_suffix = ".png"
+            if target_path.is_file():
+                clearart_path = target_path.with_name(f"{target_path.stem}-clearart{clearart_suffix}")
+            else:
+                clearart_path = target_path / f"clearart{clearart_suffix}"
+            artifact_specs.append(("clearart", fanart_images.clearart_url, clearart_path))
+        if fanart_images.banner_url:
+            banner_suffix = Path(urlparse(fanart_images.banner_url).path).suffix.lower()
+            if banner_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                banner_suffix = ".jpg"
+            if target_path.is_file():
+                banner_path = target_path.with_name(f"{target_path.stem}-banner{banner_suffix}")
+            else:
+                banner_path = target_path / f"banner{banner_suffix}"
+            artifact_specs.append(("banner", fanart_images.banner_url, banner_path))
+        if fanart_images.disc_url:
+            disc_suffix = Path(urlparse(fanart_images.disc_url).path).suffix.lower()
+            if disc_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                disc_suffix = ".png"
+            if target_path.is_file():
+                disc_path = target_path.with_name(f"{target_path.stem}-disc{disc_suffix}")
+            else:
+                disc_path = target_path / f"disc{disc_suffix}"
+            artifact_specs.append(("disc", fanart_images.disc_url, disc_path))
+        if fanart_images.thumb_url:
+            thumb_suffix = Path(urlparse(fanart_images.thumb_url).path).suffix.lower()
+            if thumb_suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
+                thumb_suffix = ".jpg"
+            if target_path.is_file():
+                thumb_path = target_path.with_name(f"{target_path.stem}-thumb{thumb_suffix}")
+            else:
+                thumb_path = target_path / f"thumb{thumb_suffix}"
+            artifact_specs.append(("thumb", fanart_images.thumb_url, thumb_path))
         created_paths: list[Path] = []
         for label, image_url, artifact_path in artifact_specs:
             if _resolve_write_strategy_for_path(
                 artifact_path=artifact_path,
-                default_strategy=WRITE_STRATEGY_MISSING_ONLY,
+                default_strategy=WRITE_STRATEGY_OVERWRITE,
             ) == WRITE_STRATEGY_SKIP:
                 continue
             try:
@@ -517,7 +599,22 @@ class MetadataScraperService:
                 )
                 return [], MetadataScrapeResult(success=False, message=message)
             created_paths.append(artifact_path)
+            if label == "poster":
+                _cleanup_legacy_cover_artifact(target_path=target_path, poster_path=artifact_path)
         return created_paths, None
+
+
+def _cleanup_legacy_cover_artifact(*, target_path: Path, poster_path: Path) -> None:
+    if target_path.is_file():
+        cover_path = target_path.with_name("cover.jpg")
+    else:
+        cover_path = target_path / "cover.jpg"
+    if cover_path == poster_path or not cover_path.exists():
+        return
+    try:
+        cover_path.unlink()
+    except OSError:
+        return
 
 def _print_colored_error(*, problem: str, fix: str) -> None:
     emit_operational_log(title="元数据刮削失败", detail=problem, fix_hint=fix)
@@ -539,6 +636,11 @@ def _with_tmdb_image_fallback(
     return FanartMovieImages(
         poster_url=resolved_poster_url,
         backdrop_url=resolved_backdrop_url,
+        logo_url=fanart_images.logo_url if fanart_images is not None else "",
+        clearart_url=fanart_images.clearart_url if fanart_images is not None else "",
+        banner_url=fanart_images.banner_url if fanart_images is not None else "",
+        disc_url=fanart_images.disc_url if fanart_images is not None else "",
+        thumb_url=fanart_images.thumb_url if fanart_images is not None else "",
     )
 
 
@@ -576,6 +678,9 @@ def _resolve_chinese_scrape_movie(
             year=tmdb_movie.year,
             tmdb_id=tmdb_movie.tmdb_id,
             media_type=tmdb_movie.media_type,
+            release_date=tmdb_movie.release_date,
+            runtime_minutes=tmdb_movie.runtime_minutes,
+            tagline=tmdb_movie.tagline,
             poster_path=tmdb_movie.poster_path,
             backdrop_path=tmdb_movie.backdrop_path,
             overview=tmdb_movie.overview,
@@ -617,22 +722,31 @@ def _build_trusted_person_name_map(
     trusted_name_map: dict[str, str] = {}
     for reference in reference_by_person_id.values():
         localized = localized_by_person_id.get(reference.person_id)
-        if localized is None:
+        if localized is not None:
+            _add_trusted_name_mapping(
+                trusted_name_map,
+                source_name=reference.name,
+                localized_name=localized.name,
+            )
+            _add_trusted_name_mapping(
+                trusted_name_map,
+                source_name=reference.original_name,
+                localized_name=localized.name,
+            )
+            _add_trusted_name_mapping(
+                trusted_name_map,
+                source_name=reference.character,
+                localized_name=localized.character,
+            )
+    for person_id, localized in localized_by_person_id.items():
+        if person_id in reference_by_person_id:
+            continue
+        if not localized.character.strip():
             continue
         _add_trusted_name_mapping(
             trusted_name_map,
-            source_name=reference.name,
+            source_name=localized.original_name,
             localized_name=localized.name,
-        )
-        _add_trusted_name_mapping(
-            trusted_name_map,
-            source_name=reference.original_name,
-            localized_name=localized.name,
-        )
-        _add_trusted_name_mapping(
-            trusted_name_map,
-            source_name=reference.character,
-            localized_name=localized.character,
         )
     return trusted_name_map
 
@@ -644,7 +758,10 @@ def _build_cast_truth(
 ) -> list[dict[str, object]]:
     localized_by_person_id = _aggregate_credit_truth_by_person_id(localized_credits)
     reference_by_person_id = _aggregate_credit_truth_by_person_id(reference_credits)
-    source_credits = tuple(reference_by_person_id.values()) or tuple(localized_by_person_id.values())
+    source_credits = list(reference_by_person_id.values())
+    for person_id, localized_credit in localized_by_person_id.items():
+        if person_id not in reference_by_person_id:
+            source_credits.append(localized_credit)
     cast_truth: list[dict[str, object]] = []
     seen_people: set[str] = set()
     for source_credit in sorted(source_credits, key=lambda item: (item.order, item.person_id, item.name.casefold())):
@@ -678,6 +795,58 @@ def _build_cast_truth(
     return cast_truth
 
 
+def _build_crew_truth(
+    *,
+    localized_credits: Sequence[TmdbCreditPerson],
+    reference_credits: Sequence[TmdbCreditPerson],
+) -> list[dict[str, object]]:
+    localized_by_person_id = _aggregate_credit_truth_by_person_id(
+        [credit for credit in localized_credits if _is_supported_crew_credit(credit)]
+    )
+    reference_by_person_id = _aggregate_credit_truth_by_person_id(
+        [credit for credit in reference_credits if _is_supported_crew_credit(credit)]
+    )
+    source_credits = list(reference_by_person_id.values())
+    for person_id, localized_credit in localized_by_person_id.items():
+        if person_id not in reference_by_person_id:
+            source_credits.append(localized_credit)
+    crew_truth: list[dict[str, object]] = []
+    seen_people: set[tuple[str, str]] = set()
+    for source_credit in sorted(source_credits, key=lambda item: (item.order, item.person_id, item.job.casefold(), item.name.casefold())):
+        person_id = source_credit.person_id.strip()
+        if not person_id:
+            continue
+        reference = reference_by_person_id.get(person_id, source_credit)
+        localized = localized_by_person_id.get(person_id, source_credit)
+        resolved_job = (reference.job or localized.job).strip()
+        if resolved_job not in {"Director", "Writer", "Screenplay", "Story"}:
+            continue
+        dedupe_key = (person_id, resolved_job.casefold())
+        if dedupe_key in seen_people:
+            continue
+        resolved_name = (localized.name or reference.name or reference.original_name).strip()
+        if not resolved_name:
+            continue
+        profile_path = (localized.profile_path or reference.profile_path).strip()
+        crew_truth.append(
+            {
+                "id": person_id,
+                "name": resolved_name,
+                "original_name": (reference.original_name or reference.name or resolved_name).strip(),
+                "department": (localized.department or reference.department).strip(),
+                "job": resolved_job,
+                "profile_path": profile_path,
+                "profile_image_url": _build_tmdb_image_url(profile_path),
+            }
+        )
+        seen_people.add(dedupe_key)
+    return crew_truth
+
+
+def _is_supported_crew_credit(credit: TmdbCreditPerson) -> bool:
+    return credit.job.strip() in {"Director", "Writer", "Screenplay", "Story"}
+
+
 def _aggregate_credit_truth_by_person_id(
     credits: Sequence[TmdbCreditPerson],
 ) -> dict[str, TmdbCreditPerson]:
@@ -703,8 +872,8 @@ def _merge_credit_truth_rows(
     resolved_original_name = _pick_credit_text(ordered_credits, field_name="original_name")
     resolved_character = _pick_credit_text(cast_like_credits, field_name="character", prefer_chinese=True)
     resolved_profile_path = _pick_credit_text(cast_like_credits or ordered_credits, field_name="profile_path")
-    resolved_department = _pick_credit_text(cast_like_credits, field_name="department")
-    resolved_job = _pick_credit_text(cast_like_credits, field_name="job")
+    resolved_department = _pick_credit_text(cast_like_credits or ordered_credits, field_name="department")
+    resolved_job = _pick_credit_text(cast_like_credits or ordered_credits, field_name="job")
     return TmdbCreditPerson(
         person_id=primary_credit.person_id,
         name=resolved_name or resolved_original_name,
