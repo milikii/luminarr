@@ -197,3 +197,109 @@
 - Run Telegram-specific PT resource selection after BT ordering, then persist that filtered set as the chat's resource truth.
 - Keep the first Telegram PT card concise and move expanded grouped details into a second HTML text message.
 - Ensure both callback buttons and expanded detail rows reference the same filtered, ordered item list.
+
+## Scenario: Telegram Download Success Live Progress Sync
+
+### 1. Scope / Trigger
+
+- Trigger: Telegram download-success delivery was upgraded from a static success card into a same-message live progress sync flow with a character-based progress bar.
+- Why code-spec depth is required: this crosses Telegram send/edit transport, download-monitor persistence, background polling cadence, and channel-specific rendering contracts.
+
+### 2. Signatures
+
+- `app.bot.telegram_delivery_runtime.build_telegram_edit_text_func(application: Application)`
+- `app.bot.telegram_update_runtime.build_telegram_reply_func(...) -> Callable[[str], Awaitable[object]]`
+- `app.services.get_download_status.GetDownloadStatusService.get_status_text(task_ref: str, *, chat_id: int | None = None, channel: str | None = None) -> str`
+- `app.services.get_download_status.render_telegram_live_progress_reply(*, task_ref: str, task_status: TransmissionTaskStatus, auto_import_text: str | None) -> str`
+- `app.bot.download_follow_up_runtime.poll_pending_download_completion_once(*, download_monitor_repo: DownloadMonitorRepo, status_service: GetDownloadStatusService, telegram_edit_message_func=None, min_telegram_progress_edit_interval_seconds: float = 300.0) -> None`
+- `app.db.download_monitor_repo.DownloadMonitorRepo.bind_telegram_message(*, task_id: str, task_hash: str, message_id: int) -> None`
+- `app.db.download_monitor_repo.DownloadMonitorRepo.record_telegram_progress_sync(*, task_id: str, task_hash: str, text: str) -> None`
+
+### 3. Contracts
+
+#### Telegram success-card binding contract
+
+- Telegram add-success delivery must prefer the shared `send_text_func` path when `chat_id` is available, so the returned Telegram `message_id` can be captured.
+- Runtime must parse the original add-success payload for `任务 ID` and `任务 Hash`, then bind the returned Telegram `message_id` onto the matching `download_monitor` row.
+- The initial success card must tell the operator that the same message will continue to refresh with real progress, not that progress is placeholder-only.
+
+#### Download-monitor persistence contract
+
+- `download_monitor` now owns Telegram live-progress truth fields:
+  - `telegram_message_id`
+  - `telegram_progress_last_text`
+  - `telegram_progress_last_synced_at`
+- These fields must be migration-safe for existing SQLite databases by `ALTER TABLE` fallback in `app.db.sqlite`.
+- Binding a Telegram message must reset the stored progress-sync text/timestamp so the first real background refresh is not deduped away.
+
+#### Live-progress rendering contract
+
+- `channel="telegram_live_progress"` is a Telegram-only rendering branch; non-Telegram channels must keep their existing status-delivery format.
+- Telegram live-progress card must include, at minimum:
+  - task id
+  - task hash
+  - status label
+  - character-based progress bar
+  - exact percentage
+  - download speed
+  - ETA
+- The progress bar is presentation-only; real progress truth remains the downloader percentage stored on `TransmissionTaskStatus.percent_done`.
+- The progress bar must be deterministic from the real percentage and must not invent intermediate progress.
+
+#### Polling / dedupe contract
+
+- Background completion polling must continue querying real downloader status for pending rows even when the resulting Telegram edit is deduped.
+- Telegram message editing is allowed only when all three hold:
+  - channel is Telegram
+  - `chat_id > 0`
+  - `telegram_message_id > 0`
+- Runtime must skip Telegram edits when the newly rendered live-progress text is byte-for-byte identical to the last synced text.
+- For in-progress downloads, runtime must also respect a minimum edit interval gate.
+- For completed downloads, runtime must allow one final completion-state edit even when the normal interval gate would still block another in-progress refresh.
+
+### 4. Validation & Error Matrix
+
+- Success card sent through reply-only path with no shared sender -> keep existing Telegram reply behavior, but no same-message live sync binding occurs.
+- `download_monitor` row missing when binding `message_id` -> log operational failure and keep the success card delivered; background live editing stays disabled for that task.
+- Telegram `edit_message_text` fails -> log operational failure, keep polling, and do not overwrite last-synced progress truth.
+- Progress-sync truth write fails after a successful Telegram edit -> log operational failure; the Telegram card may already be updated, but later dedupe cannot rely on SQLite state.
+- Non-Telegram status query or passive `status xxx` query -> must not receive the Telegram live-progress card unless the explicit Telegram-only channel branch is requested.
+
+### 5. Good / Base / Bad Cases
+
+- Good: Telegram confirm-download sends one success card, binds its `message_id`, then background polling edits that same message into `下载进行中` with a visible progress bar and later into `下载完成`.
+- Base: Telegram message is bound, but the next poll renders the same text as the previous one; runtime still queries real status, but skips a redundant edit.
+- Base: Download completes between polling intervals; runtime emits one final completion-card edit even if the previous in-progress edit happened recently.
+- Bad: Background polling stops calling downloader status because the Telegram text was deduped.
+- Bad: Telegram live-progress formatting leaks into Feishu / personal WeChat / WeCom status rendering.
+- Bad: Character progress bar drifts away from the true percentage or is updated from fake local counters.
+
+### 6. Tests Required
+
+- `tests/test_get_download_status.py`
+  - assert Telegram live-progress branch renders the live-progress card
+  - assert card includes the character progress bar, percentage, speed, and ETA
+- `tests/test_telegram_reply_formatter.py`
+  - assert Telegram add-success card wording reflects that same-message progress sync will continue
+- `tests/test_telegram_delivery_runtime.py`
+  - assert `build_telegram_edit_text_func` preserves HTML parse mode and inline button extraction for the edited progress card
+- `tests/test_download_follow_up_runtime.py`
+  - assert bound Telegram messages are edited in place
+  - assert identical rendered progress text is deduped
+  - assert one final completion edit is still allowed before the row leaves `list_pending_completion`
+- `make verify-mainline`
+  - must stay green after Telegram live-progress sync changes
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+- Store only `task_hash -> message_id` in memory and lose the binding after process restart.
+- Skip status polling entirely whenever the previously rendered Telegram text did not change.
+- Render a pretty progress bar from guessed polling counts while the exact percentage says something else.
+
+#### Correct
+
+- Persist Telegram message binding and last-sync truth in `download_monitor`, so restart recovery and dedupe work off SQLite truth.
+- Continue querying real downloader state on every polling cycle, then decide separately whether a Telegram edit is needed.
+- Derive the character progress bar directly from the real downloader percentage and keep the exact percentage/speed/ETA visible alongside it.
