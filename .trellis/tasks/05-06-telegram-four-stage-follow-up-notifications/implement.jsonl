@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Load backend spec index and relevant guideline references before changing post-download notification behavior."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep focused verification and docs-gate expectations aligned with this narrow behavior patch."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Subtitle translation remains part of import-time post-processing and must stay fail-soft while surfacing stage results."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Telegram live-progress delivery contracts already exist here; this task must not regress the same-message progress sync path."}
+{"file": ".trellis/tasks/05-06-telegram-four-stage-follow-up-notifications/research/scope-split.md", "reason": "Carry the agreed four-stage scope and current notification seam into implementation."}

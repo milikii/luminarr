@@ -635,3 +635,23 @@
 
 ### 下轮目标
 - 若进入收尾或提交，按 Telegram-first slice 与并行字幕任务分开做 commit 分组。
+
+## Round 37 — 2026-05-06 19:58
+
+### 完成
+- 将下载完成后的 Telegram 自动导入主动通知从单条总结拆成四段式顺序通知：导入结果、字幕翻译结果、媒体库刷新结果、最终总结。
+- 保持下载中的 Telegram live progress 原消息编辑链不变，同时补回 `get_download_status.py` 的 `status_label` 漏定义和下载完成轮询 interval 参数兼容。
+- 收紧 `tests/test_get_download_status.py`、`tests/test_download_follow_up_runtime.py` 与 `tests/test_telegram_bot.py`，让四段式通知、新下载成功卡片和当前 scheduler 契约保持一致。
+
+### 测试状态
+- 通过: 3 / 总计: 3
+- `.venv/bin/python -m pytest -q tests/test_get_download_status.py tests/test_download_follow_up_runtime.py`
+- `make quality`
+- `make verify-mainline`
+- `make lint`
+
+### 遗留 / 下轮继续
+- 当前仓库仍有本轮之前已存在的其他未提交改动与 task 归档变更；本轮未自动提交，避免把无关文件混入同一批次。
+
+### 下轮目标
+- 若要提交或收尾，先按“四段式 TG 通知补丁”和其他并行中的 Telegram/UI 变更重新做 commit 分组。

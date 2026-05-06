@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Check agent should validate the patch against current backend guidance."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check focused tests and verification entrypoints remain the authoritative truth."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Verify subtitle-stage notifications still preserve fail-soft import-time subtitle behavior."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Verify this patch does not regress Telegram live-progress card contracts while changing follow-up notifications."}
+{"file": ".trellis/tasks/05-06-telegram-four-stage-follow-up-notifications/research/scope-split.md", "reason": "Check agent should review the implementation against the locked four-stage scope decisions."}
