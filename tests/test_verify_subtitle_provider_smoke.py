@@ -252,6 +252,51 @@ def test_verify_subtitle_provider_smoke_fails_when_translation_chain_returns_bla
     assert "字幕 provider 自检失败" in output
 
 
+def test_verify_subtitle_provider_smoke_fails_when_translation_chain_returns_non_string_line(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from app.maintenance import verify_subtitle_provider_smoke as module
+
+    config = module.SubtitleProviderSmokeConfig(
+        api_key="demo-key",
+        base_url="https://openai.example/v1",
+        model="gpt-5.4-mini",
+        timeout_seconds=30.0,
+        proxy_url="",
+    )
+
+    class _FakeTranslator:
+        def __init__(self, **kwargs) -> None:
+            return None
+
+        def _translate_lines_professional(
+            self,
+            *,
+            source_lines: list[str],
+            movie_title: str,
+            trusted_name_map: dict[str, str] | None = None,
+        ) -> list[object]:
+            _ = source_lines, movie_title, trusted_name_map
+            return ["译文一", 2, "译文三"]
+
+    monkeypatch.setattr(module, "load_subtitle_provider_smoke_config", lambda environ=None: config)
+    monkeypatch.setattr(
+        module.httpx,
+        "Client",
+        lambda *, timeout, proxy: _FakeHttpxClient(_FakeResponse(status_code=404, text="not found")),
+    )
+    monkeypatch.setattr(module, "SubtitleTranslatorService", _FakeTranslator)
+
+    exit_code = module.main([])
+
+    assert exit_code == 1
+    output = capsys.readouterr().out
+    assert "translation: fail" in output
+    assert "字幕翻译链返回了非字符串译文行：index=2, type=int" in output
+    assert "字幕 provider 自检失败" in output
+
+
 def test_verify_subtitle_provider_smoke_fails_when_translation_chain_raises_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],

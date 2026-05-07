@@ -28,6 +28,7 @@ class SubtitleProviderSmokeConfig:
 
 
 def load_subtitle_provider_smoke_config(environ: Mapping[str, str] | None = None) -> SubtitleProviderSmokeConfig:
+    """Load only the subtitle-provider env needed by the smoke tool."""
     env = os.environ if environ is None else environ
     raw_timeout = env.get("SUBTITLE_TRANSLATION_TIMEOUT_SECONDS", "").strip()
     timeout_seconds = 60.0
@@ -115,12 +116,15 @@ def _run_translation_smoke(config: SubtitleProviderSmokeConfig) -> tuple[str, st
     if len(translated_lines) != len(_SMOKE_SOURCE_LINES):
         return "fail", f"字幕翻译链返回了异常行数：source={len(_SMOKE_SOURCE_LINES)}, translated={len(translated_lines)}"
     for index, line in enumerate(translated_lines, start=1):
+        if not isinstance(line, str):
+            return "fail", f"字幕翻译链返回了非字符串译文行：index={index}, type={type(line).__name__}"
         if not line.strip():
             return "fail", f"字幕翻译链返回了空译文行：index={index}"
     return "ok", f"{len(translated_lines)}/{len(_SMOKE_SOURCE_LINES)}"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the operator-facing subtitle provider smoke verification."""
     _ = argv
     try:
         config = load_subtitle_provider_smoke_config()
