@@ -53,6 +53,13 @@ STRONG_TITLE_EXACT_GAP = 25
 STRONG_TITLE_YEAR_GAP = 20
 FRANCHISE_INTENT_RELEVANCE_WEIGHT = 500
 EXPANDED_CONFIRMATION_CANDIDATE_LOOKUP_LIMIT = 30
+PARTIAL_SEARCH_SOURCE_HINT_TEXT = "提示：部分搜索源超时，结果可能不完整。"
+PARTIAL_SEARCH_SOURCE_LOG_HINT = (
+    "检查 Prowlarr/BT 来源、代理和网络连通性；当前已回退到后续查询并返回部分结果，但部分搜索源超时，结果可能不完整。"
+)
+SEARCH_SOURCE_FAILURE_LOG_HINT = (
+    "检查 Prowlarr/BT 来源、代理和网络连通性；当前搜索未拿到结果，且这不是正常的“无候选”状态。"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +90,14 @@ class SearchRequestContext:
     media_identity_reason: str
     resolved_query: str
     raw_results: Sequence[Mapping[str, Any]]
+    search_warning_text: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class _OrderedQuerySearchOutcome:
+    resolved_query: str
+    raw_results: Sequence[Mapping[str, Any]]
+    search_warning_text: str = ""
 
 
 async def build_search_request_context(
@@ -139,6 +154,7 @@ async def build_search_request_context(
                 media_identity_reason=media_identity_assessment.reason,
                 resolved_query="",
                 raw_results=(),
+                search_warning_text="",
             )
 
     if lookup_media_candidates_func is None and lookup_movie_func is not None:
@@ -164,7 +180,7 @@ async def build_search_request_context(
         parsed_query=parsed_query,
         tmdb_movie=tmdb_movie,
     )
-    resolved_query, raw_results = await _search_candidates_with_logging(
+    search_outcome = await _search_candidates_with_logging(
         search_func=search_func,
         ordered_queries=ordered_queries,
         user_query=user_query,
@@ -176,8 +192,9 @@ async def build_search_request_context(
         tmdb_candidates=tmdb_candidates,
         media_identity_state=media_identity_assessment.state,
         media_identity_reason=media_identity_assessment.reason,
-        resolved_query=resolved_query,
-        raw_results=raw_results,
+        resolved_query=search_outcome.resolved_query,
+        raw_results=search_outcome.raw_results,
+        search_warning_text=search_outcome.search_warning_text,
     )
 
 
@@ -672,33 +689,65 @@ def _build_query(title: str, year: str) -> str:
     return f"{cleaned_title} {cleaned_year}"
 
 
-async def _search_first_non_empty(
-    search_func: SearchFunc,
-    ordered_queries: Sequence[str],
-) -> tuple[str, Sequence[Mapping[str, Any]]]:
-    for query in ordered_queries:
-        raw_results = await search_func(query)
-        if raw_results:
-            return query, raw_results
-    return "", ()
-
-
 async def _search_candidates_with_logging(
     *,
     search_func: SearchFunc,
     ordered_queries: Sequence[str],
     user_query: str,
-) -> tuple[str, Sequence[Mapping[str, Any]]]:
-    try:
-        return await _search_first_non_empty(search_func, ordered_queries)
-    except (httpx.HTTPError, json.JSONDecodeError) as error:
-        query_display = " | ".join(query for query in ordered_queries if query.strip()) or user_query
-        emit_operational_log(
-            title="搜索源查询失败",
-            detail=f"query={user_query} ordered_queries={query_display} 错误={error}",
-            fix_hint="检查 Prowlarr/BT 来源、代理和网络连通性；当前搜索未拿到结果，且这不是正常的“无候选”状态。",
+) -> _OrderedQuerySearchOutcome:
+    failures: list[tuple[str, Exception]] = []
+    last_error: Exception | None = None
+    for query in ordered_queries:
+        try:
+            raw_results = await search_func(query)
+        except (httpx.HTTPError, json.JSONDecodeError) as error:
+            failures.append((query, error))
+            last_error = error
+            continue
+        if raw_results:
+            warning_text = ""
+            if failures:
+                _emit_search_source_failure_log(
+                    user_query=user_query,
+                    ordered_queries=ordered_queries,
+                    resolved_query=query,
+                    failures=failures,
+                )
+                warning_text = PARTIAL_SEARCH_SOURCE_HINT_TEXT
+            return _OrderedQuerySearchOutcome(
+                resolved_query=query,
+                raw_results=raw_results,
+                search_warning_text=warning_text,
+            )
+    if failures and last_error is not None:
+        _emit_search_source_failure_log(
+            user_query=user_query,
+            ordered_queries=ordered_queries,
+            resolved_query="",
+            failures=failures,
         )
-        raise
+        raise last_error
+    return _OrderedQuerySearchOutcome(resolved_query="", raw_results=(), search_warning_text="")
+
+
+def _emit_search_source_failure_log(
+    *,
+    user_query: str,
+    ordered_queries: Sequence[str],
+    resolved_query: str,
+    failures: Sequence[tuple[str, Exception]],
+) -> None:
+    query_display = " | ".join(query for query in ordered_queries if query.strip()) or user_query
+    failure_display = " ; ".join(f"{query}: {error}" for query, error in failures) or "-"
+    fix_hint = PARTIAL_SEARCH_SOURCE_LOG_HINT if resolved_query.strip() else SEARCH_SOURCE_FAILURE_LOG_HINT
+    emit_operational_log(
+        title="搜索源查询失败",
+        detail=(
+            f"query={user_query} ordered_queries={query_display} resolved_query={resolved_query or '-'} "
+            f"failures={failure_display}"
+        ),
+        fix_hint=fix_hint,
+    )
 
 
 def _unique_queries(candidates: Sequence[str]) -> list[str]:

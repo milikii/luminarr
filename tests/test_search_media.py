@@ -36,7 +36,7 @@ from app.services.search_media import (
 )
 from app.services.pure_bt import BTBatchPreviewRequest
 from app.services.search_query_parser import parse_movie_query
-from app.services.search_request_context import build_search_request_context
+from app.services.search_request_context import PARTIAL_SEARCH_SOURCE_HINT_TEXT, build_search_request_context
 from app.services.telegram_pt_resource_cards import (
     TELEGRAM_PT_RESOURCE_CARD_REPLY_PREFIX,
     parse_telegram_pt_resource_reply_marker,
@@ -5284,6 +5284,175 @@ def test_search_resources_for_selected_media_telegram_path_is_not_capped_by_glob
     assert "https://example.com/dune-bhd-2160p.torrent" in resource_urls
     assert service.get_cached_candidate(1001, 7) is not None
     assert service.get_cached_candidate(1001, 7)["downloadUrl"] == "https://example.com/dune-bhd-2160p.torrent"
+
+
+def test_search_and_format_keeps_results_when_first_ordered_query_times_out(capsys) -> None:
+    seen_queries: list[str] = []
+    request = httpx.Request("GET", "https://example.com/search")
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "Dune 2021":
+            raise httpx.ReadTimeout("search timeout", request=request)
+        if query == "Dune":
+            return [
+                {
+                    "title": "Dune 2021 2160p WEB-DL",
+                    "year": 2021,
+                    "size": 8 * 1024 * 1024 * 1024,
+                    "indexerName": "IndexerMovie",
+                    "downloadUrl": "https://example.com/dune-2021.torrent",
+                }
+            ]
+        return []
+
+    service = SearchMediaService(fake_search)
+
+    text = _run(service.search_and_format("Dune 2021"))
+
+    assert seen_queries == ["Dune 2021", "Dune"]
+    assert "搜索结果：Dune 2021" in text
+    assert "Dune 2021 2160p WEB-DL (2021)" in text
+    assert PARTIAL_SEARCH_SOURCE_HINT_TEXT in text
+    output = capsys.readouterr().out
+    assert "[搜索源查询失败]" in output
+    assert "resolved_query=Dune" in output
+    assert "当前已回退到后续查询并返回部分结果" in output
+    assert "当前搜索未拿到结果" not in output
+
+
+def test_search_resources_for_selected_media_telegram_path_keeps_results_after_partial_timeout(capsys) -> None:
+    seen_queries: list[str] = []
+    request = httpx.Request("GET", "https://example.com/search")
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        if query == "좀비탐정 2020":
+            raise httpx.ReadTimeout("search timeout", request=request)
+        if query == "Zombie Detective 2020":
+            return [
+                {
+                    "title": "Zombie Detective S01 1080p WEB-DL",
+                    "year": 2020,
+                    "quality": "1080p WEB-DL",
+                    "size": 2 * 1024 * 1024 * 1024,
+                    "seeders": 16,
+                    "indexerName": "IndexerTV",
+                    "downloadUrl": "https://example.com/zombie-detective.torrent",
+                }
+            ]
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "丧尸"
+        assert year == ""
+        return [
+            TmdbMovie(
+                title="Zombie Detective",
+                original_title="좀비탐정",
+                year="2020",
+                tmdb_id="111",
+                media_type="tv",
+                poster_path="/zombie-detective.jpg",
+                overview="A detective story with a zombie lead.",
+            ),
+        ]
+
+    service = SearchMediaService(
+        fake_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    _run(service.search_and_format("丧尸", chat_id=1001, channel="telegram"))
+    text = _run(service.search_resources_for_selected_media(1001, "1", channel="telegram"))
+
+    assert seen_queries == ["좀비탐정 2020", "좀비탐정", "Zombie Detective 2020"]
+    session_token = parse_telegram_pt_resource_reply_marker(text)
+    assert session_token is not None
+    session = service.telegram_pt_resource_card_state.get_session(session_token)
+    assert session is not None
+    assert session.partial_failure_hint == PARTIAL_SEARCH_SOURCE_HINT_TEXT
+    output = capsys.readouterr().out
+    assert "[搜索源查询失败]" in output
+    assert "resolved_query=Zombie Detective 2020" in output
+    assert "当前已回退到后续查询并返回部分结果" in output
+    assert "当前搜索未拿到结果" not in output
+
+
+def test_search_resources_for_selected_media_raises_when_all_ordered_queries_fail(capsys) -> None:
+    seen_queries: list[str] = []
+    request = httpx.Request("GET", "https://example.com/search")
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        raise httpx.ConnectError("indexer unavailable", request=request)
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "丧尸"
+        assert year == ""
+        return [
+            TmdbMovie(
+                title="Zombie Detective",
+                original_title="좀비탐정",
+                year="2020",
+                tmdb_id="111",
+                media_type="tv",
+                poster_path="/zombie-detective.jpg",
+                overview="A detective story with a zombie lead.",
+            ),
+        ]
+
+    service = SearchMediaService(
+        fake_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    _run(service.search_and_format("丧尸", chat_id=1001))
+    with pytest.raises(httpx.ConnectError, match="indexer unavailable"):
+        _run(service.search_resources_for_selected_media(1001, "1"))
+
+    assert seen_queries == ["좀비탐정 2020", "좀비탐정", "Zombie Detective 2020", "Zombie Detective"]
+    output = capsys.readouterr().out
+    assert "[搜索源查询失败]" in output
+    assert "query=Zombie Detective" in output
+    assert "当前搜索未拿到结果" in output
+
+
+def test_search_resources_for_selected_media_normal_empty_results_do_not_log_timeout(capsys) -> None:
+    seen_queries: list[str] = []
+
+    async def fake_search(query: str) -> list[dict[str, object]]:
+        seen_queries.append(query)
+        return []
+
+    async def fake_tmdb_candidates(title: str, year: str) -> list[TmdbMovie]:
+        assert title == "丧尸"
+        assert year == ""
+        return [
+            TmdbMovie(
+                title="Zombie Detective",
+                original_title="좀비탐정",
+                year="2020",
+                tmdb_id="111",
+                media_type="tv",
+                poster_path="/zombie-detective.jpg",
+                overview="A detective story with a zombie lead.",
+            ),
+        ]
+
+    service = SearchMediaService(
+        fake_search,
+        lookup_media_candidates_func=fake_tmdb_candidates,
+    )
+
+    _run(service.search_and_format("丧尸", chat_id=1001))
+    text = _run(service.search_resources_for_selected_media(1001, "1"))
+
+    assert seen_queries == ["좀비탐정 2020", "좀비탐정", "Zombie Detective 2020", "Zombie Detective"]
+    assert text == NO_RESULT_TEXT_TEMPLATE.format(query="Zombie Detective")
+    assert PARTIAL_SEARCH_SOURCE_HINT_TEXT not in text
+    output = capsys.readouterr().out
+    assert "[搜索源查询失败]" not in output
 
 
 def test_candidate_state_store_persists_candidates_for_restart(tmp_path: Path) -> None:

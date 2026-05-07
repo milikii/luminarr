@@ -51,6 +51,7 @@ from app.services.search_request_context import (
     LookupMovieFunc,
     LookupMediaCandidatesFunc,
     SearchFunc,
+    _search_candidates_with_logging,
     build_search_request_context,
 )
 from app.services.bt_candidate_scorer import load_bt_scoring_rules as _load_bt_scoring_rules
@@ -401,20 +402,26 @@ class SearchMediaService:
 
         candidates = [normalize_candidate(item) for item in selected_raw_results]
         if channel in SUPPORTED_DELIVERY_CHANNELS and candidates:
-            return render_search_results_reply(
-                query=cleaned_query,
-                parsed_query=parsed_query,
-                tmdb_movie=tmdb_movie,
-                candidates=candidates,
-                channel=channel,
-                tmdb_candidates=tmdb_candidates,
+            return _append_search_warning_text(
+                render_search_results_reply(
+                    query=cleaned_query,
+                    parsed_query=parsed_query,
+                    tmdb_movie=tmdb_movie,
+                    candidates=candidates,
+                    channel=channel,
+                    tmdb_candidates=tmdb_candidates,
+                ),
+                request_context.search_warning_text,
             )
-        return format_movie_query_reply(
-            cleaned_query,
-            parsed_query,
-            tmdb_movie,
-            candidates,
-            tmdb_candidates=tmdb_candidates,
+        return _append_search_warning_text(
+            format_movie_query_reply(
+                cleaned_query,
+                parsed_query,
+                tmdb_movie,
+                candidates,
+                tmdb_candidates=tmdb_candidates,
+            ),
+            request_context.search_warning_text,
         )
 
     def is_media_candidate_selection(self, chat_id: int, index: int) -> bool | None:
@@ -449,26 +456,24 @@ class SearchMediaService:
         if media_identity is None:
             return MEDIA_SELECTION_NOT_FOUND_TEXT
 
-        ordered_queries = _build_media_identity_resource_queries(media_identity)
-        resolved_query = ""
-        raw_results: Sequence[Mapping[str, Any]] = ()
-        for query in ordered_queries:
-            raw_results = await self._search_func(query)
-            if raw_results:
-                resolved_query = query
-                break
-
-        tmdb_movie = _tmdb_movie_from_media_candidate(candidate)
-        ordered_raw_results = order_media_bt_results(
-            raw_results,
-            query=resolved_query or media_identity.get("title", "") or media_identity.get("original_title", ""),
-            media_kind=_resolve_bt_scoring_media_kind(tmdb_movie),
-            load_bt_scoring_rules_func=_load_bt_scoring_rules,
-        )
         query_label = (
             media_identity.get("title", "").strip()
             or media_identity.get("original_title", "").strip()
             or safe_text(candidate.get("title"), default="")
+        )
+        ordered_queries = _build_media_identity_resource_queries(media_identity)
+        search_outcome = await _search_candidates_with_logging(
+            search_func=self._search_func,
+            ordered_queries=ordered_queries,
+            user_query=query_label or selection_text,
+        )
+
+        tmdb_movie = _tmdb_movie_from_media_candidate(candidate)
+        ordered_raw_results = order_media_bt_results(
+            search_outcome.raw_results,
+            query=search_outcome.resolved_query or media_identity.get("title", "") or media_identity.get("original_title", ""),
+            media_kind=_resolve_bt_scoring_media_kind(tmdb_movie),
+            load_bt_scoring_rules_func=_load_bt_scoring_rules,
         )
         parsed_query = parse_movie_query(query_label)
         channel_name = (channel or "").strip().lower()
@@ -503,6 +508,7 @@ class SearchMediaService:
                 media_type=safe_text(getattr(tmdb_movie, "media_type", ""), default="movie"),
                 poster_url="" if card_poster == "暂未接入图片" else card_poster,
                 overview=card_overview,
+                partial_failure_hint=search_outcome.search_warning_text,
                 resource_items=telegram_resource_items,
             )
             return build_telegram_pt_resource_reply_marker(session.session_token)
@@ -512,20 +518,26 @@ class SearchMediaService:
             return CANDIDATE_STATE_UNAVAILABLE_TEXT
         normalized_candidates = [normalize_candidate(item) for item in selected_raw_results]
         if channel in SUPPORTED_DELIVERY_CHANNELS and normalized_candidates:
-            return render_search_results_reply(
-                query=query_label,
-                parsed_query=parsed_query,
-                tmdb_movie=tmdb_movie,
-                candidates=normalized_candidates,
-                channel=channel or "telegram",
-                tmdb_candidates=(tmdb_movie,) if tmdb_movie is not None else (),
+            return _append_search_warning_text(
+                render_search_results_reply(
+                    query=query_label,
+                    parsed_query=parsed_query,
+                    tmdb_movie=tmdb_movie,
+                    candidates=normalized_candidates,
+                    channel=channel or "telegram",
+                    tmdb_candidates=(tmdb_movie,) if tmdb_movie is not None else (),
+                ),
+                search_outcome.search_warning_text,
             )
-        return format_movie_query_reply(
-            query_label,
-            parsed_query,
-            tmdb_movie,
-            normalized_candidates,
-            tmdb_candidates=(tmdb_movie,) if tmdb_movie is not None else (),
+        return _append_search_warning_text(
+            format_movie_query_reply(
+                query_label,
+                parsed_query,
+                tmdb_movie,
+                normalized_candidates,
+                tmdb_candidates=(tmdb_movie,) if tmdb_movie is not None else (),
+            ),
+            search_outcome.search_warning_text,
         )
 
     def get_cached_candidate(self, chat_id: int, index: int) -> Mapping[str, Any] | None:
@@ -782,6 +794,16 @@ def _has_configured_adult_only_source(candidate: Mapping[str, Any]) -> bool:
     if bt_source_name in ADULT_BT_AGGREGATOR_SOURCE_NAMES or source_provider_name in ADULT_BT_AGGREGATOR_SOURCE_NAMES:
         return False
     return False
+
+
+def _append_search_warning_text(text: str, warning_text: str) -> str:
+    cleaned_text = text.strip()
+    cleaned_warning = warning_text.strip()
+    if not cleaned_warning:
+        return cleaned_text
+    if not cleaned_text:
+        return cleaned_warning
+    return f"{cleaned_text}\n\n{cleaned_warning}"
 
 
 def order_media_bt_results(

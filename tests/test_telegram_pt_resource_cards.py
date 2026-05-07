@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 from telegram import InlineKeyboardMarkup
 
 from app.bot.telegram_update_runtime import build_telegram_reply_func
+from app.services.search_request_context import PARTIAL_SEARCH_SOURCE_HINT_TEXT
 from app.services.telegram_pt_resource_cards import (
     TELEGRAM_PT_RESOURCE_CARD_REPLY_PREFIX,
     TELEGRAM_PT_RESOURCE_CARD_STALE_TEXT,
@@ -18,7 +19,11 @@ from app.services.telegram_pt_resource_cards import (
 )
 
 
-def _build_session(*, poster_url: str = "https://image.tmdb.org/t/p/w500/dune.jpg") -> TelegramPtResourceCardState:
+def _build_session(
+    *,
+    poster_url: str = "https://image.tmdb.org/t/p/w500/dune.jpg",
+    partial_failure_hint: str = "",
+) -> TelegramPtResourceCardState:
     state = TelegramPtResourceCardState()
     state.create_session(
         chat_id=1001,
@@ -28,6 +33,7 @@ def _build_session(*, poster_url: str = "https://image.tmdb.org/t/p/w500/dune.jp
         media_type="movie",
         poster_url=poster_url,
         overview="Paul Atreides leads the fight for Arrakis.",
+        partial_failure_hint=partial_failure_hint,
         resource_items=(
             {
                 "title": "Dune 2021 2160p WEB-DL",
@@ -260,6 +266,43 @@ def test_build_telegram_reply_func_sends_short_pt_caption_then_detail_message_wi
     assert "1440p WEB-DL" in detail_text
     assert "1080p BluRay" in detail_text
     assert len(detail_text) <= 4096
+
+
+def test_build_telegram_reply_func_includes_partial_timeout_hint_in_detail_message() -> None:
+    state = _build_session(partial_failure_hint=PARTIAL_SEARCH_SOURCE_HINT_TEXT)
+    session = next(iter(state._sessions_by_token.values()))  # type: ignore[attr-defined]
+    reply_text = AsyncMock(return_value="fallback")
+    send_text = AsyncMock(return_value=SimpleNamespace(message_id=654))
+    sent_media: list[tuple[int, str, str | None, str | None, InlineKeyboardMarkup | None]] = []
+
+    async def fake_send_media(
+        chat_id: int,
+        file_path: str | Path,
+        caption: str | None = None,
+        parse_mode: str | None = None,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> object:
+        resolved = Path(file_path)
+        sent_media.append((chat_id, resolved.read_text(encoding="utf-8"), caption, parse_mode, reply_markup))
+        return SimpleNamespace(message_id=321)
+
+    async def fake_download_image(url: str) -> bytes:
+        return f"downloaded:{url}".encode("utf-8")
+
+    reply_func = build_telegram_reply_func(
+        reply_text,
+        formatter=lambda value: value,
+        chat_id=1001,
+        send_text_func=send_text,
+        send_media_func=fake_send_media,
+        download_image_func=fake_download_image,
+        telegram_pt_resource_card_state=state,
+    )
+
+    asyncio.run(reply_func(build_telegram_pt_resource_reply_marker(session.session_token)))
+
+    detail_kwargs = send_text.await_args.kwargs
+    assert f"⚠️ {PARTIAL_SEARCH_SOURCE_HINT_TEXT}" in detail_kwargs["text"]
 
 
 def test_build_telegram_reply_func_falls_back_to_text_for_pt_resource_card_without_poster() -> None:

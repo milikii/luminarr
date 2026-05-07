@@ -36,6 +36,7 @@ class TelegramPtResourceCardSession:
     overview: str
     resource_snapshot_id: str
     resource_items: tuple[dict[str, Any], ...]
+    partial_failure_hint: str = ""
     message_id: int | None = None
     selected_index: int | None = None
     consumed_at: float | None = None
@@ -70,6 +71,7 @@ class TelegramPtResourceCardState:
         poster_url: str,
         overview: str,
         resource_items: Sequence[Mapping[str, Any]],
+        partial_failure_hint: str = "",
     ) -> TelegramPtResourceCardSession:
         cleaned_chat_id = int(chat_id)
         self.invalidate_chat_sessions(chat_id=cleaned_chat_id)
@@ -86,6 +88,7 @@ class TelegramPtResourceCardState:
             overview=overview.strip(),
             resource_snapshot_id=_build_resource_snapshot_id(cleaned_items),
             resource_items=cleaned_items,
+            partial_failure_hint=partial_failure_hint.strip(),
             expires_at=now + self._ttl_seconds,
             created_at=now,
         )
@@ -255,6 +258,7 @@ def format_telegram_pt_resource_detail_message(*, session: TelegramPtResourceCar
         title=session.title,
         year=session.year,
         resource_items=session.resource_items,
+        partial_failure_hint=session.partial_failure_hint,
     )
 
 
@@ -281,6 +285,7 @@ def format_telegram_pt_resource_detail_text(
     title: str,
     year: str,
     resource_items: Sequence[Mapping[str, Any]],
+    partial_failure_hint: str = "",
 ) -> str:
     normalized_items = tuple(_normalize_resource_item(item) for item in resource_items)
     lines = [
@@ -288,6 +293,8 @@ def format_telegram_pt_resource_detail_text(
         f"🎬 <b>{escape_html(title.strip() or '-')} ({escape_html(year.strip() or '-')})</b>",
         "以下编号与上方按钮一致，点击按钮即可创建下载待确认。",
     ]
+    if partial_failure_hint.strip():
+        lines.append(f"⚠️ {escape_html(partial_failure_hint.strip())}")
     for site_name, numbered_items in _group_numbered_pt_resource_items_by_site(normalized_items):
         lines.extend(("", f"<b>{escape_html(site_name)}</b>"))
         for index, item in numbered_items:
