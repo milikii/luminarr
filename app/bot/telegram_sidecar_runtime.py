@@ -55,6 +55,7 @@ WECOM_WEBHOOK_SERVER_RUNTIME_KEY = "wecom_webhook_server_runtime"
 POST_DOWNLOAD_AUTO_IMPORT_SERVICE_KEY = "post_download_auto_import_service"
 BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS = 300.0
 POST_DOWNLOAD_AUTO_IMPORT_INTERVAL_SECONDS = 300.0
+DOWNLOAD_COMPLETION_POLLING_INTERVAL_SECONDS = 5.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +67,7 @@ class TelegramSidecarRuntimeConfig:
     telegram_edit_text_func_key: str
     download_completion_polling_stop_event_key: str
     download_completion_polling_task_key: str
+    download_completion_polling_interval_seconds: float
     wecom_webhook_server_config_key: str
     wecom_webhook_server_runtime_key: str
     personal_wechat_login_service_key: str
@@ -80,6 +82,7 @@ TELEGRAM_SIDECAR_RUNTIME_CONFIG = TelegramSidecarRuntimeConfig(
     telegram_edit_text_func_key="telegram_edit_text_func",
     download_completion_polling_stop_event_key=DOWNLOAD_COMPLETION_POLLING_STOP_EVENT_KEY,
     download_completion_polling_task_key=DOWNLOAD_COMPLETION_POLLING_TASK_KEY,
+    download_completion_polling_interval_seconds=DOWNLOAD_COMPLETION_POLLING_INTERVAL_SECONDS,
     wecom_webhook_server_config_key=WECOM_WEBHOOK_SERVER_CONFIG_KEY,
     wecom_webhook_server_runtime_key=WECOM_WEBHOOK_SERVER_RUNTIME_KEY,
     personal_wechat_login_service_key="personal_wechat_login_service",
@@ -342,6 +345,7 @@ def _start_post_download_auto_import_scheduler(host: SidecarHost, *, config: Tel
         download_completion_polling_stop_event_key=config.download_completion_polling_stop_event_key,
         download_completion_polling_task_key=config.download_completion_polling_task_key,
         interval_seconds=config.post_download_auto_import_interval_seconds,
+        download_completion_interval_seconds=config.download_completion_polling_interval_seconds,
     )
 
 
