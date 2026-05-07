@@ -496,3 +496,40 @@ Restored Telegram real-smoke evidence, fixed restart-safe live progress sync, re
 ### Next Steps
 
 - None - task complete
+
+
+## Session 15: Runtime flow docs reconciliation and finish-phase cleanup
+
+**Date**: 2026-05-08
+**Task**: Runtime flow docs reconciliation and finish-phase cleanup
+**Branch**: `main`
+
+### Summary
+
+Documented runtime flows, reconciled top-level docs to code truth, strengthened docs gates, and cleared finish-phase lint/verify red lights.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bea74fa` | (see git log) |
+| `5052d3d` | (see git log) |
+| `48b15e7` | (see git log) |
+| `1121826` | (see git log) |
+| `8752743` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
