@@ -137,6 +137,7 @@
 #### Resource selection contract
 
 - Telegram PT resource path must not reuse the generic `SearchMediaService limit=5` cap before Telegram-specific selection runs.
+- Ordered PT resource queries may fail soft: if an earlier query times out or the source errors, runtime must continue trying later queries instead of aborting the whole locked-media search immediately.
 - Telegram PT resource selection should:
   - group results by site
   - target up to `6` entries per site
@@ -156,6 +157,8 @@
 ### 4. Validation & Error Matrix
 
 - Ordered BT results empty -> PT resource card path must not create a fake Telegram session; existing no-result behavior stays authoritative.
+- Ordered PT query fails but a later query succeeds -> continue with the later results, emit operational failure logs, and include a partial-timeout hint in the Telegram PT detail message so operators know the resource set may be incomplete.
+- All ordered PT queries fail abnormally -> preserve source-failure semantics; do not downgrade the outcome into a normal empty-result reply.
 - Telegram PT detail expansion would exceed `4096` -> selector must stop before overflow and keep at least one valid item.
 - Poster send fails -> log operational failure, fall back to text first message, still send second detail message.
 - New Telegram selection list differs from raw BT ranking count -> persisted `candidate_mapping` and inline buttons must use the Telegram-filtered list, not the raw pre-filter list.
@@ -174,11 +177,13 @@
 - `tests/test_search_media.py`
   - assert Telegram PT resource path is not capped by the generic service limit before Telegram filtering
   - assert persisted candidate mapping reflects the Telegram-filtered resource set
+  - assert ordered-query timeout recovery keeps later PT results and distinguishes partial failure from full source failure
 - `tests/test_telegram_pt_resource_cards.py`
   - assert first PT card caption stays short
   - assert second PT detail message is sent
   - assert detail text stays under `4096`
   - assert button numbering matches detailed rows
+  - assert partial-timeout hint appears in the Telegram PT detail message when session state carries partial source failure metadata
 - `tests/test_telegram_runtime_adapter.py`
   - assert PT callback path still consumes the same candidate that the Telegram button index references
 - `make verify-stage1-telegram-delivery`
@@ -197,6 +202,91 @@
 - Run Telegram-specific PT resource selection after BT ordering, then persist that filtered set as the chat's resource truth.
 - Keep the first Telegram PT card concise and move expanded grouped details into a second HTML text message.
 - Ensure both callback buttons and expanded detail rows reference the same filtered, ordered item list.
+
+## Scenario: Ordered Query Timeout Recovery for Search Replies
+
+### 1. Scope / Trigger
+
+- Trigger: ordered BT/PT search now recovers from per-query upstream timeout or decode failure instead of aborting the whole query chain on the first abnormal response.
+- Why code-spec depth is required: this crosses ordered query execution, reply rendering, Telegram PT session persistence, and operator-facing abnormal-vs-empty-result semantics.
+
+### 2. Signatures
+
+- `app.services.search_request_context._search_candidates_with_logging(*, search_func: SearchFunc, ordered_queries: Sequence[str], user_query: str) -> _OrderedQuerySearchOutcome`
+- `app.services.search_request_context.SearchRequestContext.search_warning_text: str`
+- `app.services.search_media.SearchMediaService.search_and_format(query: str, chat_id: int | None = None, *, channel: str | None = None) -> str`
+- `app.services.search_media.SearchMediaService.search_resources_for_selected_media(chat_id: int, selection_text: str, *, channel: str | None = None) -> str`
+- `app.services.telegram_pt_resource_cards.TelegramPtResourceCardState.create_session(..., partial_failure_hint: str = "") -> TelegramPtResourceCardSession`
+- `app.services.telegram_pt_resource_cards.format_telegram_pt_resource_detail_text(..., partial_failure_hint: str = "") -> str`
+
+### 3. Contracts
+
+#### Ordered-query recovery contract
+
+- Ordered BT/PT queries must continue trying later `ordered_queries` entries after a per-query `httpx.HTTPError` or `json.JSONDecodeError`.
+- The first later query that returns a non-empty candidate list becomes the resolved result set for ranking and rendering.
+- Partial abnormal recovery must attach the stable warning text `提示：部分搜索源超时，结果可能不完整。` through `search_warning_text`.
+
+#### Empty vs abnormal outcome contract
+
+- All ordered queries empty with no abnormal exception -> treat as a normal no-result path.
+- Any abnormal query failure followed by a later successful query -> return candidates plus the partial warning; do not escalate to a hard failure.
+- All ordered queries abnormal with no successful result -> emit the abnormal-source log and re-raise the last captured exception; do not rewrite this into a no-result reply.
+
+#### Reply transport contract
+
+- Standard search replies must append `search_warning_text` after the normal result body when partial recovery happened.
+- Telegram PT resource delivery must persist the same warning via `partial_failure_hint` in the card session and render it in the second detail message, not in callback payloads.
+- Telegram PT button numbering, persisted candidate mapping, and site-grouped detail layout must stay unchanged when the warning is present.
+
+#### Logging contract
+
+- Any abnormal ordered-query failure must keep the operational log title `搜索源查询失败`.
+- The log detail must retain:
+  - original `query`
+  - joined `ordered_queries`
+  - `resolved_query` when recovery succeeded, otherwise `-`
+  - per-query failure details
+- Normal all-empty search results must not emit this abnormal-source log.
+
+### 4. Validation & Error Matrix
+
+- First query timeout / HTTP error, later query succeeds -> keep searching, return candidates, append warning, emit abnormal-source log with the successful `resolved_query`.
+- All ordered queries timeout / HTTP error / decode failure -> emit abnormal-source log, then re-raise the last abnormal exception.
+- All ordered queries empty -> return the existing no-result reply with no warning and no abnormal-source log.
+- Telegram PT resource session created after partial recovery -> detail message includes the warning line while button indices and persisted candidates remain aligned.
+
+### 5. Good / Base / Bad Cases
+
+- Good: `Dune 2021` times out, fallback `Dune` returns candidates, and the final reply keeps the results plus the partial-source warning.
+- Base: original-title PT query times out, later English-title query resolves results, and the Telegram PT detail message shows the warning before grouped site sections.
+- Bad: the first abnormal query aborts the remaining ordered queries.
+- Bad: normal empty results are shown with the timeout warning or abnormal-source log.
+- Bad: Telegram PT session keeps the recovered resource items but drops the warning before the detail message is sent.
+
+### 6. Tests Required
+
+- `tests/test_search_media.py`
+  - `test_search_and_format_keeps_results_when_first_ordered_query_times_out`
+  - `test_search_resources_for_selected_media_telegram_path_keeps_results_after_partial_timeout`
+  - `test_search_resources_for_selected_media_raises_when_all_ordered_queries_fail`
+  - `test_search_resources_for_selected_media_normal_empty_results_do_not_log_timeout`
+- `tests/test_telegram_pt_resource_cards.py`
+  - `test_build_telegram_reply_func_includes_partial_timeout_hint_in_detail_message`
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+- Re-raise the first ordered-query timeout immediately and skip later fallback queries.
+- Swallow all abnormal query failures and pretend the final result was a normal empty search.
+- Append the partial warning to plain-text replies but drop it when building the Telegram PT resource-card session.
+
+#### Correct
+
+- Continue ordered-query execution after per-query abnormal failures and only stop early on the first non-empty result set.
+- Keep three distinct outcomes: normal empty, partial abnormal recovery, and full abnormal failure.
+- Carry the same partial warning text from ordered-query recovery into every user-visible reply surface that consumed the recovered result set.
 
 ## Scenario: Telegram Download Success Live Progress Sync
 

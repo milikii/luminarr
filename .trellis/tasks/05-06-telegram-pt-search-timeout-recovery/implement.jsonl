@@ -1,1 +1,5 @@
 {"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Load backend spec index before changing Telegram/PT search timeout behavior."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Preserve Telegram PT candidate-card flow while changing timeout recovery semantics."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Keep focused verification and docs truth aligned with repo conventions."}
+{"file": ".trellis/tasks/05-06-telegram-pt-search-timeout-recovery/research/current-timeout-truth.md", "reason": "Use current timeout behavior findings to drive the minimal recovery cut."}
