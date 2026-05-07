@@ -6,7 +6,6 @@ import sqlite3
 
 from app.bot.sidecar_host_runtime import SidecarHost
 from app.bot.shared_private_chat_sender import log_shared_private_chat_send_error
-from app.bot.telegram_delivery_runtime import build_telegram_status_inline_keyboard
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.operational_logging import emit_operational_log
 from app.services.get_download_status import GetDownloadStatusService
@@ -54,10 +53,26 @@ async def poll_pending_download_completion_once(
         pending_records = download_monitor_repo.list_pending_completion()
         if pending_records is None:
             raise DownloadCompletionPendingListError("download completion pending list result missing")
+        completed_records = _list_completed_telegram_progress_records(download_monitor_repo=download_monitor_repo)
     except (DownloadMonitorPersistenceError, sqlite3.Error, DownloadCompletionPendingListError) as error:
         _log_download_completion_pending_list_error(error=error)
         return
-    for record in pending_records:
+    records = list(pending_records)
+    seen = {
+        identity
+        for record in records
+        if (identity := _resolve_record_identity(record)) is not None
+    }
+    for record in completed_records:
+        identity = _resolve_record_identity(record)
+        if identity is None:
+            records.append(record)
+            continue
+        if identity in seen:
+            continue
+        seen.add(identity)
+        records.append(record)
+    for record in records:
         if _can_edit_telegram_progress(record=record, telegram_edit_message_func=telegram_edit_message_func):
             text = await status_service.get_status_text(
                 record.task_hash,
@@ -88,6 +103,34 @@ async def poll_pending_download_completion_once(
             )
             continue
         await status_service.get_status_text(record.task_hash, chat_id=record.chat_id)
+
+
+def _list_completed_telegram_progress_records(
+    *,
+    download_monitor_repo: DownloadMonitorRepo,
+    limit: int = 100,
+) -> list:
+    list_completed_for_auto_import = getattr(download_monitor_repo, "list_completed_for_auto_import", None)
+    if not callable(list_completed_for_auto_import):
+        return []
+    completed_records = list_completed_for_auto_import(limit=limit)
+    if completed_records is None:
+        raise DownloadCompletionPendingListError("download completion completed list result missing")
+    return [
+        record
+        for record in completed_records
+        if record.chat_id > 0
+        and record.telegram_message_id > 0
+        and not record.telegram_progress_last_text.startswith("🎉 <b>任务完成</b>")
+    ]
+
+
+def _resolve_record_identity(record) -> tuple[str, str] | None:
+    task_id = str(getattr(record, "task_id", "") or "").strip()
+    task_hash = str(getattr(record, "task_hash", "") or "").strip()
+    if not task_id or not task_hash:
+        return None
+    return (task_id, task_hash)
 
 
 async def download_completion_polling_loop(
@@ -362,7 +405,6 @@ async def _edit_telegram_progress_message(
             message_id=record.telegram_message_id,
             text=text,
             parse_mode="HTML",
-            reply_markup=build_telegram_status_inline_keyboard(record.task_hash),
         )
     except Exception as error:
         _log_telegram_progress_edit_error(record=record, error=error)

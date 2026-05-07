@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, call
 
 import pytest
-from telegram import InlineKeyboardMarkup
 
 from app.clients.transmission import TransmissionTaskStatus
 from app.bot.download_follow_up_runtime import (
@@ -202,9 +201,7 @@ def test_poll_pending_download_completion_once_edits_bound_telegram_message_and_
     assert "<b>下载进度：</b> 56%" in kwargs["text"]
     assert "<code>[██████░░░░]</code>" in kwargs["text"]
     assert "⚡ <b>速度：</b> 1.0 MB/s" in kwargs["text"]
-    reply_markup = kwargs["reply_markup"]
-    assert isinstance(reply_markup, InlineKeyboardMarkup)
-    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
+    assert "reply_markup" not in kwargs
 
 
 def test_poll_pending_download_completion_once_edits_completion_card_once_then_stops(tmp_path) -> None:
@@ -230,6 +227,15 @@ def test_poll_pending_download_completion_once_edits_completion_card_once_then_s
                     percent_done=0.56,
                     rate_download=1048576,
                     eta_seconds=121,
+                ),
+                TransmissionTaskStatus(
+                    task_id="87",
+                    task_hash="hash-87",
+                    name="Dune 1984",
+                    status_code=6,
+                    percent_done=1.0,
+                    rate_download=0,
+                    eta_seconds=-1,
                 ),
                 TransmissionTaskStatus(
                     task_id="87",
@@ -372,6 +378,97 @@ def test_poll_pending_download_completion_once_sends_single_final_summary_after_
     )
     events = event_repo.list_events_for_task_identity(task_id="87", task_hash="hash-87")
     assert any(event.event_type == "telegram.summary_sent" for event in events)
+
+
+def test_poll_pending_download_completion_once_resumes_completed_telegram_card_after_restart(tmp_path) -> None:
+    database = SqliteDatabase(str(tmp_path / "state.sqlite3"))
+    database.initialize()
+
+    setup_monitor_repo = DownloadMonitorRepo(database)
+    setup_event_repo = JobEventRepo(database)
+    setup_monitor_repo.register_download(
+        task_id="87",
+        task_hash="hash-87",
+        name="Dune 1984",
+        chat_id=1001,
+        user_id=2001,
+    )
+    setup_monitor_repo.bind_telegram_message(task_id="87", task_hash="hash-87", message_id=321)
+    setup_monitor_repo.record_status(
+        TransmissionTaskStatus(
+            task_id="87",
+            task_hash="hash-87",
+            name="Dune 1984",
+            status_code=6,
+            percent_done=1.0,
+            rate_download=0,
+            eta_seconds=-1,
+        )
+    )
+    setup_monitor_repo.record_telegram_progress_sync(
+        task_id="87",
+        task_hash="hash-87",
+        text=(
+            "✅ <b>下载完成</b>\n"
+            "<i>Dune 1984</i>\n"
+            "━━━━━━━━━━━━\n"
+            "<b>状态：</b> 后处理中\n"
+            "<b>下载进度：</b> 100%\n"
+            "<code>[██████████]</code>\n\n"
+            "━━━━━━━━━━━━\n"
+            "<b>后处理</b>\n"
+            "- 导入：等待\n"
+            "- 刮削：等待\n"
+            "- 字幕：等待\n"
+            "- 刷新：等待\n"
+            "━━━━━━━━━━━━\n"
+            "🆔 <b>任务 ID：</b> <code>87</code>\n"
+            "🔑 <b>Hash：</b> <code>hash-87</code>"
+        ),
+    )
+    setup_event_repo.append_event(
+        task_ref="hash-87",
+        task_id="87",
+        task_hash="hash-87",
+        event_type="import.succeeded",
+        message="/library/Dune 1984",
+        target_path="/library/Dune 1984",
+    )
+
+    monitor_repo = DownloadMonitorRepo(database)
+    event_repo = JobEventRepo(database)
+    status_service = GetDownloadStatusService(
+        AsyncMock(
+            return_value=TransmissionTaskStatus(
+                task_id="87",
+                task_hash="hash-87",
+                name="Dune 1984",
+                status_code=6,
+                percent_done=1.0,
+                rate_download=0,
+                eta_seconds=-1,
+            )
+        ),
+        download_monitor_repo=monitor_repo,
+        job_event_repo=event_repo,
+    )
+    edit_message_text = AsyncMock(return_value="edited")
+
+    asyncio.run(
+        poll_pending_download_completion_once(
+            download_monitor_repo=monitor_repo,
+            status_service=status_service,
+            telegram_edit_message_func=edit_message_text,
+            min_telegram_progress_edit_interval_seconds=300.0,
+        )
+    )
+
+    edit_message_text.assert_awaited_once()
+    kwargs = edit_message_text.await_args.kwargs
+    assert kwargs["chat_id"] == 1001
+    assert kwargs["message_id"] == 321
+    assert kwargs["text"].startswith("✅ <b>下载完成</b>")
+    assert "- 导入：✅ 已完成" in kwargs["text"]
 
 
 def test_poll_pending_download_completion_once_logs_pending_list_failure(capsys: pytest.CaptureFixture[str]) -> None:
