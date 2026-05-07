@@ -34,6 +34,7 @@
 3. `docs/STATUS.md`
 4. `docs/DECISIONS.md`
 5. `docs/ARCHITECTURE.md`
+6. `docs/flows/INDEX.md`
 
 按需再读：
 
@@ -47,10 +48,11 @@
 
 1. `README.md`
 2. `docs/ARCHITECTURE.md`
-3. `docs/DECISIONS.md`
-4. `docs/STATUS.md`
-5. `docs/NEXT_STEP.md`
-6. `docs/GETTING_STARTED.md`
+3. `docs/flows/INDEX.md`
+4. `docs/DECISIONS.md`
+5. `docs/STATUS.md`
+6. `docs/NEXT_STEP.md`
+7. `docs/GETTING_STARTED.md`
 
 只有在你要接手旧主线或排旧债时，再去看：
 
@@ -62,6 +64,7 @@
 - 操作者入口层：`README.md`、`docs/HUMAN_START_HERE.md`、`docs/OPERATOR_RUNBOOK.md`
 - 运行与启动层：`docs/GETTING_STARTED.md`
 - 当前施工真相层：`docs/STATUS.md`、`docs/NEXT_STEP.md`
+- 运行时流程真相层：`docs/flows/INDEX.md` 及其子文档
 - 长期边界层：`docs/DECISIONS.md`、`docs/ARCHITECTURE.md`
 - 施工纪律层：`docs/SLIMMING_RULES.md`
 - 历史闭环层：`docs/PERSISTENCE_CLOSURE_LOG.md`
@@ -73,6 +76,7 @@
 - `docs/HUMAN_START_HERE.md` 只服务非技术操作者；`AGENTS.md` 只服务 AI 执行。
 - `docs/STATUS.md` 只保留当前短快照；不要把长台账再写回去。
 - `docs/NEXT_STEP.md` 只写当前唯一主线、当前用户价值、边界和退出条件。
+- 当顶层摘要文档需要解释“真实运行链路”时，优先链接到 `docs/flows/INDEX.md`，不要把逐链路细节散写回多个入口页。
 - `docs/SLIMMING_RULES.md` 只写结构减法和文档减法的共用纪律，不写当前主线台账。
 - 新闭环优先并入 `docs/PERSISTENCE_CLOSURE_LOG.md` 2.1~2.5 现有主题分组，不新开按日期堆叠的小节。
 - 运行方式、环境变量、启动入口只写在 `docs/GETTING_STARTED.md` 和 `.env.example`。
