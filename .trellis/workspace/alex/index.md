@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 12
-- **Last Active**: 2026-05-05
+- **Total Sessions**: 14
+- **Last Active**: 2026-05-07
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~425 | Active |
+| `journal-1.md` | ~498 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,8 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 14 | 2026-05-07 | Telegram smoke recovery and PT timeout hardening | `7ca87c8`, `8eaa08e`, `0890eab`, `85e526d`, `69326bf`, `2f86f0f`, `fab4be5` | `main` |
+| 13 | 2026-05-06 | Telegram download success card phase a | `13c2a6f`, `d9ec1be` | `main` |
 | 12 | 2026-05-05 | Telegram-first auto-confirm and subtitle provider controls | `483183b`, `b84243f`, `c610fed` | `main` |
 | 11 | 2026-05-04 | MoviePilot post-processing quality upgrade | `3ab7e88` | `main` |
 | 10 | 2026-05-03 | Telegram PT resource card detail delivery | `e9bcde3` | `main` |

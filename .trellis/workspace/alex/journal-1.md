@@ -423,3 +423,76 @@ Added subtitle translation proxy toggle and repo-local ffmpeg guardrails, recut 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Telegram download success card phase a
+
+**Date**: 2026-05-06
+**Task**: Telegram download success card phase a
+**Branch**: `main`
+
+### Summary
+
+Shipped the Telegram Phase A download-success card refresh, kept it presentation-only, and split live progress syncing into a separate Phase B task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `13c2a6f` | (see git log) |
+| `d9ec1be` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 14: Telegram smoke recovery and PT timeout hardening
+
+**Date**: 2026-05-07
+**Task**: Telegram smoke recovery and PT timeout hardening
+**Branch**: `main`
+
+### Summary
+
+Restored Telegram real-smoke evidence, fixed restart-safe live progress sync, removed redundant Telegram status buttons, hardened subtitle provider smoke validation, and shipped fail-soft PT search timeout recovery.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7ca87c8` | (see git log) |
+| `8eaa08e` | (see git log) |
+| `0890eab` | (see git log) |
+| `85e526d` | (see git log) |
+| `69326bf` | (see git log) |
+| `2f86f0f` | (see git log) |
+| `fab4be5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
