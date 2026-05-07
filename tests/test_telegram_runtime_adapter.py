@@ -224,8 +224,7 @@ def test_handle_telegram_callback_query_consumes_pt_resource_card_without_shared
     assert "<code>[░░░░░░░░░░]</code>" in sent_text
     assert "消息每 5 秒自动刷新一次" in sent_text
     assert "confirm " not in sent_text
-    reply_markup = reply_text.await_args.kwargs["reply_markup"]
-    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
+    assert "reply_markup" not in reply_text.await_args.kwargs
     stored_session = search_service.telegram_pt_resource_card_state.get_session(session.session_token)
     assert stored_session is not None
     assert stored_session.status == "selected"

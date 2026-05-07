@@ -71,17 +71,34 @@ def test_build_telegram_send_text_func_sends_inline_keyboard_when_actions_exist(
     assert isinstance(reply_markup, InlineKeyboardMarkup)
     assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (
         ("确认下载", "取消下载"),
-        ("查看状态",),
     )
     assert tuple(tuple(button.callback_data for button in row) for row in reply_markup.inline_keyboard) == (
         ("confirm hash-87", "cancel hash-87"),
-        ("status hash-87",),
     )
+
+
+def test_build_telegram_send_text_func_filters_status_only_action_from_inline_keyboard() -> None:
+    send_message = AsyncMock(return_value="text-message")
+    sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    text = render_telegram_text(
+        DeliveryItem(
+            header=DeliveryHeader(kind="status", title="下载状态"),
+            sections=(DeliverySection(label="任务信息", lines=("任务 ID：87",)),),
+            actions=(DeliveryAction(label="查看状态", hint="发送 status hash-87", kind="secondary"),),
+            status="pending",
+        )
+    )
+
+    asyncio.run(sender(chat_id=1001, text=text))
+
+    kwargs = send_message.await_args.kwargs
+    assert "reply_markup" not in kwargs
 
 
 def test_build_telegram_send_text_func_uses_html_parse_mode_for_card_text() -> None:
     send_message = AsyncMock(return_value="text-message")
     sender = build_telegram_send_text_func(SimpleNamespace(bot=SimpleNamespace(send_message=send_message)))
+    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text="查看状态", callback_data="status abc123")]])
     text = (
         "✅ <b>已添加下载</b>\n"
         "🎬 <b>Dune 2021 2160p WEB-DL</b>\n\n"
@@ -90,18 +107,17 @@ def test_build_telegram_send_text_func_uses_html_parse_mode_for_card_text() -> N
         "<code>42</code>\n"
         "Hash\n"
         "<code>abc123</code>\n\n"
-        "下一步\n"
-        "查看状态：发送 status abc123"
+        "自动进度会回写到同一条消息"
     )
 
-    result = asyncio.run(sender(chat_id=1001, text=text))
+    result = asyncio.run(sender(chat_id=1001, text=text, reply_markup=reply_markup))
 
     assert result == "text-message"
     send_message.assert_awaited_once_with(
         chat_id=1001,
         text=text,
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="查看状态", callback_data="status abc123")]]),
+        reply_markup=reply_markup,
     )
 
 
@@ -110,17 +126,16 @@ def test_build_telegram_edit_text_func_uses_html_parse_mode_for_card_text() -> N
     sender = build_telegram_edit_text_func(
         SimpleNamespace(bot=SimpleNamespace(edit_message_text=edit_message_text))
     )
+    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(text="查看状态", callback_data="status abc123")]])
     text = (
-        "┏━ ⏳ <b>下载进行中</b>\n"
-        "🎬 <b>Dune 2021 2160p WEB-DL</b>\n\n"
-        "├─ <b>任务</b>\n"
-        "│  ID    <code>42</code>\n"
-        "│  Hash  <code>abc123</code>\n\n"
-        "└─ <b>操作</b>\n"
-        "   刷新状态：发送 status abc123"
+        "⏳ <b>任务下载中</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🎬 <b>资源标题：</b>\n"
+        "<i>Dune 2021 2160p WEB-DL</i>\n"
+        "📍 <b>当前状态：</b> 下载中"
     )
 
-    result = asyncio.run(sender(chat_id=1001, message_id=321, text=text))
+    result = asyncio.run(sender(chat_id=1001, message_id=321, text=text, reply_markup=reply_markup))
 
     assert result == "edited-message"
     edit_message_text.assert_awaited_once_with(
@@ -128,7 +143,7 @@ def test_build_telegram_edit_text_func_uses_html_parse_mode_for_card_text() -> N
         message_id=321,
         text=text,
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(text="刷新状态", callback_data="status abc123")]]),
+        reply_markup=reply_markup,
     )
 
 

@@ -752,9 +752,7 @@ def test_build_telegram_reply_func_replies_add_success_card_as_html() -> None:
         "⏱️ <b>消息每 5 秒自动刷新一次</b>"
     )
     assert reply_text.await_args.kwargs["parse_mode"] == "HTML"
-    reply_markup = reply_text.await_args.kwargs["reply_markup"]
-    assert isinstance(reply_markup, InlineKeyboardMarkup)
-    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
+    assert "reply_markup" not in reply_text.await_args.kwargs
 
 
 def test_build_telegram_reply_func_sends_add_success_card_via_send_text_when_available() -> None:
@@ -794,9 +792,7 @@ def test_build_telegram_reply_func_sends_add_success_card_via_send_text_when_ava
         "🔑 <b>Hash：</b> <code>abc123</code>\n\n"
         "⏱️ <b>消息每 5 秒自动刷新一次</b>"
     )
-    reply_markup = send_text.await_args.kwargs["reply_markup"]
-    assert isinstance(reply_markup, InlineKeyboardMarkup)
-    assert tuple(tuple(button.text for button in row) for row in reply_markup.inline_keyboard) == (("查看状态",),)
+    assert "reply_markup" not in send_text.await_args.kwargs
 
 
 def test_build_telegram_reply_func_tracks_add_success_message_id_in_download_monitor(tmp_path: Path) -> None:

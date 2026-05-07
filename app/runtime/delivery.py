@@ -50,7 +50,24 @@ class _RenderStyle:
 
 
 def render_telegram_text(item: DeliveryItem) -> str:
-    return _render_text_item(item, _RenderStyle())
+    telegram_actions = tuple(
+        action
+        for action in item.actions
+        if not (
+            action.label.strip() == "查看状态"
+            and action.hint.strip().startswith("发送 status ")
+        )
+    )
+    return _render_text_item(
+        DeliveryItem(
+            header=item.header,
+            sections=item.sections,
+            actions=telegram_actions,
+            footer=item.footer,
+            status=item.status,
+        ),
+        _RenderStyle(),
+    )
 
 
 def render_feishu_text(item: DeliveryItem) -> str:

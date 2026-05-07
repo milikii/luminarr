@@ -16,7 +16,6 @@ from PIL import Image, ImageDraw, ImageFont
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from app.bot.telegram_delivery_runtime import build_telegram_status_inline_keyboard
 from app.bot.telegram_reply_formatter import _has_telegram_html
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.telegram_update_repo import TelegramUpdatePersistenceError
@@ -245,7 +244,6 @@ async def _reply_telegram_add_success_message(
         chat_id=chat_id,
         text=text,
         parse_mode="HTML",
-        reply_markup=build_telegram_status_inline_keyboard(task_identity[1]) if task_identity is not None else None,
     )
     _bind_telegram_add_success_message(
         download_monitor_repo=download_monitor_repo,
