@@ -679,3 +679,146 @@
 
 ### 下轮目标
 - 若进入提交，先按 `metadata scrape quality overwrite and enrichment` 与 `telegram four-stage follow-up notifications` 两条主线拆 commit 组，再决定是否 push。
+
+## Round 39 — 2026-05-07 14:06
+
+### 完成
+- 激活 `05-02-telegram-real-smoke-restore`，按任务研究与项目真相入口复核当前环境前置条件。
+- 确认 `api.telegram.org` 的 DNS 已恢复，但宿主网络 `curl` 直连仍超时，且 `.env` 当前没有可用 `OUTBOUND_PROXY_URL`。
+- 确认 `timeout 25 .venv/bin/python -m app.main` 可短时启动；当前 blocker 已从“本地进程未运行”收口为“Telegram 出口不可用，无法补真实入站 smoke”。
+- 同步更新任务研究、`docs/STATUS.md` 与 `docs/BLOCKERS.md`，收口新的 operator-facing 真相。
+
+### 测试状态
+- 通过: 0 / 总计: 0
+- 本轮仅做环境复核：`getent ahosts api.telegram.org`、宿主网络 `curl` 探针、`timeout 25 .venv/bin/python -m app.main`
+
+### 遗留 / 下轮继续
+- 在恢复可用 Telegram 出口前，`05-02-telegram-real-smoke-restore` 仍无法完成新的真实入站 smoke 证据闭环。
+
+### 下轮目标
+- 先恢复 `api.telegram.org` 的可用出口（直连或代理），保持本地 `app.main` 运行，再做一次真实 Telegram 入站复验。
+
+## Round 40 — 2026-05-07 14:14
+
+### 完成
+- 用替代代理 `http://192.168.2.220:7890` 复核 Telegram 出口，确认代理端口可达。
+- 通过该代理调用 Telegram Bot API `getMe`，确认响应为 `404 Not Found`，不是网络超时。
+- 继续核对 `.env`，确认当前 `TELEGRAM_BOT_TOKEN` 为空（`token_len=0`）；带该代理短跑 `app.main` 时也只拉起了非 Telegram 宿主。
+- 同步更新任务研究、`docs/STATUS.md`、`docs/BLOCKERS.md`，将当前 blocker 从“代理出口缺失”收口为“Telegram token 为空”。
+
+### 测试状态
+- 通过: 0 / 总计: 0
+- 本轮仅做环境复核：代理 `curl` 探针、Telegram `getMe`、`token_len` 形态检查、带代理 `timeout 25 .venv/bin/python -m app.main`
+
+### 遗留 / 下轮继续
+- 在补回有效 `TELEGRAM_BOT_TOKEN` 前，`05-02-telegram-real-smoke-restore` 仍无法恢复 Telegram 宿主并补新的真实入站 smoke。
+
+### 下轮目标
+- 先恢复有效 `TELEGRAM_BOT_TOKEN`，再通过 `http://192.168.2.220:7890` 复跑 `getMe` 与真实 Telegram 入站 smoke。
+
+## Round 41 — 2026-05-07 14:32
+
+### 完成
+- 纠正上一轮 shell 探针的引号错误，确认“`TELEGRAM_BOT_TOKEN` 为空”并非 `.env` 真相。
+- 重新验证 `.env`：`TELEGRAM_BOT_TOKEN` 非空且格式正确；当前默认 `OUTBOUND_PROXY_URL` 也非空。
+- 通过替代代理 `http://192.168.2.220:7890` 重跑 Telegram Bot API `getMe`，确认返回 `200` 且响应体 `ok=true`。
+- 同步修正任务研究、`docs/STATUS.md`、`docs/BLOCKERS.md`，把当前状态收口为“环境前置条件已恢复，等待新的真实 Telegram 入站 smoke”。
+
+### 测试状态
+- 通过: 0 / 总计: 0
+- 本轮仅做环境复核：安全长度/形态检查、修正后的 `getMe` 探针、带代理 `timeout 25 .venv/bin/python -m app.main`
+
+### 遗留 / 下轮继续
+- 当前还缺一条本会话内的新真实 Telegram 入站消息证据。
+
+### 下轮目标
+- 保持 `app.main` 运行并接收一条真实 Telegram 消息，补齐 smoke 证据链。
+
+## Round 42 — 2026-05-07 15:23
+
+### 完成
+- 复查 `logs/trace.log`，确认当前会话已收到新的真实 Telegram 入站消息：`ping` 与 `start`。
+- 确认同会话 reply 也已发出：`候选作品：ping ✓` 与 `候选作品：start ✓`，证明入站与回包链路已恢复。
+- 将新的真实 Telegram 入站证据同步回任务研究、`docs/STATUS.md`、`docs/BLOCKERS.md`。
+
+### 测试状态
+- 通过: 0 / 总计: 0
+- 本轮仅做真实环境复核：运行态 `app.main` + `logs/trace.log` 证据检查
+
+### 遗留 / 下轮继续
+- 当前仍缺同会话 `PT 资源选择 -> 下载 -> 导入/后处理` 的新实测证据。
+
+### 下轮目标
+- 在 `app.main` 继续运行的前提下，补一条新的 PT 后半段真实 Telegram smoke 链路。
+
+## Round 43 — 2026-05-07 15:42
+
+### 完成
+- 复查 `logs/trace.log`，确认当前会话已补到新的 PT 后半段真实证据：`功夫熊猫 -> 候选作品 -> PT 资源卡 -> confirm dispatch -> 下载状态 ✓`。
+- 复查 `job_event` 与 `download_monitor`，确认 `46b907...` 在本轮新增了 `downloader.succeeded` 与 `downloader.completed_observed`，且当前状态为 `status_code=6`、`percent_done=1.0`、`is_complete=1`。
+- 确认本轮没有新增 `import.* / metadata.* / subtitle.* / refresh.*` 事件；所选标题复用了既有任务 hash，因此同会话导入/后处理证据仍未刷新。
+- 同步更新任务研究、`docs/STATUS.md`、`docs/BLOCKERS.md`。
+
+### 测试状态
+- 通过: 0 / 总计: 0
+- 本轮仅做真实环境复核：`logs/trace.log`、`job_event`、`download_monitor`
+
+### 遗留 / 下轮继续
+- 当前还缺一条“新 hash / 新导入”的同会话导入与后处理证据。
+
+### 下轮目标
+- 选择一个未复用既有下载/导入记录的 PT 标题，补齐同会话 `导入/metadata/字幕/刷新` 证据。
+
+## Round 44 — 2026-05-07 16:00
+
+### 完成
+- 复查 `logs/trace.log`，确认当前会话已补到第二条 fresh-hash PT 证据：`超人 -> 候选作品 -> PT 资源卡 -> 已添加下载 -> 下载状态 ⏳`。
+- 复查 `job_event` 与 `download_monitor`，确认新 hash `52bde7...` 已生成 `media.identity.confirmed`、`downloader.succeeded`，当前 `status_code=4`、`percent_done≈0.00447`、`is_complete=0`。
+- 确认当前不是环境阻断；剩余问题只是等待这条 fresh hash 下载完成后，继续观察新的 `import.* / metadata.* / subtitle.* / refresh.*` 事件。
+- 同步更新任务研究、`docs/STATUS.md`、`docs/BLOCKERS.md`。
+
+### 测试状态
+- 通过: 0 / 总计: 0
+- 本轮仅做真实环境复核：`logs/trace.log`、`job_event`、`download_monitor`
+
+### 遗留 / 下轮继续
+- `52bde7...` 仍在下载中，新的导入与后处理事件尚未出现。
+
+### 下轮目标
+- 等待 `52bde7...` 下载完成，并补齐同会话 `导入/metadata/字幕/刷新` 证据。
+
+## Round 45 — 2026-05-07 16:28
+
+### 完成
+- 对 fresh hash `52bde7...` 在重启前记录进度卡片快照：`3%`、`telegram_progress_last_synced_at=08:26:18`。
+- 重启 `app.main` 使修复生效，并持续观察同一条 `download_monitor` 记录。
+- 确认重启后同一张 Telegram 进度卡片继续同步：`telegram_progress_last_synced_at` 先推进到 `08:27:57`，再推进到 `08:28:10`，持久化文本也从 `3%` 刷到 `4%`。
+- 同步更新任务研究、`docs/STATUS.md`、`docs/BLOCKERS.md`，把“重启后卡片继续更新”实测结果落成 operator-facing 真相。
+
+### 测试状态
+- 通过: 24 / 总计: 24
+- `./.venv/bin/python -m pytest -q tests/test_download_follow_up_runtime.py`
+- `./.venv/bin/python -m pytest -q tests/test_get_download_status.py -k "telegram_live_progress or post_processing or summary_sent"`
+
+### 遗留 / 下轮继续
+- `52bde7...` 仍在下载中，新的导入与后处理事件尚未出现。
+
+### 下轮目标
+- 等待 `52bde7...` 下载完成，并继续抓取同会话 `导入/metadata/字幕/刷新` 证据。
+
+## Round 46 — 2026-05-07 19:48
+
+### 完成
+- 复查 `52bde7...` 的 `job_event`，确认 fresh hash `超人` 已完整走到 `import.succeeded`、`metadata.succeeded`、`subtitle.skipped`、`refresh.succeeded`、`telegram.summary_sent`。
+- 删除 Telegram 渠道里多余的 `查看状态` 入口：`已添加下载` 消息不再附带该按钮，实时进度卡片也不再附带该按钮。
+- 保留 Telegram 实时进度卡片和最终总结通知，避免和已有的实时状态链路重复。
+
+### 测试状态
+- 通过: 7 / 总计: 7
+- `./.venv/bin/python -m pytest -q tests/test_telegram_delivery_runtime.py tests/test_telegram_runtime_adapter.py tests/test_telegram_reply_formatter.py tests/test_download_follow_up_runtime.py -k "查看状态 or status_only_action or add_success or live_progress or resumes_completed_telegram_card_after_restart or edits_bound_telegram_message_and_dedupes_same_status"`
+
+### 遗留 / 下轮继续
+- 当前工作树仍混有 Telegram smoke、metadata、task bookkeeping 等并行未提交改动；提交时必须按主线拆组。
+
+### 下轮目标
+- 整理 commit 分组，先提交 Telegram smoke / progress card / TG 渠道按钮收口这条主线。

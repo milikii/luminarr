@@ -1,4 +1,4 @@
-# Current status (v555)
+# Current status (v563)
 
 ## Current mainline
 - `质量硬化`、adult BT minimum wedge、config 能力化解耦、Telegram 宿主解耦和 adult-only `btsub` 收口都保持完成态。
@@ -13,11 +13,19 @@
 - `make verify-stage1` 通过（`8` 个子组、`44 passed`）。
 - `make verify-adult-bt-wedge` 通过（总计 `429 passed`）。
 - `make lint` 通过。
-- Telegram-first 等价证据已补充：`make verify-stage1-telegram-delivery` 通过（`16 passed`）；当前环境快照同时显示 `telegram bot api unreachable`、`no luminarr process running`，因此本轮未能补到新的真实 Telegram 入站 smoke。
+- Telegram-first 等价证据已补充：`make verify-stage1-telegram-delivery` 通过（`16 passed`）；`2026-05-07` 修正探针后已确认 `.env` 中 Telegram token 与默认代理都有效，且通过替代代理 `http://192.168.2.220:7890` 调用 Telegram Bot API `getMe` 返回 `200 / ok=true`；同日 `logs/trace.log` 已新增 `ping` / `start` 的真实 Telegram 入站与回复证据，以及两条新的 PT 后半段 smoke 证据：`功夫熊猫 -> PT 资源卡 -> dispatch -> 下载状态 ✓`，和 `超人 -> PT 资源卡 -> 已添加下载 -> 下载状态 ⏳`。其后 `52bde7...` 已继续完成到 `import.succeeded / metadata.succeeded / subtitle.skipped / refresh.succeeded / telegram.summary_sent`。
 - 仓库内最近一轮真实 Telegram trace 证据仍可复查：`logs/trace.log` 保留 `成人搜 SSIS-483`、direct magnet、`BT 成人链`、`confirm bt-372f049d`、`status 3849...` 的完整链路。
 - 当前 active docs root：`15`；docs gate 预算继续满足。
 
 ## Latest verification
+- `2026-05-07` Telegram 入口收口复核：Telegram 渠道已删除“已添加下载”消息中的独立 `查看状态` 按钮，也已删除实时进度卡片上的 `查看状态` 按钮；Telegram 继续保留实时进度卡片和最终总结通知。
+- `2026-05-07` 超人 fresh-hash 完结复核：`job_event` 已记录 `import.succeeded`、`metadata.succeeded`、`subtitle.skipped`、`refresh.succeeded`、`telegram.summary_sent`，说明 fresh hash `52bde7...` 已完成导入与后处理。
+- `2026-05-07` 重启恢复复核：对 fresh hash `52bde7...` 重启 `app.main` 后，`download_monitor.telegram_progress_last_synced_at` 从 `08:26:18` 推进到 `08:27:57`、再到 `08:28:10`，持久化进度文本也从 `3%` 刷到 `4%`，证明未完成任务卡片在重启后会继续同步。
+- `2026-05-07` 新 hash PT 复核：`logs/trace.log` 记录到 `15:54:22` inbound `超人`、`15:54:56` `【PT资源卡】 3d9006a4`、`15:56:12` `confirm_dispatch/confirm_finalize succeeded`、`15:56:14` reply `已添加下载：Superman 2025...`、`15:57:58` reply `下载状态 ⏳`；`job_event` 与 `download_monitor` 确认新 hash `52bde7...` 当前仍在下载中。
+- `2026-05-07` 真实 PT 后半段复核：`logs/trace.log` 记录到 `15:35:02` inbound `功夫熊猫`、`15:35:21` `【PT资源卡】 a6a75e1b`、`15:35:27` `confirm_dispatch/confirm_finalize succeeded`、`15:40:22` reply `下载状态 ✓`；`job_event` 同步记录新的 `downloader.succeeded` 与 `downloader.completed_observed`。
+- `2026-05-07` 真实 Telegram 入站复核：`logs/trace.log` 记录到 `14:38:55` inbound `ping`、`14:38:57` reply `候选作品：ping ✓`、`14:38:57` inbound `start`、`14:39:14` reply `候选作品：start ✓`，证明当前会话已恢复 Telegram 入站与回包。
+- `2026-05-07` 修正后的 Telegram 环境复核：`.env` 中 `TELEGRAM_BOT_TOKEN` 已正确加载（非空、包含 `:`）；当前 `.env` 默认代理为 `http://192.168.2.106:10808`；替代代理 `http://192.168.2.220:7890` 也可达，且 Telegram Bot API `getMe` 通过该代理返回 `200 / ok=true`。
+- `2026-05-07` Telegram 环境复核：`getent ahosts api.telegram.org` 已恢复 DNS 解析；宿主网络 `curl -sS -m 10 -o /dev/null -w 'http=%{http_code}' https://api.telegram.org` 仍返回超时 / `http=000`；`timeout 25 .venv/bin/python -m app.main` 可短时启动本地宿主，但没有新的真实 Telegram 入站证据。
 - `2026-04-30` `make verify-stage1-duplicate-memory` 通过：snapshot persistence（`4 passed`）、duplicate service/tooling（`6 passed`）、duplicate gate/runtime（`6 passed`）。
 - `2026-04-30` `make verify-stage1-telegram-delivery` 通过：delivery renderer/runtime（`10 passed`）、Telegram-first 高频主链 focused path（`6 passed`）。
 - `2026-04-30` `make verify-stage1-bt-source-roles` 通过：source role registry（`3 passed`）、helper-only/read-only contract（`7 passed`）、main wiring（`2 passed`）。
@@ -25,7 +33,7 @@
 - `2026-04-30` Telegram 环境等价证据：`.venv/bin/python -c "from pathlib import Path; from app.maintenance.cleanup_verification_docs import _run_telegram_bot_api_snapshot; print(_run_telegram_bot_api_snapshot(Path('.')))"` 返回 `telegram bot api unreachable`；`.venv/bin/python -c "from pathlib import Path; from app.maintenance.cleanup_verification_docs import _run_runtime_process_snapshot; print(_run_runtime_process_snapshot(Path('.')))"` 返回 `no luminarr process running`。
 
 ## Current biggest risk
-- 当前最大风险已经从“Stage 1 三条子线语义会不会互相带偏”切到“环境侧 Telegram 可达性漂移”：代码与 focused gate 已经收口，但若这台机器暂时打不到 `api.telegram.org` 或本地没有运行中的 `app.main`，就无法在这一轮补新的真实 Telegram 入站 smoke。
+- 当前最大风险已经从“Stage 1 三条子线语义会不会互相带偏”切到“并行未提交改动分组”：Telegram 真实 smoke 已补到 fresh-hash 完整闭环，且 Telegram 渠道已去掉多余 `查看状态` 入口；当前主要风险是工作树里仍混有其他并行任务改动，提交时必须按主线拆组。
 - `cleanup_*_support.py` 当前为 `0` 个。
 
 ## Recommended Next Operator Command
