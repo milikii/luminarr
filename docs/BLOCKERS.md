@@ -18,3 +18,10 @@
 - `2026-05-07 15:56` 这轮 `超人` 已补到 fresh hash `52bde7...` 的 `dispatch -> 已添加下载 -> 下载状态 ⏳`；当前不是 blocker，而是等待下载完成后继续观察新的导入与后处理事件。
 - `2026-05-07 16:28` 已实测确认：重启 `app.main` 后，`52bde7...` 的 Telegram 进度卡片仍会继续同步，不再停在重启前的旧进度。
 - `2026-05-07 19:48` `52bde7...` 已完成 fresh-hash 导入与后处理闭环；当前没有 Telegram smoke 环境 blocker。
+
+## 2026-05-07 — 流程文档任务收尾验证被现有质量红灯阻断
+
+- 本轮仅新增 `docs/flows/` 下的流程文档，没有改业务代码；`./.venv/bin/python -m pytest tests/test_cleanup_docs_consistency.py` 已通过，说明 docs gate 未被新文档打坏。
+- `make quality` 与 `make lint` 当前都失败在同一个既有问题：`app/bot/telegram_update_runtime.py:240` 存在未使用局部变量 `task_identity`。
+- `make verify-mainline` 当前失败在两条既有断言：`tests/test_telegram_bot.py::test_handle_message_digit_routes_to_add_service` 与 `tests/test_telegram_bot.py::test_handle_callback_query_digit_routes_to_add_service` 仍期待 `📍 当前状态：等待下载器首次同步`，而当前真实回复文本是 `状态：等待下载器同步`。
+- 解除方式：单独修复上述 lint / 测试漂移后，再重跑 `make quality`、`make verify-mainline`、`make lint`；本轮流程文档可继续使用，但仓库当前不满足“全仓全绿”。

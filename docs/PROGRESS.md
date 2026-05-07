@@ -822,3 +822,62 @@
 
 ### 下轮目标
 - 整理 commit 分组，先提交 Telegram smoke / progress card / TG 渠道按钮收口这条主线。
+
+## Round 47 — 2026-05-07 22:43
+
+### 完成
+- 基于当前真实代码新增 `docs/flows/` 文档集合，拆分为启动装配、shared private-chat 主链、下载/导入/cleanup、BT/成人/订阅、SQLite 真相层五组流程文档，并补充目录索引。
+- 逐段复核 `app/main.py`、`app/bot/private_chat_runtime.py`、`app/services/*`、`app/db/*`，把“入口 -> 路由 -> 副作用 -> 落盘”的真实链路反写成可导航文档。
+- 确认新增流程文档没有打坏 docs gate：`tests/test_cleanup_docs_consistency.py` 继续通过。
+- 记录当前仓库级验证现状：`make quality` / `make lint` 与 `make verify-mainline` 仍存在既有红灯，本轮不改业务代码，只把失败点写入 `docs/BLOCKERS.md`。
+
+### 测试状态
+- 通过: 1 / 总计: 4
+- `./.venv/bin/python -m pytest tests/test_cleanup_docs_consistency.py`
+- 失败: `make quality`（`app/bot/telegram_update_runtime.py:240` 存在未使用局部变量 `task_identity`）
+- 失败: `make lint`（同上）
+- 失败: `make verify-mainline`（`tests/test_telegram_bot.py` 中 2 条既有断言与当前状态文案不一致）
+
+### 遗留 / 下轮继续
+- 若要把仓库重新拉回全绿，需要单独修复当前既有 lint / verify 失败；这不是本轮流程文档反写直接引入的问题。
+
+### 下轮目标
+- 若继续做收尾验证，先单独处理 `telegram_update_runtime.py` 的 lint 红灯和 `tests/test_telegram_bot.py` 的状态文案断言漂移，再重跑全仓验证。
+
+## Round 48 — 2026-05-07 23:55
+
+### 完成
+- 把 `docs/flows/` 反向接入顶层真相文档：`docs/INDEX.md` 新增 AI / 开发者阅读路径入口，`docs/PRD.md` 与 `docs/ARCHITECTURE.md` 改写为当前代码口径。
+- 收口摘要层漂移：明确数字选资源与 `import <ref>` 是 guarded auto-confirm，direct source / BT follow-up / duplicate override / copy-fallback 仍需显式 `confirm`；同步写明 capability-based 宿主、Telegram-first callback 主链、WeCom 主动发送 unsupported、pure BT 兼容分支定位。
+- 修复 `docs/STATUS.md` 与 `docs/NEXT_STEP.md` 对最新真实 Telegram smoke 的冲突，并把 `docs/SEARCH_REPLY_PRESENTATION_PLAN.md` 标记为 superseded。
+- 补 docs gate：`tests/test_cleanup_docs_consistency.py` 新增 `docs/flows/INDEX.md` 入口检查，以及 `STATUS/NEXT_STEP` 对“最新真实 Telegram smoke 已存在”的一致性断言。
+
+### 测试状态
+- 通过: 11 / 总计: 11
+- `./.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
+- 失败: `make quality`（既有红灯：`app/bot/telegram_update_runtime.py:240` 未使用局部变量 `task_identity`）
+- 失败: `make lint`（同上）
+- 失败: `make verify-mainline`（既有红灯：`tests/test_telegram_bot.py` 两条断言仍期待旧文案 `等待下载器首次同步`）
+
+### 遗留 / 下轮继续
+- 当前文档纠偏已完成，但仓库级全绿仍被既有 lint / mainline 失败阻断；这两处失败不是本轮 docs 改动引入。
+
+### 下轮目标
+- 若继续做收尾验证，先单独处理 `app/bot/telegram_update_runtime.py` 的 pyflakes 红灯和 `tests/test_telegram_bot.py` 的旧状态文案断言，再重跑 `make quality`、`make lint`、`make verify-mainline`。
+
+## Round 49 — 2026-05-08 00:13
+
+### 完成
+- 根据 `trellis-check` 审查补强 docs gate，把这轮新增的摘要层真相一并锁进 `tests/test_cleanup_docs_consistency.py`。
+- 新增对审批边界、capability-based 宿主、Telegram-first callback、WeCom 主动发送 unsupported、pure BT 隐藏兼容分支，以及 `SEARCH_REPLY_PRESENTATION_PLAN.md` superseded 状态的断言。
+- 同步把“最新真实 Telegram smoke 已存在”这一轮的 spec 学习写回 `.trellis/spec/backend/quality-guidelines.md`。
+
+### 测试状态
+- 通过: 12 / 总计: 12
+- `./.venv/bin/python -m pytest -q tests/test_cleanup_docs_consistency.py`
+
+### 遗留 / 下轮继续
+- 仓库级 `make quality` / `make lint` / `make verify-mainline` 仍被既有 runtime / test 红灯阻断，和本轮新增 docs gate 无关。
+
+### 下轮目标
+- 若继续收尾，整理 commit 分组并确认是否连同既有未识别脏文件一起提交；若要拉回全绿，再单独修复现有 lint 与 `tests/test_telegram_bot.py` 断言漂移。

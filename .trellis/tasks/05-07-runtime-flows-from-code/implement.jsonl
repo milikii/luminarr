@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for project-level conventions and available guideline files."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Quality and docs-gate expectations relevant to a docs-only change in the finish phase."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Top-level docs must match the delivered Telegram-first callback/card flow instead of older text-only assumptions."}
+{"file": ".trellis/spec/backend/bt-source-contracts.md", "reason": "Top-level docs must match current adult BT source-role truth and helper-only boundaries referenced by the runtime flows."}
