@@ -30,6 +30,7 @@
 
 - `docs/GETTING_STARTED.md`, `docs/STATUS.md`, `docs/NEXT_STEP.md`, and `docs/OPERATOR_RUNBOOK.md` must all reference `make verify-stage1` consistently.
 - `docs/STATUS.md` remains a short snapshot, not a command transcript or long checklist.
+- When a fresh real Telegram smoke already exists, `docs/STATUS.md` and `docs/NEXT_STEP.md` must both describe that truth consistently; `NEXT_STEP` must not drift back to “only equivalent evidence exists”.
 
 #### Evidence contract
 
@@ -43,6 +44,7 @@
 - New Stage 1 regression added but not wired into `verify-stage1` -> docs/tests drift; fix the Makefile target group.
 - Docs claim Stage 1 complete but omit `make verify-stage1` -> docs gate failure.
 - Docs present equivalent evidence as real smoke -> contract violation; rewrite wording to distinguish them.
+- `docs/STATUS.md` records fresh real Telegram smoke while `docs/NEXT_STEP.md` still says “no new real smoke” or “only equivalent evidence” -> cross-doc truth drift; fix both docs and the consistency gate.
 - `verify-stage1` becomes a giant flat command list instead of grouped targets -> maintainability regression; restore grouped targets.
 
 ### 5. Good/Base/Bad Cases
@@ -59,6 +61,7 @@
 - `tests/test_cleanup_docs_consistency.py`
   - assert all operator-facing docs mention `make verify-stage1`
   - assert finish-phase wording and Stage 1 completion wording stay aligned
+  - assert `docs/STATUS.md` and `docs/NEXT_STEP.md` stay aligned on whether fresh real Telegram smoke already exists
 
 ### 7. Wrong vs Correct
 

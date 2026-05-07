@@ -64,6 +64,7 @@ def test_docs_entrypoints_are_split_by_reader_role() -> None:
     assert "## 5. 文档维护规则" in index_text
     assert "docs/HUMAN_START_HERE.md" in index_text
     assert "docs/OPERATOR_RUNBOOK.md" in index_text
+    assert "docs/flows/INDEX.md" in index_text
     assert "docs/PERSISTENCE_CLOSURE_LOG.md" in index_text
     assert "archive/docs/" in index_text
     assert "docs/TEST_ENV.md" not in index_text
@@ -164,8 +165,39 @@ def test_stage1_truth_docs_point_to_single_verification_entrypoint_and_finish_ph
     assert "T19 Stage 1 聚合验证与运维真相同步" in status_text
     assert "收尾阶段" in status_text
     assert "收尾阶段" in next_step_text
+    assert "2026-05-07` 已有真实 Telegram 入站与 PT 后半段 smoke 证据" in next_step_text
     assert "当前主线已切到 `T17 Telegram-first 高频主链交付层`" not in status_text
     assert "当前唯一下一条执行入口切到 `T19 Stage 1 聚合验证与运维真相同步`" not in next_step_text
+
+
+def test_latest_real_telegram_smoke_truth_stays_consistent_between_status_and_next_step() -> None:
+    status_text = Path("docs/STATUS.md").read_text(encoding="utf-8")
+    next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
+
+    assert "真实 Telegram 入站复核" in status_text
+    assert "真实 PT 后半段复核" in status_text
+    assert "本轮没有新的真实 Telegram 入站 smoke" not in next_step_text
+    assert "focused tests + 运行态快照组成的等价证据" not in next_step_text
+    assert "已补齐" in status_text
+    assert "已有真实 Telegram 入站与 PT 后半段 smoke 证据" in next_step_text
+
+
+def test_top_level_truth_docs_keep_runtime_summary_boundaries_aligned() -> None:
+    prd_text = Path("docs/PRD.md").read_text(encoding="utf-8")
+    architecture_text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    next_step_text = Path("docs/NEXT_STEP.md").read_text(encoding="utf-8")
+    search_reply_plan_text = Path("docs/SEARCH_REPLY_PRESENTATION_PLAN.md").read_text(encoding="utf-8")
+
+    assert "数字选资源与 Telegram PT 资源卡 callback 会先落待确认，再在 pending 仍然有效时自动执行一次 confirm" in prd_text
+    assert "direct source、direct BT follow-up、adult duplicate override 仍需显式 `confirm <任务引用>`" in prd_text
+    assert "继续保持当前审批边界：direct source / BT follow-up / duplicate override / copy-fallback 显式 `confirm`；数字选资源与 `import` guarded auto-confirm。" in next_step_text
+    assert "启动配置已改为 capability-based fail-closed" in prd_text
+    assert "_resolve_runtime_host_mode()" in architecture_text
+    assert "Telegram PT 资源卡与 adult BT richer reply 通过 inline buttons / callback data 接回 shared runtime" in architecture_text
+    assert "WeCom 当前能入站并走 shared runtime，但后台主动发送仍是 unsupported" in prd_text
+    assert "shared sender 当前不支持 WeCom 主动回发；WeCom 只具备入站文本最小画像" in architecture_text
+    assert "runtime 仍保留 pure BT / raw BT 兼容分支，但这条链在当前提示里是收起状态" in prd_text
+    assert "状态：**superseded**" in search_reply_plan_text
 
 
 def test_stage1_task_board_matches_finish_phase_truth() -> None:

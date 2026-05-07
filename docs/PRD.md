@@ -1,6 +1,6 @@
 # PRD.md
 
-> 本文基于 2026-04-28 仓库代码、测试、配置和运行脚本反推得到，描述的是“当前已实现行为”，不是额外承诺的新需求。
+> 本文基于 2026-05-07 仓库代码、测试、配置和运行脚本反推得到，描述的是“当前已实现行为”，不是额外承诺的新需求。
 
 ## 1. 产品定义
 
@@ -8,8 +8,8 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 
 它不是通用 AI 助手，也不是通用多渠道机器人平台。当前代码体现出的产品核心是：
 
-- 用私聊文本作为唯一主交互面
-- 用显式 `confirm` 审批保护所有副作用
+- 用私聊文本作为统一入口；Telegram 高频链已落按钮 / callback，不再只靠手输命令
+- 用 guarded approval 保护副作用，而不是把所有路径都做成纯手动 `confirm`
 - 用 SQLite 保存任务、审批、事件和中间状态真相
 - 用单进程把多渠道入口统一接到同一套业务链
 
@@ -30,10 +30,10 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 
 ## 4. 核心价值
 
-- 用户只需要记住少量自然语言命令和 `confirm` / `cancel`
+- 用户通常只需要少量自然语言命令；Telegram 高频链可直接点按钮，少数高风险路径仍保留 `confirm` / `cancel`
 - 系统内部保持确定性路由、持久化真相和 fail-closed 行为
 - 下载、导入、cleanup 都有明确审批、事件记录和状态恢复路径
-- 同一套 shared private-chat runtime 可复用到 Telegram、personal WeChat、Feishu、WeCom
+- 同一套 shared private-chat runtime 可复用到 Telegram、personal WeChat、Feishu、WeCom，但渠道交付能力并不完全对称
 
 ## 5. 当前已实现的主要能力
 
@@ -47,8 +47,9 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 
 ### 5.2 下载确认链
 
-- 用户可通过候选序号、BT 批量选择、或直接磁力 / 链接创建待确认下载
-- 下载不会立即执行，必须经过 `confirm <任务引用>`
+- 用户可通过候选序号、Telegram PT 资源卡 callback、BT 批量选择、或直接磁力 / 链接创建下载
+- 数字选资源与 Telegram PT 资源卡 callback 会先落待确认，再在 pending 仍然有效时自动执行一次 confirm
+- direct source、direct BT follow-up、adult duplicate override 仍需显式 `confirm <任务引用>`
 - 下载确认状态写入 `approval_record` 和 `jobs`
 - 实际投递支持 Transmission 和 qBittorrent
 - 下载成功后会记录 job event，并登记到 `download_monitor`
@@ -62,18 +63,19 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 
 ### 5.4 入库确认链
 
-- 支持 `import <任务ID或Hash>` 创建待确认导入
+- 支持 `import <任务ID或Hash>` 创建待确认导入，并在 pending 正常存在时自动执行首轮 confirm
 - raw BT 任务会被明确阻断，不进入媒体入库链
-- 确认导入时默认走硬链接
+- 首轮导入默认走硬链接
 - 跨文件系统会进入显式 `copy-fallback pending`，再次 `confirm` 才走复制
 - 导入成功后会做 metadata scraping、字幕翻译、媒体库刷新
 
 ### 5.5 BT 支线
 
 - 支持直接磁力 / BT 指令入口
-- 直接磁力会先问处理链：影视入库链、成人 BT 归档链、pure BT 下载链
-- 影视入库链会继续问 `movie / series / anime`，再做 TMDB 关联
-- pure BT 会要求选择预设下载目录
+- 当前用户可见主提示优先展示两条处理链：影视入库链、成人 BT 归档链
+- runtime 仍保留 pure BT / raw BT 兼容分支，但这条链在当前提示里是收起状态，不再作为高频主路径显式曝光
+- 影视入库链会继续问 `movie / series / anime`，再做 TMDB 关联，并保持显式下载 confirm
+- pure BT 会要求选择预设下载目录，且不会进入媒体导入链
 - 成人 BT 会进入成人资源历史登记、完成后归档、到期后清理
 - 支持 BT 只读搜索、批量预览、批量确认
 
@@ -90,14 +92,28 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 - `btsub`：维护 BT 订阅，支持手动运行和后台 scheduler tick
 - 命中新资源后仍然走现有下载审批边界，不自动确认
 
-### 5.8 多渠道私聊入口
+### 5.8 多渠道私聊入口与 Telegram-first 高频交付
 
 - Telegram 文本私聊
 - personal WeChat 私聊文本轮询
 - Feishu 私聊文本长连接
 - WeCom 私聊文本 webhook
 
-这些入口共享同一套 shared private-chat runtime，而不是各写一套业务逻辑。
+这些入口共享同一套 shared private-chat runtime，而不是各写一套业务逻辑。与此同时：
+
+- Telegram 已接入按钮 / callback、PT 资源卡、实时进度卡和最终总结通知
+- Feishu / personal WeChat 当前主要复用同一套文本交付和主动文本发送
+- WeCom 当前能入站并走 shared runtime，但后台主动发送仍是 unsupported
+
+### 5.9 渠道能力矩阵
+
+| 能力 | Telegram | Feishu | personal WeChat | WeCom |
+| --- | --- | --- | --- | --- |
+| 入站文本 | 支持 | 支持 | 支持 | 支持 |
+| 主动发送文本 | 支持 | 支持 | 支持 | 不支持 |
+| 按钮 / callback | 支持 | 不支持 | 不支持 | 不支持 |
+| 实时进度卡 | 支持 | 不支持 | 不支持 | 不支持 |
+| 最终总结通知 | 支持 | 不支持 | 不支持 | 不支持 |
 
 ## 6. 产品边界
 
@@ -110,6 +126,7 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 - 不对 raw BT 提供媒体导入能力
 - 不对 watchlist 提供自动下载
 - 不对 BT subscription 提供自动 `confirm`
+- shared runtime 不等于四个渠道都具备 Telegram 同级的交付能力
 
 ## 7. 非功能要求
 
@@ -129,6 +146,7 @@ Luminarr 是一个面向小规模自托管影视场景的私聊自动化系统�
 
 ## 9. 当前明显限制
 
-- 启动入口仍然以 Telegram Application 为宿主，其他渠道 sidecar 挂在其生命周期上
-- `load_settings()` 仍把 `TELEGRAM_BOT_TOKEN`、`PROWLARR_*`、`TRANSMISSION_BASE_URL` 视为启动硬必填
+- 启动配置已改为 capability-based fail-closed，但 Telegram 仍是默认宿主；WeCom-only / Feishu-only 只覆盖最小文本私聊画像
+- WeCom 当前没有 shared proactive send 能力，因此 `btsub`、下载跟进和最终总结通知不能假设在 WeCom-only 宿主里对称可用
+- pure BT / raw BT 当前更像兼容分支，而不是顶层主推交互
 - 超大 service 文件较多，维护重点仍然偏向“收口已有复杂度”而不是扩功能

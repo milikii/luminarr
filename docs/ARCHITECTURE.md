@@ -1,18 +1,20 @@
 # ARCHITECTURE.md
 
-> 本文基于 2026-04-28 代码结构反推，描述“现在系统怎么工作”。如果文档和代码冲突，以代码为准。
+> 本文基于 2026-05-07 代码结构反推，描述“现在系统怎么工作”。如果文档和代码冲突，以代码为准。
 
 ## 1. 总体结构
 
 Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装配：
 
-1. 读取环境变量并生成 `Settings`
-2. 初始化 SQLite
-3. 创建 repo、外部 client、业务 service
-4. 创建 Telegram `Application`
-5. 把 Feishu、WeCom、personal WeChat、scheduler 作为 sidecar 挂到 Telegram 生命周期
+1. 读取环境变量并按能力生成 `Settings`
+2. 判定当前宿主模式（Telegram / WeCom / Feishu）
+3. 初始化 SQLite
+4. 创建 repo、外部 client、业务 service
+5. 创建 Telegram `Application` 或 `NonTelegramRuntimeHost`
+6. 注入 shared runtime、sender、scheduler 所需 `bot_data`
+7. 启动 Telegram polling 或非 Telegram host 生命周期
 
-业务入口不是 Web API，而是多渠道私聊文本。所有渠道最终都进入 shared private-chat runtime：
+业务入口不是 Web API，而是多渠道私聊文本和 Telegram callback。它们最终都进入 shared private-chat runtime：
 
 `渠道适配层 -> shared private-chat runtime -> execution gate -> services -> repos / external clients -> reply`
 
@@ -66,11 +68,12 @@ Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装�
   - `JobRepo`
   - `JobEventRepo`
   - `DownloadMonitorRepo`
-  - `BtPendingRepo`
-  - `WatchlistRepo`
-  - `BtSubscriptionRepo`
-  - `AdultContentRegistryRepo`
-  - `TelegramUpdateRepo`
+- `BtPendingRepo`
+- `WatchlistRepo`
+- `BtSubscriptionRepo`
+- `AdultContentRegistryRepo`
+- `AdultDuplicateMemorySnapshotRepo`
+- `TelegramUpdateRepo`
 
 ### 4.2 外部 client
 
@@ -82,12 +85,13 @@ Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装�
 - `EmbyClient` / `JellyfinClient` / `PlexClient`
 - `WebSourceClient`
 - `FeishuClient`
-- `JavLibraryReadOnlyHelperClient`
+- Avmoo / Avsox / JavBus / Caribbeancom / JavLibrary read-only helper clients
 
 ### 4.3 业务 service
 
 - `SearchMediaService`
 - `AddToDownloaderService`
+- `AdultDuplicateMemoryService`
 - `GetDownloadStatusService`
 - `ImportToLibraryService`
 - `PostDownloadAutoImportService`
@@ -102,9 +106,11 @@ Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装�
 ### 4.4 运行时宿主
 
 - `build_telegram_application()` 创建 Telegram `Application`
-- `telegram_sidecar_runtime.py` 在 `post_init` / `post_shutdown` 中启动和关闭：
+- `_resolve_runtime_host_mode()` 会在 Telegram、WeCom-only、Feishu-only 之间选择宿主
+- `NonTelegramRuntimeHost` 为 WeCom-only / Feishu-only 提供最小 host 容器
+- `telegram_sidecar_runtime.py` / `non_telegram_runtime_host.py` 负责启动和关闭：
   - Feishu 长连接
-  - personal WeChat 轮询
+  - personal WeChat 轮询（仅 Telegram host）
   - WeCom webhook server
   - 下载完成轮询与自动导入 scheduler
   - BT subscription scheduler
@@ -121,10 +127,10 @@ Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装�
 
 随后统一进入下面的路由顺序：
 
-1. 开场路由：取消、direct BT、personal WeChat 登录、BT 只读、BT 批量确认
+1. 开场路由：取消、direct BT、personal WeChat 登录、BT 只读、BT 批量确认、adult duplicate override
 2. BT follow-up：处理链选择、媒体类型选择
 3. execution-gated 路由：状态、watchlist、btsub、import、cleanup
-4. 尾部路由：`confirm`、TMDB 关联、raw BT 目录选择、数字选片、搜索 fallback
+4. 尾部路由：`confirm`、TMDB 关联、raw BT 目录选择、数字选片 / callback 选资源、搜索 fallback
 
 `ExecutionGate` 会把只读操作直接放行，把副作用操作串行化。
 
@@ -133,6 +139,7 @@ Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装�
 ### Telegram
 
 - `telegram_runtime_adapter.py` 把 Update / CallbackQuery 接到 runtime
+- Telegram PT 资源卡与 adult BT richer reply 通过 inline buttons / callback data 接回 shared runtime
 - `telegram_update_repo` 负责 update 去重
 - Telegram 也是 sidecar 生命周期宿主
 
@@ -151,6 +158,7 @@ Luminarr 是一个单进程 Python 应用。`app/main.py` 在启动时完成装�
 
 - `wecom_adapter.py` 负责验签、解密、回包加密
 - `wecom_webhook_server.py` 提供轻量 HTTP webhook 入口
+- shared sender 当前不支持 WeCom 主动回发；WeCom 只具备入站文本最小画像
 
 ### 跨渠道统一层
 
@@ -181,6 +189,7 @@ BT 只读和 BT 批量预览共用同一个 service，但不会直接触发副�
 - 写入 downloader approval pending
 - 写入 pending `jobs`
 - 记录 `job_event`
+- 数字选资源 / Telegram callback 走 guarded auto-confirm；direct source / BT follow-up / duplicate override 保留显式 `confirm`
 - `confirm` 后真正调下载器
 - 记录 `download_monitor`
 - 维护成人资源历史状态
@@ -202,7 +211,7 @@ BT 只读和 BT 批量预览共用同一个 service，但不会直接触发副�
 
 - 跳过低质量 CAM / TS 等资源
 - 成人内容走 `AdultArchiveService`
-- 普通内容走 `ImportToLibraryService.import_by_task_ref()`
+- 普通内容走 `ImportToLibraryService.auto_import_by_task_ref()`
 
 ### 7.4 导入与后处理
 
@@ -211,7 +220,8 @@ BT 只读和 BT 批量预览共用同一个 service，但不会直接触发副�
 - 校验下载是否完成
 - 识别 raw BT 并阻断
 - 生成导入待确认
-- `confirm` 后执行硬链接导入
+- `import <ref>` 会走 `auto_import_by_task_ref()`：先创建 pending，再自动执行首轮 confirm
+- 首轮 confirm 默认执行硬链接导入
 - 跨文件系统时进入 copy-fallback pending
 - 记录 import 事件、媒体身份、目标路径
 
@@ -296,7 +306,7 @@ BT 只读和 BT 批量预览共用同一个 service，但不会直接触发副�
 
 ## 11. 当前结构性限制
 
-- Telegram `Application` 仍是整个 runtime host；其他渠道和 scheduler 不是独立宿主
+- Telegram 仍是默认宿主，但代码已支持 WeCom-only / Feishu-only 的最小文本私聊 host；当前不应再把系统描述成 Telegram-only
 - `shared private-chat runtime` 仍通过 `app.bot.telegram_bot` 读取大量常量和 service key
-- 配置校验仍是 Telegram / Prowlarr / Transmission 优先，不是按功能开关做按需校验
+- 渠道共享的是 runtime，不是 Telegram 同级的交付能力：按钮 / callback、实时进度卡、最终总结通知当前都主要绑定 Telegram
 - 若后续继续扩功能，最大的维护风险不是协议，而是 `services/` 下多个超大文件
