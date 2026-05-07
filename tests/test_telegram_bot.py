@@ -2132,7 +2132,7 @@ def test_handle_message_digit_routes_to_add_service() -> None:
     assert "✅ <b>任务已添加并开始下载</b>" in sent_text
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "📍 <b>当前状态：</b> 等待下载器首次同步" in sent_text
+    assert "<b>状态：</b> 等待下载器同步" in sent_text
     assert "待确认：下载" not in sent_text
 
 
@@ -2165,7 +2165,7 @@ def test_handle_callback_query_digit_routes_to_add_service() -> None:
     assert "✅ <b>任务已添加并开始下载</b>" in sent_text
     assert "<code>11</code>" in sent_text
     assert "<code>h11</code>" in sent_text
-    assert "📍 <b>当前状态：</b> 等待下载器首次同步" in sent_text
+    assert "<b>状态：</b> 等待下载器同步" in sent_text
     assert "待确认：下载" not in sent_text
 
 

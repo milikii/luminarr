@@ -237,7 +237,6 @@ async def _reply_telegram_add_success_message(
     text: str,
     download_monitor_repo: DownloadMonitorRepo | None = None,
 ) -> object:
-    task_identity = _extract_add_success_task_identity(original_text)
     result = await _send_or_reply_text(
         reply_text_func=reply_text_func,
         send_text_func=send_text_func,
