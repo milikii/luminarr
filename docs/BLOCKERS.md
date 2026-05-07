@@ -25,3 +25,9 @@
 - `make quality` 与 `make lint` 当前都失败在同一个既有问题：`app/bot/telegram_update_runtime.py:240` 存在未使用局部变量 `task_identity`。
 - `make verify-mainline` 当前失败在两条既有断言：`tests/test_telegram_bot.py::test_handle_message_digit_routes_to_add_service` 与 `tests/test_telegram_bot.py::test_handle_callback_query_digit_routes_to_add_service` 仍期待 `📍 当前状态：等待下载器首次同步`，而当前真实回复文本是 `状态：等待下载器同步`。
 - 解除方式：单独修复上述 lint / 测试漂移后，再重跑 `make quality`、`make verify-mainline`、`make lint`；本轮流程文档可继续使用，但仓库当前不满足“全仓全绿”。
+
+## 2026-05-08 — 流程文档任务收尾验证红灯已解除
+
+- 已删除 `app/bot/telegram_update_runtime.py:240` 的未使用局部变量 `task_identity`，`make lint` 与 `make quality` 恢复通过。
+- 已将 `tests/test_telegram_bot.py` 中 2 条 Telegram add-success 断言对齐到当前真实文案 `状态：等待下载器同步`，`make verify-mainline` 恢复通过。
+- 当前这组收尾验证 blocker 已解除；后续若再出现红灯，应按新的失败点单独记录。

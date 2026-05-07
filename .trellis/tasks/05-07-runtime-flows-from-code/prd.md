@@ -2,7 +2,7 @@
 
 ## Goal
 
-从当前仓库真实代码、现有架构文档和测试入口反推 Luminarr 的完整功能流程，并用 `docs/flows/` 反向纠偏顶层真相文档。输出不仅包括 `docs/flows/` 下的流程文档集合，还包括把 `docs/PRD.md`、`docs/ARCHITECTURE.md`、`docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/INDEX.md` 和相关 docs gate 更新到与代码一致的状态。
+从当前仓库真实代码、现有架构文档和测试入口反推 Luminarr 的完整功能流程，并用 `docs/flows/` 反向纠偏顶层真相文档。输出不仅包括 `docs/flows/` 下的流程文档集合，还包括把 `docs/PRD.md`、`docs/ARCHITECTURE.md`、`docs/NEXT_STEP.md`、`docs/STATUS.md`、`docs/INDEX.md` 和相关 docs gate 更新到与代码一致的状态；在收尾验证阶段，再顺手修复本轮暴露出的 3 个既有红灯，使仓库重新回到可验证状态。
 
 ## What I already know
 
@@ -12,12 +12,14 @@
 * 当前主线能力覆盖：搜索、候选选择、下载确认、状态查询、导入确认、后处理、cleanup、watchlist、成人 BT subscription、多渠道入口。
 * 当前项目处于收尾阶段；本轮不应扩功能、不应修改运行时行为。
 * 用户已明确指出：主要漂移不在 backend contracts，而在顶层摘要文档仍停留在 T01/T17/T19 之前的旧口径。
+* 本轮 docs 收口完成后，用户已明确要求继续修复 3 个既有红灯：`make quality` / `make lint` 的未使用变量，以及 `make verify-mainline` 中 2 条仍断言旧文案的 Telegram 测试。
 
 ## Assumptions (temporary)
 
 * `docs/flows/` 继续作为接近代码的 runtime truth，不替代顶层摘要层，但需要被顶层文档明确引用。
 * 本轮允许修正顶层文档对审批口径、宿主能力、Telegram-first 交互、渠道能力矩阵和 pure BT 定位的失真描述。
 * 本轮允许补 docs gate，专门约束 `docs/STATUS.md` 与 `docs/NEXT_STEP.md` 对最新真实 Telegram smoke 结论的一致性。
+* 后续红灯修复应保持行为不变：只去掉无用局部变量，并把测试文案对齐到当前真实输出。
 
 ## Open Questions
 
@@ -43,7 +45,10 @@
   * pure BT：文档必须明确它是“代码保留、提示收起”的兼容分支，而不是与 PT / 成人 BT 同权的用户主链。
 * `docs/INDEX.md` 需要把 `docs/flows/` 纳入 AI / 开发者阅读路径。
 * `docs/SEARCH_REPLY_PRESENTATION_PLAN.md` 需要被标记为 superseded 或归档，避免与已交付 Telegram-first 行为相冲突。
-* 本轮不修改应用代码、不新增运行依赖；允许对 docs gate 测试做最小必要变更。
+* 文档收口完成后，允许做 2 个最小代码/测试修复：
+  * 删除 `app/bot/telegram_update_runtime.py` 中未使用的 `task_identity` 局部变量，恢复 `make lint` / `make quality`
+  * 将 `tests/test_telegram_bot.py` 中 2 条旧断言从“等待下载器首次同步”对齐到当前真实文案“等待下载器同步”，恢复 `make verify-mainline`
+* 不新增运行依赖，不借机改业务逻辑，不扩大到其他无关测试或重构。
 
 ## Acceptance Criteria (evolving)
 
@@ -51,7 +56,9 @@
 * [ ] `docs/PRD.md`、`docs/ARCHITECTURE.md`、`docs/NEXT_STEP.md`、`docs/STATUS.md` 对当前代码和 `docs/flows/` 没有明显冲突。
 * [ ] 顶层文档已明确 guarded auto-confirm、capability-based host、Telegram-first callback 主链、渠道能力矩阵和 pure BT 兼容分支定位。
 * [ ] docs gate 新增至少一条跨文档一致性检查，用来约束最新真实 Telegram smoke 结论不打架。
-* [ ] 本轮没有应用代码行为改动。
+* [ ] `app/bot/telegram_update_runtime.py` 的未使用变量红灯已移除。
+* [ ] `tests/test_telegram_bot.py` 的 2 条 Telegram add-success 断言已与真实输出对齐。
+* [ ] `make quality`、`make lint`、`make verify-mainline` 通过，且不通过的话必须能明确归因到本轮范围之外的问题。
 
 ## Definition of Done (team quality bar)
 
@@ -66,6 +73,7 @@
 * 任何业务逻辑、配置能力、依赖、架构边界的修改
 * 新功能设计或产品重定义
 * 为了“写得更完整”而把顶层摘要文档膨胀成逐函数说明
+* 借修红灯顺手改 Telegram 交付语义、下载状态文案或运行时行为
 * 自动发布、push 或提交
 
 ## Technical Notes
@@ -87,4 +95,7 @@
   * `app/bot/shared_private_chat_sender.py`
   * `app/bot/bt_processing_path_runtime.py`
   * `app/bot/query_text_runtime.py`
-* 输出形式倾向于“flows truth + 顶层摘要纠偏 + docs gate 补强”。
+* 收尾红灯修复触点仅限：
+  * `app/bot/telegram_update_runtime.py`
+  * `tests/test_telegram_bot.py`
+* 输出形式倾向于“flows truth + 顶层摘要纠偏 + docs gate 补强 + 最小红灯修复”。
