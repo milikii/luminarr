@@ -533,3 +533,37 @@ Documented runtime flows, reconciled top-level docs to code truth, strengthened 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 16: Subtitle translation pipeline hardening
+
+**Date**: 2026-05-08
+**Task**: Subtitle translation pipeline hardening
+**Branch**: `main`
+
+### Summary
+
+Hardened subtitle translation with resumable chunk progress, configurable ASS font sizes, spec updates, and real-provider smoke evidence.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e6274c2` | (see git log) |
+| `ad364ca` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
