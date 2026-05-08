@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for relevant subtitle translation guidance."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Current subtitle translation contracts and newly added resumability/ASS output expectations."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Quality gate expectations for a focused subtitle timing feature."}
+{"file": ".trellis/tasks/archive/2026-05/05-08-subtitle-translation-proxy/research/oss-llm-subtitle-translation-patterns.md", "reason": "Background research from the prior subtitle hardening task, useful context for what should stay out of scope."}
+{"file": ".trellis/tasks/05-08-subtitle-offset-timing/research/auto-subtitle-sync-options.md", "reason": "Current automatic sync options research that justifies ffsubsync as the MVP backend and keeps Whisper/ASR out of scope."}

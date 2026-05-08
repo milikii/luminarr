@@ -1,1 +1,5 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for subtitle timing validation."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Check that timing adjustments preserve current subtitle translation output contracts."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check repository verification expectations stay green after adding offset support."}
+{"file": ".trellis/tasks/archive/2026-05/05-08-subtitle-translation-proxy/research/oss-llm-subtitle-translation-patterns.md", "reason": "Prior task research gives context for keeping offset MVP separate from full auto-sync."}
+{"file": ".trellis/tasks/05-08-subtitle-offset-timing/research/auto-subtitle-sync-options.md", "reason": "Check implementation against the current auto-sync MVP decision and its stated non-goals."}

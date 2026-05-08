@@ -925,3 +925,27 @@
 
 ### 下轮目标
 - 若继续打磨字幕体验，先决定是否实现固定 offset 校时；若继续收尾，则整理 commit 分组并提交当前 task。
+
+## Round 52 — 2026-05-08 22:51
+
+### 完成
+- 为新的 SRT 字幕翻译主链默认接入 `ffsubsync`：先对源英文 SRT 做自动同步，再基于同步后的时间轴生成 plain `.zh.srt`，并从 plain 输出重建 `.dual.ass`。
+- 保持自动同步的 fail-soft 合同：`ffsubsync` 缺失、超时、非零退出或坏输出时，只记 operational log，不阻断 plain/dual 字幕产出。
+- 将 `ffsubsync` 的运行时前置补齐到 `requirements.txt`、`Dockerfile` 与 `.env.example`，并把对应约束写回 `.trellis/spec/backend/subtitle-translation-contracts.md`。
+- 根据 `trellis-check` 反馈补了一处写出顺序问题：现在只有 plain `.zh.srt` 成功落盘后才清 progress state；若 plain 写失败，会清掉已生成的 `.dual.ass` 残件并保留 progress state 供续跑。
+
+### 测试状态
+- 通过: 7 / 总计: 7
+- `./.venv/bin/python -m pytest -q tests/test_subtitle_translator.py`
+- `./.venv/bin/python -m pytest -q tests/test_config.py -k 'subtitle'`
+- `./.venv/bin/python -m pytest -q tests/test_main.py -k 'subtitle_translation or cast_localization or subtitle_ass_font_sizes'`
+- `make lint`
+- `make quality`
+- `make verify-mainline`
+
+### 遗留 / 下轮继续
+- 当前没有额外的代码级 blocker；剩余风险主要是运行时安装面：本地 Python 3.12 裸环境安装 `ffsubsync` 可能需要 `gcc`，但缺失时当前实现会 fail-soft。
+- 这轮没有再跑真实 `ffsubsync + 真实视频` 的整片端到端样本；真实行为证据目前来自单测和代码审查。
+
+### 下轮目标
+- 若继续推进字幕体验，可针对临时副本补一次真实 `ffsubsync` 端到端样本验证；若先收尾，则整理 commit 分组并提交 `subtitle-offset-timing` 当前实现。
