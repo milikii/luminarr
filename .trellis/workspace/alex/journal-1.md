@@ -567,3 +567,38 @@ Hardened subtitle translation with resumable chunk progress, configurable ASS fo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 17: Subtitle automatic sync via ffsubsync
+
+**Date**: 2026-05-08
+**Task**: Subtitle automatic sync via ffsubsync
+**Branch**: `main`
+
+### Summary
+
+Added default ffsubsync-based subtitle auto-sync for new SRT translation runs, kept plain zh.srt as timing truth, regenerated dual.ass from synced plain timing, and preserved fail-soft behavior plus verification coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `31c0a9d` | (see git log) |
+| `742723c` | (see git log) |
+| `be142d5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

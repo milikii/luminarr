@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 16
+- **Total Sessions**: 17
 - **Last Active**: 2026-05-08
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~569 | Active |
+| `journal-1.md` | ~604 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 17 | 2026-05-08 | Subtitle automatic sync via ffsubsync | `31c0a9d`, `742723c`, `be142d5` | `main` |
 | 16 | 2026-05-08 | Subtitle translation pipeline hardening | `e6274c2`, `ad364ca` | `main` |
 | 15 | 2026-05-08 | Runtime flow docs reconciliation and finish-phase cleanup | `bea74fa`, `5052d3d`, `48b15e7`, `1121826`, `8752743` | `main` |
 | 14 | 2026-05-07 | Telegram smoke recovery and PT timeout hardening | `7ca87c8`, `8eaa08e`, `0890eab`, `85e526d`, `69326bf`, `2f86f0f`, `fab4be5` | `main` |
