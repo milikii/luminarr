@@ -239,12 +239,14 @@ class SubtitleTranslatorService:
         source_text: str,
         movie_title: str,
         subtitle_path: Path,
+        reference_video_path: Path | None,
         trusted_name_map: dict[str, str],
     ) -> tuple[str | None, str | None]:
         return _translate_srt_subtitle_content(
             source_text=source_text,
             movie_title=movie_title,
             subtitle_path=subtitle_path,
+            reference_video_path=reference_video_path,
             translate_lines=lambda source_lines, resolved_movie_title: self._translate_lines_professional(
                 source_lines=source_lines,
                 movie_title=resolved_movie_title,

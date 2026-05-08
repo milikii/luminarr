@@ -8,7 +8,7 @@ WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg gcc \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -r /app/requirements.txt
 

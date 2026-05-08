@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -28,6 +30,7 @@ class _SubtitleFile:
     source_path: Path
     translated_path: Path
     kind: str
+    reference_video_path: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +87,7 @@ _BILINGUAL_ASS_FONT_FAMILY = "LXGW WenKai"
 _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE = 44
 _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE = 24
 _SUBTITLE_TRANSLATION_CHUNK_SIZE = 20
+_DEFAULT_FFSUBSYNC_TIMEOUT_SECONDS = 120.0
 _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX = {
     "ass": ".ass",
     "mov_text": ".srt",
@@ -160,7 +164,7 @@ def _extract_adjacent_subtitle_suffix(*, target_path: Path, subtitle_path: Path)
     return None
 
 
-def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
+def _build_subtitle_file(path: Path, *, reference_video_path: Path | None = None) -> _SubtitleFile | None:
     if not path.exists() or not path.is_file():
         return None
     if path.name.lower().endswith(_BILINGUAL_ASS_OUTPUT_SUFFIX):
@@ -169,9 +173,19 @@ def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
         return None
     suffix = path.suffix.lower()
     if suffix == ".srt":
-        return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.srt"), kind="srt")
+        return _SubtitleFile(
+            source_path=path,
+            translated_path=path.with_suffix(".zh.srt"),
+            kind="srt",
+            reference_video_path=reference_video_path,
+        )
     if suffix == ".ass":
-        return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.ass"), kind="ass")
+        return _SubtitleFile(
+            source_path=path,
+            translated_path=path.with_suffix(".zh.ass"),
+            kind="ass",
+            reference_video_path=reference_video_path,
+        )
     return None
 
 
@@ -295,7 +309,7 @@ def _resolve_external_subtitle_files(video_path: Path) -> tuple[list[_SubtitleFi
     external_subtitle_files = [
         subtitle_file
         for path in external_subtitle_paths
-        if (subtitle_file := _build_subtitle_file(path)) is not None
+        if (subtitle_file := _build_subtitle_file(path, reference_video_path=video_path)) is not None
     ]
     if external_subtitle_files:
         return external_subtitle_files, "external"
@@ -336,8 +350,12 @@ def _build_embedded_subtitle_extract_command(
     ]
 
 
-def _resolve_extracted_subtitle_file(output_path: Path) -> tuple[_SubtitleFile | None, _SubtitleCommandFailure | None]:
-    subtitle_file = _build_subtitle_file(output_path)
+def _resolve_extracted_subtitle_file(
+    output_path: Path,
+    *,
+    reference_video_path: Path | None = None,
+) -> tuple[_SubtitleFile | None, _SubtitleCommandFailure | None]:
+    subtitle_file = _build_subtitle_file(output_path, reference_video_path=reference_video_path)
     if subtitle_file is not None:
         return subtitle_file, None
     return None, _SubtitleCommandFailure(
@@ -362,8 +380,8 @@ def _resolve_embedded_subtitle_extract_result(
             reason="extract_failed",
             problem=f"字幕翻译失败：提取英文内嵌字幕失败：{video_path}，原因：{problem}",
             fix="确认视频里确实有可提取的英文文本字幕流；若是图片字幕（PGS/VobSub），当前不会自动 OCR 翻译。",
-    )
-    return _resolve_extracted_subtitle_file(output_path)
+        )
+    return _resolve_extracted_subtitle_file(output_path, reference_video_path=video_path)
 
 
 def _extract_embedded_subtitle_file_for_video(
@@ -419,6 +437,118 @@ def _read_subtitle_source_text(source_path: Path) -> tuple[str | None, _Subtitle
     )
 
 
+def _build_subprocess_env_with_local_ffmpeg() -> dict[str, str] | None:
+    if not _LOCAL_FFMPEG_DIR.is_dir():
+        return None
+    env = os.environ.copy()
+    current_path = env.get("PATH", "")
+    env["PATH"] = (
+        f"{_LOCAL_FFMPEG_DIR}{os.pathsep}{current_path}"
+        if current_path
+        else str(_LOCAL_FFMPEG_DIR)
+    )
+    return env
+
+
+def _build_ffsubsync_command(
+    *,
+    command_path: str,
+    reference_video_path: Path,
+    subtitle_path: Path,
+    output_path: Path,
+) -> list[str]:
+    return [
+        command_path,
+        str(reference_video_path),
+        "-i",
+        str(subtitle_path),
+        "-o",
+        str(output_path),
+    ]
+
+
+def _auto_sync_srt_subtitle_text_with_ffsubsync(
+    *,
+    source_text: str,
+    subtitle_path: Path,
+    reference_video_path: Path | None,
+) -> str:
+    if reference_video_path is None or not reference_video_path.exists() or not reference_video_path.is_file():
+        return source_text
+    ffsubsync_command = shutil.which("ffsubsync")
+    if not ffsubsync_command:
+        emit_operational_log(
+            title="字幕自动校时失败",
+            detail=f"source={subtitle_path} video={reference_video_path} reason=ffsubsync unavailable",
+            fix_hint="安装 `ffsubsync` 后会自动启用字幕校时；当前会保留原始时间轴继续输出 plain/dual 字幕。",
+        )
+        return source_text
+
+    with tempfile.TemporaryDirectory(prefix="luminarr-ffsubsync-") as temp_dir:
+        output_path = Path(temp_dir) / subtitle_path.name
+        completed, failure = _run_subprocess_command(
+            command=_build_ffsubsync_command(
+                command_path=ffsubsync_command,
+                reference_video_path=reference_video_path,
+                subtitle_path=subtitle_path,
+                output_path=output_path,
+            ),
+            timeout_seconds=_DEFAULT_FFSUBSYNC_TIMEOUT_SECONDS,
+            missing_problem=f"字幕自动校时失败：系统缺少 ffsubsync，无法自动同步字幕：{subtitle_path}",
+            missing_fix=(
+                "安装 `ffsubsync`，并确认当前运行环境可执行该命令；当前会保留原始时间轴继续输出 plain/dual 字幕。"
+            ),
+            timeout_problem=f"字幕自动校时失败：ffsubsync 执行超时：source={subtitle_path} video={reference_video_path}",
+            timeout_fix=(
+                "检查视频/字幕文件是否可读，以及 ffsubsync/ffmpeg 是否能在当前环境正常运行；当前会保留原始时间轴继续输出。"
+            ),
+            env=_build_subprocess_env_with_local_ffmpeg(),
+        )
+        if failure is not None:
+            emit_operational_log(
+                title="字幕自动校时失败",
+                detail=f"source={subtitle_path} video={reference_video_path} reason={failure.problem}",
+                fix_hint=failure.fix,
+            )
+            return source_text
+        if completed is None:
+            return source_text
+        if completed.returncode != 0:
+            emit_operational_log(
+                title="字幕自动校时失败",
+                detail=(
+                    f"source={subtitle_path} video={reference_video_path} "
+                    f"stderr={(completed.stderr or '').strip()} stdout={(completed.stdout or '').strip()}"
+                ).strip(),
+                fix_hint=(
+                    "检查 ffsubsync / ffmpeg 是否可执行，并确认视频与字幕样本匹配；当前会保留原始时间轴继续输出 plain/dual 字幕。"
+                ),
+            )
+            return source_text
+        synced_text, read_failure = _read_subtitle_source_text(output_path)
+        if read_failure is not None or not synced_text:
+            failure_detail = read_failure.problem if read_failure is not None else "ffsubsync 输出为空"
+            emit_operational_log(
+                title="字幕自动校时失败",
+                detail=f"source={subtitle_path} video={reference_video_path} reason={failure_detail}",
+                fix_hint="检查 ffsubsync 输出文件是否生成且仍是可读的 `.srt`；当前会保留原始时间轴继续输出。",
+            )
+            return source_text
+        if not _parse_srt_blocks(synced_text):
+            emit_operational_log(
+                title="字幕自动校时失败",
+                detail=f"source={subtitle_path} video={reference_video_path} reason=ffsubsync 输出不是有效 SRT",
+                fix_hint="检查 ffsubsync 输出格式；当前会保留原始时间轴继续输出 plain/dual 字幕。",
+            )
+            return source_text
+        emit_operational_log(
+            title="字幕自动校时已应用",
+            detail=f"source={subtitle_path} video={reference_video_path} backend=ffsubsync",
+            fix_hint="plain `.zh.srt` 将作为同步后时间轴真相，`.dual.ass` 会基于它重生成。",
+        )
+        return synced_text
+
+
 def _subtitle_content_looks_chinese(source_path: Path) -> bool:
     source_text, failure = _read_subtitle_source_text(source_path)
     if failure is not None or not source_text:
@@ -448,7 +578,7 @@ def _translate_single_subtitle_file(
     *,
     subtitle_file: _SubtitleFile,
     movie_title: str,
-    translate_srt: Callable[[str, str, Path], tuple[str | None, str | None]],
+    translate_srt: Callable[[str, str, Path, Path | None], tuple[str | None, str | None]],
     translate_ass: Callable[[str, str, Path], tuple[str | None, str | None]],
 ) -> tuple[bool, str | None, _SubtitleCommandFailure | None]:
     source_text, read_failure = _read_subtitle_source_text(subtitle_file.source_path)
@@ -472,7 +602,9 @@ def _translate_single_subtitle_file(
         rendered_output=rendered_output,
     )
     if write_failure is not None:
+        _cleanup_bilingual_ass_sidecar(source_path=subtitle_file.source_path)
         return False, None, write_failure
+    _clear_subtitle_translation_progress(subtitle_file.source_path)
     return True, None, None
 
 
@@ -610,7 +742,7 @@ def _resolve_translated_subtitle_content(
     subtitle_file: _SubtitleFile,
     source_text: str,
     movie_title: str,
-    translate_srt: Callable[[str, str, Path], tuple[str | None, str | None]],
+    translate_srt: Callable[[str, str, Path, Path | None], tuple[str | None, str | None]],
     translate_ass: Callable[[str, str, Path], tuple[str | None, str | None]],
 ) -> tuple[str | None, str | None, _SubtitleCommandFailure | None]:
     if subtitle_file.kind == "srt":
@@ -618,6 +750,7 @@ def _resolve_translated_subtitle_content(
             source_text=source_text,
             movie_title=movie_title,
             subtitle_path=subtitle_file.source_path,
+            reference_video_path=subtitle_file.reference_video_path,
         )
         return rendered_output, error_message, None
     if subtitle_file.kind == "ass":
@@ -1220,11 +1353,17 @@ def _translate_srt_subtitle_content(
     source_text: str,
     movie_title: str,
     subtitle_path: Path,
+    reference_video_path: Path | None,
     translate_lines: Callable[[list[str], str], list[str]],
     bilingual_ass_chinese_font_size: int = _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE,
     bilingual_ass_english_font_size: int = _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE,
 ) -> tuple[str | None, str | None]:
-    blocks = _parse_srt_blocks(source_text)
+    resolved_source_text = _auto_sync_srt_subtitle_text_with_ffsubsync(
+        source_text=source_text,
+        subtitle_path=subtitle_path,
+        reference_video_path=reference_video_path,
+    )
+    blocks = _parse_srt_blocks(resolved_source_text)
     if not blocks:
         message = f"字幕翻译失败：{subtitle_path} 不是有效 SRT 或内容为空。"
         _print_colored_error(
@@ -1251,9 +1390,11 @@ def _translate_srt_subtitle_content(
         _SrtBlock(index=block.index, timecode=block.timecode, text=translated_text)
         for block, translated_text in zip(blocks, translated_lines)
     ]
-    bilingual_ass_output = _render_bilingual_ass_from_srt_blocks(
-        blocks=blocks,
-        translated_blocks=translated_blocks,
+    rendered_output = _render_srt(translated_blocks)
+    bilingual_ass_output = _render_bilingual_ass_from_plain_srt_output(
+        source_blocks=blocks,
+        translated_srt_output=rendered_output,
+        fallback_translated_blocks=translated_blocks,
         chinese_font_size=bilingual_ass_chinese_font_size,
         english_font_size=bilingual_ass_english_font_size,
     )
@@ -1261,8 +1402,7 @@ def _translate_srt_subtitle_content(
         source_path=subtitle_path,
         bilingual_output=bilingual_ass_output,
     )
-    _clear_subtitle_translation_progress(subtitle_path)
-    return _render_srt(translated_blocks), None
+    return rendered_output, None
 
 
 def _translate_ass_subtitle_content(
@@ -1309,7 +1449,6 @@ def _translate_ass_subtitle_content(
             english_font_size=bilingual_ass_english_font_size,
         ),
     )
-    _clear_subtitle_translation_progress(subtitle_path)
     return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
 
 
@@ -1321,14 +1460,17 @@ def _run_subprocess_command(
     missing_fix: str,
     timeout_problem: str,
     timeout_fix: str,
+    env: dict[str, str] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str] | None, _SubtitleCommandFailure | None]:
     try:
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout_seconds,
-        )
+        run_kwargs: dict[str, object] = {
+            "capture_output": True,
+            "text": True,
+            "timeout": timeout_seconds,
+        }
+        if env is not None:
+            run_kwargs["env"] = env
+        completed = subprocess.run(command, **run_kwargs)
     except FileNotFoundError:
         return None, _SubtitleCommandFailure(reason="missing", problem=missing_problem, fix=missing_fix)
     except subprocess.TimeoutExpired:
@@ -1396,6 +1538,25 @@ def _render_bilingual_ass_from_srt_blocks(
             f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{bilingual_text}"
         )
     return header + "\n".join(dialogue_lines) + "\n"
+
+
+def _render_bilingual_ass_from_plain_srt_output(
+    *,
+    source_blocks: list[_SrtBlock],
+    translated_srt_output: str,
+    fallback_translated_blocks: list[_SrtBlock],
+    chinese_font_size: int = _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE,
+    english_font_size: int = _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE,
+) -> str:
+    translated_blocks = _parse_srt_blocks(translated_srt_output)
+    if len(translated_blocks) != len(source_blocks):
+        translated_blocks = fallback_translated_blocks
+    return _render_bilingual_ass_from_srt_blocks(
+        blocks=source_blocks,
+        translated_blocks=translated_blocks,
+        chinese_font_size=chinese_font_size,
+        english_font_size=english_font_size,
+    )
 
 
 def _render_bilingual_ass_from_ass_lines(
@@ -1508,6 +1669,18 @@ def _write_bilingual_ass_sidecar(*, source_path: Path, bilingual_output: str) ->
             title="双排字幕写入失败",
             detail=f"source={source_path} target={bilingual_path} 错误={exc}",
             fix_hint="检查字幕目录写权限和磁盘空间；当前 plain 字幕仍会保留。",
+        )
+
+
+def _cleanup_bilingual_ass_sidecar(*, source_path: Path) -> None:
+    bilingual_path = source_path.with_suffix(_BILINGUAL_ASS_OUTPUT_SUFFIX)
+    try:
+        bilingual_path.unlink(missing_ok=True)
+    except OSError as exc:
+        emit_operational_log(
+            title="双排字幕清理失败",
+            detail=f"source={source_path} target={bilingual_path} 错误={exc}",
+            fix_hint="检查字幕目录写权限；重新执行翻译前可手动删除残留 `.dual.ass` 文件。",
         )
 
 

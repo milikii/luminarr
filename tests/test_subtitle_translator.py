@@ -61,6 +61,142 @@ def test_translate_for_import_creates_zh_subtitle_for_file_target(tmp_path: Path
     assert "hello movie" in bilingual_payload
 
 
+def test_auto_sync_srt_subtitle_text_with_ffsubsync_uses_synced_output_on_success(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    video_path = tmp_path / "Interstellar (2014).mkv"
+    video_path.write_bytes(b"video")
+    subtitle_path = tmp_path / "Interstellar (2014).srt"
+    subtitle_path.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+    synced_text = "1\n00:00:05,000 --> 00:00:07,000\nhello movie\n"
+
+    def fake_run_subprocess_command(
+        *,
+        command: list[str],
+        timeout_seconds: float,
+        missing_problem: str,
+        missing_fix: str,
+        timeout_problem: str,
+        timeout_fix: str,
+        env: dict[str, str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str] | None, subtitle_support._SubtitleCommandFailure | None]:
+        assert str(video_path) in command
+        assert str(subtitle_path) in command
+        assert timeout_seconds > 0
+        assert env is None or "PATH" in env
+        output_path = Path(command[command.index("-o") + 1])
+        output_path.write_text(synced_text, encoding="utf-8")
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr=""), None
+
+    monkeypatch.setattr(subtitle_support.shutil, "which", lambda name: name if name == "ffsubsync" else None)
+    monkeypatch.setattr(subtitle_support, "_run_subprocess_command", fake_run_subprocess_command)
+
+    result = subtitle_support._auto_sync_srt_subtitle_text_with_ffsubsync(
+        source_text=subtitle_path.read_text(encoding="utf-8"),
+        subtitle_path=subtitle_path,
+        reference_video_path=video_path,
+    )
+
+    assert result == synced_text
+
+
+def test_auto_sync_srt_subtitle_text_with_ffsubsync_logs_failure_and_falls_back_to_original(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    video_path = tmp_path / "Interstellar (2014).mkv"
+    video_path.write_bytes(b"video")
+    subtitle_path = tmp_path / "Interstellar (2014).srt"
+    original_text = "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n"
+    subtitle_path.write_text(original_text, encoding="utf-8")
+    logged: list[dict[str, str]] = []
+
+    def fake_emit_operational_log(*, title: str, detail: str, fix_hint: str) -> None:
+        logged.append({"title": title, "detail": detail, "fix_hint": fix_hint})
+
+    def fake_run_subprocess_command(
+        *,
+        command: list[str],
+        timeout_seconds: float,
+        missing_problem: str,
+        missing_fix: str,
+        timeout_problem: str,
+        timeout_fix: str,
+        env: dict[str, str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str] | None, subtitle_support._SubtitleCommandFailure | None]:
+        return subprocess.CompletedProcess(args=command, returncode=1, stdout="", stderr="sync exploded"), None
+
+    monkeypatch.setattr(subtitle_support.shutil, "which", lambda name: name if name == "ffsubsync" else None)
+    monkeypatch.setattr(subtitle_support, "emit_operational_log", fake_emit_operational_log)
+    monkeypatch.setattr(subtitle_support, "_run_subprocess_command", fake_run_subprocess_command)
+
+    result = subtitle_support._auto_sync_srt_subtitle_text_with_ffsubsync(
+        source_text=original_text,
+        subtitle_path=subtitle_path,
+        reference_video_path=video_path,
+    )
+
+    assert result == original_text
+    assert any(entry["title"] == "字幕自动校时失败" for entry in logged)
+    assert any("sync exploded" in entry["detail"] for entry in logged)
+
+
+def test_translate_for_import_uses_synced_srt_timing_for_plain_and_dual_outputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+    synced_text = "1\n00:00:05,000 --> 00:00:07,000\nhello movie\n"
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        source_lines = user_payload.get("source_lines")
+        assert isinstance(source_lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
+
+    def fake_auto_sync(*, source_text: str, subtitle_path: Path, reference_video_path: Path | None) -> str:
+        assert source_text == subtitle_file.read_text(encoding="utf-8")
+        assert subtitle_path == subtitle_file
+        assert reference_video_path == target_file
+        return synced_text
+
+    monkeypatch.setattr(
+        subtitle_support,
+        "_auto_sync_srt_subtitle_text_with_ffsubsync",
+        fake_auto_sync,
+    )
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-synced-timing",
+            task_id="synced-timing",
+            task_hash="hash-synced-timing",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Interstellar (2014).zh.srt"
+    bilingual_file = library_dir / "Interstellar (2014).dual.ass"
+    assert result.success is True
+    assert "00:00:05,000 --> 00:00:07,000" in translated_file.read_text(encoding="utf-8")
+    assert "Dialogue: 0,0:00:05.00,0:00:07.00,Default" in bilingual_file.read_text(encoding="utf-8")
+
+
 def test_translate_for_import_success_message_prefers_metadata_title(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)
@@ -795,7 +931,13 @@ def test_translate_for_import_directory_reports_chinese_embedded_skip_when_all_e
     episode1.write_bytes(b"video-1")
     episode2.write_bytes(b"video-2")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -875,10 +1017,19 @@ def test_translate_for_import_directory_mixes_external_and_embedded_episode_subt
         assert isinstance(source_lines, list)
         return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
+        if _command_name(args) == "ffsubsync":
+            assert env is None or "PATH" in env
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="ffsubsync unavailable")
         if _command_name(args) == "ffprobe":
             assert str(episode2) in args
             return subprocess.CompletedProcess(
@@ -935,7 +1086,13 @@ def test_translate_for_import_skips_when_no_subtitle_file(tmp_path: Path, monkey
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -1117,10 +1274,19 @@ def test_translate_for_import_extracts_embedded_english_subtitle_when_no_externa
         assert isinstance(source_lines, list)
         return json.dumps({"translations": [f"专业译文：{line}" for line in source_lines]}, ensure_ascii=False)
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
+        if _command_name(args) == "ffsubsync":
+            assert env is None or "PATH" in env
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="ffsubsync unavailable")
         if _command_name(args) == "ffprobe":
             return subprocess.CompletedProcess(
                 args=args,
@@ -1180,7 +1346,13 @@ def test_translate_for_import_skips_when_embedded_chinese_subtitle_exists(
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -1226,7 +1398,13 @@ def test_translate_for_import_prefers_chinese_embedded_skip_over_extractable_eng
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -1278,7 +1456,13 @@ def test_translate_for_import_skips_when_only_non_text_embedded_english_subtitle
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -1319,7 +1503,13 @@ def test_probe_embedded_subtitles_falls_back_to_ffmpeg_when_ffprobe_missing(tmp_
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         if _command_name(args) == "ffprobe":
             raise FileNotFoundError("ffprobe")
         assert _command_name(args) == "ffmpeg"
@@ -1354,7 +1544,13 @@ def test_probe_embedded_subtitles_prefers_repo_local_ffprobe_when_present(tmp_pa
 
     monkeypatch.setattr(subtitle_support, "_LOCAL_FFMPEG_DIR", local_ffmpeg_dir)
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert args[0] == str(local_ffprobe)
         return subprocess.CompletedProcess(
             args=args,
@@ -1404,10 +1600,19 @@ def test_translate_for_import_prefers_repo_local_ffmpeg_for_embedded_subtitle_ex
 
     monkeypatch.setattr(subtitle_support, "_LOCAL_FFMPEG_DIR", local_ffmpeg_dir)
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
+        if _command_name(args) == "ffsubsync":
+            assert env is None or "PATH" in env
+            return subprocess.CompletedProcess(args=args, returncode=1, stdout="", stderr="ffsubsync unavailable")
         if Path(args[0]) == local_ffprobe:
             return subprocess.CompletedProcess(
                 args=args,
@@ -1463,7 +1668,13 @@ def test_probe_embedded_subtitles_fails_when_ffprobe_and_ffmpeg_are_both_missing
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         if _command_name(args) == "ffprobe":
             raise FileNotFoundError("ffprobe")
         if _command_name(args) == "ffmpeg":
@@ -1485,7 +1696,13 @@ def test_probe_embedded_subtitles_ignores_invalid_ffprobe_stream_items(tmp_path:
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -1528,7 +1745,13 @@ def test_probe_embedded_subtitles_fails_when_ffprobe_output_is_not_json(tmp_path
     target_file = tmp_path / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert _command_name(args) == "ffprobe"
         return subprocess.CompletedProcess(
             args=args,
@@ -1557,7 +1780,13 @@ def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_inv
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
@@ -1584,7 +1813,8 @@ def test_translate_for_import_fails_when_extracted_embedded_subtitle_file_is_inv
             return subprocess.CompletedProcess(args=args, returncode=0, stdout="", stderr="")
         raise AssertionError(f"unexpected command: {args}")
 
-    def fake_build_subtitle_file(_: Path) -> None:
+    def fake_build_subtitle_file(_: Path, *, reference_video_path: Path | None = None) -> None:
+        assert reference_video_path == target_file
         return None
 
     monkeypatch.setattr(subtitle_support.subprocess, "run", fake_run)
@@ -1614,7 +1844,13 @@ def test_translate_for_import_cleans_partial_extracted_subtitle_when_ffmpeg_extr
     target_file = library_dir / "Interstellar (2014).mkv"
     target_file.write_bytes(b"video")
 
-    def fake_run(args: list[str], capture_output: bool, text: bool, timeout: float) -> subprocess.CompletedProcess[str]:
+    def fake_run(
+        args: list[str],
+        capture_output: bool,
+        text: bool,
+        timeout: float,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         assert capture_output is True
         assert text is True
         assert timeout == 60.0
@@ -1776,9 +2012,12 @@ def test_translate_for_import_fails_when_writing_translated_subtitle(tmp_path: P
         )
     )
 
+    progress_path = subtitle_support._build_subtitle_progress_path(subtitle_file)
     assert result.success is False
     assert result.skipped is False
     assert "写入字幕文件失败" in result.message
+    assert not (library_dir / "Interstellar (2014).dual.ass").exists()
+    assert progress_path.exists()
 
 
 def test_translate_for_import_keeps_plain_output_when_bilingual_sidecar_write_fails(
