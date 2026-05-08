@@ -8,6 +8,7 @@ from app.services.subtitle_translation_support import (
     _EmbeddedSubtitleStream,
     _SubtitleFile,
     _SubtitleCommandFailure,
+    _clear_subtitle_translation_progress,
     _SubtitleImportPreparationFailure,
     _build_subtitle_translation_summary,
     _extract_embedded_subtitle_file_for_video,
@@ -50,6 +51,8 @@ class SubtitleTranslatorService:
         model: str = "",
         timeout_seconds: float = 60.0,
         proxy_url: str = "",
+        bilingual_ass_chinese_font_size: int = 44,
+        bilingual_ass_english_font_size: int = 24,
         request_chat_completion_func: Callable[[str, dict[str, object]], str] | None = None,
     ) -> None:
         self._api_key = api_key.strip()
@@ -57,6 +60,8 @@ class SubtitleTranslatorService:
         self._model = model.strip() or "gpt-5.4"
         self._timeout_seconds = max(10.0, timeout_seconds)
         self._proxy_url = proxy_url.strip()
+        self._bilingual_ass_chinese_font_size = max(1, int(bilingual_ass_chinese_font_size))
+        self._bilingual_ass_english_font_size = max(1, int(bilingual_ass_english_font_size))
         self._request_chat_completion_func = request_chat_completion_func
 
     def translate_for_import(self, translate_input: SubtitleTranslateInput) -> SubtitleTranslateResult:
@@ -184,6 +189,7 @@ class SubtitleTranslatorService:
         translated_count = 0
         for subtitle_file in subtitle_files:
             if subtitle_file.translated_path.exists():
+                _clear_subtitle_translation_progress(subtitle_file.source_path)
                 continue
             result = self._translate_single_file(
                 subtitle_file=subtitle_file,
@@ -244,6 +250,8 @@ class SubtitleTranslatorService:
                 movie_title=resolved_movie_title,
                 trusted_name_map=trusted_name_map,
             ),
+            bilingual_ass_chinese_font_size=self._bilingual_ass_chinese_font_size,
+            bilingual_ass_english_font_size=self._bilingual_ass_english_font_size,
         )
 
     def _translate_ass_text(
@@ -263,6 +271,8 @@ class SubtitleTranslatorService:
                 movie_title=resolved_movie_title,
                 trusted_name_map=trusted_name_map,
             ),
+            bilingual_ass_chinese_font_size=self._bilingual_ass_chinese_font_size,
+            bilingual_ass_english_font_size=self._bilingual_ass_english_font_size,
         )
 
     def _translate_lines_professional(

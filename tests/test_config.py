@@ -40,6 +40,8 @@ def test_load_settings_reads_token() -> None:
     assert settings.subtitle_translation_model == "gpt-5.4"
     assert settings.subtitle_translation_timeout_seconds == 60.0
     assert settings.subtitle_translation_use_proxy is False
+    assert settings.subtitle_ass_chinese_font_size == 44
+    assert settings.subtitle_ass_english_font_size == 24
     assert settings.sqlite_db_path == "/data/luminarr.db"
     assert settings.feishu_app_id == ""
     assert settings.feishu_app_secret == ""
@@ -345,6 +347,24 @@ def test_load_settings_reads_subtitle_translation_settings() -> None:
     assert settings.subtitle_translation_base_url == "https://openai.example/v1"
     assert settings.subtitle_translation_model == "gpt-5.4"
     assert settings.subtitle_translation_timeout_seconds == 45.0
+    assert settings.subtitle_ass_chinese_font_size == 44
+    assert settings.subtitle_ass_english_font_size == 24
+
+
+def test_load_settings_reads_subtitle_ass_font_sizes() -> None:
+    settings = load_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "token-value",
+            "PROWLARR_BASE_URL": "http://prowlarr:9696/",
+            "PROWLARR_API_KEY": "api-key",
+            "TRANSMISSION_BASE_URL": "http://transmission:9091/",
+            "SUBTITLE_ASS_CHINESE_FONT_SIZE": "52",
+            "SUBTITLE_ASS_ENGLISH_FONT_SIZE": "30",
+        }
+    )
+
+    assert settings.subtitle_ass_chinese_font_size == 52
+    assert settings.subtitle_ass_english_font_size == 30
 
 
 def test_load_settings_strips_whitespace_from_subtitle_timeout() -> None:

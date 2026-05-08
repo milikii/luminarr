@@ -73,7 +73,35 @@ Subtitle chat-completion payload must include:
   - Chinese on the top line
   - English on the bottom line in smaller text
   - `LXGW WenKai` / `LxgwWenKai` as the preferred Chinese font family name
+- Chinese and English ASS font sizes must be runtime-configurable rather than hard-coded, so local playback can tune readability without code changes.
 - If bilingual sidecar generation fails, the plain subtitle output must still succeed and remain the authoritative fallback.
+
+#### Long-running translation resilience contract
+
+- Subtitle translation for `.srt` / `.ass` must support resumable progress for long-running files.
+- Progress state must be persisted beside the source subtitle as a `.translation-progress.json` file.
+- Progress state must record at least:
+  - source hash
+  - subtitle kind
+  - chunk size
+  - translated lines accumulated so far
+  - last failure reason
+- On rerun, if source hash / kind / chunk size still match, translation must resume from the first untranslated chunk instead of restarting from zero.
+- If the final translated subtitle already exists, stale progress state must be cleared and the run should skip cleanly.
+- One-to-one line mapping remains mandatory even in resumed mode; resumability must not relax the output contract.
+
+#### Chunk observability contract
+
+- The translation path must emit chunk-level observable progress when a chunk succeeds, including:
+  - absolute chunk index
+  - total chunk count
+  - translated line count vs total line count
+- Retries and split fallbacks must also be observable with:
+  - chunk label
+  - retry attempt number
+  - line count
+  - last error
+- These signals may be logged operationally and/or persisted in progress state, but they must be visible without re-running the whole translation blindly.
 
 ### 4. Validation & Error Matrix
 
@@ -84,6 +112,7 @@ Subtitle chat-completion payload must include:
 - Non-string or empty `trusted_name_map` entries in metadata -> ignore invalid entries, do not fail subtitle translation.
 - Model output line-count mismatch or invalid JSON -> fail subtitle translation for that import step, preserving existing fail-soft import behavior.
 - Bilingual ASS/SSA sidecar generation failure -> log a warning and keep the plain translation output; do not fail the import-time subtitle step.
+- Mid-run timeout / 502 / 503 / upstream disconnect during a later chunk -> keep previously translated chunk progress persisted; the next run resumes instead of discarding successful work.
 
 ## Scenario: AI cast localization supplement
 
@@ -187,6 +216,10 @@ Subtitle chat-completion payload must include:
   - existing unsupported-format / bad-JSON / bad-encoding cases still behave correctly
   - plain translation still succeeds when bilingual sidecar write fails
   - bilingual ASS sidecar is generated for both SRT and ASS inputs
+  - progress state is persisted after successful chunks when a later chunk fails
+  - rerun resumes from saved progress instead of restarting from zero
+  - configured ASS font sizes are reflected in generated bilingual output
+  - retry observability includes absolute chunk label and attempt count
 
 - `tests/test_main.py`
   - startup wiring still constructs subtitle translation path successfully after credits lookup plumbing

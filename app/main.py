@@ -582,6 +582,8 @@ def main() -> None:
             model=settings.subtitle_translation_model,
             timeout_seconds=settings.subtitle_translation_timeout_seconds,
             proxy_url=_resolve_subtitle_translation_proxy_url(settings),
+            bilingual_ass_chinese_font_size=settings.subtitle_ass_chinese_font_size,
+            bilingual_ass_english_font_size=settings.subtitle_ass_english_font_size,
         ).translate_for_import,
         job_event_repo=job_event_repo,
         approval_repo=approval_repo,

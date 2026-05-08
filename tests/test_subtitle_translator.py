@@ -364,6 +364,204 @@ def test_translate_for_import_fails_when_single_line_chunk_still_drifts(tmp_path
     assert not (library_dir / "Akron.zh.srt").exists()
 
 
+def test_translate_for_import_resumes_from_saved_progress_state(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Akron.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Akron.srt"
+    subtitle_file.write_text(
+        "\n\n".join(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index + 1:02d},000\nline {index}"
+            for index in range(1, 43)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    source_lines = [f"line {index}" for index in range(1, 43)]
+    progress_path = subtitle_support._build_subtitle_progress_path(subtitle_file)
+    source_hash = subtitle_support._hash_subtitle_source_text("\n".join(source_lines))
+    subtitle_support._persist_subtitle_translation_progress(
+        source_path=subtitle_file,
+        state=subtitle_support._SubtitleTranslationProgressState(
+            source_hash=source_hash,
+            kind="srt",
+            chunk_size=20,
+            translated_lines=tuple(f"已恢复译文：{line}" for line in source_lines[:20]),
+        ),
+    )
+
+    seen_chunk_sizes: list[int] = []
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        lines = user_payload.get("source_lines")
+        assert isinstance(lines, list)
+        seen_chunk_sizes.append(len(lines))
+        return json.dumps({"translations": [f"专业译文：{line}" for line in lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-resume",
+            task_id="resume",
+            task_hash="hash-resume",
+            target_path=str(target_file),
+        )
+    )
+
+    translated_file = library_dir / "Akron.zh.srt"
+    assert result.success is True
+    assert seen_chunk_sizes == [20, 2]
+    payload = translated_file.read_text(encoding="utf-8")
+    assert "已恢复译文：line 1" in payload
+    assert "已恢复译文：line 20" in payload
+    assert "专业译文：line 21" in payload
+    assert "专业译文：line 42" in payload
+    assert not progress_path.exists()
+
+
+def test_translate_for_import_persists_progress_before_later_chunk_failure(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Akron.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Akron.srt"
+    subtitle_file.write_text(
+        "\n\n".join(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index + 1:02d},000\nline {index}"
+            for index in range(1, 23)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    call_count = 0
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        nonlocal call_count
+        call_count += 1
+        lines = user_payload.get("source_lines")
+        assert isinstance(lines, list)
+        if call_count >= 2:
+            raise RuntimeError("provider down")
+        return json.dumps({"translations": [f"专业译文：{line}" for line in lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-progress",
+            task_id="progress",
+            task_hash="hash-progress",
+            target_path=str(target_file),
+        )
+    )
+
+    progress_path = subtitle_support._build_subtitle_progress_path(subtitle_file)
+    payload = json.loads(progress_path.read_text(encoding="utf-8"))
+    assert result.success is False
+    assert result.skipped is False
+    assert payload["translated_lines"][0] == "专业译文：line 1"
+    assert len(payload["translated_lines"]) == 20
+    assert "provider down" in payload["last_error"]
+    assert not (library_dir / "Akron.zh.srt").exists()
+
+
+def test_translate_for_import_uses_configurable_bilingual_ass_font_sizes(tmp_path: Path) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Interstellar (2014).mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Interstellar (2014).srt"
+    subtitle_file.write_text(
+        "1\n00:00:01,000 --> 00:00:03,000\nhello movie\n",
+        encoding="utf-8",
+    )
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        lines = user_payload.get("source_lines")
+        assert isinstance(lines, list)
+        return json.dumps({"translations": [f"专业译文：{line}" for line in lines]}, ensure_ascii=False)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+        bilingual_ass_chinese_font_size=60,
+        bilingual_ass_english_font_size=30,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-font",
+            task_id="font",
+            task_hash="hash-font",
+            target_path=str(target_file),
+        )
+    )
+
+    bilingual_payload = (library_dir / "Interstellar (2014).dual.ass").read_text(encoding="utf-8")
+    assert result.success is True
+    assert "\\fs60" in bilingual_payload
+    assert "\\fs30" in bilingual_payload
+
+
+def test_translate_for_import_logs_retry_with_absolute_chunk_label(tmp_path: Path, monkeypatch) -> None:
+    library_dir = tmp_path / "library"
+    library_dir.mkdir(parents=True)
+    target_file = library_dir / "Akron.mkv"
+    target_file.write_bytes(b"video")
+    subtitle_file = library_dir / "Akron.srt"
+    subtitle_file.write_text(
+        "\n\n".join(
+            f"{index}\n00:00:{index:02d},000 --> 00:00:{index + 1:02d},000\nline {index}"
+            for index in range(1, 23)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    logged: list[dict[str, str]] = []
+
+    def fake_emit_operational_log(*, title: str, detail: str, fix_hint: str) -> None:
+        logged.append({"title": title, "detail": detail, "fix_hint": fix_hint})
+
+    call_count = 0
+
+    def fake_request(_: str, user_payload: dict[str, object]) -> str:
+        nonlocal call_count
+        call_count += 1
+        lines = user_payload.get("source_lines")
+        assert isinstance(lines, list)
+        if call_count == 1:
+            raise RuntimeError("provider down")
+        return json.dumps({"translations": [f"专业译文：{line}" for line in lines]}, ensure_ascii=False)
+
+    monkeypatch.setattr(subtitle_support, "emit_operational_log", fake_emit_operational_log)
+
+    service = SubtitleTranslatorService(
+        api_key="demo-key",
+        request_chat_completion_func=fake_request,
+    )
+    result = service.translate_for_import(
+        SubtitleTranslateInput(
+            task_ref="hash-retry-log",
+            task_id="retry-log",
+            task_hash="hash-retry-log",
+            target_path=str(target_file),
+        )
+    )
+
+    assert result.success is True
+    retry_logs = [entry for entry in logged if entry["title"] == "字幕翻译重试"]
+    assert retry_logs
+    assert "chunk=1/2" in retry_logs[0]["detail"]
+    assert "attempt=1" in retry_logs[0]["detail"]
+
+
 def test_translate_for_import_skips_when_translated_subtitle_already_exists(tmp_path: Path) -> None:
     library_dir = tmp_path / "library"
     library_dir.mkdir(parents=True)

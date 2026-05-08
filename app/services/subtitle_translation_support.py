@@ -6,6 +6,8 @@ import re
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 from typing import TypeVar
 
@@ -64,14 +66,23 @@ class _SubtitleImportTranslationPlan:
     trusted_name_map: dict[str, str]
 
 
+@dataclass(frozen=True, slots=True)
+class _SubtitleTranslationProgressState:
+    source_hash: str
+    kind: str
+    chunk_size: int
+    translated_lines: tuple[str, ...]
+    last_error: str = ""
+
+
 _VIDEO_FILE_SUFFIXES = frozenset({".mkv", ".mp4", ".m4v", ".avi", ".mov", ".wmv", ".ts", ".m2ts", ".webm"})
 _SUBTITLE_FILE_SUFFIXES = (".srt", ".ass")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _LOCAL_FFMPEG_DIR = _REPO_ROOT / ".tools" / "ffmpeg"
 _BILINGUAL_ASS_OUTPUT_SUFFIX = ".dual.ass"
 _BILINGUAL_ASS_FONT_FAMILY = "LXGW WenKai"
-_BILINGUAL_ASS_CHINESE_FONT_SIZE = 44
-_BILINGUAL_ASS_ENGLISH_FONT_SIZE = 24
+_DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE = 44
+_DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE = 24
 _SUBTITLE_TRANSLATION_CHUNK_SIZE = 20
 _EMBEDDED_SUBTITLE_OUTPUT_SUFFIX = {
     "ass": ".ass",
@@ -162,6 +173,121 @@ def _build_subtitle_file(path: Path) -> _SubtitleFile | None:
     if suffix == ".ass":
         return _SubtitleFile(source_path=path, translated_path=path.with_suffix(".zh.ass"), kind="ass")
     return None
+
+
+def _build_subtitle_progress_path(source_path: Path) -> Path:
+    return Path(f"{source_path}.translation-progress.json")
+
+
+def _hash_subtitle_source_text(source_text: str) -> str:
+    return sha256(source_text.encode("utf-8")).hexdigest()
+
+
+def _load_subtitle_translation_progress(
+    *,
+    source_path: Path,
+    source_hash: str,
+    kind: str,
+    chunk_size: int,
+) -> _SubtitleTranslationProgressState | None:
+    progress_path = _build_subtitle_progress_path(source_path)
+    if not progress_path.exists() or not progress_path.is_file():
+        return None
+    try:
+        payload = json.loads(progress_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        emit_operational_log(
+            title="字幕翻译进度状态损坏",
+            detail=f"path={progress_path} 错误={error}",
+            fix_hint="当前会忽略损坏的 progress state 并从头翻译；如需手动清理，可删除该 `.translation-progress.json` 文件。",
+        )
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if str(payload.get("source_hash", "")).strip() != source_hash:
+        return None
+    if str(payload.get("kind", "")).strip() != kind:
+        return None
+    if int(payload.get("chunk_size", 0) or 0) != chunk_size:
+        return None
+    raw_translated_lines = payload.get("translated_lines")
+    if not isinstance(raw_translated_lines, list):
+        return None
+    translated_lines: list[str] = []
+    for item in raw_translated_lines:
+        if not isinstance(item, str):
+            return None
+        translated_lines.append(item)
+    return _SubtitleTranslationProgressState(
+        source_hash=source_hash,
+        kind=kind,
+        chunk_size=chunk_size,
+        translated_lines=tuple(translated_lines),
+        last_error=str(payload.get("last_error", "")).strip(),
+    )
+
+
+def _persist_subtitle_translation_progress(
+    *,
+    source_path: Path,
+    state: _SubtitleTranslationProgressState,
+) -> None:
+    payload = {
+        "version": 1,
+        "source_hash": state.source_hash,
+        "kind": state.kind,
+        "chunk_size": state.chunk_size,
+        "translated_lines": list(state.translated_lines),
+        "last_error": state.last_error,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    _build_subtitle_progress_path(source_path).write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _clear_subtitle_translation_progress(source_path: Path) -> None:
+    _build_subtitle_progress_path(source_path).unlink(missing_ok=True)
+
+
+def _log_subtitle_translation_progress(
+    *,
+    source_path: Path,
+    translated_count: int,
+    total_count: int,
+    chunk_label: str,
+    last_error: str = "",
+) -> None:
+    detail = (
+        f"source={source_path} progress={translated_count}/{total_count} "
+        f"chunk={chunk_label} updated_at={datetime.now(UTC).isoformat()}"
+    )
+    if last_error:
+        detail = f"{detail} last_error={last_error}"
+    emit_operational_log(
+        title="字幕翻译进度",
+        detail=detail,
+        fix_hint="这是运行态进度记录；若进程中断，可复用 progress state 继续翻译。",
+    )
+
+
+def _log_subtitle_translation_retry(
+    *,
+    source_path: Path,
+    chunk_label: str,
+    attempt: int,
+    line_count: int,
+    error: str,
+) -> None:
+    emit_operational_log(
+        title="字幕翻译重试",
+        detail=(
+            f"source={source_path} chunk={chunk_label} attempt={attempt} "
+            f"line_count={line_count} error={error} updated_at={datetime.now(UTC).isoformat()}"
+        ),
+        fix_hint="这是 chunk 级重试记录；若同一 chunk 多次失败，可等待 provider 恢复或稍后继续。",
+    )
 
 
 def _resolve_external_subtitle_files(video_path: Path) -> tuple[list[_SubtitleFile], str]:
@@ -884,6 +1010,80 @@ def _translate_blocks_in_chunks(
     return translated_blocks, None
 
 
+def _translate_lines_in_chunks_with_progress(
+    *,
+    source_path: Path,
+    source_lines: list[str],
+    kind: str,
+    chunk_size: int,
+    translate_chunk: Callable[[list[str]], tuple[list[str] | None, str | None]],
+) -> tuple[list[str] | None, str | None]:
+    source_hash = _hash_subtitle_source_text("\n".join(source_lines))
+    progress_state = _load_subtitle_translation_progress(
+        source_path=source_path,
+        source_hash=source_hash,
+        kind=kind,
+        chunk_size=chunk_size,
+    )
+    translated_lines = list(progress_state.translated_lines) if progress_state is not None else []
+    if translated_lines:
+        _log_subtitle_translation_progress(
+            source_path=source_path,
+            translated_count=len(translated_lines),
+            total_count=len(source_lines),
+            chunk_label="resume",
+            last_error=progress_state.last_error if progress_state is not None else "",
+        )
+    if len(translated_lines) > len(source_lines):
+        return None, "字幕翻译进度状态与源字幕不一致：已记录条数超过当前源字幕总条数。"
+    start_index = len(translated_lines)
+    remaining_lines = source_lines[start_index:]
+    if not remaining_lines:
+        return translated_lines, None
+    total_chunks = (len(source_lines) + chunk_size - 1) // chunk_size
+    starting_chunk_index = start_index // chunk_size + 1
+    for chunk_offset, chunk in enumerate(_chunk_blocks(remaining_lines, size=chunk_size), start=starting_chunk_index):
+        chunk_label = f"{chunk_offset}/{total_chunks}"
+        translated_chunk, error_message = translate_chunk(chunk, chunk_label)
+        if translated_chunk is None:
+            _persist_subtitle_translation_progress(
+                source_path=source_path,
+                state=_SubtitleTranslationProgressState(
+                    source_hash=source_hash,
+                    kind=kind,
+                    chunk_size=chunk_size,
+                    translated_lines=tuple(translated_lines),
+                    last_error=error_message or "",
+                ),
+            )
+            _log_subtitle_translation_progress(
+                source_path=source_path,
+                translated_count=len(translated_lines),
+                total_count=len(source_lines),
+                chunk_label=chunk_label,
+                last_error=error_message or "",
+            )
+            return None, error_message
+        translated_lines.extend(text.strip() for text in translated_chunk)
+        _persist_subtitle_translation_progress(
+            source_path=source_path,
+            state=_SubtitleTranslationProgressState(
+                source_hash=source_hash,
+                kind=kind,
+                chunk_size=chunk_size,
+                translated_lines=tuple(translated_lines),
+                last_error="",
+            ),
+        )
+        _log_subtitle_translation_progress(
+            source_path=source_path,
+            translated_count=len(translated_lines),
+            total_count=len(source_lines),
+            chunk_label=chunk_label,
+        )
+    return translated_lines, None
+
+
 def _is_line_count_mismatch_runtime_error(error_message: str) -> bool:
     return error_message.startswith("翻译行数不一致（source=")
 
@@ -893,12 +1093,14 @@ def _translate_chunk_lines_by_splitting(
     source_lines: list[str],
     translate_lines: Callable[[list[str]], list[str]],
     subtitle_path: Path,
+    chunk_label: str,
 ) -> tuple[list[str] | None, str | None]:
     midpoint = len(source_lines) // 2
     left_lines, left_error = _translate_chunk_lines(
         source_lines=source_lines[:midpoint],
         translate_lines=translate_lines,
         subtitle_path=subtitle_path,
+        chunk_label=f"{chunk_label}.1",
     )
     if left_lines is None:
         return None, left_error
@@ -907,39 +1109,11 @@ def _translate_chunk_lines_by_splitting(
         source_lines=source_lines[midpoint:],
         translate_lines=translate_lines,
         subtitle_path=subtitle_path,
+        chunk_label=f"{chunk_label}.2",
     )
     if right_lines is None:
         return None, right_error
     return left_lines + right_lines, None
-
-
-def _retry_or_split_line_count_mismatch(
-    *,
-    source_lines: list[str],
-    translate_lines: Callable[[list[str]], list[str]],
-    subtitle_path: Path,
-    remaining_same_chunk_retries: int,
-    mismatch_message: str,
-) -> tuple[list[str] | None, str | None]:
-    if remaining_same_chunk_retries > 0:
-        return _translate_chunk_lines(
-            source_lines=source_lines,
-            translate_lines=translate_lines,
-            subtitle_path=subtitle_path,
-            remaining_same_chunk_retries=remaining_same_chunk_retries - 1,
-        )
-    if len(source_lines) > 1:
-        return _translate_chunk_lines_by_splitting(
-            source_lines=source_lines,
-                translate_lines=translate_lines,
-                subtitle_path=subtitle_path,
-            )
-    message = f"模型翻译失败：{subtitle_path}，原因：{mismatch_message}"
-    _print_colored_error(
-        problem=message,
-        fix="检查模型输出格式约束，确保返回严格 JSON translations 数组；必要时更换更稳的模型。",
-    )
-    return None, message
 
 
 def _translate_chunk_lines(
@@ -947,18 +1121,58 @@ def _translate_chunk_lines(
     source_lines: list[str],
     translate_lines: Callable[[list[str]], list[str]],
     subtitle_path: Path,
+    chunk_label: str,
     remaining_same_chunk_retries: int = 1,
+    remaining_runtime_retries: int = 2,
 ) -> tuple[list[str] | None, str | None]:
     try:
         translated_lines = translate_lines(source_lines)
     except RuntimeError as exc:
+        _log_subtitle_translation_retry(
+            source_path=subtitle_path,
+            chunk_label=chunk_label,
+            attempt=3 - remaining_runtime_retries,
+            line_count=len(source_lines),
+            error=str(exc),
+        )
         if _is_line_count_mismatch_runtime_error(str(exc)):
-            return _retry_or_split_line_count_mismatch(
+            if remaining_same_chunk_retries > 0:
+                return _translate_chunk_lines(
+                    source_lines=source_lines,
+                    translate_lines=translate_lines,
+                    subtitle_path=subtitle_path,
+                    chunk_label=chunk_label,
+                    remaining_same_chunk_retries=remaining_same_chunk_retries - 1,
+                    remaining_runtime_retries=remaining_runtime_retries,
+                )
+            if len(source_lines) > 1:
+                return _translate_chunk_lines_by_splitting(
+                    source_lines=source_lines,
+                    translate_lines=translate_lines,
+                    subtitle_path=subtitle_path,
+                    chunk_label=chunk_label,
+                )
+            message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
+            _print_colored_error(
+                problem=message,
+                fix="检查模型输出格式约束，确保返回严格 JSON translations 数组；必要时更换更稳的模型。",
+            )
+            return None, message
+        if remaining_runtime_retries > 0:
+            return _translate_chunk_lines(
                 source_lines=source_lines,
                 translate_lines=translate_lines,
                 subtitle_path=subtitle_path,
+                chunk_label=chunk_label,
                 remaining_same_chunk_retries=remaining_same_chunk_retries,
-                mismatch_message=str(exc),
+                remaining_runtime_retries=remaining_runtime_retries - 1,
+            )
+        if len(source_lines) > 1:
+            return _translate_chunk_lines_by_splitting(
+                source_lines=source_lines,
+                translate_lines=translate_lines,
+                subtitle_path=subtitle_path,
+                chunk_label=chunk_label,
             )
         message = f"模型翻译失败：{subtitle_path}，原因：{exc}"
         _print_colored_error(
@@ -968,27 +1182,36 @@ def _translate_chunk_lines(
         return None, message
 
     if len(translated_lines) != len(source_lines):
+        mismatch_message = f"翻译行数不一致（source={len(source_lines)}, translated={len(translated_lines)}）"
+        _log_subtitle_translation_retry(
+            source_path=subtitle_path,
+            chunk_label=chunk_label,
+            attempt=2 - remaining_same_chunk_retries,
+            line_count=len(source_lines),
+            error=mismatch_message,
+        )
         if remaining_same_chunk_retries > 0:
             return _translate_chunk_lines(
                 source_lines=source_lines,
                 translate_lines=translate_lines,
                 subtitle_path=subtitle_path,
+                chunk_label=chunk_label,
                 remaining_same_chunk_retries=remaining_same_chunk_retries - 1,
+                remaining_runtime_retries=remaining_runtime_retries,
             )
         if len(source_lines) > 1:
             return _translate_chunk_lines_by_splitting(
                 source_lines=source_lines,
                 translate_lines=translate_lines,
                 subtitle_path=subtitle_path,
+                chunk_label=chunk_label,
             )
-        mismatch_message = f"翻译行数不一致（source={len(source_lines)}, translated={len(translated_lines)}）"
-        return _retry_or_split_line_count_mismatch(
-            source_lines=source_lines,
-            translate_lines=translate_lines,
-            subtitle_path=subtitle_path,
-            remaining_same_chunk_retries=0,
-            mismatch_message=mismatch_message,
+        message = f"模型翻译失败：{subtitle_path}，原因：{mismatch_message}"
+        _print_colored_error(
+            problem=message,
+            fix="检查模型输出格式约束，确保返回严格 JSON translations 数组；必要时更换更稳的模型。",
         )
+        return None, message
     return translated_lines, None
 
 
@@ -998,6 +1221,8 @@ def _translate_srt_subtitle_content(
     movie_title: str,
     subtitle_path: Path,
     translate_lines: Callable[[list[str], str], list[str]],
+    bilingual_ass_chinese_font_size: int = _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE,
+    bilingual_ass_english_font_size: int = _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE,
 ) -> tuple[str | None, str | None]:
     blocks = _parse_srt_blocks(source_text)
     if not blocks:
@@ -1008,31 +1233,35 @@ def _translate_srt_subtitle_content(
         )
         return None, message
 
-    translated_blocks, error_message = _translate_blocks_in_chunks(
-        blocks=blocks,
-        size=_SUBTITLE_TRANSLATION_CHUNK_SIZE,
-        get_source_text=lambda block: block.text,
-        translate_chunk=lambda source_lines: _translate_chunk_lines(
+    translated_lines, error_message = _translate_lines_in_chunks_with_progress(
+        source_path=subtitle_path,
+        source_lines=[block.text for block in blocks],
+        kind="srt",
+        chunk_size=_SUBTITLE_TRANSLATION_CHUNK_SIZE,
+        translate_chunk=lambda source_lines, chunk_label: _translate_chunk_lines(
             source_lines=source_lines,
             subtitle_path=subtitle_path,
+            chunk_label=chunk_label,
             translate_lines=lambda lines: translate_lines(lines, movie_title),
         ),
-        build_output_block=lambda block, translated_text: _SrtBlock(
-            index=block.index,
-            timecode=block.timecode,
-            text=translated_text,
-        ),
     )
-    if translated_blocks is None:
+    if translated_lines is None:
         return None, error_message
+    translated_blocks = [
+        _SrtBlock(index=block.index, timecode=block.timecode, text=translated_text)
+        for block, translated_text in zip(blocks, translated_lines)
+    ]
     bilingual_ass_output = _render_bilingual_ass_from_srt_blocks(
         blocks=blocks,
         translated_blocks=translated_blocks,
+        chinese_font_size=bilingual_ass_chinese_font_size,
+        english_font_size=bilingual_ass_english_font_size,
     )
     _write_bilingual_ass_sidecar(
         source_path=subtitle_path,
         bilingual_output=bilingual_ass_output,
     )
+    _clear_subtitle_translation_progress(subtitle_path)
     return _render_srt(translated_blocks), None
 
 
@@ -1042,6 +1271,8 @@ def _translate_ass_subtitle_content(
     movie_title: str,
     subtitle_path: Path,
     translate_lines: Callable[[list[str], str], list[str]],
+    bilingual_ass_chinese_font_size: int = _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE,
+    bilingual_ass_english_font_size: int = _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE,
 ) -> tuple[str | None, str | None]:
     lines, dialogue_lines = _parse_ass_dialogue_lines(source_text)
     if not dialogue_lines:
@@ -1052,16 +1283,17 @@ def _translate_ass_subtitle_content(
         )
         return None, message
 
-    translated_lines, error_message = _translate_blocks_in_chunks(
-        blocks=dialogue_lines,
-        size=_SUBTITLE_TRANSLATION_CHUNK_SIZE,
-        get_source_text=lambda line: line.text,
-        translate_chunk=lambda source_lines: _translate_chunk_lines(
+    translated_lines, error_message = _translate_lines_in_chunks_with_progress(
+        source_path=subtitle_path,
+        source_lines=[line.text for line in dialogue_lines],
+        kind="ass",
+        chunk_size=_SUBTITLE_TRANSLATION_CHUNK_SIZE,
+        translate_chunk=lambda source_lines, chunk_label: _translate_chunk_lines(
             source_lines=source_lines,
             subtitle_path=subtitle_path,
+            chunk_label=chunk_label,
             translate_lines=lambda lines: translate_lines(lines, movie_title),
         ),
-        build_output_block=lambda _, translated_text: translated_text,
     )
     if translated_lines is None:
         return None, error_message
@@ -1073,8 +1305,11 @@ def _translate_ass_subtitle_content(
             lines=lines,
             dialogue_lines=dialogue_lines,
             translated_lines=translated_lines,
+            chinese_font_size=bilingual_ass_chinese_font_size,
+            english_font_size=bilingual_ass_english_font_size,
         ),
     )
+    _clear_subtitle_translation_progress(subtitle_path)
     return _render_ass_lines(lines, had_trailing_newline=source_text.endswith(("\n", "\r"))), None
 
 
@@ -1144,14 +1379,18 @@ def _render_bilingual_ass_from_srt_blocks(
     *,
     blocks: list[_SrtBlock],
     translated_blocks: list[_SrtBlock],
+    chinese_font_size: int = _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE,
+    english_font_size: int = _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE,
 ) -> str:
-    header = _build_bilingual_ass_header()
+    header = _build_bilingual_ass_header(chinese_font_size=chinese_font_size)
     dialogue_lines: list[str] = []
     for source_block, translated_block in zip(blocks, translated_blocks):
         start_time, end_time = _convert_srt_timecode_to_ass(source_block.timecode)
         bilingual_text = _build_bilingual_ass_dialogue_text(
             chinese_text=translated_block.text,
             english_text=source_block.text,
+            chinese_font_size=chinese_font_size,
+            english_font_size=english_font_size,
         )
         dialogue_lines.append(
             f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{bilingual_text}"
@@ -1164,6 +1403,8 @@ def _render_bilingual_ass_from_ass_lines(
     lines: list[str],
     dialogue_lines: list[_AssDialogueLine],
     translated_lines: list[str],
+    chinese_font_size: int = _DEFAULT_BILINGUAL_ASS_CHINESE_FONT_SIZE,
+    english_font_size: int = _DEFAULT_BILINGUAL_ASS_ENGLISH_FONT_SIZE,
 ) -> str:
     bilingual_lines = list(lines)
     for dialogue_line, translated_text in zip(dialogue_lines, translated_lines):
@@ -1172,12 +1413,14 @@ def _render_bilingual_ass_from_ass_lines(
             + _build_bilingual_ass_dialogue_text(
                 chinese_text=translated_text,
                 english_text=dialogue_line.text,
+                chinese_font_size=chinese_font_size,
+                english_font_size=english_font_size,
             )
         )
     return _render_ass_lines(bilingual_lines, had_trailing_newline=bool(lines and lines[-1] == ""))
 
 
-def _build_bilingual_ass_header() -> str:
+def _build_bilingual_ass_header(*, chinese_font_size: int) -> str:
     return (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -1190,7 +1433,7 @@ def _build_bilingual_ass_header() -> str:
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
         "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, "
         "Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        f"Style: Default,{_BILINGUAL_ASS_FONT_FAMILY},{_BILINGUAL_ASS_CHINESE_FONT_SIZE},"
+        f"Style: Default,{_BILINGUAL_ASS_FONT_FAMILY},{chinese_font_size},"
         "&H00FFFFFF,&H00FFFFFF,&H00111111,&H64000000,0,0,0,0,100,100,0,0,1,1,0,2,30,30,20,1\n"
         "\n"
         "[Events]\n"
@@ -1217,23 +1460,29 @@ def _normalize_srt_timestamp_for_ass(timestamp: str) -> str:
     return f"{hours}:{int(minutes_text):02d}:{seconds:02d}.{centiseconds:02d}"
 
 
-def _build_bilingual_ass_dialogue_text(*, chinese_text: str, english_text: str) -> str:
+def _build_bilingual_ass_dialogue_text(
+    *,
+    chinese_text: str,
+    english_text: str,
+    chinese_font_size: int,
+    english_font_size: int,
+) -> str:
     chinese = _escape_ass_text(chinese_text.strip())
     english = _escape_ass_text(english_text.strip())
     if chinese and english:
         return (
-            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_CHINESE_FONT_SIZE}\\an2}}"
+            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{chinese_font_size}\\an2}}"
             f"{chinese}"
-            f"\\N{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_ENGLISH_FONT_SIZE}}}{english}"
+            f"\\N{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{english_font_size}}}{english}"
         )
     if chinese:
         return (
-            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_CHINESE_FONT_SIZE}\\an2}}"
+            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{chinese_font_size}\\an2}}"
             f"{chinese}"
         )
     if english:
         return (
-            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{_BILINGUAL_ASS_ENGLISH_FONT_SIZE}\\an2}}"
+            f"{{\\fn{_BILINGUAL_ASS_FONT_FAMILY}\\fs{english_font_size}\\an2}}"
             f"{english}"
         )
     return ""

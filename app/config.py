@@ -70,6 +70,8 @@ class Settings:
     subtitle_translation_model: str
     subtitle_translation_timeout_seconds: float
     subtitle_translation_use_proxy: bool
+    subtitle_ass_chinese_font_size: int
+    subtitle_ass_english_font_size: int
     pt_min_seed_hours: int
     sqlite_db_path: str
     raw_bt_destination_options: tuple[RawBtDestinationOption, ...]
@@ -571,6 +573,20 @@ def load_settings(environ: Mapping[str, str] | None = None) -> Settings:
         subtitle_translation_model=_read_optional(env, "SUBTITLE_TRANSLATION_MODEL") or "gpt-5.4",
         subtitle_translation_timeout_seconds=subtitle_translation_timeout_seconds,
         subtitle_translation_use_proxy=_read_optional_bool(env, "SUBTITLE_TRANSLATION_USE_PROXY", False),
+        subtitle_ass_chinese_font_size=_read_optional_int_with_validator(
+            env,
+            "SUBTITLE_ASS_CHINESE_FONT_SIZE",
+            44,
+            predicate=lambda value: value > 0,
+            error_message="SUBTITLE_ASS_CHINESE_FONT_SIZE must be a positive integer",
+        ),
+        subtitle_ass_english_font_size=_read_optional_int_with_validator(
+            env,
+            "SUBTITLE_ASS_ENGLISH_FONT_SIZE",
+            24,
+            predicate=lambda value: value > 0,
+            error_message="SUBTITLE_ASS_ENGLISH_FONT_SIZE must be a positive integer",
+        ),
         pt_min_seed_hours=_read_optional_non_negative_int(env, "PT_MIN_SEED_HOURS", 0),
         sqlite_db_path=_read_optional(env, "SQLITE_DB_PATH") or "/data/luminarr.db",
         raw_bt_destination_options=_read_raw_bt_destination_options(env),

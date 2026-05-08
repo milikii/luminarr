@@ -851,6 +851,8 @@ def _build_main_settings(**overrides: object) -> _MainSettings:
         "subtitle_translation_model": "gpt-5.4",
         "subtitle_translation_timeout_seconds": 60.0,
         "subtitle_translation_use_proxy": False,
+        "subtitle_ass_chinese_font_size": 44,
+        "subtitle_ass_english_font_size": 24,
         "pt_min_seed_hours": 0,
         "sqlite_db_path": "/tmp/luminarr.db",
         "raw_bt_destination_options": (),
@@ -942,6 +944,105 @@ def test_resolve_subtitle_translation_proxy_url_uses_outbound_proxy_when_enabled
     )
 
     assert _resolve_subtitle_translation_proxy_url(settings) == "http://proxy.local:7890"
+
+
+def test_main_wires_subtitle_ass_font_sizes_into_subtitle_translator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _build_main_settings(
+        subtitle_translation_api_key="subtitle-key",
+        subtitle_ass_chinese_font_size=58,
+        subtitle_ass_english_font_size=30,
+    )
+    created: dict[str, object] = {}
+
+    async def _empty_search(*_args: object, **_kwargs: object) -> list[dict[str, object]]:
+        return []
+
+    def _simple_component(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace()
+
+    def _capture_subtitle_translator_service(**kwargs: object) -> SimpleNamespace:
+        created["subtitle_translator_kwargs"] = kwargs
+        return SimpleNamespace(translate_for_import=None)
+
+    def _fake_build_application(
+        token: str,
+        search_service,
+        add_to_downloader_service,
+        get_download_status_service,
+        import_to_library_service,
+        cleanup_downloaded_source_service,
+        manage_watchlist_service,
+        manage_bt_subscription_service,
+        **kwargs: object,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(bot_data={tg.SEARCH_SERVICE_KEY: search_service})
+
+    monkeypatch.setattr("app.main.load_settings", lambda: settings)
+    monkeypatch.setattr("app.main.configure_trace_log_file", lambda **_kwargs: None)
+    monkeypatch.setattr("app.main.SqliteDatabase", _FakeDatabase)
+    monkeypatch.setattr("app.main.CandidateMappingRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobEventRepo", _simple_component)
+    monkeypatch.setattr("app.main.JobRepo", _simple_component)
+    monkeypatch.setattr("app.main.ApprovalRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultContentRegistryRepo", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemorySnapshotRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtPendingRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSubscriptionRepo", _simple_component)
+    monkeypatch.setattr("app.main.DownloadMonitorRepo", _simple_component)
+    monkeypatch.setattr("app.main.TelegramUpdateRepo", _simple_component)
+    monkeypatch.setattr("app.main.WatchlistRepo", _simple_component)
+    monkeypatch.setattr("app.main.ClarificationRepo", _simple_component)
+    monkeypatch.setattr("app.main.BtSourceProvider", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(
+        "app.main.BtSourceAdapter",
+        lambda *_args, **_kwargs: SimpleNamespace(search=_empty_search, search_page=_empty_search),
+    )
+    monkeypatch.setattr(
+        "app.main.JavLibraryReadOnlyHelperClient",
+        lambda **_kwargs: SimpleNamespace(lookup=lambda *_args, **_inner_kwargs: None),
+    )
+    monkeypatch.setattr("app.main.SearchMediaService", _simple_component)
+    monkeypatch.setattr("app.main.AdultDuplicateMemoryService", _simple_component)
+    monkeypatch.setattr("app.main.AddToDownloaderService", _simple_component)
+    monkeypatch.setattr("app.main.ImportToLibraryService", _simple_component)
+    monkeypatch.setattr("app.main.PostDownloadAutoImportService", _simple_component)
+    monkeypatch.setattr("app.main.GetDownloadStatusService", _simple_component)
+    monkeypatch.setattr("app.main.CleanupDownloadedSourceService", _simple_component)
+    monkeypatch.setattr("app.main.ManageWatchlistService", _simple_component)
+    monkeypatch.setattr("app.main.ManageBtSubscriptionService", _simple_component)
+    monkeypatch.setattr("app.main.AdultArchiveService", _simple_component)
+    monkeypatch.setattr("app.main.SubtitleTranslatorService", _capture_subtitle_translator_service)
+    monkeypatch.setattr("app.main.PersonalWeChatLoginService", _simple_component)
+    monkeypatch.setattr("app.main._build_refresh_media_server_func", lambda _settings: None)
+    monkeypatch.setattr("app.main.build_application", _fake_build_application)
+    monkeypatch.setattr("app.main._run_application_polling", lambda _application: None)
+    monkeypatch.setattr(
+        "app.main.ProwlarrClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("ProwlarrClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.TransmissionClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("legacy TransmissionClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.QbittorrentClient",
+        lambda **_kwargs: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "app.main.FeishuClient",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("FeishuClient should not be created")),
+    )
+    monkeypatch.setattr(
+        "app.main.FeishuLongConnectionService",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("FeishuLongConnectionService should not be created")),
+    )
+
+    run_main()
+
+    assert created["subtitle_translator_kwargs"]["bilingual_ass_chinese_font_size"] == 58
+    assert created["subtitle_translator_kwargs"]["bilingual_ass_english_font_size"] == 30
 
 
 def test_main_keeps_tmdb_only_metadata_scraper_when_ai_cast_localization_is_disabled(
