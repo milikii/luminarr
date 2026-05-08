@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for Telegram search card validation."}
+{"file": ".trellis/spec/backend/telegram-candidate-card-contracts.md", "reason": "Check that Telegram candidate confirmation delivery stays aligned with poster/card contracts."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Check repository verification expectations stay green after the regression fix."}
