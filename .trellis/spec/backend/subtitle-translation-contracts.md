@@ -76,6 +76,21 @@ Subtitle chat-completion payload must include:
 - Chinese and English ASS font sizes must be runtime-configurable rather than hard-coded, so local playback can tune readability without code changes.
 - If bilingual sidecar generation fails, the plain subtitle output must still succeed and remain the authoritative fallback.
 
+#### Automatic subtitle timing sync contract
+
+- For future/new SRT subtitle translation runs, the pipeline should attempt `ffsubsync` automatically before translation.
+- Auto-sync must only affect the new translation path; do not add a bulk re-sync entrypoint for already existing library subtitles.
+- The timing truth remains plain `.zh.srt`:
+  - sync source English SRT first
+  - translate onto the synced timing
+  - regenerate `.dual.ass` from that synced plain timing
+- Auto-sync is SRT-first for this MVP; existing ASS translation path may remain unsynced.
+- Auto-sync must fail soft:
+  - plain translated output still succeeds on the original timing
+  - `.dual.ass` still succeeds on the same fallback timing
+  - the sync failure is operationally observable
+- This contract does not introduce Whisper/ASR, `alass`, or any alternate sync backend in the default path.
+
 #### Long-running translation resilience contract
 
 - Subtitle translation for `.srt` / `.ass` must support resumable progress for long-running files.
@@ -112,6 +127,7 @@ Subtitle chat-completion payload must include:
 - Non-string or empty `trusted_name_map` entries in metadata -> ignore invalid entries, do not fail subtitle translation.
 - Model output line-count mismatch or invalid JSON -> fail subtitle translation for that import step, preserving existing fail-soft import behavior.
 - Bilingual ASS/SSA sidecar generation failure -> log a warning and keep the plain translation output; do not fail the import-time subtitle step.
+- `ffsubsync` missing / timeout / bad output / non-zero exit -> log operational warning and continue translation with the original subtitle timing.
 - Mid-run timeout / 502 / 503 / upstream disconnect during a later chunk -> keep previously translated chunk progress persisted; the next run resumes instead of discarding successful work.
 
 ## Scenario: AI cast localization supplement
@@ -216,6 +232,8 @@ Subtitle chat-completion payload must include:
   - existing unsupported-format / bad-JSON / bad-encoding cases still behave correctly
   - plain translation still succeeds when bilingual sidecar write fails
   - bilingual ASS sidecar is generated for both SRT and ASS inputs
+  - SRT translation uses synced timing for both plain `.zh.srt` and `.dual.ass` when `ffsubsync` succeeds
+  - `ffsubsync` failure falls back to original timing without failing the translation
   - progress state is persisted after successful chunks when a later chunk fails
   - rerun resumes from saved progress instead of restarting from zero
   - configured ASS font sizes are reflected in generated bilingual output
