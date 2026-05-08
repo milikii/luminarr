@@ -424,18 +424,6 @@ def _format_telegram_media_candidate_detail_line(line: str) -> str:
     return _apply_telegram_html(line)
 
 
-@dataclass(slots=True)
-class _TelegramMediaCandidate:
-    index: int
-    title: str
-    poster_url: str = ""
-    original_title: str = ""
-    year: str = ""
-    media_type: str = ""
-    overview: str = ""
-    tmdb_detail_url: str = ""
-
-
 def _format_telegram_media_candidate_reply(text: str) -> str:
     stripped_text = text.strip()
     if not stripped_text.startswith(TELEGRAM_MEDIA_CANDIDATE_PREFIX):
@@ -446,85 +434,36 @@ def _format_telegram_media_candidate_reply(text: str) -> str:
         return text
 
     query = _strip_delivery_status_marker(lines[0].removeprefix(TELEGRAM_MEDIA_CANDIDATE_PREFIX).strip())
-    candidates = _parse_telegram_media_candidates(lines[1:])
-    candidate_count = len(candidates)
+    candidate_count = sum(1 for line in lines[1:] if re.match(r"^\d+\.\s", line.strip()))
     if not query or candidate_count <= 0:
         return text
 
-    formatted_lines = [f"【{_html.escape(query)}】共找到 {candidate_count} 条相关信息，请选择操作"]
-    for candidate in candidates:
-        formatted_lines.append("")
-        formatted_lines.extend(_render_telegram_media_candidate_block(candidate))
-    formatted_lines.extend(("", "下一步", *get_media_candidate_confirmation_action_lines()))
-    return "\n".join(formatted_lines)
-
-
-def _parse_telegram_media_candidates(lines: list[str]) -> list[_TelegramMediaCandidate]:
-    candidates: list[_TelegramMediaCandidate] = []
-    current: _TelegramMediaCandidate | None = None
-    for raw_line in lines:
-        cleaned_line = raw_line.strip()
-        if not cleaned_line or cleaned_line == "下一步":
+    formatted_lines = [f"【候选作品】 {_html.escape(query)}", f"候选作品（{candidate_count} 条）"]
+    in_actions = False
+    for line in lines[1:]:
+        cleaned_line = line.strip()
+        if not cleaned_line:
             continue
-        if cleaned_line.startswith(("确认作品：", "都不对：", "候选作品（")):
+        if cleaned_line == "下一步":
+            in_actions = True
+            continue
+        if in_actions:
+            continue
+        if cleaned_line == f"候选作品（{candidate_count} 条）":
             continue
         candidate_match = re.match(r"^(?P<index>\d+)\.\s+(?P<title>.+)$", cleaned_line)
         if candidate_match is not None:
-            current = _TelegramMediaCandidate(
-                index=int(str(candidate_match.group("index") or "0")),
-                title=str(candidate_match.group("title") or "").strip(),
+            if formatted_lines[-1] != f"候选作品（{candidate_count} 条）":
+                formatted_lines.append("")
+            formatted_lines.append(
+                f"【{candidate_match.group('index')}】 <b>{_html.escape(str(candidate_match.group('title') or '').strip())}</b>"
             )
-            candidates.append(current)
             continue
-        if current is not None:
-            _apply_telegram_media_candidate_line(current, cleaned_line)
-    return candidates
-
-
-def _apply_telegram_media_candidate_line(candidate: _TelegramMediaCandidate, line: str) -> None:
-    label, value = _split_candidate_field(line)
-    if not label or not value:
-        return
-    if label == "海报":
-        candidate.poster_url = value
-        return
-    if label == "原名":
-        candidate.original_title = value
-        return
-    if label == "年份":
-        candidate.year = value
-        return
-    if label == "类型":
-        candidate.media_type = value
-        return
-    if label == "简介":
-        candidate.overview = value
-        return
-    if label == "TMDB详情":
-        candidate.tmdb_detail_url = value
-
-
-def _render_telegram_media_candidate_block(candidate: _TelegramMediaCandidate) -> list[str]:
-    lines = [_render_telegram_media_candidate_title_line(candidate)]
-    if candidate.index == 1 and candidate.poster_url:
-        poster_url = _html.escape(candidate.poster_url, quote=True)
-        lines.append(f'海报预览：<a href="{poster_url}">打开海报</a>')
-    if candidate.original_title:
-        lines.append(f"<i>{_html.escape(candidate.original_title)}</i>")
-    if candidate.year:
-        lines.append(f"📅 <b>年份：</b> {_html.escape(candidate.year)}")
-    if candidate.media_type:
-        lines.append(f"🎞 <b>类型：</b> {_html.escape(candidate.media_type)}")
-    if candidate.overview:
-        lines.append(f"📝 <b>简介：</b> {_html.escape(candidate.overview)}")
-    return lines
-
-
-def _render_telegram_media_candidate_title_line(candidate: _TelegramMediaCandidate) -> str:
-    if not candidate.tmdb_detail_url:
-        return _html.escape(f"{candidate.index}. {candidate.title}")
-    tmdb_detail_url = _html.escape(candidate.tmdb_detail_url, quote=True)
-    return f'{candidate.index}. <a href="{tmdb_detail_url}">{_html.escape(candidate.title)}</a>'
+        if cleaned_line.startswith("直接回复对应序号确认作品"):
+            continue
+        formatted_lines.append(_format_telegram_media_candidate_detail_line(cleaned_line))
+    formatted_lines.extend(("", "下一步", *get_media_candidate_confirmation_action_lines()))
+    return "\n".join(formatted_lines)
 
 
 def _format_telegram_adult_bt_line(line: str) -> str:
