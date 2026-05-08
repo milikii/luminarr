@@ -30,11 +30,12 @@
 
 #### Telegram aggregate-confirmation contract
 
-- Telegram media candidate confirmation must render as one aggregate HTML message whenever it fits within Telegram's 4096-character limit.
-- When the aggregate text exceeds 4096 characters, runtime must continue in ordered follow-up text messages; splitting is a transport fallback, not a return to poster-card mode.
+- Telegram media candidate confirmation must keep the aggregate HTML confirmation text as the authoritative selection message.
+- When the first candidate has poster/fanart media, Telegram should send one preferred poster image card first, then send the aggregate HTML confirmation text.
+- When the aggregate text exceeds 4096 characters, runtime must continue in ordered follow-up text messages; splitting is a transport fallback, not a return to per-candidate poster-card mode.
 - The first line must follow the operator-facing pattern `【查询词】共找到 N 条相关信息，请选择操作`.
 - Every candidate title must be a clickable TMDB detail link.
-- The first candidate must expose a poster preview link when poster/fanart data is available.
+- The first candidate must still expose a poster preview link inside the aggregate confirmation text when poster/fanart data is available, so text fallback semantics stay stable.
 - Candidate selection remains candidate-first and text-index driven; this contract does not redesign PT resource cards or resource-search ordering.
 
 #### Poster-source contract
@@ -48,7 +49,10 @@
 
 #### Transport contract
 
-- Telegram candidate confirmation prefers `send_message(parse_mode="HTML")`, not `send_photo`.
+- Telegram candidate confirmation prefers a two-step transport when poster media exists:
+  1. `send_photo` / equivalent Telegram photo reply for the first candidate poster card
+  2. `send_message(parse_mode="HTML")` for the aggregate candidate confirmation text
+- If poster download or Telegram photo send fails, runtime must fall back to the aggregate HTML text message without dropping the poster preview link.
 - Runtime must preserve HTML formatting when sending aggregate candidate messages.
 - Runtime must split oversized aggregate confirmation text without reordering candidates or dropping the final action lines.
 
@@ -78,6 +82,7 @@
   - assert non-Telegram candidate confirmation layout stays unchanged
 - `tests/test_telegram_reply_formatter.py`
   - assert candidate confirmation text becomes one aggregate HTML message with clickable TMDB titles
+  - assert Telegram replies send the preferred poster image card before the aggregate confirmation text when a first-candidate poster exists
   - assert only the first candidate exposes a poster preview link
   - assert oversized aggregate confirmation text is split into continuation messages under 4096 characters
 - `tests/test_telegram_delivery_runtime.py`
@@ -95,7 +100,7 @@
 
 #### Correct
 
-- Keep one aggregate candidate-confirmation flow for Telegram, with clickable TMDB titles and a best-effort first-candidate poster preview link.
+- Keep one aggregate candidate-confirmation flow for Telegram, with a best-effort first-candidate poster image card plus clickable TMDB titles in the follow-up text.
 - Apply fanart enrichment to the Telegram candidate-confirmation path, including the default empty-channel path.
 - Preserve the business order: candidate lock first, resource search second.
 

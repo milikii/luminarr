@@ -949,3 +949,24 @@
 
 ### 下轮目标
 - 若继续推进字幕体验，可针对临时副本补一次真实 `ffsubsync` 端到端样本验证；若先收尾，则整理 commit 分组并提交 `subtitle-offset-timing` 当前实现。
+
+## Round 53 — 2026-05-09 00:24
+
+### 完成
+- 修复 Telegram 搜索候选确认回退：恢复“首选海报图片卡片 + 聚合候选确认文本”的消息流，不再退回成只有海报预览链接的普通文本消息。
+- 修改 `app/bot/telegram_update_runtime.py` 的 aggregate candidate 发送路径：多候选时也先发首选海报图片卡片，再发送完整的 HTML 候选确认文本；单候选路径继续保留完整 caption。
+- 将 `.trellis/spec/backend/telegram-candidate-card-contracts.md` 同步到真实实现，明确“首选海报卡片先发，聚合 HTML 候选确认文本随后发出”的 contract。
+
+### 测试状态
+- 通过: 4 / 总计: 4
+- `./.venv/bin/python -m pytest -q tests/test_telegram_reply_formatter.py -k 'aggregate_candidate or local_posters_before_candidate or single_candidate_followup_minimal'`
+- `./.venv/bin/python -m pytest -q tests/test_search_media.py -k 'explicit_year_prefers_media_confirmation_before_resource_search or search_resources_for_selected_media_keeps_existing_related_title_order_after_confirmation or search_and_format_falls_back_to_resource_search_when_tmdb_candidates_are_empty'`
+- `make lint`
+- `make quality`
+- `make verify-mainline`
+
+### 遗留 / 下轮继续
+- 当前缺少一条真实 Telegram 实机 smoke 来确认图片卡片视觉效果，但代码路径和仓库 gate 已绿。
+
+### 下轮目标
+- 若继续收尾，则提交 `telegram-search-card-regression` 当前修复并按需要执行 `finish-work`。
