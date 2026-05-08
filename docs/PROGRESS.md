@@ -900,3 +900,28 @@
 
 ### 下轮目标
 - 结束当前 task 的收尾动作：按需要执行 `/finish-work`，或在用户确认后提交本轮最小代码 / 测试修复。
+
+## Round 51 — 2026-05-08 19:50
+
+### 完成
+- 将字幕翻译链路从“单块失败整片作废”收口到可恢复实现：为每个源字幕引入 `.translation-progress.json` 进度状态，成功 chunk 逐步落盘，中断后可从首个未完成 chunk 继续。
+- 为 chunk 翻译补充可观察性：成功进度、retry 次数、失败原因都会通过 operational log 暴露，且 chunk 编号改为整片绝对 `X/Y`，不再只按剩余块计数。
+- 将双语 ASS 的中英文字号改成运行时配置，新增 `SUBTITLE_ASS_CHINESE_FONT_SIZE` / `SUBTITLE_ASS_ENGLISH_FONT_SIZE`，并在 `config -> main -> SubtitleTranslatorService` 完整接线。
+- 将这一轮 learnings 写回 `.trellis/spec/backend/subtitle-translation-contracts.md`，把“断点续跑、chunk 可观察性、ASS 字号可配”收成正式 contract。
+- 追加一次真实 provider 的 temp-copy smoke：对《爱的进行时》副本翻译 `90s` 后主动截断，确认 progress state 已在真实运行态下落盘，且记录了前 `20/1183` 行成功译文。
+
+### 测试状态
+- 通过: 6 / 总计: 6
+- `./.venv/bin/python -m pytest -q tests/test_config.py -k 'subtitle'`
+- `./.venv/bin/python -m pytest -q tests/test_main.py -k 'subtitle_translation or cast_localization or subtitle_ass_font_sizes'`
+- `./.venv/bin/python -m pytest -q tests/test_subtitle_translator.py`
+- `make lint`
+- `make quality`
+- `make verify-mainline`
+
+### 遗留 / 下轮继续
+- 真实媒体库里的《爱的进行时》当前已存在 `zh.srt` / `dual.ass`，所以正式链路会按设计跳过，不再强制重翻；若要继续做运行态验证，应基于临时副本或新的电影样本。
+- 固定 offset 校时仍未开始，本轮明确留到下一轮，不和翻译链路稳定性混做。
+
+### 下轮目标
+- 若继续打磨字幕体验，先决定是否实现固定 offset 校时；若继续收尾，则整理 commit 分组并提交当前 task。

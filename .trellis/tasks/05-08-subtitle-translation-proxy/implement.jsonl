@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend spec index for relevant subtitle translation and quality guidance."}
+{"file": ".trellis/spec/backend/subtitle-translation-contracts.md", "reason": "Subtitle translation env/config behavior and expected translation artifacts."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verification expectations for a config/runtime retry task."}
+{"file": ".trellis/tasks/05-08-subtitle-translation-proxy/research/oss-llm-subtitle-translation-patterns.md", "reason": "Open-source subtitle translation patterns relevant to proxy use, chunking, and retries."}
