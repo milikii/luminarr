@@ -97,6 +97,7 @@ def build_telegram_reply_func(
         if _is_aggregate_candidate_reply(formatted_text):
             return await _send_aggregate_candidate_messages(
                 reply_text_func=reply_func,
+                reply_photo_func=reply_photo_func,
                 send_text_func=send_text_func,
                 send_media_func=send_media_func,
                 download_image_func=download_image_func,
@@ -517,21 +518,26 @@ async def _send_candidate_card_messages(
 async def _send_aggregate_candidate_messages(
     *,
     reply_text_func: TelegramReplyTextFunc,
+    reply_photo_func: Callable[..., Awaitable[object]] | None,
     send_text_func: TelegramSendTextFunc | None,
     send_media_func: TelegramSendMediaFunc | None,
     download_image_func: DownloadImageFunc | None,
     chat_id: int | None,
     text: str,
 ) -> object:
-    if chat_id is not None and send_media_func is not None and download_image_func is not None:
-        media_result = await _send_single_aggregate_candidate_card(
+    media_result: object | None = None
+    if reply_photo_func is not None:
+        media_result = await _reply_preferred_aggregate_candidate_card(
+            reply_photo_func=reply_photo_func,
+            text=text,
+        )
+    if media_result is None and chat_id is not None and send_media_func is not None and download_image_func is not None:
+        media_result = await _send_preferred_aggregate_candidate_card(
             send_media_func=send_media_func,
             download_image_func=download_image_func,
             chat_id=chat_id,
             text=text,
         )
-        if media_result is not None:
-            return media_result
     last_result: object | None = None
     for chunk in _split_telegram_text_chunks(text):
         last_result = await _send_or_reply_text(
@@ -540,20 +546,40 @@ async def _send_aggregate_candidate_messages(
             chat_id=chat_id,
             text=chunk,
         )
-    return last_result
+    return last_result if last_result is not None else media_result
 
 
-async def _send_single_aggregate_candidate_card(
+async def _reply_preferred_aggregate_candidate_card(
+    *,
+    reply_photo_func: Callable[..., Awaitable[object]],
+    text: str,
+) -> object | None:
+    poster_url, caption = _extract_preferred_aggregate_candidate_card(text)
+    if not poster_url or not caption:
+        return None
+    try:
+        kwargs: dict[str, object] = {"photo": poster_url, "caption": caption}
+        if _has_telegram_html(caption):
+            kwargs["parse_mode"] = "HTML"
+        return await reply_photo_func(**kwargs)
+    except Exception as error:
+        emit_operational_log(
+            title="Telegram 候选海报发送失败",
+            detail=f"url={poster_url} 原因={error}",
+            fix_hint="检查 Telegram 侧媒体发送权限、图片 URL 可达性和 caption 长度；当前会退回纯文本候选卡，不影响后续数字确认。",
+        )
+        return None
+
+
+async def _send_preferred_aggregate_candidate_card(
     *,
     send_media_func: TelegramSendMediaFunc,
     download_image_func: DownloadImageFunc,
     chat_id: int,
     text: str,
 ) -> object | None:
-    if not _is_single_aggregate_candidate(text):
-        return None
-    poster_url, caption = _extract_single_aggregate_candidate_card(text)
-    if not poster_url:
+    poster_url, caption = _extract_preferred_aggregate_candidate_card(text)
+    if not poster_url or not caption:
         return None
     artifact = await _download_candidate_media_artifact(
         download_image_func=download_image_func,
@@ -592,18 +618,40 @@ def _is_single_aggregate_candidate(text: str) -> bool:
     return count == 1
 
 
-def _extract_single_aggregate_candidate_card(text: str) -> tuple[str, str | None]:
+def _extract_preferred_aggregate_candidate_card(text: str) -> tuple[str, str | None]:
     lines = [line.strip() for line in text.splitlines()]
     caption_lines: list[str] = []
     poster_url = ""
+    if _is_single_aggregate_candidate(text):
+        for line in lines:
+            if not line:
+                continue
+            if line == "下一步":
+                break
+            if line.startswith("海报预览："):
+                poster_match = re.search(r'href="(?P<url>https?://[^"]+)"', line)
+                if poster_match is not None:
+                    poster_url = str(poster_match.group("url") or "").strip()
+                continue
+            caption_lines.append(line)
+        return poster_url, _resolve_candidate_block_caption(caption_lines)
+    seen_first_candidate = False
     for line in lines:
         if not line:
+            if seen_first_candidate:
+                break
             continue
+        if _AGGREGATE_CANDIDATE_ITEM_RE.match(line):
+            if seen_first_candidate:
+                break
+            seen_first_candidate = True
         if line.startswith("海报预览："):
             poster_match = re.search(r'href="(?P<url>https?://[^"]+)"', line)
             if poster_match is not None:
                 poster_url = str(poster_match.group("url") or "").strip()
             continue
+        if line == "下一步":
+            break
         caption_lines.append(line)
     return poster_url, _resolve_candidate_block_caption(caption_lines)
 

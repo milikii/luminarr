@@ -441,12 +441,16 @@ def test_build_telegram_reply_func_sends_adult_bt_card_as_photo_caption_with_but
 
 def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirmation_text() -> None:
     send_text = AsyncMock(return_value="text-ok")
+    send_media = AsyncMock(return_value="media-ok")
+    download_image = AsyncMock(return_value=b"fake-image")
     reply_text = AsyncMock(return_value="fallback")
     reply_func = build_telegram_reply_func(
         reply_text,
         formatter=format_telegram_reply,
         chat_id=1001,
         send_text_func=send_text,
+        send_media_func=send_media,
+        download_image_func=download_image,
     )
     text = render_media_candidate_confirmation_reply(
         query="你的名字",
@@ -487,6 +491,15 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
 
     assert result == "text-ok"
     reply_text.assert_not_called()
+    download_image.assert_awaited_once_with("https://image.tmdb.org/t/p/w500/your-name.jpg")
+    send_media.assert_awaited_once()
+    assert send_media.await_args.args[0] == 1001
+    assert send_media.await_args.args[3] == "HTML"
+    media_caption = send_media.await_args.args[2]
+    assert media_caption.startswith("【你的名字】共找到 3 条相关信息，请选择操作")
+    assert '1. <a href="https://www.themoviedb.org/movie/101">你的名字。 (2016) | movie</a>' in media_caption
+    assert '海报预览：<a href="https://image.tmdb.org/t/p/w500/your-name.jpg">打开海报</a>' not in media_caption
+    assert "<i>君の名は。</i>" in media_caption
     send_text.assert_awaited_once()
     kwargs = send_text.await_args.kwargs
     sent_text = kwargs["text"]
@@ -532,14 +545,13 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
 
     result = asyncio.run(reply_func(text))
 
-    assert result == "media-ok"
+    assert result == "text-ok"
     reply_text.assert_not_called()
     download_image.assert_awaited_once_with("https://image.tmdb.org/t/p/w500/dune.jpg")
     send_media.assert_awaited_once()
     assert send_media.await_args.args[0] == 1001
     assert send_media.await_args.args[2] is not None
     assert send_media.await_args.args[3] == "HTML"
-    send_text.assert_not_awaited()
     caption = send_media.await_args.args[2]
     assert caption.startswith("【Dune 2021】共找到 1 条相关信息，请选择操作")
     assert '1. <a href="https://www.themoviedb.org/movie/438631">Dune (2021) | movie</a>' in caption
@@ -549,6 +561,19 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
     assert "🎞 <b>类型：</b> movie" in caption
     assert "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis." in caption
     assert caption.endswith(
+        "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis."
+    )
+    send_text.assert_awaited_once()
+    sent_text = send_text.await_args.kwargs["text"]
+    assert send_text.await_args.kwargs["parse_mode"] == "HTML"
+    assert sent_text == (
+        "【Dune 2021】共找到 1 条相关信息，请选择操作\n\n"
+        '1. <a href="https://www.themoviedb.org/movie/438631">Dune (2021) | movie</a>\n'
+        '海报预览：<a href="https://image.tmdb.org/t/p/w500/dune.jpg">打开海报</a>\n'
+        "<i>Dune</i>\n"
+        "📅 <b>年份：</b> 2021\n"
+        "🎞 <b>类型：</b> movie\n"
+        "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis.\n\n"
         "下一步\n"
         "确认作品：直接回复序号，例如 1\n"
         "都不对：发送更详细的名称，或直接发送新的名字/关键词重新搜"
@@ -580,8 +605,19 @@ def test_build_telegram_reply_func_sends_aggregate_candidate_confirmation_as_htm
     result = asyncio.run(reply_func(text))
 
     assert result == "text-sent"
-    reply_photo.assert_not_awaited()
+    reply_photo.assert_awaited_once()
     reply_text.assert_not_awaited()
+    photo_kwargs = reply_photo.await_args.kwargs
+    assert photo_kwargs["photo"] == "https://image.tmdb.org/t/p/w500/dune.jpg"
+    assert photo_kwargs["parse_mode"] == "HTML"
+    assert photo_kwargs["caption"] == (
+        "【Dune 2021】共找到 1 条相关信息，请选择操作\n"
+        '1. <a href="https://www.themoviedb.org/movie/438631">Dune (2021) | movie</a>\n'
+        "<i>Dune</i>\n"
+        "📅 <b>年份：</b> 2021\n"
+        "🎞 <b>类型：</b> movie\n"
+        "📝 <b>简介：</b> Paul Atreides leads nomadic tribes in a battle to control Arrakis."
+    )
     kwargs = send_text.await_args.kwargs
     assert kwargs["chat_id"] == 1001
     assert kwargs["parse_mode"] == "HTML"
@@ -859,8 +895,19 @@ def test_build_telegram_reply_func_sends_candidate_cards_as_photo_messages_when_
     result = asyncio.run(reply_func(text))
 
     assert result == "text-sent"
-    reply_photo.assert_not_awaited()
+    reply_photo.assert_awaited_once()
     reply_text.assert_not_awaited()
+    photo_kwargs = reply_photo.await_args.kwargs
+    assert photo_kwargs["photo"] == "https://image.tmdb.org/t/p/w500/your-name.jpg"
+    assert photo_kwargs["parse_mode"] == "HTML"
+    assert photo_kwargs["caption"] == (
+        "【你的名字】共找到 2 条相关信息，请选择操作\n"
+        '1. <a href="https://www.themoviedb.org/movie/101">你的名字。 (2016) | movie</a>\n'
+        "<i>君の名は。</i>\n"
+        "📅 <b>年份：</b> 2016\n"
+        "🎞 <b>类型：</b> movie\n"
+        "📝 <b>简介：</b> Two teenagers share a mysterious connection."
+    )
     sent_text = send_text.await_args.kwargs["text"]
     assert sent_text.startswith("【你的名字】共找到 2 条相关信息，请选择操作")
     assert '1. <a href="https://www.themoviedb.org/movie/101">你的名字。 (2016) | movie</a>' in sent_text
@@ -895,13 +942,14 @@ def test_build_telegram_reply_func_falls_back_to_text_when_photo_send_fails(caps
     result = asyncio.run(reply_func(text))
 
     assert result == "text-sent"
-    reply_photo.assert_not_awaited()
+    reply_photo.assert_awaited_once()
     reply_text.assert_not_awaited()
     sent_text = send_text.await_args.kwargs["text"]
     assert sent_text.startswith("【你的名字】共找到 1 条相关信息，请选择操作")
     assert '海报预览：<a href="https://image.tmdb.org/t/p/w500/your-name.jpg">打开海报</a>' in sent_text
     output = capsys.readouterr().out
-    assert "[Telegram 候选海报发送失败]" not in output
+    assert "[Telegram 候选海报发送失败]" in output
+    assert "telegram photo failed" in output
 
 
 def test_build_telegram_reply_func_keeps_poster_url_in_adult_text_fallback_when_photo_send_fails(capsys) -> None:
