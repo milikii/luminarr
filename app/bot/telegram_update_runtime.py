@@ -1,25 +1,23 @@
 from __future__ import annotations
 
 import inspect
-import sqlite3
+import re
 import shutil
+import sqlite3
 import tempfile
 import textwrap
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-import re
 from urllib.parse import urlparse
 
 import httpx
 from PIL import Image, ImageDraw, ImageFont
-
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from app.bot.telegram_reply_formatter import _has_telegram_html
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
-from app.db.telegram_update_repo import TelegramUpdatePersistenceError
-from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.db.telegram_update_repo import TelegramUpdatePersistenceError, TelegramUpdateRepo
 from app.operational_logging import emit_operational_log
 from app.services.search_reply_formatter import format_size, truncate_text
 from app.services.telegram_pt_resource_cards import (
@@ -94,16 +92,6 @@ def build_telegram_reply_func(
                 reply_photo_func=reply_photo_func,
                 text=formatted_text,
             )
-        if _is_aggregate_candidate_reply(formatted_text):
-            return await _send_aggregate_candidate_messages(
-                reply_text_func=reply_func,
-                reply_photo_func=reply_photo_func,
-                send_text_func=send_text_func,
-                send_media_func=send_media_func,
-                download_image_func=download_image_func,
-                chat_id=chat_id,
-                text=formatted_text,
-            )
         if (
             chat_id is not None
             and send_text_func is not None
@@ -142,8 +130,6 @@ _CANDIDATE_BLOCK_START_RE = re.compile(r"^【(?P<index>\d+)】\s+")
 _STRIP_HTML_RE = re.compile(r"</?(?:b|i|u|s|code|pre|a)\b[^>]*>")
 _ADULT_BT_CARD_PREFIX = "【成人资源候选】"
 _PT_RESOURCE_CARD_PREFIX = "【PT资源卡】"
-_AGGREGATE_CANDIDATE_HEADER_RE = re.compile(r"^【.+】共找到\s+\d+\s+条相关信息，请选择操作$")
-_AGGREGATE_CANDIDATE_ITEM_RE = re.compile(r"^\d+\.\s+")
 _ADD_SUCCESS_HEADER_RE = re.compile(r"^✅\s*<b>已添加下载</b>$")
 _ADD_SUCCESS_CARD_HEADER_RE = re.compile(r"^✅\s*<b>任务已添加并开始下载</b>$")
 _URL_ACTION_LINE_PATTERN = re.compile(r"^(?P<label>[^：]+)：打开\s+(?P<url>https?://\S+)$")
@@ -154,7 +140,6 @@ _PLACEHOLDER_PANEL = "#22324A"
 _PLACEHOLDER_ACCENT = "#E0B04B"
 _PLACEHOLDER_TEXT = "#F5F7FA"
 _PLACEHOLDER_SUBTEXT = "#B8C4D6"
-_TELEGRAM_MESSAGE_CHAR_LIMIT = 4096
 
 
 def _strip_telegram_html_tags(text: str) -> str:
@@ -173,13 +158,6 @@ def _is_candidate_card_reply(text: str) -> bool:
 
 def _is_pt_resource_card_reply(text: str) -> bool:
     return text.strip().startswith(_PT_RESOURCE_CARD_PREFIX)
-
-
-def _is_aggregate_candidate_reply(text: str) -> bool:
-    stripped_text = text.strip()
-    if not stripped_text:
-        return False
-    return bool(_AGGREGATE_CANDIDATE_HEADER_RE.match(stripped_text.splitlines()[0]))
 
 
 def _is_telegram_add_success_reply(text: str) -> bool:
@@ -513,148 +491,6 @@ async def _send_candidate_card_messages(
         chat_id=chat_id,
         text=cleaned_text,
     )
-
-
-async def _send_aggregate_candidate_messages(
-    *,
-    reply_text_func: TelegramReplyTextFunc,
-    reply_photo_func: Callable[..., Awaitable[object]] | None,
-    send_text_func: TelegramSendTextFunc | None,
-    send_media_func: TelegramSendMediaFunc | None,
-    download_image_func: DownloadImageFunc | None,
-    chat_id: int | None,
-    text: str,
-) -> object:
-    media_result: object | None = None
-    if reply_photo_func is not None:
-        media_result = await _reply_preferred_aggregate_candidate_card(
-            reply_photo_func=reply_photo_func,
-            text=text,
-        )
-    if media_result is None and chat_id is not None and send_media_func is not None and download_image_func is not None:
-        media_result = await _send_preferred_aggregate_candidate_card(
-            send_media_func=send_media_func,
-            download_image_func=download_image_func,
-            chat_id=chat_id,
-            text=text,
-        )
-    last_result: object | None = None
-    for chunk in _split_telegram_text_chunks(text):
-        last_result = await _send_or_reply_text(
-            reply_text_func=reply_text_func,
-            send_text_func=send_text_func,
-            chat_id=chat_id,
-            text=chunk,
-        )
-    return last_result if last_result is not None else media_result
-
-
-async def _reply_preferred_aggregate_candidate_card(
-    *,
-    reply_photo_func: Callable[..., Awaitable[object]],
-    text: str,
-) -> object | None:
-    poster_url, caption = _extract_preferred_aggregate_candidate_card(text)
-    if not poster_url or not caption:
-        return None
-    try:
-        kwargs: dict[str, object] = {"photo": poster_url, "caption": caption}
-        if _has_telegram_html(caption):
-            kwargs["parse_mode"] = "HTML"
-        return await reply_photo_func(**kwargs)
-    except Exception as error:
-        emit_operational_log(
-            title="Telegram 候选海报发送失败",
-            detail=f"url={poster_url} 原因={error}",
-            fix_hint="检查 Telegram 侧媒体发送权限、图片 URL 可达性和 caption 长度；当前会退回纯文本候选卡，不影响后续数字确认。",
-        )
-        return None
-
-
-async def _send_preferred_aggregate_candidate_card(
-    *,
-    send_media_func: TelegramSendMediaFunc,
-    download_image_func: DownloadImageFunc,
-    chat_id: int,
-    text: str,
-) -> object | None:
-    poster_url, caption = _extract_preferred_aggregate_candidate_card(text)
-    if not poster_url or not caption:
-        return None
-    artifact = await _download_candidate_media_artifact(
-        download_image_func=download_image_func,
-        poster_url=poster_url,
-    )
-    if artifact is None:
-        return None
-    try:
-        parse_mode = "HTML" if caption and _has_telegram_html(caption) else None
-        return await _call_send_media_func(
-            send_media_func=send_media_func,
-            chat_id=chat_id,
-            artifact=artifact,
-            caption=caption,
-            parse_mode=parse_mode,
-            reply_markup=None,
-        )
-    except Exception as error:
-        emit_operational_log(
-            title="Telegram 候选海报发送失败",
-            detail=f"url={poster_url or str(artifact)} 原因={error}",
-            fix_hint="检查 Telegram 侧媒体发送权限、图片格式和候选海报 URL；当前会退回纯文本候选卡，不影响后续数字确认。",
-        )
-        return None
-    finally:
-        _cleanup_temp_media_artifact(artifact)
-
-
-def _is_single_aggregate_candidate(text: str) -> bool:
-    count = 0
-    for line in text.splitlines():
-        if _AGGREGATE_CANDIDATE_ITEM_RE.match(line.strip()):
-            count += 1
-            if count > 1:
-                return False
-    return count == 1
-
-
-def _extract_preferred_aggregate_candidate_card(text: str) -> tuple[str, str | None]:
-    lines = [line.strip() for line in text.splitlines()]
-    caption_lines: list[str] = []
-    poster_url = ""
-    if _is_single_aggregate_candidate(text):
-        for line in lines:
-            if not line:
-                continue
-            if line == "下一步":
-                break
-            if line.startswith("海报预览："):
-                poster_match = re.search(r'href="(?P<url>https?://[^"]+)"', line)
-                if poster_match is not None:
-                    poster_url = str(poster_match.group("url") or "").strip()
-                continue
-            caption_lines.append(line)
-        return poster_url, _resolve_candidate_block_caption(caption_lines)
-    seen_first_candidate = False
-    for line in lines:
-        if not line:
-            if seen_first_candidate:
-                break
-            continue
-        if _AGGREGATE_CANDIDATE_ITEM_RE.match(line):
-            if seen_first_candidate:
-                break
-            seen_first_candidate = True
-        if line.startswith("海报预览："):
-            poster_match = re.search(r'href="(?P<url>https?://[^"]+)"', line)
-            if poster_match is not None:
-                poster_url = str(poster_match.group("url") or "").strip()
-            continue
-        if line == "下一步":
-            break
-        caption_lines.append(line)
-    return poster_url, _resolve_candidate_block_caption(caption_lines)
-
 
 async def _send_pt_resource_card_message(
     *,
@@ -991,51 +827,6 @@ def _compose_candidate_card_text(
             lines.append("")
         lines.extend(action_lines)
     return "\n".join(lines).strip()
-
-
-def _split_telegram_text_chunks(text: str, *, limit: int = _TELEGRAM_MESSAGE_CHAR_LIMIT) -> tuple[str, ...]:
-    normalized_text = text.strip()
-    if len(normalized_text) <= limit:
-        return (normalized_text,)
-    chunks: list[str] = []
-    current_chunk = ""
-    for block in _split_telegram_text_blocks(normalized_text, limit=limit):
-        if not current_chunk:
-            current_chunk = block
-            continue
-        candidate_chunk = f"{current_chunk}\n\n{block}"
-        if len(candidate_chunk) <= limit:
-            current_chunk = candidate_chunk
-            continue
-        chunks.append(current_chunk)
-        current_chunk = block
-    if current_chunk:
-        chunks.append(current_chunk)
-    return tuple(chunks)
-
-
-def _split_telegram_text_blocks(text: str, *, limit: int) -> tuple[str, ...]:
-    blocks = [block.strip() for block in text.split("\n\n") if block.strip()]
-    resolved_blocks: list[str] = []
-    for block in blocks:
-        if len(block) <= limit:
-            resolved_blocks.append(block)
-            continue
-        current_block = ""
-        for line in [line.rstrip() for line in block.splitlines() if line.strip()]:
-            if not current_block:
-                current_block = line
-                continue
-            candidate_block = f"{current_block}\n{line}"
-            if len(candidate_block) <= limit:
-                current_block = candidate_block
-                continue
-            resolved_blocks.append(current_block)
-            current_block = line
-        if current_block:
-            resolved_blocks.append(current_block)
-    return tuple(resolved_blocks)
-
 
 def _normalize_candidate_card_header_lines(
     *,

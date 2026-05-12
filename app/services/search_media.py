@@ -17,27 +17,35 @@ from app.clients.web_source import (
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
 from app.db.candidate_repo import CandidateMappingRepo
 from app.db.clarification_repo import ClarificationRepo
-from app.search_title_normalization import BT_RESULT_TITLE_NOISE_TOKENS, compact_match_key, normalize_match_key, normalize_spaces
-from app.services.adult_content import extract_exact_adult_content_match
-from app.services.bt_read_only_display import AdultReadOnlyLookupFunc, BtReadOnlyDisplayService
+from app.operational_logging import emit_operational_log
+from app.search_title_normalization import (
+    BT_RESULT_TITLE_NOISE_TOKENS,
+    compact_match_key,
+    normalize_match_key,
+    normalize_spaces,
+)
 from app.services import search_reply_formatter
+from app.services.adult_content import extract_exact_adult_content_match
 from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, filter_candidates
+from app.services.bt_candidate_scorer import load_bt_scoring_rules as _load_bt_scoring_rules
+from app.services.bt_read_only_display import AdultReadOnlyLookupFunc, BtReadOnlyDisplayService
 from app.services.bt_sources import canonicalize_bt_source_name, resolve_bt_source
 from app.services.media_identity import build_media_identity_from_tmdb_movie, normalize_media_identity_payload
-from app.operational_logging import emit_operational_log
+from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
 from app.services.search_media_state import (
     CandidateLoadResult,
     CandidateStateStore,
     ClarificationQueryLoadResult,
     ClarificationStateStore,
 )
+from app.services.search_query_parser import parse_movie_query
 from app.services.search_reply_formatter import (
     DEFAULT_MEDIA_CANDIDATE_CONFIRMATION_LIMIT,
-    format_media_candidate_confirmation_reply,
     format_adult_bt_resource_fallback_reply,
     format_bt_batch_preview_reply,
     format_bt_batch_preview_selection_label,
     format_bt_read_only_reply,
+    format_media_candidate_confirmation_reply,
     format_movie_query_reply,
     normalize_candidate,
     render_media_candidate_confirmation_reply,
@@ -46,16 +54,13 @@ from app.services.search_reply_formatter import (
     safe_indexer,
     safe_text,
 )
-from app.services.search_query_parser import parse_movie_query
 from app.services.search_request_context import (
-    LookupMovieFunc,
     LookupMediaCandidatesFunc,
+    LookupMovieFunc,
     SearchFunc,
     _search_candidates_with_logging,
     build_search_request_context,
 )
-from app.services.bt_candidate_scorer import load_bt_scoring_rules as _load_bt_scoring_rules
-from app.services.pure_bt import BTBatchPreviewRequest, select_batch_preview_candidates
 from app.services.telegram_pt_resource_cards import (
     TelegramPtResourceCardState,
     build_telegram_pt_resource_reply_marker,
@@ -99,7 +104,7 @@ GetMovieImagesFunc = Callable[[str], Awaitable[FanartMovieImages | None]]
 load_bt_scoring_rules = _load_bt_scoring_rules
 
 
-class UnsupportedBatchPreviewPageUrl(ValueError):
+class UnsupportedBatchPreviewPageUrlError(ValueError):
     pass
 
 
@@ -113,14 +118,14 @@ async def search_bt_batch_preview_candidates(
     resolved_page_url = resolve_supported_web_source_page_request(query)
     if resolved_page_url is not None:
         if raw_page_search_func is None:
-            raise UnsupportedBatchPreviewPageUrl(query)
+            raise UnsupportedBatchPreviewPageUrlError(query)
         return await search_raw_page_candidates(
             resolved_page_url,
             raw_page_search_func=raw_page_search_func,
             prepare_raw_candidates=prepare_raw_candidates,
         )
     if looks_like_http_url(query) or looks_like_web_source_page_request(query):
-        raise UnsupportedBatchPreviewPageUrl(query)
+        raise UnsupportedBatchPreviewPageUrlError(query)
     raw_results = await raw_search_func(query)
     return tuple(prepare_raw_candidates(raw_results, query=query))
 
@@ -135,10 +140,10 @@ async def search_raw_page_candidates(
     if not cleaned_page_url:
         return ()
     if raw_page_search_func is None:
-        raise UnsupportedBatchPreviewPageUrl(cleaned_page_url)
+        raise UnsupportedBatchPreviewPageUrlError(cleaned_page_url)
     try:
         raw_results = await raw_page_search_func(cleaned_page_url)
-    except UnsupportedBatchPreviewPageUrl:
+    except UnsupportedBatchPreviewPageUrlError:
         raise
     except (httpx.HTTPError, ValueError) as error:
         emit_operational_log(
@@ -268,7 +273,7 @@ class SearchMediaService:
                 raw_page_search_func=self._raw_page_search_func,
                 prepare_raw_candidates=self._bt_read_only_display.prepare_raw_candidates,
             )
-        except UnsupportedBatchPreviewPageUrl:
+        except UnsupportedBatchPreviewPageUrlError:
             return BT_BATCH_PREVIEW_PAGE_URL_UNSUPPORTED_TEXT_TEMPLATE.format(query=cleaned_query)
         helper_match = await self._bt_read_only_display.lookup_helper_match(cleaned_query)
         selection_source_results = self._bt_read_only_display.prepare_selection_candidates(
