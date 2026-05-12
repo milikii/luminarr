@@ -970,3 +970,27 @@
 
 ### 下轮目标
 - 若继续收尾，则提交 `telegram-search-card-regression` 当前修复并按需要执行 `finish-work`。
+
+## Round 54 — 2026-05-09 01:01
+
+### 完成
+- 纠正 `telegram-search-card-regression` 的错误方向：撤掉 Telegram 搜索候选确认里的“首候选海报 + 聚合文本” special-case，恢复逐候选图片卡片消息流。
+- 保留 `app/services/search_reply_formatter.py` 的候选排序、fanart 回填和资源搜索时序，不改 PT 资源卡、成人 BT 卡、下载成功卡和 ranking。
+- 同步更新 `.trellis/tasks/05-08-telegram-search-card-regression/prd.md`、`.trellis/spec/backend/telegram-candidate-card-contracts.md` 以及 `verify-stage1-telegram-delivery` 的 focused gate，确保回归保护重新对准逐候选卡片行为。
+
+### 测试状态
+- 通过: 8 / 总计: 8
+- `./.venv/bin/python -m pytest tests/test_telegram_reply_formatter.py`
+- `./.venv/bin/python -m pytest tests/test_search_media.py -k 'telegram_confirmation_uses_fanart_poster_when_tmdb_missing or default_candidate_confirmation_uses_fanart_poster_when_channel_omitted or keeps_non_telegram_candidate_confirmation_layout_intact or with_explicit_year_prefers_media_confirmation_before_resource_search or expands_confirmation_candidate_lookup_limit_for_telegram_style_flow or with_explicit_year_but_low_confidence_tmdb_hit_prefers_confirmation'`
+- `./.venv/bin/python -m pytest tests/test_telegram_delivery_runtime.py`
+- `./.venv/bin/python -m pytest tests/test_makefile.py -k verify_stage1_telegram_delivery_group`
+- `make verify-stage1-telegram-delivery`
+- `make lint`
+- `make quality`
+- `make verify-mainline`
+
+### 遗留 / 下轮继续
+- 当前没有新的代码级 blocker；剩余风险仅是尚未补新的真实 Telegram 实机图片卡片 smoke。
+
+### 下轮目标
+- 若继续收尾，则按当前回归修复的最终状态整理 commit 分组，并视需要补一次真实 Telegram 候选图片卡片 smoke。

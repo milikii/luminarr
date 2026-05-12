@@ -20,7 +20,7 @@ quality:
 	$(PYTHON) -m pytest -q tests/test_makefile.py tests/test_cleanup_docs_consistency.py tests/test_cleanup_verification_window_doc.py
 
 lint:
-	$(PYTHON) -m pyflakes app tests
+	$(PYTHON) -m ruff check app tests
 
 test-downloader-focused:
 	$(PYTHON) -m pytest -q tests/test_add_execution_follow_up.py tests/test_add_to_downloader.py tests/test_private_chat_confirm_runtime.py
@@ -52,7 +52,7 @@ verify-stage1-duplicate-memory:
 verify-stage1-telegram-delivery:
 	$(PYTHON) -m pytest -q tests/test_delivery_renderers.py tests/test_telegram_delivery_runtime.py
 	$(PYTHON) -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k "routes_search_with_channel_delivery_renderer or routes_add_pending_with_channel_delivery_renderer or routes_status_with_channel_delivery_renderer or import_formats_import_approval_for_telegram or routes_duplicate_override_follow_up"
-	$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_reply_formatter.py -k "prefers_media_confirmation_for_strong_cjk_title_before_resource_search or keeps_non_telegram_candidate_confirmation_layout_intact or formats_media_candidate_confirmation_with_primary_hero_block or sends_aggregate_candidate_confirmation_as_html_text or splits_aggregate_candidate_confirmation_at_telegram_limit"
+	$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_reply_formatter.py -k "prefers_media_confirmation_for_strong_cjk_title_before_resource_search or keeps_non_telegram_candidate_confirmation_layout_intact or formats_media_candidate_confirmation_with_primary_hero_block or sends_local_posters_before_candidate_confirmation_text or keeps_single_candidate_followup_minimal_after_local_poster_send or adds_html_candidate_caption_and_per_card_button or uses_placeholder_media_for_posterless_candidate_in_mixed_list or refills_failed_candidate_poster_block_into_text"
 	$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_pt_resource_cards.py tests/test_telegram_runtime_adapter.py -k "returns_telegram_pt_card_marker_after_media_lock or pt_resource or consumes_pt_resource_card or rejects_cancelled_pt_resource_card"
 	$(PYTHON) -m pytest -q tests/test_add_to_downloader.py -k pt_resource_card_task_ref
 

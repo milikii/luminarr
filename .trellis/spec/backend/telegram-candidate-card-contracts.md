@@ -6,8 +6,8 @@
 
 ### 1. Scope / Trigger
 
-- Trigger: Telegram candidate confirmation was upgraded from per-candidate poster cards into a single aggregate HTML message flow.
-- Why code-spec depth is required: this crosses service selection flow, TMDB/fanart enrichment, Telegram formatter/runtime chunking, and channel-specific fallback behavior.
+- Trigger: Telegram candidate confirmation must keep the poster-card delivery path instead of collapsing into a first-candidate-only preview plus aggregate HTML text.
+- Why code-spec depth is required: this crosses service selection flow, TMDB/fanart enrichment, Telegram formatter/runtime delivery, and channel-specific fallback behavior.
 
 ### 2. Signatures
 
@@ -28,47 +28,54 @@
 - Candidate confirmation must not trigger resource search side effects.
 - Resource search remains in the selected-media path, not in Telegram card rendering.
 
-#### Telegram aggregate-confirmation contract
+#### Telegram candidate-card contract
 
-- Telegram media candidate confirmation must keep the aggregate HTML confirmation text as the authoritative selection message.
-- When the first candidate has poster/fanart media, Telegram should send one preferred poster image card first, then send the aggregate HTML confirmation text.
-- When the aggregate text exceeds 4096 characters, runtime must continue in ordered follow-up text messages; splitting is a transport fallback, not a return to per-candidate poster-card mode.
-- The first line must follow the operator-facing pattern `【查询词】共找到 N 条相关信息，请选择操作`.
-- Every candidate title must be a clickable TMDB detail link.
-- The first candidate must still expose a poster preview link inside the aggregate confirmation text when poster/fanart data is available, so text fallback semantics stay stable.
+- Telegram media candidate confirmation must format into:
+  1. header text `【候选作品】 <query>`
+  2. candidate count line `候选作品（N 条）`
+  3. one candidate block per TMDB candidate
+  4. final action lines under `下一步`
+- Each candidate block must begin with `【序号】 <b>标题 (年份) | 类型</b>`.
+- Candidate detail lines stay card-friendly:
+  - `海报: <url>` when poster/fanart exists
+  - `<i>原名</i>`
+  - `📅 年份`
+  - `🎞 类型`
+  - `📝 简介`
+  - `🌐 TMDB详情`
 - Candidate selection remains candidate-first and text-index driven; this contract does not redesign PT resource cards or resource-search ordering.
 
 #### Poster-source contract
 
-- Poster resolution priority for Telegram candidate confirmation preview is:
+- Poster resolution priority for Telegram candidate confirmation cards is:
   1. TMDB poster
   2. fanart poster
 - `fanart` enrichment applies only to Telegram candidate-confirmation rendering and must not alter non-Telegram channel output contracts.
 - Empty `channel=""` still counts as the default Telegram candidate-confirmation path for poster enrichment.
-- If no poster/fanart URL is available, candidate confirmation must stay text-first; the missing preview link must not block candidate display.
+- If no poster/fanart URL is available, Telegram runtime may generate a placeholder image card; if placeholder generation or media send also fails, that candidate must fall back into text without blocking the rest of the list.
 
 #### Transport contract
 
-- Telegram candidate confirmation prefers a two-step transport when poster media exists:
-  1. `send_photo` / equivalent Telegram photo reply for the first candidate poster card
-  2. `send_message(parse_mode="HTML")` for the aggregate candidate confirmation text
-- If poster download or Telegram photo send fails, runtime must fall back to the aggregate HTML text message without dropping the poster preview link.
-- Runtime must preserve HTML formatting when sending aggregate candidate messages.
-- Runtime must split oversized aggregate confirmation text without reordering candidates or dropping the final action lines.
+- Telegram candidate confirmation prefers per-candidate media delivery:
+  1. for each candidate block, send `send_photo` / equivalent Telegram photo reply when media or placeholder media is available
+  2. attach a single-candidate inline button `确认作品 N`
+  3. after media sends finish, send one final text message containing the header, any candidate blocks that failed media delivery, and the final action lines
+- If poster download, placeholder generation, or Telegram photo send fails for one candidate, runtime must fall back only that candidate block into text; it must not collapse the whole confirmation into a first-candidate aggregate message.
+- Runtime must preserve HTML formatting in candidate captions and any text fallback blocks.
 
 ### 4. Validation & Error Matrix
 
-- Fanart HTTP / auth / proxy failure -> log operational failure, keep candidate visible, omit preview link if no TMDB poster exists.
-- TMDB poster missing and no fanart poster -> keep aggregate confirmation text intact without a preview link.
-- Aggregate candidate text exceeds Telegram 4096-char limit -> split into ordered continuation messages and keep the final action lines in the last chunk.
+- Fanart HTTP / auth / proxy failure -> log operational failure, keep candidate visible, use TMDB poster when available, otherwise continue toward placeholder/text fallback.
+- TMDB poster missing and no fanart poster -> candidate still remains visible; Telegram may use a placeholder media card or text fallback for that candidate.
+- One candidate media send fails but others succeed -> successful cards stay as media, failed candidate reappears in the follow-up text, final action lines stay present.
 - Non-Telegram channel rendering -> must keep previous candidate confirmation layout and must not receive Telegram-only fanart/placeholder behavior.
 
 ### 5. Good / Base / Bad Cases
 
-- Good: Telegram ambiguous title query returns one aggregate HTML message with clickable TMDB titles, the first candidate exposes a poster preview link, and selecting a candidate then moves into resource search.
-- Base: TMDB poster is missing, fanart returns a poster, and Telegram aggregate confirmation uses the fanart URL as the first preview link without changing non-Telegram output.
-- Base: TMDB and fanart both miss, runtime still sends the aggregate candidate text and preserves candidate selection.
-- Bad: Telegram falls back to one poster card per candidate again.
+- Good: Telegram ambiguous title query returns one poster card per candidate, each card keeps the same candidate number used for later selection, and the final text only carries the header/action summary.
+- Base: TMDB poster is missing, fanart returns a poster, and Telegram still sends that candidate as a media card without changing non-Telegram output.
+- Base: TMDB and fanart both miss, runtime sends a placeholder card or candidate text fallback while preserving candidate selection.
+- Bad: Telegram collapses candidate confirmation into “first candidate poster + aggregate text”.
 - Bad: fanart enrichment starts running for WeChat / Feishu / WeCom candidate rendering.
 - Bad: resource search executes before candidate selection is confirmed.
 
@@ -81,26 +88,26 @@
   - assert default empty `channel` still gets Telegram fanart enrichment
   - assert non-Telegram candidate confirmation layout stays unchanged
 - `tests/test_telegram_reply_formatter.py`
-  - assert candidate confirmation text becomes one aggregate HTML message with clickable TMDB titles
-  - assert Telegram replies send the preferred poster image card before the aggregate confirmation text when a first-candidate poster exists
-  - assert only the first candidate exposes a poster preview link
-  - assert oversized aggregate confirmation text is split into continuation messages under 4096 characters
+  - assert candidate confirmation text formats into `【候选作品】` header plus per-candidate card blocks
+  - assert Telegram replies send one poster card per candidate when posters exist
+  - assert posterless candidates still get placeholder media or text fallback without changing numbering
+  - assert failed candidate media sends reappear in the final text fallback while successful cards stay as media
 - `tests/test_telegram_delivery_runtime.py`
-  - assert standard Telegram text/media delivery behavior remains valid after the aggregate-confirmation change
+  - assert standard Telegram text/media delivery behavior remains valid after candidate-card delivery changes
 - `make verify-stage1-telegram-delivery`
-  - must stay green after Telegram aggregate-confirmation changes
+  - must stay green after Telegram candidate-card changes
 
 ### 7. Wrong vs Correct
 
 #### Wrong
 
-- Use TMDB poster for the first candidate and leave the rest as separate poster cards.
+- Collapse candidate confirmation into one preferred-poster card plus aggregate confirmation text.
 - Treat `channel=""` as “not Telegram”, causing default Telegram candidate confirmations to skip fanart fallback.
-- Move resource search into the aggregate rendering path because Telegram now shows richer candidate confirmations.
+- Move resource search into the rendering path because Telegram now shows richer candidate confirmations.
 
 #### Correct
 
-- Keep one aggregate candidate-confirmation flow for Telegram, with a best-effort first-candidate poster image card plus clickable TMDB titles in the follow-up text.
+- Keep one candidate-card flow for Telegram, with one poster/placeholder card per candidate plus a final text message for header, failed blocks, and actions.
 - Apply fanart enrichment to the Telegram candidate-confirmation path, including the default empty-channel path.
 - Preserve the business order: candidate lock first, resource search second.
 

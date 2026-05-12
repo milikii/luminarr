@@ -1,12 +1,12 @@
-# restore telegram preferred poster search card
+# restore telegram candidate poster cards
 
 ## Goal
 
-恢复 Telegram 搜索影片信息时的首选海报图片卡片消息：先发首选海报图片卡片，再给候选确认文本；不要再退回成只有海报预览链接的普通文本消息。
+恢复 Telegram 搜索影片信息时的候选海报图片卡片消息流：每个候选继续走图片卡片/失败退文，最后只保留精简确认文本；不要再走“首个候选单独海报 + 聚合纯文本确认”的错误方向。
 
 ## What I already know
 
-* 用户反馈：发送搜索影片信息后，“又转回去”成没有首选海报图片的普通消息。
+* 用户反馈：发送搜索影片信息后，候选确认被错误改成“首个候选海报 + 聚合纯文本”，不再是逐候选图片卡片。
 * 相关 contracts 在 `.trellis/spec/backend/telegram-candidate-card-contracts.md`。
 * 相关代码集中在：
   * `app/services/search_reply_formatter.py`
@@ -17,14 +17,14 @@
 
 ## Requirements
 
-* 修复后恢复预期的 Telegram 首选海报卡片/图片交付。
-* 只恢复“首选海报图片卡片 + 候选确认文本”这一条 UX，不把所有候选都改成图片消息。
-* 保持后续的候选确认文本、TMDB 链接和数字选择语义不变。
+* 修复后恢复预期的 Telegram 候选海报卡片/图片交付。
+* 恢复“逐候选图片卡片 + 最后一条精简确认文本”这一条 UX，不再保留首候选 special-case aggregate 路线。
+* 保持后续的数字选择语义、候选排序、TMDB/fanart 补全和资源搜索时序不变。
 * 不顺手改 PT 资源卡、成人资源卡、下载成功卡等无关链路。
 
 ## Acceptance Criteria
 
-* [ ] Telegram 搜索影片信息时恢复首选海报图片卡片行为
+* [ ] Telegram 搜索影片信息时恢复逐候选海报图片卡片行为
 * [ ] 相关测试新增/更新并通过
 * [ ] `make lint`、`make quality`、`make verify-mainline` 继续通过
 
