@@ -24,9 +24,9 @@
 
 ## Acceptance Criteria
 
-* [ ] Telegram 搜索影片信息时恢复逐候选海报图片卡片行为
-* [ ] 相关测试新增/更新并通过
-* [ ] `make lint`、`make quality`、`make verify-mainline` 继续通过
+* [x] Telegram 搜索影片信息时恢复逐候选海报图片卡片行为
+* [x] 相关测试新增/更新并通过
+* [x] `make lint`、`make quality`、`make verify-mainline` 继续通过
 
 ## Out of Scope
 
