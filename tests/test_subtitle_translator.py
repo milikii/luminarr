@@ -5,11 +5,11 @@ import subprocess
 from pathlib import Path
 from unittest.mock import Mock
 
-import app.services.subtitle_translation_support as subtitle_support
-import app.services.subtitle_translator as subtitle_module
 import httpx
 import pytest
 
+import app.services.subtitle_translation_support as subtitle_support
+import app.services.subtitle_translator as subtitle_module
 from app.services.subtitle_translator import SubtitleTranslateInput, SubtitleTranslatorService
 
 

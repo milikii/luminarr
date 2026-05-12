@@ -4,6 +4,7 @@ import asyncio
 from unittest.mock import AsyncMock
 
 import httpx
+
 from app.bot import telegram_bot as tg
 from app.bot.private_chat_raw_bt_destination_runtime import handle_raw_bt_destination_follow_up
 from app.bot.raw_bt_destination_runtime import RawBtDestinationPending

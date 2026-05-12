@@ -15,8 +15,8 @@ from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.adult_archive_service import AdultArchiveOperationError, AdultArchiveStateUnavailableError
 from app.services.get_download_status import (
-    STATUS_AUTO_IMPORT_WARNING_TEXT,
     STATUS_AUTO_IMPORT_STATE_UNAVAILABLE_TEXT,
+    STATUS_AUTO_IMPORT_WARNING_TEXT,
     STATUS_NOT_FOUND_TEXT,
     STATUS_QUERY_FAILED_TEXT,
     STATUS_QUERY_USAGE_TEXT,
@@ -25,8 +25,8 @@ from app.services.get_download_status import (
 )
 from app.services.post_download_auto_import import (
     AUTO_IMPORT_SKIPPED_BY_RULE_EVENT,
-    AutoImportStateUnavailableError,
     AutoImportRunResult,
+    AutoImportStateUnavailableError,
     PostDownloadAutoImportService,
 )
 

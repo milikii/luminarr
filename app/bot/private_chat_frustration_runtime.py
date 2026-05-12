@@ -11,10 +11,10 @@ from app.bot.bt_processing_path_runtime import (
     BT_PROCESSING_PATH_CANCELLED_TEXT,
     clear_bt_processing_path_pending,
 )
+from app.bot.bt_tmdb_association_runtime import clear_bt_tmdb_association_pending
 from app.bot.execution_runtime import run_sync_with_policy
 from app.bot.query_text_runtime import is_frustration_text
 from app.bot.raw_bt_destination_runtime import clear_raw_bt_destination_pending
-from app.bot.bt_tmdb_association_runtime import clear_bt_tmdb_association_pending
 from app.db.job_repo import JobPersistenceError
 from app.operational_logging import emit_operational_log
 

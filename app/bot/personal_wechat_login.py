@@ -39,6 +39,8 @@ try:
     from wechat_clawbot.api.client import close_shared_client
     from wechat_clawbot.auth.accounts import (
         DEFAULT_BASE_URL as DEFAULT_WECHAT_API_BASE_URL,
+    )
+    from wechat_clawbot.auth.accounts import (
         clear_stale_accounts_for_user_id,
         register_weixin_account_id,
         save_weixin_account,

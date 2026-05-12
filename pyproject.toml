@@ -1,0 +1,39 @@
+[project]
+name = "luminarr"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [".venv", ".git", ".worktrees", ".trellis/.backup*", "__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501", "E702", "UP047", "UP046", "UP031"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "tests"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+disallow_untyped_defs = false
+check_untyped_defs = true
+ignore_missing_imports = true
+exclude = "^tests/"
+
+[[tool.mypy.overrides]]
+module = "app.db.*"
+disable_error_code = ["attr-defined", "index", "return-value", "union-attr", "call-overload", "assignment", "arg-type"]
+
+[[tool.mypy.overrides]]
+module = "app.bot.*"
+disable_error_code = ["attr-defined", "union-attr"]

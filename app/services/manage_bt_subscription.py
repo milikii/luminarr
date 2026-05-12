@@ -6,8 +6,8 @@ from typing import Any
 
 import httpx
 
-from app.operational_logging import emit_operational_log
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionRepo
+from app.operational_logging import emit_operational_log
 from app.services.add_to_downloader import ADD_PENDING_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
 from app.services.bt_subscription_candidate_helpers import (
     pick_subscription_candidate,

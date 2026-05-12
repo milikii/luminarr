@@ -14,6 +14,7 @@ from app.search_franchise_intent import (
     resolve_franchise_intent_boost,
 )
 from app.search_title_normalization import (
+    SHORT_STRONG_TITLE_COMPACT_LIMIT,
     ShortQueryCandidateProfile,
     is_short_cjk_title_query,
     is_title_match_prefix_family,
@@ -23,7 +24,6 @@ from app.search_title_normalization import (
     score_title_match,
     should_preserve_short_query_candidate_spread,
     title_match_relation_priority,
-    SHORT_STRONG_TITLE_COMPACT_LIMIT,
 )
 
 SHORT_GENERIC_QUERY_SAMPLE_LIMIT = 10

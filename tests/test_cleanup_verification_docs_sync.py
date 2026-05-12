@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import io
-from pathlib import Path
 import subprocess
 import urllib.error
+from pathlib import Path
 
 import pytest
 
 from app.bot.cleanup_smoke_logging import build_cleanup_private_chat_smoke_log_line
 from app.maintenance.cleanup_verification_docs import (
-    CleanupVerificationDocsSyncError,
     SNAPSHOT_SPECS,
+    CleanupVerificationDocsSyncError,
     SnapshotRun,
     _collect_in_window_cleanup_smoke_channel_dates,
     _has_running_luminarr_process,
@@ -408,7 +408,7 @@ def test_run_telegram_bot_api_snapshot_reads_quoted_env_file_token(
     (tmp_path / ".env").write_text('TELEGRAM_BOT_TOKEN="test-token"\n', encoding="utf-8")
 
     class _FakeResponse(io.BytesIO):
-        def __enter__(self) -> "_FakeResponse":
+        def __enter__(self) -> _FakeResponse:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> None:
@@ -467,7 +467,7 @@ def test_run_telegram_bot_api_snapshot_reads_env_file_and_returns_ready(
     (tmp_path / ".env").write_text("TELEGRAM_BOT_TOKEN=test-token\n", encoding="utf-8")
 
     class _FakeResponse(io.BytesIO):
-        def __enter__(self) -> "_FakeResponse":
+        def __enter__(self) -> _FakeResponse:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> None:
@@ -490,7 +490,7 @@ def test_run_telegram_bot_api_snapshot_returns_rejected_when_api_says_not_ok(
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
 
     class _FakeResponse(io.BytesIO):
-        def __enter__(self) -> "_FakeResponse":
+        def __enter__(self) -> _FakeResponse:
             return self
 
         def __exit__(self, exc_type, exc, tb) -> None:

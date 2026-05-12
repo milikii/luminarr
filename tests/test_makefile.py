@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 
 def _extract_makefile_target_commands(text: str, target: str) -> list[str]:
@@ -129,7 +129,7 @@ def test_makefile_lint_target_points_to_repo_static_guard() -> None:
     makefile_text = Path("Makefile").read_text(encoding="utf-8")
     commands = _extract_makefile_target_commands(makefile_text, "lint")
 
-    assert commands == ["$(PYTHON) -m pyflakes app tests"]
+    assert commands == ["$(PYTHON) -m ruff check app tests"]
 
 
 def test_makefile_quality_gate_targets_point_to_current_focused_regressions() -> None:
@@ -227,7 +227,7 @@ def test_makefile_verify_stage1_telegram_delivery_group_keeps_current_regression
     assert commands == [
         "$(PYTHON) -m pytest -q tests/test_delivery_renderers.py tests/test_telegram_delivery_runtime.py",
         "$(PYTHON) -m pytest -q tests/test_private_chat_runtime.py tests/test_telegram_bot.py -k \"routes_search_with_channel_delivery_renderer or routes_add_pending_with_channel_delivery_renderer or routes_status_with_channel_delivery_renderer or import_formats_import_approval_for_telegram or routes_duplicate_override_follow_up\"",
-        "$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_reply_formatter.py -k \"prefers_media_confirmation_for_strong_cjk_title_before_resource_search or keeps_non_telegram_candidate_confirmation_layout_intact or formats_media_candidate_confirmation_with_primary_hero_block or sends_aggregate_candidate_confirmation_as_html_text or splits_aggregate_candidate_confirmation_at_telegram_limit\"",
+        "$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_reply_formatter.py -k \"prefers_media_confirmation_for_strong_cjk_title_before_resource_search or keeps_non_telegram_candidate_confirmation_layout_intact or formats_media_candidate_confirmation_with_primary_hero_block or sends_local_posters_before_candidate_confirmation_text or keeps_single_candidate_followup_minimal_after_local_poster_send or adds_html_candidate_caption_and_per_card_button or uses_placeholder_media_for_posterless_candidate_in_mixed_list or refills_failed_candidate_poster_block_into_text\"",
         "$(PYTHON) -m pytest -q tests/test_search_media.py tests/test_telegram_pt_resource_cards.py tests/test_telegram_runtime_adapter.py -k \"returns_telegram_pt_card_marker_after_media_lock or pt_resource or consumes_pt_resource_card or rejects_cancelled_pt_resource_card\"",
         "$(PYTHON) -m pytest -q tests/test_add_to_downloader.py -k pt_resource_card_task_ref",
     ]

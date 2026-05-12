@@ -8,11 +8,11 @@ from typing import Any
 from app.clients.tmdb import TmdbMovie
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.search_title_normalization import compact_match_key, normalize_match_key, normalize_spaces
+from app.services.adult_metadata_localization import resolve_adult_localized_metadata
 from app.services.adult_metadata_sources import (
     canonicalize_adult_metadata_source_name,
     get_adult_metadata_source_profile,
 )
-from app.services.adult_metadata_localization import resolve_adult_localized_metadata
 from app.services.bt_sources import resolve_bt_source
 from app.services.search_query_parser import ParsedMovieQuery
 

@@ -6,7 +6,6 @@ import httpx
 
 from app.clients.caribbeancom_helper import CaribbeancomReadOnlyHelperClient
 
-
 DETAIL_HTML = """
 <html>
   <head>

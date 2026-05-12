@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from collections.abc import Awaitable, Callable
 from functools import partial
 
@@ -13,63 +14,100 @@ from app.bot.bt_processing_path_runtime import (
     BT_PROCESSING_PATH_PROMPT_TEXT,
 )
 from app.bot.bt_tmdb_association_runtime import (
+    BT_CLASSIFICATION_LABELS,
     BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
     BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
-    BT_CLASSIFICATION_LABELS,
+)
+from app.bot.bt_tmdb_association_runtime import (
     enter_media_import_bt_flow as enter_shared_media_import_bt_flow,
+)
+from app.bot.bt_tmdb_association_runtime import (
     format_bt_tmdb_association_pending_reminder as _format_bt_tmdb_association_pending_reminder,
-)
-from app.bot.telegram_bt_pending_runtime import (
-    clear_bt_classification_pending as clear_shared_telegram_bt_classification_pending,
-    clear_bt_processing_path_pending as clear_shared_telegram_bt_processing_path_pending,
-    clear_bt_tmdb_association_pending as clear_shared_telegram_bt_tmdb_association_pending,
-    clear_raw_bt_destination_pending as clear_shared_telegram_raw_bt_destination_pending,
-    get_bt_tmdb_association_pending as get_shared_telegram_bt_tmdb_association_pending,
-    get_raw_bt_destination_pending as get_shared_telegram_raw_bt_destination_pending,
-    is_bt_classification_pending as is_shared_telegram_bt_classification_pending,
-    is_bt_processing_path_pending as is_shared_telegram_bt_processing_path_pending,
-    pop_bt_classification_pending as pop_shared_telegram_bt_classification_pending,
-    pop_bt_processing_path_pending as pop_shared_telegram_bt_processing_path_pending,
-    set_bt_classification_pending as set_shared_telegram_bt_classification_pending,
-    set_bt_processing_path_pending as set_shared_telegram_bt_processing_path_pending,
-    set_bt_tmdb_association_pending as set_shared_telegram_bt_tmdb_association_pending,
-    set_raw_bt_destination_pending as set_shared_telegram_raw_bt_destination_pending,
-)
-from app.bot.telegram_bt_entry_runtime import (
-    enter_media_import_bt_flow as enter_shared_telegram_media_import_bt_flow,
-    enter_pure_bt_flow as enter_shared_telegram_pure_bt_flow,
-)
-from app.bot.raw_bt_destination_runtime import (
-    PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
-    RAW_BT_DESTINATION_CANCELLED_TEXT,
-    RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-    enter_pure_bt_flow as enter_shared_pure_bt_flow,
 )
 from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
     PersonalWeChatLoginService,
     parse_personal_wechat_login_query,
 )
-from app.bot.telegram_sidecar_runtime import _log_bt_subscription_scheduler_config_error, _run_bt_subscription_scheduler_tick_once
-from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
+from app.bot.raw_bt_destination_runtime import (
+    PURE_BT_CANDIDATE_SELECTED_TEMPLATE,
+    RAW_BT_DESTINATION_CANCELLED_TEXT,
+    RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+)
+from app.bot.raw_bt_destination_runtime import (
+    enter_pure_bt_flow as enter_shared_pure_bt_flow,
+)
+from app.bot.telegram_bt_entry_runtime import (
+    enter_media_import_bt_flow as enter_shared_telegram_media_import_bt_flow,
+)
+from app.bot.telegram_bt_entry_runtime import (
+    enter_pure_bt_flow as enter_shared_telegram_pure_bt_flow,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    clear_bt_classification_pending as clear_shared_telegram_bt_classification_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    clear_bt_processing_path_pending as clear_shared_telegram_bt_processing_path_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    clear_bt_tmdb_association_pending as clear_shared_telegram_bt_tmdb_association_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    clear_raw_bt_destination_pending as clear_shared_telegram_raw_bt_destination_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    get_bt_tmdb_association_pending as get_shared_telegram_bt_tmdb_association_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    get_raw_bt_destination_pending as get_shared_telegram_raw_bt_destination_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    is_bt_classification_pending as is_shared_telegram_bt_classification_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    is_bt_processing_path_pending as is_shared_telegram_bt_processing_path_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    pop_bt_classification_pending as pop_shared_telegram_bt_classification_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    pop_bt_processing_path_pending as pop_shared_telegram_bt_processing_path_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    set_bt_classification_pending as set_shared_telegram_bt_classification_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    set_bt_processing_path_pending as set_shared_telegram_bt_processing_path_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    set_bt_tmdb_association_pending as set_shared_telegram_bt_tmdb_association_pending,
+)
+from app.bot.telegram_bt_pending_runtime import (
+    set_raw_bt_destination_pending as set_shared_telegram_raw_bt_destination_pending,
+)
+from app.bot.telegram_sidecar_runtime import (
+    _log_bt_subscription_scheduler_config_error,
+    _run_bt_subscription_scheduler_tick_once,
+)
 from app.clients.tmdb import TmdbMovie
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_DUPLICATE_OVERRIDE,
     BtPendingRepo,
 )
-from app.db.job_repo import JobRepo, WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY
+from app.db.job_repo import WORKFLOW_ADD_TO_DOWNLOADER, WORKFLOW_IMPORT_TO_LIBRARY, JobRepo
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.runtime.execution_policy import (
-    ACTION_BT_READ_ONLY_HELPER,
     ACTION_ADD_TO_DOWNLOADER,
+    ACTION_BT_READ_ONLY_HELPER,
     ACTION_CANCEL_PENDING_APPROVAL,
-    ACTION_CLEANUP_INSPECT,
-    ACTION_PERSONAL_WECHAT_LOGIN,
-    ACTION_CONFIRM_ADD_TO_DOWNLOADER,
     ACTION_CLEANUP_DOWNLOADER_SOURCE,
+    ACTION_CLEANUP_INSPECT,
+    ACTION_CONFIRM_ADD_TO_DOWNLOADER,
     ACTION_CONFIRM_IMPORT_TO_LIBRARY,
     ACTION_GET_DOWNLOAD_STATUS,
     ACTION_IMPORT_TO_LIBRARY,
+    ACTION_PERSONAL_WECHAT_LOGIN,
     ACTION_RESET_CANDIDATES,
     ACTION_RESET_CLARIFICATION,
     ACTION_SEARCH_MEDIA,
@@ -78,20 +116,20 @@ from app.services.add_to_downloader import (
     ADD_CANCELLED_TEXT,
     AddToDownloaderService,
 )
+from app.services.bt_subscription_command import parse_bt_subscription_query
 from app.services.cleanup_downloaded_source import (
     CleanupDownloadedSourceService,
     parse_cleanup_inspect_query,
     parse_cleanup_query,
 )
-from app.services.bt_subscription_command import parse_bt_subscription_query
 from app.services.get_download_status import GetDownloadStatusService, parse_status_query
-from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.import_to_library import (
     IMPORT_CANCELLED_TEXT,
     ImportToLibraryService,
     parse_confirm_query,
     parse_import_query,
 )
+from app.services.manage_bt_subscription import ManageBtSubscriptionService
 from app.services.manage_watchlist import ManageWatchlistService, parse_watchlist_query
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.search_media import SearchMediaService

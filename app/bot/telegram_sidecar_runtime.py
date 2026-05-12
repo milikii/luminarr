@@ -5,18 +5,15 @@ from dataclasses import dataclass
 
 from telegram.ext import Application
 
-from app.bot.sidecar_host_runtime import (
-    SIDECAR_HOST_SEND_TEXT_FUNC_KEY,
-    SidecarHost,
-    resolve_sidecar_host_send_text_func,
-)
-from app.bot.downloader_execution_runtime import (
-    ResolvedDownloaderExecution,
-    resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
-)
 from app.bot.download_follow_up_runtime import (
     start_download_follow_up_scheduler,
     stop_download_follow_up_scheduler,
+)
+from app.bot.downloader_execution_runtime import (
+    ResolvedDownloaderExecution,
+)
+from app.bot.downloader_execution_runtime import (
+    resolve_bound_downloader_execution as resolve_shared_bound_downloader_execution,
 )
 from app.bot.execution_runtime import resolve_execution_gate
 from app.bot.feishu_long_connection import (
@@ -24,6 +21,11 @@ from app.bot.feishu_long_connection import (
     FeishuLongConnectionService,
 )
 from app.bot.personal_wechat_login import PersonalWeChatLoginService
+from app.bot.sidecar_host_runtime import (
+    SIDECAR_HOST_SEND_TEXT_FUNC_KEY,
+    SidecarHost,
+    resolve_sidecar_host_send_text_func,
+)
 from app.bot.wecom_webhook_server import (
     WeComWebhookServerConfig,
     WeComWebhookServerRuntime,
@@ -31,12 +33,11 @@ from app.bot.wecom_webhook_server import (
     stop_wecom_webhook_server,
 )
 from app.operational_logging import emit_operational_log
+from app.runtime.execution_policy import ACTION_BT_SUBSCRIPTION_RUN, ExecutionGate
 from app.services.manage_bt_subscription import (
     BtSubscriptionDispatchContext,
     ManageBtSubscriptionService,
 )
-from app.runtime.execution_policy import ACTION_BT_SUBSCRIPTION_RUN, ExecutionGate
-
 
 DOWNLOADER_EXECUTION_CONFIG_MISSING_TEMPLATE = "下载器角色 {role} 绑定的实例不存在：{name}。请检查配置后重试。"
 GET_DOWNLOAD_STATUS_SERVICE_KEY = "get_download_status_service"
@@ -194,7 +195,7 @@ async def _bt_subscription_scheduler_loop(
             _log_bt_subscription_scheduler_loop_error(error=error)
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=BT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECONDS)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             continue
 
 

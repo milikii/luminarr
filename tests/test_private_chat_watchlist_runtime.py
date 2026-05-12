@@ -4,9 +4,9 @@ import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+from app.bot import telegram_bot as tg
 from app.bot.execution_runtime import watchlist_policy_action
 from app.bot.private_chat_watchlist_runtime import handle_watchlist_query
-from app.bot import telegram_bot as tg
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.db.watchlist_repo import WatchlistRepo

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sqlite3
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any

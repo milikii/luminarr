@@ -5,9 +5,13 @@ import re
 from app.services.pure_bt import (
     BTBatchConfirmRequest,
     BTBatchPreviewRequest,
-    extract_bt_batch_confirm_request as extract_pure_bt_batch_confirm_request,
-    extract_bt_batch_preview_request as extract_pure_bt_batch_preview_request,
     extract_bt_search_query,
+)
+from app.services.pure_bt import (
+    extract_bt_batch_confirm_request as extract_pure_bt_batch_confirm_request,
+)
+from app.services.pure_bt import (
+    extract_bt_batch_preview_request as extract_pure_bt_batch_preview_request,
 )
 
 FRUSTRATION_TEXTS = frozenset({"不对", "停", "重来", "换一个", "算了", "取消"})

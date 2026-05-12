@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.services.bt_candidate_scorer import BTCandidate, BTScoringContext, BTScoringRules, filter_candidates, pick_best
-from app.services.bt_candidate_scorer import DEFAULT_BT_SCORING_RULES, load_bt_scoring_rules
+from app.services.bt_candidate_scorer import (
+    DEFAULT_BT_SCORING_RULES,
+    BTCandidate,
+    BTScoringContext,
+    BTScoringRules,
+    filter_candidates,
+    load_bt_scoring_rules,
+    pick_best,
+)
 
 
 def test_filter_candidates_drops_invalid_source() -> None:

@@ -7,10 +7,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.bot.feishu_adapter import handle_feishu_private_text_event
 from app.bot.channel_identity import project_channel_chat_id
+from app.bot.feishu_adapter import handle_feishu_private_text_event
 from app.bot.personal_wechat_text import handle_personal_wechat_private_text_event
-from app.bot.telegram_runtime_adapter import handle_telegram_message as handle_message
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
     CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
@@ -19,22 +18,23 @@ from app.bot.telegram_bot import (
     SEARCH_SERVICE_KEY,
     SERVICE_NOT_READY_TEXT,
 )
+from app.bot.telegram_runtime_adapter import handle_telegram_message as handle_message
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
     WECOM_RECEIVE_ID_BOT_DATA_KEY,
     WECOM_TOKEN_BOT_DATA_KEY,
     handle_wecom_private_text_event,
 )
-from app.db.job_event_repo import JobEventRepo, JobEvent
+from app.db.job_event_repo import JobEvent, JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
-from app.services.add_to_downloader import AddToDownloaderService
 from app.services import cleanup_downloaded_source as cleanup_module
-from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.add_to_downloader import AddToDownloaderService
 from app.services.cleanup_downloaded_source import (
     CLEANUP_INSPECT_QUERY_USAGE_TEXT,
     CLEANUP_QUERY_USAGE_TEXT,
     CLEANUP_SOURCE_TYPE_UNSUPPORTED_TEXT,
+    CleanupDownloadedSourceService,
 )
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService

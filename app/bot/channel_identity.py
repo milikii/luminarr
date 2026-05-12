@@ -39,7 +39,7 @@ def _project_channel_identity(
         return None
 
     digest = hashlib.sha256(
-        f"{cleaned_channel}:{cleaned_kind}:{cleaned_external_id}".encode("utf-8")
+        f"{cleaned_channel}:{cleaned_kind}:{cleaned_external_id}".encode()
     ).digest()
     projected_id = int.from_bytes(digest[:8], "big") & 0x7FFF_FFFF_FFFF_FFFF
     return projected_id or 1

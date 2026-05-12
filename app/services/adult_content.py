@@ -4,7 +4,6 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-
 ADULT_ARCHIVE_CATEGORIES = (
     "fc2",
     "censored",

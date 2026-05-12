@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import html
-import sqlite3
 import re
+import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
@@ -16,8 +16,8 @@ from app.downloader_route_lookup import DownloaderRouteLookupError
 from app.operational_logging import emit_operational_log
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_delivery_item
 from app.services.post_download_auto_import import (
-    AutoImportStateUnavailableError,
     POST_PROCESSING_SUMMARY_EVENT,
+    AutoImportStateUnavailableError,
     PostDownloadAutoImportService,
 )
 

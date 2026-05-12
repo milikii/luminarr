@@ -9,8 +9,8 @@ from telegram.error import NetworkError
 
 from app.bot import telegram_bot as tg
 from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
-from app.bot.shared_private_chat_sender import build_shared_private_chat_send_text_func
 from app.bot.feishu_long_connection import FEISHU_LONG_CONNECTION_SERVICE_KEY
+from app.bot.shared_private_chat_sender import build_shared_private_chat_send_text_func
 from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
 from app.bot.telegram_sidecar_runtime import (
     BT_SUBSCRIPTION_SCHEDULER_TASK_KEY,
@@ -35,13 +35,15 @@ from app.downloader_route_lookup import (
     _resolve_lookup_client_for_task,
 )
 from app.main import (
-    _build_ai_cast_localization_service,
     _build_adult_read_only_lookup_func,
+    _build_ai_cast_localization_service,
     _build_bt_source_providers,
     _build_refresh_media_server_func,
     _resolve_downloader_client_for_dispatch,
     _resolve_subtitle_translation_proxy_url,
     _run_application_polling,
+)
+from app.main import (
     main as run_main,
 )
 

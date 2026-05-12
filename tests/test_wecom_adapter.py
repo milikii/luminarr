@@ -3,17 +3,18 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
-from pathlib import Path
-from types import SimpleNamespace
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 import app.bot.channel_contact_runtime as channel_contact_runtime
+import app.bot.wecom_webhook_server as wecom_webhook_server_module
 from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -35,20 +36,19 @@ from app.bot.wecom_adapter import (
     handle_wecom_private_text_event,
     parse_wecom_private_text_event,
 )
-from app.db.job_event_repo import JobEventRepo
-from app.db.job_repo import JobRepo
-from app.db.sqlite import SqliteDatabase
 from app.bot.wecom_webhook_server import (
     WeComWebhookServerConfig,
     start_wecom_webhook_server,
     stop_wecom_webhook_server,
 )
-import app.bot.wecom_webhook_server as wecom_webhook_server_module
+from app.db.job_event_repo import JobEventRepo
+from app.db.job_repo import JobRepo
+from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
-from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.cleanup_downloaded_source import (
     CLEANUP_INSPECT_QUERY_USAGE_TEXT,
     CLEANUP_QUERY_USAGE_TEXT,
+    CleanupDownloadedSourceService,
 )
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService

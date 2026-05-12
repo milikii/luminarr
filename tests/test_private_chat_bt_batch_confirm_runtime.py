@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
+from app.bot import telegram_bot as tg
 from app.bot.downloader_execution_runtime import resolve_bound_downloader_execution
 from app.bot.private_chat_bt_batch_confirm_runtime import handle_bt_batch_confirm_query
-from app.bot import telegram_bot as tg
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.services.add_to_downloader import AddToDownloaderService
 from app.services.search_media import SearchMediaService

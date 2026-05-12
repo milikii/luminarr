@@ -6,12 +6,12 @@ from unittest.mock import AsyncMock
 import httpx
 import pytest
 
+from app.bot import telegram_bot as tg
+from app.bot.private_chat_bt_read_only_runtime import handle_bt_read_only_query
 from app.bot.private_chat_search_runtime import (
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT,
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
 )
-from app.bot.private_chat_bt_read_only_runtime import handle_bt_read_only_query
-from app.bot import telegram_bot as tg
 from app.services.search_media import SearchMediaService
 
 

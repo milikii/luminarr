@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from collections.abc import Mapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,7 +406,7 @@ def delete_approval_row(
 def resolve_approval_record_from_row(
     *,
     row: Mapping[str, object] | None,
-    to_approval_record: callable,
+    to_approval_record: Callable[..., object],
 ) -> object | None:
     if row is None:
         return None

@@ -27,10 +27,10 @@ from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
-from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.cleanup_downloaded_source import (
     CLEANUP_INSPECT_QUERY_USAGE_TEXT,
     CLEANUP_QUERY_USAGE_TEXT,
+    CleanupDownloadedSourceService,
 )
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService

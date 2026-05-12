@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 import sqlite3
+from datetime import datetime
 
-from app.bot.sidecar_host_runtime import SidecarHost
 from app.bot.shared_private_chat_sender import log_shared_private_chat_send_error
+from app.bot.sidecar_host_runtime import SidecarHost
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.operational_logging import emit_operational_log
 from app.services.get_download_status import GetDownloadStatusService
@@ -37,7 +37,7 @@ async def post_download_auto_import_scheduler_loop(
             _log_post_download_auto_import_scheduler_error(error=error)
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             continue
 
 
@@ -160,7 +160,7 @@ async def download_completion_polling_loop(
             _log_download_completion_polling_loop_error(error=error)
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=interval_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             continue
 
 

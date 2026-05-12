@@ -16,11 +16,11 @@ from app.db.job_repo_support import (
     normalize_job_pending_upsert_identity,
     normalize_job_workflow,
     resolve_job_record_from_row,
-    upsert_pending_job_row,
     update_downloader_job_completed,
     update_job_cancel_pending,
     update_job_lease_claim,
     update_job_state_transition,
+    upsert_pending_job_row,
 )
 from app.db.sqlite import SqliteDatabase
 

@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
+from app.bot import telegram_bot as tg
 from app.bot.private_chat_search_runtime import (
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT,
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
     handle_search_query_fallback,
 )
-from app.bot import telegram_bot as tg
 from app.services.search_media import SearchMediaService
 
 

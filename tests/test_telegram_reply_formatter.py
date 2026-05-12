@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock
 from telegram import InlineKeyboardMarkup
 
 from app.bot import telegram_update_runtime
+from app.bot.telegram_reply_formatter import format_telegram_reply
+from app.bot.telegram_update_runtime import build_telegram_reply_func
 from app.clients.tmdb import TmdbMovie
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.sqlite import SqliteDatabase
-from app.bot.telegram_update_runtime import build_telegram_reply_func
-from app.bot.telegram_reply_formatter import format_telegram_reply
 from app.runtime.delivery import DeliveryAction, DeliveryHeader, DeliveryItem, DeliverySection, render_telegram_text
 from app.services.search_query_parser import ParsedMovieQuery
 from app.services.search_reply_formatter import (
@@ -485,7 +485,7 @@ def test_build_telegram_reply_func_sends_local_posters_before_candidate_confirma
         return "media-ok"
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_text = AsyncMock(return_value="fallback")
     reply_func = build_telegram_reply_func(
@@ -610,7 +610,7 @@ def test_build_telegram_reply_func_keeps_single_candidate_followup_minimal_after
         return "media-ok"
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_text = AsyncMock(return_value="fallback")
     reply_func = build_telegram_reply_func(
@@ -720,7 +720,7 @@ def test_build_telegram_reply_func_uses_placeholder_media_for_posterless_candida
         return "media-ok"
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_text = AsyncMock(return_value="fallback")
     reply_func = build_telegram_reply_func(
@@ -856,7 +856,7 @@ def test_build_telegram_reply_func_refills_failed_candidate_poster_block_into_te
         return "media-ok"
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_text = AsyncMock(return_value="fallback")
     reply_func = build_telegram_reply_func(

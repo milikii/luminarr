@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 
@@ -247,7 +247,7 @@ def fetch_job_row_by_identity(
 def resolve_job_record_from_row(
     *,
     row: Mapping[str, object] | None,
-    to_job_record: callable,
+    to_job_record: Callable[..., object],
 ) -> object | None:
     if row is None:
         return None

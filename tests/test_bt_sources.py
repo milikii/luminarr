@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+
 import httpx
 
 from app.clients.web_source import (
     JAVBUS_RULE,
     NYAA_RULE,
-    TOKYOTOSHO_RULE,
     SUKEBEI_RULE,
+    TOKYOTOSHO_RULE,
     UnsupportedWebSourcePageError,
     WebSourceClient,
     get_configured_web_source_rule,
@@ -26,8 +27,8 @@ from app.services.bt_sources import (
     BtSourceProvider,
     build_bt_candidate_dedupe_key,
     canonicalize_bt_source_name,
-    get_default_adult_bt_source_names,
     get_bt_source_profile,
+    get_default_adult_bt_source_names,
     is_active_bt_source,
 )
 

@@ -6,7 +6,6 @@ import httpx
 
 from app.clients.javbus_helper import JavBusReadOnlyHelperClient
 
-
 SEARCH_HTML = """
 <html>
   <body>

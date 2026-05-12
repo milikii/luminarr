@@ -13,7 +13,6 @@ from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_STARTED_TEXT,
     PersonalWeChatLoginService,
 )
-from app.clients.transmission import TransmissionTask
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.bot.telegram_bot import (
     ADD_TO_DOWNLOADER_SERVICE_KEY,
@@ -30,18 +29,19 @@ from app.bot.telegram_bot import (
     TELEGRAM_SEND_MEDIA_FUNC_KEY,
     TELEGRAM_SEND_TEXT_FUNC_KEY,
 )
+from app.clients.transmission import TransmissionTask
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
+from app.db.bt_pending_repo import BtPendingRepo
 from app.db.candidate_repo import CandidatePersistenceError
 from app.db.clarification_repo import ClarificationPersistenceError
 from app.db.job_event_repo import JobEventRepo
 from app.db.job_repo import JobPersistenceError, JobRepo
-from app.db.bt_pending_repo import BtPendingRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import ADD_CANCEL_STATE_UNAVAILABLE_TEXT, AddToDownloaderService
-from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.cleanup_downloaded_source import (
     CLEANUP_INSPECT_QUERY_USAGE_TEXT,
     CLEANUP_QUERY_USAGE_TEXT,
+    CleanupDownloadedSourceService,
 )
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService

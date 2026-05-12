@@ -5,14 +5,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from app.bot import telegram_bot as tg
-from app.services.add_to_downloader import AddToDownloaderService
-from app.services.search_media import SearchMediaService
-from app.services.telegram_pt_resource_cards import build_telegram_pt_resource_callback_data
-from app.db.telegram_update_repo import TelegramUpdatePersistenceError
 from app.bot.telegram_bot import TELEGRAM_UPDATE_REPO_KEY
 from app.bot.telegram_runtime_adapter import handle_telegram_callback_query, handle_telegram_message
 from app.db.sqlite import SqliteDatabase
-from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.db.telegram_update_repo import TelegramUpdatePersistenceError, TelegramUpdateRepo
+from app.services.add_to_downloader import AddToDownloaderService
+from app.services.search_media import SearchMediaService
+from app.services.telegram_pt_resource_cards import build_telegram_pt_resource_callback_data
 
 
 def _build_update(

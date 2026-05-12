@@ -4,24 +4,8 @@ from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
-from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
-from app.db.bt_pending_repo import BtPendingRepo
-from app.db.job_repo import JobRepo
-from app.db.telegram_update_repo import TelegramUpdateRepo
-from app.runtime.execution_policy import ExecutionGate
+from app.bot.execution_runtime import resolve_execution_gate
 from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
-from app.services.add_to_downloader import AddToDownloaderService
-from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
-from app.services.get_download_status import GetDownloadStatusService
-from app.services.import_to_library import ImportToLibraryService
-from app.services.manage_bt_subscription import ManageBtSubscriptionService
-from app.services.manage_watchlist import ManageWatchlistService
-from app.services.post_download_auto_import import PostDownloadAutoImportService
-from app.services.search_media import SearchMediaService
-from app.bot.telegram_sidecar_runtime import (
-    start_telegram_application_lifecycle,
-    stop_telegram_application_lifecycle,
-)
 from app.bot.telegram_delivery_runtime import (
     build_telegram_edit_text_func,
     build_telegram_send_media_func,
@@ -29,6 +13,10 @@ from app.bot.telegram_delivery_runtime import (
 )
 from app.bot.telegram_downloader_execution_runtime import resolve_telegram_bound_downloader_execution_from_context
 from app.bot.telegram_reply_formatter import format_telegram_reply
+from app.bot.telegram_sidecar_runtime import (
+    start_telegram_application_lifecycle,
+    stop_telegram_application_lifecycle,
+)
 from app.bot.telegram_update_runtime import (
     build_telegram_download_image_func,
     build_telegram_reply_func,
@@ -38,7 +26,19 @@ from app.bot.telegram_update_runtime import (
     resolve_telegram_chat_id,
     resolve_telegram_user_id,
 )
-from app.bot.execution_runtime import resolve_execution_gate
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
+from app.db.bt_pending_repo import BtPendingRepo
+from app.db.job_repo import JobRepo
+from app.db.telegram_update_repo import TelegramUpdateRepo
+from app.runtime.execution_policy import ExecutionGate
+from app.services.add_to_downloader import AddToDownloaderService
+from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
+from app.services.get_download_status import GetDownloadStatusService
+from app.services.import_to_library import ImportToLibraryService
+from app.services.manage_bt_subscription import ManageBtSubscriptionService
+from app.services.manage_watchlist import ManageWatchlistService
+from app.services.post_download_auto_import import PostDownloadAutoImportService
+from app.services.search_media import SearchMediaService
 from app.services.telegram_pt_resource_cards import (
     TELEGRAM_PT_RESOURCE_CARD_STALE_TEXT,
     build_telegram_pt_resource_task_ref,
@@ -47,13 +47,13 @@ from app.services.telegram_pt_resource_cards import (
 
 
 async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
     from app.bot import telegram_bot as tg
+    from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 
     message = update.effective_message
     if message is None:
         return
-    query_text = str((message.text or message.caption or "")).strip()
+    query_text = str(message.text or message.caption or "").strip()
     if not query_text:
         return
 
@@ -89,8 +89,8 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def handle_telegram_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
     from app.bot import telegram_bot as tg
+    from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 
     callback_query = getattr(update, "callback_query", None)
     if callback_query is None:

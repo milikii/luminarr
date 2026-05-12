@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.clients.transmission import TransmissionTask
-from app.db.adult_duplicate_memory_snapshot_repo import AdultDuplicateMemorySnapshotRepo
 from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceError, AdultContentRegistryRepo
+from app.db.adult_duplicate_memory_snapshot_repo import AdultDuplicateMemorySnapshotRepo
 from app.db.approval_repo import (
     APPROVAL_STATUS_CANCELLED,
     DEFAULT_PENDING_TIMEOUT_SECONDS,
@@ -22,6 +22,7 @@ from app.db.candidate_repo import CandidateMappingRepo
 from app.db.download_monitor_repo import DownloadMonitorRepo
 from app.db.job_repo import JOB_STATE_CANCELLED, JobPersistenceError, JobRecord, JobRepo
 from app.db.sqlite import SqliteDatabase
+from app.services.add_pending_context import build_bt_task_ref, build_pending_add_context
 from app.services.add_to_downloader import (
     ADD_APPROVAL_PENDING_TEXT,
     ADD_CANCEL_STATE_UNAVAILABLE_TEXT,
@@ -32,16 +33,15 @@ from app.services.add_to_downloader import (
     ADD_FINALIZATION_WARNING_TEXT,
     ADD_PENDING_STATE_UNAVAILABLE_TEXT,
     CANDIDATE_SOURCE_MISSING_TEXT,
-    ConfirmExecutionContext,
     SELECT_LOOKUP_FAILED_TEXT,
     SELECT_NOT_FOUND_TEXT,
     SELECT_OUT_OF_RANGE_TEXT,
     SELECT_USAGE_TEXT,
     AddToDownloaderService,
+    ConfirmExecutionContext,
     PendingAddContext,
 )
 from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
-from app.services.add_pending_context import build_bt_task_ref, build_pending_add_context
 from app.services.search_media import SearchMediaService
 from app.trace_logging import parse_trace_log_line
 

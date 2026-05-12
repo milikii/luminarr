@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, Mock, call
 
 import pytest
 
-from app.clients.transmission import TransmissionTaskStatus
 from app.bot.download_follow_up_runtime import (
     download_completion_polling_loop,
     poll_pending_download_completion_once,
@@ -23,13 +22,14 @@ from app.bot.telegram_bot import (
     POST_DOWNLOAD_AUTO_IMPORT_STOP_EVENT_KEY,
     POST_DOWNLOAD_AUTO_IMPORT_TASK_KEY,
 )
+from app.clients.transmission import TransmissionTaskStatus
 from app.db.download_monitor_repo import DownloadMonitorPersistenceError, DownloadMonitorRepo
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.post_download_auto_import import (
-    AutoImportRunResult,
     POST_PROCESSING_SUMMARY_EVENT,
+    AutoImportRunResult,
     PostDownloadAutoImportService,
 )
 

@@ -11,8 +11,8 @@ from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.channel_contact_runtime import record_channel_contact
+from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.operational_logging import emit_operational_log

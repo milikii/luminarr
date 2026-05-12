@@ -11,16 +11,16 @@ from app.db.approval_repo_support import (
     fetch_exact_approval_row,
     fetch_latest_approval_row_for_task_id,
     move_approval_identity_row,
-    normalize_executed_identity,
     normalize_approval_identity,
+    normalize_executed_identity,
     normalize_move_identity,
-    request_approval_row,
     normalize_transition_identity,
+    request_approval_row,
     resolve_approval_record_from_row,
     resolve_requested_lease_version_from_row,
-    upsert_approval_row,
     update_approval_executed_version,
     update_approval_status,
+    upsert_approval_row,
 )
 from app.db.sqlite import SqliteDatabase
 

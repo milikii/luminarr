@@ -6,7 +6,6 @@ import httpx
 
 from app.clients.avmoo_helper import AvmooReadOnlyHelperClient
 
-
 SEARCH_HTML = """
 <html>
   <body>

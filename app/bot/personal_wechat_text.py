@@ -6,8 +6,8 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.channel_contact_runtime import record_channel_contact
+from app.bot.channel_identity import project_channel_chat_id, project_channel_user_id
 from app.bot.cleanup_smoke_logging import log_cleanup_private_chat_smoke
 from app.bot.private_chat_runtime import handle_private_chat_query_text as dispatch_private_chat_text
 from app.operational_logging import emit_operational_log
@@ -34,6 +34,8 @@ try:
     from wechat_clawbot.api.types import MessageItemType, MessageType
     from wechat_clawbot.auth.accounts import (
         DEFAULT_BASE_URL as DEFAULT_WECHAT_API_BASE_URL,
+    )
+    from wechat_clawbot.auth.accounts import (
         list_weixin_account_ids,
         load_weixin_account,
     )
@@ -526,7 +528,7 @@ class PersonalWeChatTextService:
             return
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=delay_seconds)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return
 
     def _is_api_error(self, response: object) -> bool:

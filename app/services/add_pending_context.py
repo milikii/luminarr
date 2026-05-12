@@ -11,8 +11,8 @@ from app.db.adult_content_registry_repo import AdultContentRegistryPersistenceEr
 from app.operational_logging import emit_operational_log
 from app.services.adult_content import extract_exact_adult_content_match
 from app.services.bt_read_only_display import build_adult_history_text
-from app.services.media_identity import normalize_media_identity_payload
 from app.services.bt_sources import resolve_bt_source
+from app.services.media_identity import normalize_media_identity_payload
 from app.services.search_media import SearchMediaService
 
 SELECT_USAGE_TEXT = "请输入要选择的序号，例如：1"

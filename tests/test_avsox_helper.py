@@ -6,7 +6,6 @@ import httpx
 
 from app.clients.avsox_helper import AvsoxReadOnlyHelperClient
 
-
 SEARCH_HTML = """
 <html>
   <body>

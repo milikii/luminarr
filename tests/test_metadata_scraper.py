@@ -28,7 +28,7 @@ def test_scrape_for_import_writes_metadata_sidecar(tmp_path: Path) -> None:
         )
 
     async def fake_download_image(url: str) -> bytes:
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
     result = _run(
@@ -1222,7 +1222,7 @@ def test_scrape_for_import_writes_nfo_next_to_primary_video_in_directory_target(
         )
 
     async def fake_download_image(url: str) -> bytes:
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
     result = _run(
@@ -1272,7 +1272,7 @@ def test_scrape_for_import_writes_extended_fanart_assets_for_directory_target(tm
         )
 
     async def fake_download_image(url: str) -> bytes:
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
     result = _run(
@@ -1325,7 +1325,7 @@ def test_scrape_for_import_removes_legacy_cover_when_poster_is_regenerated(tmp_p
         )
 
     async def fake_download_image(url: str) -> bytes:
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
     result = _run(
@@ -1407,7 +1407,7 @@ def test_scrape_for_import_falls_back_to_tmdb_poster_when_fanart_missing(tmp_pat
 
     async def fake_download_image(url: str) -> bytes:
         seen_urls.append(url)
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(
         fake_tmdb_lookup,
@@ -1463,7 +1463,7 @@ def test_scrape_for_import_falls_back_to_tmdb_backdrop_when_fanart_missing(tmp_p
 
     async def fake_download_image(url: str) -> bytes:
         seen_urls.append(url)
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(
         fake_tmdb_lookup,
@@ -1510,7 +1510,7 @@ def test_scrape_for_import_overwrites_existing_images(tmp_path: Path) -> None:
 
     async def fake_download_image(url: str) -> bytes:
         seen_urls.append(url)
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
     result = _run(
@@ -1551,7 +1551,7 @@ def test_scrape_for_import_cleans_up_partial_image_artifacts_on_download_failure
         seen_urls.append(url)
         if url.endswith("bg.jpg"):
             raise httpx.ConnectError("network down", request=httpx.Request("GET", url))
-        return f"image:{url}".encode("utf-8")
+        return f"image:{url}".encode()
 
     service = MetadataScraperService(fake_tmdb_lookup, fake_fanart, download_image_func=fake_download_image)
     result = _run(

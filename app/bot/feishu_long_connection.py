@@ -74,7 +74,7 @@ class FeishuLongConnectionService:
         self._ws_client: Any = None
         self._main_loop: asyncio.AbstractEventLoop | None = None
         self._bot_data: MutableMapping[str, object] | None = None
-        self._reply_text_func: Callable[["FeishuPrivateTextEvent", str], Awaitable[object]] | None = None
+        self._reply_text_func: Callable[[FeishuPrivateTextEvent, str], Awaitable[object]] | None = None
 
     def is_available(self) -> bool:
         return lark_oapi is not None and lark_ws_client_module is not None

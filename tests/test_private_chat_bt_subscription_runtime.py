@@ -4,13 +4,13 @@ import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock
 
+from app.bot import telegram_bot as tg
 from app.bot.execution_runtime import bt_subscription_policy_action
 from app.bot.private_chat_bt_subscription_runtime import (
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT,
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
     handle_bt_subscription_query,
 )
-from app.bot import telegram_bot as tg
 from app.config import DownloaderInstanceConfig, DownloaderRoleBinding
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase

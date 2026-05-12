@@ -4,8 +4,8 @@ import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, Mock
 
-from app.bot.private_chat_cleanup_runtime import handle_cleanup_query
 from app.bot import telegram_bot as tg
+from app.bot.private_chat_cleanup_runtime import handle_cleanup_query
 from app.db.job_event_repo import JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService

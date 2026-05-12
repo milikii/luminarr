@@ -9,8 +9,8 @@ from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
 from app.services.manage_watchlist import (
     WATCHLIST_ADD_FAILED_TEXT,
     WATCHLIST_ADD_USAGE_TEXT,
-    WATCHLIST_EMPTY_TEXT,
     WATCHLIST_CLEAR_FAILED_TEXT,
+    WATCHLIST_EMPTY_TEXT,
     WATCHLIST_LIST_FAILED_TEXT,
     WATCHLIST_REMOVE_FAILED_TEXT,
     WATCHLIST_REMOVE_USAGE_TEXT,

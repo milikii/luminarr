@@ -5,9 +5,11 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from app.bot.bt_tmdb_association_runtime import (
     clear_bt_tmdb_association_pending,
     get_bt_tmdb_association_pending,
-    handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
     log_bt_tmdb_association_error,
     resolve_bt_tmdb_candidates_lookup,
+)
+from app.bot.bt_tmdb_association_runtime import (
+    handle_bt_tmdb_association_query as handle_shared_bt_tmdb_association_query,
 )
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]

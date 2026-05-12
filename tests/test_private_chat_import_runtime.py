@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
-from app.bot.private_chat_import_runtime import handle_import_query
 from app.bot import telegram_bot as tg
+from app.bot.private_chat_import_runtime import handle_import_query
 from app.services.import_to_library import ImportToLibraryService
 
 

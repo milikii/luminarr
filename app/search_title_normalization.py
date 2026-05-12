@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
 import re
 import unicodedata
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 _SEARCH_TITLE_NOISE_VARIANTS: tuple[str, ...] = (
     r"imax(?:\s+enhanced)?",

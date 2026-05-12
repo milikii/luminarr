@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 from app.services.search_media import (
-    UnsupportedBatchPreviewPageUrl,
+    UnsupportedBatchPreviewPageUrlError,
     search_bt_batch_preview_candidates,
     search_raw_page_candidates,
 )
@@ -49,7 +49,7 @@ def test_search_raw_page_candidates_uses_page_fetch_and_preparation() -> None:
 
 
 def test_search_bt_batch_preview_candidates_rejects_unsupported_page_url() -> None:
-    with pytest.raises(UnsupportedBatchPreviewPageUrl):
+    with pytest.raises(UnsupportedBatchPreviewPageUrlError):
         asyncio.run(
             search_bt_batch_preview_candidates(
                 "https://example.com/list",

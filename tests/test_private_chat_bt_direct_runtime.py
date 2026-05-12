@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.bot.private_chat_bt_direct_runtime import handle_bt_direct_intent_query
 from app.bot import telegram_bot as tg
+from app.bot.private_chat_bt_direct_runtime import handle_bt_direct_intent_query
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.sqlite import SqliteDatabase
 

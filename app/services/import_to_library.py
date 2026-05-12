@@ -8,18 +8,33 @@ from pathlib import Path
 
 from app.clients.transmission import TransmissionImportSource
 from app.db.approval_repo import (
-    ApprovalRepo,
     ApprovalPersistenceError,
+    ApprovalRepo,
 )
 from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
-from app.db.job_repo import JOB_STATE_PENDING_APPROVAL, JobPersistenceError, JobRecord, JobRepo, WORKFLOW_IMPORT_TO_LIBRARY
+from app.db.job_repo import (
+    JOB_STATE_PENDING_APPROVAL,
+    WORKFLOW_IMPORT_TO_LIBRARY,
+    JobPersistenceError,
+    JobRecord,
+    JobRepo,
+)
 from app.operational_logging import emit_operational_log
 from app.services import import_transfer_execution
 from app.services.import_approval_state import ImportApprovalState, ImportTargetLookupResult
 from app.services.import_context_lookup import ConfirmExecutionContext, ImportContextLookup
-from app.services.import_post_processing import ImportPostProcessingService, MetadataScrapeFunc, RefreshMediaServerFunc, SubtitleTranslateFunc
-from app.services.import_prepare_state import ImportPrepareState, extract_title_year_for_scrape, extract_title_year_from_text
-from app.services.import_prepare_state import build_movie_target_name_from_identity
+from app.services.import_post_processing import (
+    ImportPostProcessingService,
+    MetadataScrapeFunc,
+    RefreshMediaServerFunc,
+    SubtitleTranslateFunc,
+)
+from app.services.import_prepare_state import (
+    ImportPrepareState,
+    build_movie_target_name_from_identity,
+    extract_title_year_for_scrape,
+    extract_title_year_from_text,
+)
 from app.services.import_transfer_execution import IMPORT_EXECUTION_MODE_COPY, ImportExecutionResult, PreparedImport
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_from_json
 from app.services.workflow_trace_logger import WorkflowTraceLogger

@@ -18,8 +18,8 @@ from app.search_franchise_intent import (
     resolve_franchise_intent_boost,
 )
 from app.search_title_normalization import (
-    ShortQueryCandidateProfile,
     SHORT_STRONG_TITLE_COMPACT_LIMIT,
+    ShortQueryCandidateProfile,
     compact_match_key,
     is_confident_title_match,
     is_title_match_prefix_family,

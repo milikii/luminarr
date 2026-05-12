@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.db.job_event_repo import JobEventPersistenceError
-from app.db.job_event_repo import JobEventRepo
+from app.db.job_event_repo import JobEventPersistenceError, JobEventRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.import_to_library import ImportToLibraryService
 from app.services.media_identity import MEDIA_IDENTITY_EVENT_TYPE, media_identity_to_json

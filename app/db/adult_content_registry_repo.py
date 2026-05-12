@@ -5,7 +5,6 @@ from typing import Any
 
 from app.db.sqlite import SqliteDatabase
 
-
 ADULT_CONTENT_STATUS_PENDING = "pending"
 ADULT_CONTENT_STATUS_DOWNLOADING = "downloading"
 ADULT_CONTENT_STATUS_ARCHIVED_PRESENT = "archived_present"

@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
-from app.bot.private_chat_status_runtime import handle_status_query
 from app.bot import telegram_bot as tg
+from app.bot.private_chat_status_runtime import handle_status_query
 from app.clients.transmission import TransmissionTaskStatus
 from app.services.get_download_status import GetDownloadStatusService
 

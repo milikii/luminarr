@@ -11,8 +11,8 @@ import httpx
 from app.clients.transmission import TransmissionImportSource
 from app.config import AdultArchiveDestination
 from app.db.adult_content_registry_repo import (
-    ADULT_CONTENT_STATUS_ARCHIVED_PRESENT,
     ADULT_CONTENT_STATUS_ARCHIVED_DELETED,
+    ADULT_CONTENT_STATUS_ARCHIVED_PRESENT,
     ADULT_CONTENT_STATUS_DOWNLOADING,
     ADULT_CONTENT_STATUS_PENDING,
     AdultContentRegistryPersistenceError,

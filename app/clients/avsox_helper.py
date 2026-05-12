@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 import re
+from collections.abc import Iterable
 from html import unescape
 from urllib.parse import quote_plus, urljoin, urlparse
 

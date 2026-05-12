@@ -157,7 +157,7 @@ def test_build_telegram_reply_func_sends_pt_resource_card_as_photo_caption_with_
         return SimpleNamespace(message_id=321)
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_func = build_telegram_reply_func(
         reply_text,
@@ -219,7 +219,7 @@ def test_build_telegram_reply_func_sends_short_pt_caption_then_detail_message_wi
         return SimpleNamespace(message_id=321)
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_func = build_telegram_reply_func(
         reply_text,
@@ -287,7 +287,7 @@ def test_build_telegram_reply_func_includes_partial_timeout_hint_in_detail_messa
         return SimpleNamespace(message_id=321)
 
     async def fake_download_image(url: str) -> bytes:
-        return f"downloaded:{url}".encode("utf-8")
+        return f"downloaded:{url}".encode()
 
     reply_func = build_telegram_reply_func(
         reply_text,

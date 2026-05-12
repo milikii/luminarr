@@ -5,13 +5,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
+from app.bot import telegram_bot as tg
 from app.bot.personal_wechat_login import (
     PERSONAL_WECHAT_LOGIN_SERVICE_KEY,
     PERSONAL_WECHAT_LOGIN_STARTED_TEXT,
     PersonalWeChatLoginService,
 )
 from app.bot.private_chat_login_runtime import handle_personal_wechat_login_query
-from app.bot import telegram_bot as tg
 
 
 class _ExecutionGate:

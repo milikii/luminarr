@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from app.bot import telegram_bot as tg
 from app.bot.bt_processing_path_runtime import set_bt_processing_path_pending
 from app.bot.private_chat_frustration_runtime import handle_frustration_query
-from app.bot import telegram_bot as tg
 from app.db.bt_pending_repo import BtPendingRepo
 from app.db.job_repo import JobRepo
 from app.db.sqlite import SqliteDatabase

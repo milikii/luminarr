@@ -9,7 +9,7 @@ import httpx
 from app.db.bt_subscription_repo import BtSubscriptionItem, BtSubscriptionPersistenceError, BtSubscriptionRepo
 from app.db.sqlite import SqliteDatabase
 from app.services.add_to_downloader import AddToDownloaderService
-from app.services.bt_candidate_scorer import BTScoringRules, DEFAULT_BT_SCORING_RULES
+from app.services.bt_candidate_scorer import DEFAULT_BT_SCORING_RULES, BTScoringRules
 from app.services.bt_subscription_command import (
     BT_SUBSCRIPTION_ADULT_ONLY_TEXT,
     ParsedBtSubscriptionAddRequest,

@@ -12,6 +12,8 @@ from app.operational_logging import emit_operational_log
 from app.services.adult_content import extract_exact_adult_content_match
 from app.services.adult_metadata_sources import (
     AdultMetadataSourceProfile,
+)
+from app.services.adult_metadata_sources import (
     get_adult_metadata_source_rank as get_ranked_adult_metadata_source_profiles,
 )
 from app.services.media_name_parser import parse_media_name

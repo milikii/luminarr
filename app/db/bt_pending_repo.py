@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from app.db.sqlite import SqliteDatabase
 
-
 BT_PENDING_STAGE_PROCESSING_PATH = "processing_path"
 BT_PENDING_STAGE_CLASSIFICATION = "classification"
 BT_PENDING_STAGE_TMDB_ASSOCIATION = "tmdb_association"

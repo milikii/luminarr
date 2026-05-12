@@ -11,7 +11,7 @@ from pathlib import Path
 from app.clients.transmission import TransmissionImportSource
 from app.operational_logging import emit_operational_log
 from app.services.import_context_lookup import ConfirmExecutionContext
-from app.services.import_post_processing import ImportPostProcessRequest, ImportPostProcessingService
+from app.services.import_post_processing import ImportPostProcessingService, ImportPostProcessRequest
 
 IMPORT_EXECUTION_MODE_COPY = "copy"
 IMPORT_EXECUTION_MODE_HARDLINK = "hardlink"

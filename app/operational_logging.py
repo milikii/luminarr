@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 

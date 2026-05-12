@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import httpx
+
 from app.bot import telegram_bot as tg
 from app.bot.bt_tmdb_association_runtime import BtTmdbAssociationPending
 from app.bot.private_chat_bt_tmdb_runtime import handle_bt_tmdb_follow_up

@@ -5,8 +5,10 @@ from collections.abc import Awaitable, Callable, MutableMapping
 from app.bot.raw_bt_destination_runtime import (
     clear_raw_bt_destination_pending,
     get_raw_bt_destination_pending,
-    handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
     log_pure_bt_search_error,
+)
+from app.bot.raw_bt_destination_runtime import (
+    handle_raw_bt_destination_query as handle_shared_raw_bt_destination_query,
 )
 
 PrivateChatReplyFunc = Callable[[str], Awaitable[object]]

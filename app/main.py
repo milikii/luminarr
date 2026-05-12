@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+
 import httpx
 from telegram.error import NetworkError
 
@@ -14,11 +15,8 @@ from app.bot.feishu_long_connection import (
     FeishuLongConnectionService,
 )
 from app.bot.non_telegram_runtime_host import NonTelegramRuntimeHost
-from app.bot.shared_private_chat_sender import (
-    build_feishu_proactive_send_text_func,
-    build_personal_wechat_proactive_send_text_func,
-    build_shared_private_chat_send_text_func,
-)
+from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
+from app.bot.personal_wechat_text import PERSONAL_WECHAT_TEXT_SERVICE_KEY, PersonalWeChatTextService
 from app.bot.private_chat_bt_subscription_runtime import (
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT,
     BT_SUBSCRIPTION_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
@@ -27,36 +25,44 @@ from app.bot.private_chat_search_runtime import (
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT,
     SEARCH_CAPABILITY_UNAVAILABLE_TEXT_BOT_DATA_KEY,
 )
-from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
-from app.bot.personal_wechat_text import PERSONAL_WECHAT_TEXT_SERVICE_KEY, PersonalWeChatTextService
+from app.bot.shared_private_chat_sender import (
+    build_feishu_proactive_send_text_func,
+    build_personal_wechat_proactive_send_text_func,
+    build_shared_private_chat_send_text_func,
+)
+from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
+from app.bot.telegram_runtime_adapter import build_telegram_application as build_application
 from app.bot.telegram_sidecar_runtime import (
     TELEGRAM_SIDECAR_RUNTIME_CONFIG,
     start_non_telegram_sidecar_host_lifecycle,
     stop_non_telegram_sidecar_host_lifecycle,
 )
-from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
 from app.bot.wecom_adapter import (
     WECOM_ENCODING_AES_KEY_BOT_DATA_KEY,
     WECOM_RECEIVE_ID_BOT_DATA_KEY,
     WECOM_TOKEN_BOT_DATA_KEY,
 )
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
-from app.bot.telegram_runtime_adapter import build_telegram_application as build_application
 from app.clients.adult_read_only_helper_chain import AdultReadOnlyLookupFunc, compose_adult_read_only_lookup_func
 from app.clients.avmoo_helper import AvmooReadOnlyHelperClient
 from app.clients.avsox_helper import AvsoxReadOnlyHelperClient
 from app.clients.caribbeancom_helper import CaribbeancomReadOnlyHelperClient
 from app.clients.emby import EmbyClient
-from app.clients.feishu import FeishuClient
 from app.clients.fanart import FanartClient
-from app.clients.jellyfin import JellyfinClient
+from app.clients.feishu import FeishuClient
 from app.clients.javbus_helper import JavBusReadOnlyHelperClient
 from app.clients.javlibrary_helper import JavLibraryReadOnlyHelperClient
+from app.clients.jellyfin import JellyfinClient
 from app.clients.plex import PlexClient
 from app.clients.prowlarr import ProwlarrClient
 from app.clients.qbittorrent import QbittorrentClient
 from app.clients.tmdb import TmdbClient
-from app.clients.transmission import TransmissionClient, TransmissionImportSource, TransmissionTask, TransmissionTaskStatus
+from app.clients.transmission import (
+    TransmissionClient,
+    TransmissionImportSource,
+    TransmissionTask,
+    TransmissionTaskStatus,
+)
 from app.clients.web_source import WebSourceClient, get_configured_web_source_rule
 from app.config import ConfigError, DownloaderInstanceConfig, load_settings
 from app.db.adult_content_registry_repo import AdultContentRegistryRepo
@@ -73,26 +79,26 @@ from app.db.sqlite import SqliteDatabase
 from app.db.telegram_update_repo import TelegramUpdateRepo
 from app.db.watchlist_repo import WatchlistRepo
 from app.downloader_route_lookup import (
-    _get_torrent_import_source_with_routing,
-    _remove_torrent_with_routing,
-    _get_torrent_status_with_routing,
-    _format_downloader_context,
     _emit_downloader_issue_log,
+    _format_downloader_context,
+    _get_torrent_import_source_with_routing,
+    _get_torrent_status_with_routing,
+    _remove_torrent_with_routing,
     _resolve_downloader_instance_and_client,
 )
 from app.operational_logging import emit_operational_log
 from app.runtime.execution_policy import ExecutionGate
 from app.services.add_to_downloader import AddToDownloaderService
+from app.services.adult_archive_service import AdultArchiveService
 from app.services.adult_duplicate_memory import AdultDuplicateMemoryService
 from app.services.adult_metadata_translation import AdultMetadataTranslatorService
-from app.services.adult_archive_service import AdultArchiveService
 from app.services.bt_sources import BtSourceAdapter, BtSourceProvider, get_default_adult_bt_source_names
+from app.services.cast_localization import AICastLocalizationService
 from app.services.cleanup_downloaded_source import CleanupDownloadedSourceService
 from app.services.get_download_status import GetDownloadStatusService
 from app.services.import_to_library import ImportToLibraryService
-from app.services.manage_watchlist import ManageWatchlistService
 from app.services.manage_bt_subscription import ManageBtSubscriptionService
-from app.services.cast_localization import AICastLocalizationService
+from app.services.manage_watchlist import ManageWatchlistService
 from app.services.metadata_scraper import MetadataScraperService
 from app.services.post_download_auto_import import PostDownloadAutoImportService
 from app.services.refresh_media_server import RefreshMediaServerService

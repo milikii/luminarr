@@ -12,8 +12,70 @@ import pytest
 from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler
 
+from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
 from app.bot.personal_wechat_login import PERSONAL_WECHAT_LOGIN_SERVICE_KEY, PersonalWeChatLoginService
 from app.bot.personal_wechat_text import PERSONAL_WECHAT_TEXT_SERVICE_KEY
+from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
+from app.bot.telegram_bot import (
+    ADD_TO_DOWNLOADER_SERVICE_KEY,
+    BT_CLASSIFICATION_PROMPT_TEXT,
+    BT_PENDING_REPO_KEY,
+    BT_PROCESSING_PATH_CANCELLED_TEXT,
+    BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
+    BT_PROCESSING_PATH_PROMPT_TEXT,
+    BT_READ_ONLY_HELPER_FAILED_TEXT,
+    BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
+    BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
+    BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
+    BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
+    CLARIFICATION_RESET_TEXT,
+    CLARIFICATION_SELECTION_BLOCKED_TEXT,
+    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
+    DOWNLOADER_INSTANCES_KEY,
+    DOWNLOADER_ROLE_BINDING_KEY,
+    FRUSTRATION_RESET_TEXT,
+    GET_DOWNLOAD_STATUS_SERVICE_KEY,
+    IMPORT_TO_LIBRARY_SERVICE_KEY,
+    JOB_REPO_KEY,
+    LLM_PHYSICAL_FAILURE_SAFE_TEXT,
+    MANAGE_BT_SUBSCRIPTION_SERVICE_KEY,
+    MANAGE_WATCHLIST_SERVICE_KEY,
+    RAW_BT_DESTINATION_CANCELLED_TEXT,
+    RAW_BT_DESTINATION_OPTIONS_KEY,
+    RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
+    SEARCH_SERVICE_KEY,
+    SERVICE_NOT_READY_TEXT,
+    TELEGRAM_SEND_MEDIA_FUNC_KEY,
+    TELEGRAM_SEND_TEXT_FUNC_KEY,
+    _clear_bt_classification_pending,
+    _clear_bt_processing_path_pending,
+    _clear_bt_tmdb_association_pending,
+    _clear_raw_bt_destination_pending,
+    _enter_media_import_bt_flow,
+    _enter_pure_bt_flow,
+    _get_bt_tmdb_association_pending,
+    _get_raw_bt_destination_pending,
+    _is_bt_classification_pending,
+    _is_bt_processing_path_pending,
+    _log_bt_subscription_scheduler_config_error,
+    _pop_bt_classification_pending,
+    _pop_bt_processing_path_pending,
+    _run_bt_subscription_scheduler_tick_once,
+    _set_bt_classification_pending,
+    _set_bt_processing_path_pending,
+    _set_bt_tmdb_association_pending,
+    _set_raw_bt_destination_pending,
+)
+from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
+from app.bot.telegram_runtime_adapter import (
+    build_telegram_application as build_application,
+)
+from app.bot.telegram_runtime_adapter import (
+    handle_telegram_callback_query as handle_callback_query,
+)
+from app.bot.telegram_runtime_adapter import (
+    handle_telegram_message as handle_message,
+)
 from app.bot.telegram_sidecar_runtime import (
     TELEGRAM_SIDECAR_RUNTIME_CONFIG,
     _log_bt_subscription_scheduler_loop_error,
@@ -25,76 +87,17 @@ from app.bot.telegram_sidecar_runtime import (
     stop_sidecar_host_lifecycle,
     stop_telegram_application_lifecycle,
 )
-from app.bot.sidecar_host_runtime import SIDECAR_HOST_SEND_TEXT_FUNC_KEY
-from app.bot.channel_contact_runtime import CHANNEL_CONTACT_REGISTRY_KEY, ChannelContactRegistry
 from app.bot.wecom_webhook_server import WeComWebhookServerConfig
-from app.bot.telegram_delivery_runtime import build_telegram_send_media_func
-from app.bot.telegram_runtime_adapter import (
-    build_telegram_application as build_application,
-    handle_telegram_callback_query as handle_callback_query,
-    handle_telegram_message as handle_message,
-)
-from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.clients.tmdb import TmdbMovie
-from app.clients.transmission import TransmissionTaskStatus
-from app.db.bt_pending_repo import BtPendingPersistenceError
-from app.bot.telegram_bot import (
-    ADD_TO_DOWNLOADER_SERVICE_KEY,
-    BT_READ_ONLY_HELPER_FAILED_TEXT,
-    BT_PENDING_REPO_KEY,
-    BT_CLASSIFICATION_PROMPT_TEXT,
-    BT_PROCESSING_PATH_CANCELLED_TEXT,
-    BT_PROCESSING_PATH_PENDING_REMINDER_TEXT,
-    BT_PROCESSING_PATH_PROMPT_TEXT,
-    RAW_BT_DESTINATION_CANCELLED_TEXT,
-    RAW_BT_DESTINATION_OPTIONS_KEY,
-    RAW_BT_DESTINATION_SERVICE_NOT_READY_TEXT,
-    BT_TMDB_ASSOCIATION_CANCELLED_TEXT,
-    BT_TMDB_ASSOCIATION_SERVICE_NOT_READY_TEXT,
-    BT_TMDB_MOVIE_CANDIDATES_LOOKUP_KEY,
-    BT_TMDB_TV_CANDIDATES_LOOKUP_KEY,
-    CLARIFICATION_SELECTION_BLOCKED_TEXT,
-    CLARIFICATION_RESET_TEXT,
-    CLEANUP_DOWNLOADED_SOURCE_SERVICE_KEY,
-    DOWNLOADER_INSTANCES_KEY,
-    DOWNLOADER_ROLE_BINDING_KEY,
-    FRUSTRATION_RESET_TEXT,
-    GET_DOWNLOAD_STATUS_SERVICE_KEY,
-    IMPORT_TO_LIBRARY_SERVICE_KEY,
-    JOB_REPO_KEY,
-    LLM_PHYSICAL_FAILURE_SAFE_TEXT,
-    MANAGE_BT_SUBSCRIPTION_SERVICE_KEY,
-    MANAGE_WATCHLIST_SERVICE_KEY,
-    SEARCH_SERVICE_KEY,
-    SERVICE_NOT_READY_TEXT,
-    TELEGRAM_SEND_MEDIA_FUNC_KEY,
-    TELEGRAM_SEND_TEXT_FUNC_KEY,
-    _get_bt_tmdb_association_pending,
-    _get_raw_bt_destination_pending,
-    _clear_bt_classification_pending,
-    _clear_bt_processing_path_pending,
-    _clear_bt_tmdb_association_pending,
-    _enter_media_import_bt_flow,
-    _enter_pure_bt_flow,
-    _is_bt_classification_pending,
-    _is_bt_processing_path_pending,
-    _pop_bt_classification_pending,
-    _pop_bt_processing_path_pending,
-    _set_bt_classification_pending,
-    _set_bt_processing_path_pending,
-    _set_bt_tmdb_association_pending,
-    _set_raw_bt_destination_pending,
-    _clear_raw_bt_destination_pending,
-    _run_bt_subscription_scheduler_tick_once,
-    _log_bt_subscription_scheduler_config_error,
-)
-from app.clients.transmission import TransmissionImportSource
+from app.clients.transmission import TransmissionImportSource, TransmissionTaskStatus
+from app.config import DownloaderInstanceConfig, DownloaderRoleBinding, RawBtDestinationOption
 from app.db.approval_repo import ApprovalRepo
 from app.db.bt_pending_repo import (
     BT_PENDING_STAGE_CLASSIFICATION,
     BT_PENDING_STAGE_PROCESSING_PATH,
     BT_PENDING_STAGE_RAW_BT_DESTINATION,
     BT_PENDING_STAGE_TMDB_ASSOCIATION,
+    BtPendingPersistenceError,
     BtPendingRepo,
 )
 from app.db.bt_subscription_repo import BtSubscriptionRepo

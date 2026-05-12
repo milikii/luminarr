@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import sqlite3
+from dataclasses import dataclass
 
 from app.db.bt_subscription_repo import BtSubscriptionRepo
 from app.db.watchlist_repo import WatchlistPersistenceError, WatchlistRepo
